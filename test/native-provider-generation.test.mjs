@@ -399,9 +399,10 @@ test('provider closure rejects escaped, linked, and dynamic modules',async t=>{
     );
 
     const linked=await providerFixture(t,'arcane-provider-linked-');
+    const canonicalLinkedHelper=await realpath(linked.helperPath);
     const canonicalize=async candidate=>{
         const canonical=await realpath(candidate);
-        return sameFile(candidate,linked.helperPath)
+        return sameFile(canonical,canonicalLinkedHelper)
             ?path.join(path.dirname(linked.arcaneRoot),'linked-provider-target.mjs')
             :canonical;
     };
