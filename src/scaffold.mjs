@@ -39,13 +39,14 @@ function validateInputs(appId,displayName){
 }
 
 function validateScaffoldTarget(target){
-    if(!['browser','portable'].includes(target)){
-        fail(`Invalid scaffold target: ${String(target)}. Expected browser or portable.`,'ARCANE_USAGE');
+    const targets=['browser','portable','windows-x64','linux-x64','linux-arm64','android-arm64'];
+    if(!targets.includes(target)){
+        fail(`Invalid scaffold target: ${String(target)}. Expected one of ${targets.join(', ')}.`,'ARCANE_USAGE');
     }
 }
 
 async function scaffoldIcon(target){
-    return target==='portable'
+    return target!=='browser'
         ?readFile(new URL('./templates/assets/app-icon.png',import.meta.url))
         :undefined;
 }
@@ -172,7 +173,9 @@ async function prepareExistingPackage(workspaceRoot,files){
     if(declared!==undefined&&!isSupportedSdkDeclaration(declared)){
         conflicts.push(`${SDK_NAME} must be ${SDK_VERSION} or a local file: tarball`);
     }
+    const appSelectionScripts=new Set(['build','run']);
     for(const [name,command] of Object.entries(generated.scripts)){
+        if(appSelectionScripts.has(name))continue;
         if(existing.scripts?.[name]!==undefined&&existing.scripts[name]!==command){
             conflicts.push(`scripts.${name} must be "${command}"`);
         }

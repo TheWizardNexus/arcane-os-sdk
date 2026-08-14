@@ -75,7 +75,7 @@
           </a>
         </div>
         <div class="hero-notices">
-          <p class="development-notice"><strong>Development state</strong><span>Not yet published to npm. Browser and verified portable directory builds are available; executable targets are deferred.</span></p>
+          <p class="development-notice"><strong>Development state</strong><span>Not yet published to npm. Browser, portable, Windows x64, and Linux x64 development targets are available.</span></p>
           <button class="motion-toggle" type="button" data-motion-toggle aria-pressed="false">Pause background motion</button>
         </div>
         <ul class="hero-facts" aria-label="SDK highlights">
@@ -138,9 +138,9 @@
         </li>
         <li>
           <span class="step-number">03</span>
-          <h3>Package and verify</h3>
-          <p>Produce a deterministic browser release or a verified app-scoped portable Core directory.</p>
-          <code>arcane package</code>
+          <h3>Package or build</h3>
+          <p>Package a deterministic browser release, or build the app's declared portable, Windows, or Linux target.</p>
+          <code>arcane package / arcane build</code>
         </li>
         <li>
           <span class="step-number">04</span>
@@ -202,7 +202,7 @@ npm run check</code></pre>
           <p class="eyebrow">Platform contract</p>
           <h2 id="targets-title">Named now. Enabled only when complete.</h2>
         </div>
-        <p>The adapter protocol supports today’s browser and portable directories without pretending deferred executables already ship.</p>
+        <p>The adapter protocol supports browser, portable, Windows x64, and Linux x64 development without overstating production readiness.</p>
       </div>
 
       <div class="target-table-wrap" role="region" aria-label="Arcane OS SDK target support" tabindex="0">
@@ -213,13 +213,14 @@ npm run check</code></pre>
           <tbody>
             <tr><th scope="row">Browser</th><td>Directory</td><td><span class="status-chip status-live">Available</span></td><td>Verified package and loopback run</td></tr>
             <tr><th scope="row">Portable</th><td>Core directory</td><td><span class="status-chip status-live">Available</span></td><td>Explicit <code>--arcane-root</code>; verified, not executable</td></tr>
-            <tr><th scope="row">Windows x64</th><td>EXE</td><td><span class="status-chip status-planned">Deferred</span></td><td>Bind secure transaction to retained toolchain receipt</td></tr>
-            <tr><th scope="row">Linux x64 / ARM64</th><td>AppImage, DEB, RPM</td><td><span class="status-chip status-planned">Deferred</span></td><td>Host, architecture, and signing work</td></tr>
-            <tr><th scope="row">Android ARM64</th><td>APK, AAB</td><td><span class="status-chip status-planned">Deferred</span></td><td>Single-app Gradle bridge and signing</td></tr>
+            <tr><th scope="row">Windows x64</th><td>EXE bundle</td><td><span class="status-chip status-live">Available</span></td><td>Unsigned local development; retained broker and authenticated readiness</td></tr>
+            <tr><th scope="row">Linux x64</th><td>DEB</td><td><span class="status-chip status-live">Available</span></td><td>Unsigned local development; user-owned no-install run</td></tr>
+            <tr><th scope="row">Linux ARM64</th><td>DEB</td><td><span class="status-chip status-planned">Deferred</span></td><td>ARM64 host and toolchain evidence</td></tr>
+            <tr><th scope="row">Android ARM64</th><td>APK</td><td><span class="status-chip status-planned">Deferred</span></td><td>Single-app Gradle bridge, identity, and signing</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="honesty-note"><strong>No substitute artifacts.</strong> The portable build is a verified app-scoped Core payload and cannot run directly. A deferred executable target returns a stable unavailable error and creates nothing.</p>
+      <p class="honesty-note"><strong>Development evidence stays development evidence.</strong> Portable output cannot run directly. Windows and Linux x64 are unsigned local-test paths, not production signing or release approval. Deferred targets return a stable unavailable error and create nothing.</p>
     </section>
 
     <section id="ollama" class="content-section section-shell feature-split" aria-labelledby="ollama-title">
@@ -253,7 +254,7 @@ npm run check</code></pre>
       <div class="section-heading">
         <p class="eyebrow">Architecture that can grow</p>
         <h2 id="architecture-title">Trust facts are verified once and carried forward.</h2>
-        <p>The SDK is arranged around explicit boundaries that a future graphical control panel and native builders can reuse.</p>
+        <p>The SDK is arranged around explicit boundaries shared by the CLI, native builders, and a future graphical control panel.</p>
       </div>
       <div class="principle-grid">
         <article>
@@ -272,7 +273,7 @@ npm run check</code></pre>
           <p>Paired native providers accept one release, descriptor, toolchain root, target request, and output root.</p>
         </article>
       </div>
-      <div class="architecture-line" aria-label="External app repository flows through the shared toolchain into verified browser and future native targets">
+      <div class="architecture-line" aria-label="External app repository flows through the shared toolchain into verified browser and native targets">
         <span>App repository</span><i aria-hidden="true"></i><span>Shared toolchain</span><i aria-hidden="true"></i><span>Verified target</span>
       </div>
     </section>
@@ -281,22 +282,22 @@ npm run check</code></pre>
       <div class="section-heading split-heading">
         <div>
           <p class="eyebrow">Development roadmap</p>
-          <h2 id="roadmap-title">Portable extraction ready. Executable boundaries next.</h2>
+          <h2 id="roadmap-title">Desktop development works. Mobile and ARM64 next.</h2>
         </div>
         <a class="text-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/roadmap.md" target="_blank" rel="noreferrer">Open the full roadmap <span aria-hidden="true">↗</span></a>
       </div>
       <div class="roadmap-grid">
         <article class="roadmap-current">
           <span>Current</span><h3>External and integrated app toolchain</h3>
-          <p>Scaffold, check, test, serve, package, verify, and run browser apps, then build a verified portable Core directory through an explicit compatible Arcane OS checkout. Newer Core versions work when they retain every declared protocol, feature, capability, and method contract.</p>
+          <p>Scaffold, check, test, serve, and package independently; build verified portable, Windows x64, and Linux x64 development artifacts through an explicit compatible Arcane OS checkout.</p>
         </article>
         <article>
-          <span>Next</span><h3>Retained Windows toolchain authority</h3>
-          <p>Bind Arcane's per-build secure Windows transaction foundation to a fully retained toolchain receipt before enabling EXE output.</p>
+          <span>Proven</span><h3>Contract-based compatibility</h3>
+          <p>Newer Core versions work when they retain every declared protocol, feature, capability, and method contract.</p>
         </article>
         <article>
-          <span>Later</span><h3>Arcane-native executable development</h3>
-          <p>Extend the integrated source workflow to app-scoped native hosts with retained toolchain and artifact receipts.</p>
+          <span>Later</span><h3>Android and ARM64</h3>
+          <p>Add isolated single-app Android packaging and independently verified ARM64 host/toolchain paths without changing the provider contract.</p>
         </article>
       </div>
     </section>
@@ -314,7 +315,7 @@ npm run check</code></pre>
       <img src="assets/arcane-sigil-512.png" alt="" width="112" height="112">
       <p class="eyebrow">Arcane applications, everywhere they belong</p>
       <h2 id="cta-title">Your app repository. Arcane’s contract.</h2>
-      <p>Run browser apps today or build a verified portable Core directory; executable targets remain explicitly deferred.</p>
+      <p>Run browser, Windows x64, and Linux x64 development apps today; portable remains a verified non-runnable builder payload.</p>
       <div class="hero-actions">
         <a class="button button-primary" href="#commands">See the commands</a>
         <a class="button button-secondary" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">Explore on GitHub <span aria-hidden="true">↗</span></a>
@@ -327,7 +328,7 @@ npm run check</code></pre>
       <img src="assets/arcane-sigil-512.png" alt="" width="40" height="40">
       <span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span>
     </a>
-    <p>Development software · Browser and portable directory targets available · Executables explicitly deferred</p>
+    <p>Development software · Browser, portable, Windows x64, and Linux x64 available · Android and ARM64 deferred</p>
     <nav aria-label="Footer navigation">
       <a href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">Repository</a>
       <a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/architecture.md" target="_blank" rel="noreferrer">Architecture</a>

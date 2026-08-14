@@ -4,7 +4,7 @@ import {
     validateAppConfig as validatePackagerAppConfig,
     validateRootConfig as validatePackagerRootConfig
 } from './packager/core.mjs';
-import {loadAppDescriptor} from './app-descriptor.mjs';
+import {appDescriptorSha256,loadAppDescriptor} from './app-descriptor.mjs';
 
 const APP_ID_PATTERN=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const SHA256_PATTERN=/^[a-f0-9]{64}$/;
@@ -260,6 +260,90 @@ function assertHtmlContract(source,appId,{entry='index.html',strictStyles=true}=
     }
 }
 
+export async function validateDiscoveredApplication({
+    workspaceRoot,
+    workspaceMode,
+    workspaceConfig,
+    app,
+    signal,
+    onEvent
+}={}){
+    throwIfAborted(signal);
+    if(!app||typeof app.appId!=='string'||typeof app.appRoot!=='string'
+        ||!app.manifest||!app.descriptor){
+        fail('A discovered Arcane application is required for focused validation.');
+    }
+    const canonicalWorkspaceRoot=path.resolve(workspaceRoot);
+    const expectedAppRoot=path.join(canonicalWorkspaceRoot,'apps',app.appId);
+    if(path.resolve(app.appRoot)!==expectedAppRoot){
+        fail(`Discovered app ${app.appId} does not belong to the selected workspace.`);
+    }
+    let config=workspaceConfig;
+    if(!config){
+        const profile=await inspectWorkspaceProfile(canonicalWorkspaceRoot);
+        if(profile.workspaceMode!==workspaceMode){
+            fail('The selected Arcane workspace profile changed before focused validation.');
+        }
+        config=profile.config;
+    }
+    if(!isObject(config?.sharedPayloads)){
+        fail('The selected Arcane workspace configuration is unavailable for focused validation.');
+    }
+    const configPath=path.join(app.appRoot,APP_CONFIG_NAME);
+    const rawManifest=await readJson(
+        configPath,
+        `apps/${app.appId}/${APP_CONFIG_NAME}`
+    );
+    const manifest=validatePackagerAppConfig(rawManifest,app.appId,config,configPath);
+    if(!manifest.shared.includes('browser-runtime')){
+        fail(`apps/${app.appId}/${APP_CONFIG_NAME} must include the browser-runtime shared payload.`);
+    }
+    const loadedDescriptor=await loadAppDescriptor({
+        workspaceRoot:canonicalWorkspaceRoot,
+        appRoot:app.appRoot,
+        appId:app.appId,
+        packageManifest:rawManifest
+    });
+    const descriptor=loadedDescriptor.descriptor;
+    if(appDescriptorSha256(descriptor)!==appDescriptorSha256(app.descriptor)){
+        fail(
+            `The canonical descriptor for ${app.appId} changed after application discovery.`,
+            'ARCANE_INTEGRITY_FAILED'
+        );
+    }
+    const freshApp=Object.freeze({
+        appId:app.appId,
+        appRoot:app.appRoot,
+        manifest,
+        descriptor,
+        descriptorSource:loadedDescriptor.source,
+        descriptorPath:loadedDescriptor.descriptorPath
+    });
+    const entryPath=path.join(app.appRoot,manifest.entry);
+    const info=await lstat(entryPath);
+    if(info.isSymbolicLink()||!info.isFile()){
+        fail(`apps/${app.appId}/${manifest.entry} must be a real file.`);
+    }
+    assertHtmlContract(await readFile(entryPath,'utf8'),app.appId,{
+        entry:manifest.entry,
+        strictStyles:workspaceMode==='external'
+    });
+    const receipt=Object.freeze({
+        valid:true,
+        workspaceRoot:canonicalWorkspaceRoot,
+        workspaceMode,
+        appId:app.appId,
+        appRoot:app.appRoot,
+        app:freshApp
+    });
+    await emit(onEvent,{
+        type:'workspace.application.validated',
+        workspaceRoot:canonicalWorkspaceRoot,
+        appId:app.appId
+    });
+    return receipt;
+}
+
 export async function validateWorkspace({workspaceRoot=process.cwd(),appId,signal,onEvent}={}){
     throwIfAborted(signal);
     const resolved=await resolveWorkspace({workspaceRoot,appId});
@@ -272,6 +356,7 @@ export async function validateWorkspace({workspaceRoot=process.cwd(),appId,signa
         await emit(onEvent,{type:'workspace.validate.check',name,ok:true});
     };
     let lock;
+    let validatedApplication;
     const workspaceMode=resolved.config.workspaceMode;
     await add('workspace-profile',async()=>{
         if(workspaceMode!=='external'&&workspaceMode!=='integrated'){
@@ -337,14 +422,13 @@ export async function validateWorkspace({workspaceRoot=process.cwd(),appId,signa
         });
     }
     await add('app-entry',async()=>{
-        const entryPath=path.join(resolved.appRoot,resolved.app.manifest.entry);
-        const info=await lstat(entryPath);
-        if(info.isSymbolicLink()||!info.isFile()){
-            fail(`apps/${resolved.appId}/${resolved.app.manifest.entry} must be a real file.`);
-        }
-        assertHtmlContract(await readFile(entryPath,'utf8'),resolved.appId,{
-            entry:resolved.app.manifest.entry,
-            strictStyles:workspaceMode==='external'
+        validatedApplication=await validateDiscoveredApplication({
+            workspaceRoot:resolved.workspaceRoot,
+            workspaceMode,
+            workspaceConfig:resolved.config,
+            app:resolved.app,
+            signal,
+            onEvent
         });
     });
     const receipt=Object.freeze({
@@ -354,7 +438,7 @@ export async function validateWorkspace({workspaceRoot=process.cwd(),appId,signa
         appId:resolved.appId,
         appRoot:resolved.appRoot,
         config:resolved.config,
-        app:resolved.app,
+        app:validatedApplication.app,
         lock,
         checks:Object.freeze(checks)
     });

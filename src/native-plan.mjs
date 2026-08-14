@@ -8,7 +8,7 @@ import {
     validateAppDescriptor
 } from './app-descriptor.mjs';
 import {
-    authenticateAppReleaseReceipt,
+    authenticateAppReleaseAuthority,
     parseSemver,
     readVerifiedAppReleaseFile
 } from './packager/core.mjs';
@@ -274,11 +274,18 @@ function releaseSummary(receipt){
     });
 }
 
-async function authenticateReleaseReceipt(receipt,releaseRoot,signal,expectedPackageConfig){
+async function authenticateReleaseAuthority(
+    receipt,
+    releaseRoot,
+    signal,
+    expectedPackageConfig,
+    expectedDescriptor
+){
     try{
-        return await authenticateAppReleaseReceipt(receipt,{
+        return await authenticateAppReleaseAuthority(receipt,{
             releaseRoot,
             expectedPackageConfig,
+            expectedDescriptor,
             signal
         });
     }catch(error){
@@ -297,25 +304,39 @@ async function authenticatedRelease(item,targetRequest,{signal}){
         new Set(['appDescriptor','appReleaseRoot','appReleaseReceipt']),
         'application release input'
     );
-    const descriptor=validateAppDescriptor(item.appDescriptor,{appId:item.appDescriptor?.id});
+    const presentedDescriptor=validateAppDescriptor(
+        item.appDescriptor,
+        {appId:item.appDescriptor?.id}
+    );
+    const root=await canonicalDirectory(
+        item.appReleaseRoot,
+        `Release root for ${presentedDescriptor.id}`
+    );
+    const authority=await authenticateReleaseAuthority(
+        item.appReleaseReceipt,
+        root,
+        signal,
+        projectPackageManifest(presentedDescriptor),
+        presentedDescriptor
+    );
+    const receipt=authority.receipt;
+    const descriptor=validateAppDescriptor(authority.descriptor,{
+        appId:presentedDescriptor.id
+    });
+    if(appDescriptorSha256(descriptor)!==authority.descriptorSha256){
+        fail('App release descriptor authority hash is invalid.',ERROR_CODES.integrityFailed);
+    }
     projectNativeDescriptor(descriptor);
     if(!descriptor.targets.includes(targetRequest.target)){
         fail(`App ${descriptor.id} does not declare target ${targetRequest.target}.`);
     }
-    const root=await canonicalDirectory(item.appReleaseRoot,`Release root for ${descriptor.id}`);
-    const receipt=await authenticateReleaseReceipt(
-        item.appReleaseReceipt,
-        root,
-        signal,
-        projectPackageManifest(descriptor)
-    );
     const app=releaseApp(receipt);
     if(app?.id!==descriptor.id||app?.version!==descriptor.version){
         fail(`Release identity for ${descriptor.id} does not match its canonical descriptor.`,ERROR_CODES.integrityFailed);
     }
     return Object.freeze({
         descriptor,
-        descriptorSha256:appDescriptorSha256(descriptor),
+        descriptorSha256:authority.descriptorSha256,
         releaseRoot:root,
         releaseReceipt:receipt,
         readFile:(relativePath,{signal}={})=>readVerifiedAppReleaseFile(receipt,{
@@ -326,7 +347,7 @@ async function authenticatedRelease(item,targetRequest,{signal}){
         summary:immutable({
             id:descriptor.id,
             version:descriptor.version,
-            descriptorSha256:appDescriptorSha256(descriptor),
+            descriptorSha256:authority.descriptorSha256,
             release:releaseSummary(receipt)
         })
     });
@@ -383,7 +404,52 @@ function toolchainSummary(receipt,toolchainRoot){
     });
 }
 
+function providerGenerationSummary(value,{optional=false}={}){
+    if(value===undefined&&optional)return null;
+    if(!isObject(value)
+        ||value.kind!=='arcane-native-provider-generation'
+        ||!SHA256_PATTERN.test(value.generationSha256)
+        ||!SHA256_PATTERN.test(value.contentSha256)
+        ||!Number.isInteger(value.moduleCount)
+        ||value.moduleCount<1
+        ||value.moduleCount>128){
+        fail(
+            'Native provider generation evidence is invalid.',
+            ERROR_CODES.integrityFailed
+        );
+    }
+    return immutable({
+        kind:'arcane-native-provider-generation',
+        generationSha256:value.generationSha256,
+        contentSha256:value.contentSha256,
+        moduleCount:value.moduleCount
+    });
+}
+
+function assertProviderGenerationBinding(summary,provider,label){
+    if(!summary)return;
+    const actual=providerGenerationSummary(provider?.providerGeneration,{optional:true});
+    if(!actual||JSON.stringify(actual)!==JSON.stringify(summary)){
+        fail(
+            `${label} belongs to a different native provider module generation.`,
+            ERROR_CODES.integrityFailed
+        );
+    }
+}
+
 function assertExpectedPlanBinding(state,{expectedNativeBuilder,expectedTarget}={}){
+    assertProviderGenerationBinding(
+        state.providerGeneration,
+        state.provider,
+        'Native build plan'
+    );
+    if(expectedNativeBuilder!==undefined){
+        assertProviderGenerationBinding(
+            state.providerGeneration,
+            expectedNativeBuilder,
+            'Expected native builder'
+        );
+    }
     if(expectedNativeBuilder!==undefined&&state.provider!==expectedNativeBuilder){
         fail('Native build plan belongs to a different paired provider.',ERROR_CODES.integrityFailed);
     }
@@ -413,18 +479,20 @@ async function authenticateState(state,{expectedNativeBuilder,expectedTarget,sig
             minimumCoreVersion:state.plan.minimumCoreVersion
         });
     }
-    await authenticateReleaseReceipt(
+    await authenticateReleaseAuthority(
         state.application.releaseReceipt,
         state.application.releaseRoot,
         signal,
-        projectPackageManifest(state.application.descriptor)
+        projectPackageManifest(state.application.descriptor),
+        state.application.descriptor
     );
     for(const dependency of state.dependencies){
-        await authenticateReleaseReceipt(
+        await authenticateReleaseAuthority(
             dependency.releaseReceipt,
             dependency.releaseRoot,
             signal,
-            projectPackageManifest(dependency.descriptor)
+            projectPackageManifest(dependency.descriptor),
+            dependency.descriptor
         );
     }
     const outputRoot=await canonicalFutureDirectory(state.outputRoot,'Native output root');
@@ -440,6 +508,7 @@ export async function createNativeBuildPlan({
     appReleaseReceipt,
     appDescriptor,
     dependencyReleases=[],
+    providerGeneration,
     minimumCoreVersion,
     protectedRoots=[],
     outputRoot,
@@ -450,6 +519,11 @@ export async function createNativeBuildPlan({
     throwIfAborted(signal);
     await onEvent?.(Object.freeze({type:'native.plan.started'}));
     const provider=validateNativeBuilder(nativeBuilder);
+    const generation=providerGenerationSummary(
+        providerGeneration===undefined?provider.providerGeneration:providerGeneration,
+        {optional:true}
+    );
+    assertProviderGenerationBinding(generation,provider,'Native build plan');
     const request=validateTargetRequest(targetRequest);
     const canonicalToolchainRoot=await canonicalDirectory(toolchainRoot,'Native toolchain root');
     const authenticatedToolchain=await provider.authenticateToolchainReceipt(
@@ -500,6 +574,7 @@ export async function createNativeBuildPlan({
     const plan=immutable({
         protocol:NATIVE_BUILD_PLAN_PROTOCOL,
         generation:randomBytes(16).toString('hex'),
+        ...(generation?{providerGeneration:generation}:{}),
         toolchain:authenticatedToolchainSummary,
         minimumCoreVersion:requiredCoreVersion,
         app:application.summary,
@@ -517,6 +592,7 @@ export async function createNativeBuildPlan({
     issuedPlans.set(plan,Object.freeze({
         plan,
         provider,
+        providerGeneration:generation,
         toolchainRoot:canonicalToolchainRoot,
         toolchainReceipt,
         minimumCoreVersion:requiredCoreVersion,

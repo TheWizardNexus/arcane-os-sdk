@@ -27,7 +27,9 @@ export {createReporter} from './events.mjs';
 export {runProcess} from './process.mjs';
 export {runDoctor,assessArcaneOllama} from './doctor.mjs';
 export {
+    ARCANE_NATIVE_PROVIDER_PATHS,
     ARCANE_PORTABLE_PROVIDER_PATH,
+    loadArcaneNativeProvider,
     loadArcanePortableProvider
 } from './native-provider-loader.mjs';
 export {
@@ -45,6 +47,10 @@ export {
     verifyTarget
 } from './targets/index.mjs';
 export {
+    assertIntegratedNativeToolchain,
+    assertIntegratedPortableToolchain,
+    assertNativeApplicationToolchainCompatibility,
+    assertPortableToolchainCompatibility,
     buildApplication,
     checkApplication,
     createApplication,
@@ -58,6 +64,7 @@ export {
     packageApplication,
     planApplication,
     prepareNativeTarget,
+    resolveNativeBuildOutputRoot,
     resolvePortableBuildOutputRoot,
     repositoryApplication,
     runApplication,
@@ -100,10 +107,13 @@ export {
     validateAppDescriptor
 } from './app-descriptor.mjs';
 export {
+    authenticateAppReleaseAuthority,
     authenticateAppReleaseReceipt,
+    authenticateSharedPayloadSnapshot,
     discoverApps as discoverPackagerApps,
     inspectApp,
     packageApp,
+    prepareSharedPayloadSnapshot,
     readVerifiedAppReleaseFile,
     verifyApp
 } from './packager/core.mjs';

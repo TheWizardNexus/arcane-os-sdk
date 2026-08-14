@@ -6,6 +6,12 @@
   its exact upstream source and content inventory.
 - Added explicit `--arcane-root` portable provider pairing, native doctor and
   prepare commands, and verified single-app portable Core directory builds.
+- Added real Windows x64 EXE-bundle and Linux x64 DEB providers for unsigned
+  local development, including same-process verified launch and owned
+  cancellation. Android and ARM64 remain deferred.
+- Bound paired providers to one immutable module generation, retained and reused
+  one shared-payload snapshot across an app dependency closure, and bound the
+  canonical app descriptor to the verified release receipt.
 - Bound native plans to the exact schema-2 package policy and SDK-authenticated
   release readers, made each plan single-attempt, and reject incompatible Core
   versions, protocols, features, capabilities, and methods before build while

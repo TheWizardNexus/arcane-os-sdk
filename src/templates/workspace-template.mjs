@@ -29,33 +29,45 @@ export function workspaceTemplate({
     target='browser',
     appIcon
 }){
-    if(!['browser','portable'].includes(target)){
+    const supportedTargets=['browser','portable','windows-x64','linux-x64','linux-arm64','android-arm64'];
+    if(!supportedTargets.includes(target)){
         throw new Error(`Unsupported scaffold target: ${String(target)}.`);
     }
-    const portable=target==='portable';
-    if(portable&&!(appIcon instanceof Uint8Array)){
-        throw new Error('The portable scaffold requires its bundled raster icon.');
+    const native=target!=='browser';
+    const deferredNative=['linux-arm64','android-arm64'].includes(target);
+    const buildTarget=native?target:'browser';
+    const runTarget=native&&target!=='portable'?target:'browser';
+    if(native&&!(appIcon instanceof Uint8Array)){
+        throw new Error(`The ${target} scaffold requires its bundled raster icon.`);
     }
     const name=displayName||`Arcane ${titleCase(appId)}`;
     const packageName=`arcane-${appId}`;
     const runtimeContentSha256=runtimeRelease?.contentSha256;
     const upstreamCommit=runtimeRelease?.source?.commit;
     const packageInclude=[`${appId}.css`,'index.html'];
-    if(portable)packageInclude.push('img/icon.png');
+    if(native)packageInclude.push('img/icon.png');
     packageInclude.push('manifest.json','modules');
-    const portableGuide=portable?`
-## Portable Arcane Core directory
+    const nativeGuide=native?`
+## ${target} native target
 
-This scaffold declares both the browser and portable targets and includes the
-required raster application icon. Pair it with one explicit Arcane OS checkout:
+This scaffold declares both the browser and ${target} targets and includes the
+required raster application icon.
+${deferredNative?`
+The SDK currently reports ${target} as deferred and will not substitute another
+format. The descriptor is ready for that target when its platform provider and
+trust evidence are implemented.
+`:`
+Pair it with one explicit Arcane OS checkout:
 
 \`\`\`sh
-npm exec -- arcane native-doctor --target portable --arcane-root "<path-to-Arcane-OS>"
-npm exec -- arcane build --target portable --arcane-root "<path-to-Arcane-OS>"
+npm exec -- arcane native-doctor --target ${target} --arcane-root "<path-to-Arcane-OS>"
+npm run build -- --arcane-root "<path-to-Arcane-OS>"
+${target==='portable'?'':`npm run run -- --arcane-root "<path-to-Arcane-OS>"\n`}
 \`\`\`
 
-The result is a verified app-scoped Core directory under \`build/portable/\`.
-It is not a Windows or Linux executable and cannot be run directly.
+The selected Arcane provider must support this target or the command fails without
+substituting a browser package. Native output defaults to \`build/${target}/\`.
+${target==='portable'?'The portable result is an app-scoped Core directory, not a directly runnable executable.\n':''}`}
 The generated \`img/icon.png\` is an Arcane OS SDK template asset governed by
 the SDK's license terms; replace it with your own raster application icon when
 appropriate.
@@ -120,8 +132,9 @@ npm run package
 npm run run
 \`\`\`
 
-The browser release is written to \`dist/${appId}\`. Linux and Android executables require future native target adapters; the SDK reports those targets as deferred instead of substituting a browser package.
-${portableGuide}
+The browser release is written to \`dist/${appId}\`. Native providers accept only
+explicit targets and fail honestly when their platform toolchain is unavailable.
+${nativeGuide}
 
 Every browser release also carries Arcane OS licensing material under \`licenses/arcane-os/\`. Review those terms before distribution.
 `);
@@ -135,8 +148,10 @@ Every browser release also carries Arcane OS licensing material under \`licenses
             test:'arcane test',
             check:'arcane check',
             package:'arcane package',
-            build:'arcane build --target browser',
-            run:'arcane run --target browser'
+            build:`arcane build --target ${buildTarget}`,
+            run:`arcane run --target ${runTarget}`,
+            'build:browser':'arcane build --target browser',
+            'run:browser':'arcane run --target browser'
         },
         devDependencies:{
             [SDK_NAME]:SDK_VERSION
@@ -238,7 +253,7 @@ jobs:
         },
         native:{
             type:'app',
-            icon:portable?'img/icon.png':null,
+            icon:native?'img/icon.png':null,
             order:100,
             bundledApps:[]
         },
@@ -247,7 +262,7 @@ jobs:
             minimumCoreVersion,
             features:[]
         },
-        targets:portable?['browser','portable']:['browser']
+        targets:native?['browser',target].sort():['browser']
     }));
     files.set(`apps/${appId}/arcane-package.json`,json({
         schemaVersion:1,
@@ -332,7 +347,7 @@ action?.addEventListener('click',()=>{
     status.textContent=\`The \${appName} app is working.\`;
 });
 `);
-    if(portable){
+    if(native){
         files.set(`apps/${appId}/img/icon.png`,Buffer.from(appIcon));
     }
     files.set(`apps/${appId}/test/app.test.mjs`,`import assert from 'node:assert/strict';

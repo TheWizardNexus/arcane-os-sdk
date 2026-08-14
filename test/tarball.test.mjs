@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {readFile,writeFile} from 'node:fs/promises';
+import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';
@@ -23,7 +23,7 @@ function runNpm(arguments_,options){
 }
 
 test('packed npm artifact installs and drives an external repository end to end',{
-    timeout:120_000
+    timeout:180_000
 },async t=>{
     const temporary=await temporaryDirectory(t,{prefix:'arcane-tarball-'});
     const packed=await runNpm(
@@ -50,9 +50,23 @@ test('packed npm artifact installs and drives an external repository end to end'
     assert.ok(packReport.files.every(file=>!file.path.startsWith('.github/')));
 
     const tarballPath=path.join(temporary,packReport.filename);
+    const harnessRoot=path.join(temporary,'packed-sdk-harness');
+    await mkdir(harnessRoot);
+    await writeFile(path.join(harnessRoot,'package.json'),`${JSON.stringify({
+        name:'packed-sdk-harness',
+        private:true,
+        type:'module',
+        devDependencies:{'arcane-os':`file:${tarballPath}`}
+    },null,2)}\n`);
+    const harnessInstalled=await runNpm(
+        ['install','--ignore-scripts','--no-audit','--no-fund'],
+        {cwd:harnessRoot,timeout:60_000}
+    );
+    assert.equal(harnessInstalled.code,0,harnessInstalled.stderr);
+    const packedCli=path.join(harnessRoot,'node_modules','arcane-os','bin','arcane.mjs');
     const workspaceRoot=path.join(temporary,'external-app');
     const scaffolded=await runNode([
-        path.join(repositoryRoot,'bin','arcane.mjs'),
+        packedCli,
         'new',
         'external-app',
         '--path',workspaceRoot,
@@ -162,4 +176,65 @@ test('packed npm artifact installs and drives an external repository end to end'
     ],{cwd:workspaceRoot,timeout:60_000});
     assert.equal(verified.code,0,verified.stderr);
     assert.equal(JSON.parse(verified.stdout).result.release.verified,true);
+
+    const arcaneRoot=path.join(temporary,'synthetic-arcane');
+    const providerPath=path.join(
+        arcaneRoot,'machine_bundles','arcane-os-machine-bundle','tools','portable-native-provider.mjs'
+    );
+    await mkdir(path.dirname(providerPath),{recursive:true});
+    await writeFile(providerPath,`import {mkdir,realpath,writeFile} from 'node:fs/promises';
+import path from 'node:path';
+const toolchains=new WeakSet();
+const artifacts=new WeakSet();
+const provider={
+  protocol:'arcane-native-builder/1',
+  async describe(){return {protocol:'arcane-native-builder/1',targets:['portable']};},
+  async doctor(){return {ready:true};},
+  async prepare({toolchainRoot}){
+    const receipt=Object.freeze({
+      kind:'packed-test-toolchain',version:'0.8.12',protocolVersion:'arcane/1',
+      features:Object.freeze([]),supportedCapabilities:Object.freeze([]),supportedMethods:Object.freeze([]),
+      canonicalLocation:await realpath(toolchainRoot),contentSha256:'a'.repeat(64)
+    });
+    toolchains.add(receipt);
+    return receipt;
+  },
+  async authenticateToolchainReceipt(receipt){
+    if(!toolchains.has(receipt))throw new Error('foreign toolchain receipt');
+    return receipt;
+  },
+  async build({toolchainReceipt,appDescriptor,appReleaseReceipt,readAppReleaseFile,outputRoot}){
+    if(!toolchains.has(toolchainReceipt))throw new Error('foreign toolchain receipt');
+    const selected=appReleaseReceipt.files.find(file=>file.path.endsWith('/index.html'))??appReleaseReceipt.files[0];
+    const bytes=await readAppReleaseFile(selected.path);
+    const artifactRoot=path.join(outputRoot,appDescriptor.id);
+    await mkdir(artifactRoot,{recursive:true});
+    await writeFile(path.join(artifactRoot,'PACKED_SDK_NATIVE_PROOF.txt'),bytes);
+    const artifactReceipt=Object.freeze({kind:'packed-sdk-native-artifact',artifactRoot,sourcePath:selected.path,bytes:bytes.length});
+    artifacts.add(artifactReceipt);
+    return {artifactReceipt};
+  },
+  async verify({artifactReceipt}){
+    if(!artifacts.has(artifactReceipt))throw new Error('foreign artifact receipt');
+    return {verified:true,artifactReceipt};
+  },
+  async run(){throw new Error('portable target is not runnable');}
+};
+export const arcaneNativeBuilderProvider=Object.freeze(provider);
+export default arcaneNativeBuilderProvider;
+`,'utf8');
+    const nativeBuilt=await runNode([
+        installedCli,'build','--target','portable','--workspace',workspaceRoot,
+        '--arcane-root',arcaneRoot,'--output','json'
+    ],{cwd:workspaceRoot,timeout:60_000});
+    assert.equal(nativeBuilt.code,0,`${nativeBuilt.stdout}\n${nativeBuilt.stderr}`);
+    const nativeResult=JSON.parse(nativeBuilt.stdout).result;
+    assert.equal(nativeResult.artifactReceipt.kind,'packed-sdk-native-artifact');
+    assert.ok(nativeResult.artifactReceipt.bytes>0);
+    assert.equal(
+        await readFile(path.join(
+            workspaceRoot,'build','portable','external-app','PACKED_SDK_NATIVE_PROOF.txt'
+        ),'utf8'),
+        await readFile(path.join(workspaceRoot,'apps','external-app','index.html'),'utf8')
+    );
 });

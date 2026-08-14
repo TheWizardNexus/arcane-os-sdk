@@ -8,6 +8,7 @@
   "properties": {
     "protocol": { "const": "arcane-native-build-plan/1" },
     "generation": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+    "providerGeneration": { "$ref": "#/$defs/providerGeneration" },
     "toolchain": { "$ref": "#/$defs/toolchain" },
     "minimumCoreVersion": { "$ref": "#/$defs/semver" },
     "app": { "$ref": "#/$defs/app" },
@@ -33,6 +34,17 @@
     "semver": {
       "type": "string",
       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "providerGeneration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "generationSha256", "contentSha256", "moduleCount"],
+      "properties": {
+        "kind": { "const": "arcane-native-provider-generation" },
+        "generationSha256": { "$ref": "#/$defs/sha256" },
+        "contentSha256": { "$ref": "#/$defs/sha256" },
+        "moduleCount": { "type": "integer", "minimum": 1, "maximum": 128 }
+      }
     },
     "toolchain": {
       "type": "object",

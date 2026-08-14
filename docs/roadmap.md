@@ -19,20 +19,22 @@ unbounded build.
 
 - Keep the implemented process-local `arcane-native-build-plan/1` and
   `arcane-native-builder/1` lifecycle as the single provider seam for the CLI,
-  GUI, CI, and Codex. `portable` now pairs only through an explicit Arcane root;
-  other native targets remain deferred without a complete paired provider.
+  GUI, CI, and Codex. Portable, Windows x64, and Linux x64 pair only through an
+  explicit Arcane root; Android and ARM64 remain deferred until their complete
+  providers and host evidence exist.
 - Migrate built-in apps from the implemented schema-2 `arcane-app.json`
   descriptor fallback to authored descriptors without changing exact v1 release
   or native-host artifacts.
 - Update Arcane's exact-key consumers to project the new descriptor into the
   current catalog while preserving v1 app-release admission during migration.
-- Extend the implemented portable Arcane provider, which already accepts an
-  explicit toolchain root and one verified app release, to executable providers
-  without weakening its selected-app and declared-dependency boundary.
-- Add an authenticated Arcane host broker for cross-process verification receipt
-  reuse and app-scoped Core development sessions.
-- Retain and authenticate the exact packaged artifact state across browser and
-  native plan, verify, and run boundaries instead of treating a mutable path or
+- Preserve the implemented portable, Windows x64, and Linux x64 providers as
+  one selected app plus its exact declared dependency closure. Add new providers
+  without weakening that release-reader boundary.
+- Extend the implemented same-process retained receipt lifecycle through an
+  authenticated Arcane host broker only when persistent cross-process reuse or
+  restartable app-scoped Core sessions are required.
+- Preserve exact packaged-artifact authority across browser and native plan,
+  verify, and run boundaries; never regress to treating a mutable path or
   manifest file as a reusable receipt.
 - Add a manifest-declared origin policy for native enforcement and an optional
   policy-faithful development mode. The current capability-gated loopback host
@@ -42,14 +44,14 @@ unbounded build.
 ## Platform adapters
 
 - `portable`: keep the available verified app-scoped Core directory reproducible
-  from an external packed-SDK install and an explicit Arcane `0.8.11` checkout;
+  from an external packed-SDK install and an explicit compatible Arcane checkout;
   do not present it as an executable or direct-run target.
-- `windows-x64`: bind the implemented per-build secure transaction foundation to
-  a fully retained Windows toolchain receipt, then produce and verify a complete
-  development application directory and EXE. Add explicit production signing as
-  separate promotion work.
-- `linux-x64`: extract the single-app WebKitGTK host and add AppImage, DEB, and
-  RPM formats as distinct requests.
+- `windows-x64`: keep the implemented retained toolchain broker, EXE bundle,
+  authenticated host-readiness signal, and owned same-process cancellation
+  reproducible. Production signing and installation remain separate work.
+- `linux-x64`: keep the implemented single-app WebKitGTK host, verified amd64
+  DEB, user-owned extraction, and same-process cancellation reproducible. Add
+  AppImage and RPM only as distinct later format requests.
 - `linux-arm64`: build and verify an ARM64 Core and native host before enabling
   the Linux packaging formats.
 - `android-arm64`: build one app flavor from one approved descriptor; reject
@@ -63,5 +65,5 @@ unbounded build.
 - Add authenticated GitHub artifact admission so Arcane OS installs verified
   releases without cloning proprietary source.
 - Extend the implemented integrated source/check/package/browser-run profile to
-  an app-scoped native development host once the extracted builders can retain
-  the same toolchain and artifact receipts on-device.
+  the available Windows x64 and Linux x64 app-scoped development hosts without
+  introducing a second GUI-only builder.

@@ -24,8 +24,13 @@ npm exec -- arcane run --target browser
 
 # Pair the portable provider through one explicit Arcane OS checkout
 npm exec -- arcane native-doctor --target portable --arcane-root "../Arcane OS"
-npm exec -- arcane build --target portable --arcane-root "../Arcane OS"`,
-    note: "Browser packages can run. Portable builds produce a verified app-scoped Core directory, not an executable or direct-run target."
+npm exec -- arcane build --target portable --arcane-root "../Arcane OS"
+
+# In apps scaffolded with the matching --target, build, verify, launch,
+# and own cancellation in the same process
+npm exec -- arcane run --target windows-x64 --arcane-root "../Arcane OS"
+npm exec -- arcane run --target linux-x64 --arcane-root "../Arcane OS"`,
+    note: "Browser, Windows x64, and Linux x64 development apps can run. Portable builds produce a verified app-scoped Core directory, not an executable or direct-run target."
   }),
   registry: Object.freeze({
     title: "After arcane-os@dev is published",

@@ -48,7 +48,7 @@ copy Arcane runtime source into its repository.
 
 Release schema 1 and builder identity `arcane-app-packager-v1` remain unchanged
 because current Arcane native admission treats them as exact contracts. Native
-builder extraction will authenticate the schema-2 descriptor digest as a
+builders authenticate the schema-2 descriptor digest as a
 separate build input while exact v1 host artifacts remain unchanged.
 
 ## Operation ownership
@@ -69,11 +69,11 @@ schema-1 release inventory to `ARCANE_APP_RELEASE.json`; its operation result
 returns a deeply immutable, process-authenticated receipt that binds the
 canonical location, app policy, complete inventory, content digest, and verified
 filesystem identities. The browser run path authenticates that receipt before
-serving it, and the portable provider consumes the release through SDK-bound
-verified readers before it verifies the app-scoped Core payload. Executable
-adapters and cross-process reuse require an immutable retained artifact state
-and an authenticated Arcane broker; a path, timestamp, environment variable, or
-receipt file alone is not authority.
+serving it, and every native provider consumes release bytes through SDK-bound
+verified readers before verifying its app-scoped artifact. Windows and Linux
+retain artifact authority for same-process verification and launch. Persistent
+cross-process reuse still requires an authenticated Arcane broker; a path,
+timestamp, environment variable, or receipt file alone is not authority.
 
 The loopback server treats the mutable filesystem as an input, not as an
 immutable receipt. Before sending headers it reads each requested source,
@@ -87,18 +87,23 @@ file responses, with a bounded wait queue.
 
 The SDK implements protocol `arcane-native-build-plan/1` and the injected
 provider contract `arcane-native-builder/1`. Pairing is process-local; it never
-registers a mutable global provider or searches for a toolchain. For the
-available `portable` target, the CLI loads one fixed provider module from the
-explicit `--arcane-root` Arcane OS checkout. One paired toolchain can perform
-this lifecycle:
+registers a mutable global provider or searches for a toolchain. For each
+supported native target, the CLI loads one fixed provider module from the
+explicit `--arcane-root` Arcane OS checkout. Provider code is bound to one
+process generation; if a pull changes any loaded provider module, the SDK fails
+closed and requires a fresh worker rather than combining new hashes with Node's
+cached old modules. One paired toolchain can perform this lifecycle:
 
 ```text
 doctor -> prepare -> plan -> build -> verify receipt -> run receipt
 ```
 
-The portable provider implements the lifecycle through verification. Its run
-operation fails honestly because the resulting app-scoped Core payload is a
-directory, not an executable.
+The portable provider implements the lifecycle through verification and fails
+honestly on run because its result is a directory. Windows x64 and Linux x64
+also implement same-process launch and owned cancellation. Windows uses a
+retained per-build broker and authenticated host readiness; Linux produces a
+verified amd64 DEB and runs a retained user-owned extraction without install or
+elevation. All three are unsigned local-development profiles.
 
 The plan binds one explicit `toolchainRoot` and authenticated receipt, one app
 release root and receipt, its approved schema-2 descriptor digest, only its
@@ -115,10 +120,13 @@ the highest minimum declared by the runtime, selected app, and bundled app
 dependencies; keep each app's Arcane protocol generation; and provide every
 declared feature, capability, and method. Missing requirements stop before
 provider build; a newer compatible Core is accepted. Exact hashes
-remain integrity identities, not compatibility rules. This portable path has
-been validated from an independent workspace installed from the packed npm
-tarball. It does not copy proprietary source into the Arcane checkout.
+remain integrity identities, not compatibility rules. The provider paths have
+been validated from independent workspaces. They do not copy proprietary source
+into the Arcane checkout.
 
-Executable adapters remain deferred. Arcane's per-build Windows secure
-transaction foundation is not yet bound to a fully retained Windows toolchain
-receipt, and the Linux and Android providers have not implemented this contract.
+See [compatibility.md](compatibility.md) for the complete app and bundled-app
+admission rule and the required handling of breaking contract changes.
+
+Linux ARM64 and Android ARM64 remain deferred. Production signing, installation,
+update continuity, and release acceptance are also outside these development
+providers; a successful unsigned local build is not evidence for those gates.

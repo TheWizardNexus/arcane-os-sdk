@@ -269,6 +269,41 @@ test('changed verified source state blocks package promotion',async t=>{
     assert.equal((await verifyApp({workspaceRoot,appId:'fixture-app'})).verified,true);
 });
 
+test('descriptor mutation during packaging blocks release promotion',async t=>{
+    const parent=await temporaryDirectory(t,{prefix:'arcane-descriptor-race-package-'});
+    const workspaceRoot=path.join(parent,'workspace');
+    const appId='descriptor-race';
+    await createWorkspace({targetPath:workspaceRoot,appId});
+    await installSdkRuntime(workspaceRoot);
+    await packageApp({workspaceRoot,appId});
+    const releaseManifestPath=path.join(
+        workspaceRoot,
+        'dist',
+        appId,
+        'ARCANE_APP_RELEASE.json'
+    );
+    const before=await readFile(releaseManifestPath,'utf8');
+    const descriptorPath=path.join(workspaceRoot,'apps',appId,'arcane-app.json');
+    const descriptor=JSON.parse(await readFile(descriptorPath,'utf8'));
+    let changed=false;
+
+    await assert.rejects(
+        packageApp({
+            workspaceRoot,
+            appId,
+            onEvent:async event=>{
+                if(changed||event.type!=='package.copy.progress')return;
+                changed=true;
+                descriptor.permissions.capabilities=['storage.read'];
+                await writeFile(descriptorPath,`${JSON.stringify(descriptor,null,2)}\n`);
+            }
+        }),
+        /descriptor authority|changed after/u
+    );
+    assert.equal(changed,true);
+    assert.equal(await readFile(releaseManifestPath,'utf8'),before);
+});
+
 test('toolchain package events serialize heartbeat and complete before settlement',async t=>{
     const parent=await temporaryDirectory(t,{prefix:'arcane-toolchain-events-'});
     const workspaceRoot=path.join(parent,'workspace');

@@ -97,24 +97,39 @@ test('create refuses a nonempty target and init preserves existing authored file
     assert.ok(receipt.createdFiles.includes('apps/preserved-app/index.html'));
 });
 
-test('portable scaffold includes a real raster icon and declares browser plus portable targets',async t=>{
+test('every native scaffold includes a real raster icon and declares browser plus its selected target',async t=>{
     const parent=await temporaryDirectory(t);
-    const targetPath=path.join(parent,'portable-app');
-    const receipt=await createWorkspace({targetPath,appId:'portable-app',target:'portable'});
+    for(const target of ['portable','windows-x64','linux-x64','linux-arm64','android-arm64']){
+        const appId=`scaffold-${target}`;
+        const targetPath=path.join(parent,appId);
+        const receipt=await createWorkspace({targetPath,appId,target});
+        const appRoot=path.join(targetPath,'apps',appId);
+        const descriptor=JSON.parse(await readFile(path.join(appRoot,'arcane-app.json'),'utf8'));
+        const packageManifest=JSON.parse(await readFile(path.join(appRoot,'arcane-package.json'),'utf8'));
+        const icon=await readFile(path.join(appRoot,'img','icon.png'));
+        const readme=await readFile(path.join(targetPath,'README.md'),'utf8');
+        const packageDocument=JSON.parse(await readFile(path.join(targetPath,'package.json'),'utf8'));
 
-    const appRoot=path.join(targetPath,'apps','portable-app');
-    const descriptor=JSON.parse(await readFile(path.join(appRoot,'arcane-app.json'),'utf8'));
-    const packageManifest=JSON.parse(await readFile(path.join(appRoot,'arcane-package.json'),'utf8'));
-    const icon=await readFile(path.join(appRoot,'img','icon.png'));
-    const readme=await readFile(path.join(targetPath,'README.md'),'utf8');
-
-    assert.equal(receipt.target,'portable');
-    assert.deepEqual(descriptor.targets,['browser','portable']);
-    assert.equal(descriptor.native.icon,'img/icon.png');
-    assert.ok(descriptor.package.include.includes('img/icon.png'));
-    assert.deepEqual(projectPackageManifest(descriptor),packageManifest);
-    assert.deepEqual([...icon.subarray(0,8)],[137,80,78,71,13,10,26,10]);
-    assert.match(readme,/arcane build --target portable --arcane-root/);
+        assert.equal(receipt.target,target);
+        assert.deepEqual(descriptor.targets,['browser',target].sort());
+        assert.equal(descriptor.native.icon,'img/icon.png');
+        assert.ok(descriptor.package.include.includes('img/icon.png'));
+        assert.deepEqual(projectPackageManifest(descriptor),packageManifest);
+        assert.deepEqual([...icon.subarray(0,8)],[137,80,78,71,13,10,26,10]);
+        assert.equal(packageDocument.scripts.build,`arcane build --target ${target}`);
+        assert.equal(
+            packageDocument.scripts.run,
+            `arcane run --target ${target==='portable'?'browser':target}`
+        );
+        assert.equal(packageDocument.scripts['build:browser'],'arcane build --target browser');
+        assert.equal(packageDocument.scripts['run:browser'],'arcane run --target browser');
+        if(['linux-arm64','android-arm64'].includes(target)){
+            assert.match(readme,new RegExp(`reports ${target} as deferred`,'u'));
+            assert.doesNotMatch(readme,new RegExp(`arcane build --target ${target}`,'u'));
+        }else{
+            assert.match(readme,/npm run build -- --arcane-root/u);
+        }
+    }
 });
 
 test('init preflights package conflicts before creating any template files',async t=>{

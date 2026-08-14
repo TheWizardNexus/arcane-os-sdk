@@ -60,6 +60,9 @@ test('package exposes both supported executable names and public contracts',asyn
 test('root SDK export exposes receipt authenticators and verified file readers',()=>{
     assert.equal(typeof sdk.authenticateRuntimeReceipt,'function');
     assert.equal(typeof sdk.authenticateAppReleaseReceipt,'function');
+    assert.equal(typeof sdk.authenticateAppReleaseAuthority,'function');
+    assert.equal(typeof sdk.authenticateSharedPayloadSnapshot,'function');
+    assert.equal(typeof sdk.prepareSharedPayloadSnapshot,'function');
     assert.equal(typeof sdk.readVerifiedAppReleaseFile,'function');
     assert.equal(typeof sdk.readVerifiedRuntimeFile,'function');
     assert.equal(typeof sdk.validateAppDescriptor,'function');
@@ -76,6 +79,12 @@ test('root SDK export exposes receipt authenticators and verified file readers',
     assert.equal(typeof sdk.doctorNativeTarget,'function');
     assert.equal(typeof sdk.prepareNativeTarget,'function');
     assert.equal(typeof sdk.verifyNativeArtifact,'function');
+    assert.equal(typeof sdk.loadArcaneNativeProvider,'function');
+    assert.equal(typeof sdk.loadArcanePortableProvider,'function');
+    assert.equal(typeof sdk.ARCANE_NATIVE_PROVIDER_PATHS,'object');
+    assert.equal(typeof sdk.resolveNativeBuildOutputRoot,'function');
+    assert.equal(typeof sdk.assertIntegratedNativeToolchain,'function');
+    assert.equal(typeof sdk.assertNativeApplicationToolchainCompatibility,'function');
 });
 
 test('package schema string rules match the packager validators',async()=>{
@@ -168,6 +177,11 @@ test('native build plan schema uses the packager semantic-version contract',asyn
     assert.equal(nativePlanSchema.$defs.semver.pattern,packageSchema.properties.version.pattern);
     assert.deepEqual(nativePlanSchema.properties.minimumCoreVersion,{$ref:'#/$defs/semver'});
     assert.deepEqual(nativePlanSchema.$defs.toolchain.properties.version,{$ref:'#/$defs/semver'});
+    assert.deepEqual(nativePlanSchema.properties.providerGeneration,{$ref:'#/$defs/providerGeneration'});
+    assert.equal(
+        nativePlanSchema.$defs.providerGeneration.properties.kind.const,
+        'arcane-native-provider-generation'
+    );
 });
 
 test('CI and trusted publishing workflows retain their platform and authority gates',async()=>{

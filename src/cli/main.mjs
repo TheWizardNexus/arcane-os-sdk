@@ -3,7 +3,7 @@ import {createReporter} from '../events.mjs';
 import {executeOperation} from '../toolchain.mjs';
 import {ArcaneError,ERROR_CODES,normalizeError} from '../errors.mjs';
 import {CLI_NAME,SDK_NAME,SDK_VERSION,OUTPUT_MODES} from '../constants.mjs';
-import {loadArcanePortableProvider} from '../native-provider-loader.mjs';
+import {loadArcaneNativeProvider} from '../native-provider-loader.mjs';
 
 const VALUE_OPTIONS=new Set([
     'path',
@@ -31,18 +31,18 @@ const FLAG_OPTIONS=new Set([
 export const HELP_TEXT=`Arcane OS application SDK ${SDK_VERSION}
 
 Usage:
-  ${CLI_NAME} new <id> [--path <directory>] [--display-name <name>] [--target browser|portable] [--git]
-  ${CLI_NAME} init [id] [--workspace <directory>] [--display-name <name>] [--target browser|portable]
+  ${CLI_NAME} new <id> [--path <directory>] [--display-name <name>] [--target <target>] [--git]
+  ${CLI_NAME} init [id] [--workspace <directory>] [--display-name <name>] [--target <target>]
   ${CLI_NAME} doctor [--workspace <directory>] [--arcane-root <directory>]
   ${CLI_NAME} dev [--app <id>] [--host 127.0.0.1] [--port 8000]
   ${CLI_NAME} test [--app <id>]
   ${CLI_NAME} check [--app <id>] [--skip-tests]
   ${CLI_NAME} package [--app <id>] [--dry-run]
   ${CLI_NAME} verify [--app <id>]
-  ${CLI_NAME} native-doctor --target portable --arcane-root <directory>
-  ${CLI_NAME} native-prepare --target portable --arcane-root <directory>
+  ${CLI_NAME} native-doctor --target <native-target> --arcane-root <directory>
+  ${CLI_NAME} native-prepare --target <native-target> --arcane-root <directory>
   ${CLI_NAME} build --target <target> [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>]
-  ${CLI_NAME} run [--target browser] [--app <id>]
+  ${CLI_NAME} run [--target <target>] [--app <id>] [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>]
   ${CLI_NAME} targets
   ${CLI_NAME} repo status|pull|push
 
@@ -53,7 +53,9 @@ Global:
   --version                     Show the SDK version.
 
 The npm package is ${SDK_NAME}. Both the ${CLI_NAME} and arcane-os executables
-invoke this same headless toolchain.`;
+invoke this same headless toolchain. Portable, Windows x64, and Linux x64 native
+operations require --arcane-root. Linux ARM64 and Android ARM64 can be scaffolded
+but remain deferred until their platform and signing evidence is implemented.`;
 
 function usage(message){
     throw new ArcaneError(ERROR_CODES.usage,message);
@@ -226,7 +228,7 @@ function operationOptions(command,parsed,cwd){
     }
     if(command==='native-doctor'||command==='native-prepare'){
         noExtraPositionals(command,positionals);
-        if(!values.target)usage(`${command} requires --target portable.`);
+        if(!values.target)usage(`${command} requires --target <native-target>.`);
         return {
             target:values.target,
             arcaneRoot:values['arcane-root']?path.resolve(cwd,values['arcane-root']):undefined,
@@ -239,6 +241,10 @@ function operationOptions(command,parsed,cwd){
         return {
             ...common,
             target:values.target??'browser',
+            arcaneRoot:values['arcane-root']?path.resolve(cwd,values['arcane-root']):undefined,
+            outputRoot:values['output-root']?path.resolve(cwd,values['output-root']):undefined,
+            format:values.format,
+            signing:values.signing,
             host:values.host??'127.0.0.1',
             port:readPort(values.port,8000)
         };
@@ -258,7 +264,21 @@ function operationOptions(command,parsed,cwd){
     usage(`Unknown command: ${command}. Run ${CLI_NAME} --help for usage.`);
 }
 
-function portableTargetRequest({format,signing}={}){
+const NATIVE_REQUESTS=Object.freeze({
+    'windows-x64':Object.freeze({
+        platform:'windows',architecture:'x64',defaultFormat:'exe',formats:new Set(['exe'])
+    }),
+    'linux-x64':Object.freeze({
+        platform:'linux',architecture:'x64',defaultFormat:'deb',formats:new Set(['deb'])
+    })
+});
+
+const DEFERRED_NATIVE_REQUESTS=Object.freeze({
+    'linux-arm64':'Linux ARM64 remains deferred until a native provider supplies real ARM64 build evidence.',
+    'android-arm64':'Android ARM64 remains deferred until the APK provider and explicit development signer contract are implemented.'
+});
+
+function portableRequestDefinition(){
     const platform=process.platform==='win32'?'windows':process.platform;
     const architecture=process.arch==='x64'?'x64':process.arch==='arm64'?'arm64':process.arch;
     if(!['windows','linux'].includes(platform)||!['x64','arm64'].includes(architecture)){
@@ -267,42 +287,63 @@ function portableTargetRequest({format,signing}={}){
             `The portable native provider does not support ${process.platform}/${process.arch}.`
         );
     }
+    return {platform,architecture,defaultFormat:'portable',formats:new Set(['portable'])};
+}
+
+export function createNativeTargetRequest({target,format,signing}={}){
+    if(DEFERRED_NATIVE_REQUESTS[target]){
+        throw new ArcaneError(
+            ERROR_CODES.targetDeferred,
+            DEFERRED_NATIVE_REQUESTS[target],
+            {details:{target}}
+        );
+    }
+    const definition=target==='portable'?portableRequestDefinition():NATIVE_REQUESTS[target];
+    if(!definition){
+        usage(`Target ${String(target)} is not a registered native target.`);
+    }
+    const selectedFormat=format??definition.defaultFormat;
+    if(!definition.formats.has(selectedFormat)){
+        usage(
+            `Target ${target} does not support --format ${String(selectedFormat)}. `
+            +`Expected ${[...definition.formats].join(', ')}.`
+        );
+    }
     const signingMode=signing??'unsigned-local-test';
     if(signingMode!=='unsigned-local-test'){
-        usage('The portable CLI seam currently supports only --signing unsigned-local-test.');
-    }
-    if(format!==undefined&&format!=='portable'){
-        usage('The portable target requires --format portable.');
+        usage('The CLI native seam currently supports only --signing unsigned-local-test.');
     }
     return Object.freeze({
-        target:'portable',
-        platform,
-        architecture,
-        format:'portable',
+        target,
+        platform:definition.platform,
+        architecture:definition.architecture,
+        format:selectedFormat,
         signing:Object.freeze({mode:signingMode,profileId:null})
     });
 }
 
-async function pairPortableProvider(command,options,loadProvider,{signal,onEvent}={}){
-    const nativeOperation=(command==='build'&&options.target==='portable')
+async function pairNativeProvider(command,options,loadProvider,{signal,onEvent}={}){
+    const nativeOperation=(['build','run'].includes(command)&&options.target!=='browser')
         ||command==='native-doctor'
         ||command==='native-prepare';
     if(!nativeOperation)return options;
-    if(options.target!=='portable'){
-        usage(`${command} can pair only the portable target in this SDK version.`);
+    if(options.target==='browser'){
+        usage(`${command} requires one native target.`);
     }
+    const targetRequest=createNativeTargetRequest(options);
     if(!options.arcaneRoot){
-        usage(`${command} for target portable requires --arcane-root <directory>.`);
+        usage(`${command} for target ${options.target} requires --arcane-root <directory>.`);
     }
-    const targetRequest=portableTargetRequest(options);
     const loaded=await loadProvider({
         arcaneRoot:options.arcaneRoot,
+        target:options.target,
         signal,
         onEvent
     });
     return {
         ...options,
         nativeBuilder:loaded.nativeBuilder,
+        providerGeneration:loaded.providerGeneration,
         toolchainRoot:loaded.toolchainRoot,
         targetRequest
     };
@@ -383,7 +424,7 @@ export async function runCli(argv=process.argv.slice(2),{
     stdout=process.stdout,
     stderr=process.stderr,
     execute=executeOperation,
-    loadNativeProvider=loadArcanePortableProvider,
+    loadNativeProvider=loadArcaneNativeProvider,
     controller=new AbortController()
 }={}){
     let reporter;
@@ -407,7 +448,7 @@ export async function runCli(argv=process.argv.slice(2),{
             return 0;
         }
 
-        const options=await pairPortableProvider(
+        const options=await pairNativeProvider(
             command,
             operationOptions(command,parsed,cwd),
             loadNativeProvider,

@@ -96,7 +96,7 @@ test('CLI machine events preserve long user command text within the public schem
 });
 
 test('CLI reports deferred native target instead of creating a substitute artifact',async()=>{
-    const result=await runCli(['build','--target','linux-x64','--output','ndjson']);
+    const result=await runCli(['build','--target','android-arm64','--output','ndjson']);
     assert.equal(result.code,1);
     const events=parseNdjson(result.stdout);
     assert.equal(events.at(-1).type,'operation.failed');

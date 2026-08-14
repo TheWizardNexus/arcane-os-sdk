@@ -15,6 +15,7 @@ import {
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
+import {isDeepStrictEqual} from 'node:util';
 
 export const ROOT_CONFIG_NAME='arcane-packager.json';
 export const APP_CONFIG_NAME='arcane-package.json';
@@ -26,7 +27,18 @@ const RENAME_RETRY_LIMIT=20;
 const RENAME_RETRY_DELAY_MS=250;
 const READ_ONLY_NO_FOLLOW=FS_CONSTANTS.O_RDONLY|(FS_CONSTANTS.O_NOFOLLOW??0);
 const MAX_VERIFIED_APP_FILE_BYTES=64*1024*1024;
+const MAX_SHARED_SNAPSHOT_FILE_COUNT=10000;
+const MAX_SHARED_SNAPSHOT_FILE_BYTES=64*1024*1024;
+const MAX_SHARED_SNAPSHOT_TOTAL_BYTES=64*1024*1024;
+const APP_DESCRIPTOR_NAME='arcane-app.json';
+const LEGACY_APP_REGISTRY_PATH=path.join(
+    'machine_bundles',
+    'arcane-os-machine-bundle',
+    'arcane-apps.json'
+);
 const issuedAppReleaseReceipts=new WeakMap();
+const issuedSharedPayloadSnapshots=new WeakMap();
+let appDescriptorContractsPromise;
 
 function fileIdentity(info){
     return Object.freeze({
@@ -76,8 +88,8 @@ async function openStableRegularFile(filePath,label,expectedIdentity){
     }
 }
 
-async function readStableBytes(filePath,label){
-    const opened=await openStableRegularFile(filePath,label);
+async function readStableBytes(filePath,label,expectedIdentity){
+    const opened=await openStableRegularFile(filePath,label,expectedIdentity);
     try{
         const bytes=await opened.handle.readFile();
         const after=await opened.handle.stat({bigint:true});
@@ -445,17 +457,21 @@ export function incrementSemver(value,bump,preid){
     return formatSemver(next);
 }
 
-async function readJsonDocument(filePath,label=filePath){
+async function readJsonDocument(filePath,label=filePath,{expectedIdentity}={}){
     let document;
     try{
-        document=await readStableBytes(filePath,label);
+        document=await readStableBytes(filePath,label,expectedIdentity);
     }catch(error){
         if(error?.code==='ENOENT')fail(`${label} does not exist.`);
         throw error;
     }
 
     try{
-        return {value:JSON.parse(document.bytes.toString('utf8')),identity:document.identity};
+        return {
+            value:JSON.parse(document.bytes.toString('utf8')),
+            bytes:document.bytes,
+            identity:document.identity
+        };
     }catch(error){
         fail(`${label} is not valid JSON: ${error.message}`);
     }
@@ -487,10 +503,18 @@ function validateSharedRoute(route,label){
     return Object.freeze({source,destination,include,exclude});
 }
 
-async function loadRootConfig(workspaceRoot){
+async function loadRootConfigDocument(workspaceRoot){
     const configPath=path.join(workspaceRoot,ROOT_CONFIG_NAME);
-    const value=await readJson(configPath,ROOT_CONFIG_NAME);
-    return validateRootConfig(value,configPath);
+    const document=await readJsonDocument(configPath,ROOT_CONFIG_NAME);
+    return {
+        ...document,
+        value:validateRootConfig(document.value,configPath),
+        configPath
+    };
+}
+
+async function loadRootConfig(workspaceRoot){
+    return (await loadRootConfigDocument(workspaceRoot)).value;
 }
 
 export function validateRootConfig(value,configPath=ROOT_CONFIG_NAME){
@@ -798,7 +822,153 @@ async function assertOptionalSafeOutput(distRoot,outputRoot,appId){
     return true;
 }
 
-async function getAppContext({workspaceRoot:requestedWorkspaceRoot,appId}){
+async function appDescriptorContracts(){
+    appDescriptorContractsPromise??=import('../app-descriptor.mjs');
+    return appDescriptorContractsPromise;
+}
+
+async function optionalRegularFileIdentity(filePath,label){
+    let info;
+    try{
+        info=await lstat(filePath,{bigint:true});
+    }catch(error){
+        if(error?.code==='ENOENT')return null;
+        throw error;
+    }
+    if(info.isSymbolicLink()||!info.isFile()){
+        fail(`${label} must be a regular file, not a link or special entry.`);
+    }
+    return fileIdentity(info);
+}
+
+function recordedIdentityMatches(left,right){
+    if(left===null||right===null)return left===right;
+    return left.device===right.device
+        &&left.inode===right.inode
+        &&left.bytes===right.bytes
+        &&left.modifiedNanoseconds===right.modifiedNanoseconds
+        &&left.changedNanoseconds===right.changedNanoseconds
+        &&left.links===right.links;
+}
+
+async function createAppDescriptorAuthority(context,packageDocument,{signal}={}){
+    throwIfAborted(signal);
+    const contracts=await appDescriptorContracts();
+    const descriptorPath=path.join(context.appRoot,APP_DESCRIPTOR_NAME);
+    const descriptorIdentity=await optionalRegularFileIdentity(
+        descriptorPath,
+        `apps/${context.config.id}/${APP_DESCRIPTOR_NAME}`
+    );
+    let descriptor;
+    let source;
+    let sourcePath;
+    let sourceIdentity;
+
+    if(descriptorIdentity){
+        const descriptorDocument=await readJsonDocument(
+            descriptorPath,
+            `apps/${context.config.id}/${APP_DESCRIPTOR_NAME}`,
+            {expectedIdentity:descriptorIdentity}
+        );
+        descriptor=contracts.validateAppDescriptor(descriptorDocument.value,{
+            appId:context.config.id
+        });
+        if(!isDeepStrictEqual(
+            contracts.projectPackageManifest(descriptor),
+            packageDocument.value
+        )){
+            fail(`${APP_DESCRIPTOR_NAME} does not project exactly to ${APP_CONFIG_NAME}.`);
+        }
+        source='authored';
+        sourcePath=descriptorPath;
+        sourceIdentity=descriptorDocument.identity;
+    }else{
+        const registryPath=path.join(context.workspaceRoot,LEGACY_APP_REGISTRY_PATH);
+        const registryBefore=await optionalRegularFileIdentity(
+            registryPath,
+            'Arcane native app registry'
+        );
+        const loaded=await contracts.loadAppDescriptor({
+            workspaceRoot:context.workspaceRoot,
+            appRoot:context.appRoot,
+            appId:context.config.id,
+            packageManifest:packageDocument.value
+        });
+        const [descriptorAfter,registryAfter]=await Promise.all([
+            optionalRegularFileIdentity(
+                descriptorPath,
+                `apps/${context.config.id}/${APP_DESCRIPTOR_NAME}`
+            ),
+            optionalRegularFileIdentity(registryPath,'Arcane native app registry')
+        ]);
+        if(descriptorAfter!==null||!recordedIdentityMatches(registryBefore,registryAfter)){
+            fail(`The descriptor source for ${context.config.id} changed while it was selected.`);
+        }
+        descriptor=loaded.descriptor;
+        source=loaded.source;
+        sourcePath=registryBefore?registryPath:null;
+        sourceIdentity=registryBefore;
+    }
+
+    const canonicalDescriptor=immutableJsonCopy(descriptor);
+    return Object.freeze({
+        descriptor:canonicalDescriptor,
+        descriptorSha256:contracts.appDescriptorSha256(canonicalDescriptor),
+        source,
+        sourcePath,
+        sourceIdentity,
+        packageConfigPath:context.config.configPath,
+        packageConfigIdentity:packageDocument.identity
+    });
+}
+
+async function assertAppDescriptorAuthorityCurrent(context,{signal}={}){
+    const expected=context.descriptorAuthority;
+    if(!expected)fail('Canonical app descriptor authority is unavailable.');
+    const packageDocument=await readJsonDocument(
+        expected.packageConfigPath,
+        expected.packageConfigPath,
+        {expectedIdentity:expected.packageConfigIdentity}
+    );
+    const config=validateAppConfig(
+        packageDocument.value,
+        context.config.id,
+        context.rootConfig,
+        expected.packageConfigPath
+    );
+    const current=await createAppDescriptorAuthority(
+        {...context,config},
+        packageDocument,
+        {signal}
+    );
+    if(current.descriptorSha256!==expected.descriptorSha256
+        ||current.source!==expected.source
+        ||current.sourcePath!==expected.sourcePath
+        ||!recordedIdentityMatches(current.sourceIdentity,expected.sourceIdentity)
+        ||!recordedIdentityMatches(
+            current.packageConfigIdentity,
+            expected.packageConfigIdentity
+        )){
+        fail(`The canonical descriptor authority for ${context.config.id} changed during packaging.`);
+    }
+    return expected;
+}
+
+async function assertValidatedDescriptorAuthority(validation,descriptorAuthority){
+    if(validation===undefined||validation?.app?.descriptor===undefined)return;
+    const descriptor=validation?.app?.descriptor;
+    const contracts=await appDescriptorContracts();
+    if(contracts.appDescriptorSha256(descriptor)!==descriptorAuthority.descriptorSha256){
+        fail('Source validation returned a different canonical Arcane application descriptor.');
+    }
+}
+
+async function getAppContext({
+    workspaceRoot:requestedWorkspaceRoot,
+    appId,
+    bindDescriptorAuthority=false,
+    signal
+}){
     const workspaceRoot=normalizeWorkspaceRoot(requestedWorkspaceRoot);
 
     if(typeof appId!=='string'||!APP_ID_PATTERN.test(appId)){
@@ -830,8 +1000,11 @@ async function getAppContext({workspaceRoot:requestedWorkspaceRoot,appId}){
 
     await assertNoLinks(appsRoot,appRoot,`apps/${appId}`);
     const configPath=path.join(appRoot,APP_CONFIG_NAME);
-    const rawConfig=await readJson(configPath,`apps/${appId}/${APP_CONFIG_NAME}`);
-    const config=validateAppConfig(rawConfig,appId,rootConfig,configPath);
+    const configDocument=await readJsonDocument(
+        configPath,
+        `apps/${appId}/${APP_CONFIG_NAME}`
+    );
+    const config=validateAppConfig(configDocument.value,appId,rootConfig,configPath);
     await validateLocalAIModelDefinitions(appRoot,config);
     const distRoot=path.join(workspaceRoot,rootConfig.distRoot);
     const outputRoot=resolveInside(distRoot,appId,'package output');
@@ -841,7 +1014,12 @@ async function getAppContext({workspaceRoot:requestedWorkspaceRoot,appId}){
         await assertOptionalSafeOutput(distRoot,outputRoot,appId);
     }
 
-    return {workspaceRoot,rootConfig,appsRoot,appRoot,distRoot,outputRoot,config};
+    const context={workspaceRoot,rootConfig,appsRoot,appRoot,distRoot,outputRoot,config};
+    if(!bindDescriptorAuthority)return context;
+    return {
+        ...context,
+        descriptorAuthority:await createAppDescriptorAuthority(context,configDocument,{signal})
+    };
 }
 
 async function enumerateRoute({
@@ -937,7 +1115,247 @@ async function enumerateRoute({
     return files;
 }
 
-async function collectPackageFiles(context,{signal}={}){
+function workspaceLocationIdentity(info){
+    return Object.freeze({
+        device:String(info.dev),
+        inode:String(info.ino)
+    });
+}
+
+function workspaceLocationMatches(info,identity){
+    return String(info.dev)===identity.device&&String(info.ino)===identity.inode;
+}
+
+function normalizeSharedPayloadSelection(sharedPayloadIds,rootConfig,{required=false}={}){
+    const selected=sharedPayloadIds===undefined
+        ?Object.keys(rootConfig.sharedPayloads)
+        :sharedPayloadIds;
+
+    if(!Array.isArray(selected)||selected.length>256||(required&&selected.length===0)){
+        fail('sharedPayloadIds must be a non-empty array with at most 256 entries.');
+    }
+
+    const normalized=[];
+    const seen=new Set();
+    for(const [index,id] of selected.entries()){
+        if(typeof id!=='string'||!SAFE_SHARED_ID_PATTERN.test(id)
+            ||!Object.hasOwn(rootConfig.sharedPayloads,id)){
+            fail(`sharedPayloadIds[${index}] references an unknown shared payload: ${String(id)}`);
+        }
+        if(seen.has(id))fail(`sharedPayloadIds contains a duplicate shared payload: ${id}`);
+        seen.add(id);
+        normalized.push(id);
+    }
+    return Object.freeze(normalized.sort(compareText));
+}
+
+function assertSnapshotCoverage(state,requiredIds){
+    for(const id of requiredIds){
+        if(!Object.hasOwn(state.filesBySharedPayload,id)){
+            fail(`Shared payload snapshot does not include the required payload: ${id}`);
+        }
+    }
+}
+
+async function authenticateSharedPayloadSnapshotState(receipt,{
+    workspaceRoot,
+    sharedPayloadIds,
+    signal
+}={}){
+    throwIfAborted(signal);
+    const state=issuedSharedPayloadSnapshots.get(receipt);
+    if(!state)fail('Shared payload snapshot was not issued by this SDK process.');
+    const requested=normalizeWorkspaceRoot(workspaceRoot);
+    let workspaceInfo;
+    let canonicalWorkspaceRoot;
+    try{
+        workspaceInfo=await lstat(requested,{bigint:true});
+        canonicalWorkspaceRoot=await realpath(requested);
+    }catch(error){
+        fail(`Shared payload snapshot workspace is unavailable: ${error.message}`);
+    }
+    if(workspaceInfo.isSymbolicLink()||!workspaceInfo.isDirectory()
+        ||canonicalWorkspaceRoot!==state.canonicalWorkspaceRoot
+        ||receipt.canonicalWorkspaceRoot!==canonicalWorkspaceRoot
+        ||!workspaceLocationMatches(workspaceInfo,state.workspaceIdentity)){
+        fail('Shared payload snapshot belongs to a different workspace identity.');
+    }
+    let configInfo;
+    try{
+        configInfo=await lstat(state.rootConfigPath,{bigint:true});
+    }catch(error){
+        fail(`Shared payload snapshot root configuration changed: ${error.message}`);
+    }
+    if(configInfo.isSymbolicLink()||!configInfo.isFile()
+        ||!identityMatches(configInfo,state.rootConfigIdentity)){
+        fail('Shared payload snapshot root configuration changed after preparation.');
+    }
+    if(sharedPayloadIds!==undefined){
+        if(!Array.isArray(sharedPayloadIds)||sharedPayloadIds.length>256){
+            fail('sharedPayloadIds must be an array with at most 256 entries.');
+        }
+        const seen=new Set();
+        for(const [index,id] of sharedPayloadIds.entries()){
+            if(typeof id!=='string'||!SAFE_SHARED_ID_PATTERN.test(id)||seen.has(id)){
+                fail(`sharedPayloadIds[${index}] is invalid or duplicated.`);
+            }
+            seen.add(id);
+        }
+        assertSnapshotCoverage(state,sharedPayloadIds);
+    }
+    throwIfAborted(signal);
+    return state;
+}
+
+export async function prepareSharedPayloadSnapshot({
+    workspaceRoot:requestedWorkspaceRoot,
+    sharedPayloadIds,
+    signal,
+    onEvent
+}={}){
+    await emitOperation(onEvent,{type:'shared-payload.snapshot.started'});
+    throwIfAborted(signal);
+    const resolvedWorkspaceRoot=normalizeWorkspaceRoot(requestedWorkspaceRoot);
+    const initialWorkspaceInfo=await lstat(resolvedWorkspaceRoot,{bigint:true});
+    if(initialWorkspaceInfo.isSymbolicLink()||!initialWorkspaceInfo.isDirectory()){
+        fail('Shared payload snapshot workspace must be a real directory.');
+    }
+    const canonicalWorkspaceRoot=await realpath(resolvedWorkspaceRoot);
+    await assertNoLinks(canonicalWorkspaceRoot,canonicalWorkspaceRoot,'shared payload snapshot workspace');
+    const rootConfigDocument=await loadRootConfigDocument(canonicalWorkspaceRoot);
+    const selectedIds=normalizeSharedPayloadSelection(
+        sharedPayloadIds,
+        rootConfigDocument.value,
+        {required:true}
+    );
+    const retained=[];
+    const retainedBySharedPayload=Object.fromEntries(selectedIds.map(id=>[id,[]]));
+    let totalBytes=0;
+    let completedFiles=0;
+
+    for(const sharedPayloadId of selectedIds){
+        const routes=rootConfigDocument.value.sharedPayloads[sharedPayloadId];
+        for(const [routeIndex,route] of routes.entries()){
+            throwIfAborted(signal);
+            const sourceRoot=resolveInside(
+                canonicalWorkspaceRoot,
+                route.source,
+                `sharedPayloads.${sharedPayloadId}[${routeIndex}].source`
+            );
+            const files=await enumerateRoute({
+                workspaceRoot:canonicalWorkspaceRoot,
+                sourceRoot,
+                destinationRoot:route.destination,
+                include:route.include,
+                exclude:route.exclude,
+                label:`sharedPayloads.${sharedPayloadId}[${routeIndex}]`,
+                signal
+            });
+            for(const file of files){
+                throwIfAborted(signal);
+                if(retained.length>=MAX_SHARED_SNAPSHOT_FILE_COUNT){
+                    fail(`Shared payload snapshot exceeds ${MAX_SHARED_SNAPSHOT_FILE_COUNT} files.`);
+                }
+                if(file.bytes>MAX_SHARED_SNAPSHOT_FILE_BYTES){
+                    fail(`Shared payload snapshot file exceeds ${MAX_SHARED_SNAPSHOT_FILE_BYTES} bytes: ${file.sourceRelative}`);
+                }
+                if(totalBytes+file.bytes>MAX_SHARED_SNAPSHOT_TOTAL_BYTES){
+                    fail(`Shared payload snapshot exceeds ${MAX_SHARED_SNAPSHOT_TOTAL_BYTES} retained bytes.`);
+                }
+                const stable=await readStableBytes(file.source,file.label,file.identity);
+                if(stable.bytes.length!==file.bytes){
+                    fail(`Shared payload snapshot file changed size while retained: ${file.sourceRelative}`);
+                }
+                const digest=createHash('sha256').update(stable.bytes).digest('hex');
+                const source=route.source==='.'
+                    ?file.sourceRelative
+                    :`${route.source}/${file.sourceRelative}`;
+                const record=Object.freeze({
+                    ...file,
+                    sharedPayloadId,
+                    routeIndex,
+                    sourceRelative:normalizeRelativePath(source,'shared payload snapshot source'),
+                    retainedBytes:stable.bytes,
+                    sha256:digest
+                });
+                retained.push(record);
+                retainedBySharedPayload[sharedPayloadId].push(record);
+                totalBytes+=stable.bytes.length;
+                completedFiles+=1;
+                await emitOperation(onEvent,{
+                    type:'shared-payload.snapshot.progress',
+                    current:completedFiles,
+                    completedBytes:totalBytes,
+                    sharedPayloadId,
+                    path:record.sourceRelative
+                });
+            }
+        }
+    }
+
+    const [finalWorkspaceInfo,finalConfigInfo]=await Promise.all([
+        lstat(canonicalWorkspaceRoot,{bigint:true}),
+        lstat(rootConfigDocument.configPath,{bigint:true})
+    ]);
+    const workspaceIdentity=workspaceLocationIdentity(initialWorkspaceInfo);
+    if(finalWorkspaceInfo.isSymbolicLink()||!finalWorkspaceInfo.isDirectory()
+        ||!workspaceLocationMatches(finalWorkspaceInfo,workspaceIdentity)
+        ||finalConfigInfo.isSymbolicLink()||!finalConfigInfo.isFile()
+        ||!identityMatches(finalConfigInfo,rootConfigDocument.identity)){
+        fail('Shared payload snapshot workspace or root configuration changed during preparation.');
+    }
+
+    const inventory=retained.map(record=>({
+        sharedPayloadId:record.sharedPayloadId,
+        routeIndex:record.routeIndex,
+        source:record.sourceRelative,
+        destination:record.destination,
+        bytes:record.bytes,
+        sha256:record.sha256
+    })).sort((left,right)=>compareText(JSON.stringify(left),JSON.stringify(right)));
+    const receipt=immutableJsonCopy({
+        schemaVersion:1,
+        kind:'arcane-shared-payload-snapshot',
+        canonicalWorkspaceRoot,
+        workspaceIdentity,
+        rootConfig:Object.freeze({
+            path:ROOT_CONFIG_NAME,
+            identity:rootConfigDocument.identity,
+            sha256:createHash('sha256').update(rootConfigDocument.bytes).digest('hex')
+        }),
+        sharedPayloadIds:selectedIds,
+        files:inventory,
+        fileCount:inventory.length,
+        totalBytes,
+        contentSha256:createHash('sha256').update(JSON.stringify(inventory)).digest('hex')
+    });
+    const filesBySharedPayload=Object.freeze(Object.fromEntries(
+        Object.entries(retainedBySharedPayload).map(([id,files])=>[id,Object.freeze(files)])
+    ));
+    issuedSharedPayloadSnapshots.set(receipt,Object.freeze({
+        receipt,
+        canonicalWorkspaceRoot,
+        workspaceIdentity,
+        rootConfigPath:rootConfigDocument.configPath,
+        rootConfigIdentity:rootConfigDocument.identity,
+        files:Object.freeze(retained),
+        filesBySharedPayload
+    }));
+    await emitOperation(onEvent,{
+        type:'shared-payload.snapshot.completed',
+        fileCount:receipt.fileCount,
+        totalBytes:receipt.totalBytes,
+        contentSha256:receipt.contentSha256
+    });
+    return receipt;
+}
+
+export async function authenticateSharedPayloadSnapshot(receipt,options={}){
+    await authenticateSharedPayloadSnapshotState(receipt,options);
+    return receipt;
+}
+
+async function collectPackageFiles(context,{signal,sharedPayloadState}={}){
     const {workspaceRoot,appRoot,config,rootConfig}=context;
     const files=await enumerateRoute({
         workspaceRoot,
@@ -950,24 +1368,31 @@ async function collectPackageFiles(context,{signal}={}){
         signal
     });
 
-    for(const sharedId of config.shared){
-        const routes=rootConfig.sharedPayloads[sharedId];
+    if(sharedPayloadState){
+        assertSnapshotCoverage(sharedPayloadState,config.shared);
+        for(const sharedId of config.shared){
+            files.push(...sharedPayloadState.filesBySharedPayload[sharedId]);
+        }
+    }else{
+        for(const sharedId of config.shared){
+            const routes=rootConfig.sharedPayloads[sharedId];
 
-        for(const [index,route] of routes.entries()){
-            const sourceRoot=resolveInside(
-                workspaceRoot,
-                route.source,
-                `sharedPayloads.${sharedId}[${index}].source`
-            );
-            files.push(...await enumerateRoute({
-                workspaceRoot,
-                sourceRoot,
-                destinationRoot:route.destination,
-                include:route.include,
-                exclude:route.exclude,
-                label:`sharedPayloads.${sharedId}[${index}]`,
-                signal
-            }));
+            for(const [index,route] of routes.entries()){
+                const sourceRoot=resolveInside(
+                    workspaceRoot,
+                    route.source,
+                    `sharedPayloads.${sharedId}[${index}].source`
+                );
+                files.push(...await enumerateRoute({
+                    workspaceRoot,
+                    sourceRoot,
+                    destinationRoot:route.destination,
+                    include:route.include,
+                    exclude:route.exclude,
+                    label:`sharedPayloads.${sharedId}[${index}]`,
+                    signal
+                }));
+            }
         }
     }
 
@@ -1005,6 +1430,33 @@ async function copyPackageFiles(files,outputRoot,{signal,onEvent}={}){
         throwIfAborted(signal);
         const destination=resolveInside(outputRoot,file.destination,'package destination');
         await mkdir(path.dirname(destination),{recursive:true});
+        if(file.retainedBytes!==undefined){
+            if(!Buffer.isBuffer(file.retainedBytes)||file.retainedBytes.length!==file.bytes){
+                fail(`Retained shared payload bytes are invalid for ${file.destination}.`);
+            }
+            const output=await open(destination,'wx');
+            let copiedBytes=0;
+            try{
+                throwIfAborted(signal);
+                await output.writeFile(file.retainedBytes);
+                copiedBytes=file.retainedBytes.length;
+                const outputAfter=await output.stat({bigint:true});
+                if(Number(outputAfter.size)!==copiedBytes){
+                    fail(`Could not finish writing retained shared payload ${file.destination}.`);
+                }
+            }finally{
+                await output.close().catch(()=>{});
+            }
+            completedBytes+=copiedBytes;
+            await emitOperation(onEvent,{
+                type:'package.copy.progress',
+                current:index+1,
+                total:files.length,
+                completedBytes,
+                path:file.destination
+            });
+            continue;
+        }
         const source=await openStableRegularFile(file.source,file.label,file.identity);
         let output;
         let copiedBytes=0;
@@ -1227,9 +1679,17 @@ function appReleasePackageBinding(config){
     });
 }
 
-async function issueAppReleaseReceipt(root,release,identities,{signal,packageConfig}={}){
+async function issueAppReleaseReceipt(root,release,identities,{
+    signal,
+    packageConfig,
+    descriptorAuthority
+}={}){
     const state=await assertArtifactState(root,identities,{signal});
     const packageBinding=appReleasePackageBinding(packageConfig);
+    if(!descriptorAuthority?.descriptor
+        ||!/^[a-f0-9]{64}$/u.test(descriptorAuthority.descriptorSha256)){
+        fail('Canonical app descriptor authority is required to issue a release receipt.');
+    }
     const receipt={
         schemaVersion:1,
         kind:'arcane-app-release-verification',
@@ -1254,12 +1714,16 @@ async function issueAppReleaseReceipt(root,release,identities,{signal,packageCon
         canonicalLocation:state.canonical,
         rootIdentity:state.rootIdentity,
         identities:receipt.identities,
-        packageBinding
+        packageBinding,
+        descriptorAuthority:Object.freeze({
+            descriptor:descriptorAuthority.descriptor,
+            descriptorSha256:descriptorAuthority.descriptorSha256
+        })
     }));
     return receipt;
 }
 
-export async function authenticateAppReleaseReceipt(receipt,{
+async function authenticateAppReleaseReceiptState(receipt,{
     releaseRoot,
     expectedPackageConfig,
     signal
@@ -1283,7 +1747,40 @@ export async function authenticateAppReleaseReceipt(receipt,{
         fail('App release receipt belongs to a different authored package policy.');
     }
     await assertArtifactState(canonical,state.identities,{signal});
+    return state;
+}
+
+export async function authenticateAppReleaseReceipt(receipt,options={}){
+    await authenticateAppReleaseReceiptState(receipt,options);
     return receipt;
+}
+
+export async function authenticateAppReleaseAuthority(receipt,{
+    releaseRoot,
+    expectedPackageConfig,
+    expectedDescriptor,
+    signal
+}={}){
+    const state=await authenticateAppReleaseReceiptState(receipt,{
+        releaseRoot,
+        expectedPackageConfig,
+        signal
+    });
+    const authority=state.descriptorAuthority;
+    if(!authority?.descriptor||!/^[a-f0-9]{64}$/u.test(authority.descriptorSha256)){
+        fail('App release receipt is missing its canonical descriptor authority.');
+    }
+    if(expectedDescriptor!==undefined){
+        const contracts=await appDescriptorContracts();
+        if(contracts.appDescriptorSha256(expectedDescriptor)!==authority.descriptorSha256){
+            fail('App release receipt belongs to a different canonical app descriptor.');
+        }
+    }
+    return Object.freeze({
+        receipt,
+        descriptor:authority.descriptor,
+        descriptorSha256:authority.descriptorSha256
+    });
 }
 
 export async function readVerifiedAppReleaseFile(receipt,{
@@ -1819,6 +2316,8 @@ async function packageAppUnlocked({
     exactVersion,
     dryRun=false,
     context:preparedContext,
+    sharedPayloadSnapshot,
+    authenticatedSharedPayloadState,
     signal,
     onEvent,
     validateSourceState
@@ -1827,10 +2326,18 @@ async function packageAppUnlocked({
     if(validateSourceState!==undefined&&typeof validateSourceState!=='function'){
         fail('validateSourceState must be a function when provided.');
     }
-    const context=preparedContext??await getAppContext({workspaceRoot,appId});
+    const context=preparedContext??await getAppContext({
+        workspaceRoot,
+        appId,
+        bindDescriptorAuthority:true,
+        signal
+    });
     const currentVersion=context.config.version;
     const version=resolveTargetVersion(currentVersion,{bump,exactVersion,preid});
-    const files=await collectPackageFiles(context,{signal});
+    const files=await collectPackageFiles(context,{
+        signal,
+        sharedPayloadState:authenticatedSharedPayloadState
+    });
     const preview={
         app:appId,
         currentVersion,
@@ -1910,7 +2417,16 @@ async function packageAppUnlocked({
 
         throwIfAborted(signal);
         if(validateSourceState){
-            await validateSourceState();
+            const validation=await validateSourceState({signal});
+            await assertValidatedDescriptorAuthority(validation,context.descriptorAuthority);
+        }
+        await assertAppDescriptorAuthorityCurrent(context,{signal});
+        if(sharedPayloadSnapshot!==undefined){
+            await authenticateSharedPayloadSnapshotState(sharedPayloadSnapshot,{
+                workspaceRoot:context.workspaceRoot,
+                sharedPayloadIds:context.config.shared,
+                signal
+            });
         }
         await assertArtifactState(staging,verifiedRelease.identities,{signal});
         throwIfAborted(signal);
@@ -1934,7 +2450,11 @@ async function packageAppUnlocked({
             context.outputRoot,
             verifiedRelease.release,
             verifiedRelease.identities,
-            {signal,packageConfig:{...context.config,version}}
+            {
+                signal,
+                packageConfig:{...context.config,version},
+                descriptorAuthority:context.descriptorAuthority
+            }
         );
 
         if(version!==currentVersion){
@@ -1991,20 +2511,29 @@ async function packageAppUnlocked({
 
 export async function packageApp(options){
     throwIfAborted(options?.signal);
-    if(options?.dryRun){
-        return packageAppUnlocked(options);
-    }
-
     const context=await getAppContext({
         workspaceRoot:options?.workspaceRoot,
-        appId:options?.appId
+        appId:options?.appId,
+        bindDescriptorAuthority:true,
+        signal:options?.signal
     });
     throwIfAborted(options?.signal);
+    const authenticatedSharedPayloadState=options?.sharedPayloadSnapshot===undefined
+        ?null
+        :await authenticateSharedPayloadSnapshotState(options.sharedPayloadSnapshot,{
+            workspaceRoot:context.workspaceRoot,
+            sharedPayloadIds:context.config.shared,
+            signal:options?.signal
+        });
+    if(options?.dryRun){
+        return packageAppUnlocked({...options,context,authenticatedSharedPayloadState});
+    }
+
     await assertSafeDistBoundary(context.workspaceRoot,context.distRoot,{create:true});
     const releaseLock=await acquirePackageLock(context.distRoot,options?.appId);
 
     try{
-        return await packageAppUnlocked({...options,context});
+        return await packageAppUnlocked({...options,context,authenticatedSharedPayloadState});
     }finally{
         await releaseLock();
     }
@@ -2012,7 +2541,12 @@ export async function packageApp(options){
 
 export async function verifyApp({workspaceRoot,appId,signal,onEvent}){
     throwIfAborted(signal);
-    const context=await getAppContext({workspaceRoot,appId});
+    const context=await getAppContext({
+        workspaceRoot,
+        appId,
+        bindDescriptorAuthority:true,
+        signal
+    });
     const adapter=await loadAdapter(context);
     const releaseState=await verifyBuiltPackage(
         context,
@@ -2026,7 +2560,11 @@ export async function verifyApp({workspaceRoot,appId,signal,onEvent}){
         context.outputRoot,
         release,
         releaseState.identities,
-        {signal,packageConfig:context.config}
+        {
+            signal,
+            packageConfig:context.config,
+            descriptorAuthority:context.descriptorAuthority
+        }
     );
 
     return {

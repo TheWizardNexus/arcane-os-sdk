@@ -36,22 +36,22 @@ const DEFINITIONS=Object.freeze([
     Object.freeze({
         id:'windows-x64',
         displayName:'Windows x64 executable',
-        status:'deferred',
+        status:'pairing-required',
         platforms:['windows'],
         architectures:['x64'],
         formats:['exe'],
-        signingModes:['development','production'],
-        reason:'The Windows builder still requires an explicit, external app-release input seam.'
+        signingModes:['unsigned-local-test'],
+        reason:'Windows output requires explicit pairing to a compatible Arcane OS checkout with --arcane-root.'
     }),
     Object.freeze({
         id:'linux-x64',
         displayName:'Linux x64 executable',
-        status:'deferred',
+        status:'pairing-required',
         platforms:['linux'],
         architectures:['x64'],
-        formats:['appimage','deb','rpm'],
-        signingModes:['development','production'],
-        reason:'The Linux single-app native target adapter is planned but not implemented.'
+        formats:['deb'],
+        signingModes:['unsigned-local-test'],
+        reason:'Linux x64 output requires explicit pairing to a compatible Arcane OS checkout with --arcane-root.'
     }),
     Object.freeze({
         id:'linux-arm64',
@@ -59,7 +59,7 @@ const DEFINITIONS=Object.freeze([
         status:'deferred',
         platforms:['linux'],
         architectures:['arm64'],
-        formats:['appimage','deb','rpm'],
+        formats:['deb'],
         signingModes:['development','production'],
         reason:'The Linux ARM64 single-app native target adapter is planned but not implemented.'
     }),
@@ -69,9 +69,9 @@ const DEFINITIONS=Object.freeze([
         status:'deferred',
         platforms:['android'],
         architectures:['arm64'],
-        formats:['apk','aab'],
-        signingModes:['development','production'],
-        reason:'The Android single-app Gradle target adapter is planned but not implemented.'
+        formats:['apk'],
+        signingModes:['development'],
+        reason:'The Android single-app APK adapter and explicit development signer contract are planned but not implemented.'
     })
 ]);
 
@@ -264,6 +264,7 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
         appReleaseReceipt,
         appDescriptor,
         dependencyReleases,
+        providerGeneration,
         minimumCoreVersion,
         protectedRoots,
         outputRoot,
@@ -280,6 +281,7 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
             appReleaseReceipt,
             appDescriptor,
             dependencyReleases,
+            providerGeneration:providerGeneration??provider.providerGeneration,
             minimumCoreVersion,
             protectedRoots,
             outputRoot,

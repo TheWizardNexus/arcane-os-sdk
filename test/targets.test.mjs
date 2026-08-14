@@ -24,6 +24,13 @@ test('target registry distinguishes available, pairing-required, and deferred ta
     assert.equal(targets[1].status,'pairing-required');
     assert.deepEqual(targets[1].signingModes,['unsigned-local-test']);
     assert.match(targets[1].reason,/--arcane-root/);
+    assert.deepEqual(targets.find(target=>target.id==='windows-x64').formats,['exe']);
+    assert.deepEqual(targets.find(target=>target.id==='windows-x64').signingModes,['unsigned-local-test']);
+    assert.deepEqual(targets.find(target=>target.id==='linux-x64').formats,['deb']);
+    assert.deepEqual(targets.find(target=>target.id==='linux-x64').signingModes,['unsigned-local-test']);
+    assert.deepEqual(targets.find(target=>target.id==='linux-arm64').formats,['deb']);
+    assert.deepEqual(targets.find(target=>target.id==='android-arm64').formats,['apk']);
+    assert.deepEqual(targets.find(target=>target.id==='android-arm64').signingModes,['development']);
     for(const target of targets.slice(1)){
         assert.equal(target.protocol,'arcane-target-adapter/1');
         assert.ok(target.reason);
@@ -35,14 +42,22 @@ test('target registry distinguishes available, pairing-required, and deferred ta
     assert.deepEqual(await getTargetAdapter('browser').prepare(),{
         target:'browser',status:'available',ready:true,required:false
     });
-    for(const target of targets.slice(2))assert.equal(target.status,'deferred');
+    for(const targetId of ['portable','windows-x64','linux-x64']){
+        assert.equal(targets.find(target=>target.id===targetId).status,'pairing-required');
+    }
+    for(const targetId of ['linux-arm64','android-arm64']){
+        assert.equal(targets.find(target=>target.id===targetId).status,'deferred');
+    }
 });
 
 test('deferred adapters reject plan and build without producing substitute output',async()=>{
     for(const targetId of ['portable','windows-x64','linux-x64','linux-arm64','android-arm64']){
         const adapter=getTargetAdapter(targetId);
         const status=await adapter.doctor();
-        assert.equal(status.status,targetId==='portable'?'pairing-required':'deferred');
+        assert.equal(
+            status.status,
+            ['portable','windows-x64','linux-x64'].includes(targetId)?'pairing-required':'deferred'
+        );
         assert.equal(status.ready,false);
         await assert.rejects(
             adapter.plan({workspaceRoot:'ignored',appId:'ignored'}),

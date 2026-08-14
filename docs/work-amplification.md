@@ -24,15 +24,29 @@ There is no implicit all-app, all-target, or Android-flavor loop.
   check, toolchain preparation, build, and verification sequence completed in
   approximately 9.2 seconds. This is development evidence, not a cross-machine
   performance guarantee.
+- Shared native closure packaging: one retained shared-payload snapshot reads
+  and hashes 147 files / 3,153,739 bytes once. A two-app closure reuses that
+  snapshot instead of repeating 147 source reads for each app; each distinct
+  app release still writes and inventories its own output once.
+- Windows x64 executable: one cold development request retained 2,530 toolchain
+  files / 218,292,008 bytes once, compiled one 22-file / 60,488,912-byte
+  external artifact, reused its verified receipt, reached authenticated host
+  readiness, and cancelled the owned process tree in 11.8 seconds. The selected
+  app release contained seven files, each read once.
+- Linux x64 executable: one WSL development request produced one 23,577,108-byte
+  amd64 DEB with 328 verified installed files / 82,783,539 uncompressed bytes.
+  Toolchain preparation took 7.1 seconds, build plus verification took 15.7
+  seconds, repeat verification reused the identical receipt in 0 ms, and the
+  WSLg host ran for eight seconds before owned cancellation.
 
 Invariant work includes SDK/runtime resolution and the portable provider's 20
 required Arcane toolchain inputs, snapshotted once per prepared toolchain state.
 App source validation, tests, and release inventory are identity-bound once per
-app state. Portable assembly is identity-bound once per requested target, and
-final artifact verification consumes its one-shot receipt without repeating the
-toolchain preparation. Compilation and signing for future executable targets
-remain identity-bound once per requested target. Compatible file traversal may
-be batched with bounded sequential streaming.
+app state. Portable assembly and Windows/Linux compilation are identity-bound
+once per requested target, and final artifact verification authenticates and
+reuses the retained receipt instead of repeating toolchain preparation or final
+inventory work. Compatible file traversal is batched with bounded sequential
+streaming.
 
 Runtime verification binds version, source identity, inventory, and hashes. The
 schema-1 app-release manifest binds its packaged inventory and content digest.

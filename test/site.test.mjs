@@ -34,14 +34,15 @@ test('Pages document is semantic, project-path safe, and truthful',async()=>{
     assert.doesNotMatch(html,/(?:href|src)="\//u);
 
     assert.match(html,/Not yet published to npm/u);
-    assert.match(html,/Browser and verified portable directory builds are available; executable targets are deferred/u);
-    assert.match(html,/build a verified portable Core directory through an explicit compatible Arcane OS checkout/u);
+    assert.match(html,/Browser, portable, Windows x64, and Linux x64 development targets are available/u);
+    assert.match(html,/build verified portable, Windows x64, and Linux x64 development artifacts through an explicit compatible Arcane OS checkout/u);
     assert.match(html,/CLI, CI, future GUI, and Codex/u);
     assert.match(html,/doctor \/ expected contract/u);
     assert.match(html,/<span class="ready-pill">example<\/span>/u);
-    assert.match(html,/The portable build is a verified app-scoped Core payload and cannot run directly/u);
-    assert.match(html,/A deferred executable target returns a stable unavailable error and creates nothing/u);
-    for(const target of ['Browser','Portable','Windows x64','Linux x64 / ARM64','Android ARM64']){
+    assert.match(html,/Portable output cannot run directly/u);
+    assert.match(html,/Windows and Linux x64 are unsigned local-test paths/u);
+    assert.match(html,/Deferred targets return a stable unavailable error and create nothing/u);
+    for(const target of ['Browser','Portable','Windows x64','Linux x64','Linux ARM64','Android ARM64']){
         assert.match(html,new RegExp(`<th scope="row">${target.replace('/','\\/')}</th>`,'u'));
     }
     assert.match(html,/AGPL-3\.0-only/u);
@@ -90,6 +91,8 @@ test('space motion is bounded, controllable, and accessibility-aware',async()=>{
     assert.match(script,/navigator\.clipboard/u);
     assert.match(script,/native-doctor --target portable --arcane-root/u);
     assert.match(script,/build --target portable --arcane-root/u);
+    assert.match(script,/run --target windows-x64 --arcane-root/u);
+    assert.match(script,/run --target linux-x64 --arcane-root/u);
     assert.match(script,/new local-app --path \.\.\/local-app --target portable --git/u);
     assert.match(script,/not an executable or direct-run target/u);
     assert.doesNotMatch(script,/innerHTML/u);

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {cp,mkdir,readFile,realpath,writeFile} from 'node:fs/promises';
+import {cp,lstat,mkdir,readFile,realpath,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import {
@@ -13,9 +13,14 @@ import {getTargetAdapter} from '../src/targets/index.mjs';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';
 import {packageApp} from '../src/packager/core.mjs';
 import {createWorkspace} from '../src/scaffold.mjs';
+import {resolveWorkspace,validateDiscoveredApplication} from '../src/workspace.mjs';
 import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
 
-async function prepareNativeRelease(parent,{appId='native-app',displayName='Native App'}={}){
+async function prepareNativeRelease(parent,{
+    appId='native-app',
+    displayName='Native App',
+    mutateDescriptor
+}={}){
     const workspaceRoot=path.join(parent,'workspace');
     await createWorkspace({targetPath:workspaceRoot,appId,displayName});
     const installedRoot=path.join(workspaceRoot,'node_modules','arcane-os');
@@ -31,6 +36,7 @@ async function prepareNativeRelease(parent,{appId='native-app',displayName='Nati
     descriptor.targets=['windows-x64'];
     descriptor.package.include.push('img');
     descriptor.package.include.sort();
+    mutateDescriptor?.(descriptor);
     await mkdir(path.join(appRoot,'img'),{recursive:true});
     await writeFile(path.join(appRoot,'img','icon.png'),'synthetic development icon\n');
     await writeFile(descriptorPath,`${JSON.stringify(descriptor,null,2)}\n`);
@@ -241,25 +247,197 @@ test('native plan binds explicit verified inputs and withholds source paths from
     );
 });
 
-test('native plan enforces the highest bundled dependency requirements',async t=>{
-    const parent=await temporaryDirectory(t,{prefix:'arcane-native-dependency-'});
-    const application=await prepareNativeRelease(path.join(parent,'application'));
-    const dependency=await prepareNativeRelease(path.join(parent,'dependency'),{
-        appId:'dependency-app',
-        displayName:'Dependency App'
+test('focused validation and release authority reject descriptor-only source drift',async t=>{
+    const parent=await temporaryDirectory(t,{prefix:'arcane-descriptor-authority-'});
+    const application=await prepareNativeRelease(parent);
+    const discovered=await resolveWorkspace({
+        workspaceRoot:application.workspaceRoot,
+        appId:application.appId
     });
-    const appDescriptor={
-        ...application.descriptor,
-        native:{...application.descriptor.native,bundledApps:[dependency.appId]}
-    };
-    const dependencyDescriptor={
-        ...dependency.descriptor,
-        requirements:{
-            ...dependency.descriptor.requirements,
-            minimumCoreVersion:'0.8.12',
-            features:['dependency.contract']
+    const descriptorPath=path.join(application.appRoot,'arcane-app.json');
+    const original=JSON.parse(await readFile(descriptorPath,'utf8'));
+    const mutations=[
+        ['permissions.capabilities',descriptor=>{
+            descriptor.permissions.capabilities=['storage.read'];
+        }],
+        ['requirements.minimumCoreVersion',descriptor=>{
+            descriptor.requirements.minimumCoreVersion='0.8.12';
+        }],
+        ['native.bundledApps',descriptor=>{
+            descriptor.native.bundledApps=['dependency-app'];
+        }],
+        ['targets',descriptor=>{
+            descriptor.targets=['browser','windows-x64'];
+        }]
+    ];
+
+    for(const [label,mutate] of mutations){
+        const changed=structuredClone(original);
+        mutate(changed);
+        await writeFile(descriptorPath,`${JSON.stringify(changed,null,2)}\n`);
+        await assert.rejects(
+            validateDiscoveredApplication({
+                workspaceRoot:discovered.workspaceRoot,
+                workspaceMode:discovered.config.workspaceMode,
+                workspaceConfig:discovered.config,
+                app:discovered.app
+            }),
+            error=>error?.code==='ARCANE_INTEGRITY_FAILED'
+                &&/canonical descriptor/u.test(error.message),
+            label
+        );
+        await writeFile(descriptorPath,`${JSON.stringify(original,null,2)}\n`);
+    }
+
+    const toolchainRoot=path.join(parent,'toolchain');
+    await mkdir(toolchainRoot);
+    const toolchainReceipt=Object.freeze({
+        kind:'arcane-native-toolchain',
+        version:'0.8.12',
+        protocolVersion:'arcane/1',
+        features:Object.freeze([]),
+        supportedCapabilities:Object.freeze(['storage.read']),
+        supportedMethods:Object.freeze([]),
+        canonicalLocation:await realpath(toolchainRoot),
+        contentSha256:'e'.repeat(64)
+    });
+    let buildCalls=0;
+    const baseProvider=nativeProvider(toolchainReceipt,{});
+    const provider=Object.freeze({
+        ...baseProvider,
+        build:async()=>{
+            buildCalls+=1;
+            return {artifactReceipt:Object.freeze({kind:'unexpected-artifact'})};
+        }
+    });
+    for(const [index,[label,mutate]] of mutations.entries()){
+        const changed=structuredClone(original);
+        mutate(changed);
+        const outputRoot=path.join(parent,'rejected-output',String(index));
+        await assert.rejects(
+            createNativeBuildPlan({
+                nativeBuilder:provider,
+                toolchainRoot,
+                toolchainReceipt,
+                appReleaseRoot:application.releaseRoot,
+                appReleaseReceipt:application.releaseReceipt,
+                appDescriptor:changed,
+                outputRoot,
+                targetRequest:{
+                    target:'windows-x64',
+                    platform:'windows',
+                    architecture:'x64',
+                    format:'exe',
+                    signing:{mode:'unsigned-local-test',profileId:null}
+                }
+            }),
+            error=>error?.code==='ARCANE_INTEGRITY_FAILED'
+                &&/different canonical app descriptor/u.test(error.message),
+            label
+        );
+        await assert.rejects(lstat(outputRoot),{code:'ENOENT'});
+    }
+    assert.equal(buildCalls,0);
+});
+
+test('native plan binds the provider generation projection and rejects drift before provider work',async t=>{
+    const parent=await temporaryDirectory(t,{prefix:'arcane-provider-plan-generation-'});
+    const application=await prepareNativeRelease(parent);
+    const toolchainRoot=path.join(parent,'toolchain');
+    await mkdir(toolchainRoot);
+    const toolchainReceipt=Object.freeze({
+        kind:'arcane-native-toolchain',
+        version:'0.8.11',
+        protocolVersion:'arcane/1',
+        features:Object.freeze([]),
+        supportedCapabilities:Object.freeze([]),
+        supportedMethods:Object.freeze([]),
+        canonicalLocation:await realpath(toolchainRoot),
+        contentSha256:'f'.repeat(64)
+    });
+    let generation=Object.freeze({
+        kind:'arcane-native-provider-generation',
+        generationSha256:'1'.repeat(64),
+        contentSha256:'2'.repeat(64),
+        moduleCount:3,
+        canonicalArcaneRoot:'must-not-enter-the-plan'
+    });
+    let authenticateCalls=0;
+    let buildCalls=0;
+    const base=nativeProvider(toolchainReceipt,{});
+    const provider={
+        ...base,
+        get providerGeneration(){return generation;},
+        authenticateToolchainReceipt:async(...args)=>{
+            authenticateCalls+=1;
+            return base.authenticateToolchainReceipt(...args);
+        },
+        build:async()=>{
+            buildCalls+=1;
+            return {artifactReceipt:Object.freeze({kind:'unexpected-artifact'})};
         }
     };
+    const outputRoot=path.join(parent,'generation-output');
+    const plan=await createNativeBuildPlan({
+        nativeBuilder:provider,
+        providerGeneration:generation,
+        toolchainRoot,
+        toolchainReceipt,
+        appReleaseRoot:application.releaseRoot,
+        appReleaseReceipt:application.releaseReceipt,
+        appDescriptor:application.descriptor,
+        outputRoot,
+        targetRequest:{
+            target:'windows-x64',
+            platform:'windows',
+            architecture:'x64',
+            format:'exe',
+            signing:{mode:'unsigned-local-test',profileId:null}
+        }
+    });
+    assert.deepEqual(plan.providerGeneration,{
+        kind:'arcane-native-provider-generation',
+        generationSha256:'1'.repeat(64),
+        contentSha256:'2'.repeat(64),
+        moduleCount:3
+    });
+    assert.deepEqual(Object.keys(plan.providerGeneration),[
+        'kind','generationSha256','contentSha256','moduleCount'
+    ]);
+    assert.equal(authenticateCalls,1);
+
+    generation=Object.freeze({
+        ...generation,
+        generationSha256:'3'.repeat(64),
+        contentSha256:'4'.repeat(64)
+    });
+    await assert.rejects(
+        executeNativeBuildPlan(plan,{expectedNativeBuilder:provider}),
+        error=>error?.code==='ARCANE_INTEGRITY_FAILED'
+            &&/different native provider module generation/u.test(error.message)
+    );
+    assert.equal(authenticateCalls,1);
+    assert.equal(buildCalls,0);
+    await assert.rejects(lstat(outputRoot),{code:'ENOENT'});
+});
+
+test('native plan enforces the highest bundled dependency requirements',async t=>{
+    const parent=await temporaryDirectory(t,{prefix:'arcane-native-dependency-'});
+    const dependency=await prepareNativeRelease(path.join(parent,'dependency'),{
+        appId:'dependency-app',
+        displayName:'Dependency App',
+        mutateDescriptor:descriptor=>{
+            descriptor.requirements.minimumCoreVersion='0.8.12';
+            descriptor.requirements.features=['dependency.contract'];
+        }
+    });
+    const application=await prepareNativeRelease(path.join(parent,'application'),{
+        mutateDescriptor:descriptor=>{
+            descriptor.native.bundledApps=[dependency.appId];
+        }
+    });
+    const appDescriptor=application.descriptor;
+    const dependencyDescriptor=dependency.descriptor;
     const toolchainRoot=path.join(parent,'toolchain');
     await mkdir(toolchainRoot);
     const canonicalToolchainRoot=await realpath(toolchainRoot);
@@ -463,7 +641,7 @@ test('an injected toolchain plans and builds one native target without changing 
     );
     const pairedTargets=(await toolchain.targets()).targets;
     assert.equal(pairedTargets.find(target=>target.id==='windows-x64').status,'available');
-    assert.equal(pairedTargets.find(target=>target.id==='linux-x64').status,'deferred');
+    assert.equal(pairedTargets.find(target=>target.id==='linux-x64').status,'pairing-required');
 
     events.length=0;
     const built=await toolchain.build({
@@ -582,7 +760,7 @@ test('an injected toolchain plans and builds one native target without changing 
             target:'linux-x64',
             platform:'linux',
             architecture:'x64',
-            format:'appimage',
+            format:'deb',
             signing:{mode:'unsigned-local-test',profileId:null}
         }
     });
@@ -596,14 +774,14 @@ test('an injected toolchain plans and builds one native target without changing 
     );
 
     const defaultAdapter=getTargetAdapter('windows-x64');
-    assert.equal((await defaultAdapter.describe()).status,'deferred');
+    assert.equal((await defaultAdapter.describe()).status,'pairing-required');
     await assert.rejects(
         defaultAdapter.build({target:'windows-x64'}),
         error=>error?.code==='ARCANE_TARGET_DEFERRED'
     );
 
     const unpaired=createToolchain({target:'windows-x64',targetRequest});
-    assert.equal((await unpaired.doctorNative()).status,'deferred');
+    assert.equal((await unpaired.doctorNative()).status,'pairing-required');
     for(const operation of [
         ()=>unpaired.prepareNative(),
         ()=>unpaired.verifyNative({artifactReceipt:built.artifactReceipt}),
