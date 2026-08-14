@@ -66,6 +66,14 @@ export {
 export {discoverApps,resolveWorkspace,selectApp,validateWorkspace} from './workspace.mjs';
 export {startDevServer} from './dev-server.mjs';
 export {
+    APP_DESCRIPTOR_NAME,
+    APP_DESCRIPTOR_SCHEMA_VERSION,
+    loadAppDescriptor,
+    projectNativeDescriptor,
+    projectPackageManifest,
+    validateAppDescriptor
+} from './app-descriptor.mjs';
+export {
     authenticateAppReleaseReceipt,
     discoverApps as discoverPackagerApps,
     inspectApp,

@@ -111,6 +111,7 @@ function assertPackageMetadata(packageDocument){
         './targets',
         './packager',
         './runtime/manifest',
+        './schemas/arcane-app.json',
         './schemas/arcane-package.json',
         './schemas/arcane-lock.json',
         './schemas/cli-event.json',

@@ -173,6 +173,45 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run check
 `);
+    files.set(`apps/${appId}/arcane-app.json`,json({
+        schemaVersion:2,
+        id:appId,
+        displayName:name,
+        description:`${name} Arcane application.`,
+        version:'0.1.0',
+        publisher:{
+            id:'the-wizard-nexus',
+            name:'The Wizard Nexus'
+        },
+        package:{
+            entry:'index.html',
+            strategy:'static',
+            include:[`${appId}.css`,'index.html','manifest.json','modules'],
+            exclude:[],
+            shared:['browser-runtime']
+        },
+        permissions:{
+            capabilities:[],
+            methods:[]
+        },
+        security:{
+            connectOrigins:[],
+            frameOrigins:[],
+            mediaOrigins:[]
+        },
+        native:{
+            type:'app',
+            icon:null,
+            order:100,
+            bundledApps:[]
+        },
+        requirements:{
+            arcaneProtocol:'arcane/1',
+            minimumCoreVersion:'0.8.10',
+            features:[]
+        },
+        targets:['browser']
+    }));
     files.set(`apps/${appId}/arcane-package.json`,json({
         schemaVersion:1,
         id:appId,

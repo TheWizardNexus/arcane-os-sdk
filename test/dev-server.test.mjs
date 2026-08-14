@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {createWorkspace} from '../src/scaffold.mjs';
 import {startDevServer} from '../src/dev-server.mjs';
+import {projectPackageManifest} from '../src/app-descriptor.mjs';
 import {packageApp} from '../src/packager/core.mjs';
 import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
 
@@ -84,10 +85,15 @@ test('source server exposes only the selected app and SDK browser routes',async 
     await createWorkspace({targetPath:workspaceRoot,appId:'served-app'});
     await installRuntime(workspaceRoot);
     const appRoot=path.join(workspaceRoot,'apps','served-app');
-    const configPath=path.join(appRoot,'arcane-package.json');
-    const config=JSON.parse(await readFile(configPath,'utf8'));
-    config.include.push('TEST');
-    await writeFile(configPath,`${JSON.stringify(config,null,2)}\n`);
+    const descriptorPath=path.join(appRoot,'arcane-app.json');
+    const descriptor=JSON.parse(await readFile(descriptorPath,'utf8'));
+    descriptor.package.include.push('TEST');
+    descriptor.package.include.sort();
+    await writeFile(descriptorPath,`${JSON.stringify(descriptor,null,2)}\n`);
+    await writeFile(
+        path.join(appRoot,'arcane-package.json'),
+        `${JSON.stringify(projectPackageManifest(descriptor),null,2)}\n`
+    );
     await mkdir(path.join(appRoot,'TEST'),{recursive:true});
     await writeFile(path.join(appRoot,'TEST','secret.txt'),'private\n');
     const events=[];
@@ -133,6 +139,7 @@ test('source server exposes only the selected app and SDK browser routes',async 
     for(const deniedPath of [
         '/package.json',
         '/apps/served-app',
+        '/apps/served-app/arcane-app.json',
         '/apps/served-app/arcane-package.json',
         '/apps/served-app/test/app.test.mjs',
         '/apps/served-app/tests/private.test.mjs',

@@ -39,7 +39,7 @@ const MAX_CONCURRENT_FILE_RESPONSES=4;
 const MAX_PENDING_FILE_RESPONSES=256;
 const SESSION_COOKIE='Arcane-Dev-Session';
 const PRIVATE_SOURCE_SEGMENTS=new Set([
-    'arcane-package.json','test','tests','scripts','node_modules','dist','local'
+    'arcane-app.json','arcane-package.json','test','tests','scripts','node_modules','dist','local'
 ]);
 
 // This server is a loopback-only development host, not a production policy
@@ -301,8 +301,43 @@ function sourcePathAllowed(relative,manifest){
     });
 }
 
+function sharedPathAllowed(relative,route){
+    const posix=relative.join('/');
+    if(!posix||relative.some(segment=>segment.startsWith('.')))return false;
+    const comparable=inventoryKey(posix);
+    const excluded=(route.exclude??[]).some(item=>{
+        const candidate=inventoryKey(item);
+        return comparable===candidate||comparable.startsWith(`${candidate}/`);
+    });
+    if(excluded)return false;
+    return route.include.some(item=>{
+        const candidate=inventoryKey(item);
+        return comparable===candidate||comparable.startsWith(`${candidate}/`);
+    });
+}
+
 async function sourceRoutes(workspaceRoot,appId,{runtimeReceipt,signal,onEvent}){
     const resolved=await resolveWorkspace({workspaceRoot,appId});
+    if(resolved.config.workspaceMode==='integrated'){
+        return {
+            workspaceRoot:resolved.workspaceRoot,
+            workspaceMode:'integrated',
+            appId:resolved.appId,
+            startPath:`/apps/${resolved.appId}/${resolved.app.manifest.entry}`,
+            mappings:[
+                {
+                    prefix:['apps',resolved.appId],
+                    root:resolved.appRoot,
+                    allow:relative=>sourcePathAllowed(relative,resolved.app.manifest)
+                },
+                ...resolved.config.sharedPayloads['browser-runtime'].map(route=>({
+                    prefix:route.destination.split('/'),
+                    root:path.join(resolved.workspaceRoot,...route.source.split('/')),
+                    allow:relative=>sharedPathAllowed(relative,route)
+                }))
+            ]
+        };
+    }
     const runtimeRoot=path.join(
         resolved.workspaceRoot,
         'node_modules',
@@ -315,6 +350,7 @@ async function sourceRoutes(workspaceRoot,appId,{runtimeReceipt,signal,onEvent})
     const strongTypeIdentities=identityMap(verified.identities,'strong-type');
     return {
         workspaceRoot:resolved.workspaceRoot,
+        workspaceMode:'external',
         appId:resolved.appId,
         startPath:`/apps/${resolved.appId}/${resolved.app.manifest.entry}`,
         mappings:[

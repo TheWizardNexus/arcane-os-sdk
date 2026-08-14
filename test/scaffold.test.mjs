@@ -3,6 +3,7 @@ import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import {createWorkspace,initWorkspace} from '../src/scaffold.mjs';
+import {projectPackageManifest} from '../src/app-descriptor.mjs';
 import {temporaryDirectory} from './helpers.mjs';
 
 test('workspace scaffold creates a private external app using the exact SDK version',async t=>{
@@ -45,6 +46,11 @@ test('workspace scaffold creates a private external app using the exact SDK vers
     assert.match(lock.runtime.contentSha256,/^[0-9a-f]{64}$/);
 
     const appRoot=path.join(targetPath,'apps','signal-lab');
+    const descriptor=JSON.parse(await readFile(path.join(appRoot,'arcane-app.json'),'utf8'));
+    const packageManifest=JSON.parse(await readFile(path.join(appRoot,'arcane-package.json'),'utf8'));
+    assert.equal(descriptor.schemaVersion,2);
+    assert.equal(descriptor.id,'signal-lab');
+    assert.deepEqual(projectPackageManifest(descriptor),packageManifest);
     const html=await readFile(path.join(appRoot,'index.html'),'utf8');
     const theme=html.indexOf('./arcane/css/theme.css');
     const primitives=html.indexOf('./arcane/css/primitives.css');

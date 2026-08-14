@@ -265,11 +265,11 @@ export async function runDoctor({
                 signal,
                 onEvent
             });
-            checks.push(check('workspace','pass','The external Arcane app workspace is valid.',{
-                details:{workspaceRoot:result.workspaceRoot,appId:result.appId}
+            checks.push(check('workspace','pass',`The ${result.workspaceMode} Arcane app workspace is valid.`,{
+                details:{workspaceRoot:result.workspaceRoot,appId:result.appId,workspaceMode:result.workspaceMode}
             }));
         }catch(error){
-            checks.push(check('workspace','fail',`The external Arcane app workspace is invalid: ${error.message}`));
+            checks.push(check('workspace','fail',`The Arcane app workspace is invalid: ${error.message}`));
         }
     }else{
         checks.push(check(

@@ -124,20 +124,23 @@ async function preparedWorkspace(options){
         signal:options.signal,
         onEvent:options.onEvent
     });
-    const runtimeRoot=path.join(
-        workspace.workspaceRoot,
-        'node_modules',
-        'arcane-os',
-        'runtime'
-    );
-    const runtimeReceipt=await verifyRuntime({
-        runtimeRoot,
-        signal:options.signal,
-        onEvent:options.onEvent
-    });
+    const external=workspace.workspaceMode==='external';
+    const runtimeRoot=external
+        ?path.join(workspace.workspaceRoot,'node_modules','arcane-os','runtime')
+        :workspace.workspaceRoot;
+    const runtimeReceipt=external
+        ?await verifyRuntime({
+            runtimeRoot,
+            signal:options.signal,
+            onEvent:options.onEvent
+        })
+        :null;
     return {
         runtimeReceipt,
         runtimeRoot,
+        workspaceMode:workspace.workspaceMode,
+        descriptor:workspace.app.descriptor,
+        descriptorSource:workspace.app.descriptorSource,
         workspaceRoot:workspace.workspaceRoot,
         appId:workspace.appId,
         appRoot:workspace.appRoot,
@@ -145,10 +148,22 @@ async function preparedWorkspace(options){
     };
 }
 
-function validatePreparedRuntime(prepared){
-    return authenticateRuntimeReceipt(prepared.runtimeReceipt,{
-        runtimeRoot:prepared.runtimeRoot
+async function validatePreparedRuntime(prepared,{signal}={}){
+    if(prepared.workspaceMode==='external'){
+        return authenticateRuntimeReceipt(prepared.runtimeReceipt,{
+            runtimeRoot:prepared.runtimeRoot,
+            signal
+        });
+    }
+    const validation=await validateWorkspace({
+        workspaceRoot:prepared.workspaceRoot,
+        appId:prepared.appId,
+        signal
     });
+    if(validation.workspaceMode!=='integrated'){
+        throw new ArcaneError(ERROR_CODES.workspaceInvalid,'The integrated Arcane workspace profile changed during the operation.');
+    }
+    return validation;
 }
 
 export async function createApplication(options={}){
@@ -213,16 +228,24 @@ export async function checkApplication(options={}){
     const tests=options.skipTests
         ?{passed:true,skipped:true,testFiles:[]}
         :await testApplication({...options,...prepared});
-    await validatePreparedRuntime(prepared);
+    await validatePreparedRuntime(prepared,{signal:options.signal});
     return {
         ok:true,
+        workspaceMode:prepared.workspaceMode,
         workspaceRoot:prepared.workspaceRoot,
         appId:prepared.appId,
-        runtime:{
-            manifestSha256:prepared.runtimeReceipt.manifestSha256,
-            contentSha256:prepared.runtimeReceipt.contentSha256,
-            fileCount:prepared.runtimeReceipt.fileCount
-        },
+        descriptorSource:prepared.descriptorSource,
+        runtime:prepared.runtimeReceipt
+            ?{
+                mode:'sdk',
+                manifestSha256:prepared.runtimeReceipt.manifestSha256,
+                contentSha256:prepared.runtimeReceipt.contentSha256,
+                fileCount:prepared.runtimeReceipt.fileCount
+            }
+            :{
+                mode:'workspace',
+                sourceRoot:'arcane'
+            },
         checks:prepared.validation.checks,
         tests
     };
@@ -235,6 +258,7 @@ export async function developApplication(options={}){
         appId:prepared.appId,
         mode:'source',
         runtimeReceipt:prepared.runtimeReceipt,
+        workspaceMode:prepared.workspaceMode,
         host:options.host,
         port:options.port,
         signal:options.signal,
@@ -253,14 +277,15 @@ export async function packageApplication(options={}){
             dryRun:Boolean(options.dryRun),
             signal,
             onEvent,
-            validateSourceState:()=>validatePreparedRuntime(prepared)
+            validateSourceState:({signal}={})=>validatePreparedRuntime(prepared,{signal})
         }),
         options
     );
     return {
         workspaceRoot:prepared.workspaceRoot,
+        workspaceMode:prepared.workspaceMode,
         appId:prepared.appId,
-        runtimeContentSha256:prepared.runtimeReceipt.contentSha256,
+        runtimeContentSha256:prepared.runtimeReceipt?.contentSha256??null,
         release
     };
 }
@@ -277,11 +302,12 @@ export async function verifyApplication(options={}){
         }),
         options
     );
-    await validatePreparedRuntime(prepared);
+    await validatePreparedRuntime(prepared,{signal:options.signal});
     return {
         workspaceRoot:prepared.workspaceRoot,
+        workspaceMode:prepared.workspaceMode,
         appId:prepared.appId,
-        runtimeContentSha256:prepared.runtimeReceipt.contentSha256,
+        runtimeContentSha256:prepared.runtimeReceipt?.contentSha256??null,
         release
     };
 }
@@ -301,11 +327,15 @@ export async function buildApplication(options={}){
             ...prepared,
             signal,
             onEvent,
-            validateSourceState:()=>validatePreparedRuntime(prepared)
+            validateSourceState:({signal}={})=>validatePreparedRuntime(prepared,{signal})
         }),
         options
     );
-    return {...result,runtimeContentSha256:prepared.runtimeReceipt.contentSha256};
+    return {
+        ...result,
+        workspaceMode:prepared.workspaceMode,
+        runtimeContentSha256:prepared.runtimeReceipt?.contentSha256??null
+    };
 }
 
 export async function runApplication(options={}){

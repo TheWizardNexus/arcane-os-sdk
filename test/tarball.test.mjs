@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
+import {projectPackageManifest} from '../src/app-descriptor.mjs';
 import {
     repositoryRoot,
     runCommand,
@@ -41,6 +42,7 @@ test('packed npm artifact installs and drives an external repository end to end'
     assert.equal(packReport.version,'0.1.0-dev.0');
     assert.ok(packReport.files.some(file=>file.path==='bin/arcane.mjs'));
     assert.ok(packReport.files.some(file=>file.path==='runtime/ARCANE_RUNTIME_RELEASE.json'));
+    assert.ok(packReport.files.some(file=>file.path==='schemas/arcane-app.schema.json'));
     assert.ok(packReport.files.some(file=>file.path==='schemas/arcane-package.schema.json'));
     assert.ok(packReport.files.some(file=>file.path==='NOTICE'));
     assert.ok(packReport.files.every(file=>!file.path.startsWith('test/')));
@@ -84,11 +86,15 @@ test('packed npm artifact installs and drives an external repository end to end'
     );
     assert.equal(cleanInstalled.code,0,cleanInstalled.stderr);
 
-    const appManifestPath=path.join(workspaceRoot,'apps','external-app','arcane-package.json');
-    const appManifest=JSON.parse(await readFile(appManifestPath,'utf8'));
-    appManifest.version='0.1.0+external.1';
-    delete appManifest.exclude;
-    await writeFile(appManifestPath,`${JSON.stringify(appManifest,null,2)}\n`);
+    const appRoot=path.join(workspaceRoot,'apps','external-app');
+    const descriptorPath=path.join(appRoot,'arcane-app.json');
+    const descriptor=JSON.parse(await readFile(descriptorPath,'utf8'));
+    descriptor.version='0.1.0+external.1';
+    await writeFile(descriptorPath,`${JSON.stringify(descriptor,null,2)}\n`);
+    await writeFile(
+        path.join(appRoot,'arcane-package.json'),
+        `${JSON.stringify(projectPackageManifest(descriptor),null,2)}\n`
+    );
 
     for(const executable of ['arcane','arcane-os']){
         const invoked=await runNpm(

@@ -490,6 +490,10 @@ function validateSharedRoute(route,label){
 async function loadRootConfig(workspaceRoot){
     const configPath=path.join(workspaceRoot,ROOT_CONFIG_NAME);
     const value=await readJson(configPath,ROOT_CONFIG_NAME);
+    return validateRootConfig(value,configPath);
+}
+
+export function validateRootConfig(value,configPath=ROOT_CONFIG_NAME){
     assertOnlyKeys(value,new Set(['schemaVersion','appsRoot','distRoot','sharedPayloads']),ROOT_CONFIG_NAME);
 
     if(value.schemaVersion!==1){
@@ -529,7 +533,7 @@ async function loadRootConfig(workspaceRoot){
     });
 }
 
-function validateAppConfig(value,appId,rootConfig,configPath){
+export function validateAppConfig(value,appId,rootConfig,configPath=`apps/${appId}/${APP_CONFIG_NAME}`){
     assertOnlyKeys(
         value,
         new Set([
