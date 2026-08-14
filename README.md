@@ -1,4 +1,15 @@
+[![Arcane OS SDK — external application SDK and command-line toolchain](https://raw.githubusercontent.com/TheWizardNexus/arcane-os-sdk/main/assets/arcane-os-sdk-readme-header.png)](https://github.com/TheWizardNexus/arcane-os-sdk)
+
 # Arcane OS SDK
+
+<p align="center">
+  <strong>Build, test, package, and manage Arcane applications from their own repositories.</strong><br>
+  Use the Arcane runtime and ArcaneOllama readiness checks without placing proprietary application source inside Arcane OS.
+</p>
+
+<p align="center">
+  <a href="https://github.com/TheWizardNexus/arcane-os-sdk"><strong>Open the Arcane OS SDK repository on GitHub</strong></a>
+</p>
 
 `arcane-os` is the external application SDK and command-line toolchain for
 Arcane OS. It lets an app live in its own Git repository while preserving the

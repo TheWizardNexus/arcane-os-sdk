@@ -12,3 +12,4 @@
 - Changed generated CI to use the committed dependency lock through `npm ci`.
 - Added exact-tree runtime receipts, bounded verified response snapshots, and serialized event ownership with process backpressure.
 - Preserved the pinned runtime as byte-exact Git content so clean Windows and Linux checkouts authenticate the same receipt.
+- Added the linked Arcane OS SDK README banner, explanatory subheader, and direct GitHub repository navigation.
