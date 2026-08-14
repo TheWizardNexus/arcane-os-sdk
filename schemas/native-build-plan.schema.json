@@ -4,11 +4,12 @@
   "title": "Arcane native build plan",
   "type": "object",
   "additionalProperties": false,
-  "required": ["protocol", "generation", "toolchain", "app", "dependencies", "targetRequest", "outputRoot", "operations"],
+  "required": ["protocol", "generation", "toolchain", "minimumCoreVersion", "app", "dependencies", "targetRequest", "outputRoot", "operations"],
   "properties": {
     "protocol": { "const": "arcane-native-build-plan/1" },
     "generation": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
     "toolchain": { "$ref": "#/$defs/toolchain" },
+    "minimumCoreVersion": { "$ref": "#/$defs/semver" },
     "app": { "$ref": "#/$defs/app" },
     "dependencies": {
       "type": "array",
@@ -29,16 +30,30 @@
   },
   "$defs": {
     "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
     "toolchain": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "version", "canonicalLocation", "contentSha256"],
+      "required": ["kind", "version", "protocolVersion", "features", "supportedCapabilities", "supportedMethods", "canonicalLocation", "contentSha256"],
       "properties": {
         "kind": { "type": "string", "minLength": 1 },
-        "version": { "type": "string", "minLength": 1 },
+        "version": { "$ref": "#/$defs/semver" },
+        "protocolVersion": { "type": "string", "pattern": "^arcane/[1-9][0-9]*$" },
+        "features": { "$ref": "#/$defs/contractList" },
+        "supportedCapabilities": { "$ref": "#/$defs/contractList" },
+        "supportedMethods": { "$ref": "#/$defs/contractList" },
         "canonicalLocation": { "type": "string", "minLength": 1 },
         "contentSha256": { "$ref": "#/$defs/sha256" }
       }
+    },
+    "contractList": {
+      "type": "array",
+      "maxItems": 4096,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
     },
     "release": {
       "type": "object",

@@ -5,11 +5,11 @@ const commandExamples = Object.freeze({
 npm ci
 npm run check
 npm run pack:local
-node ./bin/arcane.mjs new local-app --path ../local-app --git
+node ./bin/arcane.mjs new local-app --path ../local-app --target portable --git
 
 # From the generated app repository
 cd ../local-app
-npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.0.tgz
+npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.1.tgz
 npm run check`,
     note: "Use a packed tarball today. Local directory dependencies may become links and are intentionally rejected."
   }),
@@ -20,12 +20,16 @@ npm exec -- arcane check
 npm exec -- arcane dev
 npm exec -- arcane package
 npm exec -- arcane verify
-npm exec -- arcane run --target browser`,
-    note: "Each invocation owns one workspace, one app, and one operation. The browser target is the only available build target today."
+npm exec -- arcane run --target browser
+
+# Pair the portable provider through one explicit Arcane OS checkout
+npm exec -- arcane native-doctor --target portable --arcane-root "../Arcane OS"
+npm exec -- arcane build --target portable --arcane-root "../Arcane OS"`,
+    note: "Browser packages can run. Portable builds produce a verified app-scoped Core directory, not an executable or direct-run target."
   }),
   registry: Object.freeze({
     title: "After arcane-os@dev is published",
-    command: `npx arcane-os@dev new my-app --path ./my-app --git
+    command: `npx arcane-os@dev new my-app --path ./my-app --target portable --git
 cd my-app
 npm install
 npm run check

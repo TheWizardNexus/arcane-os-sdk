@@ -3,6 +3,7 @@ import {createReporter} from '../events.mjs';
 import {executeOperation} from '../toolchain.mjs';
 import {ArcaneError,ERROR_CODES,normalizeError} from '../errors.mjs';
 import {CLI_NAME,SDK_NAME,SDK_VERSION,OUTPUT_MODES} from '../constants.mjs';
+import {loadArcanePortableProvider} from '../native-provider-loader.mjs';
 
 const VALUE_OPTIONS=new Set([
     'path',
@@ -15,6 +16,7 @@ const VALUE_OPTIONS=new Set([
     'target',
     'format',
     'signing',
+    'output-root',
     'output'
 ]);
 const FLAG_OPTIONS=new Set([
@@ -29,15 +31,17 @@ const FLAG_OPTIONS=new Set([
 export const HELP_TEXT=`Arcane OS application SDK ${SDK_VERSION}
 
 Usage:
-  ${CLI_NAME} new <id> [--path <directory>] [--display-name <name>] [--git]
-  ${CLI_NAME} init [id] [--workspace <directory>] [--display-name <name>]
+  ${CLI_NAME} new <id> [--path <directory>] [--display-name <name>] [--target browser|portable] [--git]
+  ${CLI_NAME} init [id] [--workspace <directory>] [--display-name <name>] [--target browser|portable]
   ${CLI_NAME} doctor [--workspace <directory>] [--arcane-root <directory>]
   ${CLI_NAME} dev [--app <id>] [--host 127.0.0.1] [--port 8000]
   ${CLI_NAME} test [--app <id>]
   ${CLI_NAME} check [--app <id>] [--skip-tests]
   ${CLI_NAME} package [--app <id>] [--dry-run]
   ${CLI_NAME} verify [--app <id>]
-  ${CLI_NAME} build --target <target> [--format <format>] [--signing <mode>]
+  ${CLI_NAME} native-doctor --target portable --arcane-root <directory>
+  ${CLI_NAME} native-prepare --target portable --arcane-root <directory>
+  ${CLI_NAME} build --target <target> [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>]
   ${CLI_NAME} run [--target browser] [--app <id>]
   ${CLI_NAME} targets
   ${CLI_NAME} repo status|pull|push
@@ -162,6 +166,7 @@ function operationOptions(command,parsed,cwd){
             targetPath:path.resolve(cwd,values.path??appId),
             appId,
             displayName:values['display-name'],
+            target:values.target??'browser',
             initializeGit:flags.has('git')
         };
     }
@@ -170,7 +175,8 @@ function operationOptions(command,parsed,cwd){
         return {
             workspaceRoot,
             appId:positionals[0]??values.app??inferredAppId(workspaceRoot),
-            displayName:values['display-name']
+            displayName:values['display-name'],
+            target:values.target??'browser'
         };
     }
     if(command==='doctor'){
@@ -211,9 +217,21 @@ function operationOptions(command,parsed,cwd){
         return {
             ...common,
             target:values.target,
+            arcaneRoot:values['arcane-root']?path.resolve(cwd,values['arcane-root']):undefined,
+            outputRoot:values['output-root']?path.resolve(cwd,values['output-root']):undefined,
             format:values.format,
             signing:values.signing,
             dryRun:flags.has('dry-run')
+        };
+    }
+    if(command==='native-doctor'||command==='native-prepare'){
+        noExtraPositionals(command,positionals);
+        if(!values.target)usage(`${command} requires --target portable.`);
+        return {
+            target:values.target,
+            arcaneRoot:values['arcane-root']?path.resolve(cwd,values['arcane-root']):undefined,
+            format:values.format,
+            signing:values.signing
         };
     }
     if(command==='run'){
@@ -238,6 +256,56 @@ function operationOptions(command,parsed,cwd){
         return {...common,action};
     }
     usage(`Unknown command: ${command}. Run ${CLI_NAME} --help for usage.`);
+}
+
+function portableTargetRequest({format,signing}={}){
+    const platform=process.platform==='win32'?'windows':process.platform;
+    const architecture=process.arch==='x64'?'x64':process.arch==='arm64'?'arm64':process.arch;
+    if(!['windows','linux'].includes(platform)||!['x64','arm64'].includes(architecture)){
+        throw new ArcaneError(
+            ERROR_CODES.targetUnavailable,
+            `The portable native provider does not support ${process.platform}/${process.arch}.`
+        );
+    }
+    const signingMode=signing??'unsigned-local-test';
+    if(signingMode!=='unsigned-local-test'){
+        usage('The portable CLI seam currently supports only --signing unsigned-local-test.');
+    }
+    if(format!==undefined&&format!=='portable'){
+        usage('The portable target requires --format portable.');
+    }
+    return Object.freeze({
+        target:'portable',
+        platform,
+        architecture,
+        format:'portable',
+        signing:Object.freeze({mode:signingMode,profileId:null})
+    });
+}
+
+async function pairPortableProvider(command,options,loadProvider,{signal,onEvent}={}){
+    const nativeOperation=(command==='build'&&options.target==='portable')
+        ||command==='native-doctor'
+        ||command==='native-prepare';
+    if(!nativeOperation)return options;
+    if(options.target!=='portable'){
+        usage(`${command} can pair only the portable target in this SDK version.`);
+    }
+    if(!options.arcaneRoot){
+        usage(`${command} for target portable requires --arcane-root <directory>.`);
+    }
+    const targetRequest=portableTargetRequest(options);
+    const loaded=await loadProvider({
+        arcaneRoot:options.arcaneRoot,
+        signal,
+        onEvent
+    });
+    return {
+        ...options,
+        nativeBuilder:loaded.nativeBuilder,
+        toolchainRoot:loaded.toolchainRoot,
+        targetRequest
+    };
 }
 
 function commandFromArgs(args){
@@ -315,6 +383,7 @@ export async function runCli(argv=process.argv.slice(2),{
     stdout=process.stdout,
     stderr=process.stderr,
     execute=executeOperation,
+    loadNativeProvider=loadArcanePortableProvider,
     controller=new AbortController()
 }={}){
     let reporter;
@@ -338,7 +407,12 @@ export async function runCli(argv=process.argv.slice(2),{
             return 0;
         }
 
-        const options=operationOptions(command,parsed,cwd);
+        const options=await pairPortableProvider(
+            command,
+            operationOptions(command,parsed,cwd),
+            loadNativeProvider,
+            {signal:controller.signal,onEvent:event=>reporter.forward(event)}
+        );
         const result=await execute(command,{
             ...options,
             signal:controller.signal,

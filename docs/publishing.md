@@ -1,6 +1,6 @@
 # Development publication
 
-The first npm version is `0.1.0-dev.0` and `publishConfig.tag` is `dev`, so an
+The current unpublished npm version is `0.1.0-dev.1` and `publishConfig.tag` is `dev`, so an
 accidental publication does not become the default `latest` release.
 
 The unscoped package installs both `arcane` and `arcane-os`. The short command
@@ -13,7 +13,7 @@ No npm publication has occurred yet. For local development, run
 with `npm install --save-dev --save-exact <path>`. Keep the tarball at the path
 recorded by `package-lock.json`; subsequent `npm ci` verifies its recorded npm
 integrity. Arcane separately requires the installed package to identify exactly
-as `arcane-os@0.1.0-dev.0` and verifies the locked runtime. A local directory
+as `arcane-os@0.1.0-dev.1` and verifies the locked runtime. A local directory
 `file:` install is intentionally unsupported because it may be linked.
 
 Before the first publish:

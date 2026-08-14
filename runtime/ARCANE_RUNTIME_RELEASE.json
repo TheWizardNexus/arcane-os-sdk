@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
   "builder": "arcane-sdk-runtime-v1",
-  "sdkVersion": "0.1.0-dev.0",
+  "sdkVersion": "0.1.0-dev.1",
   "source": {
     "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
-    "commit": "ed463af186ffa8ce86f19fd1094aa04f77b9cb59",
-    "bundleVersion": "0.8.10",
+    "commit": "12f308607fd2675bd812d98dd6c5c07472af8383",
+    "bundleVersion": "0.8.11",
     "protocol": "arcane/1"
   },
-  "fileCount": 143,
-  "totalBytes": 3091359,
-  "contentSha256": "c1a70c8fd70c1dba269b72d04e3e7b4f24a8ff19ceb95e4b76146f59ab801647",
+  "fileCount": 144,
+  "totalBytes": 3114773,
+  "contentSha256": "c48644f0c4df0265b72118c81c2df9f00d7bad158aa0c3f5701cda37e389f71c",
   "files": [
     {
       "path": "arcane/components/app-bar.html",
@@ -34,8 +34,8 @@
     },
     {
       "path": "arcane/components/chat.html",
-      "bytes": 24682,
-      "sha256": "da7aaac8e6463aeca4def3ffb8443f983b8295726c4ad07236789b6a765abdc7"
+      "bytes": 24710,
+      "sha256": "0d92ec8531a7a63ac070661ce553fcc6c577977154544cabf0ec06bea4cba298"
     },
     {
       "path": "arcane/components/conversation-view.html",
@@ -99,8 +99,8 @@
     },
     {
       "path": "arcane/components/markdown-document.html",
-      "bytes": 31574,
-      "sha256": "d7559b42495b296b877e2f19ec0cde858176e98557affc3d70ecf89c98cb9850"
+      "bytes": 32793,
+      "sha256": "4188458e25299f18cbf5393e5f7707a385623187331491772afe5e26d58e3304"
     },
     {
       "path": "arcane/components/markdown-editor.html",
@@ -154,8 +154,8 @@
     },
     {
       "path": "arcane/components/speech.html",
-      "bytes": 10814,
-      "sha256": "06f3b4358a6e2ea90ae0eaa18fae965bf3b2c9c37677748f3530b90610d87201"
+      "bytes": 10912,
+      "sha256": "170324cb17057460efe72201cea5e7bd58d0b4b3d9b4f884e44d62e5d4f6daa0"
     },
     {
       "path": "arcane/components/summary-strip.html",
@@ -195,7 +195,7 @@
     {
       "path": "arcane/components/voice-transcription.html",
       "bytes": 14471,
-      "sha256": "9f2588d2ca5080b19cf12932fa309e0cf535fb8a5a453666d2c8cb60696417c1"
+      "sha256": "7fab0ca767c252f661f7a3a5e09cf7325692b64a1d03e5731dc5d4f83c80c124"
     },
     {
       "path": "arcane/components/weather-widget.html",
@@ -219,8 +219,8 @@
     },
     {
       "path": "arcane/css/document-site.css",
-      "bytes": 18250,
-      "sha256": "ff423c67adc155c182de3790f8aec3f09f1d9f110d32112d15b4047edd5e853b"
+      "bytes": 19070,
+      "sha256": "f1958230a4b74ab965742eeb1c6d331b4b8e184d20efcc56f709cfa355b11ce6"
     },
     {
       "path": "arcane/css/layout.css",
@@ -255,7 +255,7 @@
     {
       "path": "arcane/entities/Chat.js",
       "bytes": 10105,
-      "sha256": "7bf015b367c2e204d36ae05c1fc12e81d35e2388d233b3c337295eb4a376cd7f"
+      "sha256": "f3344ba76d538af2c4bc7d917b5d0260772b0dcf3d0809e1d8f14ab21d2b17a8"
     },
     {
       "path": "arcane/entities/CommunicationMessage.js",
@@ -369,8 +369,8 @@
     },
     {
       "path": "arcane/modules/AI.js",
-      "bytes": 34153,
-      "sha256": "079f2fdfa5ba5988156c459f305103df2bea3d937c46d1f7d79146a5cb360a52"
+      "bytes": 46249,
+      "sha256": "0d78467d45ac67fb09719a5094133fb50d803f79c0f8351b38d155ef7cb46429"
     },
     {
       "path": "arcane/modules/AIPreferenceRuntime.js",
@@ -528,14 +528,19 @@
       "sha256": "68604439786f663e2b7ae38ac5e7b0a7bbeb5d02e8cd840501640528c016ca43"
     },
     {
+      "path": "arcane/modules/IsolatedModelQuestionRunner.js",
+      "bytes": 8956,
+      "sha256": "9f1967cfad5e9ec8c46d9e39539c85f5d8d05804592671c30a60032984a471a4"
+    },
+    {
       "path": "arcane/modules/LocalAIReadiness.js",
       "bytes": 19459,
       "sha256": "a61b860d0203dc39608a4cbd19f99fcac4928a9e444bf64c8cbd40b7bee252fe"
     },
     {
       "path": "arcane/modules/LocalAIReadinessController.js",
-      "bytes": 3705,
-      "sha256": "fb8a096fbd1278d91f11706a1b1748327016644fff342aa9093be5d965133ff2"
+      "bytes": 3902,
+      "sha256": "20ea01da5d995f27bbadeff9105a7f658386f70a92e08c7655093ce116a63cf6"
     },
     {
       "path": "arcane/modules/MD.js",

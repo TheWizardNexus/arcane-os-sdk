@@ -66,7 +66,7 @@
     .document-content{
         line-height:1.65;
         min-width:0;
-        overflow-wrap:anywhere;
+        overflow-wrap:break-word;
     }
 
     .document-content:focus{
@@ -133,7 +133,22 @@
 
     .document-content table{
         border-collapse:collapse;
+        display:block;
         inline-size:100%;
+        max-inline-size:100%;
+        overflow-x:auto;
+        overscroll-behavior-inline:contain;
+    }
+
+    .document-content table :where(code,kbd){
+        overflow-wrap:normal;
+        white-space:normal;
+        word-break:normal;
+    }
+
+    .document-content table:focus-visible{
+        outline:3px solid var(--focus-color);
+        outline-offset:.2rem;
     }
 
     .document-content :where(th,td){
@@ -157,6 +172,7 @@
 
         .document-content :where(h1,h2,h3,h4,h5,h6):focus,
         .document-content a:focus-visible,
+        .document-content table:focus-visible,
         .table-of-contents a:focus-visible{
             outline-color:Highlight;
         }
@@ -656,6 +672,7 @@
         }
 
         tableOfContents=decorateHeadings(fragment);
+        decorateTables(fragment);
         contentElement.replaceChildren(fragment);
         buildTableOfContents(tableOfContents);
         transition(
@@ -814,6 +831,26 @@
                     return Object.freeze({id,level,text});
                 }
             );
+    }
+
+    function decorateTables(fragment){
+        Array.from(fragment.querySelectorAll('table')).forEach(
+            (table,index)=>{
+                const headers=Array.from(table.querySelectorAll('thead th'));
+                headers.forEach(header=>{
+                    header.scope='col';
+                });
+                const headingText=headers
+                    .map(header=>header.textContent.trim())
+                    .filter(Boolean)
+                    .join(', ');
+                const prefix=`Data table ${index+1}`;
+                const label=headingText?`${prefix}: ${headingText}`:prefix;
+
+                table.tabIndex=0;
+                table.setAttribute('aria-label',label.slice(0,256));
+            }
+        );
     }
 
     function buildTableOfContents(entries=[]){

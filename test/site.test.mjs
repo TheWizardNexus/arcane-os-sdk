@@ -34,12 +34,13 @@ test('Pages document is semantic, project-path safe, and truthful',async()=>{
     assert.doesNotMatch(html,/(?:href|src)="\//u);
 
     assert.match(html,/Not yet published to npm/u);
-    assert.match(html,/Browser packaging is available; native targets are deferred/u);
-    assert.match(html,/process-local native provider contract ready for platform pairing/u);
+    assert.match(html,/Browser and verified portable directory builds are available; executable targets are deferred/u);
+    assert.match(html,/build a verified portable Core directory through an explicit compatible Arcane OS checkout/u);
     assert.match(html,/CLI, CI, future GUI, and Codex/u);
     assert.match(html,/doctor \/ expected contract/u);
     assert.match(html,/<span class="ready-pill">example<\/span>/u);
-    assert.match(html,/A deferred native target returns a stable unavailable error and creates nothing/u);
+    assert.match(html,/The portable build is a verified app-scoped Core payload and cannot run directly/u);
+    assert.match(html,/A deferred executable target returns a stable unavailable error and creates nothing/u);
     for(const target of ['Browser','Portable','Windows x64','Linux x64 / ARM64','Android ARM64']){
         assert.match(html,new RegExp(`<th scope="row">${target.replace('/','\\/')}</th>`,'u'));
     }
@@ -87,6 +88,10 @@ test('space motion is bounded, controllable, and accessibility-aware',async()=>{
     assert.match(script,/window\.cancelAnimationFrame/u);
     assert.match(script,/ArrowRight/u);
     assert.match(script,/navigator\.clipboard/u);
+    assert.match(script,/native-doctor --target portable --arcane-root/u);
+    assert.match(script,/build --target portable --arcane-root/u);
+    assert.match(script,/new local-app --path \.\.\/local-app --target portable --git/u);
+    assert.match(script,/not an executable or direct-run target/u);
     assert.doesNotMatch(script,/innerHTML/u);
     assert.doesNotMatch(script,/(?:fetch|XMLHttpRequest)\s*\(/u);
 });

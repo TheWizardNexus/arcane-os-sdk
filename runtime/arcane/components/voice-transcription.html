@@ -296,7 +296,7 @@
             return options.transcribe;
         }
         if(typeof globalThis.ai?.fetchSTT!=='function'){
-            await import(moduleURL('AI.js?v=6'));
+            await import(moduleURL('AI.js?v=7'));
         }
         if(typeof globalThis.ai?.fetchSTT!=='function'){
             throw new Error('Speech transcription is not configured.');

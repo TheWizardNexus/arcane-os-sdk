@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.0-dev.1
+
+- Synchronized the bundled browser runtime with Arcane OS 0.8.11 and pinned
+  its exact upstream source and content inventory.
+- Added explicit `--arcane-root` portable provider pairing, native doctor and
+  prepare commands, and verified single-app portable Core directory builds.
+- Bound native plans to the exact schema-2 package policy and SDK-authenticated
+  release readers, made each plan single-attempt, and reject incompatible Core
+  versions, protocols, features, capabilities, and methods before build while
+  accepting newer compatible Arcane versions.
+- Added `new` and `init --target portable` scaffolding with the required raster
+  icon, browser-plus-portable target intent, and generated portable guidance.
+- Refuse unknown portable output collisions and authenticate an exact prior
+  Arcane artifact before replacement.
+- Fixed the generated app test so newly scaffolded repositories execute their
+  theme and package identity checks successfully.
+
 ## 0.1.0-dev.0
 
 - Added the first external-repository Arcane OS SDK and `arcane` CLI.

@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {createWorkspace,initWorkspace} from '../src/scaffold.mjs';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';
-import {temporaryDirectory} from './helpers.mjs';
+import {runNode,temporaryDirectory} from './helpers.mjs';
 
 test('workspace scaffold creates a private external app using the exact SDK version',async t=>{
     const parent=await temporaryDirectory(t);
@@ -18,13 +18,14 @@ test('workspace scaffold creates a private external app using the exact SDK vers
     });
 
     assert.equal(receipt.workspaceRoot,targetPath);
+    assert.equal(receipt.target,'browser');
     assert.equal(events.at(0).type,'scaffold.started');
     assert.equal(events.at(-1).type,'scaffold.completed');
 
     const packageDocument=JSON.parse(await readFile(path.join(targetPath,'package.json'),'utf8'));
     assert.equal(packageDocument.private,true);
     assert.equal(packageDocument.type,'module');
-    assert.equal(packageDocument.devDependencies['arcane-os'],'0.1.0-dev.0');
+    assert.equal(packageDocument.devDependencies['arcane-os'],'0.1.0-dev.1');
 
     const packager=JSON.parse(await readFile(path.join(targetPath,'arcane-packager.json'),'utf8'));
     assert.equal(packager.sharedPayloads['browser-runtime'].length,3);
@@ -38,10 +39,11 @@ test('workspace scaffold creates a private external app using the exact SDK vers
     const workflow=await readFile(path.join(targetPath,'.github','workflows','check.yml'),'utf8');
     assert.match(workflow,/run: npm ci --ignore-scripts/);
     assert.doesNotMatch(workflow,/run: npm install/);
+    assert.match(await readFile(path.join(targetPath,'.gitignore'),'utf8'),/^build\/$/mu);
 
     const lock=JSON.parse(await readFile(path.join(targetPath,'arcane.lock.json'),'utf8'));
     assert.equal(lock.sdk.name,'arcane-os');
-    assert.equal(lock.sdk.version,'0.1.0-dev.0');
+    assert.equal(lock.sdk.version,'0.1.0-dev.1');
     assert.equal(lock.protocols.arcane,'arcane/1');
     assert.match(lock.runtime.contentSha256,/^[0-9a-f]{64}$/);
 
@@ -61,6 +63,14 @@ test('workspace scaffold creates a private external app using the exact SDK vers
     assert.match(html,/<meta name="arcane-app-id" content="signal-lab">/);
     assert.ok(theme>=0&&primitives>theme&&appStyle>primitives);
     assert.ok(bootstrap>appStyle&&appModule>bootstrap);
+
+    const generatedTest=path.join(appRoot,'test','app.test.mjs');
+    const generatedTestResult=await runNode(['--test',generatedTest],{cwd:targetPath});
+    assert.equal(
+        generatedTestResult.code,
+        0,
+        `Generated application test failed to parse or run:\n${generatedTestResult.stderr}`
+    );
 
     const css=await readFile(path.join(appRoot,'signal-lab.css'),'utf8');
     assert.doesNotMatch(css,/#(?:[0-9a-f]{3}|[0-9a-f]{6})(?![0-9a-f])/iu);
@@ -85,6 +95,26 @@ test('create refuses a nonempty target and init preserves existing authored file
     assert.equal(await readFile(path.join(initialized,'README.md'),'utf8'),'# Existing README\n');
     assert.ok(receipt.skippedFiles.includes('README.md'));
     assert.ok(receipt.createdFiles.includes('apps/preserved-app/index.html'));
+});
+
+test('portable scaffold includes a real raster icon and declares browser plus portable targets',async t=>{
+    const parent=await temporaryDirectory(t);
+    const targetPath=path.join(parent,'portable-app');
+    const receipt=await createWorkspace({targetPath,appId:'portable-app',target:'portable'});
+
+    const appRoot=path.join(targetPath,'apps','portable-app');
+    const descriptor=JSON.parse(await readFile(path.join(appRoot,'arcane-app.json'),'utf8'));
+    const packageManifest=JSON.parse(await readFile(path.join(appRoot,'arcane-package.json'),'utf8'));
+    const icon=await readFile(path.join(appRoot,'img','icon.png'));
+    const readme=await readFile(path.join(targetPath,'README.md'),'utf8');
+
+    assert.equal(receipt.target,'portable');
+    assert.deepEqual(descriptor.targets,['browser','portable']);
+    assert.equal(descriptor.native.icon,'img/icon.png');
+    assert.ok(descriptor.package.include.includes('img/icon.png'));
+    assert.deepEqual(projectPackageManifest(descriptor),packageManifest);
+    assert.deepEqual([...icon.subarray(0,8)],[137,80,78,71,13,10,26,10]);
+    assert.match(readme,/arcane build --target portable --arcane-root/);
 });
 
 test('init preflights package conflicts before creating any template files',async t=>{

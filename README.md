@@ -19,8 +19,9 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This is development software. Version `0.1.0-dev.0` is not a production or
-release-candidate claim. It has not yet been published to npm.
+This is development software. Version `0.1.0-dev.1` synchronizes the Arcane
+`0.8.11` runtime, but it is not a production or release-candidate claim. It has
+not yet been published to npm.
 
 ## Install
 
@@ -28,7 +29,7 @@ After the development package is published under the npm `dev` tag, create a
 new repository-shaped Arcane application:
 
 ```bash
-npx arcane-os@dev new my-app --path ./my-app --git
+npx arcane-os@dev new my-app --path ./my-app --target portable --git
 cd my-app
 npm install
 npm run check
@@ -40,7 +41,7 @@ missing Arcane files:
 
 ```bash
 npm install --save-dev --save-exact arcane-os@dev
-npm exec -- arcane init my-app
+npm exec -- arcane init my-app --target portable
 ```
 
 The npm package is named `arcane-os`. Its primary executable is `arcane`, and
@@ -69,11 +70,11 @@ tarball install in the app's package manifest and lock:
 npm ci
 npm run check
 npm run pack:local
-node ./bin/arcane.mjs new local-app --path ../local-app --git
+node ./bin/arcane.mjs new local-app --path ../local-app --target portable --git
 
 # From the generated app repository
 cd ../local-app
-npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.0.tgz
+npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.1.tgz
 npm run check
 npm ci
 ```
@@ -102,22 +103,24 @@ node ../arcane-os-sdk/bin/arcane.mjs dev --workspace "../Arcane OS" --app calcul
 node ../arcane-os-sdk/bin/arcane.mjs package --workspace "../Arcane OS" --app calculator
 ```
 
-`arcane init new-app --workspace <arcane-root>` detects the integrated profile
+`arcane init new-app --workspace <arcane-root> --target portable` detects the integrated profile
 and writes only `apps/new-app/` boilerplate. It does not modify Arcane OS root
 scripts, dependencies, workflows, lock files, or repository instructions.
 
 ## Commands
 
 ```text
-arcane new <id> [--path <directory>] [--display-name <name>] [--git]
-arcane init [id] [--workspace <directory>] [--display-name <name>]
+arcane new <id> [--path <directory>] [--display-name <name>] [--target browser|portable] [--git]
+arcane init [id] [--workspace <directory>] [--display-name <name>] [--target browser|portable]
 arcane doctor [--workspace <directory>] [--arcane-root <directory>]
 arcane dev [--app <id>] [--host 127.0.0.1] [--port 8000]
 arcane test [--app <id>]
 arcane check [--app <id>] [--skip-tests]
 arcane package [--app <id>] [--dry-run]
 arcane verify [--app <id>]
-arcane build --target <target> [--format <format>] [--signing <mode>]
+arcane native-doctor --target portable --arcane-root <directory>
+arcane native-prepare --target portable --arcane-root <directory>
+arcane build --target <target> [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>]
 arcane run [--target browser] [--app <id>]
 arcane targets
 arcane repo status|pull|push
@@ -129,12 +132,38 @@ network, hashing, test, process, or service work begins.
 
 ## Current target support
 
-The verified browser application release is available now. The SDK also ships
-the process-local native plan and provider contract: a paired provider can
-doctor and prepare one toolchain, plan and build one verified app release,
-verify the resulting artifact, and run that exact artifact receipt. The default
-CLI does not yet bundle a real Arcane native provider, so Windows, Linux, Android,
-and portable native targets remain deferred.
+The verified browser application release and portable directory build are
+available now. Portable builds explicitly pair the SDK with a compatible
+Arcane OS checkout; the SDK never searches for or silently selects a
+mutable toolchain root. From an external application repository, run:
+
+```bash
+npm exec -- arcane native-doctor --target portable --arcane-root "../Arcane OS"
+npm exec -- arcane build --target portable --arcane-root "../Arcane OS"
+```
+
+Use `--target portable` when scaffolding to include the required raster icon and
+declare both `browser` and `portable` in the canonical app descriptor. The
+browser remains available from the same repository.
+
+`native-prepare` is available as a standalone toolchain-integrity diagnostic.
+Do not run it immediately before `build`: receipts are process-owned, and the
+build command prepares and reuses its own exact toolchain state once.
+
+The build authenticates the selected app release and descriptor, requires the
+Core to meet the highest minimum declared by the SDK runtime, selected app, and
+bundled dependencies, keep their declared Arcane protocol, and provide every
+required feature, capability, and method. A newer compatible Core is accepted.
+It copies release bytes through verified readers and emits an app-scoped Arcane Core payload under
+`build/portable/` by default. That payload is a verified directory for platform
+builder integration. It is not an executable and `arcane run --target portable`
+is intentionally unavailable.
+
+This path has been exercised end to end from an external repository installed
+from the packed `arcane-os-0.1.0-dev.1.tgz`. Windows, Linux, and Android
+executables remain deferred. The Arcane repository now has a per-build secure
+Windows transaction foundation, but it is not yet paired with a fully retained
+Windows toolchain receipt and therefore does not enable the Windows target.
 
 | Capability | Ready now |
 |---|---|
@@ -143,10 +172,11 @@ and portable native targets remain deferred.
 | Integrated Arcane checkout workflow | Yes |
 | ArcaneOllama managed-service check | Yes on supported Windows hosts |
 | SDK native plan/provider/receipt boundary | Yes |
-| Windows EXE, Linux package, Android APK/AAB, or portable native output | No; the Arcane platform providers still need extraction |
+| Portable app-scoped Core directory | Yes, with explicit `--arcane-root`; verified but not directly runnable |
+| Windows EXE, Linux package, or Android APK/AAB | No; executable platform providers remain deferred |
 
-Deferred targets fail with a stable error; they never emit a browser directory
-or another portable substitute and call it a native executable.
+Deferred executable targets fail with a stable error; the available portable
+directory is never represented as a Windows, Linux, or Android executable.
 
 See [docs/platform-targets.md](docs/platform-targets.md) for the matrix and
 [docs/architecture.md](docs/architecture.md) for the boundary. The issue-ready

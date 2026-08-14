@@ -26,12 +26,12 @@ const DEFINITIONS=Object.freeze([
     Object.freeze({
         id:'portable',
         displayName:'Portable native application',
-        status:'deferred',
+        status:'pairing-required',
         platforms:['windows','linux'],
         architectures:['x64','arm64'],
         formats:['portable'],
-        signingModes:['development','production'],
-        reason:'The external single-app portable builder has not been extracted from Arcane OS.'
+        signingModes:['unsigned-local-test'],
+        reason:'Portable output is available only when explicitly paired to a compatible Arcane OS checkout with --arcane-root.'
     }),
     Object.freeze({
         id:'windows-x64',
@@ -83,14 +83,17 @@ function describe(definition){
         architectures:[...definition.architectures],
         formats:[...definition.formats],
         signingModes:[...definition.signingModes],
-        methods:['describe','doctor','plan','build','verify','run']
+        methods:['describe','doctor','prepare','plan','build','verify','run']
     };
 }
 
 function deferredError(definition){
+    const state=definition.status==='pairing-required'
+        ?`requires explicit pairing. ${definition.reason}`
+        :`is deferred. ${definition.reason}`;
     return new ArcaneError(
         ERROR_CODES.targetDeferred,
-        `Target ${definition.id} is deferred. ${definition.reason}`,
+        `Target ${definition.id} ${state}`,
         {details:describe(definition)}
     );
 }
@@ -106,7 +109,7 @@ function createDeferredAdapter(definition){
         describe:async()=>describe(definition),
         doctor:async()=>({
             target:definition.id,
-            status:'deferred',
+            status:definition.status,
             ready:false,
             reason:definition.reason
         }),
@@ -124,6 +127,10 @@ const browserAdapter=Object.freeze({
     id:'browser',
     describe:async()=>describe(browserDefinition),
     doctor:async()=>({target:'browser',status:'available',ready:true}),
+    async prepare({signal}={}){
+        throwIfAborted(signal);
+        return {target:'browser',status:'available',ready:true,required:false};
+    },
     async plan({workspaceRoot,appId,format='directory',signing='none',signal}={}){
         throwIfAborted(signal);
         if(format!=='directory'){
@@ -234,6 +241,21 @@ function selectedArtifactReceipt(artifactReceipt){
 export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
     const definition=nativeDefinition(targetId);
     const provider=validateNativeBuilder(nativeBuilder);
+    let providerDescriptionPromise;
+
+    async function requireProviderTarget(){
+        providerDescriptionPromise??=Promise.resolve(provider.describe()).then(description=>{
+            if(!description||description.protocol!=='arcane-native-builder/1'
+                ||!Array.isArray(description.targets)||!description.targets.includes(targetId)){
+                throw new ArcaneError(
+                    ERROR_CODES.targetUnavailable,
+                    `The selected native provider does not declare support for target ${targetId}.`
+                );
+            }
+            return description;
+        });
+        return providerDescriptionPromise;
+    }
 
     async function plan({
         toolchainRoot,
@@ -242,12 +264,14 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
         appReleaseReceipt,
         appDescriptor,
         dependencyReleases,
+        minimumCoreVersion,
         protectedRoots,
         outputRoot,
         targetRequest,
         signal,
         onEvent
     }={}){
+        await requireProviderTarget();
         return createNativeBuildPlan({
             nativeBuilder:provider,
             toolchainRoot,
@@ -256,6 +280,7 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
             appReleaseReceipt,
             appDescriptor,
             dependencyReleases,
+            minimumCoreVersion,
             protectedRoots,
             outputRoot,
             targetRequest:selectedNativeRequest(targetId,targetRequest),
@@ -267,13 +292,17 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
     return Object.freeze({
         protocol:TARGET_ADAPTER_PROTOCOL,
         id:definition.id,
-        describe:async()=>({
-            ...describe(definition),
-            status:'available',
-            reason:null
-        }),
+        describe:async()=>{
+            await requireProviderTarget();
+            return {
+                ...describe(definition),
+                status:'available',
+                reason:null
+            };
+        },
         async doctor({toolchainRoot,toolchainReceipt,targetRequest,signal,onEvent}={}){
             throwIfAborted(signal);
+            await requireProviderTarget();
             return provider.doctor({
                 toolchainRoot,
                 toolchainReceipt,
@@ -284,6 +313,7 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
         },
         async prepare({toolchainRoot,targetRequest,signal,onEvent}={}){
             throwIfAborted(signal);
+            await requireProviderTarget();
             return provider.prepare({
                 toolchainRoot,
                 targetRequest:selectedNativeRequest(targetId,targetRequest),
@@ -294,6 +324,7 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
         plan,
         async build({nativePlan,...options}={}){
             throwIfAborted(options.signal);
+            await requireProviderTarget();
             const selectedPlan=nativePlan??await plan(options);
             const result=await executeNativeBuildPlan(selectedPlan,{
                 expectedNativeBuilder:provider,
@@ -320,6 +351,7 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
             onEvent
         }={}){
             throwIfAborted(signal);
+            await requireProviderTarget();
             const selectedReceipt=selectedArtifactReceipt(artifactReceipt);
             const result=await provider.verify({
                 toolchainRoot,
@@ -351,6 +383,7 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
             onEvent
         }={}){
             throwIfAborted(signal);
+            await requireProviderTarget();
             const selectedReceipt=selectedArtifactReceipt(artifactReceipt);
             const result=await provider.run({
                 toolchainRoot,

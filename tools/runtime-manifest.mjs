@@ -80,8 +80,8 @@ async function buildManifest(){
         sdkVersion:packageJson.version,
         source:{
             repository:'https://github.com/TheWizardNexus/ARCANE-OS.git',
-            commit:'ed463af186ffa8ce86f19fd1094aa04f77b9cb59',
-            bundleVersion:'0.8.10',
+            commit:'12f308607fd2675bd812d98dd6c5c07472af8383',
+            bundleVersion:'0.8.11',
             protocol:'arcane/1'
         },
         fileCount:files.length,

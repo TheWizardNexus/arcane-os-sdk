@@ -12,17 +12,27 @@ There is no implicit all-app, all-target, or Android-flavor loop.
 
 - Scaffold: approximately 15-25 files, less than 100 KiB, target under one
   second before an optional dependency installation.
-- Shared browser payload: the 143-file, approximately 3.1 MB runtime plus three
+- Shared browser payload: the 144-file, approximately 3.1 MB runtime plus three
   SDK licensing files, verified once per exact SDK installation state.
 - Small browser package: app bytes plus the shared runtime, copied and inventoried
   once into an atomic staging directory.
-- Native build: one explicitly selected target. A representative cold build has
-  not yet been measured because external native adapters remain deferred.
+- Portable build: one explicitly selected app and one host platform request. In
+  a fresh packed-SDK external-repository run on Windows, the SDK's Arcane 0.8.11
+  runtime produced a 153-file, 3,236,727-byte selected release against the newer
+  compatible Arcane 0.8.12 toolchain. The verified portable result contained
+  160 files and 4,570,320 bytes. The complete pack, install, Ollama doctor, app
+  check, toolchain preparation, build, and verification sequence completed in
+  approximately 9.2 seconds. This is development evidence, not a cross-machine
+  performance guarantee.
 
-Invariant work includes SDK/runtime resolution and exact native toolchain assets.
+Invariant work includes SDK/runtime resolution and the portable provider's 20
+required Arcane toolchain inputs, snapshotted once per prepared toolchain state.
 App source validation, tests, and release inventory are identity-bound once per
-app state. Compilation and signing are identity-bound once per requested target.
-Compatible file traversal may be batched with bounded sequential streaming.
+app state. Portable assembly is identity-bound once per requested target, and
+final artifact verification consumes its one-shot receipt without repeating the
+toolchain preparation. Compilation and signing for future executable targets
+remain identity-bound once per requested target. Compatible file traversal may
+be batched with bounded sequential streaming.
 
 Runtime verification binds version, source identity, inventory, and hashes. The
 schema-1 app-release manifest binds its packaged inventory and content digest.

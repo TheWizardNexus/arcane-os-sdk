@@ -54,7 +54,7 @@
 
 <script type="module">
     import('../modules/DBLS.js');
-    import('../modules/AI.js?v=6');
+    import('../modules/AI.js?v=7');
 
     const audioElement = new Audio();
     const host=this;
@@ -251,7 +251,12 @@
     }
 
     function muteToggle(){
-        setMuted(!host.muted);
+        const muted=!host.muted;
+        setMuted(muted);
+
+        if(!muted){
+            window.ai?.resumeAudio?.();
+        }
     }
 
     async function transcribe(transcription=''){

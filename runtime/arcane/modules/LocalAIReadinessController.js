@@ -105,11 +105,21 @@ export function createLocalAIReadinessController({
         return active;
     };
 
+    const ensure=()=>{
+        if(active){
+            return active;
+        }
+        return latestReport
+            ?Promise.resolve(latestReport)
+            :check();
+    };
+
     const retry=()=>void check();
     status?.addEventListener('local-ai-retry',retry);
 
     return Object.freeze({
         check,
+        ensure,
         destroy(){
             status?.removeEventListener('local-ai-retry',retry);
         },

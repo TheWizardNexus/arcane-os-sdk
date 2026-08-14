@@ -22,13 +22,13 @@ function memoryStream(){
 test('CLI help and version succeed through the shipped executable',async()=>{
     const help=await runCli(['--help']);
     assert.equal(help.code,0);
-    assert.match(help.stdout,/Arcane OS application SDK 0\.1\.0-dev\.0/);
+    assert.match(help.stdout,/Arcane OS application SDK 0\.1\.0-dev\.1/);
     assert.match(help.stdout,/external or integrated Arcane workspace/);
     assert.match(help.stdout,/arcane-os executables/);
 
     const version=await runCli(['--version']);
     assert.equal(version.code,0);
-    assert.equal(version.stdout.trim(),'0.1.0-dev.0');
+    assert.equal(version.stdout.trim(),'0.1.0-dev.1');
 });
 
 test('both installed command names execute the published CLI entry',async()=>{
@@ -44,7 +44,7 @@ test('both installed command names execute the published CLI entry',async()=>{
         assert.equal(invoked.code,0,invoked.stderr);
         const result=JSON.parse(invoked.stdout);
         assert.equal(result.ok,true);
-        assert.equal(result.result,'0.1.0-dev.0');
+        assert.equal(result.result,'0.1.0-dev.1');
     }
 });
 
@@ -59,6 +59,7 @@ test('CLI NDJSON output acknowledges before returning target state',async()=>{
     assert.deepEqual(events.map(event=>event.sequence),events.map((_event,index)=>index+1));
     const targets=events.at(-1).data.result.targets;
     assert.equal(targets.find(target=>target.id==='browser').status,'available');
+    assert.equal(targets.find(target=>target.id==='portable').status,'pairing-required');
     assert.equal(targets.find(target=>target.id==='android-arm64').status,'deferred');
 });
 

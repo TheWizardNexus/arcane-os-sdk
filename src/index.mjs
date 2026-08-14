@@ -27,6 +27,10 @@ export {createReporter} from './events.mjs';
 export {runProcess} from './process.mjs';
 export {runDoctor,assessArcaneOllama} from './doctor.mjs';
 export {
+    ARCANE_PORTABLE_PROVIDER_PATH,
+    loadArcanePortableProvider
+} from './native-provider-loader.mjs';
+export {
     repositoryPull,
     repositoryPush,
     repositoryStatus,
@@ -54,6 +58,7 @@ export {
     packageApplication,
     planApplication,
     prepareNativeTarget,
+    resolvePortableBuildOutputRoot,
     repositoryApplication,
     runApplication,
     testApplication,
@@ -79,6 +84,7 @@ export {startDevServer} from './dev-server.mjs';
 export {
     NATIVE_BUILD_PLAN_PROTOCOL,
     NATIVE_BUILDER_PROTOCOL,
+    assertNativeToolchainCompatibility,
     authenticateNativeBuildPlan,
     createNativeBuildPlan,
     executeNativeBuildPlan,

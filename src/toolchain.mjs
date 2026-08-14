@@ -5,6 +5,7 @@ import {resolveWorkspace,validateWorkspace} from './workspace.mjs';
 import {startDevServer} from './dev-server.mjs';
 import {authenticateRuntimeReceipt,verifyRuntime} from './runtime.mjs';
 import {packageApp,verifyApp} from './packager/core.mjs';
+import {assertNativeToolchainCompatibility} from './native-plan.mjs';
 import {runDoctor} from './doctor.mjs';
 import {runProcess} from './process.mjs';
 import {
@@ -22,6 +23,29 @@ async function emit(onEvent,event){
     await onEvent?.(event);
 }
 
+function nativeArtifactReceipt(result){
+    return result?.artifactReceipt??result?.built?.artifactReceipt??null;
+}
+
+function withEventDeliveryFailure(result,error){
+    const eventDelivery=Object.freeze({
+        status:'degraded',
+        errorCode:'ARCANE_EVENT_DELIVERY_FAILED',
+        message:String(error?.message??error)
+    });
+    if(result?.built?.artifactReceipt){
+        return {...result,built:{...result.built,eventDelivery}};
+    }
+    return {...result,eventDelivery};
+}
+
+function isNativeCommitEvent(label,event){
+    return label==='build'&&(
+        event?.type==='native.build.committed'
+        ||(event?.phase==='publish'&&event?.status==='completed')
+    );
+}
+
 async function ownedWork(label,work,{signal,onEvent,heartbeatMs=5000}={}){
     throwIfAborted(signal);
     const controller=new AbortController();
@@ -31,9 +55,20 @@ async function ownedWork(label,work,{signal,onEvent,heartbeatMs=5000}={}){
         forwardAbort();
     }
     throwIfAborted(controller.signal);
+    let committed=false;
     const events=createEventQueue(onEvent,{
-        onFailure:error=>controller.abort(error)
+        onFailure:error=>{
+            if(!committed)controller.abort(error);
+        }
     });
+    const forwardEvent=async event=>{
+        if(isNativeCommitEvent(label,event))committed=true;
+        try{
+            await events.send(event);
+        }catch(error){
+            if(!committed)throw error;
+        }
+    };
     const abort=()=>{
         void events.enqueue({
             type:`${label}.cancellation-pending`,
@@ -63,13 +98,20 @@ async function ownedWork(label,work,{signal,onEvent,heartbeatMs=5000}={}){
         heartbeat.unref?.();
         const result=await work({
             signal:controller.signal,
-            onEvent:event=>events.send(event)
+            onEvent:forwardEvent
         });
+        if(nativeArtifactReceipt(result))committed=true;
         stopProducers();
-        throwIfAborted(controller.signal);
-        await events.send({type:`${label}.completed`,message:`${label} completed.`});
-        await events.drain();
-        throwIfAborted(controller.signal);
+        if(!committed)throwIfAborted(controller.signal);
+        try{
+            await events.send({type:`${label}.completed`,message:`${label} completed.`});
+            await events.drain();
+        }catch(error){
+            if(committed)return withEventDeliveryFailure(result,error);
+            throw error;
+        }
+        if(!committed)throwIfAborted(controller.signal);
+        if(events.error&&committed)return withEventDeliveryFailure(result,events.error);
         return result;
     }catch(error){
         stopProducers();
@@ -398,6 +440,44 @@ export async function prepareNativeTarget(options={}){
     );
 }
 
+export function resolvePortableBuildOutputRoot({workspaceMode,workspaceRoot,outputRoot}={}){
+    if(workspaceMode==='integrated'&&!outputRoot){
+        throw new ArcaneError(
+            ERROR_CODES.usage,
+            'An integrated portable build requires --output-root outside the Arcane OS checkout.'
+        );
+    }
+    return path.resolve(outputRoot??path.join(workspaceRoot,'build','portable'));
+}
+
+function sameCanonicalPath(left,right){
+    const normalize=value=>{
+        const normalized=path.normalize(path.resolve(value));
+        return process.platform==='win32'?normalized.toLowerCase():normalized;
+    };
+    return normalize(left)===normalize(right);
+}
+
+export function assertIntegratedPortableToolchain({workspaceMode,workspaceRoot,toolchainRoot}={}){
+    if(workspaceMode!=='integrated')return;
+    if(typeof toolchainRoot!=='string'||!sameCanonicalPath(workspaceRoot,toolchainRoot)){
+        throw new ArcaneError(
+            ERROR_CODES.policyDenied,
+            'An integrated portable build must use the same Arcane OS checkout for --workspace and --arcane-root.'
+        );
+    }
+}
+
+export function assertPortableToolchainCompatibility({prepared,toolchainReceipt}={}){
+    return assertNativeToolchainCompatibility({
+        appDescriptor:prepared?.descriptor,
+        toolchainReceipt,
+        minimumCoreVersion:prepared?.workspaceMode==='external'
+            ?prepared.runtimeReceipt?.source?.bundleVersion
+            :undefined
+    });
+}
+
 export async function verifyNativeArtifact(options={}){
     const {target,adapter}=targetSelection(options);
     const targetDescription=await adapter.describe();
@@ -424,6 +504,83 @@ export async function buildApplication(options={}){
         return adapter.build({...options,target});
     }
     if(target!=='browser'){
+        if(target==='portable'&&options.nativeBuilder!=null&&options.nativePlan==null){
+            const prepared=await preparedWorkspace(options);
+            assertIntegratedPortableToolchain({
+                workspaceMode:prepared.workspaceMode,
+                workspaceRoot:prepared.workspaceRoot,
+                toolchainRoot:options.toolchainRoot
+            });
+            if(prepared.descriptor.native.bundledApps.length>0){
+                throw new ArcaneError(
+                    ERROR_CODES.targetUnavailable,
+                    'Portable CLI builds do not yet package descriptor.native.bundledApps automatically; provide an explicit native plan with verified dependency releases.'
+                );
+            }
+            if(options.dryRun){
+                throw new ArcaneError(
+                    ERROR_CODES.usage,
+                    'Portable native build does not support --dry-run because a verified app release receipt is required.'
+                );
+            }
+            const outputRoot=resolvePortableBuildOutputRoot({
+                workspaceMode:prepared.workspaceMode,
+                workspaceRoot:prepared.workspaceRoot,
+                outputRoot:options.outputRoot
+            });
+            const result=await ownedWork(
+                'build',
+                async({signal,onEvent})=>{
+                    const release=await packageApp({
+                        workspaceRoot:prepared.workspaceRoot,
+                        appId:prepared.appId,
+                        signal,
+                        onEvent,
+                        validateSourceState:({signal:validationSignal}={})=>validatePreparedRuntime(
+                            prepared,
+                            {signal:validationSignal}
+                        )
+                    });
+                    const toolchainReceipt=await adapter.prepare({
+                        toolchainRoot:options.toolchainRoot,
+                        targetRequest:options.targetRequest,
+                        signal,
+                        onEvent
+                    });
+                    const built=await adapter.build({
+                        nativeBuilder:options.nativeBuilder,
+                        toolchainRoot:options.toolchainRoot,
+                        toolchainReceipt,
+                        appReleaseRoot:path.resolve(prepared.workspaceRoot,release.output),
+                        appReleaseReceipt:release.receipt,
+                        appDescriptor:prepared.descriptor,
+                        dependencyReleases:[],
+                        minimumCoreVersion:prepared.workspaceMode==='external'
+                            ?prepared.runtimeReceipt?.source?.bundleVersion
+                            :prepared.descriptor.requirements.minimumCoreVersion,
+                        protectedRoots:[
+                            prepared.appRoot,
+                            ...(prepared.workspaceMode==='external'?[prepared.runtimeRoot]:[]),
+                            ...(options.protectedRoots??[])
+                        ],
+                        outputRoot,
+                        targetRequest:options.targetRequest,
+                        signal,
+                        onEvent
+                    });
+                    return {built,release};
+                },
+                options
+            );
+            return {
+                ...result.built,
+                workspaceRoot:prepared.workspaceRoot,
+                workspaceMode:prepared.workspaceMode,
+                appId:prepared.appId,
+                runtimeContentSha256:prepared.runtimeReceipt?.contentSha256??null,
+                release:result.release
+            };
+        }
         return ownedWork(
             'build',
             ({signal,onEvent})=>adapter.build({...options,target,signal,onEvent}),
@@ -469,16 +626,17 @@ export async function runApplication(options={}){
     return runTarget({...selectedOptions,...prepared,target});
 }
 
-export function describeTargets(options={}){
+export async function describeTargets(options={}){
     const targets=listTargets();
     const pairedTarget=options.target??options.targetRequest?.target;
     if(options.nativeBuilder==null||pairedTarget==null||pairedTarget==='browser'){
         return {protocol:'arcane-target-adapter/1',targets};
     }
-    createNativeTargetAdapter({
+    const pairedAdapter=createNativeTargetAdapter({
         targetId:pairedTarget,
         nativeBuilder:options.nativeBuilder
     });
+    await pairedAdapter.describe();
     return {
         protocol:'arcane-target-adapter/1',
         targets:targets.map(target=>target.id===pairedTarget

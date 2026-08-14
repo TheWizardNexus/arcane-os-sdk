@@ -50,6 +50,11 @@ class AI {
         LOCAL_SPEACH: 'kokoro'
     }
 
+    #speechAbbreviations=new Set([
+        'co','dept','dr','e.g','etc','fig','i.e','inc','jr','ltd','mr',
+        'mrs','ms','no','prof','sr','st','vs'
+    ]);
+
     // Note: if we expand cloud providers, simply add their expected JSON metadata here
     get #serviceHeaders(){
         return {
@@ -198,6 +203,16 @@ class AI {
     audioMessageChunks='';
     sourceNodes=[];
     isSpeaking=false;
+    audioContext=null;
+    currentSpeechJob=null;
+    speechGeneration=0;
+    speechJobs=[];
+    speechAwaitingGesture=false;
+    speechPlaybackStarting=false;
+    speechResumeAttempt=0;
+    speechResumePending=false;
+    speechSynthesisTail=Promise.resolve();
+    speechUnlockHandler=null;
 
     // Set models to be used by the AI. 
     // Note: Only those that are defined are set.
@@ -456,7 +471,10 @@ class AI {
         id=Date.now(),
         seeThinking=false
     ){
-        this.#assertServiceConfigured(this.llmService);
+        let speechTurnCompleted=false;
+
+        try{
+            this.#assertServiceConfigured(this.llmService);
 
         const request={
             model:this.model,
@@ -566,7 +584,9 @@ class AI {
             if(Object.keys(nativeToolCalls).length&&!nativeContent){
                 streamHandler('',`M-${id}`,false);
             }
+            this.finishTTS();
             await streamComplete(nativeResult,`M-${id}`,isThinking);
+            speechTurnCompleted=true;
             return nativeResult;
         }
 
@@ -744,10 +764,17 @@ class AI {
         if(Object.keys(tool_funcs).length&&!chunkString){
             streamHandler('',`M-${id}`,false);
         }
+        this.finishTTS();
         await streamComplete(streamResult, `M-${id}`,isThinking);
 
         //sync
+        speechTurnCompleted=true;
         return streamResult;
+        }finally{
+            if(!speechTurnCompleted){
+                this.stopAudio();
+            }
+        }
     }
 
     async fetch(
@@ -855,121 +882,265 @@ class AI {
         return responseJSON;
     }
 
-    async streamTTS(
-        text = '', 
+    streamTTS(
+        text='',
         end=false
     ){
-        if(ai.muted){
-            console.info('muted');
-            return
+        if(this.muted){
+            if(end){
+                this.audioMessageChunks='';
+            }
+            return Promise.resolve(false);
         }
 
-        this.audioMessageChunks += text;
+        this.audioMessageChunks+=String(text||'');
+        const outputs=this.#extractSpeechSegments(end);
 
-        if (!end && !/[.!?。！？]/.test(this.audioMessageChunks) && this.audioMessageChunks.length < 160) {
-            return;
+        if(!outputs.length){
+            return Promise.resolve(true);
         }
 
-        //console.log(this.audioMessageChunks);
-
-        let outputs = this.audioMessageChunks.split(/(?<=[.!?。！？])/);
-        const output = outputs.splice(0, 1)[0];
-        this.audioMessageChunks = outputs.join('');
-
-        //console.log(this.audioMessageChunks);
-
-        if (output.length < 1) {
-            return;
-        }
-
-        //console.log(output);
-
-        try {
+        try{
             this.#assertServiceConfigured(this.ttsService);
-            const audioChunks = [];
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const sourceNode = audioContext.createBufferSource();
-            this.sourceNodes.push(sourceNode);
-            sourceNode.index = this.sourceNodes.length - 1;
-            sourceNode.onended = this.nextSentance;
-
-            const request={
-                model: this.modelTTS,
-                voice: window.user.AI_voice,
-                input: output,
-                speed: this.voiceSpeed,
-/*
-                response_format: 'aac',
-*/
-                instructions: (await window.user.personality || 'A behavioral health technician with a slight veteran feel on occasion.')
-                +(' and sounding a bit '+await window.user.religion || 'caring') || '',
-                response_format: this.audioFormat,
-            };
-
-            const nativeSpeech=this.#nativeSpeech(this.ttsService);
-
-            if(nativeSpeech){
-                const response=await nativeSpeech.synthesize({
-                    model:this.modelTTS,
-                    voice:String(window.user?.AI_voice||'af_heart'),
-                    input:output,
-                    responseFormat:this.audioFormat,
-                    speed:this.voiceSpeed
-                });
-
-                if(!response||typeof response.audioBase64!=='string'){
-                    throw new TypeError('Arcane returned an invalid local speech response.');
-                }
-
-                audioChunks.push(this.#base64ToBytes(response.audioBase64));
-                await ai.playAudio(
-                    audioChunks,
-                    audioContext,
-                    sourceNode,
-                    typeof response.contentType==='string'?response.contentType:this.audioType
-                );
-                return true;
-            }
-
-            const body = JSON.stringify(request);
-
-            const response = await fetch(
-                this.urlTTS, 
-                {
-                    method: 'POST',
-                    credentials: credentials,
-                    headers: this.#ttsHeaders[this.ttsService],
-                    body: body
-                }
-            );
-
-            if(!response.ok){
-                throw new Error(`Speech synthesis failed with status ${response.status}.`);
-            }
-
-            const audioStream = response.body;
-            const reader = audioStream.getReader();
-            
-            async function processAudio() {
-                let { done, value } = await reader.read();
-                if (done) {
-                    ai.playAudio(audioChunks, audioContext, sourceNode);
-                    return;
-                }
-
-                if (value) {
-                    audioChunks.push(value);
-                }
-
-                processAudio();
-            }
-
-            processAudio();
-        } catch (error) {
-            console.warn('Error fetching audio from AI:', error);
+        }catch(error){
+            console.warn('Error preparing speech from AI:',error);
+            return Promise.resolve(false);
         }
 
-        return true;
+        const generation=this.speechGeneration;
+        const jobs=[];
+
+        for(const output of outputs){
+            jobs.push(this.#queueSpeechJob(output,generation));
+        }
+
+        return Promise.all(jobs).then(
+            function reportQueuedSpeechResult(results){
+                return results.every(Boolean);
+            }
+        );
+    }
+
+    finishTTS(){
+        return this.streamTTS('',true);
+    }
+
+    #extractSpeechSegments(end=false){
+        const segments=[];
+        const maximumLength=220;
+        let remainder=this.audioMessageChunks;
+
+        while(remainder.trim()){
+            const terminator=this.#findSpeechTerminator(remainder,end);
+            let boundary=terminator
+                ?terminator.index+terminator[0].length
+                :-1;
+
+            if(boundary<0&&remainder.length>=maximumLength){
+                const candidate=remainder.slice(0,maximumLength+1);
+                const whitespace=candidate.lastIndexOf(' ');
+                boundary=whitespace>=80?whitespace+1:maximumLength;
+            }else if(boundary<0&&end){
+                boundary=remainder.length;
+            }
+
+            if(boundary<0){
+                break;
+            }
+
+            const segment=remainder.slice(0,boundary).trim();
+            remainder=remainder.slice(boundary).trimStart();
+
+            if(segment){
+                segments.push(segment);
+            }
+        }
+
+        this.audioMessageChunks=remainder;
+        return segments;
+    }
+
+    #findSpeechTerminator(text,end=false){
+        const pattern=end
+            ?/(?:[\u3002\uFF01\uFF1F]|[.!?](?=\s|$))/g
+            :/(?:[\u3002\uFF01\uFF1F]|[.!?](?=\s+\S))/g;
+        let terminator;
+
+        while((terminator=pattern.exec(text))){
+            if(
+                terminator[0]==='.'
+                &&this.#isSpeechAbbreviation(text,terminator.index)
+            ){
+                continue;
+            }
+
+            return terminator;
+        }
+
+        return null;
+    }
+
+    #isSpeechAbbreviation(text,periodIndex){
+        const beforePeriod=text.slice(0,periodIndex);
+        const token=beforePeriod.match(/([A-Za-z][A-Za-z.]*)$/)?.[1]?.toLowerCase();
+
+        if(!token){
+            const currentLine=beforePeriod.slice(beforePeriod.lastIndexOf('\n')+1);
+            return /^\s*\d+$/.test(currentLine);
+        }
+
+        if(token.length===1||/^(?:[a-z]\.)+[a-z]$/.test(token)){
+            return true;
+        }
+
+        return this.#speechAbbreviations.has(token);
+    }
+
+    #queueSpeechJob(text,generation){
+        const job={
+            abortController:null,
+            generation,
+            sourceNode:null,
+            state:'queued',
+            text
+        };
+        const runtime=this;
+        const previous=this.speechSynthesisTail;
+
+        this.speechJobs.push(job);
+
+        const synthesis=previous.then(
+            function synthesizeQueuedSpeech(){
+                return runtime.#prepareSpeechJob(job);
+            }
+        ).catch(
+            function discardFailedSpeechJob(error){
+                return runtime.#failSpeechJob(job,error);
+            }
+        );
+
+        this.speechSynthesisTail=synthesis.then(
+            function releaseSpeechSynthesisSlot(){
+                return undefined;
+            }
+        );
+
+        return synthesis;
+    }
+
+    async #prepareSpeechJob(job){
+        if(job.generation!==this.speechGeneration||this.muted){
+            return this.#cancelSpeechJob(job);
+        }
+
+        job.state='synthesizing';
+        const audio=await this.#requestSpeechAudio(job);
+
+        if(job.generation!==this.speechGeneration||this.muted){
+            return this.#cancelSpeechJob(job);
+        }
+
+        const audioContext=this.#getSpeechAudioContext();
+        return this.playAudio(
+            audio.chunks,
+            audioContext,
+            null,
+            audio.type,
+            job
+        );
+    }
+
+    async #requestSpeechAudio(job){
+        const nativeSpeech=this.#nativeSpeech(this.ttsService);
+
+        if(nativeSpeech){
+            const response=await nativeSpeech.synthesize({
+                model:this.modelTTS,
+                voice:String(window.user?.AI_voice||'af_heart'),
+                input:job.text,
+                responseFormat:this.audioFormat,
+                speed:this.voiceSpeed
+            });
+
+            if(!response||typeof response.audioBase64!=='string'){
+                throw new TypeError('Arcane returned an invalid local speech response.');
+            }
+
+            return {
+                chunks:[this.#base64ToBytes(response.audioBase64)],
+                type:typeof response.contentType==='string'
+                    ?response.contentType
+                    :this.audioType
+            };
+        }
+
+        job.abortController=new AbortController();
+        const personality=await window.user?.personality
+            ||'A behavioral health technician with a slight veteran feel on occasion.';
+        const religion=await window.user?.religion||'caring';
+        const request={
+            model:this.modelTTS,
+            voice:window.user?.AI_voice,
+            input:job.text,
+            speed:this.voiceSpeed,
+            instructions:`${personality} and sounding a bit ${religion}`,
+            response_format:this.audioFormat
+        };
+        const response=await fetch(
+            this.urlTTS,
+            {
+                method:'POST',
+                credentials,
+                headers:this.#ttsHeaders[this.ttsService],
+                body:JSON.stringify(request),
+                signal:job.abortController.signal
+            }
+        );
+
+        if(!response.ok){
+            throw new Error(`Speech synthesis failed with status ${response.status}.`);
+        }
+
+        const reader=response.body?.getReader?.();
+
+        if(!reader){
+            throw new TypeError('Speech synthesis response body is not readable.');
+        }
+
+        const chunks=[];
+
+        try{
+            while(true){
+                const {done,value}=await reader.read();
+
+                if(done){
+                    break;
+                }
+
+                if(value){
+                    chunks.push(value);
+                }
+            }
+        }finally{
+            reader.releaseLock?.();
+        }
+
+        return {chunks,type:this.audioType};
+    }
+
+    #getSpeechAudioContext(){
+        if(this.audioContext&&this.audioContext.state!=='closed'){
+            return this.audioContext;
+        }
+
+        const AudioContext=window.AudioContext||window.webkitAudioContext;
+
+        if(typeof AudioContext!=='function'){
+            throw new TypeError('Audio playback is unavailable in this browser.');
+        }
+
+        this.audioContext=new AudioContext();
+        return this.audioContext;
     }
 
     async fetchSTT(
@@ -1027,62 +1198,353 @@ class AI {
         return text;
     }
 
-    async stopAudio(){
-        this.sourceNodes.splice(1);
-        try{
-            //console.log('stopping')
-            this.sourceNodes[0]?.stop();
-        }catch(err){
-            console.warn(err);
-        }
-        this.sourceNodes.splice(0);
-        this.isSpeaking = false;
-    }
+    stopAudio(){
+        this.speechGeneration+=1;
+        this.speechResumeAttempt+=1;
+        this.speechResumePending=false;
+        this.audioMessageChunks='';
+        this.#clearSpeechUnlock();
 
-    async playAudio(audioChunks=[], audioContext, sourceNode, audioType=this.audioType) {
-        if(ai.muted){
-            console.info('muted');
-            this.stopAudio();
-            return
-        }
+        for(const job of this.speechJobs){
+            job.abortController?.abort();
+            job.state='cancelled';
 
-        try {
-            audioContext.onstatechange = (e) => { console.log(this, e) };
-            
-            const audioBlob = new Blob(audioChunks, { type: audioType });
-            const arrayBuffer = await audioBlob.arrayBuffer();
-            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-            
-            sourceNode.buffer = audioBuffer;
-            sourceNode.connect(audioContext.destination);
-
-            if (!ai.isSpeaking) {
-                ai.isSpeaking = true;
-                this.sourceNodes[0].start(0);
+            if(job.sourceNode){
+                job.sourceNode.onended=null;
             }
-        } catch (error) {
-            console.warn('Error decoding audio data:', error);
-            this.nextSentance();
+        }
+
+        for(const sourceNode of this.sourceNodes){
+            sourceNode.onended=null;
+
+            if(sourceNode.__arcaneStarted){
+                try{
+                    sourceNode.stop();
+                }catch(error){
+                    console.warn('Error stopping AI audio:',error);
+                }
+            }
+
+            sourceNode.disconnect?.();
+        }
+
+        this.speechJobs.splice(0);
+        this.sourceNodes.splice(0);
+        this.currentSpeechJob=null;
+        this.isSpeaking=false;
+        return true;
+    }
+
+    async resumeAudio(audioContext=null,fromUserGesture=true){
+        if(this.muted){
+            return false;
+        }
+
+        if(fromUserGesture){
+            this.#clearSpeechUnlock();
+        }
+
+        let attempt=0;
+        let context;
+
+        try{
+            context=audioContext||this.#getSpeechAudioContext();
+
+            if(context.state==='running'){
+                this.#clearSpeechUnlock();
+                this.#requestSpeechPlayback();
+                return true;
+            }
+
+            if(typeof context.resume!=='function'){
+                this.#waitForSpeechGesture();
+                return false;
+            }
+
+            attempt=++this.speechResumeAttempt;
+            this.speechResumePending=true;
+            await context.resume();
+
+            if(attempt!==this.speechResumeAttempt){
+                return context.state==='running';
+            }
+
+            this.speechResumePending=false;
+
+            if(context.state==='running'){
+                this.#clearSpeechUnlock();
+                this.#requestSpeechPlayback();
+                return true;
+            }
+        }catch(error){
+            if(attempt&&attempt!==this.speechResumeAttempt){
+                return context?.state==='running';
+            }
+
+            if(attempt===this.speechResumeAttempt){
+                this.speechResumePending=false;
+            }
+            this.#waitForSpeechGesture(error);
+            return false;
+        }
+
+        this.#waitForSpeechGesture();
+        return false;
+    }
+
+    async playAudio(
+        audioChunks=[],
+        audioContext=this.#getSpeechAudioContext(),
+        sourceNode=null,
+        audioType=this.audioType,
+        speechJob=null
+    ){
+        const job=speechJob||{
+            abortController:null,
+            generation:this.speechGeneration,
+            sourceNode:null,
+            state:'decoding',
+            text:''
+        };
+
+        if(!speechJob){
+            this.speechJobs.push(job);
+        }
+
+        if(this.muted||job.generation!==this.speechGeneration){
+            return this.#cancelSpeechJob(job);
+        }
+
+        try{
+            job.state='decoding';
+            const audioBlob=new Blob(audioChunks,{type:audioType});
+            const arrayBuffer=await audioBlob.arrayBuffer();
+            const audioBuffer=await audioContext.decodeAudioData(arrayBuffer);
+
+            if(this.muted||job.generation!==this.speechGeneration){
+                return this.#cancelSpeechJob(job);
+            }
+
+            const preparedSource=sourceNode||audioContext.createBufferSource();
+            const runtime=this;
+
+            preparedSource.buffer=audioBuffer;
+            preparedSource.connect(audioContext.destination);
+            preparedSource.__arcaneStarted=false;
+            preparedSource.onended=function finishQueuedSpeechSource(){
+                runtime.nextSentance(job);
+            };
+            job.sourceNode=preparedSource;
+            job.state='ready';
+            this.sourceNodes.push(preparedSource);
+            this.#requestSpeechPlayback();
+            return true;
+        }catch(error){
+            return this.#failSpeechJob(job,error);
         }
     }
 
-    async nextSentance() {
-        //console.log(ai.sourceNodes, ai.sourceNodes[0].index, ai.isSpeaking, ai.sourceNodes[0].context.state);
-        ai.isSpeaking = false;
-        ai.sourceNodes.splice(0, 1);
-        if (ai.sourceNodes.length < 1) {
-            return;
+    #requestSpeechPlayback(){
+        this.#pumpSpeechPlayback().catch(
+            function reportSpeechPlaybackFailure(error){
+                console.warn('Error playing audio data:',error);
+            }
+        );
+    }
+
+    async #pumpSpeechPlayback(){
+        if(this.speechPlaybackStarting||this.isSpeaking||this.muted){
+            return false;
         }
 
-        //console.log(ai.sourceNodes, ai.sourceNodes[0].index, ai.isSpeaking);
-        try {
-            ai.sourceNodes[0].start(0);
-            ai.isSpeaking = true;
-        } catch (err) {
-            console.warn('Error playing audio data:', err);
-            ai.isSpeaking = false;
-            ai.nextSentance();
+        this.speechPlaybackStarting=true;
+
+        try{
+            while(!this.isSpeaking&&!this.muted){
+                const job=this.speechJobs[0];
+
+                if(!job){
+                    return false;
+                }
+
+                if(job.generation!==this.speechGeneration||['cancelled','failed'].includes(job.state)){
+                    this.#removeSpeechJob(job);
+                    continue;
+                }
+
+                if(job.state!=='ready'||!job.sourceNode?.buffer){
+                    return false;
+                }
+
+                const audioContext=this.#getSpeechAudioContext();
+
+                if(audioContext.state!=='running'){
+                    this.#waitForSpeechGesture();
+
+                    if(!this.speechResumePending){
+                        this.resumeAudio(audioContext,false);
+                    }
+
+                    return false;
+                }
+
+                if(
+                    this.muted
+                    ||job!==this.speechJobs[0]
+                    ||job.generation!==this.speechGeneration
+                    ||job.state!=='ready'
+                ){
+                    continue;
+                }
+
+                try{
+                    job.state='playing';
+                    job.sourceNode.__arcaneStarted=true;
+                    this.currentSpeechJob=job;
+                    this.isSpeaking=true;
+                    job.sourceNode.start(0);
+                    return true;
+                }catch(error){
+                    this.currentSpeechJob=null;
+                    this.isSpeaking=false;
+                    this.#failSpeechJob(job,error);
+                }
+            }
+        }finally{
+            this.speechPlaybackStarting=false;
+
+            if(
+                !this.isSpeaking
+                &&!this.muted
+                &&!this.speechAwaitingGesture
+                &&!this.speechResumePending
+                &&this.speechJobs[0]?.state==='ready'
+            ){
+                this.#requestSpeechPlayback();
+            }
         }
+
+        return false;
+    }
+
+    nextSentance(job=this.currentSpeechJob){
+        if(!job||job.generation!==this.speechGeneration){
+            return false;
+        }
+
+        if(job.sourceNode){
+            job.sourceNode.onended=null;
+        }
+
+        job.state='complete';
+        this.#removeSpeechJob(job);
+
+        if(this.currentSpeechJob===job){
+            this.currentSpeechJob=null;
+            this.isSpeaking=false;
+        }
+
+        this.#requestSpeechPlayback();
+        return true;
+    }
+
+    #cancelSpeechJob(job){
+        job.abortController?.abort();
+        job.state='cancelled';
+        this.#removeSpeechJob(job);
+        return false;
+    }
+
+    #failSpeechJob(job,error){
+        if(job.state==='failed'||job.state==='cancelled'){
+            return false;
+        }
+
+        job.state='failed';
+
+        if(job.sourceNode){
+            job.sourceNode.onended=null;
+        }
+
+        this.#removeSpeechJob(job);
+
+        if(this.currentSpeechJob===job){
+            this.currentSpeechJob=null;
+            this.isSpeaking=false;
+        }
+
+        if(job.generation===this.speechGeneration&&error?.name!=='AbortError'){
+            console.warn('Error preparing audio from AI:',error);
+        }
+
+        this.#requestSpeechPlayback();
+        return false;
+    }
+
+    #removeSpeechJob(job){
+        const jobIndex=this.speechJobs.indexOf(job);
+
+        if(jobIndex>=0){
+            this.speechJobs.splice(jobIndex,1);
+        }
+
+        const sourceIndex=this.sourceNodes.indexOf(job.sourceNode);
+
+        if(sourceIndex>=0){
+            this.sourceNodes.splice(sourceIndex,1);
+        }
+
+        job.sourceNode?.disconnect?.();
+    }
+
+    #waitForSpeechGesture(error=null){
+        if(this.speechUnlockHandler){
+            return false;
+        }
+
+        const runtime=this;
+        const target=window;
+
+        this.speechAwaitingGesture=true;
+        this.speechUnlockHandler=function unlockSpeechFromUserGesture(){
+            runtime.#clearSpeechUnlock();
+            runtime.resumeAudio();
+        };
+
+        target.addEventListener?.(
+            'pointerdown',
+            this.speechUnlockHandler,
+            {capture:true,once:true}
+        );
+        target.addEventListener?.(
+            'keydown',
+            this.speechUnlockHandler,
+            {capture:true,once:true}
+        );
+
+        if(error?.name&&error.name!=='NotAllowedError'){
+            console.info('AI speech is waiting for audio playback permission:',error);
+        }
+
+        return true;
+    }
+
+    #clearSpeechUnlock(){
+        if(this.speechUnlockHandler){
+            window.removeEventListener?.(
+                'pointerdown',
+                this.speechUnlockHandler,
+                true
+            );
+            window.removeEventListener?.(
+                'keydown',
+                this.speechUnlockHandler,
+                true
+            );
+        }
+
+        this.speechUnlockHandler=null;
+        this.speechAwaitingGesture=false;
     }
 }
 

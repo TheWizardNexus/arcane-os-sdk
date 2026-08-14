@@ -1,5 +1,5 @@
 const SDK_NAME='arcane-os';
-const SDK_VERSION='0.1.0-dev.0';
+const SDK_VERSION='0.1.0-dev.1';
 
 function json(value){
     return `${JSON.stringify(value,null,2)}\n`;
@@ -25,12 +25,41 @@ export function workspaceTemplate({
     displayName,
     runtimeRelease,
     appOnly=false,
-    minimumCoreVersion='0.8.10'
+    minimumCoreVersion='0.8.11',
+    target='browser',
+    appIcon
 }){
+    if(!['browser','portable'].includes(target)){
+        throw new Error(`Unsupported scaffold target: ${String(target)}.`);
+    }
+    const portable=target==='portable';
+    if(portable&&!(appIcon instanceof Uint8Array)){
+        throw new Error('The portable scaffold requires its bundled raster icon.');
+    }
     const name=displayName||`Arcane ${titleCase(appId)}`;
     const packageName=`arcane-${appId}`;
     const runtimeContentSha256=runtimeRelease?.contentSha256;
     const upstreamCommit=runtimeRelease?.source?.commit;
+    const packageInclude=[`${appId}.css`,'index.html'];
+    if(portable)packageInclude.push('img/icon.png');
+    packageInclude.push('manifest.json','modules');
+    const portableGuide=portable?`
+## Portable Arcane Core directory
+
+This scaffold declares both the browser and portable targets and includes the
+required raster application icon. Pair it with one explicit Arcane OS checkout:
+
+\`\`\`sh
+npm exec -- arcane native-doctor --target portable --arcane-root "<path-to-Arcane-OS>"
+npm exec -- arcane build --target portable --arcane-root "<path-to-Arcane-OS>"
+\`\`\`
+
+The result is a verified app-scoped Core directory under \`build/portable/\`.
+It is not a Windows or Linux executable and cannot be run directly.
+The generated \`img/icon.png\` is an Arcane OS SDK template asset governed by
+the SDK's license terms; replace it with your own raster application icon when
+appropriate.
+`:'';
 
     if(!appOnly&&(typeof runtimeContentSha256!=='string'||!/^[a-f0-9]{64}$/.test(runtimeContentSha256))){
         throw new Error('The SDK runtime release does not contain a valid contentSha256.');
@@ -43,6 +72,7 @@ export function workspaceTemplate({
     files.set('.gitignore',[
         'node_modules/',
         'dist/',
+        'build/',
         '.arcane/',
         '*.log',
         ''
@@ -91,6 +121,7 @@ npm run run
 \`\`\`
 
 The browser release is written to \`dist/${appId}\`. Linux and Android executables require future native target adapters; the SDK reports those targets as deferred instead of substituting a browser package.
+${portableGuide}
 
 Every browser release also carries Arcane OS licensing material under \`licenses/arcane-os/\`. Review those terms before distribution.
 `);
@@ -192,7 +223,7 @@ jobs:
         package:{
             entry:'index.html',
             strategy:'static',
-            include:[`${appId}.css`,'index.html','manifest.json','modules'],
+            include:packageInclude,
             exclude:[],
             shared:['browser-runtime']
         },
@@ -207,7 +238,7 @@ jobs:
         },
         native:{
             type:'app',
-            icon:null,
+            icon:portable?'img/icon.png':null,
             order:100,
             bundledApps:[]
         },
@@ -216,7 +247,7 @@ jobs:
             minimumCoreVersion,
             features:[]
         },
-        targets:['browser']
+        targets:portable?['browser','portable']:['browser']
     }));
     files.set(`apps/${appId}/arcane-package.json`,json({
         schemaVersion:1,
@@ -225,7 +256,7 @@ jobs:
         version:'0.1.0',
         entry:'index.html',
         strategy:'static',
-        include:[`${appId}.css`,'index.html','manifest.json','modules'],
+        include:packageInclude,
         exclude:[],
         shared:['browser-runtime']
     }));
@@ -301,6 +332,9 @@ action?.addEventListener('click',()=>{
     status.textContent=\`The \${appName} app is working.\`;
 });
 `);
+    if(portable){
+        files.set(`apps/${appId}/img/icon.png`,Buffer.from(appIcon));
+    }
     files.set(`apps/${appId}/test/app.test.mjs`,`import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import test from 'node:test';
@@ -315,7 +349,7 @@ test('application shell uses the shared Arcane theme in order',async()=>{
     const bootstrap=source.indexOf('./arcane/modules/ThemeBootstrap.js');
     const appModule=source.indexOf('./apps/${appId}/modules/App.js');
 
-    assert.match(source,/<base href="\.\.\/\.\.\/">/);
+    assert.match(source,/<base href="\\.\\.\\/\\.\\.\\/">/);
     assert.match(source,/<meta name="arcane-app-id" content="${appId}">/);
     assert.ok(theme>=0&&primitives>theme&&appStyle>primitives);
     assert.ok(bootstrap>appStyle&&appModule>bootstrap);

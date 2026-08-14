@@ -88,6 +88,7 @@
       "items": {
         "enum": [
           "none",
+          "unsigned-local-test",
           "development",
           "production"
         ]
@@ -105,6 +106,7 @@
       "const": [
         "describe",
         "doctor",
+        "prepare",
         "plan",
         "build",
         "verify",

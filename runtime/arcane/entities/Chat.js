@@ -1,6 +1,6 @@
 import Is from '../../node_modules/strong-type/index.js';
 import '../modules/DBOPFS.js';
-import '../modules/AI.js?v=6';
+import '../modules/AI.js?v=7';
 import {hasUserEntry} from '../modules/ChatRecords.js';
 import {normalizeMemoryContent} from '../modules/MemoryRecords.js';
 

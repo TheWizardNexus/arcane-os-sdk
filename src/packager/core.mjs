@@ -1208,8 +1208,28 @@ async function assertArtifactState(root,identities,{signal}={}){
     return {canonical,rootIdentity:fileIdentity(rootAfter)};
 }
 
-async function issueAppReleaseReceipt(root,release,identities,{signal}={}){
+function appReleasePackageBinding(config){
+    if(!isPlainObject(config)){
+        fail('App release package binding is missing.');
+    }
+    return immutableJsonCopy({
+        schemaVersion:1,
+        id:config.id,
+        displayName:config.displayName,
+        version:config.version,
+        entry:config.entry,
+        strategy:config.strategy,
+        localAIModelPolicy:config.localAIModelPolicy??{verified_only:true,models:[]},
+        include:[...(config.include??[])],
+        exclude:[...(config.exclude??[])],
+        shared:[...(config.shared??[])],
+        adapter:config.adapter??null
+    });
+}
+
+async function issueAppReleaseReceipt(root,release,identities,{signal,packageConfig}={}){
     const state=await assertArtifactState(root,identities,{signal});
+    const packageBinding=appReleasePackageBinding(packageConfig);
     const receipt={
         schemaVersion:1,
         kind:'arcane-app-release-verification',
@@ -1233,12 +1253,17 @@ async function issueAppReleaseReceipt(root,release,identities,{signal}={}){
     issuedAppReleaseReceipts.set(receipt,Object.freeze({
         canonicalLocation:state.canonical,
         rootIdentity:state.rootIdentity,
-        identities:receipt.identities
+        identities:receipt.identities,
+        packageBinding
     }));
     return receipt;
 }
 
-export async function authenticateAppReleaseReceipt(receipt,{releaseRoot,signal}={}){
+export async function authenticateAppReleaseReceipt(receipt,{
+    releaseRoot,
+    expectedPackageConfig,
+    signal
+}={}){
     const state=issuedAppReleaseReceipts.get(receipt);
     if(!state)fail('App release receipt was not issued by this SDK process.');
     if(typeof releaseRoot!=='string'||!releaseRoot.trim())fail('releaseRoot is required to authenticate an app release receipt.');
@@ -1251,6 +1276,11 @@ export async function authenticateAppReleaseReceipt(receipt,{releaseRoot,signal}
     if(rootInfo.isSymbolicLink()||!rootInfo.isDirectory()
         ||!identityMatches(rootInfo,state.rootIdentity)){
         fail('App release root changed after its receipt was issued.');
+    }
+    if(expectedPackageConfig!==undefined
+        &&JSON.stringify(appReleasePackageBinding(expectedPackageConfig))
+            !==JSON.stringify(state.packageBinding)){
+        fail('App release receipt belongs to a different authored package policy.');
     }
     await assertArtifactState(canonical,state.identities,{signal});
     return receipt;
@@ -1904,7 +1934,7 @@ async function packageAppUnlocked({
             context.outputRoot,
             verifiedRelease.release,
             verifiedRelease.identities,
-            {signal}
+            {signal,packageConfig:{...context.config,version}}
         );
 
         if(version!==currentVersion){
@@ -1996,7 +2026,7 @@ export async function verifyApp({workspaceRoot,appId,signal,onEvent}){
         context.outputRoot,
         release,
         releaseState.identities,
-        {signal}
+        {signal,packageConfig:context.config}
     );
 
     return {

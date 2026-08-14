@@ -67,6 +67,7 @@ test('root SDK export exposes receipt authenticators and verified file readers',
     assert.equal(typeof sdk.projectPackageManifest,'function');
     assert.equal(typeof sdk.projectNativeDescriptor,'function');
     assert.equal(typeof sdk.createNativeBuildPlan,'function');
+    assert.equal(typeof sdk.assertNativeToolchainCompatibility,'function');
     assert.equal(typeof sdk.authenticateNativeBuildPlan,'function');
     assert.equal(typeof sdk.executeNativeBuildPlan,'function');
     assert.equal(typeof sdk.validateNativeBuilder,'function');
@@ -152,8 +153,21 @@ test('lock and target schemas pin the emitted SDK contracts',async()=>{
         for(const format of descriptor.formats){
             assert.ok(targetSchema.properties.formats.items.enum.includes(format));
         }
+        for(const signingMode of descriptor.signingModes){
+            assert.ok(targetSchema.properties.signingModes.items.enum.includes(signingMode));
+        }
         assert.deepEqual(descriptor.methods,targetSchema.properties.methods.const);
     }
+});
+
+test('native build plan schema uses the packager semantic-version contract',async()=>{
+    const [packageSchema,nativePlanSchema]=await Promise.all([
+        readSchema('arcane-package.schema.json'),
+        readSchema('native-build-plan.schema.json')
+    ]);
+    assert.equal(nativePlanSchema.$defs.semver.pattern,packageSchema.properties.version.pattern);
+    assert.deepEqual(nativePlanSchema.properties.minimumCoreVersion,{$ref:'#/$defs/semver'});
+    assert.deepEqual(nativePlanSchema.$defs.toolchain.properties.version,{$ref:'#/$defs/semver'});
 });
 
 test('CI and trusted publishing workflows retain their platform and authority gates',async()=>{

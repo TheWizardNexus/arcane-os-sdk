@@ -38,6 +38,18 @@ function validateInputs(appId,displayName){
     }
 }
 
+function validateScaffoldTarget(target){
+    if(!['browser','portable'].includes(target)){
+        fail(`Invalid scaffold target: ${String(target)}. Expected browser or portable.`,'ARCANE_USAGE');
+    }
+}
+
+async function scaffoldIcon(target){
+    return target==='portable'
+        ?readFile(new URL('./templates/assets/app-icon.png',import.meta.url))
+        :undefined;
+}
+
 async function assertCreateTarget(targetPath){
     try{
         const info=await lstat(targetPath);
@@ -285,22 +297,30 @@ export async function createWorkspace({
     targetPath,
     appId,
     displayName,
+    target='browser',
     initializeGit=false,
     signal,
     onEvent
 }){
     validateInputs(appId,displayName);
+    validateScaffoldTarget(target);
     if(typeof targetPath!=='string'||!targetPath.trim())fail('targetPath is required.','ARCANE_USAGE');
     if(typeof initializeGit!=='boolean')fail('initializeGit must be a boolean.','ARCANE_USAGE');
     throwIfAborted(signal);
     const workspaceRoot=path.resolve(targetPath);
-    await emit(onEvent,{type:'scaffold.started',mode:'create',workspaceRoot,appId});
+    await emit(onEvent,{type:'scaffold.started',mode:'create',workspaceRoot,appId,target});
     await assertCreateTarget(workspaceRoot);
     const runtimeRelease=await loadRuntimeRelease();
-    const template=workspaceTemplate({appId,displayName,runtimeRelease});
+    const template=workspaceTemplate({
+        appId,
+        displayName,
+        runtimeRelease,
+        target,
+        appIcon:await scaffoldIcon(target)
+    });
     const result=await writeMissingFiles(workspaceRoot,template.files,{signal,onEvent});
     if(initializeGit)await runGitInit(workspaceRoot,signal,onEvent);
-    const receipt={workspaceRoot,appId,displayName:template.name,...result,gitInitialized:Boolean(initializeGit)};
+    const receipt={workspaceRoot,appId,displayName:template.name,target,...result,gitInitialized:Boolean(initializeGit)};
     await emit(onEvent,{type:'scaffold.completed',...receipt});
     return receipt;
 }
@@ -309,13 +329,15 @@ export async function initWorkspace({
     workspaceRoot=process.cwd(),
     appId,
     displayName,
+    target='browser',
     signal,
     onEvent
 }){
     validateInputs(appId,displayName);
+    validateScaffoldTarget(target);
     throwIfAborted(signal);
     const resolvedRoot=path.resolve(workspaceRoot);
-    await emit(onEvent,{type:'scaffold.started',mode:'init',workspaceRoot:resolvedRoot,appId});
+    await emit(onEvent,{type:'scaffold.started',mode:'init',workspaceRoot:resolvedRoot,appId,target});
     await assertInitTarget(resolvedRoot);
     const profile=await existingWorkspaceProfile(resolvedRoot);
     const workspaceMode=profile?.workspaceMode??'external';
@@ -324,9 +346,17 @@ export async function initWorkspace({
             appId,
             displayName,
             appOnly:true,
-            minimumCoreVersion:await integratedCoreVersion(resolvedRoot)
+            minimumCoreVersion:await integratedCoreVersion(resolvedRoot),
+            target,
+            appIcon:await scaffoldIcon(target)
         })
-        :workspaceTemplate({appId,displayName,runtimeRelease:await loadRuntimeRelease()});
+        :workspaceTemplate({
+            appId,
+            displayName,
+            runtimeRelease:await loadRuntimeRelease(),
+            target,
+            appIcon:await scaffoldIcon(target)
+        });
     const packagePlan=workspaceMode==='integrated'
         ?Object.freeze({exists:true,updated:false})
         :await prepareExistingPackage(resolvedRoot,template.files);
@@ -337,6 +367,7 @@ export async function initWorkspace({
         workspaceMode,
         appId,
         displayName:template.name,
+        target,
         ...result,
         packageUpdated,
         gitInitialized:false

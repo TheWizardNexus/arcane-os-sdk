@@ -14,25 +14,35 @@ async function installSdkPayload(workspaceRoot){
     }
 }
 
-test('target registry exposes one available browser target and honest deferred native targets',async()=>{
+test('target registry distinguishes available, pairing-required, and deferred targets',async()=>{
     const targets=listTargets();
     assert.deepEqual(
         targets.map(target=>target.id),
         ['browser','portable','windows-x64','linux-x64','linux-arm64','android-arm64']
     );
     assert.equal(targets[0].status,'available');
+    assert.equal(targets[1].status,'pairing-required');
+    assert.deepEqual(targets[1].signingModes,['unsigned-local-test']);
+    assert.match(targets[1].reason,/--arcane-root/);
     for(const target of targets.slice(1)){
         assert.equal(target.protocol,'arcane-target-adapter/1');
-        assert.equal(target.status,'deferred');
         assert.ok(target.reason);
     }
+    for(const target of targets){
+        const adapter=getTargetAdapter(target.id);
+        for(const method of target.methods)assert.equal(typeof adapter[method],'function',`${target.id}.${method}`);
+    }
+    assert.deepEqual(await getTargetAdapter('browser').prepare(),{
+        target:'browser',status:'available',ready:true,required:false
+    });
+    for(const target of targets.slice(2))assert.equal(target.status,'deferred');
 });
 
 test('deferred adapters reject plan and build without producing substitute output',async()=>{
     for(const targetId of ['portable','windows-x64','linux-x64','linux-arm64','android-arm64']){
         const adapter=getTargetAdapter(targetId);
         const status=await adapter.doctor();
-        assert.equal(status.status,'deferred');
+        assert.equal(status.status,targetId==='portable'?'pairing-required':'deferred');
         assert.equal(status.ready,false);
         await assert.rejects(
             adapter.plan({workspaceRoot:'ignored',appId:'ignored'}),

@@ -1,8 +1,17 @@
 import {randomBytes} from 'node:crypto';
 import {lstat,realpath} from 'node:fs/promises';
 import path from 'node:path';
-import {appDescriptorSha256,projectNativeDescriptor,validateAppDescriptor} from './app-descriptor.mjs';
-import {authenticateAppReleaseReceipt} from './packager/core.mjs';
+import {
+    appDescriptorSha256,
+    projectNativeDescriptor,
+    projectPackageManifest,
+    validateAppDescriptor
+} from './app-descriptor.mjs';
+import {
+    authenticateAppReleaseReceipt,
+    parseSemver,
+    readVerifiedAppReleaseFile
+} from './packager/core.mjs';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 
 export const NATIVE_BUILD_PLAN_PROTOCOL='arcane-native-build-plan/1';
@@ -30,6 +39,7 @@ const NATIVE_TARGETS=Object.freeze({
 const SIGNING_MODES=new Set(['unsigned-local-test','development','production']);
 const SHA256_PATTERN=/^[a-f0-9]{64}$/u;
 const issuedPlans=new WeakMap();
+const attemptedPlans=new WeakSet();
 
 function fail(message,code=ERROR_CODES.policyDenied,details){
     throw new ArcaneError(code,message,{details});
@@ -52,6 +62,118 @@ function immutable(value){
         Object.entries(value).map(([key,item])=>[key,immutable(item)])
     ));
     return value;
+}
+
+function compareSemver(leftValue,rightValue){
+    const left=parseSemver(leftValue);
+    const right=parseSemver(rightValue);
+    for(const key of ['major','minor','patch']){
+        if(left[key]!==right[key])return left[key]<right[key]?-1:1;
+    }
+    if(!left.prerelease.length&&!right.prerelease.length)return 0;
+    if(!left.prerelease.length)return 1;
+    if(!right.prerelease.length)return -1;
+    const length=Math.max(left.prerelease.length,right.prerelease.length);
+    for(let index=0;index<length;index+=1){
+        const leftPart=left.prerelease[index];
+        const rightPart=right.prerelease[index];
+        if(leftPart===undefined)return -1;
+        if(rightPart===undefined)return 1;
+        if(leftPart===rightPart)continue;
+        const leftNumeric=/^\d+$/u.test(leftPart);
+        const rightNumeric=/^\d+$/u.test(rightPart);
+        if(leftNumeric&&rightNumeric){
+            if(leftPart.length!==rightPart.length)return leftPart.length<rightPart.length?-1:1;
+            return leftPart<rightPart?-1:1;
+        }
+        if(leftNumeric!==rightNumeric)return leftNumeric?-1:1;
+        return leftPart<rightPart?-1:1;
+    }
+    return 0;
+}
+
+function canonicalContractList(value,label,{maximum=4096}={}){
+    if(!Array.isArray(value)||value.length>maximum||value.some(item=>typeof item!=='string'||!item)){
+        fail(`${label} must be a bounded, unique, sorted string array.`,ERROR_CODES.integrityFailed);
+    }
+    const sorted=[...value].sort((left,right)=>left.localeCompare(right,'en'));
+    if(new Set(value).size!==value.length||value.some((item,index)=>item!==sorted[index])){
+        fail(`${label} must be a bounded, unique, sorted string array.`,ERROR_CODES.integrityFailed);
+    }
+    return value;
+}
+
+function assertRequirementsAvailable(required,available,label){
+    if(!Array.isArray(available)){
+        fail(`The native toolchain receipt does not bind supported ${label}.`,ERROR_CODES.integrityFailed);
+    }
+    const missing=required.filter(value=>!available.includes(value));
+    if(missing.length){
+        fail(
+            `The native toolchain does not provide required ${label}: ${missing.join(', ')}.`,
+            ERROR_CODES.targetUnavailable
+        );
+    }
+}
+
+export function assertNativeToolchainCompatibility({
+    appDescriptor,
+    toolchainReceipt,
+    minimumCoreVersion
+}={}){
+    const descriptor=validateAppDescriptor(appDescriptor,{appId:appDescriptor?.id});
+    const requirements=descriptor.requirements;
+    if(!isObject(toolchainReceipt)||typeof toolchainReceipt.version!=='string'){
+        fail('Native compatibility inputs are incomplete.',ERROR_CODES.integrityFailed);
+    }
+    if(toolchainReceipt.protocolVersion!==requirements.arcaneProtocol){
+        fail(
+            `The app requires ${requirements.arcaneProtocol}, but the native toolchain provides ${String(toolchainReceipt.protocolVersion??'unknown')}.`,
+            ERROR_CODES.targetUnavailable
+        );
+    }
+    const requiredVersions=[requirements.minimumCoreVersion];
+    if(minimumCoreVersion!==undefined)requiredVersions.push(minimumCoreVersion);
+    for(const requiredVersion of requiredVersions){
+        try{
+            if(typeof requiredVersion!=='string'||compareSemver(toolchainReceipt.version,requiredVersion)<0){
+                fail(
+                    `Arcane Core ${toolchainReceipt.version} does not meet the required minimum ${String(requiredVersion??'unknown')}.`,
+                    ERROR_CODES.targetUnavailable
+                );
+            }
+        }catch(error){
+            if(error instanceof ArcaneError)throw error;
+            fail('Native compatibility contains an invalid Arcane version.',ERROR_CODES.integrityFailed);
+        }
+    }
+    assertRequirementsAvailable(requirements.features,toolchainReceipt.features,'features');
+    assertRequirementsAvailable(
+        descriptor.permissions.capabilities,
+        toolchainReceipt.supportedCapabilities,
+        'capabilities'
+    );
+    assertRequirementsAvailable(
+        descriptor.permissions.methods,
+        toolchainReceipt.supportedMethods,
+        'methods'
+    );
+    return descriptor;
+}
+
+function highestCoreMinimum(versions){
+    let highest=null;
+    for(const version of versions){
+        if(version===undefined)continue;
+        try{
+            parseSemver(version);
+        }catch(error){
+            fail('Native compatibility contains an invalid minimum Core version.',ERROR_CODES.integrityFailed);
+        }
+        if(highest===null||compareSemver(version,highest)>0)highest=version;
+    }
+    if(highest===null)fail('Native compatibility has no minimum Core version.',ERROR_CODES.integrityFailed);
+    return highest;
 }
 
 function sameOrDescendant(parent,candidate){
@@ -152,9 +274,13 @@ function releaseSummary(receipt){
     });
 }
 
-async function authenticateReleaseReceipt(receipt,releaseRoot,signal){
+async function authenticateReleaseReceipt(receipt,releaseRoot,signal,expectedPackageConfig){
     try{
-        return await authenticateAppReleaseReceipt(receipt,{releaseRoot,signal});
+        return await authenticateAppReleaseReceipt(receipt,{
+            releaseRoot,
+            expectedPackageConfig,
+            signal
+        });
     }catch(error){
         if(error?.code===ERROR_CODES.cancelled)throw error;
         throw new ArcaneError(
@@ -177,7 +303,12 @@ async function authenticatedRelease(item,targetRequest,{signal}){
         fail(`App ${descriptor.id} does not declare target ${targetRequest.target}.`);
     }
     const root=await canonicalDirectory(item.appReleaseRoot,`Release root for ${descriptor.id}`);
-    const receipt=await authenticateReleaseReceipt(item.appReleaseReceipt,root,signal);
+    const receipt=await authenticateReleaseReceipt(
+        item.appReleaseReceipt,
+        root,
+        signal,
+        projectPackageManifest(descriptor)
+    );
     const app=releaseApp(receipt);
     if(app?.id!==descriptor.id||app?.version!==descriptor.version){
         fail(`Release identity for ${descriptor.id} does not match its canonical descriptor.`,ERROR_CODES.integrityFailed);
@@ -187,6 +318,11 @@ async function authenticatedRelease(item,targetRequest,{signal}){
         descriptorSha256:appDescriptorSha256(descriptor),
         releaseRoot:root,
         releaseReceipt:receipt,
+        readFile:(relativePath,{signal}={})=>readVerifiedAppReleaseFile(receipt,{
+            releaseRoot:root,
+            relativePath,
+            signal
+        }),
         summary:immutable({
             id:descriptor.id,
             version:descriptor.version,
@@ -225,12 +361,23 @@ function toolchainSummary(receipt,toolchainRoot){
     if(!isObject(receipt)||receipt.canonicalLocation!==toolchainRoot
         ||typeof receipt.kind!=='string'||!receipt.kind
         ||typeof receipt.version!=='string'||!receipt.version
+        ||typeof receipt.protocolVersion!=='string'||!/^arcane\/[1-9][0-9]*$/u.test(receipt.protocolVersion)
         ||!SHA256_PATTERN.test(receipt.contentSha256)){
         fail('The native builder returned an invalid authenticated toolchain receipt.',ERROR_CODES.integrityFailed);
     }
+    const features=canonicalContractList(receipt.features,'toolchainReceipt.features',{maximum:256});
+    const supportedCapabilities=canonicalContractList(
+        receipt.supportedCapabilities,
+        'toolchainReceipt.supportedCapabilities'
+    );
+    const supportedMethods=canonicalContractList(receipt.supportedMethods,'toolchainReceipt.supportedMethods');
     return immutable({
         kind:receipt.kind,
         version:receipt.version,
+        protocolVersion:receipt.protocolVersion,
+        features,
+        supportedCapabilities,
+        supportedMethods,
         canonicalLocation:receipt.canonicalLocation,
         contentSha256:receipt.contentSha256
     });
@@ -259,13 +406,26 @@ async function authenticateState(state,{expectedNativeBuilder,expectedTarget,sig
     if(JSON.stringify(summary)!==JSON.stringify(state.plan.toolchain)){
         fail('The native toolchain identity changed after plan creation.',ERROR_CODES.integrityFailed);
     }
+    for(const item of [state.application,...state.dependencies]){
+        assertNativeToolchainCompatibility({
+            appDescriptor:item.descriptor,
+            toolchainReceipt:summary,
+            minimumCoreVersion:state.plan.minimumCoreVersion
+        });
+    }
     await authenticateReleaseReceipt(
         state.application.releaseReceipt,
         state.application.releaseRoot,
-        signal
+        signal,
+        projectPackageManifest(state.application.descriptor)
     );
     for(const dependency of state.dependencies){
-        await authenticateReleaseReceipt(dependency.releaseReceipt,dependency.releaseRoot,signal);
+        await authenticateReleaseReceipt(
+            dependency.releaseReceipt,
+            dependency.releaseRoot,
+            signal,
+            projectPackageManifest(dependency.descriptor)
+        );
     }
     const outputRoot=await canonicalFutureDirectory(state.outputRoot,'Native output root');
     if(outputRoot!==state.outputRoot)fail('The native output root identity changed after plan creation.',ERROR_CODES.integrityFailed);
@@ -280,6 +440,7 @@ export async function createNativeBuildPlan({
     appReleaseReceipt,
     appDescriptor,
     dependencyReleases=[],
+    minimumCoreVersion,
     protectedRoots=[],
     outputRoot,
     targetRequest,
@@ -295,6 +456,7 @@ export async function createNativeBuildPlan({
         toolchainReceipt,
         {toolchainRoot:canonicalToolchainRoot,signal,onEvent}
     );
+    const authenticatedToolchainSummary=toolchainSummary(authenticatedToolchain,canonicalToolchainRoot);
     const application=await authenticatedRelease({
         appDescriptor,
         appReleaseRoot,
@@ -309,6 +471,18 @@ export async function createNativeBuildPlan({
     }
     assertDependencyClosure(application,dependencies);
     dependencies.sort((left,right)=>left.descriptor.id.localeCompare(right.descriptor.id,'en'));
+    const requiredCoreVersion=highestCoreMinimum([
+        minimumCoreVersion,
+        application.descriptor.requirements.minimumCoreVersion,
+        ...dependencies.map(item=>item.descriptor.requirements.minimumCoreVersion)
+    ]);
+    for(const item of [application,...dependencies]){
+        assertNativeToolchainCompatibility({
+            appDescriptor:item.descriptor,
+            toolchainReceipt:authenticatedToolchainSummary,
+            minimumCoreVersion:requiredCoreVersion
+        });
+    }
 
     const canonicalOutputRoot=await canonicalFutureDirectory(outputRoot,'Native output root');
     const protectedPaths=[
@@ -326,7 +500,8 @@ export async function createNativeBuildPlan({
     const plan=immutable({
         protocol:NATIVE_BUILD_PLAN_PROTOCOL,
         generation:randomBytes(16).toString('hex'),
-        toolchain:toolchainSummary(authenticatedToolchain,canonicalToolchainRoot),
+        toolchain:authenticatedToolchainSummary,
+        minimumCoreVersion:requiredCoreVersion,
         app:application.summary,
         dependencies:dependencies.map(item=>item.summary),
         targetRequest:request,
@@ -344,6 +519,7 @@ export async function createNativeBuildPlan({
         provider,
         toolchainRoot:canonicalToolchainRoot,
         toolchainReceipt,
+        minimumCoreVersion:requiredCoreVersion,
         application,
         dependencies:Object.freeze(dependencies),
         outputRoot:canonicalOutputRoot,
@@ -373,6 +549,13 @@ export async function executeNativeBuildPlan(plan,{
     const state=issuedPlans.get(plan);
     if(!state)fail('Native build plan was not issued by this SDK process.',ERROR_CODES.integrityFailed);
     throwIfAborted(signal);
+    if(attemptedPlans.has(plan)){
+        fail(
+            'Native build plan generation has already been attempted; create a new plan before retrying.',
+            ERROR_CODES.integrityFailed
+        );
+    }
+    attemptedPlans.add(plan);
     await onEvent?.(Object.freeze({type:'native.build.started',appId:plan.app.id,target:plan.targetRequest.target}));
     await authenticateState(state,{expectedNativeBuilder,expectedTarget,signal,onEvent});
     const result=await state.provider.build({
@@ -380,11 +563,13 @@ export async function executeNativeBuildPlan(plan,{
         toolchainReceipt:state.toolchainReceipt,
         appReleaseRoot:state.application.releaseRoot,
         appReleaseReceipt:state.application.releaseReceipt,
+        readAppReleaseFile:(relativePath)=>state.application.readFile(relativePath,{signal}),
         appDescriptor:state.application.descriptor,
         descriptorSha256:state.application.descriptorSha256,
         dependencyReleases:state.dependencies.map(item=>Object.freeze({
             appReleaseRoot:item.releaseRoot,
             appReleaseReceipt:item.releaseReceipt,
+            readFile:(relativePath)=>item.readFile(relativePath,{signal}),
             appDescriptor:item.descriptor,
             descriptorSha256:item.descriptorSha256
         })),
@@ -396,6 +581,11 @@ export async function executeNativeBuildPlan(plan,{
     if(!isObject(result)||!result.artifactReceipt){
         fail('Native builder did not return an artifact receipt.',ERROR_CODES.integrityFailed);
     }
+    await onEvent?.(Object.freeze({
+        type:'native.build.committed',
+        appId:plan.app.id,
+        target:plan.targetRequest.target
+    }));
     await onEvent?.(Object.freeze({
         type:'native.verify.started',
         appId:plan.app.id,
