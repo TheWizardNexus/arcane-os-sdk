@@ -80,3 +80,26 @@ receipt-bound files, and repeats the handle/path identity check. A response is
 therefore an exact verified byte snapshot even if another process writes during
 the request. Development serving is limited to 64 MiB per file and four active
 file responses, with a bounded wait queue.
+
+## Native provider boundary
+
+The SDK implements protocol `arcane-native-build-plan/1` and the injected
+provider contract `arcane-native-builder/1`. Pairing is process-local; it never
+registers a mutable global provider and never makes the default CLI advertise an
+unavailable target. One paired toolchain can perform this lifecycle:
+
+```text
+doctor -> prepare -> plan -> build -> verify receipt -> run receipt
+```
+
+The plan binds one explicit `toolchainRoot` and authenticated receipt, one app
+release root and receipt, its approved schema-2 descriptor digest, only its
+declared dependency releases, one non-overlapping output root, and one target,
+platform, architecture, format, and signing request. App source and workspace
+paths are withheld from the native provider. Build completion requires provider
+verification, and later verify/run calls receive the exact artifact receipt.
+
+This is the stable SDK seam, not a claim that a platform builder has shipped.
+The default target registry remains deferred until Arcane's portable, Windows,
+Linux, and Android builders implement this contract with retained artifact
+authority.

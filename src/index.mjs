@@ -34,6 +34,7 @@ export {
 } from './repository.mjs';
 export {
     buildTarget,
+    createNativeTargetAdapter,
     getTargetAdapter,
     listTargets,
     runTarget,
@@ -47,13 +48,17 @@ export {
     describeTargets,
     developApplication,
     doctorApplication,
+    doctorNativeTarget,
     executeOperation,
     initializeApplication,
     packageApplication,
+    planApplication,
+    prepareNativeTarget,
     repositoryApplication,
     runApplication,
     testApplication,
-    verifyApplication
+    verifyApplication,
+    verifyNativeArtifact
 } from './toolchain.mjs';
 export {createWorkspace,initWorkspace} from './scaffold.mjs';
 export {
@@ -76,7 +81,8 @@ export {
     NATIVE_BUILDER_PROTOCOL,
     authenticateNativeBuildPlan,
     createNativeBuildPlan,
-    executeNativeBuildPlan
+    executeNativeBuildPlan,
+    validateNativeBuilder
 } from './native-plan.mjs';
 export {
     APP_DESCRIPTOR_NAME,

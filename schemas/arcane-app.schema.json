@@ -71,7 +71,19 @@
       "additionalProperties": false,
       "required": ["capabilities", "methods"],
       "properties": {
-        "capabilities": { "$ref": "#/$defs/permissionList" },
+        "capabilities": {
+          "allOf": [
+            { "$ref": "#/$defs/permissionList" },
+            {
+              "not": {
+                "allOf": [
+                  { "contains": { "const": "external.open" } },
+                  { "contains": { "const": "web.embed" } }
+                ]
+              }
+            }
+          ]
+        },
         "methods": { "$ref": "#/$defs/methodList" }
       }
     },
@@ -91,7 +103,10 @@
       "required": ["type", "icon", "order", "bundledApps"],
       "properties": {
         "type": { "const": "app" },
-        "icon": { "oneOf": [{ "$ref": "#/$defs/relativePath" }, { "type": "null" }] },
+        "icon": {
+          "description": "A safe raster image path. Native targets require a non-null value. Coverage by package.include is enforced by the runtime validator because JSON Schema cannot compare property values or path prefixes.",
+          "oneOf": [{ "$ref": "#/$defs/rasterIcon" }, { "type": "null" }]
+        },
         "order": { "type": "integer", "minimum": 0, "maximum": 10000 },
         "bundledApps": {
           "type": "array",
@@ -148,6 +163,72 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "targets": { "contains": { "not": { "const": "browser" } } }
+        },
+        "required": ["targets"]
+      },
+      "then": {
+        "properties": {
+          "native": {
+            "properties": {
+              "icon": { "$ref": "#/$defs/rasterIcon" }
+            },
+            "required": ["icon"]
+          }
+        },
+        "required": ["native"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "security": {
+            "properties": {
+              "frameOrigins": { "minItems": 1 }
+            },
+            "required": ["frameOrigins"]
+          }
+        },
+        "required": ["security"]
+      },
+      "then": {
+        "properties": {
+          "permissions": {
+            "properties": {
+              "capabilities": { "contains": { "const": "web.embed" } }
+            },
+            "required": ["capabilities"]
+          }
+        },
+        "required": ["permissions"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "id": { "not": { "const": "browser" } }
+        },
+        "required": ["id"]
+      },
+      "then": {
+        "properties": {
+          "security": {
+            "properties": {
+              "frameOrigins": {
+                "not": { "contains": { "const": "https:" } }
+              }
+            },
+            "required": ["frameOrigins"]
+          }
+        },
+        "required": ["security"]
+      }
+    }
+  ],
   "$defs": {
     "appId": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
     "presentationText": {
@@ -170,6 +251,15 @@
       "type": "string",
       "minLength": 1,
       "pattern": "^(?!.*\\\\)(?!.*:)(?!.*(?:^|/)(?:\\.{1,2}|(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\\.[^/]*)?)(?:/|$))(?!.*[. ](?:/|$))[^/\\u0000-\\u001f\\u007f]+(?:/[^/\\u0000-\\u001f\\u007f]+)*$"
+    },
+    "rasterIcon": {
+      "allOf": [
+        { "$ref": "#/$defs/relativePath" },
+        {
+          "maxLength": 160,
+          "pattern": "\\.(?:[Ii][Cc][Oo]|[Jj][Pp][Ee]?[Gg]|[Pp][Nn][Gg]|[Ww][Ee][Bb][Pp])$"
+        }
+      ]
     },
     "pathList": {
       "type": "array",

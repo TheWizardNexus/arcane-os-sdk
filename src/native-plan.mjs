@@ -97,7 +97,7 @@ async function canonicalFutureDirectory(value,label){
     }
 }
 
-function validateProvider(provider){
+export function validateNativeBuilder(provider){
     const methods=['describe','doctor','prepare','authenticateToolchainReceipt','build','verify','run'];
     if(!isObject(provider)||provider.protocol!==NATIVE_BUILDER_PROTOCOL
         ||methods.some(method=>typeof provider[method]!=='function')){
@@ -236,8 +236,21 @@ function toolchainSummary(receipt,toolchainRoot){
     });
 }
 
-async function authenticateState(state,{signal,onEvent}={}){
+function assertExpectedPlanBinding(state,{expectedNativeBuilder,expectedTarget}={}){
+    if(expectedNativeBuilder!==undefined&&state.provider!==expectedNativeBuilder){
+        fail('Native build plan belongs to a different paired provider.',ERROR_CODES.integrityFailed);
+    }
+    if(expectedTarget!==undefined&&state.plan.targetRequest.target!==expectedTarget){
+        fail(
+            `Native build plan target ${state.plan.targetRequest.target} does not match ${expectedTarget}.`,
+            ERROR_CODES.integrityFailed
+        );
+    }
+}
+
+async function authenticateState(state,{expectedNativeBuilder,expectedTarget,signal,onEvent}={}){
     throwIfAborted(signal);
+    assertExpectedPlanBinding(state,{expectedNativeBuilder,expectedTarget});
     const authenticatedToolchain=await state.provider.authenticateToolchainReceipt(
         state.toolchainReceipt,
         {toolchainRoot:state.toolchainRoot,signal,onEvent}
@@ -275,7 +288,7 @@ export async function createNativeBuildPlan({
 }={}){
     throwIfAborted(signal);
     await onEvent?.(Object.freeze({type:'native.plan.started'}));
-    const provider=validateProvider(nativeBuilder);
+    const provider=validateNativeBuilder(nativeBuilder);
     const request=validateTargetRequest(targetRequest);
     const canonicalToolchainRoot=await canonicalDirectory(toolchainRoot,'Native toolchain root');
     const authenticatedToolchain=await provider.authenticateToolchainReceipt(
@@ -340,18 +353,28 @@ export async function createNativeBuildPlan({
     return plan;
 }
 
-export async function authenticateNativeBuildPlan(plan,{signal,onEvent}={}){
+export async function authenticateNativeBuildPlan(plan,{
+    expectedNativeBuilder,
+    expectedTarget,
+    signal,
+    onEvent
+}={}){
     const state=issuedPlans.get(plan);
     if(!state)fail('Native build plan was not issued by this SDK process.',ERROR_CODES.integrityFailed);
-    return authenticateState(state,{signal,onEvent});
+    return authenticateState(state,{expectedNativeBuilder,expectedTarget,signal,onEvent});
 }
 
-export async function executeNativeBuildPlan(plan,{signal,onEvent}={}){
+export async function executeNativeBuildPlan(plan,{
+    expectedNativeBuilder,
+    expectedTarget,
+    signal,
+    onEvent
+}={}){
     const state=issuedPlans.get(plan);
     if(!state)fail('Native build plan was not issued by this SDK process.',ERROR_CODES.integrityFailed);
     throwIfAborted(signal);
     await onEvent?.(Object.freeze({type:'native.build.started',appId:plan.app.id,target:plan.targetRequest.target}));
-    await authenticateState(state,{signal,onEvent});
+    await authenticateState(state,{expectedNativeBuilder,expectedTarget,signal,onEvent});
     const result=await state.provider.build({
         toolchainRoot:state.toolchainRoot,
         toolchainReceipt:state.toolchainReceipt,
@@ -373,6 +396,29 @@ export async function executeNativeBuildPlan(plan,{signal,onEvent}={}){
     if(!isObject(result)||!result.artifactReceipt){
         fail('Native builder did not return an artifact receipt.',ERROR_CODES.integrityFailed);
     }
+    await onEvent?.(Object.freeze({
+        type:'native.verify.started',
+        appId:plan.app.id,
+        target:plan.targetRequest.target
+    }));
+    const artifactVerification=await state.provider.verify({
+        toolchainRoot:state.toolchainRoot,
+        toolchainReceipt:state.toolchainReceipt,
+        artifactReceipt:result.artifactReceipt,
+        outputRoot:state.outputRoot,
+        targetRequest:state.targetRequest,
+        signal,
+        onEvent
+    });
+    if(!isObject(artifactVerification)||artifactVerification.verified!==true){
+        fail('Native builder did not verify the built artifact.',ERROR_CODES.integrityFailed);
+    }
+    throwIfAborted(signal);
+    await onEvent?.(Object.freeze({
+        type:'native.verify.completed',
+        appId:plan.app.id,
+        target:plan.targetRequest.target
+    }));
     await onEvent?.(Object.freeze({type:'native.build.completed',appId:plan.app.id,target:plan.targetRequest.target}));
-    return result;
+    return {...result,artifactVerification};
 }

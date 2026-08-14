@@ -7,13 +7,19 @@ named operations:
 describe -> doctor -> plan -> build -> verify -> run
 ```
 
-The protocol reserves plans that bind an immutable app-release receipt, app
-descriptor and policy, SDK/toolchain, platform, architecture, format, signing
-mode and identity, and destination. The available browser adapter currently
-plans from the selected workspace and schema-1 release manifest. Native builds
-must add retained-state receipt ownership before becoming available. Builds
-write only to operation-owned staging; verification owns each target trust
-decision, and activation must reuse that exact receipt.
+The available browser adapter plans from the selected workspace and schema-1
+release manifest. The SDK also implements the process-local
+`arcane-native-build-plan/1` and `arcane-native-builder/1` boundary for an
+explicitly injected provider. It binds an authenticated app release and
+schema-2 descriptor, toolchain receipt, platform, architecture, format, signing
+mode and identity, declared dependency releases, and destination. A paired
+provider must verify the built artifact before build completion, and verify/run
+reuse that exact artifact receipt.
+
+The npm package does not yet contain a real platform provider. Consequently the
+default registry and CLI keep every native target deferred. Builds write only to
+operation-owned staging; a future provider must retain immutable artifact state
+before its target can become available.
 
 | Target | Formats | Development status |
 |---|---|---|

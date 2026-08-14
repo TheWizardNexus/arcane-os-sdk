@@ -69,6 +69,12 @@ test('root SDK export exposes receipt authenticators and verified file readers',
     assert.equal(typeof sdk.createNativeBuildPlan,'function');
     assert.equal(typeof sdk.authenticateNativeBuildPlan,'function');
     assert.equal(typeof sdk.executeNativeBuildPlan,'function');
+    assert.equal(typeof sdk.validateNativeBuilder,'function');
+    assert.equal(typeof sdk.createNativeTargetAdapter,'function');
+    assert.equal(typeof sdk.planApplication,'function');
+    assert.equal(typeof sdk.doctorNativeTarget,'function');
+    assert.equal(typeof sdk.prepareNativeTarget,'function');
+    assert.equal(typeof sdk.verifyNativeArtifact,'function');
 });
 
 test('package schema string rules match the packager validators',async()=>{

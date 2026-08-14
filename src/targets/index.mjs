@@ -6,6 +6,11 @@ import {
     TARGET_IDS
 } from '../constants.mjs';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from '../errors.mjs';
+import {
+    createNativeBuildPlan,
+    executeNativeBuildPlan,
+    validateNativeBuilder
+} from '../native-plan.mjs';
 
 const DEFINITIONS=Object.freeze([
     Object.freeze({
@@ -105,6 +110,7 @@ function createDeferredAdapter(definition){
             ready:false,
             reason:definition.reason
         }),
+        prepare:unavailable,
         plan:unavailable,
         build:unavailable,
         verify:unavailable,
@@ -193,6 +199,176 @@ const adapters=new Map([
         createDeferredAdapter(definition)
     ])
 ]);
+
+function nativeDefinition(targetId){
+    const definition=DEFINITIONS.find(item=>item.id===targetId);
+    if(!definition||definition.id==='browser'){
+        throw new ArcaneError(
+            ERROR_CODES.targetUnavailable,
+            `A native target adapter cannot be paired for ${String(targetId)}.`
+        );
+    }
+    return definition;
+}
+
+function selectedNativeRequest(targetId,targetRequest){
+    if(targetRequest?.target!==targetId){
+        throw new ArcaneError(
+            ERROR_CODES.targetUnavailable,
+            `The injected native adapter for ${targetId} requires an explicit matching targetRequest.`
+        );
+    }
+    return targetRequest;
+}
+
+function selectedArtifactReceipt(artifactReceipt){
+    if(!artifactReceipt||typeof artifactReceipt!=='object'||Array.isArray(artifactReceipt)){
+        throw new ArcaneError(
+            ERROR_CODES.integrityFailed,
+            'An explicit native artifact receipt is required.'
+        );
+    }
+    return artifactReceipt;
+}
+
+export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
+    const definition=nativeDefinition(targetId);
+    const provider=validateNativeBuilder(nativeBuilder);
+
+    async function plan({
+        toolchainRoot,
+        toolchainReceipt,
+        appReleaseRoot,
+        appReleaseReceipt,
+        appDescriptor,
+        dependencyReleases,
+        protectedRoots,
+        outputRoot,
+        targetRequest,
+        signal,
+        onEvent
+    }={}){
+        return createNativeBuildPlan({
+            nativeBuilder:provider,
+            toolchainRoot,
+            toolchainReceipt,
+            appReleaseRoot,
+            appReleaseReceipt,
+            appDescriptor,
+            dependencyReleases,
+            protectedRoots,
+            outputRoot,
+            targetRequest:selectedNativeRequest(targetId,targetRequest),
+            signal,
+            onEvent
+        });
+    }
+
+    return Object.freeze({
+        protocol:TARGET_ADAPTER_PROTOCOL,
+        id:definition.id,
+        describe:async()=>({
+            ...describe(definition),
+            status:'available',
+            reason:null
+        }),
+        async doctor({toolchainRoot,toolchainReceipt,targetRequest,signal,onEvent}={}){
+            throwIfAborted(signal);
+            return provider.doctor({
+                toolchainRoot,
+                toolchainReceipt,
+                targetRequest:selectedNativeRequest(targetId,targetRequest),
+                signal,
+                onEvent
+            });
+        },
+        async prepare({toolchainRoot,targetRequest,signal,onEvent}={}){
+            throwIfAborted(signal);
+            return provider.prepare({
+                toolchainRoot,
+                targetRequest:selectedNativeRequest(targetId,targetRequest),
+                signal,
+                onEvent
+            });
+        },
+        plan,
+        async build({nativePlan,...options}={}){
+            throwIfAborted(options.signal);
+            const selectedPlan=nativePlan??await plan(options);
+            const result=await executeNativeBuildPlan(selectedPlan,{
+                expectedNativeBuilder:provider,
+                expectedTarget:targetId,
+                signal:options.signal,
+                onEvent:options.onEvent
+            });
+            return {
+                ...result,
+                target:targetId,
+                platform:selectedPlan.targetRequest.platform,
+                architecture:selectedPlan.targetRequest.architecture,
+                format:selectedPlan.targetRequest.format,
+                signing:selectedPlan.targetRequest.signing,
+                plan:selectedPlan
+            };
+        },
+        async verify({
+            toolchainRoot,
+            toolchainReceipt,
+            artifactReceipt,
+            targetRequest,
+            signal,
+            onEvent
+        }={}){
+            throwIfAborted(signal);
+            const selectedReceipt=selectedArtifactReceipt(artifactReceipt);
+            const result=await provider.verify({
+                toolchainRoot,
+                toolchainReceipt,
+                artifactReceipt:selectedReceipt,
+                targetRequest:selectedNativeRequest(targetId,targetRequest),
+                signal,
+                onEvent
+            });
+            if(!result||result.verified!==true){
+                throw new ArcaneError(
+                    ERROR_CODES.integrityFailed,
+                    `The native provider did not verify the ${targetId} artifact.`
+                );
+            }
+            return {
+                target:targetId,
+                targetRequest,
+                artifactReceipt:selectedReceipt,
+                verification:result
+            };
+        },
+        async run({
+            toolchainRoot,
+            toolchainReceipt,
+            artifactReceipt,
+            targetRequest,
+            signal,
+            onEvent
+        }={}){
+            throwIfAborted(signal);
+            const selectedReceipt=selectedArtifactReceipt(artifactReceipt);
+            const result=await provider.run({
+                toolchainRoot,
+                toolchainReceipt,
+                artifactReceipt:selectedReceipt,
+                targetRequest:selectedNativeRequest(targetId,targetRequest),
+                signal,
+                onEvent
+            });
+            return {
+                target:targetId,
+                targetRequest,
+                artifactReceipt:selectedReceipt,
+                result
+            };
+        }
+    });
+}
 
 export function listTargets(){
     return DEFINITIONS.map(describe);

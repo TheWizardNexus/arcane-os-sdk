@@ -35,6 +35,7 @@ test('Pages document is semantic, project-path safe, and truthful',async()=>{
 
     assert.match(html,/Not yet published to npm/u);
     assert.match(html,/Browser packaging is available; native targets are deferred/u);
+    assert.match(html,/process-local native provider contract ready for platform pairing/u);
     assert.match(html,/CLI, CI, future GUI, and Codex/u);
     assert.match(html,/doctor \/ expected contract/u);
     assert.match(html,/<span class="ready-pill">example<\/span>/u);

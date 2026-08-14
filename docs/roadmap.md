@@ -17,12 +17,15 @@ unbounded build.
 
 ## App admission and native extraction
 
+- Keep the implemented process-local `arcane-native-build-plan/1` and
+  `arcane-native-builder/1` lifecycle as the single provider seam for the CLI,
+  GUI, CI, and Codex. Default targets remain deferred without a paired provider.
 - Migrate built-in apps from the implemented schema-2 `arcane-app.json`
   descriptor fallback to authored descriptors without changing exact v1 release
   or native-host artifacts.
 - Update Arcane's exact-key consumers to project the new descriptor into the
   current catalog while preserving v1 app-release admission during migration.
-- Extract the native builder behind explicit `toolchainRoot`, verified
+- Implement the Arcane native provider behind explicit `toolchainRoot`, verified
   `appReleaseRoot`, approved `appDescriptor`, `outputRoot`, and `targetRequest`
   inputs. It must load only the selected app and declared dependencies.
 - Add an authenticated Arcane host broker for cross-process verification receipt

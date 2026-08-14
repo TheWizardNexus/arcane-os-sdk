@@ -129,12 +129,24 @@ network, hashing, test, process, or service work begins.
 
 ## Current target support
 
-The verified browser application release is available now. The target adapter
-contract already reserves Windows, Linux x64/ARM64, and Android ARM64, but their
-external single-app native builders are intentionally marked deferred until the
-Arcane machine toolchain accepts explicit release, descriptor, toolchain, and
-output roots. Deferred targets fail with a stable error; they never emit a
-portable substitute and call it native.
+The verified browser application release is available now. The SDK also ships
+the process-local native plan and provider contract: a paired provider can
+doctor and prepare one toolchain, plan and build one verified app release,
+verify the resulting artifact, and run that exact artifact receipt. The default
+CLI does not yet bundle a real Arcane native provider, so Windows, Linux, Android,
+and portable native targets remain deferred.
+
+| Capability | Ready now |
+|---|---|
+| Scaffold, develop, test, check, package, verify, and browser run | Yes |
+| External proprietary-source repository workflow | Yes, subject to the distribution license below |
+| Integrated Arcane checkout workflow | Yes |
+| ArcaneOllama managed-service check | Yes on supported Windows hosts |
+| SDK native plan/provider/receipt boundary | Yes |
+| Windows EXE, Linux package, Android APK/AAB, or portable native output | No; the Arcane platform providers still need extraction |
+
+Deferred targets fail with a stable error; they never emit a browser directory
+or another portable substitute and call it a native executable.
 
 See [docs/platform-targets.md](docs/platform-targets.md) for the matrix and
 [docs/architecture.md](docs/architecture.md) for the boundary. The issue-ready

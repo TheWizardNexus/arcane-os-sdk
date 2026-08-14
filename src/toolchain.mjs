@@ -7,7 +7,13 @@ import {authenticateRuntimeReceipt,verifyRuntime} from './runtime.mjs';
 import {packageApp,verifyApp} from './packager/core.mjs';
 import {runDoctor} from './doctor.mjs';
 import {runProcess} from './process.mjs';
-import {buildTarget,getTargetAdapter,listTargets,runTarget} from './targets/index.mjs';
+import {
+    buildTarget,
+    createNativeTargetAdapter,
+    getTargetAdapter,
+    listTargets,
+    runTarget
+} from './targets/index.mjs';
 import {runRepositoryAction} from './repository.mjs';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 import {createEventQueue} from './event-queue.mjs';
@@ -312,12 +318,117 @@ export async function verifyApplication(options={}){
     };
 }
 
-export async function buildApplication(options={}){
-    const target=options.target;
-    const adapter=getTargetAdapter(target);
+function targetSelection(options){
+    const target=options.target??options.targetRequest?.target;
+    const registered=getTargetAdapter(target);
+    if(target!=='browser'&&options.nativeBuilder!=null){
+        return {
+            target,
+            adapter:createNativeTargetAdapter({
+                targetId:target,
+                nativeBuilder:options.nativeBuilder
+            })
+        };
+    }
+    return {target,adapter:registered};
+}
+
+export async function planApplication(options={}){
+    const {target,adapter}=targetSelection(options);
     const targetDescription=await adapter.describe();
     if(targetDescription.status!=='available'){
-        return buildTarget(options);
+        return adapter.plan({...options,target});
+    }
+    if(target==='browser'){
+        const prepared=await preparedWorkspace(options);
+        return ownedWork(
+            'plan',
+            ({signal,onEvent})=>adapter.plan({
+                ...options,
+                ...prepared,
+                target,
+                signal,
+                onEvent
+            }),
+            options
+        );
+    }
+    return ownedWork(
+        'plan',
+        ({signal,onEvent})=>adapter.plan({...options,target,signal,onEvent}),
+        options
+    );
+}
+
+export async function doctorNativeTarget(options={}){
+    const {target,adapter}=targetSelection(options);
+    const targetDescription=await adapter.describe();
+    if(targetDescription.status!=='available'){
+        return adapter.doctor({...options,target});
+    }
+    if(target==='browser'){
+        throw new ArcaneError(
+            ERROR_CODES.targetUnavailable,
+            'Native target doctor requires one explicitly selected native target.'
+        );
+    }
+    return ownedWork(
+        'native.doctor',
+        ({signal,onEvent})=>adapter.doctor({...options,target,signal,onEvent}),
+        options
+    );
+}
+
+export async function prepareNativeTarget(options={}){
+    const {target,adapter}=targetSelection(options);
+    const targetDescription=await adapter.describe();
+    if(targetDescription.status!=='available'){
+        return adapter.prepare({...options,target});
+    }
+    if(target==='browser'){
+        throw new ArcaneError(
+            ERROR_CODES.targetUnavailable,
+            'Native target preparation requires one explicitly selected native target.'
+        );
+    }
+    return ownedWork(
+        'native.prepare',
+        ({signal,onEvent})=>adapter.prepare({...options,target,signal,onEvent}),
+        options
+    );
+}
+
+export async function verifyNativeArtifact(options={}){
+    const {target,adapter}=targetSelection(options);
+    const targetDescription=await adapter.describe();
+    if(targetDescription.status!=='available'){
+        return adapter.verify({...options,target});
+    }
+    if(target==='browser'){
+        throw new ArcaneError(
+            ERROR_CODES.targetUnavailable,
+            'Native artifact verification requires one explicitly selected native target.'
+        );
+    }
+    return ownedWork(
+        'native.verify',
+        ({signal,onEvent})=>adapter.verify({...options,target,signal,onEvent}),
+        options
+    );
+}
+
+export async function buildApplication(options={}){
+    const {target,adapter}=targetSelection(options);
+    const targetDescription=await adapter.describe();
+    if(targetDescription.status!=='available'){
+        return adapter.build({...options,target});
+    }
+    if(target!=='browser'){
+        return ownedWork(
+            'build',
+            ({signal,onEvent})=>adapter.build({...options,target,signal,onEvent}),
+            options
+        );
     }
     const prepared=await preparedWorkspace(options);
     const result=await ownedWork(
@@ -339,18 +450,41 @@ export async function buildApplication(options={}){
 }
 
 export async function runApplication(options={}){
-    const target=options.target??'browser';
-    const adapter=getTargetAdapter(target);
+    const selectedOptions=options.target==null&&options.targetRequest?.target==null
+        ?{...options,target:'browser'}
+        :options;
+    const {target,adapter}=targetSelection(selectedOptions);
     const targetDescription=await adapter.describe();
     if(targetDescription.status!=='available'){
-        return runTarget({...options,target});
+        return adapter.run({...selectedOptions,target});
     }
-    const prepared=await preparedWorkspace(options);
-    return runTarget({...options,...prepared,target});
+    if(target!=='browser'){
+        return ownedWork(
+            'run',
+            ({signal,onEvent})=>adapter.run({...selectedOptions,target,signal,onEvent}),
+            selectedOptions
+        );
+    }
+    const prepared=await preparedWorkspace(selectedOptions);
+    return runTarget({...selectedOptions,...prepared,target});
 }
 
-export function describeTargets(){
-    return {protocol:'arcane-target-adapter/1',targets:listTargets()};
+export function describeTargets(options={}){
+    const targets=listTargets();
+    const pairedTarget=options.target??options.targetRequest?.target;
+    if(options.nativeBuilder==null||pairedTarget==null||pairedTarget==='browser'){
+        return {protocol:'arcane-target-adapter/1',targets};
+    }
+    createNativeTargetAdapter({
+        targetId:pairedTarget,
+        nativeBuilder:options.nativeBuilder
+    });
+    return {
+        protocol:'arcane-target-adapter/1',
+        targets:targets.map(target=>target.id===pairedTarget
+            ?{...target,status:'available',reason:null}
+            :target)
+    };
 }
 
 export async function repositoryApplication(options={}){
@@ -367,9 +501,13 @@ export async function executeOperation(command,options={}){
         check:checkApplication,
         package:packageApplication,
         verify:verifyApplication,
+        'native-doctor':doctorNativeTarget,
+        'native-prepare':prepareNativeTarget,
+        'native-verify':verifyNativeArtifact,
+        plan:planApplication,
         build:buildApplication,
         run:runApplication,
-        targets:async()=>describeTargets(),
+        targets:async options=>describeTargets(options),
         repo:repositoryApplication
     };
     const operation=operations[command];
@@ -390,9 +528,13 @@ export function createToolchain(defaults={}){
         check:options=>checkApplication({...defaults,...options}),
         package:options=>packageApplication({...defaults,...options}),
         verify:options=>verifyApplication({...defaults,...options}),
+        doctorNative:options=>doctorNativeTarget({...defaults,...options}),
+        prepareNative:options=>prepareNativeTarget({...defaults,...options}),
+        verifyNative:options=>verifyNativeArtifact({...defaults,...options}),
+        plan:options=>planApplication({...defaults,...options}),
         build:options=>buildApplication({...defaults,...options}),
         run:options=>runApplication({...defaults,...options}),
-        targets:()=>describeTargets(),
+        targets:options=>describeTargets({...defaults,...options}),
         repository:options=>repositoryApplication({...defaults,...options})
     });
 }

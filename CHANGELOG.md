@@ -11,6 +11,11 @@
   and preserves every Arcane root package, workflow, lock, and instruction file.
 - Added app scaffolding, environment diagnostics, browser development, focused tests, validation, deterministic packaging, and package verification.
 - Added a platform-neutral target adapter contract with an available browser target and explicit deferred Windows, Linux, and Android native targets.
+- Added a process-local native provider pairing lifecycle for doctor, caller-owned
+  preparation, immutable planning, verified build, artifact verification, and
+  receipt-bound run without changing the default deferred target registry.
+- Tightened the public app-descriptor schema to match native raster-icon,
+  embedding-capability, browser frame-origin, and conflicting-capability rules.
 - Added fixed Git status, fast-forward pull, and push operations for future Arcane Developer control-panel use.
 - Added a durable local `.tgz` development install path while retaining exact installed SDK and runtime identity checks.
 - Added preflight package conflict detection for `arcane init` and a two-pass template path preflight to avoid predictable partial scaffolds.
