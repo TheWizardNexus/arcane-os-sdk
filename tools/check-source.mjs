@@ -34,6 +34,7 @@ const FORBIDDEN_NATIVE_EXTENSIONS=new Set([
     '.so'
 ]);
 const FORBIDDEN_TOOLCHAIN_PACKAGES=new Set(['ts-node','tsx','typescript']);
+const REQUIRED_RUNTIME_ATTRIBUTE='runtime/** -text -whitespace';
 
 function fail(message){
     throw new Error(message);
@@ -142,10 +143,23 @@ function assertPackageMetadata(packageDocument){
     }
 }
 
+async function assertRuntimeGitAttributes(){
+    const attributesPath=path.join(REPOSITORY_ROOT,'.gitattributes');
+    const attributeLines=(await readFile(attributesPath,'utf8'))
+        .split(/\r?\n/u)
+        .map(line=>line.trim())
+        .filter(Boolean);
+
+    if(attributeLines.at(-1)!==REQUIRED_RUNTIME_ATTRIBUTE){
+        fail(`${REQUIRED_RUNTIME_ATTRIBUTE} must be the final .gitattributes rule so pinned runtime bytes are never normalized.`);
+    }
+}
+
 async function main(){
     const packagePath=path.join(REPOSITORY_ROOT,'package.json');
     const packageDocument=JSON.parse(await readFile(packagePath,'utf8'));
     assertPackageMetadata(packageDocument);
+    await assertRuntimeGitAttributes();
 
     const binPath=path.resolve(REPOSITORY_ROOT,packageDocument.bin.arcane);
     const relativeBinPath=path.relative(REPOSITORY_ROOT,binPath);
