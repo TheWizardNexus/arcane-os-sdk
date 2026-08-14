@@ -84,6 +84,24 @@ function insideRoot(root,candidate){
     return relative===''||(!relative.startsWith(`..${path.sep}`)&&relative!=='..'&&!path.isAbsolute(relative));
 }
 
+async function assertUnlinkedDirectoryAncestors(location,inspect){
+    const resolved=path.resolve(location);
+    const parsed=path.parse(resolved);
+    const relative=resolved.slice(parsed.root.length);
+    let current=parsed.root;
+    const components=relative.split(path.sep).filter(Boolean);
+    for(let index=0;index<components.length-1;index+=1){
+        current=path.join(current,components[index]);
+        const info=await inspect(current);
+        if(info.isSymbolicLink()||!info.isDirectory()){
+            fail('The Arcane OS checkout root must not use a linked or non-directory ancestor.',{
+                arcaneRoot:resolved,
+                ancestor:current
+            });
+        }
+    }
+}
+
 function closureFailure(message,details){
     throw new ArcaneError(PROVIDER_CLOSURE_CODE,message,{details});
 }
@@ -928,13 +946,8 @@ async function initializeProviderReservation(record){
                 arcaneRoot:record.requestedRoot
             });
         }
+        await assertUnlinkedDirectoryAncestors(record.requestedRoot,record.inspect);
         record.canonicalRoot=await record.canonicalize(record.requestedRoot);
-        if(!samePath(record.canonicalRoot,record.requestedRoot)){
-            fail('The Arcane OS checkout root must not resolve through a linked location.',{
-                arcaneRoot:record.requestedRoot,
-                canonicalRoot:record.canonicalRoot
-            });
-        }
         if(!await regularFile(record.requestedProvider,record.inspect)){
             fail(`The selected Arcane OS checkout does not contain the ${record.target} native provider.`,{
                 target:record.target,
@@ -943,7 +956,11 @@ async function initializeProviderReservation(record){
             });
         }
         record.providerPath=await record.canonicalize(record.requestedProvider);
-        if(!samePath(record.providerPath,record.requestedProvider)){
+        const expectedProvider=path.join(
+            record.canonicalRoot,
+            ...ARCANE_NATIVE_PROVIDER_PATHS[record.target]
+        );
+        if(!samePath(record.providerPath,expectedProvider)){
             fail(`The Arcane ${record.target} provider path must not resolve through a linked location.`,{
                 target:record.target,
                 providerPath:record.requestedProvider

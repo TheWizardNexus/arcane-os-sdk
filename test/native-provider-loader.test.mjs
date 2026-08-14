@@ -84,6 +84,26 @@ test('loader imports only the fixed allowlisted provider path for every native t
     assert.equal(portable.providerPath,path.join(canonicalArcaneRoot,...ARCANE_PORTABLE_PROVIDER_PATH));
 });
 
+test('loader rejects an Arcane checkout reached through a linked ancestor',async t=>{
+    const parent=await temporaryDirectory(t,{prefix:'arcane-provider-linked-root-'});
+    const realParent=path.join(parent,'real-parent');
+    const arcaneRoot=path.join(realParent,'arcane');
+    const providerPath=path.join(arcaneRoot,...ARCANE_PORTABLE_PROVIDER_PATH);
+    await mkdir(path.dirname(providerPath),{recursive:true});
+    await writeFile(providerPath,'export default {};\n','utf8');
+    const linkedParent=path.join(parent,'linked-parent');
+    await symlink(realParent,linkedParent,process.platform==='win32'?'junction':'dir');
+
+    await assert.rejects(
+        ()=>loadArcanePortableProvider({
+            arcaneRoot:path.join(linkedParent,'arcane'),
+            importModule:async()=>({arcaneNativeBuilderProvider:provider()})
+        }),
+        error=>error.code==='ARCANE_TARGET_UNAVAILABLE'
+            &&/linked or non-directory ancestor/u.test(error.message)
+    );
+});
+
 test('loader fails honestly when the provider is absent or violates the protocol',async t=>{
     const arcaneRoot=await temporaryDirectory(t,{prefix:'arcane-provider-missing-'});
     await assert.rejects(
@@ -274,35 +294,37 @@ test('target pairing requires the provider to declare the selected target',async
 });
 
 test('integrated portable builds require an explicit external output root',()=>{
+    const integratedRoot=path.resolve('integrated-arcane-workspace');
+    const externalRoot=path.resolve('external-arcane-workspace');
     assert.throws(
         ()=>resolvePortableBuildOutputRoot({
             workspaceMode:'integrated',
-            workspaceRoot:'C:\\Arcane'
+            workspaceRoot:integratedRoot
         }),
         error=>error.code==='ARCANE_USAGE'&&/requires --output-root/u.test(error.message)
     );
     assert.equal(
         resolvePortableBuildOutputRoot({
             workspaceMode:'external',
-            workspaceRoot:'C:\\workspace'
+            workspaceRoot:externalRoot
         }),
-        path.resolve('C:\\workspace','build','portable')
+        path.join(externalRoot,'build','portable')
     );
     assert.equal(
         resolveNativeBuildOutputRoot({
             target:'windows-x64',
             workspaceMode:'external',
-            workspaceRoot:'C:\\workspace'
+            workspaceRoot:externalRoot
         }),
-        path.resolve('C:\\workspace','build','windows-x64')
+        path.join(externalRoot,'build','windows-x64')
     );
     for(const relative of ['.git','apps','apps/unrelated-app','dist','node_modules']){
         assert.throws(
             ()=>resolveNativeBuildOutputRoot({
                 target:'windows-x64',
                 workspaceMode:'external',
-                workspaceRoot:'C:\\workspace',
-                outputRoot:path.resolve('C:\\workspace',...relative.split('/'))
+                workspaceRoot:externalRoot,
+                outputRoot:path.join(externalRoot,...relative.split('/'))
             }),
             error=>error.code==='ARCANE_POLICY_DENIED'&&/dedicated build\/ namespace/u.test(error.message),
             relative
@@ -312,29 +334,29 @@ test('integrated portable builds require an explicit external output root',()=>{
         ()=>resolveNativeBuildOutputRoot({
             target:'windows-x64',
             workspaceMode:'integrated',
-            workspaceRoot:'C:\\Arcane',
-            outputRoot:'C:\\Arcane\\build\\windows-x64'
+            workspaceRoot:integratedRoot,
+            outputRoot:path.join(integratedRoot,'build','windows-x64')
         }),
         error=>error.code==='ARCANE_POLICY_DENIED'&&/must be outside/u.test(error.message)
     );
     assert.doesNotThrow(()=>assertIntegratedPortableToolchain({
         workspaceMode:'integrated',
-        workspaceRoot:'C:\\Arcane',
-        toolchainRoot:'C:\\Arcane'
+        workspaceRoot:integratedRoot,
+        toolchainRoot:integratedRoot
     }));
     assert.throws(
         ()=>assertIntegratedPortableToolchain({
             workspaceMode:'integrated',
-            workspaceRoot:'C:\\Arcane-A',
-            toolchainRoot:'C:\\Arcane-B'
+            workspaceRoot:integratedRoot,
+            toolchainRoot:path.resolve('different-arcane-workspace')
         }),
         error=>error.code==='ARCANE_POLICY_DENIED'&&/same Arcane OS checkout/u.test(error.message)
     );
     assert.doesNotThrow(()=>assertIntegratedNativeToolchain({
         target:'windows-x64',
         workspaceMode:'integrated',
-        workspaceRoot:'C:\\Arcane',
-        toolchainRoot:'C:\\Arcane'
+        workspaceRoot:integratedRoot,
+        toolchainRoot:integratedRoot
     }));
 });
 
