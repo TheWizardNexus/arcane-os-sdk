@@ -1,4 +1,4 @@
-[![Arcane OS SDK — external application SDK and command-line toolchain](https://raw.githubusercontent.com/TheWizardNexus/arcane-os-sdk/main/assets/arcane-os-sdk-readme-header.png)](https://github.com/TheWizardNexus/arcane-os-sdk)
+[![Arcane OS SDK — external application SDK and command-line toolchain](https://raw.githubusercontent.com/TheWizardNexus/arcane-os-sdk/main/site/assets/arcane-os-sdk-readme-header.png)](https://thewizardnexus.github.io/arcane-os-sdk/)
 
 # Arcane OS SDK
 
@@ -8,7 +8,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/TheWizardNexus/arcane-os-sdk"><strong>Open the Arcane OS SDK repository on GitHub</strong></a>
+  <a href="https://thewizardnexus.github.io/arcane-os-sdk/"><strong>Visit the Arcane OS SDK site</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/TheWizardNexus/arcane-os-sdk"><strong>Open the GitHub repository</strong></a>
 </p>
 
 `arcane-os` is the external application SDK and command-line toolchain for

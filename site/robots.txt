@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://thewizardnexus.github.io/arcane-os-sdk/sitemap.xml

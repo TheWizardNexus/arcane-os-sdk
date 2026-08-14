@@ -1,0 +1,135 @@
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {readFile,stat} from 'node:fs/promises';
+import path from 'node:path';
+import test from 'node:test';
+import {repositoryRoot} from './helpers.mjs';
+
+const siteRoot=path.join(repositoryRoot,'site');
+
+async function readSiteFile(fileName,encoding='utf8'){
+    return readFile(path.join(siteRoot,fileName),encoding);
+}
+
+function pngDimensions(buffer){
+    assert.equal(buffer.subarray(1,4).toString('ascii'),'PNG');
+    return {width:buffer.readUInt32BE(16),height:buffer.readUInt32BE(20)};
+}
+
+test('Pages document is semantic, project-path safe, and truthful',async()=>{
+    const html=await readSiteFile('index.html');
+    assert.match(html,/^<!doctype html>/u);
+    assert.match(html,/<html lang="en">/u);
+    assert.match(html,/<meta name="viewport"/u);
+    assert.match(html,/Content-Security-Policy/u);
+    assert.match(html,/default-src 'self'/u);
+    assert.match(html,/<link rel="canonical" href="https:\/\/thewizardnexus\.github\.io\/arcane-os-sdk\/">/u);
+    assert.equal((html.match(/<h1\b/gu)??[]).length,1);
+    assert.match(html,/<a class="skip-link" href="#main-content">/u);
+    assert.match(html,/<main id="main-content">/u);
+    assert.match(html,/<canvas id="space-canvas" aria-hidden="true"><\/canvas>/u);
+    assert.match(html,/<div class="hero-system" aria-hidden="true">/u);
+    assert.match(html,/data-motion-toggle aria-pressed="false"/u);
+    assert.doesNotMatch(html,/tabindex="[1-9][0-9]*"/u);
+    assert.doesNotMatch(html,/(?:href|src)="\//u);
+
+    assert.match(html,/Not yet published to npm/u);
+    assert.match(html,/Browser packaging is available; native targets are deferred/u);
+    assert.match(html,/CLI, CI, future GUI, and Codex/u);
+    assert.match(html,/doctor \/ expected contract/u);
+    assert.match(html,/<span class="ready-pill">example<\/span>/u);
+    assert.match(html,/A deferred native target returns a stable unavailable error and creates nothing/u);
+    for(const target of ['Browser','Portable','Windows x64','Linux x64 / ARM64','Android ARM64']){
+        assert.match(html,new RegExp(`<th scope="row">${target.replace('/','\\/')}</th>`,'u'));
+    }
+    assert.match(html,/AGPL-3\.0-only/u);
+    assert.match(html,/commercial notice as permission/u);
+
+    for(const anchor of html.match(/<a\b[^>]*target="_blank"[^>]*>/gu)??[]){
+        assert.match(anchor,/rel="noreferrer"/u);
+    }
+
+    const localReferences=[];
+    for(const match of html.matchAll(/(?:href|src)="([^"]+)"/gu)){
+        const reference=match[1];
+        if(reference.startsWith('#')||reference.startsWith('https://')||reference.startsWith('mailto:')) continue;
+        localReferences.push(reference);
+    }
+    assert.ok(localReferences.length>=5);
+    for(const reference of localReferences){
+        const localPath=path.resolve(siteRoot,reference.split(/[?#]/u,1)[0]);
+        assert.equal(path.relative(siteRoot,localPath).startsWith('..'),false,reference);
+        assert.equal((await stat(localPath)).isFile(),true,reference);
+    }
+});
+
+test('space motion is bounded, controllable, and accessibility-aware',async()=>{
+    const [styles,script]=await Promise.all([
+        readSiteFile('styles.css'),
+        readSiteFile('app.js')
+    ]);
+    assert.match(styles,/@media \(prefers-reduced-motion: reduce\)/u);
+    assert.match(styles,/@media \(forced-colors: active\)/u);
+    assert.match(styles,/:focus-visible/u);
+    assert.match(styles,/\.motion-paused \.orbit/u);
+    assert.match(styles,/\.motion-paused \.readiness-pulse span/u);
+    assert.match(styles,/@media \(max-width: 520px\)/u);
+    assert.doesNotMatch(styles,/calc\(var\(--mouse-[xy]\) \* /u);
+
+    assert.match(script,/Math\.max\(45, Math\.min\(120,/u);
+    assert.match(script,/Math\.min\(window\.devicePixelRatio \|\| 1, 1\.5\)/u);
+    assert.match(script,/time - lastDraw >= 33/u);
+    assert.match(script,/prefers-reduced-motion: reduce/u);
+    assert.match(script,/visibilitychange/u);
+    assert.match(script,/IntersectionObserver/u);
+    assert.match(script,/localStorage\.setItem\(preferenceKey/u);
+    assert.match(script,/window\.cancelAnimationFrame/u);
+    assert.match(script,/ArrowRight/u);
+    assert.match(script,/navigator\.clipboard/u);
+    assert.doesNotMatch(script,/innerHTML/u);
+    assert.doesNotMatch(script,/(?:fetch|XMLHttpRequest)\s*\(/u);
+});
+
+test('Pages assets retain exact brand identities',async()=>{
+    const [header,sigil]=await Promise.all([
+        readSiteFile(path.join('assets','arcane-os-sdk-readme-header.png'),null),
+        readSiteFile(path.join('assets','arcane-sigil-512.png'),null)
+    ]);
+    assert.deepEqual(pngDimensions(header),{width:2172,height:724});
+    assert.deepEqual(pngDimensions(sigil),{width:512,height:512});
+    assert.equal(
+        createHash('sha256').update(header).digest('hex').toUpperCase(),
+        '4DC9AD6FCAA572B3789BDD0FB5847D399840FBDEB46CD54B717478AE46685D47'
+    );
+    assert.equal(
+        createHash('sha256').update(sigil).digest('hex').toUpperCase(),
+        '6CBB0C89168713E5DF9FAB9E0A51628A40D13F449498DB7832A800A5E425D48D'
+    );
+});
+
+test('Pages workflow deploys only the static site with least authority',async()=>{
+    const [workflow,packageDocument,readme,robots,sitemap]=await Promise.all([
+        readFile(path.join(repositoryRoot,'.github','workflows','pages.yml'),'utf8'),
+        readFile(path.join(repositoryRoot,'package.json'),'utf8').then(JSON.parse),
+        readFile(path.join(repositoryRoot,'README.md'),'utf8'),
+        readSiteFile('robots.txt'),
+        readSiteFile('sitemap.xml')
+    ]);
+    assert.match(workflow,/contents:\s*read/u);
+    assert.match(workflow,/pages:\s*write/u);
+    assert.match(workflow,/id-token:\s*write/u);
+    assert.match(workflow,/github\.repository == 'TheWizardNexus\/arcane-os-sdk'/u);
+    assert.match(workflow,/github\.ref == 'refs\/heads\/main'/u);
+    assert.match(workflow,/actions\/checkout@v7/u);
+    assert.match(workflow,/actions\/configure-pages@v6/u);
+    assert.match(workflow,/actions\/upload-pages-artifact@v5/u);
+    assert.match(workflow,/actions\/deploy-pages@v5/u);
+    assert.match(workflow,/path: \.\/site/u);
+    assert.equal(packageDocument.homepage,'https://thewizardnexus.github.io/arcane-os-sdk/');
+    assert.equal(packageDocument.files.some(entry=>entry.startsWith('site')),false);
+    assert.match(readme,/https:\/\/thewizardnexus\.github\.io\/arcane-os-sdk\//u);
+    assert.match(readme,/main\/site\/assets\/arcane-os-sdk-readme-header\.png/u);
+    assert.match(readme,/https:\/\/github\.com\/TheWizardNexus\/arcane-os-sdk/u);
+    assert.match(robots,/Sitemap: https:\/\/thewizardnexus\.github\.io\/arcane-os-sdk\/sitemap\.xml/u);
+    assert.match(sitemap,/<loc>https:\/\/thewizardnexus\.github\.io\/arcane-os-sdk\/<\/loc>/u);
+});
