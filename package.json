@@ -1,0 +1,69 @@
+{
+  "name": "arcane-os",
+  "version": "0.1.0-dev.0",
+  "description": "Arcane OS application SDK, CLI, browser runtime, and cross-platform build toolchain.",
+  "type": "module",
+  "main": "./src/index.mjs",
+  "bin": {
+    "arcane": "./bin/arcane.mjs",
+    "arcane-os": "./bin/arcane.mjs"
+  },
+  "exports": {
+    ".": "./src/index.mjs",
+    "./toolchain": "./src/toolchain.mjs",
+    "./events": "./src/events.mjs",
+    "./targets": "./src/targets/index.mjs",
+    "./packager": "./src/packager/core.mjs",
+    "./runtime/manifest": "./runtime/ARCANE_RUNTIME_RELEASE.json",
+    "./schemas/arcane-package.json": "./schemas/arcane-package.schema.json",
+    "./schemas/arcane-lock.json": "./schemas/arcane-lock.schema.json",
+    "./schemas/cli-event.json": "./schemas/cli-event.schema.json",
+    "./schemas/target-adapter.json": "./schemas/target-adapter.schema.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "runtime/",
+    "schemas/",
+    "docs/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "COMMERCIAL-LICENSE.md",
+    "NOTICE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "node tools/check-source.mjs && node tools/runtime-manifest.mjs --verify && npm test",
+    "runtime:verify": "node tools/runtime-manifest.mjs --verify",
+    "pack:local": "npm pack --ignore-scripts",
+    "pack:inspect": "npm pack --dry-run --json",
+    "prepack": "npm run check"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheWizardNexus/arcane-os-sdk.git"
+  },
+  "homepage": "https://github.com/TheWizardNexus/arcane-os-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/TheWizardNexus/arcane-os-sdk/issues"
+  },
+  "keywords": [
+    "arcane-os",
+    "sdk",
+    "cli",
+    "applications",
+    "ollama"
+  ],
+  "author": "The Wizard Nexus",
+  "license": "AGPL-3.0-only",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "tag": "dev"
+  }
+}

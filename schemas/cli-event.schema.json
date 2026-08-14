@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/TheWizardNexus/arcane-os-sdk/schemas/cli-event.schema.json",
+  "title": "Arcane CLI event",
+  "description": "One ordered NDJSON event emitted by an Arcane CLI operation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "operationId",
+    "sequence",
+    "timestamp",
+    "command",
+    "type",
+    "status"
+  ],
+  "properties": {
+    "protocol": {
+      "const": "arcane-cli-events/1"
+    },
+    "operationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9]*)+$"
+    },
+    "command": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "accepted",
+        "running",
+        "completed",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "message": {
+      "type": "string"
+    },
+    "data": {}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "operation.accepted"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "accepted"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "operation.completed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "completed"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "operation.failed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "failed"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "operation.cancelled"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "cancelled"
+          }
+        }
+      }
+    }
+  ]
+}

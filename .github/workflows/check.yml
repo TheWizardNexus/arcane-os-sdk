@@ -1,0 +1,42 @@
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Node ${{ matrix.node }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+        node:
+          - 22
+          - 24
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+      - name: Use Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Run development checks
+        run: npm run check
+      - name: Install the command aliases
+        run: npm install --global --ignore-scripts .
+      - name: Exercise installed command aliases
+        run: |
+          arcane --version
+          arcane-os --help

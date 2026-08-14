@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/TheWizardNexus/arcane-os-sdk/schemas/arcane-lock.schema.json",
+  "title": "Arcane SDK workspace lock",
+  "description": "Pins an authored workspace to one SDK runtime and protocol state.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "sdk",
+    "runtime",
+    "protocols"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "sdk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "const": "arcane-os"
+        },
+        "version": {
+          "const": "0.1.0-dev.0"
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest",
+        "contentSha256",
+        "upstreamCommit"
+      ],
+      "properties": {
+        "manifest": {
+          "const": "node_modules/arcane-os/runtime/ARCANE_RUNTIME_RELEASE.json"
+        },
+        "contentSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "upstreamCommit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
+    "protocols": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arcane",
+        "cliEvents",
+        "targetAdapter"
+      ],
+      "properties": {
+        "arcane": {
+          "const": "arcane/1"
+        },
+        "cliEvents": {
+          "const": "arcane-cli-events/1"
+        },
+        "targetAdapter": {
+          "const": "arcane-target-adapter/1"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

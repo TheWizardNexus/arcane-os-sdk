@@ -1,0 +1,65 @@
+name: Publish development package
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish npm dev tag
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: npm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+      - name: Assert the authorized repository and ref
+        shell: bash
+        run: |
+          test "$GITHUB_REPOSITORY" = "TheWizardNexus/arcane-os-sdk"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Use Node.js 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+          package-manager-cache: false
+      - name: Use a trusted-publishing compatible npm
+        run: npm install --global npm@11.16.0
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Require an unpublished development version
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import {execFileSync} from 'node:child_process';
+          import packageDocument from './package.json' with {type:'json'};
+
+          if(!/-dev(?:\.|$)/.test(packageDocument.version)){
+              throw new Error(`Refusing to publish non-development version ${packageDocument.version}.`);
+          }
+
+          try{
+              execFileSync('npm',['view',`${packageDocument.name}@${packageDocument.version}`,'version'],{
+                  encoding:'utf8',
+                  stdio:['ignore','pipe','pipe']
+              });
+          }catch(error){
+              const diagnostics=`${error.stdout??''}\n${error.stderr??''}`;
+              if(error.status===1&&/(?:E404|404 Not Found)/.test(diagnostics)){
+                  process.exit(0);
+              }
+              throw error;
+          }
+
+          throw new Error(`${packageDocument.name}@${packageDocument.version} is already published.`);
+          NODE
+      - name: Run development checks
+        run: npm run check
+      - name: Publish with npm trusted publishing
+        run: npm publish --ignore-scripts --access public --tag dev

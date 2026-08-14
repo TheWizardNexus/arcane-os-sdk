@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/TheWizardNexus/arcane-os-sdk/schemas/arcane-package.schema.json",
+  "title": "Arcane application package",
+  "description": "Authored application input accepted by the Arcane application packager.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "displayName",
+    "version",
+    "entry",
+    "strategy",
+    "include",
+    "shared"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "id": {
+      "$ref": "#/$defs/appId"
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^(?=.*\\S)[^<>\\u0000-\\u001f\\u007f]+$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "entry": {
+      "$ref": "#/$defs/relativePath"
+    },
+    "strategy": {
+      "enum": [
+        "static",
+        "adapter"
+      ]
+    },
+    "localAIModelPolicy": {
+      "$ref": "#/$defs/localAIModelPolicy"
+    },
+    "include": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/pathList"
+        },
+        {
+          "minItems": 1
+        }
+      ]
+    },
+    "exclude": {
+      "$ref": "#/$defs/pathList"
+    },
+    "shared": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+      }
+    },
+    "adapter": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/relativePath"
+        },
+        {
+          "pattern": "^scripts/[A-Za-z0-9._/-]+\\.mjs$"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "strategy": {
+            "const": "adapter"
+          }
+        },
+        "required": [
+          "strategy"
+        ]
+      },
+      "then": {
+        "required": [
+          "adapter"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "adapter"
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "appId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!.*\\\\)(?!.*:)(?!.*(?:^|/)(?:\\.{1,2}|(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\\.[^/]*)?)(?:/|$))(?!.*[. ](?:/|$))[^/\\u0000-\\u001f\\u007f]+(?:/[^/\\u0000-\\u001f\\u007f]+)*$"
+    },
+    "literalRelativePath": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/relativePath"
+        },
+        {
+          "pattern": "^[^*?\\[\\]{}]+$"
+        }
+      ]
+    },
+    "pathList": {
+      "type": "array",
+      "maxItems": 512,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/literalRelativePath"
+      }
+    },
+    "localAIModelPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verified_only",
+        "models"
+      ],
+      "properties": {
+        "verified_only": {
+          "type": "boolean"
+        },
+        "models": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "definition"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,191}(?::[A-Za-z0-9][A-Za-z0-9._-]{0,63})?$",
+                "not": {
+                  "pattern": "^[Oo][Pp][Ee][Nn][Aa][Ii]$"
+                }
+              },
+              "definition": {
+                "type": "string",
+                "maxLength": 128,
+                "pattern": "^(?:Modelfile|[A-Za-z0-9][A-Za-z0-9._-]{0,118}\\.Modelfile)$"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

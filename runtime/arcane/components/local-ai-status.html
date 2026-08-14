@@ -1,0 +1,317 @@
+<link rel="stylesheet" href="./arcane/css/primitives.css?v=1">
+<style>
+    :host{
+        display:block;
+        inset-block-start:4.5rem;
+        inset-inline-end:1rem;
+        max-width:min(34rem,calc(100vw - 2rem));
+        position:fixed;
+        width:max-content;
+        z-index:120;
+    }
+    :host([hidden]){display:none}
+    .panel{
+        background:var(--arcane-surface-raised,var(--modal-background));
+        border:1px solid var(--arcane-border,var(--border-color));
+        border-radius:var(--arcane-radius-3,.7rem);
+        box-shadow:0 .7rem 2rem var(--shadow-color);
+        color:var(--arcane-text,var(--text-color));
+        display:grid;
+        gap:var(--arcane-space-3,.75rem);
+        max-height:calc(100vh - 6rem);
+        overflow:auto;
+        padding:var(--arcane-space-4,1rem);
+    }
+    .heading{align-items:start;display:flex;gap:var(--arcane-space-3,.75rem);justify-content:space-between}
+    h2,p{margin:0}
+    h2{font-size:1.05rem;line-height:1.3}
+    .dismiss{
+        background:transparent;
+        border:0;
+        color:inherit;
+        cursor:pointer;
+        font:inherit;
+        min-height:2.5rem;
+        min-width:2.5rem;
+        padding:.35rem;
+    }
+    .dismiss:focus-visible,.action:focus-visible,summary:focus-visible{
+        outline:3px solid var(--arcane-focus,var(--focus-color));
+        outline-offset:2px;
+    }
+    .services{display:grid;gap:.45rem;list-style:none;margin:0;padding:0}
+    .service{align-items:start;display:grid;gap:.25rem;grid-template-columns:minmax(7.5rem,auto) 1fr}
+    .service-name{font-weight:700}
+    .service-state{color:var(--arcane-muted,var(--muted-text-color));overflow-wrap:anywhere}
+    .service[data-state="ready"] .service-state{color:var(--success-color)}
+    .service[data-state="unavailable"] .service-state{color:var(--danger-color)}
+    .actions{display:flex;flex-wrap:wrap;gap:.55rem}
+    .action{
+        align-items:center;
+        background:var(--arcane-action,var(--button-background));
+        border:1px solid var(--arcane-border,var(--border-color));
+        border-radius:.5rem;
+        color:var(--arcane-action-text,var(--button-text-color));
+        cursor:pointer;
+        display:inline-flex;
+        font:inherit;
+        font-weight:700;
+        justify-content:center;
+        min-height:2.75rem;
+        padding:.65rem .9rem;
+        text-decoration:none;
+    }
+    .action.secondary{background:transparent;color:inherit}
+    details{border-block-start:1px solid var(--arcane-border,var(--border-color));padding-block-start:.7rem}
+    summary{cursor:pointer;font-weight:700;min-height:2.5rem;padding:.45rem 0}
+    details p{color:var(--arcane-muted,var(--muted-text-color));line-height:1.45}
+    @media(max-width:36rem){
+        :host{inset-block-start:auto;inset-block-end:1rem;inset-inline:1rem;max-width:none;width:auto}
+        .service{grid-template-columns:1fr}
+        .actions{display:grid}
+    }
+    @media(forced-colors:active){.panel,.action{border:1px solid CanvasText}}
+</style>
+
+<section id="panel" class="panel" aria-labelledby="localAIStatusTitle" aria-busy="false">
+    <header class="heading">
+        <div>
+            <h2 id="localAIStatusTitle">Checking local AI</h2>
+            <p id="summary" role="status" aria-live="polite">Checking the selected local services.</p>
+        </div>
+        <button id="dismiss" class="dismiss" type="button" aria-label="Dismiss local AI status">&#x2715;</button>
+    </header>
+    <ul id="services" class="services" aria-label="Selected local AI services"></ul>
+    <div id="actions" class="actions" hidden>
+        <button id="retry" class="action" type="button">Retry</button>
+        <button id="settings" class="action secondary" type="button">Open Arcane Settings</button>
+        <a id="profile" class="action secondary">Open Profile</a>
+    </div>
+    <p id="nativeHelp" role="status" tabindex="-1" hidden>From the Arcane OS Home screen, open Settings, choose Local AI, review the signed service diagnostics, and then return here to Retry.</p>
+    <details id="manual" hidden>
+        <summary>Start local services manually</summary>
+        <p id="manualText">Open the Ollama application or run <code>ollama serve</code>. If local transcription or speech is selected, also start your installed Arcane speech runtime. Then return here and choose Retry.</p>
+    </details>
+</section>
+
+<script type="module">
+    const host=this;
+    const root=host.shadowRoot;
+    const panel=root.querySelector('#panel');
+    const title=root.querySelector('#localAIStatusTitle');
+    const summary=root.querySelector('#summary');
+    const services=root.querySelector('#services');
+    const actions=root.querySelector('#actions');
+    const retry=root.querySelector('#retry');
+    const settings=root.querySelector('#settings');
+    const profile=root.querySelector('#profile');
+    const nativeHelp=root.querySelector('#nativeHelp');
+    const manual=root.querySelector('#manual');
+    const dismiss=root.querySelector('#dismiss');
+    const labels=Object.freeze({
+        llm:'Language model',
+        stt:'Transcription',
+        tts:'Spoken responses'
+    });
+    const readyDismissDelay=5000;
+    let options={};
+    let readyDismissTimer=null;
+    let readyForDismiss=false;
+
+    host.begin=begin;
+    host.configure=configure;
+    host.present=present;
+
+    retry.addEventListener('click',function dispatchRetryRequest(){
+        host.dispatchEvent(new CustomEvent('local-ai-retry',{
+            bubbles:true,
+            composed:true
+        }));
+    });
+    settings.addEventListener('click',function showNativeRecoveryHelp(){
+        nativeHelp.hidden=false;
+        nativeHelp.focus?.();
+    });
+    dismiss.addEventListener('click',function dismissStatusManually(){
+        hideStatus('manual');
+    });
+    host.addEventListener('pointerenter',cancelReadyDismiss);
+    host.addEventListener('pointerleave',scheduleReadyDismiss);
+    host.addEventListener('focusin',cancelReadyDismiss);
+    host.addEventListener('focusout',scheduleReadyDismiss);
+
+    function cancelReadyDismiss(){
+        if(readyDismissTimer!==null){
+            clearTimeout(readyDismissTimer);
+            readyDismissTimer=null;
+        }
+    }
+
+    function scheduleReadyDismiss(){
+        cancelReadyDismiss();
+        if(!readyForDismiss){
+            return;
+        }
+        readyDismissTimer=setTimeout(autoDismissReadyStatus,readyDismissDelay);
+    }
+
+    function autoDismissReadyStatus(){
+        readyDismissTimer=null;
+        if(!readyForDismiss){
+            return;
+        }
+        if(host.matches(':hover')||root.activeElement){
+            return;
+        }
+        hideStatus('ready-timeout');
+    }
+
+    function hideStatus(reason){
+        cancelReadyDismiss();
+        readyForDismiss=false;
+        host.hidden=true;
+        host.dispatchEvent(new CustomEvent('local-ai-status-dismissed',{
+            bubbles:true,
+            composed:true,
+            detail:{reason}
+        }));
+    }
+
+    function configure(input={}){
+        options={
+            profileHref:host.dataset.profileHref||null,
+            ...options,
+            ...input
+        };
+        if(options.profileHref){
+            profile.href=new URL(options.profileHref,document.baseURI).href;
+        }else{
+            profile.removeAttribute('href');
+        }
+        return {...options};
+    }
+
+    function begin(requirements={}){
+        readyForDismiss=false;
+        cancelReadyDismiss();
+        host.hidden=false;
+        panel.setAttribute('aria-busy','true');
+        title.textContent='Checking local AI';
+        summary.setAttribute('role','status');
+        summary.textContent='Checking the selected local services.';
+        actions.hidden=true;
+        manual.hidden=true;
+        nativeHelp.hidden=true;
+        renderServices(requirements,'checking');
+    }
+
+    function present(report={}){
+        const runtime=report.runtime||{};
+        const results=report.slots||report.results||report;
+        const requiredEntries=Object.keys(labels).map(function createRequiredEntry(key){
+            return [
+                key,
+                normalizeResult(results?.[key])
+            ];
+        }).filter(function entryIsRequired(entry){
+            return entry[1].required;
+        });
+        const unavailable=requiredEntries.filter(function entryIsUnavailable(entry){
+            return !entry[1].ready;
+        });
+        const browser=runtime.managedLocalAI===false||runtime.native===false||report.mode==='browser';
+
+        if(requiredEntries.length===0){
+            readyForDismiss=false;
+            cancelReadyDismiss();
+            host.hidden=true;
+            return report;
+        }
+
+        host.hidden=false;
+        panel.setAttribute('aria-busy','false');
+        renderEntries(requiredEntries);
+        actions.hidden=unavailable.length===0;
+        manual.hidden=!browser||unavailable.length===0;
+        settings.hidden=browser;
+        profile.hidden=!browser;
+        nativeHelp.hidden=true;
+
+        if(unavailable.length===0){
+            title.textContent='Local AI is ready';
+            summary.setAttribute('role','status');
+            summary.textContent='The selected local model and speech services are available.';
+            readyForDismiss=true;
+            scheduleReadyDismiss();
+            return report;
+        }
+
+        readyForDismiss=false;
+        cancelReadyDismiss();
+        title.textContent='Local AI needs attention';
+        summary.setAttribute('role','alert');
+        summary.textContent=browser
+            ?'Start the unavailable local service yourself and Retry, or open Profile, switch each affected option to OpenAI, and enter your OpenAI API key.'
+            :'Arcane could not recover every selected managed local service. Retry or open Arcane Settings > Local AI.';
+        return report;
+    }
+
+    function normalizeResult(value={}){
+        if(typeof value==='boolean'){
+            return {required:true,ready:value,message:''};
+        }
+        return {
+            required:Boolean(value?.required),
+            ready:Boolean(value?.ready),
+            message:String(value?.message||value?.reason||value?.errorCode||'')
+        };
+    }
+
+    function renderServices(requirements,state){
+        const entries=Object.keys(labels).map(function createCheckingEntry(key){
+            return [
+                key,
+                {
+                    required:Boolean(requirements?.[key]?.required??requirements?.[key]),
+                    ready:false,
+                    message:''
+                }
+            ];
+        }).filter(function checkingEntryIsRequired(entry){
+            return entry[1].required;
+        });
+        renderEntries(entries,state);
+    }
+
+    function renderEntries(entries,state=''){
+        const fragment=document.createDocumentFragment();
+        for(const [key,result] of entries){
+            const item=document.createElement('li');
+            const name=document.createElement('span');
+            const status=document.createElement('span');
+            const itemState=state==='checking'
+                ?'checking'
+                :result.ready
+                    ?'ready'
+                    :'unavailable';
+            item.className='service';
+            item.dataset.state=itemState;
+            name.className='service-name';
+            name.textContent=labels[key];
+            status.className='service-state';
+            status.textContent=state==='checking'
+                ?'Checking...'
+                :result.ready
+                    ?'Ready'
+                    :result.message||'Unavailable';
+            item.append(name,status);
+            fragment.append(item);
+        }
+        services.replaceChildren(fragment);
+    }
+
+    configure();
+    host.hidden=true;
+    host.ready=true;
+    host.dispatchEvent(new CustomEvent('local-ai-status-ready',{bubbles:true,composed:true}));
+</script>

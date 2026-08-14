@@ -1,0 +1,360 @@
+<link rel="stylesheet" href="./arcane/css/layout.css?v=3" />
+<style>
+    button{
+        width:16em;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+    }
+
+    button:active{
+        opacity:.5;
+    } 
+
+    button.pressed{
+        opacity:.6;
+        border:.2em;
+        border-color:var(--border-color);
+    }
+
+    .end{
+        background-color:var(--danger-color);
+        margin-left:1em;
+    }
+
+    .mute{
+        float:right;
+    }
+    
+    @media (max-width: 48em) {
+        body {
+            grid-template-columns: 2.2em 1fr;
+        }
+        
+        button {
+            width:100%;
+        }
+        
+        .end{
+            margin:0;
+        }
+    }
+    
+    
+</style>
+
+<p class="hidden">Will auto send after X seconds of silence set in code.</p>
+<button id="recordButton" type="button">Push To Talk</button>
+<button id="stopButton" type="button" class='hidden' disabled>Send</button>
+<button id="endButton" type="button" class="end">Complete</button>
+<button id="muteButton" type="button" class="mute" aria-pressed="true" aria-label="Unmute AI voice">Unmute</button>
+
+<script type="module">
+    import('../modules/DBLS.js');
+    import('../modules/AI.js?v=6');
+
+    const audioElement = new Audio();
+    const host=this;
+    const shadowRoot=host.shadowRoot;
+    const recordButton = shadowRoot.querySelector('#recordButton');
+    const stopButton = shadowRoot.querySelector('#stopButton');
+    const muteButton = shadowRoot.querySelector('#muteButton');
+    const sourceNodes = [];
+    const audioRecordingChunks=[];
+    const silenceDuration=0;//2000;
+    
+    let mediaRecorder=null;
+    let activeStream=null;
+    let audioMessageChunks = '';
+    let isSpeaking = false;
+    let silenceTimer;
+    
+    /**
+     * Configure the initial AI speech state. The default remains muted for
+     * compatibility with existing consumers. Apps own preference persistence.
+     */
+    host.initialMuted=typeof host.initialMuted==='boolean'?host.initialMuted:true;
+    host.muted=host.initialMuted;
+    host.configure=configure;
+    host.setAvailability=setAvailability;
+    host.setMuted=setMuted;
+    host.availability={
+        microphone:Boolean(navigator.mediaDevices?.getUserMedia&&globalThis.MediaRecorder),
+        stt:true,
+        tts:true
+    };
+    setAvailability({});
+    setMuted(host.initialMuted);
+    void observeMicrophonePermission();
+    host.componentReady=true;
+    host.dispatchEvent(new CustomEvent('speech-ready',{
+        bubbles:true,
+        composed:true,
+        detail:{speech:host}
+    }));
+
+    recordButton.addEventListener(
+        'mousedown', 
+        record
+    );
+
+    recordButton.addEventListener(
+        'touchstart', 
+        record
+    );
+
+    recordButton.addEventListener(
+        'mouseup', 
+        stop
+    );
+
+    recordButton.addEventListener(
+        'touchend', 
+        stop
+    );
+
+    // recordButton.addEventListener(
+    //     'click', 
+    //     record
+    // );
+
+    // stopButton.addEventListener(
+    //     'click', 
+    //     stop
+    // );
+
+    muteButton.addEventListener(
+        'click', 
+        muteToggle
+    );
+
+    shadowRoot.querySelector('#endButton').addEventListener(
+        'click',
+        function submitCompletionCommand(event){
+            event.target.disabled=true;
+            transcribe('End now, run all tool functions.');
+        }
+    );
+
+    window.addEventListener(
+        'ai-ready',
+        function aiReadyHandler(){
+            setMuted(host.muted);
+        }
+    );
+
+    if(window.ai?.ready){
+        setMuted(host.muted);
+    }
+
+    function configure(options={}){
+        if(Object.prototype.hasOwnProperty.call(options,'initialMuted')){
+            if(typeof options.initialMuted!=='boolean'){
+                throw new TypeError('initialMuted must be boolean');
+            }
+
+            host.initialMuted=options.initialMuted;
+            setMuted(host.initialMuted);
+        }
+
+        if(
+            Object.prototype.hasOwnProperty.call(options,'stt')
+            ||Object.prototype.hasOwnProperty.call(options,'tts')
+            ||Object.prototype.hasOwnProperty.call(options,'microphone')
+        ){
+            setAvailability(options);
+        }
+
+        return host;
+    }
+
+    function setAvailability(input={}){
+        const availability={
+            microphone:Object.prototype.hasOwnProperty.call(input,'microphone')
+                ?Boolean(input.microphone)
+                :host.availability.microphone,
+            stt:Object.prototype.hasOwnProperty.call(input,'stt')
+                ?Boolean(input.stt)
+                :host.availability.stt,
+            tts:Object.prototype.hasOwnProperty.call(input,'tts')
+                ?Boolean(input.tts)
+                :host.availability.tts
+        };
+
+        host.availability=availability;
+        recordButton.disabled=!availability.stt||!availability.microphone;
+        stopButton.disabled=recordButton.disabled;
+        recordButton.title=!availability.stt
+            ?'The selected transcription service is unavailable.'
+            :!availability.microphone
+                ?'Microphone access is unavailable. Text chat is still available.'
+                :'Push to talk';
+        recordButton.setAttribute('aria-label',recordButton.title);
+        muteButton.disabled=!availability.tts;
+
+        if(!availability.tts){
+            muteButton.textContent='Voice unavailable';
+            muteButton.setAttribute('aria-label','Selected speech service unavailable');
+            if(window.ai){
+                window.ai.muted=true;
+                window.ai.stopAudio?.();
+            }
+        }else{
+            setMuted(host.muted);
+        }
+
+        return {...availability};
+    }
+
+    async function observeMicrophonePermission(){
+        if(!navigator.permissions?.query||!navigator.mediaDevices?.getUserMedia){
+            return;
+        }
+
+        try{
+            const permission=await navigator.permissions.query({name:'microphone'});
+            const synchronize=()=>setAvailability({
+                microphone:permission.state!=='denied'
+            });
+            permission.addEventListener?.('change',synchronize);
+            synchronize();
+        }catch{
+            // Some supported browsers do not expose microphone through the
+            // Permissions API. getUserMedia remains the authoritative check.
+        }
+    }
+
+    function setMuted(muted){
+        if(typeof muted!=='boolean'){
+            throw new TypeError('muted must be boolean');
+        }
+
+        host.muted=muted;
+        if(host.availability.tts){
+            muteButton.textContent=muted?'Unmute':'Mute';
+            muteButton.setAttribute('aria-pressed',String(muted));
+            muteButton.setAttribute('aria-label',muted?'Unmute AI voice':'Mute AI voice');
+        }
+
+        if(window.ai){
+            window.ai.muted=host.availability.tts?muted:true;
+
+            if(muted&&typeof window.ai.stopAudio==='function'){
+                window.ai.stopAudio();
+            }
+        }
+
+        return host;
+    }
+
+    function muteToggle(){
+        setMuted(!host.muted);
+    }
+
+    async function transcribe(transcription=''){
+        const transcriptionEvent = new CustomEvent(
+            'speech-transcription-complete', 
+            {
+                detail: { text: transcription }
+            }
+        );
+
+        host.dispatchEvent(transcriptionEvent);
+    }
+
+    async function record() {
+        if(!host.availability.stt||!host.availability.microphone){
+            return false;
+        }
+        ai.stopAudio();
+        audioRecordingChunks.splice(0);
+        try{
+            activeStream=await navigator.mediaDevices.getUserMedia({audio:true});
+        }catch(error){
+            if(['NotAllowedError','NotFoundError','NotReadableError','SecurityError'].includes(error?.name)){
+                setAvailability({microphone:false});
+                host.dispatchEvent(new CustomEvent('speech-microphone-unavailable',{
+                    bubbles:true,
+                    composed:true,
+                    detail:{reason:error.name}
+                }));
+                return false;
+            }
+            throw error;
+        }
+        mediaRecorder=new MediaRecorder(activeStream);
+        
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(activeStream);
+        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+        
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+
+        processor.onaudioprocess = function(event) {
+            const input = event.inputBuffer.getChannelData(0);
+            const isSilent = input.every(sample => Math.abs(sample) < 0.05); // Threshold for silence
+            
+            if (isSilent&&silenceDuration) {
+                console.log('silent');
+                if(!silenceTimer){
+                    silenceTimer = setTimeout(() => {
+                        
+                        //console.log('TIMER SAYS STOPPING');
+                        stop();
+                        clearTimeout(silenceTimer);
+                    }, silenceDuration); // wait for specified milliseconds of silence
+                }
+            } else {
+                clearTimeout(silenceTimer);
+                silenceTimer=false;
+            }
+        };
+
+        mediaRecorder.ondataavailable = event => {
+            audioRecordingChunks.push(event.data);
+        };
+        
+        mediaRecorder.onstop = async () => {
+            processor.disconnect();
+            source.disconnect();
+            activeStream?.getTracks().forEach(track=>track.stop());
+            activeStream=null;
+            
+            const audioBlob = new Blob(audioRecordingChunks, { type: 'audio/webm; codecs=opus' });
+            const audioFile = new File([audioBlob], 'audio.webm', { type: 'audio/webm' });
+            //console.log(audioFile)
+
+            //playBackAudio(audioBlob);
+
+            const transcription = await ai.fetchSTT(audioFile);
+
+            transcribe(transcription);
+
+            console.log(transcription);
+        };
+        
+        mediaRecorder.start();
+        // recordButton.disabled = true;
+        // stopButton.disabled = false;
+    }
+
+    async function stop() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+        // recordButton.disabled = false;
+        // stopButton.disabled = true;
+    }
+
+    async function playBackAudio(audioBlob) {
+        const audioUrl = URL.createObjectURL(audioBlob);
+        audioElement.src = audioUrl;
+        audioElement.play();
+    }
+
+    
+</script>
