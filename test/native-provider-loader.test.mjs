@@ -42,7 +42,8 @@ function memoryStream(){
 
 test('loader imports only the fixed provider path and returns the canonical Arcane root',async t=>{
     const arcaneRoot=await temporaryDirectory(t,{prefix:'arcane-provider-loader-'});
-    const providerPath=path.join(arcaneRoot,...ARCANE_PORTABLE_PROVIDER_PATH);
+    const canonicalArcaneRoot=await realpath(arcaneRoot);
+    const providerPath=path.join(canonicalArcaneRoot,...ARCANE_PORTABLE_PROVIDER_PATH);
     await mkdir(path.dirname(providerPath),{recursive:true});
     await writeFile(providerPath,'export default {};\n','utf8');
     const expectedProvider=provider();
@@ -59,7 +60,7 @@ test('loader imports only the fixed provider path and returns the canonical Arca
     assert.equal(importedSpecifier,pathToFileURL(providerPath).href);
     assert.equal(loaded.nativeBuilder,expectedProvider);
     assert.equal(loaded.providerPath,providerPath);
-    assert.equal(loaded.toolchainRoot,arcaneRoot);
+    assert.equal(loaded.toolchainRoot,canonicalArcaneRoot);
 });
 
 test('loader fails honestly when the provider is absent or violates the protocol',async t=>{
@@ -292,6 +293,7 @@ test('paired CLI build packages one app and gives the provider only verified rel
     );
 
     const canonicalToolchainRoot=await realpath(toolchainRoot);
+    const canonicalWorkspaceRoot=await realpath(workspaceRoot);
     const toolchainReceipt=Object.freeze({
         kind:'arcane-portable-toolchain',
         version:'0.8.11',
@@ -355,7 +357,7 @@ test('paired CLI build packages one app and gives the provider only verified rel
     assert.equal(stderr.read(),'');
     assert.equal(capture.prepare.toolchainRoot,canonicalToolchainRoot);
     assert.equal(capture.build.appDescriptor.id,appId);
-    assert.equal(capture.build.outputRoot,path.join(workspaceRoot,'build','portable'));
+    assert.equal(capture.build.outputRoot,path.join(canonicalWorkspaceRoot,'build','portable'));
     assert.equal(capture.build.dependencyReleases.length,0);
     assert.equal(Object.hasOwn(capture.build,'workspaceRoot'),false);
     assert.equal(Object.hasOwn(capture.build,'appRoot'),false);
