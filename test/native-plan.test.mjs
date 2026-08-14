@@ -140,7 +140,7 @@ test('native plan binds explicit verified inputs and withholds source paths from
     assert.equal(capture.verifyRequest.artifactReceipt,result.artifactReceipt);
     assert.equal(capture.request.toolchainRoot,canonicalToolchainRoot);
     assert.equal(capture.request.appReleaseRoot,await realpath(application.releaseRoot));
-    assert.equal(capture.request.outputRoot,path.resolve(outputRoot));
+    assert.equal(capture.request.outputRoot,plan.outputRoot);
     assert.equal(capture.request.appDescriptor.id,application.appId);
     assert.equal(Object.hasOwn(capture.request,'workspaceRoot'),false);
     assert.equal(Object.hasOwn(capture.request,'appRoot'),false);
