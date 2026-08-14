@@ -95,6 +95,117 @@ function nativeProvider(toolchainReceipt,capture){
     });
 }
 
+test('native plan public boundary admits only the exact dev.2 target matrix before provider or toolchain work',async t=>{
+    const parent=await temporaryDirectory(t,{prefix:'arcane-native-target-matrix-'});
+    const missingToolchainRoot=path.join(parent,'missing-toolchain');
+    let authenticateCalls=0;
+    const unused=async()=>({});
+    const provider=Object.freeze({
+        protocol:NATIVE_BUILDER_PROTOCOL,
+        describe:unused,
+        doctor:unused,
+        prepare:unused,
+        authenticateToolchainReceipt:async()=>{
+            authenticateCalls+=1;
+            return {};
+        },
+        build:unused,
+        verify:unused,
+        run:unused
+    });
+    const unsigned=Object.freeze({mode:'unsigned-local-test',profileId:null});
+    const androidDevelopment=Object.freeze({
+        mode:'development',
+        profileId:'arcane-android-development-v1'
+    });
+    const admitted=[
+        ['portable/windows-x64',{
+            target:'portable',platform:'windows',architecture:'x64',format:'portable',signing:unsigned
+        }],
+        ['portable/linux-arm64',{
+            target:'portable',platform:'linux',architecture:'arm64',format:'portable',signing:unsigned
+        }],
+        ['windows-x64',{
+            target:'windows-x64',platform:'windows',architecture:'x64',format:'exe',signing:unsigned
+        }],
+        ['linux-x64',{
+            target:'linux-x64',platform:'linux',architecture:'x64',format:'deb',signing:unsigned
+        }],
+        ['linux-arm64',{
+            target:'linux-arm64',platform:'linux',architecture:'arm64',format:'deb',signing:unsigned
+        }],
+        ['android-arm64',{
+            target:'android-arm64',platform:'android',architecture:'arm64',format:'apk',signing:androidDevelopment
+        }]
+    ];
+    for(const [label,targetRequest] of admitted){
+        await assert.rejects(
+            createNativeBuildPlan({nativeBuilder:provider,toolchainRoot:missingToolchainRoot,targetRequest}),
+            error=>error?.code==='ARCANE_POLICY_DENIED'
+                &&/Native toolchain root does not exist/u.test(error.message),
+            label
+        );
+    }
+    assert.equal(authenticateCalls,0);
+
+    const rejected=[
+        ['AppImage',{
+            target:'linux-x64',platform:'linux',architecture:'x64',format:'appimage',signing:unsigned
+        }],
+        ['RPM',{
+            target:'linux-arm64',platform:'linux',architecture:'arm64',format:'rpm',signing:unsigned
+        }],
+        ['AAB',{
+            target:'android-arm64',platform:'android',architecture:'arm64',format:'aab',signing:androidDevelopment
+        }],
+        ['production signing',{
+            target:'android-arm64',platform:'android',architecture:'arm64',format:'apk',
+            signing:{mode:'production',profileId:'arcane-android-development-v1'}
+        }],
+        ['missing Android development profile',{
+            target:'android-arm64',platform:'android',architecture:'arm64',format:'apk',
+            signing:{mode:'development',profileId:null}
+        }],
+        ['wrong Android development profile',{
+            target:'android-arm64',platform:'android',architecture:'arm64',format:'apk',
+            signing:{mode:'development',profileId:'another-profile'}
+        }],
+        ['target/platform mismatch',{
+            target:'windows-x64',platform:'linux',architecture:'x64',format:'exe',signing:unsigned
+        }],
+        ['target/architecture mismatch',{
+            target:'windows-x64',platform:'windows',architecture:'arm64',format:'exe',signing:unsigned
+        }],
+        ['target/format mismatch',{
+            target:'windows-x64',platform:'windows',architecture:'x64',format:'deb',signing:unsigned
+        }],
+        ['unsigned target with a profile',{
+            target:'linux-x64',platform:'linux',architecture:'x64',format:'deb',
+            signing:{mode:'unsigned-local-test',profileId:'unexpected-profile'}
+        }]
+    ];
+    let providerReads=0;
+    const unreadProvider=new Proxy({}, {
+        get(){
+            providerReads+=1;
+            throw new Error('provider must not be read for a rejected target request');
+        }
+    });
+    for(const [label,targetRequest] of rejected){
+        await assert.rejects(
+            createNativeBuildPlan({
+                nativeBuilder:unreadProvider,
+                toolchainRoot:missingToolchainRoot,
+                targetRequest
+            }),
+            error=>error?.code==='ARCANE_TARGET_UNAVAILABLE',
+            label
+        );
+    }
+    assert.equal(providerReads,0);
+    assert.equal(authenticateCalls,0);
+});
+
 test('native plan binds explicit verified inputs and withholds source paths from the provider',async t=>{
     const parent=await temporaryDirectory(t,{prefix:'arcane-native-plan-'});
     const application=await prepareNativeRelease(parent);
@@ -103,7 +214,7 @@ test('native plan binds explicit verified inputs and withholds source paths from
     const canonicalToolchainRoot=await realpath(toolchainRoot);
     const toolchainReceipt=Object.freeze({
         kind:'arcane-native-toolchain',
-        version:'0.8.11',
+        version:'0.8.12',
         protocolVersion:'arcane/1',
         features:Object.freeze([]),
         supportedCapabilities:Object.freeze([]),
@@ -137,7 +248,7 @@ test('native plan binds explicit verified inputs and withholds source paths from
     assert.equal(plan.protocol,'arcane-native-build-plan/1');
     assert.equal(plan.app.id,application.appId);
     assert.equal(plan.targetRequest.target,'windows-x64');
-    assert.equal(plan.minimumCoreVersion,'0.8.11');
+    assert.equal(plan.minimumCoreVersion,'0.8.12');
     assert.equal(plan.toolchain.protocolVersion,'arcane/1');
     assert.deepEqual(plan.toolchain.features,[]);
     assert.deepEqual(plan.toolchain.supportedCapabilities,[]);
@@ -261,7 +372,7 @@ test('focused validation and release authority reject descriptor-only source dri
             descriptor.permissions.capabilities=['storage.read'];
         }],
         ['requirements.minimumCoreVersion',descriptor=>{
-            descriptor.requirements.minimumCoreVersion='0.8.12';
+            descriptor.requirements.minimumCoreVersion='0.8.13';
         }],
         ['native.bundledApps',descriptor=>{
             descriptor.native.bundledApps=['dependency-app'];
@@ -347,7 +458,7 @@ test('native plan binds the provider generation projection and rejects drift bef
     await mkdir(toolchainRoot);
     const toolchainReceipt=Object.freeze({
         kind:'arcane-native-toolchain',
-        version:'0.8.11',
+        version:'0.8.12',
         protocolVersion:'arcane/1',
         features:Object.freeze([]),
         supportedCapabilities:Object.freeze([]),
@@ -520,7 +631,7 @@ test('native plan execution admits one owner and rejects concurrent or sequentia
     const canonicalToolchainRoot=await realpath(toolchainRoot);
     const toolchainReceipt=Object.freeze({
         kind:'arcane-native-toolchain',
-        version:'0.8.11',
+        version:'0.8.12',
         protocolVersion:'arcane/1',
         features:Object.freeze([]),
         supportedCapabilities:Object.freeze([]),
@@ -595,7 +706,7 @@ test('an injected toolchain plans and builds one native target without changing 
     const canonicalToolchainRoot=await realpath(toolchainRoot);
     const toolchainReceipt=Object.freeze({
         kind:'arcane-native-toolchain',
-        version:'0.8.11',
+        version:'0.8.12',
         protocolVersion:'arcane/1',
         features:Object.freeze([]),
         supportedCapabilities:Object.freeze([]),

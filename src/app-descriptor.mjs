@@ -448,7 +448,7 @@ function synthesizedDescriptor(packageManifest,nativeDescriptor){
             features:[]
         },
         targets:nativeDescriptor!==undefined
-            ?['android-arm64','browser','linux-x64','portable','windows-x64']
+            ?['android-arm64','browser','linux-arm64','linux-x64','portable','windows-x64']
             :['browser']
     },{appId:packageManifest.id});
 }

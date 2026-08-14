@@ -7,13 +7,39 @@ The default cardinality is:
 ```
 
 There is no implicit all-app, all-target, or Android-flavor loop.
+Selecting `android-arm64` produces exactly one architecture-neutral APK with no
+native ABI fan-out. It does not build one artifact per ABI, an AAB, a release
+signing variant, or a publication/update artifact. Every native invocation also
+selects one explicit compatible `--arcane-root` and one app descriptor that
+already declares that target; a target list never causes provider discovery or
+additional builds.
+
+Shared/Core development has a separate integrated-only cardinality:
+
+```text
+1 integrated workspace x 1 fixed provider generation x 1 operation x 1 owned process tree
+```
+
+The focused-test operation selects exactly one repository-relative
+`.test.mjs`; the development-check operation selects only Arcane's canonical
+check. The 14,465-byte provider is read and hashed once for the process
+generation, then its unchanged filesystem identity is checked without rereading
+or rehashing its bytes around import and execution. Preparation reads Arcane's
+10,270-byte package manifest once and launches one owned process tree. A focused
+fixture completed in about 0.14 seconds on the development laptop; the canonical
+check owns its nested npm/test process tree and intentionally costs the complete
+Arcane development gate. Within one SDK process, one checkout admits only one
+such process tree at a time, so concurrent requests fail busy instead of
+multiplying that gate. Shared scope has no app, package, target, architecture,
+format, or signing loop and does not produce app output.
 
 ## Cold-path budget
 
 - Scaffold: approximately 15-25 files, less than 100 KiB, target under one
   second before an optional dependency installation.
-- Shared browser payload: the 144-file, approximately 3.1 MB runtime plus three
-  SDK licensing files, verified once per exact SDK installation state.
+- Shared browser payload: 152 files / 3,277,152 bytes, comprising the exact
+  149-file / 3,238,186-byte dev.2 runtime receipt plus three SDK licensing files
+  / 38,966 bytes, verified once per exact SDK installation state.
 - Small browser package: app bytes plus the shared runtime, copied and inventoried
   once into an atomic staging directory.
 - Portable build: one explicitly selected app and one host platform request. In
@@ -25,9 +51,10 @@ There is no implicit all-app, all-target, or Android-flavor loop.
   approximately 9.2 seconds. This is development evidence, not a cross-machine
   performance guarantee.
 - Shared native closure packaging: one retained shared-payload snapshot reads
-  and hashes 147 files / 3,153,739 bytes once. A two-app closure reuses that
-  snapshot instead of repeating 147 source reads for each app; each distinct
-  app release still writes and inventories its own output once.
+  and hashes the current manifest-bound runtime and licensing inventory once. A
+  two-app closure reuses that snapshot instead of repeating those source reads
+  for each app; each distinct app release still writes and inventories its own
+  output once.
 - Windows x64 executable: one cold development request retained 2,530 toolchain
   files / 218,292,008 bytes once, compiled one 22-file / 60,488,912-byte
   external artifact, reused its verified receipt, reached authenticated host
@@ -38,15 +65,39 @@ There is no implicit all-app, all-target, or Android-flavor loop.
   Toolchain preparation took 7.1 seconds, build plus verification took 15.7
   seconds, repeat verification reused the identical receipt in 0 ms, and the
   WSLg host ran for eight seconds before owned cancellation.
+- Linux ARM64 executable: exact-SHA workflow run `31842361832` authenticated one
+  seven-file / 5,143-byte release with seven provider reads and two retained
+  browser-runtime source reads, each exactly once. It retained 2,461 toolchain
+  files / 113,959,126 bytes, compiled a 149,720-byte AArch64 host and 71,240-byte
+  AArch64 bridge, and built one retained-verified 21,232,932-byte ARM64 DEB.
+  Preparation took 6,304 ms, build 16,868 ms, verification 447 ms, WebKit
+  readiness 1,972 ms, and the complete build/readiness/cancellation lifecycle
+  25,625 ms. The owned leader and process group were live at readiness and
+  absent after cancellation. The workflow kept Ubuntu's AppArmor
+  user-namespace restriction enabled while loading the packaged Bubblewrap
+  profile. This is development evidence for source revision
+  `4382043c09285ea203aa6daba1732660966ac409`, not Linux signing, installation,
+  release, or promotion evidence.
+- Android ARM64 application: one exact-SHA development request authenticated a
+  five-file / 611-byte synthetic external release with five release reads,
+  prepared one retained offline Gradle/toolchain closure in 159.4 seconds,
+  built one 1,438,324-byte APK in 69.9 seconds, reused verification evidence in
+  3 ms, and reached exact process/generation/nonce-bound content-and-bridge
+  readiness on a physical ARM64/API 37 device in 4.5 seconds. The APK contained
+  64 ZIP entries and zero native ABI entries. The 234.2-second total also proved
+  owned cancellation, force-stop, uninstall, and post-run package absence. This
+  is development evidence for source revision `be6732ab71cbecb43d037aaad994ade5f2f4d1b6`,
+  not Android release, store, update, or promotion evidence.
 
-Invariant work includes SDK/runtime resolution and the portable provider's 20
-required Arcane toolchain inputs, snapshotted once per prepared toolchain state.
-App source validation, tests, and release inventory are identity-bound once per
-app state. Portable assembly and Windows/Linux compilation are identity-bound
-once per requested target, and final artifact verification authenticates and
-reuses the retained receipt instead of repeating toolchain preparation or final
-inventory work. Compatible file traversal is batched with bounded sequential
-streaming.
+Invariant work includes SDK/runtime resolution and each selected provider
+generation, snapshotted once per prepared toolchain state. The portable
+provider's 20 required Arcane toolchain inputs remain one such snapshot. App
+source validation, tests, and release inventory are identity-bound once per app
+state. Portable assembly, Windows/Linux compilation, and Android APK assembly
+and development signing are identity-bound once per requested target. Final
+artifact verification authenticates and reuses the retained receipt instead of
+repeating toolchain preparation or final inventory work. Compatible file
+traversal is batched with bounded sequential streaming.
 
 Runtime verification binds version, source identity, inventory, and hashes. The
 schema-1 app-release manifest binds its packaged inventory and content digest.

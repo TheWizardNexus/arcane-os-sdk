@@ -107,6 +107,7 @@
     const profile=root.querySelector('#profile');
     const nativeHelp=root.querySelector('#nativeHelp');
     const manual=root.querySelector('#manual');
+    const manualText=root.querySelector('#manualText');
     const dismiss=root.querySelector('#dismiss');
     const labels=Object.freeze({
         llm:'Language model',
@@ -219,7 +220,10 @@
         const unavailable=requiredEntries.filter(function entryIsUnavailable(entry){
             return !entry[1].ready;
         });
+        const userManaged=report.mode==='user-managed-loopback';
+        const guidanceMessage=String(report?.guidance?.message||'').trim();
         const browser=runtime.managedLocalAI===false||runtime.native===false||report.mode==='browser';
+        const manualRecovery=browser||userManaged;
 
         if(requiredEntries.length===0){
             readyForDismiss=false;
@@ -232,15 +236,21 @@
         panel.setAttribute('aria-busy','false');
         renderEntries(requiredEntries);
         actions.hidden=unavailable.length===0;
-        manual.hidden=!browser||unavailable.length===0;
-        settings.hidden=browser;
-        profile.hidden=!browser;
+        manual.hidden=!manualRecovery||unavailable.length===0;
+        settings.hidden=manualRecovery;
+        profile.hidden=!manualRecovery;
         nativeHelp.hidden=true;
+        manualText.textContent=userManaged
+            ?guidanceMessage
+                ||'Review the unavailable user-managed Android service, then return here and choose Retry. Arcane does not install, start, repair, pull, or otherwise manage local AI services or models.'
+            :'Open the Ollama application or run ollama serve. If local transcription or speech is selected, also start your installed Arcane speech runtime. Then return here and choose Retry.';
 
         if(unavailable.length===0){
             title.textContent='Local AI is ready';
             summary.setAttribute('role','status');
-            summary.textContent='The selected local model and speech services are available.';
+            summary.textContent=userManaged
+                ?'The Android host admitted the selected model through your reachable Termux/Ollama service. Arcane does not manage its lifecycle.'
+                :'The selected local model and speech services are available.';
             readyForDismiss=true;
             scheduleReadyDismiss();
             return report;
@@ -250,7 +260,10 @@
         cancelReadyDismiss();
         title.textContent='Local AI needs attention';
         summary.setAttribute('role','alert');
-        summary.textContent=browser
+        summary.textContent=userManaged
+            ?guidanceMessage
+                ||'Review the unavailable user-managed Android service, then Retry or open Profile and switch the affected option to OpenAI.'
+            :browser
             ?'Start the unavailable local service yourself and Retry, or open Profile, switch each affected option to OpenAI, and enter your OpenAI API key.'
             :'Arcane could not recover every selected managed local service. Retry or open Arcane Settings > Local AI.';
         return report;

@@ -34,17 +34,26 @@ test('Pages document is semantic, project-path safe, and truthful',async()=>{
     assert.doesNotMatch(html,/(?:href|src)="\//u);
 
     assert.match(html,/Not yet published to npm/u);
-    assert.match(html,/Browser, portable, Windows x64, and Linux x64 development targets are available/u);
-    assert.match(html,/build verified portable, Windows x64, and Linux x64 development artifacts through an explicit compatible Arcane OS checkout/u);
+    assert.match(html,/Browser plus five explicitly paired native development targets are available/u);
+    assert.match(html,/build one declared portable, Windows x64, Linux x64, Linux ARM64, or Android ARM64 development artifact through an explicit compatible Arcane OS checkout/u);
     assert.match(html,/CLI, CI, future GUI, and Codex/u);
     assert.match(html,/doctor \/ expected contract/u);
     assert.match(html,/<span class="ready-pill">example<\/span>/u);
-    assert.match(html,/Portable output cannot run directly/u);
-    assert.match(html,/Windows and Linux x64 are unsigned local-test paths/u);
-    assert.match(html,/Deferred targets return a stable unavailable error and create nothing/u);
+    assert.match(html,/integrated shared\/Core profile with <code>--scope shared<\/code>/u);
+    assert.match(html,/Every native target requires an explicit compatible <code>--arcane-root<\/code> and matching scaffold descriptor/u);
+    assert.match(html,/Portable cannot run directly/u);
+    assert.match(html,/Windows and both Linux DEBs are unsigned-local-test/u);
+    assert.match(html,/development-signed, architecture-neutral APK with no native ABI/u);
+    assert.match(html,/Linux ARM64 has exact-SHA native workflow evidence/u);
+    assert.match(html,/Android has exact-SHA physical ARM64\/API 37 evidence/u);
+    assert.match(html,/physical\/native ARM64 device for run/u);
+    assert.match(html,/AAB, release signing, publishing, and update continuity remain deferred/u);
+    assert.doesNotMatch(html,/Android and ARM64 deferred|Mobile and ARM64 next|Deferred targets return|native E2E is not yet claimed|final adversarial fixes/u);
     for(const target of ['Browser','Portable','Windows x64','Linux x64','Linux ARM64','Android ARM64']){
         assert.match(html,new RegExp(`<th scope="row">${target.replace('/','\\/')}</th>`,'u'));
     }
+    assert.match(html,/Linux ARM64<\/th><td>DEB<\/td><td><span class="status-chip status-live">Available<\/span>/u);
+    assert.match(html,/Android ARM64<\/th><td>APK only<\/td><td><span class="status-chip status-live">Available<\/span>/u);
     assert.match(html,/AGPL-3\.0-only/u);
     assert.match(html,/commercial notice as permission/u);
 
@@ -93,8 +102,17 @@ test('space motion is bounded, controllable, and accessibility-aware',async()=>{
     assert.match(script,/build --target portable --arcane-root/u);
     assert.match(script,/run --target windows-x64 --arcane-root/u);
     assert.match(script,/run --target linux-x64 --arcane-root/u);
+    assert.match(script,/test --workspace "\.\.\/Arcane OS" --scope shared --test-file/u);
+    assert.match(script,/check --workspace "\.\.\/Arcane OS" --scope shared/u);
+    assert.match(script,/native-doctor --target linux-arm64 --arcane-root .*--format deb --signing unsigned-local-test/u);
+    assert.match(script,/build --target linux-arm64 --arcane-root .*--format deb --signing unsigned-local-test/u);
+    assert.match(script,/run --target linux-arm64 --arcane-root .*--format deb --signing unsigned-local-test/u);
+    assert.match(script,/native-doctor --target android-arm64 --arcane-root .*--format apk --signing development/u);
+    assert.match(script,/build --target android-arm64 --arcane-root .*--format apk --signing development/u);
+    assert.match(script,/run --target android-arm64 --arcane-root .*--format apk --signing development/u);
     assert.match(script,/new local-app --path \.\.\/local-app --target portable --git/u);
-    assert.match(script,/not an executable or direct-run target/u);
+    assert.match(script,/compatible --arcane-root and matching scaffold descriptor/u);
+    assert.match(script,/architecture-neutral APK with no native ABI/u);
     assert.doesNotMatch(script,/innerHTML/u);
     assert.doesNotMatch(script,/(?:fetch|XMLHttpRequest)\s*\(/u);
 });

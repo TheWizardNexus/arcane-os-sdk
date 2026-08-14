@@ -20,7 +20,7 @@ build plan authenticates the host toolchain receipt and checks every member of
 that closure before a provider may read release bytes or mutate output.
 
 This permits normal non-breaking Arcane upgrades. For example, an app requiring
-Core `0.8.11` can run on `0.8.12` or `0.9.0` when the required protocol,
+Core `0.8.12` can run on `0.8.13` or `0.9.0` when the required protocol,
 features, capabilities, and methods are still present. A higher version does
 not override a missing contract.
 

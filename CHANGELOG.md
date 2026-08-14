@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.0-dev.2
+
+- Synchronized the bundled browser runtime with Arcane OS 0.8.12 and retained
+  its exact 149-file source inventory.
+- Added an integrated-only shared/Core development scope that runs one exact
+  focused Arcane test or Arcane's canonical development check through a fixed,
+  generation-bound provider without packaging an app.
+- Added fixed provider pairing and canonical target requests for Linux ARM64
+  DEB and development-signed Android ARM64 APK builds while preserving the
+  existing browser, portable, Windows x64, and Linux x64 workflows.
+- Made integrated app testing select only the chosen app's test tree while
+  external repositories continue to run their root and selected-app tests.
+- Bound shared provider execution to one owned process tree per checkout in an
+  SDK process, with immediate acknowledgement, cancellation, busy rejection,
+  mutation detection, and surfaced failure.
+
 ## 0.1.0-dev.1
 
 - Synchronized the bundled browser runtime with Arcane OS 0.8.11 and pinned

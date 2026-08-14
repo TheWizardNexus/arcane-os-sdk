@@ -9,7 +9,7 @@ node ./bin/arcane.mjs new local-app --path ../local-app --target portable --git
 
 # From the generated app repository
 cd ../local-app
-npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.1.tgz
+npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.2.tgz
 npm run check`,
     note: "Use a packed tarball today. Local directory dependencies may become links and are intentionally rejected."
   }),
@@ -22,6 +22,10 @@ npm exec -- arcane package
 npm exec -- arcane verify
 npm exec -- arcane run --target browser
 
+# Integrated shared/Core development selects one focused test or one check
+node ../arcane-os-sdk/bin/arcane.mjs test --workspace "../Arcane OS" --scope shared --test-file test/component-contracts.test.mjs
+node ../arcane-os-sdk/bin/arcane.mjs check --workspace "../Arcane OS" --scope shared
+
 # Pair the portable provider through one explicit Arcane OS checkout
 npm exec -- arcane native-doctor --target portable --arcane-root "../Arcane OS"
 npm exec -- arcane build --target portable --arcane-root "../Arcane OS"
@@ -29,8 +33,18 @@ npm exec -- arcane build --target portable --arcane-root "../Arcane OS"
 # In apps scaffolded with the matching --target, build, verify, launch,
 # and own cancellation in the same process
 npm exec -- arcane run --target windows-x64 --arcane-root "../Arcane OS"
-npm exec -- arcane run --target linux-x64 --arcane-root "../Arcane OS"`,
-    note: "Browser, Windows x64, and Linux x64 development apps can run. Portable builds produce a verified app-scoped Core directory, not an executable or direct-run target."
+npm exec -- arcane run --target linux-x64 --arcane-root "../Arcane OS"
+
+# On a compatible native ARM64 Linux toolchain
+npm exec -- arcane native-doctor --target linux-arm64 --arcane-root "../Arcane OS" --format deb --signing unsigned-local-test
+npm exec -- arcane build --target linux-arm64 --arcane-root "../Arcane OS" --format deb --signing unsigned-local-test
+npm exec -- arcane run --target linux-arm64 --arcane-root "../Arcane OS" --format deb --signing unsigned-local-test
+
+# Android run requires one connected physical/native ARM64 device
+npm exec -- arcane native-doctor --target android-arm64 --arcane-root "../Arcane OS" --format apk --signing development
+npm exec -- arcane build --target android-arm64 --arcane-root "../Arcane OS" --format apk --signing development
+npm exec -- arcane run --target android-arm64 --arcane-root "../Arcane OS" --format apk --signing development`,
+    note: "Every native command requires a compatible --arcane-root and matching scaffold descriptor. Portable is verified but non-runnable; Windows and Linux are unsigned-local-test; Android is a development-signed, architecture-neutral APK with no native ABI."
   }),
   registry: Object.freeze({
     title: "After arcane-os@dev is published",

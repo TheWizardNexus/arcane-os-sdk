@@ -1,6 +1,6 @@
 {
   "name": "arcane-os",
-  "version": "0.1.0-dev.1",
+  "version": "0.1.0-dev.2",
   "description": "Arcane OS application SDK, CLI, browser runtime, and cross-platform build toolchain.",
   "type": "module",
   "main": "./src/index.mjs",
@@ -15,6 +15,7 @@
     "./targets": "./src/targets/index.mjs",
     "./native": "./src/native-plan.mjs",
     "./native-provider": "./src/native-provider-loader.mjs",
+    "./integrated-provider": "./src/integrated-provider-loader.mjs",
     "./packager": "./src/packager/core.mjs",
     "./runtime/manifest": "./runtime/ARCANE_RUNTIME_RELEASE.json",
     "./schemas/arcane-app.json": "./schemas/arcane-app.schema.json",

@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
   "builder": "arcane-sdk-runtime-v1",
-  "sdkVersion": "0.1.0-dev.1",
+  "sdkVersion": "0.1.0-dev.2",
   "source": {
     "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
-    "commit": "12f308607fd2675bd812d98dd6c5c07472af8383",
-    "bundleVersion": "0.8.11",
+    "commit": "4382043c09285ea203aa6daba1732660966ac409",
+    "bundleVersion": "0.8.12",
     "protocol": "arcane/1"
   },
-  "fileCount": 144,
-  "totalBytes": 3114773,
-  "contentSha256": "c48644f0c4df0265b72118c81c2df9f00d7bad158aa0c3f5701cda37e389f71c",
+  "fileCount": 149,
+  "totalBytes": 3238186,
+  "contentSha256": "072b858c2c03e2088c70ecd5443e8a9cfcb4d11f6af03f490766b8398d63e53f",
   "files": [
     {
       "path": "arcane/components/app-bar.html",
@@ -34,8 +34,8 @@
     },
     {
       "path": "arcane/components/chat.html",
-      "bytes": 24710,
-      "sha256": "0d92ec8531a7a63ac070661ce553fcc6c577977154544cabf0ec06bea4cba298"
+      "bytes": 46249,
+      "sha256": "295c56fd640466e87825cecfd2f5828126176d73e7821fdf109911c6c0f9c8ed"
     },
     {
       "path": "arcane/components/conversation-view.html",
@@ -94,8 +94,8 @@
     },
     {
       "path": "arcane/components/local-ai-status.html",
-      "bytes": 11908,
-      "sha256": "3fe2c1f5fe75cc69decad8d5ab937209e898918fe8cd5937f40cd5a82be6d6f6"
+      "bytes": 13020,
+      "sha256": "8b3bac32c84ea06f5b04b9eebf1eb6bb451d67be3d10efbb9ae4f71d636ef4f7"
     },
     {
       "path": "arcane/components/markdown-document.html",
@@ -254,8 +254,8 @@
     },
     {
       "path": "arcane/entities/Chat.js",
-      "bytes": 10105,
-      "sha256": "f3344ba76d538af2c4bc7d917b5d0260772b0dcf3d0809e1d8f14ab21d2b17a8"
+      "bytes": 13163,
+      "sha256": "5ad5bd76110a38da9ae6ce6fa77344c772d1d713a9c56639b78a26f16f5fe073"
     },
     {
       "path": "arcane/entities/CommunicationMessage.js",
@@ -309,8 +309,8 @@
     },
     {
       "path": "arcane/entities/User.js",
-      "bytes": 15535,
-      "sha256": "4b514a3e68d95efb28819806b58554d1a84bdbb7a3cb5c1dd1d13145b17fe94d"
+      "bytes": 20594,
+      "sha256": "e05f9e46e085e9ef88cf95e8d51a47a6929ade51edf817232e336fb152960f60"
     },
     {
       "path": "arcane/entities/Weather.js",
@@ -369,8 +369,8 @@
     },
     {
       "path": "arcane/modules/AI.js",
-      "bytes": 46249,
-      "sha256": "0d78467d45ac67fb09719a5094133fb50d803f79c0f8351b38d155ef7cb46429"
+      "bytes": 47400,
+      "sha256": "e1afb127bb5f67e635d04894741d3dacf30b67b5ce232f3336dd8cab1456debb"
     },
     {
       "path": "arcane/modules/AIPreferenceRuntime.js",
@@ -386,6 +386,11 @@
       "path": "arcane/modules/AIResponseLength.js",
       "bytes": 1941,
       "sha256": "fc295940a7cdeb959eba2fe465de88abee8832330551b6776ee0d0f743c0df6f"
+    },
+    {
+      "path": "arcane/modules/AIResponseURLPolicy.js",
+      "bytes": 17587,
+      "sha256": "905af15d5d4912a68fa96ea44b0f6ac2eef90c69c6486ce507e00a7850acd626"
     },
     {
       "path": "arcane/modules/AnsiText.js",
@@ -473,9 +478,24 @@
       "sha256": "378559117479eaae4977a127b3dbc02002fcff1768f817a4a5a878b79a04eee3"
     },
     {
+      "path": "arcane/modules/ConversationActionItems.js",
+      "bytes": 16611,
+      "sha256": "ba77b953e72a6efd0d9a62bbdbd924b53c8d9c8336fd47116648beb07b91db0a"
+    },
+    {
+      "path": "arcane/modules/ConversationClosingReport.js",
+      "bytes": 13500,
+      "sha256": "5d553cb1c988d18d2a45b68882467cbc79dd50a93d0f96693dcf1f80dddf58bb"
+    },
+    {
+      "path": "arcane/modules/ConversationTimebox.js",
+      "bytes": 17241,
+      "sha256": "1727832c339a060eaeb2e1eefb9c8498cdc93aa98cdfc220e8a1486ef07342d7"
+    },
+    {
       "path": "arcane/modules/CoreLocalModelCatalog.js",
-      "bytes": 1018,
-      "sha256": "a45da0eeeccd302ff8799dde0cac13f6a379a0e1cd56ac235d5ded141cca56f7"
+      "bytes": 1508,
+      "sha256": "e048eae7e38377754b8b0ab65d8f5bb43233144b14f01edc5ebd3e05dcf9fccc"
     },
     {
       "path": "arcane/modules/DBLS.js",
@@ -484,8 +504,8 @@
     },
     {
       "path": "arcane/modules/DBOPFS.js",
-      "bytes": 29879,
-      "sha256": "133ea76ae80210b6f2e873d4240caca62e1f8d43558f77fc0e471e60355ee5e8"
+      "bytes": 30099,
+      "sha256": "eef077c318032626cf3c455e0619dfd6a729e916c367fd4fffac72c6dcb50745"
     },
     {
       "path": "arcane/modules/DBOPFSWorker.js",
@@ -534,13 +554,13 @@
     },
     {
       "path": "arcane/modules/LocalAIReadiness.js",
-      "bytes": 19459,
-      "sha256": "a61b860d0203dc39608a4cbd19f99fcac4928a9e444bf64c8cbd40b7bee252fe"
+      "bytes": 23480,
+      "sha256": "d6ec0c842dd74d974c6e7b1c54591a25e64ec63663d283fb5602b9be99b841e5"
     },
     {
       "path": "arcane/modules/LocalAIReadinessController.js",
-      "bytes": 3902,
-      "sha256": "20ea01da5d995f27bbadeff9105a7f658386f70a92e08c7655093ce116a63cf6"
+      "bytes": 4334,
+      "sha256": "f46a484464cd67d287e5c3209ace440d290ef1b905e88b5f01f8463c278c39f4"
     },
     {
       "path": "arcane/modules/MD.js",
@@ -646,6 +666,11 @@
       "path": "arcane/modules/ScreenCapture.js",
       "bytes": 5326,
       "sha256": "40fb3c8cd1fbb529bbf09af3329930f02c01bae2500afdab61f198a783e015b5"
+    },
+    {
+      "path": "arcane/modules/SpeechPlayback.js",
+      "bytes": 21392,
+      "sha256": "a77430a61dae48bd736fe36cfdde856b158b0e7484e371c243f1a8a8d83da505"
     },
     {
       "path": "arcane/modules/StaticDocumentCatalog.js",

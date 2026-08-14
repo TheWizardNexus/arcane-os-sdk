@@ -318,6 +318,32 @@ class AI {
             :null;
     }
 
+    async #androidNativeHost(){
+        if(typeof globalThis.arcaneAndroid?.postMessage==='function'){
+            return true;
+        }
+
+        try{
+            const runtime=await globalThis.Arcane?.runtime?.current?.();
+            return runtime?.native===true
+                &&runtime?.transport==='android-webview';
+        }catch{
+            return false;
+        }
+    }
+
+    async #assertAndroidSpeechBridge(service){
+        if(service!=='LOCAL_SPEACH'||!await this.#androidNativeHost()){
+            return;
+        }
+
+        const error=new Error(
+            'Android local speech requires the capability-gated Arcane speech bridge.'
+        );
+        error.code='AI_ANDROID_NATIVE_SPEECH_UNAVAILABLE';
+        throw error;
+    }
+
     #arrayBufferToBase64(arrayBuffer){
         const bytes=new Uint8Array(arrayBuffer);
 
@@ -371,14 +397,20 @@ class AI {
     }
 
     #ollamaMessages(messages=[],toolChoice='auto'){
+        const sanitizedMessages=messages.map(function sanitizeOllamaMessage(message){
+            return {
+                role:String(message?.role??''),
+                content:String(message?.content??'')
+            };
+        });
         const requiredName=toolChoice?.function?.name;
 
         if(!requiredName){
-            return messages;
+            return sanitizedMessages;
         }
 
         const instruction=`Call the ${requiredName} function now with concise values for every required field. Do not answer in prose.`;
-        const firstMessage=messages[0];
+        const firstMessage=sanitizedMessages[0];
 
         if(firstMessage?.role==='system'){
             return [
@@ -386,13 +418,13 @@ class AI {
                     ...firstMessage,
                     content:`${firstMessage.content||''}\n\n${instruction}`
                 },
-                ...messages.slice(1)
+                ...sanitizedMessages.slice(1)
             ];
         }
 
         return [
             {role:'system',content:instruction},
-            ...messages
+            ...sanitizedMessages
         ];
     }
 
@@ -1074,6 +1106,8 @@ class AI {
             };
         }
 
+        await this.#assertAndroidSpeechBridge(this.ttsService);
+
         job.abortController=new AbortController();
         const personality=await window.user?.personality
             ||'A behavioral health technician with a slight veteran feel on occasion.';
@@ -1169,6 +1203,8 @@ class AI {
             await responseHandler(response.text);
             return response.text;
         }
+
+        await this.#assertAndroidSpeechBridge(this.sttService);
 
         const formData = new FormData();
         formData.append('file', audioFile);

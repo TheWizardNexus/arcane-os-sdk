@@ -110,6 +110,7 @@ function assertPackageMetadata(packageDocument){
         './events',
         './targets',
         './native',
+        './integrated-provider',
         './packager',
         './runtime/manifest',
         './schemas/arcane-app.json',

@@ -21,22 +21,27 @@ const NATIVE_TARGETS=Object.freeze({
     portable:Object.freeze({
         platforms:new Set(['windows','linux']),
         architectures:new Set(['x64','arm64']),
-        formats:new Set(['portable'])
+        format:'portable',
+        signingMode:'unsigned-local-test',
+        signingProfileId:null
     }),
     'windows-x64':Object.freeze({
-        platforms:new Set(['windows']),architectures:new Set(['x64']),formats:new Set(['exe'])
+        platforms:new Set(['windows']),architectures:new Set(['x64']),format:'exe',
+        signingMode:'unsigned-local-test',signingProfileId:null
     }),
     'linux-x64':Object.freeze({
-        platforms:new Set(['linux']),architectures:new Set(['x64']),formats:new Set(['appimage','deb','rpm'])
+        platforms:new Set(['linux']),architectures:new Set(['x64']),format:'deb',
+        signingMode:'unsigned-local-test',signingProfileId:null
     }),
     'linux-arm64':Object.freeze({
-        platforms:new Set(['linux']),architectures:new Set(['arm64']),formats:new Set(['appimage','deb','rpm'])
+        platforms:new Set(['linux']),architectures:new Set(['arm64']),format:'deb',
+        signingMode:'unsigned-local-test',signingProfileId:null
     }),
     'android-arm64':Object.freeze({
-        platforms:new Set(['android']),architectures:new Set(['arm64']),formats:new Set(['apk','aab'])
+        platforms:new Set(['android']),architectures:new Set(['arm64']),format:'apk',
+        signingMode:'development',signingProfileId:'arcane-android-development-v1'
     })
 });
-const SIGNING_MODES=new Set(['unsigned-local-test','development','production']);
 const SHA256_PATTERN=/^[a-f0-9]{64}$/u;
 const issuedPlans=new WeakMap();
 const attemptedPlans=new WeakSet();
@@ -233,24 +238,27 @@ function validateTargetRequest(value){
     const definition=NATIVE_TARGETS[value.target];
     if(!definition)fail(`Unsupported native target: ${String(value.target)}.`,ERROR_CODES.targetUnavailable);
     if(!definition.platforms.has(value.platform)||!definition.architectures.has(value.architecture)
-        ||!definition.formats.has(value.format)){
+        ||value.format!==definition.format){
         fail(`Target ${value.target} does not support ${value.platform}/${value.architecture}/${value.format}.`,ERROR_CODES.targetUnavailable);
     }
     assertOnlyKeys(value.signing,new Set(['mode','profileId']),'targetRequest.signing');
-    if(!SIGNING_MODES.has(value.signing.mode))fail('targetRequest.signing.mode is unsupported.');
-    const profileId=value.signing.profileId??null;
-    if(value.signing.mode==='unsigned-local-test'){
-        if(profileId!==null)fail('unsigned-local-test signing must not name a signing profile.');
-    }else if(typeof profileId!=='string'||!profileId.trim()||profileId.length>160
-        ||/[\u0000-\u001f\u007f]/u.test(profileId)){
-        fail(`${value.signing.mode} signing requires a bounded explicit profileId.`);
+    if(!Object.hasOwn(value.signing,'mode')||!Object.hasOwn(value.signing,'profileId')
+        ||value.signing.mode!==definition.signingMode
+        ||value.signing.profileId!==definition.signingProfileId){
+        const profileRequirement=definition.signingProfileId===null
+            ?'a null profileId'
+            :`profileId ${definition.signingProfileId}`;
+        fail(
+            `Target ${value.target} requires ${definition.format} with ${definition.signingMode} signing and ${profileRequirement}.`,
+            ERROR_CODES.targetUnavailable
+        );
     }
     return immutable({
         target:value.target,
         platform:value.platform,
         architecture:value.architecture,
         format:value.format,
-        signing:{mode:value.signing.mode,profileId}
+        signing:{mode:value.signing.mode,profileId:value.signing.profileId}
     });
 }
 
@@ -518,13 +526,13 @@ export async function createNativeBuildPlan({
 }={}){
     throwIfAborted(signal);
     await onEvent?.(Object.freeze({type:'native.plan.started'}));
+    const request=validateTargetRequest(targetRequest);
     const provider=validateNativeBuilder(nativeBuilder);
     const generation=providerGenerationSummary(
         providerGeneration===undefined?provider.providerGeneration:providerGeneration,
         {optional:true}
     );
     assertProviderGenerationBinding(generation,provider,'Native build plan');
-    const request=validateTargetRequest(targetRequest);
     const canonicalToolchainRoot=await canonicalDirectory(toolchainRoot,'Native toolchain root');
     const authenticatedToolchain=await provider.authenticateToolchainReceipt(
         toolchainReceipt,

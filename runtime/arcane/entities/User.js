@@ -69,6 +69,8 @@ const EMAIL_REGEX =
  * @property {number} AI_speed
  * @property {string} ai_verbosity
  * @property {boolean} initialSpeechMuted
+ * @property {boolean} conversationClosingReportEnabled
+ * @property {boolean} conversationActionItemsEnabled
  * @property {string|number} skin
  * @property {boolean} preferrsLocal
  * @property {boolean} developer
@@ -96,6 +98,8 @@ class UserEntity {
 
     #loadPromise = null;
 
+    #explicitUpdateQueue = Promise.resolve();
+
     #schema = Object.freeze(
         [
             'username',
@@ -118,6 +122,8 @@ class UserEntity {
             'AI_speed',
             'ai_verbosity',
             'initialSpeechMuted',
+            'conversationClosingReportEnabled',
+            'conversationActionItemsEnabled',
             'skin',
             'developer',
             'prefersLocal',
@@ -148,6 +154,8 @@ class UserEntity {
     #AI_speed = 1.0;
     #ai_verbosity = 'medium';
     #initialSpeechMuted = true;
+    #conversationClosingReportEnabled = true;
+    #conversationActionItemsEnabled = true;
     #skin = 'default';
     #developer = false;
     #prefersLocal = false;
@@ -521,6 +529,42 @@ class UserEntity {
 
 
 
+    /** @returns {boolean} */
+    get conversationClosingReportEnabled(){
+        return this.#conversationClosingReportEnabled;
+    }
+
+    /** @param {boolean} v */
+    set conversationClosingReportEnabled(v){
+        if(!is.boolean(v)){
+            throw new Error('conversationClosingReportEnabled must be boolean');
+        }
+
+        this.#conversationClosingReportEnabled = v;
+
+        this.#persist();
+    }
+
+
+
+    /** @returns {boolean} */
+    get conversationActionItemsEnabled(){
+        return this.#conversationActionItemsEnabled;
+    }
+
+    /** @param {boolean} v */
+    set conversationActionItemsEnabled(v){
+        if(!is.boolean(v)){
+            throw new Error('conversationActionItemsEnabled must be boolean');
+        }
+
+        this.#conversationActionItemsEnabled = v;
+
+        this.#persist();
+    }
+
+
+
     /** @returns {string|number} */
     get skin(){
         return this.#skin;
@@ -668,6 +712,112 @@ class UserEntity {
     }
 
     /**
+     * Applies and durably saves an explicit profile update as one serialized
+     * operation. A failed write restores the prior in-memory values.
+     *
+     * @param {UserEntityData|string|Object} src
+     * @returns {Promise<UserEntityData>}
+     */
+    updateExplicit(src){
+        const operation=this.#explicitUpdateQueue.then(()=>{
+            const applyUpdate=async()=>{
+                const prior=this.explicit;
+                const persist=this.persist;
+                let baseline=prior;
+
+                if(persist){
+                    const durable=await dbopfs.get(
+                        this.#tableName,
+                        this.fileName,
+                        true
+                    );
+                    if(durable){
+                        baseline=durable;
+                    }
+                }
+
+                this.persist=false;
+                try{
+                    this.explicit=baseline;
+                    this.explicit=src;
+                }finally{
+                    this.persist=persist;
+                }
+
+                if(!persist){
+                    return this.explicit;
+                }
+
+                try{
+                    await this.save();
+                    return this.explicit;
+                }catch(error){
+                    this.persist=false;
+                    try{
+                        this.explicit=baseline;
+                    }finally{
+                        this.persist=persist;
+                    }
+                    throw error;
+                }
+            };
+            return this.#withExplicitLock(applyUpdate);
+        });
+
+        this.#explicitUpdateQueue=operation.catch(()=>false);
+        return operation;
+    }
+
+    withFreshExplicit(operation){
+        if(typeof operation!=='function'){
+            throw new TypeError('A fresh UserEntity operation is required.');
+        }
+        const result=this.#explicitUpdateQueue.then(()=>
+            this.#withExplicitLock(async()=>{
+                const durable=await dbopfs.get(
+                    this.#tableName,
+                    this.fileName,
+                    true
+                );
+                if(durable){
+                    const persist=this.persist;
+                    this.persist=false;
+                    try{
+                        this.explicit=durable;
+                    }finally{
+                        this.persist=persist;
+                    }
+                }
+
+                return operation(this.explicit);
+            })
+        );
+
+        this.#explicitUpdateQueue=result.catch(()=>false);
+        return result;
+    }
+
+    #withExplicitLock(operation){
+        const locks=globalThis.navigator?.locks;
+
+        if(typeof locks?.request==='function'){
+            return locks.request(
+                `user-entity:${this.fileName}`,
+                operation
+            );
+        }
+        if(typeof globalThis.window==='object'){
+            const error=new Error(
+                'This browser cannot safely coordinate profile changes across tabs.'
+            );
+            error.code='USER_ENTITY_LOCK_UNAVAILABLE';
+            return Promise.reject(error);
+        }
+
+        return operation();
+    }
+
+    /**
      * Load entity from OPFS
      *
      * Reads serialized entity data using DBOPFS
@@ -690,6 +840,33 @@ class UserEntity {
         }finally{
             this.#loadPromise=null;
         }
+    }
+
+    /**
+     * Force-reads the durable profile so an already-open tab observes changes
+     * made by another tab before making consent-sensitive decisions.
+     *
+     * @returns {Promise<UserEntityData>}
+     */
+    async refresh(){
+        await this.#explicitUpdateQueue;
+        const user=await dbopfs.get(
+            this.#tableName,
+            this.fileName,
+            true
+        );
+
+        if(user){
+            const persist=this.persist;
+            this.persist=false;
+            try{
+                this.explicit=user;
+            }finally{
+                this.persist=persist;
+            }
+        }
+
+        return this.explicit;
     }
 
     async #load(){

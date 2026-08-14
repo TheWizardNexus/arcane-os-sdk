@@ -14,7 +14,7 @@ async function installSdkPayload(workspaceRoot){
     }
 }
 
-test('target registry distinguishes available, pairing-required, and deferred targets',async()=>{
+test('target registry distinguishes browser availability from native pairing requirements',async()=>{
     const targets=listTargets();
     assert.deepEqual(
         targets.map(target=>target.id),
@@ -42,22 +42,16 @@ test('target registry distinguishes available, pairing-required, and deferred ta
     assert.deepEqual(await getTargetAdapter('browser').prepare(),{
         target:'browser',status:'available',ready:true,required:false
     });
-    for(const targetId of ['portable','windows-x64','linux-x64']){
+    for(const targetId of ['portable','windows-x64','linux-x64','linux-arm64','android-arm64']){
         assert.equal(targets.find(target=>target.id===targetId).status,'pairing-required');
-    }
-    for(const targetId of ['linux-arm64','android-arm64']){
-        assert.equal(targets.find(target=>target.id===targetId).status,'deferred');
     }
 });
 
-test('deferred adapters reject plan and build without producing substitute output',async()=>{
+test('unpaired native adapters reject plan and build without producing substitute output',async()=>{
     for(const targetId of ['portable','windows-x64','linux-x64','linux-arm64','android-arm64']){
         const adapter=getTargetAdapter(targetId);
         const status=await adapter.doctor();
-        assert.equal(
-            status.status,
-            ['portable','windows-x64','linux-x64'].includes(targetId)?'pairing-required':'deferred'
-        );
+        assert.equal(status.status,'pairing-required');
         assert.equal(status.ready,false);
         await assert.rejects(
             adapter.plan({workspaceRoot:'ignored',appId:'ignored'}),

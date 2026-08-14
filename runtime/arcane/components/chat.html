@@ -13,7 +13,118 @@
         opacity:.36;
     }
 
+    .conversation_timebox{
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        gap:.65em 1em;
+        align-items:center;
+        margin:0 1em .75em;
+        padding:.65em .8em;
+        border:1px solid var(--border-color);
+        border-radius:.6em;
+        background:color-mix(in srgb,var(--modal-background) 88%,var(--primary-color) 12%);
+        color:var(--text-color);
+    }
+
+    .conversation_timebox[hidden]{
+        display:none;
+    }
+
+    .conversation_timebox[data-error="true"]{
+        border-color:var(--danger-color,var(--accent-color));
+    }
+
+    .conversation_timebox_summary{
+        display:flex;
+        flex-wrap:wrap;
+        gap:.35em .8em;
+        align-items:baseline;
+        min-width:0;
+    }
+
+    .conversation_timebox_summary strong{
+        font-size:.9em;
+    }
+
+    .conversation_timebox_elapsed{
+        font-variant-numeric:tabular-nums;
+        white-space:nowrap;
+    }
+
+    .conversation_timebox_status{
+        flex-basis:100%;
+        color:var(--muted-text-color,var(--text-color));
+        font-size:.78em;
+    }
+
+    .conversation_timebox_form{
+        display:flex;
+        flex-wrap:wrap;
+        gap:.45em;
+        align-items:center;
+        justify-content:flex-end;
+    }
+
+    .conversation_timebox_form label{
+        display:flex;
+        gap:.35em;
+        align-items:center;
+        font-size:.8em;
+        font-weight:700;
+    }
+
+    .conversation_timebox_form input{
+        width:5.25em;
+        min-height:2.25em;
+        padding:.25em .4em;
+        border:1px solid var(--border-color);
+        border-radius:.4em;
+        background:var(--background);
+        color:var(--text-color);
+        font:inherit;
+    }
+
+    .conversation_timebox_form input:focus,
+    .conversation_timebox_form button:focus-visible{
+        outline:.18em solid var(--focus-color);
+        outline-offset:.12em;
+    }
+
+    .conversation_timebox_form button{
+        min-height:2.25em;
+        padding:.35em .65em;
+        border:1px solid var(--border-color);
+        border-radius:.4em;
+        background:var(--primary-color);
+        color:var(--button-text-color,var(--text-color));
+        cursor:pointer;
+        font:inherit;
+        font-size:.78em;
+        font-weight:750;
+    }
+
+    .conversation_timebox_form button[data-timebox-clear]{
+        background:var(--modal-background);
+        color:var(--text-color);
+    }
+
+    .conversation_timebox_form button[hidden]{
+        display:none;
+    }
+
+    @media (max-width:44em){
+        .conversation_timebox{
+            grid-template-columns:1fr;
+        }
+
+        .conversation_timebox_form{
+            justify-content:flex-start;
+        }
+    }
+
     .chat_area ul {
+        flex:1 1 auto;
+        min-height:0;
         list-style: none;
         overflow-y: auto;
         padding: 0 1em;
@@ -189,6 +300,53 @@
 </style>
 
 <section class="chat_area">
+    <section
+        id="conversation_timebox"
+        class="conversation_timebox"
+        aria-labelledby="conversation_timebox_title"
+        hidden
+    >
+        <div class="conversation_timebox_summary">
+            <strong id="conversation_timebox_title">Conversation time</strong>
+            <span class="conversation_timebox_elapsed">
+                Elapsed
+                <output id="conversation_timebox_elapsed" role="timer" aria-live="off">00:00</output>
+            </span>
+            <span
+                id="conversation_timebox_status"
+                class="conversation_timebox_status"
+                role="status"
+                aria-live="polite"
+            >Starting the elapsed timer.</span>
+        </div>
+        <form id="conversation_timebox_form" class="conversation_timebox_form">
+            <label for="conversation_timebox_minutes">
+                Check in after
+                <input
+                    id="conversation_timebox_minutes"
+                    name="duration_minutes"
+                    type="number"
+                    min="1"
+                    step="1"
+                    inputmode="numeric"
+                    list="conversation_timebox_presets"
+                    placeholder="minutes"
+                    aria-describedby="conversation_timebox_status"
+                >
+                minutes
+            </label>
+            <datalist id="conversation_timebox_presets">
+                <option value="5"></option>
+                <option value="10"></option>
+                <option value="15"></option>
+                <option value="30"></option>
+                <option value="60"></option>
+            </datalist>
+            <button type="submit">Set check-in</button>
+            <button type="button" data-timebox-clear>No limit</button>
+            <button type="button" data-timebox-retry hidden>Retry send</button>
+        </form>
+    </section>
     <ul type='text' class='chat_output' id='chat_output'></ul>
     <div class="chat_input_area">
         <textarea type='text' class='chat_input' id='chat_input'></textarea>
@@ -389,8 +547,25 @@
     const speech = shadowRoot.querySelector('#speech');
     const uploadBtn = shadowRoot.querySelector('#chat_upload');
     const fileInput = shadowRoot.querySelector('#file_upload_input');
-    const { default: MD } = await import('../modules/MD.js');
-    const { default: FileEntity } = await import('../entities/File.js');
+    const conversationTimeboxPanel=shadowRoot.querySelector('#conversation_timebox');
+    const conversationTimeboxElapsed=shadowRoot.querySelector('#conversation_timebox_elapsed');
+    const conversationTimeboxStatus=shadowRoot.querySelector('#conversation_timebox_status');
+    const conversationTimeboxForm=shadowRoot.querySelector('#conversation_timebox_form');
+    const conversationTimeboxMinutes=shadowRoot.querySelector('#conversation_timebox_minutes');
+    const conversationTimeboxClear=shadowRoot.querySelector('[data-timebox-clear]');
+    const conversationTimeboxRetryButton=shadowRoot.querySelector('[data-timebox-retry]');
+    const conversationTimeboxControls=[
+        ...conversationTimeboxForm.querySelectorAll('input,button')
+    ];
+    const [
+        {default:MD},
+        {default:FileEntity},
+        {ConversationSubmissionBarrier,requireConversationTimeboxDelivery}
+    ]=await Promise.all([
+        import('../modules/MD.js'),
+        import('../entities/File.js'),
+        import('../modules/ConversationTimebox.js')
+    ]);
 
     host.language=host.language||'English';
     host.name = host.name||'User';
@@ -399,6 +574,16 @@
         ?speech.initialMuted
         :true;
     let initialSpeechMuteListenerInstalled=false;
+    const hostSubmissionBarrier=new ConversationSubmissionBarrier();
+    let programmaticSubmissionQueue=Promise.resolve(true);
+    let conversationTimeboxController=null;
+    let conversationTimeboxUnsubscribe=null;
+    let conversationTimeboxError='';
+    let conversationTimeboxErrorKind='';
+    let conversationTimeboxErrorVersion=0;
+    let conversationTimeboxRetry=null;
+    let lastQueuedTimeboxRevision=null;
+    let hostSubmissionGeneration=0;
 
     host.sendMessage=host.sendMessage||async function(text=''){
         console.warn('html-import chat.html `host.sendMessage` method not implemented.\n\nThis can also be done by listening for the "chat-send-message" event.\n\nIt is still best practice to implement the `.sendMessage` method atleast with an empty function.\n\n')
@@ -411,6 +596,8 @@
     host.streamMessage=streamMessage;
     host.setAIAvailability=setAIAvailability;
     host.setInitialSpeechMuted=setInitialSpeechMuted;
+    host.bindConversationTimebox=bindConversationTimebox;
+    host.submitMessage=submitMessage;
     host.aiAvailability={llm:true,stt:true,tts:true};
 
     function setInitialSpeechMuted(initialMuted){
@@ -471,6 +658,349 @@
 
         return {...availability};
     }
+
+    function formatConversationTime(milliseconds=0){
+        const totalSeconds=Math.max(0,Math.floor(milliseconds/1000));
+        const hours=Math.floor(totalSeconds/3600);
+        const minutes=Math.floor((totalSeconds%3600)/60);
+        const seconds=totalSeconds%60;
+        return hours>0
+            ?`${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`
+            :`${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+    }
+
+    function bindConversationTimebox(controller){
+        const requiredMethods=[
+            'clearLimit',
+            'controlMessage',
+            'setLimitMinutes',
+            'snapshot',
+            'start',
+            'subscribe'
+        ];
+        if(
+            !controller
+            ||requiredMethods.some(function missingConversationTimeboxMethod(name){
+                return typeof controller[name]!=='function';
+            })
+            ||typeof controller.limitReachedMessage!=='string'
+        ){
+            throw new TypeError('A compatible conversation timebox controller is required.');
+        }
+        if(conversationTimeboxController===controller){
+            return controller;
+        }
+        conversationTimeboxUnsubscribe?.();
+        conversationTimeboxController=controller;
+        lastQueuedTimeboxRevision=null;
+        clearConversationTimeboxError();
+        conversationTimeboxPanel.hidden=false;
+        conversationTimeboxStatus.textContent='Starting the elapsed timer.';
+        conversationTimeboxUnsubscribe=controller.subscribe(
+            function renderBoundConversationTimebox(state,event){
+                renderConversationTimebox(state,event);
+            }
+        );
+        try{
+            controller.start();
+        }catch(error){
+            conversationTimeboxStatus.textContent='The elapsed timer could not start.';
+            conversationTimeboxPanel.dataset.error='true';
+            conversationTimeboxUnsubscribe?.();
+            conversationTimeboxUnsubscribe=null;
+            conversationTimeboxController=null;
+            throw error;
+        }
+        return controller;
+    }
+
+    function clearConversationTimeboxRetry(){
+        conversationTimeboxRetry=null;
+        conversationTimeboxRetryButton.hidden=true;
+    }
+
+    function invalidateConversationTimeboxRetryForNewSubmission(){
+        if(!conversationTimeboxRetry){
+            return;
+        }
+        clearConversationTimeboxRetry();
+        clearConversationTimeboxError({
+            kind:'delivery',
+            clearRetry:false
+        });
+        const current=conversationTimeboxController?.snapshot();
+        if(current){
+            renderConversationTimebox(current,{type:'retry-invalidated'});
+        }
+    }
+
+    function clearConversationTimeboxError({kind='',clearRetry=true}={}){
+        if(kind&&conversationTimeboxErrorKind!==kind){
+            return false;
+        }
+        conversationTimeboxError='';
+        conversationTimeboxErrorKind='';
+        conversationTimeboxErrorVersion++;
+        conversationTimeboxPanel.removeAttribute('data-error');
+        conversationTimeboxMinutes.removeAttribute('aria-invalid');
+        if(clearRetry){
+            clearConversationTimeboxRetry();
+        }
+        return true;
+    }
+
+    function setConversationTimeboxError(message,{inputInvalid=false,kind='general'}={}){
+        conversationTimeboxError=message;
+        conversationTimeboxErrorKind=kind;
+        conversationTimeboxErrorVersion++;
+        conversationTimeboxPanel.dataset.error='true';
+        if(inputInvalid){
+            conversationTimeboxMinutes.setAttribute('aria-invalid','true');
+        }else{
+            conversationTimeboxMinutes.removeAttribute('aria-invalid');
+        }
+        if(conversationTimeboxStatus.textContent!==message){
+            conversationTimeboxStatus.textContent=message;
+        }
+    }
+
+    function renderConversationTimebox(state={},event={}){
+        if(event.type==='change'){
+            clearConversationTimeboxError();
+        }
+        conversationTimeboxElapsed.value=formatConversationTime(state.elapsedMs||0);
+        conversationTimeboxElapsed.textContent=conversationTimeboxElapsed.value;
+        conversationTimeboxPanel.dataset.state=state.status||'idle';
+        const stopped=state.status==='disposed';
+        for(const control of conversationTimeboxControls){
+            control.disabled=stopped;
+        }
+        let statusMessage='Starting the elapsed timer.';
+        if(state.status==='armed'){
+            statusMessage=`Check-in set for ${state.durationMinutes} minute${state.durationMinutes===1?'':'s'} from the latest setting.`;
+        }else if(state.status==='due'){
+            statusMessage='The time check is due. Asking whether to end or continue.';
+        }else if(state.status==='disposed'){
+            statusMessage='The elapsed timer has stopped.';
+        }else if(state.status==='unlimited'){
+            statusMessage='No time limit set. Elapsed time will keep running.';
+        }
+        if(conversationTimeboxError){
+            statusMessage=conversationTimeboxError;
+        }
+        if(conversationTimeboxStatus.textContent!==statusMessage){
+            conversationTimeboxStatus.textContent=statusMessage;
+        }
+
+        if(state.status==='due'&&lastQueuedTimeboxRevision!==state.revision){
+            const dueRevision=state.revision;
+            const dueController=conversationTimeboxController;
+            lastQueuedTimeboxRevision=dueRevision;
+            void queueConversationTimeboxMessage(
+                conversationTimeboxController.limitReachedMessage,
+                {
+                    source:'conversation-timebox-limit',
+                    synthetic:true,
+                    preserveDraft:true,
+                    timeboxRevision:dueRevision
+                },
+                function conversationTimeboxRevisionIsStillDue(){
+                    const current=dueController?.snapshot();
+                    return conversationTimeboxController===dueController
+                        &&current?.status==='due'
+                        &&current.revision===dueRevision;
+                }
+            );
+        }
+    }
+
+    function queueConversationTimeboxMessage(message,context,guard){
+        const queuedErrorVersion=conversationTimeboxErrorVersion;
+        let attemptedSubmissionGeneration=null;
+        const prior=programmaticSubmissionQueue.catch(
+            function ignorePriorProgrammaticSubmissionFailure(){
+                return false;
+            }
+        );
+        const queued=prior.then(
+            async function dispatchConversationTimeboxMessage(){
+                await hostSubmissionBarrier.waitForIdle();
+                if(typeof guard==='function'&&!guard()){
+                    return false;
+                }
+                const delivery=submitMessage(message,context);
+                attemptedSubmissionGeneration=hostSubmissionGeneration;
+                const delivered=await delivery;
+                return requireConversationTimeboxDelivery(delivered);
+            }
+        );
+        programmaticSubmissionQueue=queued.then(
+            function finishConversationTimeboxSubmission(result){
+                if(result!==false){
+                    clearConversationTimeboxRetry();
+                    clearConversationTimeboxError({
+                        kind:'delivery',
+                        clearRetry:false
+                    });
+                    const current=conversationTimeboxController?.snapshot();
+                    if(current){
+                        renderConversationTimebox(current,{type:'delivery'});
+                    }
+                }
+                return result;
+            },
+            function reportConversationTimeboxSubmissionFailure(error){
+                if(typeof guard==='function'&&!guard()){
+                    return false;
+                }
+                if(attemptedSubmissionGeneration===hostSubmissionGeneration){
+                    conversationTimeboxRetry=Object.freeze({
+                        message,
+                        context:Object.freeze({...context}),
+                        guard,
+                        submissionGeneration:attemptedSubmissionGeneration
+                    });
+                    conversationTimeboxRetryButton.hidden=false;
+                    if(
+                        conversationTimeboxErrorVersion===queuedErrorVersion
+                        &&conversationTimeboxErrorKind!=='validation'
+                    ){
+                        setConversationTimeboxError(
+                            'The timer changed, but its conversation message could not be sent. Retry when the AI is available.',
+                            {kind:'delivery'}
+                        );
+                    }
+                }
+                host.dispatchEvent(
+                    new CustomEvent(
+                        'conversation-timebox-error',
+                        {
+                            bubbles:true,
+                            composed:true,
+                            detail:{error,context:{...context}}
+                        }
+                    )
+                );
+                console.error('The conversation timebox message could not be sent.',error);
+                return false;
+            }
+        );
+        return programmaticSubmissionQueue;
+    }
+
+    function handleConversationTimeboxRetry(){
+        const retry=conversationTimeboxRetry;
+        if(!retry){
+            return;
+        }
+        if(
+            retry.submissionGeneration!==hostSubmissionGeneration
+            ||(typeof retry.guard==='function'&&!retry.guard())
+        ){
+            clearConversationTimeboxError();
+            const current=conversationTimeboxController?.snapshot();
+            if(current){
+                renderConversationTimebox(current,{type:'retry-cancelled'});
+            }
+            return;
+        }
+        clearConversationTimeboxRetry();
+        clearConversationTimeboxError({
+            kind:'delivery',
+            clearRetry:false
+        });
+        const current=conversationTimeboxController?.snapshot();
+        if(current){
+            renderConversationTimebox(current,{type:'retrying'});
+        }
+        void queueConversationTimeboxMessage(
+            retry.message,
+            {
+                ...retry.context,
+                reuseVisibleMessage:true,
+                retry:true
+            },
+            retry.guard
+        );
+    }
+
+    function handleConversationTimeboxSubmit(event){
+        event.preventDefault();
+        if(!conversationTimeboxController){
+            return;
+        }
+        const minutes=Number(conversationTimeboxMinutes.value);
+        const settingController=conversationTimeboxController;
+        try{
+            const state=settingController.setLimitMinutes(
+                minutes,
+                {source:'controls'}
+            );
+            clearConversationTimeboxError();
+            conversationTimeboxMinutes.value='';
+            void queueConversationTimeboxMessage(
+                settingController.controlMessage('set',minutes),
+                {
+                    source:'conversation-timebox-control',
+                    synthetic:true,
+                    preserveDraft:true,
+                    timeboxAction:'set',
+                    timeboxRevision:state.revision
+                },
+                function conversationTimeboxSetIsStillCurrent(){
+                    const current=settingController.snapshot();
+                    return conversationTimeboxController===settingController
+                        &&current.revision===state.revision
+                        &&current.status==='armed';
+                }
+            );
+        }catch(error){
+            setConversationTimeboxError(
+                'Enter a positive whole number of minutes.',
+                {inputInvalid:true,kind:'validation'}
+            );
+            conversationTimeboxMinutes.focus();
+        }
+    }
+
+    function handleConversationTimeboxClear(){
+        if(!conversationTimeboxController){
+            return;
+        }
+        const clearingController=conversationTimeboxController;
+        const state=clearingController.clearLimit({source:'controls'});
+        clearConversationTimeboxError();
+        conversationTimeboxMinutes.value='';
+        void queueConversationTimeboxMessage(
+            clearingController.controlMessage('clear'),
+            {
+                source:'conversation-timebox-control',
+                synthetic:true,
+                preserveDraft:true,
+                timeboxAction:'clear',
+                timeboxRevision:state.revision
+            },
+            function conversationTimeboxClearIsStillCurrent(){
+                const current=clearingController.snapshot();
+                return conversationTimeboxController===clearingController
+                    &&current.revision===state.revision
+                    &&current.status==='unlimited';
+            }
+        );
+    }
+
+    conversationTimeboxForm.addEventListener(
+        'submit',
+        handleConversationTimeboxSubmit
+    );
+    conversationTimeboxClear.addEventListener(
+        'click',
+        handleConversationTimeboxClear
+    );
+    conversationTimeboxRetryButton.addEventListener(
+        'click',
+        handleConversationTimeboxRetry
+    );
 
     {
         const chatReady=new CustomEvent(
@@ -535,8 +1065,10 @@
     textArea.addEventListener('keyup', resizeTextArea);
 
     send.addEventListener(
-        'click', 
-        sendMessage
+        'click',
+        function submitChatMessageFromButton(){
+            void submitMessage('',{source:'user'});
+        }
     );
 
     uploadBtn.addEventListener(
@@ -577,7 +1109,12 @@
 
     speech.addEventListener(
         'speech-transcription-complete',
-        sendMessage
+        function submitTranscribedChatMessage(event){
+            void submitMessage(
+                event.detail?.text||'',
+                {source:'speech'}
+            );
+        }
     )
 
     shadowRoot.querySelector('#languages').addEventListener(
@@ -611,7 +1148,8 @@
 
     async function resizeTextArea(e={}) {
         if(e.key && e.key == 'Enter' && !e.shiftKey && !send.disabled){
-            sendMessage();
+            e.preventDefault();
+            void submitMessage('',{source:'keyboard'});
         }
 
         // Reset height to shrink to content size
@@ -623,43 +1161,78 @@
         textArea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
     }
 
-    async function sendMessage(forceText='') {
-        let text = textArea.value;
-        
-        if(forceText?.detail?.text){
-            text=forceText.detail.text;
-        }
+    function observeHostSubmission(result,context){
+        const observed=hostSubmissionBarrier.track(result).catch(
+            function reportHostSubmissionFailure(error){
+                host.dispatchEvent(
+                    new CustomEvent(
+                        'chat-send-error',
+                        {
+                            bubbles:true,
+                            composed:true,
+                            detail:{error,context:{...context}}
+                        }
+                    )
+                );
+                console.error('The chat message could not be submitted.',error);
+                return false;
+            }
+        );
+        return observed;
+    }
 
-        if(forceText.length>0){
-            text=forceText;
+    async function submitMessage(textOverride='',context={}) {
+        if(typeof textOverride!=='string'){
+            throw new TypeError('Programmatic chat messages must be strings.');
+        }
+        if(!context||typeof context!=='object'||Array.isArray(context)){
+            throw new TypeError('Chat submission context must be an object.');
+        }
+        const submissionContext=Object.freeze({
+            source:'user',
+            preserveDraft:false,
+            synthetic:false,
+            ...context
+        });
+        const text=textOverride.length>0?textOverride:textArea.value;
+        if(!text.trim()){
+            return false;
         }
         const messageTime = getMilTime();
         console.info("Dispatching message:", text);
-        textArea.value = ''; // Clear the textArea after sending
+        if(!submissionContext.preserveDraft){
+            textArea.value='';
+        }
         
         //console.log(host,host.name);
         // console.log(forceText,text,1);
-        // Update the UI with the user's message
-        
-        chatOutput.innerHTML += `
-            <li class='user'>
-                <strong>${host.name} ${messageTime}:</strong>
-                <br>
-                <br>
-                <div class='markdown'>
-                    ${new MD(text).rendered}
-                </div>
-            </li>
-        `;
+        // Update the UI with the user's message. A retry reuses the visible
+        // bubble created by its first delivery attempt.
+        if(!submissionContext.reuseVisibleMessage){
+            hostSubmissionGeneration++;
+            invalidateConversationTimeboxRetryForNewSubmission();
+            chatOutput.innerHTML += `
+                <li class='user'>
+                    <strong>${host.name} ${messageTime}:</strong>
+                    <br>
+                    <br>
+                    <div class='markdown'>
+                        ${new MD(text).rendered}
+                    </div>
+                </li>
+            `;
+        }
         chatOutput.scrollTop = chatOutput.scrollHeight;
 
         const chatEvent = new CustomEvent(
             'chat-send-message',
             {
                 detail: {
-                    message:text
+                    message:text,
+                    context:submissionContext
                 },
                 bubbles: true,
+                composed:true,
                 cancelable: true
             }
         );
@@ -668,8 +1241,14 @@
         ai.resumeAudio?.();
 
         host.dispatchEvent(chatEvent);
-        
-        host.sendMessage(text);
+
+        let result;
+        try{
+            result=host.sendMessage(text,submissionContext);
+        }catch(error){
+            result=Promise.reject(error);
+        }
+        return observeHostSubmission(result,submissionContext);
     }
 
     async function receivedMessage(name = 'Assistant', text = '', id='', isThinking=false){

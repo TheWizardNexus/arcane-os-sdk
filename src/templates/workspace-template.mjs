@@ -1,5 +1,5 @@
 const SDK_NAME='arcane-os';
-const SDK_VERSION='0.1.0-dev.1';
+const SDK_VERSION='0.1.0-dev.2';
 
 function json(value){
     return `${JSON.stringify(value,null,2)}\n`;
@@ -25,7 +25,7 @@ export function workspaceTemplate({
     displayName,
     runtimeRelease,
     appOnly=false,
-    minimumCoreVersion='0.8.11',
+    minimumCoreVersion='0.8.12',
     target='browser',
     appIcon
 }){
@@ -34,7 +34,6 @@ export function workspaceTemplate({
         throw new Error(`Unsupported scaffold target: ${String(target)}.`);
     }
     const native=target!=='browser';
-    const deferredNative=['linux-arm64','android-arm64'].includes(target);
     const buildTarget=native?target:'browser';
     const runTarget=native&&target!=='portable'?target:'browser';
     if(native&&!(appIcon instanceof Uint8Array)){
@@ -52,11 +51,6 @@ export function workspaceTemplate({
 
 This scaffold declares both the browser and ${target} targets and includes the
 required raster application icon.
-${deferredNative?`
-The SDK currently reports ${target} as deferred and will not substitute another
-format. The descriptor is ready for that target when its platform provider and
-trust evidence are implemented.
-`:`
 Pair it with one explicit Arcane OS checkout:
 
 \`\`\`sh
@@ -67,7 +61,7 @@ ${target==='portable'?'':`npm run run -- --arcane-root "<path-to-Arcane-OS>"\n`}
 
 The selected Arcane provider must support this target or the command fails without
 substituting a browser package. Native output defaults to \`build/${target}/\`.
-${target==='portable'?'The portable result is an app-scoped Core directory, not a directly runnable executable.\n':''}`}
+${target==='portable'?'The portable result is an app-scoped Core directory, not a directly runnable executable.\n':''}
 The generated \`img/icon.png\` is an Arcane OS SDK template asset governed by
 the SDK's license terms; replace it with your own raster application icon when
 appropriate.

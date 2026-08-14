@@ -1,7 +1,7 @@
 import {
     checkLocalAIReadiness,
     deriveLocalAIRequirements
-} from './LocalAIReadiness.js?v=2';
+} from './LocalAIReadiness.js?v=3';
 
 const SLOT_NAMES=Object.freeze(['llm','stt','tts']);
 
@@ -15,6 +15,18 @@ function availabilityFromReport(report={}){
 
 function selectedPreferences(source){
     return typeof source==='function'?source():source;
+}
+
+function pendingReport(requirements){
+    return Object.freeze({
+        slots:Object.freeze(Object.fromEntries(SLOT_NAMES.map(name=>[
+            name,
+            Object.freeze({
+                ...requirements[name],
+                ready:requirements[name].required?false:null
+            })
+        ])))
+    });
 }
 
 async function waitForStatusComponent(status){
@@ -52,17 +64,19 @@ export function createLocalAIReadinessController({
 
     let active=null;
     let latestReport=null;
+    let currentAvailability=availabilityFromReport({});
 
-    const applyAvailability=()=>{
-        if(!latestReport){
-            return;
-        }
-        const availability=availabilityFromReport(latestReport);
+    const publishAvailability=()=>{
         if(typeof chat.setAIAvailability==='function'){
-            chat.setAIAvailability(availability);
+            chat.setAIAvailability(currentAvailability);
         }else{
-            chat.addEventListener('chat-ready',applyAvailability,{once:true});
+            chat.addEventListener('chat-ready',publishAvailability,{once:true});
         }
+    };
+
+    const applyAvailability=report=>{
+        currentAvailability=availabilityFromReport(report);
+        publishAvailability();
     };
 
     const check=async()=>{
@@ -75,6 +89,7 @@ export function createLocalAIReadinessController({
             const requirements=deriveLocalAIRequirements(preferenceTuple);
             const required=SLOT_NAMES.some(name=>requirements[name].required);
 
+            applyAvailability(pendingReport(requirements));
             await waitForStatusComponent(status);
             status?.configure?.({profileHref});
             if(required){
@@ -88,7 +103,7 @@ export function createLocalAIReadinessController({
                 preferences:preferenceTuple
             });
             status?.present?.(latestReport);
-            applyAvailability();
+            applyAvailability(latestReport);
             if(typeof onChange==='function'){
                 onChange(latestReport);
             }
@@ -124,7 +139,7 @@ export function createLocalAIReadinessController({
             status?.removeEventListener('local-ai-retry',retry);
         },
         get availability(){
-            return availabilityFromReport(latestReport||{});
+            return currentAvailability;
         },
         get report(){
             return latestReport;
@@ -133,7 +148,7 @@ export function createLocalAIReadinessController({
             if(!SLOT_NAMES.includes(name)){
                 throw new TypeError('Local AI slot must be llm, stt, or tts.');
             }
-            return availabilityFromReport(latestReport||{})[name];
+            return currentAvailability[name];
         }
     });
 }

@@ -56,12 +56,12 @@ function validateRelease(value){
     if(value.schemaVersion!==1||value.builder!=='arcane-sdk-runtime-v1'){
         fail('Runtime manifest uses an unsupported schema or builder.');
     }
-    if(value.sdkVersion!=='0.1.0-dev.1')fail('Runtime manifest sdkVersion is incompatible with this SDK.');
+    if(value.sdkVersion!=='0.1.0-dev.2')fail('Runtime manifest sdkVersion is incompatible with this SDK.');
     if(!value.source||typeof value.source!=='object'
         ||Object.keys(value.source).sort(compareText).join('\0')!=='bundleVersion\0commit\0protocol\0repository'
         ||value.source.repository!=='https://github.com/TheWizardNexus/ARCANE-OS.git'
         ||typeof value.source.commit!=='string'||!/^[a-f0-9]{40}$/.test(value.source.commit)
-        ||value.source.bundleVersion!=='0.8.11'||value.source.protocol!=='arcane/1'){
+        ||value.source.bundleVersion!=='0.8.12'||value.source.protocol!=='arcane/1'){
         fail('Runtime manifest source identity is invalid.');
     }
     if(!Array.isArray(value.files)||!Number.isSafeInteger(value.fileCount)

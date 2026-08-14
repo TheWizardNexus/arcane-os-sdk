@@ -17,6 +17,8 @@ const VALUE_OPTIONS=new Set([
     'format',
     'signing',
     'output-root',
+    'scope',
+    'test-file',
     'output'
 ]);
 const FLAG_OPTIONS=new Set([
@@ -35,8 +37,10 @@ Usage:
   ${CLI_NAME} init [id] [--workspace <directory>] [--display-name <name>] [--target <target>]
   ${CLI_NAME} doctor [--workspace <directory>] [--arcane-root <directory>]
   ${CLI_NAME} dev [--app <id>] [--host 127.0.0.1] [--port 8000]
-  ${CLI_NAME} test [--app <id>]
-  ${CLI_NAME} check [--app <id>] [--skip-tests]
+  ${CLI_NAME} test [--app <id>] [--scope app]
+  ${CLI_NAME} test --scope shared --test-file <repo-relative.test.mjs>
+  ${CLI_NAME} check [--app <id>] [--scope app] [--skip-tests]
+  ${CLI_NAME} check --scope shared
   ${CLI_NAME} package [--app <id>] [--dry-run]
   ${CLI_NAME} verify [--app <id>]
   ${CLI_NAME} native-doctor --target <native-target> --arcane-root <directory>
@@ -53,9 +57,9 @@ Global:
   --version                     Show the SDK version.
 
 The npm package is ${SDK_NAME}. Both the ${CLI_NAME} and arcane-os executables
-invoke this same headless toolchain. Portable, Windows x64, and Linux x64 native
-operations require --arcane-root. Linux ARM64 and Android ARM64 can be scaffolded
-but remain deferred until their platform and signing evidence is implemented.`;
+invoke this same headless toolchain. Every native operation requires one explicit
+--arcane-root. Available providers build portable directories, Windows x64 EXE
+bundles, Linux x64 or ARM64 DEBs, and development-signed Android APKs.`;
 
 function usage(message){
     throw new ArcaneError(ERROR_CODES.usage,message);
@@ -139,6 +143,14 @@ function readPort(value,defaultValue){
     return port;
 }
 
+function readScope(value){
+    const scope=value??'app';
+    if(!['app','shared'].includes(scope)){
+        usage(`Invalid --scope value: ${String(scope)}. Expected app or shared.`);
+    }
+    return scope;
+}
+
 function inferredAppId(workspaceRoot){
     const id=path.basename(workspaceRoot)
         .normalize('NFKD')
@@ -158,7 +170,14 @@ function operationOptions(command,parsed,cwd){
     const {values,flags}=parsed;
     const positionals=parsed.positionals.slice(1);
     const workspaceRoot=path.resolve(cwd,values.workspace??'.');
-    const common={workspaceRoot,appId:values.app};
+    const scope=readScope(values.scope);
+    const common={workspaceRoot,appId:values.app,scope};
+    if(scope==='shared'&&!['test','check'].includes(command)){
+        usage(`--scope shared is not supported by ${command}; shared development cannot package or build app output.`);
+    }
+    if(values['test-file']!==undefined&&command!=='test'){
+        usage('--test-file is supported only by test --scope shared.');
+    }
 
     if(command==='new'){
         const appId=positionals[0];
@@ -199,11 +218,23 @@ function operationOptions(command,parsed,cwd){
     }
     if(command==='test'){
         noExtraPositionals(command,positionals);
-        return common;
+        if(scope==='shared'){
+            if(values.app)usage('test --scope shared does not accept --app.');
+            if(!values['test-file']){
+                usage('test --scope shared requires --test-file <repo-relative.test.mjs>.');
+            }
+        }else if(values['test-file']){
+            usage('--test-file requires test --scope shared.');
+        }
+        return {...common,scope,testFile:values['test-file']};
     }
     if(command==='check'){
         noExtraPositionals(command,positionals);
-        return {...common,skipTests:flags.has('skip-tests')};
+        if(scope==='shared'){
+            if(values.app)usage('check --scope shared does not accept --app.');
+            if(flags.has('skip-tests'))usage('check --scope shared does not accept --skip-tests.');
+        }
+        return {...common,scope,skipTests:flags.has('skip-tests')};
     }
     if(command==='package'){
         noExtraPositionals(command,positionals);
@@ -266,16 +297,25 @@ function operationOptions(command,parsed,cwd){
 
 const NATIVE_REQUESTS=Object.freeze({
     'windows-x64':Object.freeze({
-        platform:'windows',architecture:'x64',defaultFormat:'exe',formats:new Set(['exe'])
+        platform:'windows',architecture:'x64',defaultFormat:'exe',formats:new Set(['exe']),
+        defaultSigning:'unsigned-local-test',defaultProfileId:null,
+        signingModes:new Set(['unsigned-local-test'])
     }),
     'linux-x64':Object.freeze({
-        platform:'linux',architecture:'x64',defaultFormat:'deb',formats:new Set(['deb'])
+        platform:'linux',architecture:'x64',defaultFormat:'deb',formats:new Set(['deb']),
+        defaultSigning:'unsigned-local-test',defaultProfileId:null,
+        signingModes:new Set(['unsigned-local-test'])
+    }),
+    'linux-arm64':Object.freeze({
+        platform:'linux',architecture:'arm64',defaultFormat:'deb',formats:new Set(['deb']),
+        defaultSigning:'unsigned-local-test',defaultProfileId:null,
+        signingModes:new Set(['unsigned-local-test'])
+    }),
+    'android-arm64':Object.freeze({
+        platform:'android',architecture:'arm64',defaultFormat:'apk',formats:new Set(['apk']),
+        defaultSigning:'development',defaultProfileId:'arcane-android-development-v1',
+        signingModes:new Set(['development'])
     })
-});
-
-const DEFERRED_NATIVE_REQUESTS=Object.freeze({
-    'linux-arm64':'Linux ARM64 remains deferred until a native provider supplies real ARM64 build evidence.',
-    'android-arm64':'Android ARM64 remains deferred until the APK provider and explicit development signer contract are implemented.'
 });
 
 function portableRequestDefinition(){
@@ -287,17 +327,18 @@ function portableRequestDefinition(){
             `The portable native provider does not support ${process.platform}/${process.arch}.`
         );
     }
-    return {platform,architecture,defaultFormat:'portable',formats:new Set(['portable'])};
+    return {
+        platform,
+        architecture,
+        defaultFormat:'portable',
+        formats:new Set(['portable']),
+        defaultSigning:'unsigned-local-test',
+        defaultProfileId:null,
+        signingModes:new Set(['unsigned-local-test'])
+    };
 }
 
 export function createNativeTargetRequest({target,format,signing}={}){
-    if(DEFERRED_NATIVE_REQUESTS[target]){
-        throw new ArcaneError(
-            ERROR_CODES.targetDeferred,
-            DEFERRED_NATIVE_REQUESTS[target],
-            {details:{target}}
-        );
-    }
     const definition=target==='portable'?portableRequestDefinition():NATIVE_REQUESTS[target];
     if(!definition){
         usage(`Target ${String(target)} is not a registered native target.`);
@@ -309,16 +350,19 @@ export function createNativeTargetRequest({target,format,signing}={}){
             +`Expected ${[...definition.formats].join(', ')}.`
         );
     }
-    const signingMode=signing??'unsigned-local-test';
-    if(signingMode!=='unsigned-local-test'){
-        usage('The CLI native seam currently supports only --signing unsigned-local-test.');
+    const signingMode=signing??definition.defaultSigning;
+    if(!definition.signingModes.has(signingMode)){
+        usage(
+            `Target ${target} does not support --signing ${String(signingMode)}. `
+            +`Expected ${[...definition.signingModes].join(', ')}.`
+        );
     }
     return Object.freeze({
         target,
         platform:definition.platform,
         architecture:definition.architecture,
         format:selectedFormat,
-        signing:Object.freeze({mode:signingMode,profileId:null})
+        signing:Object.freeze({mode:signingMode,profileId:definition.defaultProfileId})
     });
 }
 

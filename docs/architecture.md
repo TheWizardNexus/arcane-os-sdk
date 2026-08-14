@@ -23,6 +23,21 @@ The development server and packager consume the same route destinations in
 both cases, so app imports do not change. Integrated initialization creates
 only app-owned files and never rewrites Arcane root configuration.
 
+The shared/Core development profile is a separate integrated-only scope selected
+with `--scope shared`. The SDK loads exactly
+`tools/integrated-development-provider.mjs` from the selected Arcane checkout as
+one process generation. That provider admits only one exact repository-relative
+focused `.test.mjs` through Arcane's canonical focused runner or Arcane's
+canonical development check. External workspaces cannot use the scope, and
+shared operations never enter app discovery, packaging, target planning, build,
+verification, or run paths. Provider bytes and filesystem identity are
+authenticated before and after the owned child operation; a generation change
+poisons that pairing and requires a new CLI process.
+Integrated app testing remains isolated to the selected `apps/<id>/test/`
+tree; it cannot recursively select Arcane root tests or another app's tests.
+External repositories retain their existing workspace-root plus selected-app
+test layout.
+
 ## App and release contract
 
 The first SDK version deliberately preserves Arcane's current repository-shaped
@@ -60,6 +75,12 @@ through one serialized owned event queue. Process streams apply pause/resume
 backpressure and heartbeats coalesce. Callback failure cancels owned work, drains
 the queue, and reaches the caller or CLI exit status. Packaging preserves prior
 output until verified replacement.
+
+For `--scope shared`, the cardinality changes to one integrated workspace, one
+named operation, and either one exact test file or one development check. The
+same owned event queue and process supervisor provide acknowledgement, bounded
+stream delivery, heartbeat, cancellation, process-tree cleanup, and nonzero
+failure propagation. No app or target loop exists in that scope.
 
 ## Verification receipts
 
@@ -99,11 +120,20 @@ doctor -> prepare -> plan -> build -> verify receipt -> run receipt
 ```
 
 The portable provider implements the lifecycle through verification and fails
-honestly on run because its result is a directory. Windows x64 and Linux x64
-also implement same-process launch and owned cancellation. Windows uses a
-retained per-build broker and authenticated host readiness; Linux produces a
-verified amd64 DEB and runs a retained user-owned extraction without install or
-elevation. All three are unsigned local-development profiles.
+honestly on run because its result is a directory. Windows x64, Linux x64,
+Linux ARM64, and Android ARM64 implement same-process launch and owned
+cancellation when their compatible host/device requirements are present.
+Windows uses a retained per-build broker and authenticated host readiness. The
+Linux provider produces a verified amd64 or ARM64 DEB and runs a retained
+user-owned extraction without install or elevation. Portable, Windows, and
+Linux use the `unsigned-local-test` signing profile.
+
+The Android provider produces one development-signed APK. It contains no native
+library or ABI-specific payload, so the artifact is architecture-neutral; the
+`android-arm64` target instead binds the supported run path to one physical
+device with native ARM64 support. APK is the only Android format in this
+development provider. AAB, release signing, publishing, and update continuity
+remain outside it.
 
 The plan binds one explicit `toolchainRoot` and authenticated receipt, one app
 release root and receipt, its approved schema-2 descriptor digest, only its
@@ -114,7 +144,7 @@ through SDK-bound verified readers rather than accepting a mutable source path
 as authority. Build completion requires provider verification, and later
 verify/run calls receive the exact artifact receipt.
 
-The SDK `0.1.0-dev.1` runtime requires Arcane `0.8.11` or newer. Compatibility
+The SDK `0.1.0-dev.2` runtime requires Arcane `0.8.12` or newer. Compatibility
 is contractual rather than exact-version pinning: the prepared Core must meet
 the highest minimum declared by the runtime, selected app, and bundled app
 dependencies; keep each app's Arcane protocol generation; and provide every
@@ -127,6 +157,12 @@ into the Arcane checkout.
 See [compatibility.md](compatibility.md) for the complete app and bundled-app
 admission rule and the required handling of breaking contract changes.
 
-Linux ARM64 and Android ARM64 remain deferred. Production signing, installation,
-update continuity, and release acceptance are also outside these development
-providers; a successful unsigned local build is not evidence for those gates.
+Linux ARM64 shares the implemented Linux provider, focused tests, and a
+target-scoped remote evidence workflow. At Arcane revision
+`4382043c09285ea203aa6daba1732660966ac409`, that workflow proved native AArch64
+toolchain, DEB, host/Core/bridge, retained verification, sandboxed WebKit
+readiness, and owned process-group cancellation. The hardened Android path has
+exact-SHA physical ARM64/API 37 build, process/generation/nonce readiness,
+cancellation, uninstall, and absence evidence. Neither record establishes
+production signing, installation, publishing, update continuity, release
+acceptance, or production readiness.

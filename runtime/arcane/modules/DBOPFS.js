@@ -17,6 +17,30 @@ const DEFAULT_TABLE_DIRECTORIES=Object.freeze({
     memories:'memory'
 });
 
+function parseFileValue(fileName='',textContent=''){
+    let value=textContent;
+    const extension=fileName.slice(fileName.lastIndexOf('.')+1).toLowerCase();
+
+    switch(extension){
+        case 'json':
+            try{
+                value=JSON.parse(textContent.trim());
+            }catch{}
+            break;
+        case 'jsonl':
+        case 'ndjson':
+            value=[];
+            for(const row of textContent.split('\n')){
+                try{
+                    value.push(JSON.parse(row.trim()));
+                }catch{}
+            }
+            break;
+    }
+
+    return value;
+}
+
 if(navigator.storage?.persist){
     await navigator.storage.persist().catch(()=>false);
 }
@@ -396,13 +420,20 @@ class DBOPFS {
                         append
                     );
 
-                    this.#tables[tableName][fileName]=await this.get(tableName,fileName,true);
+                    if(append){
+                        delete this.#tables[tableName][fileName];
+                    }else{
+                        this.#tables[tableName][fileName]=parseFileValue(
+                            fileName,
+                            String(dataToWrite)
+                        );
+                    }
                 }catch(error){
                     console.error(`Error writing file '${fileName}' to table '${tableName}':`,error)
                     throw error
                 }
 
-                return this.#tables[tableName][fileName]
+                return append?true:this.#tables[tableName][fileName]
             }.bind(this)
         )
 
@@ -569,34 +600,10 @@ class DBOPFS {
                     this.#tables[tableName]={}
                 }
 
-                this.#tables[tableName][fileName]=textContent;
-
-                const extention=fileName.slice(
-                    fileName.lastIndexOf('.')+1)
-                    .toLowerCase();
-
-                switch(extention){
-                    case 'json':
-                        try{
-                            this.#tables[tableName][fileName]=JSON.parse(textContent.trim())
-                        }catch(e){}
-                        break;
-                    case 'jsonl':
-                    case 'ndjson':
-                        const rows=textContent.split('\n');
-                        const parsedRows=[];
-
-                        for(let i=0;i<rows.length;i++){
-                            try{
-                                parsedRows.push(
-                                    JSON.parse(rows[i].trim())
-                                );
-                            }catch(e){}
-                        }
-
-                        this.#tables[tableName][fileName]=parsedRows;
-                        break;
-                }
+                this.#tables[tableName][fileName]=parseFileValue(
+                    fileName,
+                    textContent
+                );
             }catch(error){
                 if(error.name==='NotFoundError'){
                     return null
@@ -630,9 +637,14 @@ class DBOPFS {
      * Reads all files from a table or the entire DB.
      *
      * @param {string} tableName
+     * @param {boolean} force
+     * Force each record to be read from OPFS instead of the in-memory cache.
      * @returns {Promise<Object>}
      */
-    async getAll(tableName=''){
+    async getAll(tableName='',force=false){
+        if(!is.boolean(force)){
+            throw new TypeError('DBOPFS.getAll force must be boolean');
+        }
         const items={}
 
         if(tableName){
@@ -642,7 +654,7 @@ class DBOPFS {
 
             for await(const [name]of table.entries()){
                 readPromises.push(
-                    this.get(tableName,name).then(
+                    this.get(tableName,name,force).then(
                         function assignValue(value){
                             items[name]=value
                         }
@@ -668,7 +680,7 @@ class DBOPFS {
 
                 for await(const [name]of table.entries()){
                     readPromises.push(
-                        this.get(tableName,name).then(
+                        this.get(tableName,name,force).then(
                             function assignValue(value){
                                 tableItems[name]=value;
                             }
@@ -695,10 +707,6 @@ class DBOPFS {
      * @returns {Promise<boolean>}
      */
     async delete(tableName='',fileName=''){
-        if(this.#tables[tableName]){
-            delete this.#tables[tableName][fileName]
-        }
-
         const table=await this.getTableHandle(tableName)
 
         try{
@@ -706,7 +714,12 @@ class DBOPFS {
         }catch(error){
             if(error.name!=='NotFoundError'){
                 console.error(error)
+                throw error
             }
+        }
+
+        if(this.#tables[tableName]){
+            delete this.#tables[tableName][fileName]
         }
 
         return true

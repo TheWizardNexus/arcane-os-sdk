@@ -25,7 +25,7 @@ test('workspace scaffold creates a private external app using the exact SDK vers
     const packageDocument=JSON.parse(await readFile(path.join(targetPath,'package.json'),'utf8'));
     assert.equal(packageDocument.private,true);
     assert.equal(packageDocument.type,'module');
-    assert.equal(packageDocument.devDependencies['arcane-os'],'0.1.0-dev.1');
+    assert.equal(packageDocument.devDependencies['arcane-os'],'0.1.0-dev.2');
 
     const packager=JSON.parse(await readFile(path.join(targetPath,'arcane-packager.json'),'utf8'));
     assert.equal(packager.sharedPayloads['browser-runtime'].length,3);
@@ -43,7 +43,7 @@ test('workspace scaffold creates a private external app using the exact SDK vers
 
     const lock=JSON.parse(await readFile(path.join(targetPath,'arcane.lock.json'),'utf8'));
     assert.equal(lock.sdk.name,'arcane-os');
-    assert.equal(lock.sdk.version,'0.1.0-dev.1');
+    assert.equal(lock.sdk.version,'0.1.0-dev.2');
     assert.equal(lock.protocols.arcane,'arcane/1');
     assert.match(lock.runtime.contentSha256,/^[0-9a-f]{64}$/);
 
@@ -123,12 +123,7 @@ test('every native scaffold includes a real raster icon and declares browser plu
         );
         assert.equal(packageDocument.scripts['build:browser'],'arcane build --target browser');
         assert.equal(packageDocument.scripts['run:browser'],'arcane run --target browser');
-        if(['linux-arm64','android-arm64'].includes(target)){
-            assert.match(readme,new RegExp(`reports ${target} as deferred`,'u'));
-            assert.doesNotMatch(readme,new RegExp(`arcane build --target ${target}`,'u'));
-        }else{
-            assert.match(readme,/npm run build -- --arcane-root/u);
-        }
+        assert.match(readme,/npm run build -- --arcane-root/u);
     }
 });
 

@@ -90,25 +90,87 @@
         "release": { "$ref": "#/$defs/release" }
       }
     },
-    "targetRequest": {
+    "unsignedLocalSigning": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["target", "platform", "architecture", "format", "signing"],
+      "required": ["mode", "profileId"],
       "properties": {
-        "target": { "enum": ["portable", "windows-x64", "linux-x64", "linux-arm64", "android-arm64"] },
-        "platform": { "enum": ["windows", "linux", "android"] },
-        "architecture": { "enum": ["x64", "arm64"] },
-        "format": { "enum": ["portable", "exe", "appimage", "deb", "rpm", "apk", "aab"] },
-        "signing": {
+        "mode": { "const": "unsigned-local-test" },
+        "profileId": { "type": "null" }
+      }
+    },
+    "androidDevelopmentSigning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "profileId"],
+      "properties": {
+        "mode": { "const": "development" },
+        "profileId": { "const": "arcane-android-development-v1" }
+      }
+    },
+    "targetRequest": {
+      "oneOf": [
+        {
           "type": "object",
           "additionalProperties": false,
-          "required": ["mode", "profileId"],
+          "required": ["target", "platform", "architecture", "format", "signing"],
           "properties": {
-            "mode": { "enum": ["unsigned-local-test", "development", "production"] },
-            "profileId": { "type": ["string", "null"] }
+            "target": { "const": "portable" },
+            "platform": { "enum": ["windows", "linux"] },
+            "architecture": { "enum": ["x64", "arm64"] },
+            "format": { "const": "portable" },
+            "signing": { "$ref": "#/$defs/unsignedLocalSigning" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target", "platform", "architecture", "format", "signing"],
+          "properties": {
+            "target": { "const": "windows-x64" },
+            "platform": { "const": "windows" },
+            "architecture": { "const": "x64" },
+            "format": { "const": "exe" },
+            "signing": { "$ref": "#/$defs/unsignedLocalSigning" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target", "platform", "architecture", "format", "signing"],
+          "properties": {
+            "target": { "const": "linux-x64" },
+            "platform": { "const": "linux" },
+            "architecture": { "const": "x64" },
+            "format": { "const": "deb" },
+            "signing": { "$ref": "#/$defs/unsignedLocalSigning" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target", "platform", "architecture", "format", "signing"],
+          "properties": {
+            "target": { "const": "linux-arm64" },
+            "platform": { "const": "linux" },
+            "architecture": { "const": "arm64" },
+            "format": { "const": "deb" },
+            "signing": { "$ref": "#/$defs/unsignedLocalSigning" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target", "platform", "architecture", "format", "signing"],
+          "properties": {
+            "target": { "const": "android-arm64" },
+            "platform": { "const": "android" },
+            "architecture": { "const": "arm64" },
+            "format": { "const": "apk" },
+            "signing": { "$ref": "#/$defs/androidDevelopmentSigning" }
           }
         }
-      }
+      ]
     }
   }
 }

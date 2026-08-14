@@ -2,6 +2,18 @@ import {normalizeOllamaModelIdentifier} from './OllamaModelIdentifier.js';
 
 const MAX_CORE_LOCAL_MODELS=64;
 
+export const USER_MANAGED_LOOPBACK_PROVIDER_MODE='user-managed-loopback';
+
+/**
+ * Identifies the bounded Android host response that delegates inference to a
+ * user-owned loopback Ollama process. This is provider discovery only: it does
+ * not claim that Arcane manages the service or any model lifecycle operation.
+ */
+export function isUserManagedLoopbackLocalAIStatus(status){
+    return status?.schemaVersion===2
+        &&status?.providerMode===USER_MANAGED_LOOPBACK_PROVIDER_MODE;
+}
+
 function modelDescriptor(model){
     const id=normalizeOllamaModelIdentifier(model?.id);
     const name=normalizeOllamaModelIdentifier(model?.name);

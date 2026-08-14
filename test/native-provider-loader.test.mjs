@@ -222,7 +222,7 @@ test('CLI pairs Windows and Linux x64 builds with canonical truthful requests',a
     assert.deepEqual(loadCalls.map(call=>call.target),['windows-x64','linux-x64']);
 });
 
-test('canonical CLI target requests reject unimplemented formats and deferred targets',()=>{
+test('canonical CLI target requests bind every implemented format and signing profile',()=>{
     assert.deepEqual(createNativeTargetRequest({target:'windows-x64'}),{
         target:'windows-x64',
         platform:'windows',
@@ -241,12 +241,14 @@ test('canonical CLI target requests reject unimplemented formats and deferred ta
         ()=>createNativeTargetRequest({target:'linux-x64',format:'appimage'}),
         error=>error.code==='ARCANE_USAGE'&&/does not support --format/u.test(error.message)
     );
-    for(const target of ['linux-arm64','android-arm64']){
-        assert.throws(
-            ()=>createNativeTargetRequest({target}),
-            error=>error.code==='ARCANE_TARGET_DEFERRED'&&error.details?.target===target
-        );
-    }
+    assert.deepEqual(createNativeTargetRequest({target:'linux-arm64'}),{
+        target:'linux-arm64',platform:'linux',architecture:'arm64',format:'deb',
+        signing:{mode:'unsigned-local-test',profileId:null}
+    });
+    assert.deepEqual(createNativeTargetRequest({target:'android-arm64'}),{
+        target:'android-arm64',platform:'android',architecture:'arm64',format:'apk',
+        signing:{mode:'development',profileId:'arcane-android-development-v1'}
+    });
 });
 
 test('portable run rejects before workspace, package, toolchain, build, verify, or launch work',async t=>{
@@ -371,7 +373,7 @@ test('portable compatibility accepts newer compatible Core and rejects missing r
     ));
     const prepared={
         workspaceMode:'external',
-        runtimeReceipt:{source:{bundleVersion:'0.8.11'}},
+        runtimeReceipt:{source:{bundleVersion:'0.8.12'}},
         descriptor:{
             ...descriptor,
             requirements:{
@@ -396,7 +398,7 @@ test('portable compatibility accepts newer compatible Core and rejects missing r
     assert.doesNotThrow(()=>assertPortableToolchainCompatibility({prepared,toolchainReceipt:compatible}));
     assert.throws(
         ()=>assertPortableToolchainCompatibility({prepared,toolchainReceipt:{...compatible,version:'0.8.10'}}),
-        error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/required minimum 0\.8\.11/u.test(error.message)
+        error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/required minimum 0\.8\.12/u.test(error.message)
     );
     assert.throws(
         ()=>assertPortableToolchainCompatibility({
@@ -407,7 +409,7 @@ test('portable compatibility accepts newer compatible Core and rejects missing r
             },
             toolchainReceipt:{...compatible,version:'0.8.10'}
         }),
-        error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/required minimum 0\.8\.11/u.test(error.message)
+        error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/required minimum 0\.8\.12/u.test(error.message)
     );
     assert.throws(
         ()=>assertPortableToolchainCompatibility({prepared,toolchainReceipt:{...compatible,protocolVersion:'arcane/2'}}),
@@ -477,7 +479,7 @@ test('paired CLI build packages one selected app and its exact dependency closur
     const canonicalWorkspaceRoot=await realpath(workspaceRoot);
     const toolchainReceipt=Object.freeze({
         kind:'arcane-portable-toolchain',
-        version:'0.8.11',
+        version:'0.8.12',
         protocolVersion:'arcane/1',
         features:Object.freeze([]),
         supportedCapabilities:Object.freeze([]),
@@ -701,7 +703,7 @@ test('paired CLI build packages one selected app and its exact dependency closur
     assert.equal(capture.build,priorBuildRequest);
     const mismatchEvents=parseNdjson(mismatchStdout.read());
     assert.equal(mismatchEvents.at(-1).data.error.code,'ARCANE_TARGET_UNAVAILABLE');
-    assert.match(mismatchEvents.at(-1).data.error.message,/0\.8\.10.*required minimum 0\.8\.11/u);
+    assert.match(mismatchEvents.at(-1).data.error.message,/0\.8\.10.*required minimum 0\.8\.12/u);
 
     const rejectedStdout=memoryStream();
     const rejected=await runCli(

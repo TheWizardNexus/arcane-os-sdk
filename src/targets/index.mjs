@@ -56,22 +56,22 @@ const DEFINITIONS=Object.freeze([
     Object.freeze({
         id:'linux-arm64',
         displayName:'Linux ARM64 executable',
-        status:'deferred',
+        status:'pairing-required',
         platforms:['linux'],
         architectures:['arm64'],
         formats:['deb'],
-        signingModes:['development','production'],
-        reason:'The Linux ARM64 single-app native target adapter is planned but not implemented.'
+        signingModes:['unsigned-local-test'],
+        reason:'Linux ARM64 output requires explicit pairing to a compatible Arcane OS checkout with --arcane-root and a native ARM64 toolchain.'
     }),
     Object.freeze({
         id:'android-arm64',
         displayName:'Android ARM64 application',
-        status:'deferred',
+        status:'pairing-required',
         platforms:['android'],
         architectures:['arm64'],
         formats:['apk'],
         signingModes:['development'],
-        reason:'The Android single-app APK adapter and explicit development signer contract are planned but not implemented.'
+        reason:'Android APK output requires explicit pairing to a compatible Arcane OS checkout with --arcane-root and the Android development toolchain.'
     })
 ]);
 

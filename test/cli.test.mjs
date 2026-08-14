@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {Writable} from 'node:stream';
 import test from 'node:test';
-import {runCli as runCliInProcess} from '../src/cli/main.mjs';
+import {createNativeTargetRequest,runCli as runCliInProcess} from '../src/cli/main.mjs';
 import {parseNdjson,repositoryRoot,runCli,runNode} from './helpers.mjs';
 
 function memoryStream(){
@@ -22,13 +22,14 @@ function memoryStream(){
 test('CLI help and version succeed through the shipped executable',async()=>{
     const help=await runCli(['--help']);
     assert.equal(help.code,0);
-    assert.match(help.stdout,/Arcane OS application SDK 0\.1\.0-dev\.1/);
+    assert.match(help.stdout,/Arcane OS application SDK 0\.1\.0-dev\.2/);
     assert.match(help.stdout,/external or integrated Arcane workspace/);
     assert.match(help.stdout,/arcane-os executables/);
+    assert.match(help.stdout,/test --scope shared --test-file/);
 
     const version=await runCli(['--version']);
     assert.equal(version.code,0);
-    assert.equal(version.stdout.trim(),'0.1.0-dev.1');
+    assert.equal(version.stdout.trim(),'0.1.0-dev.2');
 });
 
 test('both installed command names execute the published CLI entry',async()=>{
@@ -44,7 +45,7 @@ test('both installed command names execute the published CLI entry',async()=>{
         assert.equal(invoked.code,0,invoked.stderr);
         const result=JSON.parse(invoked.stdout);
         assert.equal(result.ok,true);
-        assert.equal(result.result,'0.1.0-dev.1');
+        assert.equal(result.result,'0.1.0-dev.2');
     }
 });
 
@@ -60,7 +61,7 @@ test('CLI NDJSON output acknowledges before returning target state',async()=>{
     const targets=events.at(-1).data.result.targets;
     assert.equal(targets.find(target=>target.id==='browser').status,'available');
     assert.equal(targets.find(target=>target.id==='portable').status,'pairing-required');
-    assert.equal(targets.find(target=>target.id==='android-arm64').status,'deferred');
+    assert.equal(targets.find(target=>target.id==='android-arm64').status,'pairing-required');
 });
 
 test('CLI JSON output has one stdout document and progress only on stderr',async()=>{
@@ -95,12 +96,34 @@ test('CLI machine events preserve long user command text within the public schem
     assert.equal(events.at(-1).data.error.code,'ARCANE_USAGE');
 });
 
-test('CLI reports deferred native target instead of creating a substitute artifact',async()=>{
+test('CLI requires explicit pairing for Android instead of creating a substitute artifact',async()=>{
     const result=await runCli(['build','--target','android-arm64','--output','ndjson']);
     assert.equal(result.code,1);
     const events=parseNdjson(result.stdout);
     assert.equal(events.at(-1).type,'operation.failed');
-    assert.equal(events.at(-1).data.error.code,'ARCANE_TARGET_DEFERRED');
+    assert.equal(events.at(-1).data.error.code,'ARCANE_USAGE');
+    assert.match(events.at(-1).data.error.message,/requires --arcane-root/u);
+});
+
+test('CLI creates truthful Linux ARM64 and Android native requests',()=>{
+    assert.deepEqual(createNativeTargetRequest({target:'linux-arm64'}),{
+        target:'linux-arm64',
+        platform:'linux',
+        architecture:'arm64',
+        format:'deb',
+        signing:{mode:'unsigned-local-test',profileId:null}
+    });
+    assert.deepEqual(createNativeTargetRequest({target:'android-arm64'}),{
+        target:'android-arm64',
+        platform:'android',
+        architecture:'arm64',
+        format:'apk',
+        signing:{mode:'development',profileId:'arcane-android-development-v1'}
+    });
+    assert.throws(
+        ()=>createNativeTargetRequest({target:'android-arm64',signing:'unsigned-local-test'}),
+        error=>error?.code==='ARCANE_USAGE'&&/Expected development/u.test(error.message)
+    );
 });
 
 test('CLI reports a server lifecycle event failure as one terminal failure',async()=>{
@@ -142,4 +165,68 @@ test('CLI reports a server lifecycle event failure as one terminal failure',asyn
             &&event.type!=='operation.accepted').length,
         1
     );
+});
+
+test('CLI maps explicit app and shared development scopes without widening commands',async()=>{
+    const invocations=[];
+    const execute=async(command,options)=>{
+        invocations.push({command,options});
+        return {ok:true};
+    };
+    for(const arguments_ of [
+        ['test','--workspace','fixture','--scope','app'],
+        [
+            'test','--workspace','fixture','--scope','shared',
+            '--test-file','test/selected.test.mjs'
+        ],
+        ['check','--workspace','fixture','--scope','shared']
+    ]){
+        const stdout=memoryStream();
+        const stderr=memoryStream();
+        const exitCode=await runCliInProcess(arguments_,{
+            cwd:'C:\\sdk-cli-fixture',
+            stdout:stdout.stream,
+            stderr:stderr.stream,
+            execute
+        });
+        assert.equal(exitCode,0,stderr.read());
+    }
+
+    assert.equal(invocations[0].command,'test');
+    assert.equal(invocations[0].options.scope,'app');
+    assert.equal(invocations[0].options.testFile,undefined);
+    assert.equal(invocations[1].command,'test');
+    assert.equal(invocations[1].options.scope,'shared');
+    assert.equal(invocations[1].options.appId,undefined);
+    assert.equal(invocations[1].options.testFile,'test/selected.test.mjs');
+    assert.equal(invocations[2].command,'check');
+    assert.equal(invocations[2].options.scope,'shared');
+    assert.equal(invocations[2].options.skipTests,false);
+});
+
+test('CLI rejects incomplete shared tests and shared output commands before execution',async()=>{
+    for(const arguments_ of [
+        ['test','--scope','shared'],
+        ['test','--scope','shared','--test-file','test/one.test.mjs','--app','one'],
+        ['check','--scope','shared','--skip-tests'],
+        ['package','--scope','shared'],
+        ['build','--scope','shared','--target','browser']
+    ]){
+        const stdout=memoryStream();
+        const stderr=memoryStream();
+        let executed=false;
+        const exitCode=await runCliInProcess([...arguments_,'--output','ndjson'],{
+            stdout:stdout.stream,
+            stderr:stderr.stream,
+            execute:async()=>{
+                executed=true;
+                return {};
+            }
+        });
+        assert.equal(exitCode,1);
+        assert.equal(executed,false);
+        const events=parseNdjson(stdout.read());
+        assert.equal(events.at(-1).type,'operation.failed');
+        assert.equal(events.at(-1).data.error.code,'ARCANE_USAGE');
+    }
 });

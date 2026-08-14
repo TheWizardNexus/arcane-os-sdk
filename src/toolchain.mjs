@@ -3,10 +3,12 @@ import {readdir,lstat,realpath} from 'node:fs/promises';
 import {createWorkspace,initWorkspace} from './scaffold.mjs';
 import {
     discoverApps as discoverWorkspaceApps,
+    inspectWorkspaceProfile,
     resolveWorkspace,
     validateDiscoveredApplication,
     validateWorkspace
 } from './workspace.mjs';
+import {loadArcaneIntegratedProvider} from './integrated-provider-loader.mjs';
 import {startDevServer} from './dev-server.mjs';
 import {authenticateRuntimeReceipt,loadRuntimeRelease,verifyRuntime} from './runtime.mjs';
 import {
@@ -172,9 +174,66 @@ async function selectedWorkspace(options){
     });
     return {
         workspaceRoot:resolved.workspaceRoot,
+        workspaceMode:resolved.config.workspaceMode,
         appId:resolved.appId??resolved.app?.id??resolved.app?.appId,
         appRoot:resolved.appRoot??resolved.app?.appRoot
     };
+}
+
+function operationScope(options){
+    const scope=options.scope??'app';
+    if(!['app','shared'].includes(scope)){
+        throw new ArcaneError(
+            ERROR_CODES.usage,
+            `Unsupported Arcane development scope: ${String(scope)}. Expected app or shared.`
+        );
+    }
+    return scope;
+}
+
+function assertApplicationScope(options,operation){
+    if(operationScope(options)!=='app'){
+        throw new ArcaneError(
+            ERROR_CODES.usage,
+            `${operation} supports only --scope app. Shared development cannot package or build application output.`
+        );
+    }
+}
+
+async function executeIntegratedSharedOperation(operation,options){
+    const label=operation==='focused-test'?'shared.test':'shared.check';
+    return ownedWork(
+        label,
+        async({signal,onEvent})=>{
+            const profile=await inspectWorkspaceProfile(options.workspaceRoot);
+            if(profile.workspaceMode!=='integrated'){
+                throw new ArcaneError(
+                    ERROR_CODES.policyDenied,
+                    `--scope shared is available only in an integrated Arcane OS workspace.`
+                );
+            }
+            const provider=await loadArcaneIntegratedProvider({
+                arcaneRoot:profile.workspaceRoot,
+                signal,
+                onEvent,
+                run:options.processRunner??runProcess
+            });
+            const result=await provider.execute({
+                operation,
+                ...(operation==='focused-test'?{testFile:options.testFile}:{}),
+                signal,
+                onEvent
+            });
+            return Object.freeze({
+                scope:'shared',
+                workspaceMode:'integrated',
+                workspaceRoot:profile.workspaceRoot,
+                providerGeneration:provider.providerGeneration,
+                result
+            });
+        },
+        options
+    );
 }
 
 async function preparedWorkspace(options){
@@ -296,15 +355,28 @@ export async function doctorApplication(options={}){
 
 export async function testApplication(options={}){
     throwIfAborted(options.signal);
+    if(operationScope(options)==='shared'){
+        if(typeof options.testFile!=='string'||!options.testFile){
+            throw new ArcaneError(
+                ERROR_CODES.usage,
+                'Shared testing requires one exact repo-relative .test.mjs file.'
+            );
+        }
+        return executeIntegratedSharedOperation('focused-test',options);
+    }
     const workspace=options.workspaceRoot&&options.appId&&options.appRoot
         ?{
             workspaceRoot:options.workspaceRoot,
+            workspaceMode:options.workspaceMode
+                ??(await inspectWorkspaceProfile(options.workspaceRoot)).workspaceMode,
             appId:options.appId,
             appRoot:options.appRoot
         }
         :await selectedWorkspace(options);
     const files=new Set();
-    await collectTests(path.join(workspace.workspaceRoot,'test'),files,options.signal);
+    if(workspace.workspaceMode==='external'){
+        await collectTests(path.join(workspace.workspaceRoot,'test'),files,options.signal);
+    }
     if(workspace.appRoot){
         await collectTests(path.join(workspace.appRoot,'test'),files,options.signal);
     }
@@ -332,6 +404,12 @@ export async function testApplication(options={}){
 }
 
 export async function checkApplication(options={}){
+    if(operationScope(options)==='shared'){
+        if(options.skipTests){
+            throw new ArcaneError(ERROR_CODES.usage,'Shared check does not accept skipTests.');
+        }
+        return executeIntegratedSharedOperation('development-check',options);
+    }
     const prepared=await preparedWorkspace(options);
     const tests=options.skipTests
         ?{passed:true,skipped:true,testFiles:[]}
@@ -360,6 +438,7 @@ export async function checkApplication(options={}){
 }
 
 export async function developApplication(options={}){
+    assertApplicationScope(options,'Development serving');
     const prepared=await preparedWorkspace(options);
     const server=await startDevServer({
         workspaceRoot:prepared.workspaceRoot,
@@ -376,6 +455,7 @@ export async function developApplication(options={}){
 }
 
 export async function packageApplication(options={}){
+    assertApplicationScope(options,'Packaging');
     const prepared=await preparedWorkspace(options);
     const release=await ownedWork(
         'package',
@@ -399,6 +479,7 @@ export async function packageApplication(options={}){
 }
 
 export async function verifyApplication(options={}){
+    assertApplicationScope(options,'Package verification');
     const prepared=await preparedWorkspace(options);
     const release=await ownedWork(
         'verify',
@@ -436,6 +517,7 @@ function targetSelection(options){
 }
 
 export async function planApplication(options={}){
+    assertApplicationScope(options,'Target planning');
     const {target,adapter}=targetSelection(options);
     const targetDescription=await adapter.describe();
     if(targetDescription.status!=='available'){
@@ -885,6 +967,7 @@ function usesWorkspaceNativeAssembly(options){
 }
 
 export async function buildApplication(options={}){
+    assertApplicationScope(options,'Building');
     const {target,adapter}=targetSelection(options);
     const targetDescription=await adapter.describe();
     if(targetDescription.status!=='available'){
@@ -925,6 +1008,7 @@ export async function buildApplication(options={}){
 }
 
 export async function runApplication(options={}){
+    assertApplicationScope(options,'Running');
     const selectedOptions=options.target==null&&options.targetRequest?.target==null
         ?{...options,target:'browser'}
         :options;

@@ -19,8 +19,8 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This is development software. Version `0.1.0-dev.1` synchronizes the Arcane
-`0.8.11` runtime, but it is not a production or release-candidate claim. It has
+This is development software. Version `0.1.0-dev.2` synchronizes the Arcane
+`0.8.12` runtime, but it is not a production or release-candidate claim. It has
 not yet been published to npm.
 
 ## Install
@@ -74,7 +74,7 @@ node ./bin/arcane.mjs new local-app --path ../local-app --target portable --git
 
 # From the generated app repository
 cd ../local-app
-npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.1.tgz
+npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.2.tgz
 npm run check
 npm ci
 ```
@@ -107,6 +107,33 @@ node ../arcane-os-sdk/bin/arcane.mjs package --workspace "../Arcane OS" --app ca
 and writes only `apps/new-app/` boilerplate. It does not modify Arcane OS root
 scripts, dependencies, workflows, lock files, or repository instructions.
 
+Shared runtime and Core work has an explicit integrated-only scope. Select one
+exact focused test, or run Arcane's canonical development check through the
+fixed Arcane-owned provider:
+
+```bash
+node ../arcane-os-sdk/bin/arcane.mjs test --workspace "../Arcane OS" --scope shared --test-file test/component-contracts.test.mjs
+node ../arcane-os-sdk/bin/arcane.mjs check --workspace "../Arcane OS" --scope shared
+```
+
+The default scope is `app`. Shared scope never discovers, packages, verifies,
+builds, or runs an application, and it is rejected in an external workspace.
+The provider admits only one repository-relative `.test.mjs` through Arcane's
+focused runner or the one canonical development check; it cannot select an
+arbitrary command or package script.
+
+In an integrated Arcane checkout, app scope runs tests only under the selected
+`apps/<id>/test/` tree and reports an honest skip when that tree has no tests.
+Arcane root, shared, and native tests require the explicit shared focused-test
+form above. External app repositories retain their root `test/` plus selected
+app-test behavior.
+
+Integrated native app builds are also implemented. `--workspace` and
+`--arcane-root` must resolve to the same Arcane checkout, one `--app` and one
+declared native target are selected, and `--output-root` must resolve outside
+that checkout. The SDK then uses the same package, plan, provider, retained
+verification, and same-process run lifecycle as an external app repository.
+
 ## Commands
 
 ```text
@@ -114,8 +141,10 @@ arcane new <id> [--path <directory>] [--display-name <name>] [--target <target>]
 arcane init [id] [--workspace <directory>] [--display-name <name>] [--target <target>]
 arcane doctor [--workspace <directory>] [--arcane-root <directory>]
 arcane dev [--app <id>] [--host 127.0.0.1] [--port 8000]
-arcane test [--app <id>]
-arcane check [--app <id>] [--skip-tests]
+arcane test [--app <id>] [--scope app]
+arcane test --scope shared --test-file <repo-relative.test.mjs>
+arcane check [--app <id>] [--scope app] [--skip-tests]
+arcane check --scope shared
 arcane package [--app <id>] [--dry-run]
 arcane verify [--app <id>]
 arcane native-doctor --target <native-target> --arcane-root <directory>
@@ -132,15 +161,19 @@ network, hashing, test, process, or service work begins.
 
 ## Current target support
 
-Browser releases, verified portable directories, Windows x64 development EXE
-bundles, and Linux x64 development DEBs are available. Native builds explicitly
-pair the SDK with a compatible Arcane OS checkout; the SDK never searches for
-or silently selects a mutable toolchain root. From an external application
-repository, run one selected target:
+Version `0.1.0-dev.2` exposes one browser target and five explicitly paired
+native development targets: a verified non-runnable portable directory, a
+Windows x64 unsigned-local-test EXE bundle, Linux x64 and Linux ARM64
+unsigned-local-test DEBs, and an Android development-signed APK. The
+`android-arm64` APK is architecture-neutral because it contains no native ABI;
+the target name identifies its supported physical/native ARM64 run profile.
 
-The app descriptor must declare the target. Scaffold separate repositories with
-the matching `--target`, or add and validate that target in the canonical
-descriptor before invoking its build command.
+Every native build requires an explicit compatible Arcane OS checkout and a
+canonical app descriptor that declares the exact selected target. The SDK never
+searches for or silently selects a mutable toolchain root. Scaffold a separate
+repository with the matching `--target`, or add and validate that target in the
+canonical descriptor before invoking its native command. From an external
+application repository, run one selected target:
 
 ```bash
 npm exec -- arcane native-doctor --target portable --arcane-root "../Arcane OS"
@@ -153,12 +186,24 @@ npm exec -- arcane run --target windows-x64 --arcane-root "../Arcane OS"
 # Linux x64, from Linux or WSL with the documented GTK/WebKit toolchain
 npm exec -- arcane build --target linux-x64 --arcane-root "../Arcane OS"
 npm exec -- arcane run --target linux-x64 --arcane-root "../Arcane OS"
+
+# Linux ARM64, on a compatible native ARM64 toolchain
+npm exec -- arcane native-doctor --target linux-arm64 --arcane-root "../Arcane OS" --format deb --signing unsigned-local-test
+npm exec -- arcane build --target linux-arm64 --arcane-root "../Arcane OS" --format deb --signing unsigned-local-test
+npm exec -- arcane run --target linux-arm64 --arcane-root "../Arcane OS" --format deb --signing unsigned-local-test
+
+# Android ARM64; run requires one connected physical/native ARM64 device
+npm exec -- arcane native-doctor --target android-arm64 --arcane-root "../Arcane OS" --format apk --signing development
+npm exec -- arcane build --target android-arm64 --arcane-root "../Arcane OS" --format apk --signing development
+npm exec -- arcane run --target android-arm64 --arcane-root "../Arcane OS" --format apk --signing development
 ```
 
-Use `--target portable`, `windows-x64`, or `linux-x64` when scaffolding to
-include the required raster icon and declare both `browser` and the selected
-native target in the canonical app descriptor. The browser remains available
-from the same repository.
+Use `--target portable`, `windows-x64`, `linux-x64`, `linux-arm64`, or
+`android-arm64` when scaffolding to include the required raster icon and declare
+both `browser` and the selected native target in the canonical app descriptor.
+The browser remains available from the same repository. A native command does
+not infer a missing descriptor target from `--target` and never substitutes a
+browser package.
 
 `native-prepare` is available as a standalone toolchain-integrity diagnostic.
 Do not run it immediately before `build`: receipts are process-owned, and the
@@ -172,18 +217,30 @@ It copies release bytes through verified readers. Portable emits an app-scoped
 Arcane Core payload under `build/portable/`; that directory is not executable
 and `arcane run --target portable` is intentionally unavailable. Windows emits
 an app-scoped executable bundle under `build/windows-x64/`. Linux emits an
-app-scoped amd64 DEB under `build/linux-x64/`. Executable `run` performs
-package, prepare, plan, build, verify, launch, and owned cancellation in one
-process because native receipts are process-owned.
+app-scoped amd64 DEB under `build/linux-x64/` or ARM64 DEB under
+`build/linux-arm64/`. Android emits one development-signed, architecture-neutral
+APK under `build/android-arm64/`; there is no native ABI payload, and its run
+path requires a physical device with native ARM64 support. Executable `run`
+performs package, prepare, plan, build, verify, launch, and owned cancellation
+in one process because native receipts are process-owned.
 
-These paths have been exercised end to end from independent external
-repositories. The Windows x64 provider compiled, verified, launched through an
+The Windows x64 and Linux x64 paths have been exercised end to end from
+independent external repositories. Windows compiled, verified, reached an
 authenticated readiness channel, and cancelled an isolated development app
-while a valid installed publisher-continuity pin remained present. The Linux
-x64 provider built and verified a real DEB and launched it under WSLg without
-installing it or using `sudo`. These are unsigned local-development results,
-not production signing or release approval. Linux ARM64 and Android ARM64 remain
-deferred.
+while a valid installed publisher-continuity pin remained present. Linux x64
+built and verified a real DEB and launched it under WSLg without installation
+or `sudo`.
+
+At Arcane source revision `4382043c09285ea203aa6daba1732660966ac409`, the
+official native ARM64 workflow built and retained-verified a 21,232,932-byte
+ARM64 DEB, proved AArch64 host, Core, and bridge binaries, reached WebKit
+load-finished readiness, and drained its owned process group. The workflow kept
+Ubuntu's AppArmor user-namespace restriction enabled and loaded the packaged
+Bubblewrap profile. At revision `be6732ab71cbecb43d037aaad994ade5f2f4d1b6`,
+the hardened Android path passed build, retained verification, exact
+process/generation/nonce readiness, cancellation, uninstall, and absence checks
+on a physical ARM64/API 37 device. These are development results, not production
+signing, store-publishing, release, or promotion evidence.
 
 | Capability | Ready now |
 |---|---|
@@ -195,11 +252,15 @@ deferred.
 | Portable app-scoped Core directory | Yes, with explicit `--arcane-root`; verified but not directly runnable |
 | Windows x64 EXE bundle | Yes, unsigned local development with explicit `--arcane-root` |
 | Linux x64 DEB | Yes, unsigned local development with explicit `--arcane-root` |
-| Linux ARM64 or Android APK/AAB | No; architecture and mobile providers remain deferred |
+| Linux ARM64 DEB | Yes, unsigned local development on a compatible native ARM64 toolchain with explicit `--arcane-root`; exact-SHA native build, verification, WebKit readiness, and cancellation evidence is recorded |
+| Android ARM64 APK | Yes, development-signed and architecture-neutral with explicit `--arcane-root`; a physical/native ARM64 device is required for run |
 
-Deferred targets fail with a stable error. Portable output is never represented
-as an executable, and Windows/Linux development evidence is never represented
-as production signing or release acceptance.
+Android supports APK only in this development profile. AAB, release signing,
+publishing, and update continuity remain deferred. Unpaired, incompatible, or
+descriptor-mismatched native requests fail without producing a substitute
+artifact. Portable output is never represented as an executable, and unsigned
+or development-signed evidence is never represented as production signing or
+release acceptance.
 
 See [docs/platform-targets.md](docs/platform-targets.md) for the matrix and
 [docs/architecture.md](docs/architecture.md) for the boundary. The exact

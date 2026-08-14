@@ -7,6 +7,7 @@ import {
     checkApplication,
     createApplication,
     developApplication,
+    initializeApplication,
     packageApplication,
     projectPackageManifest,
     runApplication,
@@ -46,6 +47,13 @@ async function configureIntegratedWorkspace(workspaceRoot){
         private:true,
         type:'module'
     });
+    await writeJson(
+        path.join(workspaceRoot,'machine_bundles','arcane-os-machine-bundle','package.json'),
+        {
+            name:'arcane-os-machine-bundle',
+            version:'0.8.12'
+        }
+    );
     await writeJson(path.join(workspaceRoot,'arcane-packager.json'),{
         schemaVersion:1,
         appsRoot:'apps',
@@ -120,6 +128,20 @@ test('integrated Arcane workspace supports the complete browser app workflow',as
         displayName:'Integrated App'
     });
     await configureIntegratedWorkspace(workspaceRoot);
+    await initializeApplication({
+        workspaceRoot,
+        appId:'other-app',
+        displayName:'Other App'
+    });
+    await mkdir(path.join(workspaceRoot,'test'),{recursive:true});
+    await writeFile(
+        path.join(workspaceRoot,'test','root-must-not-run.test.mjs'),
+        "import test from 'node:test';\ntest('root test must not run in app scope',()=>{throw new Error('root test ran');});\n"
+    );
+    await writeFile(
+        path.join(workspaceRoot,'apps','other-app','test','other-must-not-run.test.mjs'),
+        "import test from 'node:test';\ntest('other app test must not run',()=>{throw new Error('other app test ran');});\n"
+    );
 
     await assert.rejects(lstat(path.join(workspaceRoot,'arcane.lock.json')),{code:'ENOENT'});
     await assert.rejects(
@@ -156,6 +178,8 @@ test('integrated Arcane workspace supports the complete browser app workflow',as
     assert.equal(checked.runtime.sourceRoot,'arcane');
     assert.equal(checked.tests.passed,true);
     assert.equal(checked.tests.skipped,false);
+    assert.ok(checked.tests.testFiles.length>0);
+    assert.ok(checked.tests.testFiles.every(file=>file.startsWith(`apps/${appId}/test/`)));
 
     const development=await developApplication({
         workspaceRoot,

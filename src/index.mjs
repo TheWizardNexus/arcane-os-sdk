@@ -33,6 +33,11 @@ export {
     loadArcanePortableProvider
 } from './native-provider-loader.mjs';
 export {
+    ARCANE_INTEGRATED_PROVIDER_RELATIVE_PATH,
+    INTEGRATED_TOOLCHAIN_PROTOCOL,
+    loadArcaneIntegratedProvider
+} from './integrated-provider-loader.mjs';
+export {
     repositoryPull,
     repositoryPush,
     repositoryStatus,

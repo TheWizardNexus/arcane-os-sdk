@@ -45,6 +45,7 @@ test('published JSON schemas parse and declare immutable protocol versions',asyn
 
 test('package exposes both supported executable names and public contracts',async()=>{
     const packageDocument=JSON.parse(await readFile(path.join(repositoryRoot,'package.json'),'utf8'));
+    const integratedProvider=await import('arcane-os/integrated-provider');
     assert.deepEqual(packageDocument.bin,{
         arcane:'./bin/arcane.mjs',
         'arcane-os':'./bin/arcane.mjs'
@@ -55,6 +56,9 @@ test('package exposes both supported executable names and public contracts',asyn
     assert.equal(packageDocument.exports['./schemas/cli-event.json'],'./schemas/cli-event.schema.json');
     assert.equal(packageDocument.exports['./schemas/native-build-plan.json'],'./schemas/native-build-plan.schema.json');
     assert.equal(packageDocument.exports['./schemas/target-adapter.json'],'./schemas/target-adapter.schema.json');
+    assert.equal(packageDocument.exports['./integrated-provider'],'./src/integrated-provider-loader.mjs');
+    assert.equal(typeof integratedProvider.loadArcaneIntegratedProvider,'function');
+    assert.equal(integratedProvider.INTEGRATED_TOOLCHAIN_PROTOCOL,'arcane-integrated-toolchain/1');
 });
 
 test('root SDK export exposes receipt authenticators and verified file readers',()=>{
@@ -81,6 +85,9 @@ test('root SDK export exposes receipt authenticators and verified file readers',
     assert.equal(typeof sdk.verifyNativeArtifact,'function');
     assert.equal(typeof sdk.loadArcaneNativeProvider,'function');
     assert.equal(typeof sdk.loadArcanePortableProvider,'function');
+    assert.equal(typeof sdk.loadArcaneIntegratedProvider,'function');
+    assert.equal(sdk.INTEGRATED_TOOLCHAIN_PROTOCOL,'arcane-integrated-toolchain/1');
+    assert.ok(Array.isArray(sdk.ARCANE_INTEGRATED_PROVIDER_RELATIVE_PATH));
     assert.equal(typeof sdk.ARCANE_NATIVE_PROVIDER_PATHS,'object');
     assert.equal(typeof sdk.resolveNativeBuildOutputRoot,'function');
     assert.equal(typeof sdk.assertIntegratedNativeToolchain,'function');
@@ -181,6 +188,70 @@ test('native build plan schema uses the packager semantic-version contract',asyn
     assert.equal(
         nativePlanSchema.$defs.providerGeneration.properties.kind.const,
         'arcane-native-provider-generation'
+    );
+});
+
+test('native build plan schema publishes only the exact dev.2 target matrix',async()=>{
+    const schema=await readSchema('native-build-plan.schema.json');
+    const variants=schema.$defs.targetRequest.oneOf.map(variant=>({
+        target:variant.properties.target.const,
+        platforms:variant.properties.platform.enum??[variant.properties.platform.const],
+        architectures:variant.properties.architecture.enum??[variant.properties.architecture.const],
+        format:variant.properties.format.const,
+        signing:variant.properties.signing.$ref
+    }));
+    assert.deepEqual(variants,[
+        {
+            target:'portable',
+            platforms:['windows','linux'],
+            architectures:['x64','arm64'],
+            format:'portable',
+            signing:'#/$defs/unsignedLocalSigning'
+        },
+        {
+            target:'windows-x64',
+            platforms:['windows'],
+            architectures:['x64'],
+            format:'exe',
+            signing:'#/$defs/unsignedLocalSigning'
+        },
+        {
+            target:'linux-x64',
+            platforms:['linux'],
+            architectures:['x64'],
+            format:'deb',
+            signing:'#/$defs/unsignedLocalSigning'
+        },
+        {
+            target:'linux-arm64',
+            platforms:['linux'],
+            architectures:['arm64'],
+            format:'deb',
+            signing:'#/$defs/unsignedLocalSigning'
+        },
+        {
+            target:'android-arm64',
+            platforms:['android'],
+            architectures:['arm64'],
+            format:'apk',
+            signing:'#/$defs/androidDevelopmentSigning'
+        }
+    ]);
+    assert.deepEqual(schema.$defs.unsignedLocalSigning.properties,{
+        mode:{const:'unsigned-local-test'},
+        profileId:{type:'null'}
+    });
+    assert.deepEqual(schema.$defs.androidDevelopmentSigning.properties,{
+        mode:{const:'development'},
+        profileId:{const:'arcane-android-development-v1'}
+    });
+    assert.doesNotMatch(
+        JSON.stringify({
+            targetRequest:schema.$defs.targetRequest,
+            unsignedLocalSigning:schema.$defs.unsignedLocalSigning,
+            androidDevelopmentSigning:schema.$defs.androidDevelopmentSigning
+        }),
+        /appimage|rpm|aab|production/u
     );
 });
 

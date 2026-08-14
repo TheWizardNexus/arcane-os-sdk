@@ -1,5 +1,9 @@
 import {AI_PREFERENCE_SLOT_KEYS} from './AIPreferenceTuple.js';
-import {getCoreLocalModelCatalog} from './CoreLocalModelCatalog.js';
+import {
+    getCoreLocalModelCatalog,
+    isUserManagedLoopbackLocalAIStatus,
+    USER_MANAGED_LOOPBACK_PROVIDER_MODE
+} from './CoreLocalModelCatalog.js';
 import {normalizeOllamaModelIdentifier} from './OllamaModelIdentifier.js';
 
 export const LOCAL_AI_BROWSER_ENDPOINTS=Object.freeze({
@@ -351,11 +355,90 @@ async function probeNativeOllama(arcane,selectedModel){
     }
 }
 
+async function probeUserManagedLoopbackOllama(arcane,selectedModel){
+    if(typeof arcane?.localAI?.status!=='function'){
+        return freeze({
+            ready:false,
+            model:null,
+            providerMode:USER_MANAGED_LOOPBACK_PROVIDER_MODE,
+            managed:false,
+            errorCode:'ARCANE_LOCAL_AI_STATUS_UNAVAILABLE'
+        });
+    }
+
+    const model=normalizeOllamaModelIdentifier(selectedModel);
+
+    if(!model){
+        return freeze({
+            ready:false,
+            model:null,
+            providerMode:USER_MANAGED_LOOPBACK_PROVIDER_MODE,
+            managed:false,
+            errorCode:'OLLAMA_MODEL_INVALID'
+        });
+    }
+
+    try{
+        const status=await arcane.localAI.status();
+
+        if(!isUserManagedLoopbackLocalAIStatus(status)){
+            return freeze({
+                ready:false,
+                model,
+                providerMode:USER_MANAGED_LOOPBACK_PROVIDER_MODE,
+                managed:false,
+                errorCode:'ANDROID_USER_MANAGED_OLLAMA_UNAVAILABLE'
+            });
+        }
+
+        if(status?.ollama?.available!==true){
+            return freeze({
+                ready:false,
+                model,
+                providerMode:USER_MANAGED_LOOPBACK_PROVIDER_MODE,
+                managed:false,
+                errorCode:errorCode(
+                    {code:status?.ollama?.errorCode},
+                    'OLLAMA_UNAVAILABLE'
+                )
+            });
+        }
+
+        const catalog=getCoreLocalModelCatalog(status);
+        const available=catalog.some(function matchesSelectedModel(entry){
+            return entry.modelId===model;
+        });
+
+        return freeze({
+            ready:available,
+            model,
+            providerMode:USER_MANAGED_LOOPBACK_PROVIDER_MODE,
+            managed:false,
+            errorCode:available?null:'OLLAMA_MODEL_UNAVAILABLE'
+        });
+    }catch(error){
+        return freeze({
+            ready:false,
+            model,
+            providerMode:USER_MANAGED_LOOPBACK_PROVIDER_MODE,
+            managed:false,
+            errorCode:errorCode(error,'ANDROID_USER_MANAGED_OLLAMA_UNAVAILABLE')
+        });
+    }
+}
+
 function unavailableBrowserOllama(){
     return freeze({
         ready:false,
         model:null,
         errorCode:'ARCANE_CORE_REQUIRED'
+    });
+}
+
+function unavailableUserManagedSpeech(){
+    return freeze({
+        ...evaluateLocalSpeechHealth(null),
+        errorCode:'ANDROID_LOCAL_SPEECH_UNAVAILABLE'
     });
 }
 
@@ -401,12 +484,19 @@ async function probeBrowserSpeech(fetchImpl,timeoutMs){
 }
 
 async function resolveMode(runtime,arcane){
-    if(runtime==='native'||runtime==='browser'){
+    if(
+        runtime==='native'
+        ||runtime==='browser'
+        ||runtime===USER_MANAGED_LOOPBACK_PROVIDER_MODE
+    ){
         return runtime;
     }
 
     if(runtime!==undefined&&(!runtime||typeof runtime!=='object')){
-        throw new TypeError('Local AI runtime must be "native", "browser", or a runtime snapshot.');
+        throw new TypeError(
+            'Local AI runtime must be "native", "browser", '
+            +'"user-managed-loopback", or a runtime snapshot.'
+        );
     }
 
     let snapshot=runtime;
@@ -419,9 +509,16 @@ async function resolveMode(runtime,arcane){
         }
     }
 
-    return snapshot?.managedLocalAI===true
-        ?'native'
-        :'browser';
+    if(snapshot?.managedLocalAI===true){
+        return 'native';
+    }
+    if(
+        snapshot?.native===true
+        &&snapshot?.transport==='android-webview'
+    ){
+        return USER_MANAGED_LOOPBACK_PROVIDER_MODE;
+    }
+    return 'browser';
 }
 
 async function probeRequiredServices({
@@ -436,12 +533,19 @@ async function probeRequiredServices({
         requirements.llm.required
             ?mode==='native'
                 ?probeNativeOllama(arcane,requirements.llm.model)
-                :unavailableBrowserOllama()
+                :mode===USER_MANAGED_LOOPBACK_PROVIDER_MODE
+                    ?probeUserManagedLoopbackOllama(
+                        arcane,
+                        requirements.llm.model
+                    )
+                    :unavailableBrowserOllama()
             :null,
         requiresSpeech
             ?mode==='native'
                 ?probeNativeSpeech(arcane)
-                :probeBrowserSpeech(fetchImpl,timeoutMs)
+                :mode===USER_MANAGED_LOOPBACK_PROVIDER_MODE
+                    ?unavailableUserManagedSpeech()
+                    :probeBrowserSpeech(fetchImpl,timeoutMs)
             :null
     ]);
 
@@ -566,6 +670,18 @@ function browserManualInstruction(services){
     return 'Manually start your local speech service.';
 }
 
+function userManagedLoopbackInstruction(services){
+    if(services.includes('ollama')&&services.includes('speech')){
+        return 'Start your Ollama service in Termux and make the selected model available. Local speech is not provided by this Android host.';
+    }
+
+    if(services.includes('ollama')){
+        return 'Start your Ollama service in Termux and make the selected model available.';
+    }
+
+    return 'Local speech is not provided by this Android host.';
+}
+
 function guidance(mode,slots){
     const affectedSlots=unavailableSlots(slots);
 
@@ -578,7 +694,10 @@ function guidance(mode,slots){
     const message=mode==='browser'
         ?browserManualInstruction(services)
             +' Alternatively, switch the affected Profile setting to OpenAI and enter an OpenAI API/license key. Arcane will not switch providers automatically.'
-        :'Arcane could not recover the selected local AI service. Retry or review Local AI in Arcane Settings. Arcane will not switch providers automatically.';
+        :mode===USER_MANAGED_LOOPBACK_PROVIDER_MODE
+            ?userManagedLoopbackInstruction(services)
+                +' Arcane does not install, start, repair, pull, or otherwise manage this service or its models. Alternatively, switch the affected Profile setting to OpenAI. Arcane will not switch providers automatically.'
+            :'Arcane could not recover the selected local AI service. Retry or review Local AI in Arcane Settings. Arcane will not switch providers automatically.';
 
     return freeze({
         mode,
@@ -628,8 +747,10 @@ function report({
 /**
  * Checks only the local providers selected in the supplied preference tuple.
  *
- * Native Arcane apps use capability-gated bridge methods and may request one
- * bounded recovery attempt before one re-probe. Ordinary browsers never probe
+ * Managed native Arcane apps use capability-gated bridge methods and may
+ * request one bounded recovery attempt before one re-probe. Android uses only
+ * the admitted native status/chat provider for a user-managed loopback Ollama
+ * service and never invokes lifecycle recovery. Ordinary browsers never probe
  * Ollama; browser speech health remains read-only and never invokes recovery.
  */
 export async function checkLocalAIReadiness({
