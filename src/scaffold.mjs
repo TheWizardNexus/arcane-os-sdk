@@ -3,6 +3,8 @@ import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {loadRuntimeRelease} from './runtime.mjs';
 import {SDK_NAME,SDK_VERSION,workspaceTemplate} from './templates/workspace-template.mjs';
+import {inspectWorkspaceProfile} from './workspace.mjs';
+import {parseSemver} from './packager/core.mjs';
 
 const APP_ID_PATTERN=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const DISPLAY_CONTROL_PATTERN=/[\x00-\x1f\x7f]/;
@@ -74,6 +76,46 @@ async function assertInitTarget(workspaceRoot){
         throw error;
     }
     if(info.isSymbolicLink()||!info.isDirectory())fail(`Workspace must be a real directory: ${workspaceRoot}.`);
+}
+
+async function existingWorkspaceProfile(workspaceRoot){
+    const configPath=path.join(workspaceRoot,'arcane-packager.json');
+    try{
+        const info=await lstat(configPath);
+        if(info.isSymbolicLink()||!info.isFile()){
+            fail('arcane-packager.json must be a real file when present.');
+        }
+    }catch(error){
+        if(error?.code==='ENOENT')return null;
+        throw error;
+    }
+    return inspectWorkspaceProfile(workspaceRoot);
+}
+
+async function integratedCoreVersion(workspaceRoot){
+    const manifestPath=path.join(
+        workspaceRoot,
+        'machine_bundles',
+        'arcane-os-machine-bundle',
+        'package.json'
+    );
+    let manifest;
+    try{
+        const info=await lstat(manifestPath);
+        if(info.isSymbolicLink()||!info.isFile())fail('The integrated Arcane machine package must be a real file.');
+        manifest=JSON.parse(await readFile(manifestPath,'utf8'));
+    }catch(error){
+        if(error?.code==='ENOENT'){
+            fail('The integrated Arcane workspace is missing its machine-bundle package identity.');
+        }
+        if(error instanceof SyntaxError)fail(`The integrated Arcane machine package is not valid JSON: ${error.message}`);
+        throw error;
+    }
+    if(manifest?.name!=='arcane-os-machine-bundle'){
+        fail('The integrated Arcane machine package identity is invalid.');
+    }
+    parseSemver(manifest.version);
+    return manifest.version;
 }
 
 async function assertNoLinkedAncestors(workspaceRoot,relative){
@@ -275,12 +317,30 @@ export async function initWorkspace({
     const resolvedRoot=path.resolve(workspaceRoot);
     await emit(onEvent,{type:'scaffold.started',mode:'init',workspaceRoot:resolvedRoot,appId});
     await assertInitTarget(resolvedRoot);
-    const runtimeRelease=await loadRuntimeRelease();
-    const template=workspaceTemplate({appId,displayName,runtimeRelease});
-    const packagePlan=await prepareExistingPackage(resolvedRoot,template.files);
+    const profile=await existingWorkspaceProfile(resolvedRoot);
+    const workspaceMode=profile?.workspaceMode??'external';
+    const template=workspaceMode==='integrated'
+        ?workspaceTemplate({
+            appId,
+            displayName,
+            appOnly:true,
+            minimumCoreVersion:await integratedCoreVersion(resolvedRoot)
+        })
+        :workspaceTemplate({appId,displayName,runtimeRelease:await loadRuntimeRelease()});
+    const packagePlan=workspaceMode==='integrated'
+        ?Object.freeze({exists:true,updated:false})
+        :await prepareExistingPackage(resolvedRoot,template.files);
     const result=await writeMissingFiles(resolvedRoot,template.files,{signal,onEvent});
     const packageUpdated=await applyPackageMerge(resolvedRoot,packagePlan,{signal,onEvent});
-    const receipt={workspaceRoot:resolvedRoot,appId,displayName:template.name,...result,packageUpdated,gitInitialized:false};
+    const receipt={
+        workspaceRoot:resolvedRoot,
+        workspaceMode,
+        appId,
+        displayName:template.name,
+        ...result,
+        packageUpdated,
+        gitInitialized:false
+    };
     await emit(onEvent,{type:'scaffold.completed',...receipt});
     return receipt;
 }

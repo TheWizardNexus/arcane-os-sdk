@@ -123,3 +123,67 @@ test('init preserves a supported local SDK tarball declaration',async t=>{
     const result=JSON.parse(await readFile(path.join(workspaceRoot,'package.json'),'utf8'));
     assert.equal(result.devDependencies['arcane-os'],'file:../sdk-artifacts/arcane-os-0.1.0-dev.0.tgz');
 });
+
+test('init adds only app-owned files to an integrated Arcane workspace',async t=>{
+    const workspaceRoot=await temporaryDirectory(t);
+    const rootPackage={
+        name:'arcane-os',
+        version:'0.1.0',
+        private:true,
+        type:'module',
+        scripts:{check:'node existing-check.mjs'}
+    };
+    const packageSource=`${JSON.stringify(rootPackage,null,2)}\n`;
+    await writeFile(path.join(workspaceRoot,'package.json'),packageSource);
+    await writeFile(path.join(workspaceRoot,'arcane-packager.json'),`${JSON.stringify({
+        schemaVersion:1,
+        appsRoot:'apps',
+        distRoot:'dist',
+        sharedPayloads:{
+            'browser-runtime':[
+                {
+                    source:'arcane',
+                    destination:'arcane',
+                    include:['components','css','entities','img','modules'],
+                    exclude:[]
+                },
+                {
+                    source:'node_modules/strong-type',
+                    destination:'node_modules/strong-type',
+                    include:['index.js','licence','package.json'],
+                    exclude:[]
+                }
+            ]
+        }
+    },null,2)}\n`);
+    const machineRoot=path.join(workspaceRoot,'machine_bundles','arcane-os-machine-bundle');
+    await mkdir(machineRoot,{recursive:true});
+    await writeFile(path.join(machineRoot,'package.json'),`${JSON.stringify({
+        name:'arcane-os-machine-bundle',
+        version:'0.8.11'
+    },null,2)}\n`);
+
+    const receipt=await initWorkspace({
+        workspaceRoot,
+        appId:'integrated-app',
+        displayName:'Integrated App'
+    });
+
+    assert.equal(receipt.workspaceMode,'integrated');
+    assert.equal(receipt.packageUpdated,false);
+    assert.equal(await readFile(path.join(workspaceRoot,'package.json'),'utf8'),packageSource);
+    assert.ok(receipt.createdFiles.every(relative=>relative.startsWith('apps/integrated-app/')));
+    const descriptor=JSON.parse(await readFile(
+        path.join(workspaceRoot,'apps','integrated-app','arcane-app.json'),
+        'utf8'
+    ));
+    assert.equal(descriptor.requirements.minimumCoreVersion,'0.8.11');
+    await assert.rejects(
+        readFile(path.join(workspaceRoot,'arcane.lock.json'),'utf8'),
+        error=>error?.code==='ENOENT'
+    );
+    await assert.rejects(
+        readFile(path.join(workspaceRoot,'.github','workflows','check.yml'),'utf8'),
+        error=>error?.code==='ENOENT'
+    );
+});

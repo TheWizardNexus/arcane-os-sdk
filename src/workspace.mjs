@@ -153,11 +153,22 @@ async function discoverAppsInRoot(root,config){
 }
 
 export async function discoverApps(workspaceRoot=process.cwd()){
+    const profile=await inspectWorkspaceProfile(workspaceRoot);
+    return discoverAppsInRoot(profile.workspaceRoot,profile.config);
+}
+
+export async function inspectWorkspaceProfile(workspaceRoot=process.cwd()){
     const requested=path.resolve(workspaceRoot);
     await assertRealDirectory(requested,'Workspace');
-    const root=await realpath(requested);
-    const config=classifyRootConfig(await readJson(path.join(root,ROOT_CONFIG_NAME),ROOT_CONFIG_NAME));
-    return discoverAppsInRoot(root,config);
+    const canonicalRoot=await realpath(requested);
+    const config=classifyRootConfig(
+        await readJson(path.join(canonicalRoot,ROOT_CONFIG_NAME),ROOT_CONFIG_NAME)
+    );
+    return Object.freeze({
+        workspaceRoot:canonicalRoot,
+        workspaceMode:config.workspaceMode,
+        config
+    });
 }
 
 export async function selectApp(workspaceRoot=process.cwd(),appId){
@@ -178,10 +189,9 @@ export async function selectApp(workspaceRoot=process.cwd(),appId){
 }
 
 export async function resolveWorkspace({workspaceRoot=process.cwd(),appId}={}){
-    const requestedRoot=path.resolve(workspaceRoot);
-    await assertRealDirectory(requestedRoot,'Workspace');
-    const canonicalRoot=await realpath(requestedRoot);
-    const config=classifyRootConfig(await readJson(path.join(canonicalRoot,ROOT_CONFIG_NAME),ROOT_CONFIG_NAME));
+    const profile=await inspectWorkspaceProfile(workspaceRoot);
+    const canonicalRoot=profile.workspaceRoot;
+    const config=profile.config;
     const apps=await discoverAppsInRoot(canonicalRoot,config);
     if(appId!==undefined&&(typeof appId!=='string'||!APP_ID_PATTERN.test(appId))){
         fail(`Invalid app id: ${String(appId)}.`,'ARCANE_USAGE');

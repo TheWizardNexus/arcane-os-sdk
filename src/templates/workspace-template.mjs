@@ -20,16 +20,22 @@ function titleCase(appId){
         .join(' ');
 }
 
-export function workspaceTemplate({appId,displayName,runtimeRelease}){
+export function workspaceTemplate({
+    appId,
+    displayName,
+    runtimeRelease,
+    appOnly=false,
+    minimumCoreVersion='0.8.10'
+}){
     const name=displayName||`Arcane ${titleCase(appId)}`;
     const packageName=`arcane-${appId}`;
     const runtimeContentSha256=runtimeRelease?.contentSha256;
     const upstreamCommit=runtimeRelease?.source?.commit;
 
-    if(typeof runtimeContentSha256!=='string'||!/^[a-f0-9]{64}$/.test(runtimeContentSha256)){
+    if(!appOnly&&(typeof runtimeContentSha256!=='string'||!/^[a-f0-9]{64}$/.test(runtimeContentSha256))){
         throw new Error('The SDK runtime release does not contain a valid contentSha256.');
     }
-    if(typeof upstreamCommit!=='string'||!/^[a-f0-9]{40}$/.test(upstreamCommit)){
+    if(!appOnly&&(typeof upstreamCommit!=='string'||!/^[a-f0-9]{40}$/.test(upstreamCommit))){
         throw new Error('The SDK runtime release does not contain a valid upstream commit.');
     }
 
@@ -207,7 +213,7 @@ jobs:
         },
         requirements:{
             arcaneProtocol:'arcane/1',
-            minimumCoreVersion:'0.8.10',
+            minimumCoreVersion,
             features:[]
         },
         targets:['browser']
@@ -323,6 +329,12 @@ test('application package identity matches its directory',async()=>{
 });
 `);
 
+    if(appOnly){
+        return {
+            name,
+            files:new Map([...files].filter(([relative])=>relative.startsWith(`apps/${appId}/`)))
+        };
+    }
     return {name,files};
 }
 

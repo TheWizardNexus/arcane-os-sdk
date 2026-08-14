@@ -63,7 +63,13 @@ export {
     readVerifiedRuntimeFile,
     verifyRuntime
 } from './runtime.mjs';
-export {discoverApps,resolveWorkspace,selectApp,validateWorkspace} from './workspace.mjs';
+export {
+    discoverApps,
+    inspectWorkspaceProfile,
+    resolveWorkspace,
+    selectApp,
+    validateWorkspace
+} from './workspace.mjs';
 export {startDevServer} from './dev-server.mjs';
 export {
     APP_DESCRIPTOR_NAME,
