@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {appendFile,lstat,mkdir,readFile,writeFile} from 'node:fs/promises';
+import {appendFile,lstat,mkdir,readFile,realpath,symlink,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import {
@@ -160,6 +160,7 @@ function successfulRunner(calls){
 
 test('shared scope runs one exact focused test through the fixed integrated provider',async t=>{
     const workspaceRoot=await createSharedWorkspace(t,{});
+    const canonicalWorkspaceRoot=await realpath(workspaceRoot);
     const calls=[];
     const events=[];
     const result=await testApplication({
@@ -172,15 +173,15 @@ test('shared scope runs one exact focused test through the fixed integrated prov
 
     assert.equal(result.scope,'shared');
     assert.equal(result.workspaceMode,'integrated');
-    assert.equal(result.workspaceRoot,workspaceRoot);
+    assert.equal(result.workspaceRoot,canonicalWorkspaceRoot);
     assert.equal(result.result.operation,'focused-test');
     assert.equal(calls.length,1);
     assert.equal(calls[0].command,process.execPath);
     assert.deepEqual(calls[0].args,[
-        path.join(workspaceRoot,'tools','run-focused-tests.mjs'),
+        path.join(canonicalWorkspaceRoot,'tools','run-focused-tests.mjs'),
         'test/selected.test.mjs'
     ]);
-    assert.equal(calls[0].options.cwd,workspaceRoot);
+    assert.equal(calls[0].options.cwd,canonicalWorkspaceRoot);
     assert.equal(events[0].type,'shared.test.started');
     assert.ok(events.some(event=>event.type==='integrated.provider.verified'));
     assert.equal(events.at(-1).type,'shared.test.completed');
@@ -345,6 +346,19 @@ test('provider loading rejects comment-separated static and dynamic imports',asy
             label
         );
     }
+});
+
+test('provider loading rejects an Arcane root reached through a linked ancestor',async t=>{
+    const workspaceRoot=await createSharedWorkspace(t,{});
+    const aliasContainer=await temporaryDirectory(t,{prefix:'arcane-integrated-provider-alias-'});
+    const linkedParent=path.join(aliasContainer,'linked-parent');
+    await symlink(path.dirname(workspaceRoot),linkedParent,'junction');
+    const linkedWorkspace=path.join(linkedParent,path.basename(workspaceRoot));
+    await assert.rejects(
+        loadArcaneIntegratedProvider({arcaneRoot:linkedWorkspace}),
+        error=>error?.code==='ARCANE_POLICY_DENIED'
+            &&/linked or non-directory ancestor/u.test(error.message)
+    );
 });
 
 test('provider loading cancellation stops waiting for a shared initialization',async t=>{

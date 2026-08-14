@@ -66,6 +66,25 @@ async function emit(onEvent,event){
     await onEvent?.(Object.freeze(event));
 }
 
+async function assertUnlinkedDirectoryAncestors(location){
+    const resolved=path.resolve(location);
+    const parsed=path.parse(resolved);
+    const relative=resolved.slice(parsed.root.length);
+    let current=parsed.root;
+    const components=relative.split(path.sep).filter(Boolean);
+    for(let index=0;index<components.length-1;index+=1){
+        current=path.join(current,components[index]);
+        const info=await lstat(current);
+        if(info.isSymbolicLink()||!info.isDirectory()){
+            fail(
+                'The Arcane OS root must not use a linked or non-directory ancestor.',
+                ERROR_CODES.policyDenied,
+                {arcaneRoot:resolved,ancestor:current}
+            );
+        }
+    }
+}
+
 async function canonicalProviderRoot(arcaneRoot){
     if(typeof arcaneRoot!=='string'||!arcaneRoot.trim()){
         fail('An explicit Arcane OS root is required for shared development.',ERROR_CODES.usage);
@@ -83,10 +102,8 @@ async function canonicalProviderRoot(arcaneRoot){
     if(rootInfo.isSymbolicLink()||!rootInfo.isDirectory()){
         fail('The Arcane OS root must be a real directory.',ERROR_CODES.policyDenied);
     }
+    await assertUnlinkedDirectoryAncestors(requested);
     const canonicalRoot=await realpath(requested);
-    if(pathKey(canonicalRoot)!==pathKey(requested)){
-        fail('The Arcane OS root must not resolve through a linked path.',ERROR_CODES.policyDenied);
-    }
     const toolsRoot=path.join(canonicalRoot,'tools');
     const toolsInfo=await lstat(toolsRoot);
     if(toolsInfo.isSymbolicLink()||!toolsInfo.isDirectory()){
