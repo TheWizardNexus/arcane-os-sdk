@@ -22,7 +22,8 @@ function memoryStream(){
 test('CLI help and version succeed through the shipped executable',async()=>{
     const help=await runCli(['--help']);
     assert.equal(help.code,0);
-    assert.match(help.stdout,/Arcane OS external application SDK 0\.1\.0-dev\.0/);
+    assert.match(help.stdout,/Arcane OS application SDK 0\.1\.0-dev\.0/);
+    assert.match(help.stdout,/external or integrated Arcane workspace/);
     assert.match(help.stdout,/arcane-os executables/);
 
     const version=await runCli(['--version']);

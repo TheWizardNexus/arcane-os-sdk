@@ -17,9 +17,9 @@ unbounded build.
 
 ## App admission and native extraction
 
-- Define a manifest-v2 app descriptor for capabilities, granted methods,
-  security origins, icon, native type, bundled dependencies, minimum Core
-  features, publisher identity, and target compatibility.
+- Migrate built-in apps from the implemented schema-2 `arcane-app.json`
+  descriptor fallback to authored descriptors without changing exact v1 release
+  or native-host artifacts.
 - Update Arcane's exact-key consumers to project the new descriptor into the
   current catalog while preserving v1 app-release admission during migration.
 - Extract the native builder behind explicit `toolchainRoot`, verified
@@ -55,5 +55,6 @@ unbounded build.
   it stores local repository paths per user and never becomes a second builder.
 - Add authenticated GitHub artifact admission so Arcane OS installs verified
   releases without cloning proprietary source.
-- Add an Arcane-native development host once Arcane can safely provide the same
-  filesystem, process, target, cancellation, and receipt controls on-device.
+- Extend the implemented integrated source/check/package/browser-run profile to
+  an app-scoped native development host once the extracted builders can retain
+  the same toolchain and artifact receipts on-device.

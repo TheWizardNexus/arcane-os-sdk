@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#040915">
   <meta name="color-scheme" content="dark">
-  <meta name="description" content="Build, test, package, and manage Arcane OS applications from independent repositories with the arcane-os SDK and CLI.">
+  <meta name="description" content="Build, test, package, and manage Arcane OS applications inside or outside the Arcane checkout with the arcane-os SDK and CLI.">
   <meta name="robots" content="index, follow">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
   <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/">
@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="styles.css">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Arcane OS SDK">
-  <meta property="og:title" content="Arcane OS SDK — build Arcane apps from independent repositories">
+  <meta property="og:title" content="Arcane OS SDK — one app toolchain inside or outside Arcane OS">
   <meta property="og:description" content="One headless toolchain for scaffolding, testing, packaging, verification, repository operations, and ArcaneOllama readiness.">
   <meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/">
   <meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png">
@@ -22,9 +22,9 @@
   <meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Arcane OS SDK">
-  <meta name="twitter:description" content="Build Arcane apps outside the Arcane OS repository.">
+  <meta name="twitter:description" content="Use one Arcane app workflow inside or outside the Arcane OS repository.">
   <meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png">
-  <title>Arcane OS SDK | Build Arcane apps from independent repositories</title>
+  <title>Arcane OS SDK | Build Arcane apps inside or outside Arcane OS</title>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -63,10 +63,10 @@
     <section id="top" class="hero section-shell" aria-labelledby="hero-title">
       <div class="hero-copy">
         <p class="eyebrow"><span class="status-light" aria-hidden="true"></span> Development SDK · 0.1.0-dev.0</p>
-        <h1 id="hero-title">Build Arcane apps <span>outside Arcane OS.</span></h1>
+        <h1 id="hero-title">Build Arcane apps <span>inside or outside Arcane OS.</span></h1>
         <p class="hero-lead">
-          Keep every application in its own repository while one verified toolchain preserves Arcane runtime paths,
-          theme contracts, packaging, structured automation, and the boundary for future native targets.
+          Keep proprietary applications in their own repositories, or work against Arcane's live shared runtime,
+          while one toolchain preserves paths, theme contracts, packaging, and structured automation.
         </p>
         <div class="hero-actions">
           <a class="button button-primary" href="#commands">Start with the CLI</a>
@@ -79,7 +79,7 @@
           <button class="motion-toggle" type="button" data-motion-toggle aria-pressed="false">Pause background motion</button>
         </div>
         <ul class="hero-facts" aria-label="SDK highlights">
-          <li><strong>Independent</strong><span>app repositories</span></li>
+          <li><strong>Two profiles</strong><span>external and integrated</span></li>
           <li><strong>Verified</strong><span>runtime and releases</span></li>
           <li><strong>One API</strong><span>CLI, CI, future GUI, and Codex</span></li>
         </ul>
@@ -104,7 +104,7 @@
     <section class="signal-strip section-shell" aria-label="SDK operating principles">
       <article>
         <span class="signal-index">01</span>
-        <div><strong>Source stays separate</strong><small>Private app code never needs to enter the Arcane OS checkout.</small></div>
+        <div><strong>Source stays where it belongs</strong><small>Private apps stay separate; built-in work can use Arcane's live runtime.</small></div>
       </article>
       <article>
         <span class="signal-index">02</span>
@@ -118,9 +118,9 @@
 
     <section id="workflow" class="content-section section-shell" aria-labelledby="workflow-title">
       <div class="section-heading">
-        <p class="eyebrow">External repository workflow</p>
-        <h2 id="workflow-title">Your application repository becomes the unit of work.</h2>
-        <p>Scaffold once, iterate locally, and hand Arcane OS a verified release instead of proprietary source.</p>
+        <p class="eyebrow">One application workflow</p>
+        <h2 id="workflow-title">The selected application remains the unit of work.</h2>
+        <p>Use a pinned runtime in an independent repository or Arcane's live runtime in its integrated checkout.</p>
       </div>
 
       <ol class="workflow-grid">
@@ -287,16 +287,16 @@ npm run check</code></pre>
       </div>
       <div class="roadmap-grid">
         <article class="roadmap-current">
-          <span>Current</span><h3>External browser development</h3>
-          <p>Scaffold, check, test, serve, package, verify, run, inspect targets, and manage Git from independent repositories.</p>
+          <span>Current</span><h3>External and integrated browser development</h3>
+          <p>Scaffold, check, test, serve, package, verify, and run from independent repositories or the Arcane checkout.</p>
         </article>
         <article>
           <span>Next</span><h3>App admission and native inputs</h3>
           <p>Move capabilities and platform policy into an approved app descriptor, then extract single-app native builders.</p>
         </article>
         <article>
-          <span>Later</span><h3>Arcane-native development</h3>
-          <p>Run the same filesystem, process, cancellation, and receipt controls directly on Arcane OS.</p>
+          <span>Later</span><h3>Arcane-native executable development</h3>
+          <p>Extend the integrated source workflow to app-scoped native hosts with retained toolchain and artifact receipts.</p>
         </article>
       </div>
     </section>

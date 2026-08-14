@@ -5,38 +5,51 @@ one headless operation API. A client selects a named operation and consumes the
 same structured event stream; the GUI is not a second build system.
 
 ```text
-external app repository
-        |
-        +-- arcane CLI
-        +-- Arcane Developer GUI (future)
-        +-- Codex / CI
-                 |
-          shared toolchain API
-                 |
-       browser package or target adapter
+external app repository -----+
+                              |
+integrated Arcane checkout ---+-- CLI / future GUI / Codex / CI
+                                      |
+                               shared toolchain API
+                                      |
+                            browser package or target adapter
 ```
 
-## External workspace contract
+## Workspace profiles
+
+An external workspace maps the exact runtime shipped by its locked `arcane-os`
+dependency. An integrated workspace maps the live `arcane/` and
+`node_modules/strong-type` directories already owned by the Arcane checkout.
+The development server and packager consume the same route destinations in
+both cases, so app imports do not change. Integrated initialization creates
+only app-owned files and never rewrites Arcane root configuration.
+
+## App and release contract
 
 The first SDK version deliberately preserves Arcane's current repository-shaped
 URLs and release schema:
 
 ```text
+apps/<id>/arcane-app.json
 apps/<id>/arcane-package.json
 apps/<id>/index.html
 dist/<id>/ARCANE_APP_RELEASE.json
 ```
 
-The app's `arcane-packager.json` has three exact shared routes. They map the
+The authored schema-2 descriptor is canonical for new apps and projects an
+exact schema-1 `arcane-package.json` for current consumers. Existing Arcane
+apps synthesize that descriptor from their schema-1 package plus the current
+native registry during migration.
+
+An external app's `arcane-packager.json` has three exact shared routes. They map the
 installed SDK runtime to `/arcane`, its vendored strong-type dependency to
 `/node_modules/strong-type`, and the SDK's `LICENSE`,
 `COMMERCIAL-LICENSE.md`, and `NOTICE` to `/licenses/arcane-os`. The app does not
 copy Arcane runtime source into its repository.
 
 Release schema 1 and builder identity `arcane-app-packager-v1` remain unchanged
-because current Arcane native admission treats them as exact contracts. Moving
-capabilities, native security policy, publisher identity, and platform metadata
-out of Arcane's central registry requires a coordinated manifest-v2 migration.
+because current Arcane native admission treats them as exact contracts. Native
+builder extraction will authenticate the schema-2 descriptor digest as a
+separate build input while exact v1 host artifacts remain unchanged.
 
 ## Operation ownership
 

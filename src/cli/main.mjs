@@ -26,7 +26,7 @@ const FLAG_OPTIONS=new Set([
     'version'
 ]);
 
-export const HELP_TEXT=`Arcane OS external application SDK ${SDK_VERSION}
+export const HELP_TEXT=`Arcane OS application SDK ${SDK_VERSION}
 
 Usage:
   ${CLI_NAME} new <id> [--path <directory>] [--display-name <name>] [--git]
@@ -43,7 +43,7 @@ Usage:
   ${CLI_NAME} repo status|pull|push
 
 Global:
-  --workspace <directory>       Select an external application repository.
+  --workspace <directory>       Select an external or integrated Arcane workspace.
   --output human|json|ndjson    Select output framing (default: human).
   --help                        Show this help.
   --version                     Show the SDK version.

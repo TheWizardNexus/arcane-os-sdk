@@ -3,6 +3,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import {
+    appDescriptorSha256,
     loadAppDescriptor,
     projectNativeDescriptor,
     projectPackageManifest,
@@ -63,6 +64,8 @@ test('canonical descriptor projects exact browser and native compatibility input
         include:['img/icon.png','index.html','manifest.json','modules']
     });
     assert.deepEqual(value.targets,['windows-x64']);
+    assert.match(appDescriptorSha256(value),/^[a-f0-9]{64}$/u);
+    assert.equal(appDescriptorSha256(value),appDescriptorSha256(descriptor()));
 });
 
 test('native descriptors require an included raster icon and exact origin policy',()=>{

@@ -26,6 +26,7 @@ test('published JSON schemas parse and declare immutable protocol versions',asyn
         ['arcane-package.schema.json',1],
         ['arcane-lock.schema.json',1],
         ['cli-event.schema.json','arcane-cli-events/1'],
+        ['native-build-plan.schema.json','arcane-native-build-plan/1'],
         ['target-adapter.schema.json','arcane-target-adapter/1']
     ]);
 
@@ -52,6 +53,7 @@ test('package exposes both supported executable names and public contracts',asyn
     assert.equal(packageDocument.exports['./schemas/arcane-package.json'],'./schemas/arcane-package.schema.json');
     assert.equal(packageDocument.exports['./schemas/arcane-lock.json'],'./schemas/arcane-lock.schema.json');
     assert.equal(packageDocument.exports['./schemas/cli-event.json'],'./schemas/cli-event.schema.json');
+    assert.equal(packageDocument.exports['./schemas/native-build-plan.json'],'./schemas/native-build-plan.schema.json');
     assert.equal(packageDocument.exports['./schemas/target-adapter.json'],'./schemas/target-adapter.schema.json');
 });
 
@@ -61,8 +63,12 @@ test('root SDK export exposes receipt authenticators and verified file readers',
     assert.equal(typeof sdk.readVerifiedAppReleaseFile,'function');
     assert.equal(typeof sdk.readVerifiedRuntimeFile,'function');
     assert.equal(typeof sdk.validateAppDescriptor,'function');
+    assert.equal(typeof sdk.appDescriptorSha256,'function');
     assert.equal(typeof sdk.projectPackageManifest,'function');
     assert.equal(typeof sdk.projectNativeDescriptor,'function');
+    assert.equal(typeof sdk.createNativeBuildPlan,'function');
+    assert.equal(typeof sdk.authenticateNativeBuildPlan,'function');
+    assert.equal(typeof sdk.executeNativeBuildPlan,'function');
 });
 
 test('package schema string rules match the packager validators',async()=>{

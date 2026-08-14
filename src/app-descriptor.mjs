@@ -1,4 +1,5 @@
 import {isDeepStrictEqual} from 'node:util';
+import {createHash} from 'node:crypto';
 import {lstat,readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -374,6 +375,11 @@ export function projectPackageManifest(descriptor){
         `${APP_DESCRIPTOR_NAME} projection`
     );
     return projection;
+}
+
+export function appDescriptorSha256(descriptor){
+    const value=validateAppDescriptor(descriptor,{appId:descriptor?.id});
+    return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
 export function projectNativeDescriptor(descriptor,{source}={}){

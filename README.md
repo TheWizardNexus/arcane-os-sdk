@@ -3,8 +3,8 @@
 # Arcane OS SDK
 
 <p align="center">
-  <strong>Build, test, package, and manage Arcane applications from their own repositories.</strong><br>
-  Use the Arcane runtime and ArcaneOllama readiness checks without placing proprietary application source inside Arcane OS.
+  <strong>Build, test, package, and manage Arcane applications inside or outside Arcane OS.</strong><br>
+  Keep proprietary source in its own repository while using the same headless workflow for apps and shared runtime work in the Arcane checkout.
 </p>
 
 <p align="center">
@@ -13,10 +13,11 @@
   <a href="https://github.com/TheWizardNexus/arcane-os-sdk"><strong>Open the GitHub repository</strong></a>
 </p>
 
-`arcane-os` is the external application SDK and command-line toolchain for
-Arcane OS. It lets an app live in its own Git repository while preserving the
-same Arcane runtime paths, theme, packaging contract, and future native target
-boundary used by Arcane OS.
+`arcane-os` is the application SDK and command-line toolchain for Arcane OS. It
+supports two explicit workspace profiles: an external app repository uses the
+version-locked SDK runtime, while an integrated Arcane checkout uses its live
+`arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
+event, cancellation, and browser run contracts.
 
 This is development software. Version `0.1.0-dev.0` is not a production or
 release-candidate claim. It has not yet been published to npm.
@@ -89,6 +90,22 @@ commit the regenerated lock.
 Generated repositories use `npm ci --ignore-scripts` in CI. Run dependency
 installation once and commit `package-lock.json` before enabling that workflow.
 
+### Integrated Arcane OS development
+
+Run the same SDK against the Arcane OS checkout when changing a shared runtime
+capability or a built-in app. During local SDK development, invoke its source
+CLI explicitly so Arcane OS does not acquire an npm self-dependency:
+
+```bash
+node ../arcane-os-sdk/bin/arcane.mjs check --workspace "../Arcane OS" --app calculator
+node ../arcane-os-sdk/bin/arcane.mjs dev --workspace "../Arcane OS" --app calculator
+node ../arcane-os-sdk/bin/arcane.mjs package --workspace "../Arcane OS" --app calculator
+```
+
+`arcane init new-app --workspace <arcane-root>` detects the integrated profile
+and writes only `apps/new-app/` boilerplate. It does not modify Arcane OS root
+scripts, dependencies, workflows, lock files, or repository instructions.
+
 ## Commands
 
 ```text
@@ -122,6 +139,16 @@ portable substitute and call it native.
 See [docs/platform-targets.md](docs/platform-targets.md) for the matrix and
 [docs/architecture.md](docs/architecture.md) for the boundary. The issue-ready
 extraction sequence is tracked in [docs/roadmap.md](docs/roadmap.md).
+
+## Canonical app descriptor
+
+New apps own `apps/<id>/arcane-app.json` schema 2. It contains publisher,
+permissions, security, native presentation, Core requirements, and target
+intent, and deterministically projects the exact schema-1
+`arcane-package.json` required by the current browser packager. Existing Arcane
+apps remain compatible through a read-only projection of the current native
+registry until each app adopts the authored descriptor. The schema-1 release
+manifest is intentionally unchanged during this migration.
 
 ## ArcaneOllama
 

@@ -72,8 +72,16 @@ export {
 } from './workspace.mjs';
 export {startDevServer} from './dev-server.mjs';
 export {
+    NATIVE_BUILD_PLAN_PROTOCOL,
+    NATIVE_BUILDER_PROTOCOL,
+    authenticateNativeBuildPlan,
+    createNativeBuildPlan,
+    executeNativeBuildPlan
+} from './native-plan.mjs';
+export {
     APP_DESCRIPTOR_NAME,
     APP_DESCRIPTOR_SCHEMA_VERSION,
+    appDescriptorSha256,
     loadAppDescriptor,
     projectNativeDescriptor,
     projectPackageManifest,

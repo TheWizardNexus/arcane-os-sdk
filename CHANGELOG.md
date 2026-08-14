@@ -3,6 +3,12 @@
 ## 0.1.0-dev.0
 
 - Added the first external-repository Arcane OS SDK and `arcane` CLI.
+- Added external and integrated workspace profiles so the same operations can
+  use either the pinned SDK runtime or the live Arcane checkout runtime.
+- Added canonical schema-2 `arcane-app.json` descriptors with exact schema-1
+  package and native-registry compatibility projections.
+- Added integrated `arcane init` scaffolding that writes only app-owned files
+  and preserves every Arcane root package, workflow, lock, and instruction file.
 - Added app scaffolding, environment diagnostics, browser development, focused tests, validation, deterministic packaging, and package verification.
 - Added a platform-neutral target adapter contract with an available browser target and explicit deferred Windows, Linux, and Android native targets.
 - Added fixed Git status, fast-forward pull, and push operations for future Arcane Developer control-panel use.
