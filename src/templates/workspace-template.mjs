@@ -346,7 +346,7 @@ action?.addEventListener('click',()=>{
     }
     files.set(`apps/${appId}/test/app.test.mjs`,`import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import test from 'node:test';
+import test from '${SDK_NAME}/testing';
 
 const appRoot=new URL('../',import.meta.url);
 

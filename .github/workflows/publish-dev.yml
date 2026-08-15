@@ -3,14 +3,16 @@ name: Publish development package
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
-  id-token: write
+permissions: {}
 
 jobs:
   publish:
     name: Publish npm dev tag
-    if: github.ref == 'refs/heads/main'
+    if: github.repository == 'TheWizardNexus/arcane-os-sdk' && github.ref == 'refs/heads/dev'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
     environment:
       name: npm
     runs-on: ubuntu-latest
@@ -21,8 +23,24 @@ jobs:
         shell: bash
         run: |
           test "$GITHUB_REPOSITORY" = "TheWizardNexus/arcane-os-sdk"
-          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REF" = "refs/heads/dev"
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Authenticate the exact development check
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run_id="$(gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/check.yml/runs" \
+            -f branch=dev \
+            -f event=push \
+            -f status=success \
+            -f head_sha="$GITHUB_SHA" \
+            -f per_page=1 \
+            --jq '.workflow_runs[0].id // empty')"
+          test -n "$run_id"
+          echo "Reusing successful dev Check run ${run_id} for ${GITHUB_SHA}."
       - name: Use Node.js 24
         uses: actions/setup-node@v6
         with:
@@ -31,8 +49,6 @@ jobs:
           package-manager-cache: false
       - name: Use a trusted-publishing compatible npm
         run: npm install --global npm@11.16.0
-      - name: Install exact dependencies
-        run: npm ci
       - name: Require an unpublished development version
         shell: bash
         run: |
@@ -59,7 +75,5 @@ jobs:
 
           throw new Error(`${packageDocument.name}@${packageDocument.version} is already published.`);
           NODE
-      - name: Run development checks
-        run: npm run check
       - name: Publish with npm trusted publishing
         run: npm publish --ignore-scripts --access public --tag dev

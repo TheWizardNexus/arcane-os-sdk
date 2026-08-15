@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
-import test from 'node:test';
+import test from '../src/testing.mjs';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';
 import {
     repositoryRoot,

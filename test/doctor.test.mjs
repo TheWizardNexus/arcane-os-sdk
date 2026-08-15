@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test from '../src/testing.mjs';
 import {assessArcaneOllama} from '../src/doctor.mjs';
 
 const serviceHost='C:\\Program Files\\Ollama\\ArcaneOllamaService.exe';

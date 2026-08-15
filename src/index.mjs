@@ -25,6 +25,12 @@ export {
 
 export {createReporter} from './events.mjs';
 export {runProcess} from './process.mjs';
+export {
+    DEFAULT_TEST_TIMEOUT_MS,
+    registeredTestCount,
+    runRegisteredTests,
+    test
+} from './testing.mjs';
 export {runDoctor,assessArcaneOllama} from './doctor.mjs';
 export {
     ARCANE_NATIVE_PROVIDER_PATHS,

@@ -1,50 +1,150 @@
 name: Deploy SDK site to GitHub Pages
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "site/**"
-      - ".github/workflows/pages.yml"
-  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Check
+      - Promote main
+    types:
+      - completed
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+permissions: {}
 
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
+  assemble:
+    name: Assemble authenticated channel sites
+    if: >-
+      github.repository == 'TheWizardNexus/arcane-os-sdk' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == 'TheWizardNexus/arcane-os-sdk' &&
+      ((github.event.workflow_run.name == 'Check' && github.event.workflow_run.head_branch == 'dev') ||
+       (github.event.workflow_run.name == 'Promote main' && github.event.workflow_run.head_branch == 'main'))
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve authenticated channel receipts
+        id: channels
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          TRIGGER_WORKFLOW: ${{ github.event.workflow_run.name }}
+        run: |
+          set -euo pipefail
+
+          successful_sha() {
+            local workflow_file="$1"
+            local branch="$2"
+            gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_file}/runs" \
+              -f branch="$branch" \
+              -f event=push \
+              -f status=success \
+              -f per_page=1 \
+              --jq '.workflow_runs[0].head_sha // empty'
+          }
+
+          case "$TRIGGER_WORKFLOW:$TRIGGER_BRANCH" in
+            Check:dev)
+              ;;
+            "Promote main:main")
+              ;;
+            *)
+              echo "Unsupported Pages trigger ${TRIGGER_WORKFLOW}:${TRIGGER_BRANCH}." >&2
+              exit 1
+              ;;
+          esac
+
+          production_sha="$(successful_sha promote-main.yml main)"
+          development_sha="$(successful_sha check.yml dev)"
+
+          sha_pattern='^[0-9a-f]{40}$'
+          if ! [[ "$production_sha" =~ $sha_pattern && "$development_sha" =~ $sha_pattern ]]; then
+            echo "Both Pages channels require an authenticated successful workflow SHA." >&2
+            exit 1
+          fi
+
+          {
+            echo "production_sha=$production_sha"
+            echo "development_sha=$development_sha"
+          } >> "$GITHUB_OUTPUT"
+          echo "Production: ${production_sha}; development: ${development_sha}."
+
+      - name: Check out authenticated production source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.channels.outputs.production_sha }}
+          path: production
+          persist-credentials: false
+          sparse-checkout: |
+            site
+            tools/build-pages-channels.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Check out authenticated development source
+        if: steps.channels.outputs.development_sha != steps.channels.outputs.production_sha
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.channels.outputs.development_sha }}
+          path: development
+          persist-credentials: false
+          sparse-checkout: site
+          sparse-checkout-cone-mode: false
+
+      - name: Use the authenticated Node.js line
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Assemble production and development documentation
+        shell: bash
+        env:
+          DEVELOPMENT_SHA: ${{ steps.channels.outputs.development_sha }}
+          PRODUCTION_SHA: ${{ steps.channels.outputs.production_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git -C production rev-parse HEAD)" = "$PRODUCTION_SHA"
+
+          development_site=development/site
+          if test "$DEVELOPMENT_SHA" = "$PRODUCTION_SHA"; then
+            development_site=production/site
+          else
+            test "$(git -C development rev-parse HEAD)" = "$DEVELOPMENT_SHA"
+          fi
+
+          node production/tools/build-pages-channels.mjs \
+            --production production/site \
+            --development "$development_site" \
+            --output pages-artifact \
+            --production-sha "$PRODUCTION_SHA" \
+            --development-sha "$DEVELOPMENT_SHA"
+
+      - name: Upload the assembled Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: ./pages-artifact
+
   deploy:
-    if: github.repository == 'TheWizardNexus/arcane-os-sdk' && github.ref == 'refs/heads/main'
+    name: Deploy authenticated channels
+    needs: assemble
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Check out source
-        uses: actions/checkout@v7
-
       - name: Configure Pages
         uses: actions/configure-pages@v6
-
-      - name: Validate site artifact
-        shell: bash
-        run: |
-          test -f site/index.html
-          if find site -type l -print -quit | grep -q .; then
-            echo "The Pages artifact must not contain symbolic links." >&2
-            exit 1
-          fi
-
-      - name: Upload site artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: ./site
 
       - name: Deploy to GitHub Pages
         id: deployment

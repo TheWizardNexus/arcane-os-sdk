@@ -1,0 +1,53 @@
+name: Promote main
+
+on:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+concurrency:
+  group: promote-main
+  cancel-in-progress: false
+
+jobs:
+  authenticate:
+    name: Authenticate exact dev evidence
+    if: github.repository == 'TheWizardNexus/arcane-os-sdk' && github.ref == 'refs/heads/main'
+    permissions:
+      actions: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the exact main SHA to have passed on dev
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "TheWizardNexus/arcane-os-sdk"
+          test "$GITHUB_REF" = "refs/heads/main"
+
+          run_id="$(gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/check.yml/runs" \
+            -f branch=dev \
+            -f event=push \
+            -f status=success \
+            -f head_sha="$GITHUB_SHA" \
+            -f per_page=1 \
+            --jq '.workflow_runs[0].id // empty')"
+
+          if test -z "$run_id"; then
+            echo "No successful dev Check run authenticates exact SHA ${GITHUB_SHA}." >&2
+            echo "Promote by fast-forwarding main to an unchanged commit already green on dev." >&2
+            exit 1
+          fi
+
+          echo "Authenticated dev Check run ${run_id} for production SHA ${GITHUB_SHA}."
+          {
+            echo "### Production promotion receipt"
+            echo
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Reused dev Check run: \`${run_id}\`"
+            echo "- Full CI rerun: no"
+          } >> "$GITHUB_STEP_SUMMARY"

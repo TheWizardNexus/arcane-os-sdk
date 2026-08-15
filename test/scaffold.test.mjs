@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
-import test from 'node:test';
+import test from '../src/testing.mjs';
 import {createWorkspace,initWorkspace} from '../src/scaffold.mjs';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';
-import {runNode,temporaryDirectory} from './helpers.mjs';
+import {repositoryRoot,runNode,temporaryDirectory} from './helpers.mjs';
 
 test('workspace scaffold creates a private external app using the exact SDK version',async t=>{
     const parent=await temporaryDirectory(t);
@@ -65,7 +65,10 @@ test('workspace scaffold creates a private external app using the exact SDK vers
     assert.ok(bootstrap>appStyle&&appModule>bootstrap);
 
     const generatedTest=path.join(appRoot,'test','app.test.mjs');
-    const generatedTestResult=await runNode(['--test',generatedTest],{cwd:targetPath});
+    const generatedTestResult=await runNode([
+        path.join(repositoryRoot,'bin','arcane-test.mjs'),
+        generatedTest
+    ],{cwd:targetPath});
     assert.equal(
         generatedTestResult.code,
         0,

@@ -12,6 +12,7 @@
     ".": "./src/index.mjs",
     "./toolchain": "./src/toolchain.mjs",
     "./events": "./src/events.mjs",
+    "./testing": "./src/testing.mjs",
     "./targets": "./src/targets/index.mjs",
     "./native": "./src/native-plan.mjs",
     "./native-provider": "./src/native-provider-loader.mjs",
@@ -39,7 +40,7 @@
     "NOTICE"
   ],
   "scripts": {
-    "test": "node --test test/*.test.mjs",
+    "test": "node ./bin/arcane-test.mjs",
     "check": "node tools/check-source.mjs && node tools/runtime-manifest.mjs --verify && npm test",
     "runtime:verify": "node tools/runtime-manifest.mjs --verify",
     "pack:local": "npm pack --ignore-scripts",
@@ -70,5 +71,8 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/",
     "tag": "dev"
+  },
+  "dependencies": {
+    "vanilla-test": "2.1.0"
   }
 }

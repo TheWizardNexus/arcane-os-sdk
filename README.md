@@ -10,6 +10,8 @@
 <p align="center">
   <a href="https://thewizardnexus.github.io/arcane-os-sdk/"><strong>Visit the Arcane OS SDK site</strong></a>
   &nbsp;·&nbsp;
+  <a href="https://thewizardnexus.github.io/arcane-os-sdk/dev/"><strong>Development documentation</strong></a>
+  &nbsp;·&nbsp;
   <a href="https://github.com/TheWizardNexus/arcane-os-sdk"><strong>Open the GitHub repository</strong></a>
 </p>
 

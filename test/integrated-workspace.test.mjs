@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {lstat,mkdir,readFile,rm,writeFile} from 'node:fs/promises';
 import path from 'node:path';
-import test from 'node:test';
+import test from '../src/testing.mjs';
 import {
     buildApplication,
     checkApplication,
@@ -11,6 +11,7 @@ import {
     packageApplication,
     projectPackageManifest,
     runApplication,
+    testApplication,
     validateWorkspace,
     verifyApplication
 } from '../src/index.mjs';
@@ -136,11 +137,11 @@ test('integrated Arcane workspace supports the complete browser app workflow',as
     await mkdir(path.join(workspaceRoot,'test'),{recursive:true});
     await writeFile(
         path.join(workspaceRoot,'test','root-must-not-run.test.mjs'),
-        "import test from 'node:test';\ntest('root test must not run in app scope',()=>{throw new Error('root test ran');});\n"
+        "import test from 'arcane-os/testing';\ntest('root test must not run in app scope',()=>{throw new Error('root test ran');});\n"
     );
     await writeFile(
         path.join(workspaceRoot,'apps','other-app','test','other-must-not-run.test.mjs'),
-        "import test from 'node:test';\ntest('other app test must not run',()=>{throw new Error('other app test ran');});\n"
+        "import test from 'arcane-os/testing';\ntest('other app test must not run',()=>{throw new Error('other app test ran');});\n"
     );
 
     await assert.rejects(lstat(path.join(workspaceRoot,'arcane.lock.json')),{code:'ENOENT'});
@@ -250,4 +251,75 @@ test('integrated Arcane workspace supports the complete browser app workflow',as
     assert.match(await packagedTheme.text(),/--background/);
     await running.close();
     await running.lifecycle;
+});
+
+test('programmatic application tests preserve bounded isolated failure diagnostics',async t=>{
+    const parent=await temporaryDirectory(t,{prefix:'arcane-test-diagnostics-'});
+    const workspaceRoot=path.join(parent,'workspace');
+    const appId='diagnostic-app';
+    await createApplication({
+        targetPath:workspaceRoot,
+        appId,
+        displayName:'Diagnostic App'
+    });
+    await configureIntegratedWorkspace(workspaceRoot);
+    const appRoot=path.join(workspaceRoot,'apps',appId);
+    const testRoot=path.join(appRoot,'test');
+    await rm(testRoot,{recursive:true,force:true});
+    await mkdir(testRoot,{recursive:true});
+    const relativeFiles=[];
+    for(let index=0;index<5;index+=1){
+        const relative=`apps/${appId}/test/diagnostic-${String(index)}.test.mjs`;
+        relativeFiles.push(relative);
+        await writeFile(
+            path.join(workspaceRoot,...relative.split('/')),
+            `import test from 'arcane-os/testing';\n`
+                +`test('diagnostic failure ${String(index)}',()=>{\n`
+                +`  console.log('o'.repeat(100000));\n`
+                +`  console.log('ARCANE_STDOUT_SENTINEL_${String(index)}');\n`
+                +`  console.error('e'.repeat(100000));\n`
+                +`  console.error('ARCANE_STDERR_SENTINEL_${String(index)}');\n`
+                +`  throw new Error('ARCANE_DIAGNOSTIC_STACK_${String(index)}');\n`
+                +`});\n`
+        );
+    }
+
+    const assertDiagnostics=error=>{
+        assert.equal(error?.code,'ARCANE_OPERATION_FAILED');
+        assert.match(error.message,/5 isolated test files failed\./);
+        assert.match(error.message,/apps\/diagnostic-app\/test\/diagnostic-0\.test\.mjs/);
+        assert.match(error.message,/Error: ARCANE_DIAGNOSTIC_STACK_0/);
+        assert.match(error.message,/at .*diagnostic-0\.test\.mjs/);
+        assert.deepEqual(error.details?.testFiles,relativeFiles);
+        assert.equal(error.details?.failures?.length,relativeFiles.length);
+        assert.equal(error.details?.outputTruncated,true);
+        const capturedBytes=error.details.failures.reduce(
+            (total,failure)=>total
+                +Buffer.byteLength(failure.stdout,'utf8')
+                +Buffer.byteLength(failure.stderr,'utf8'),
+            0
+        );
+        assert.equal(error.details.outputBytes,capturedBytes);
+        assert.ok(capturedBytes<=error.details.outputLimitBytes);
+        for(let index=0;index<error.details.failures.length;index+=1){
+            const failure=error.details.failures[index];
+            assert.equal(failure.testFile,relativeFiles[index]);
+            assert.equal(failure.exitCode,1);
+            assert.equal(failure.signal,null);
+            assert.match(failure.stdout,new RegExp(`ARCANE_STDOUT_SENTINEL_${String(index)}`));
+            assert.match(failure.stderr,new RegExp(`ARCANE_STDERR_SENTINEL_${String(index)}`));
+            assert.match(failure.stderr,new RegExp(`Error: ARCANE_DIAGNOSTIC_STACK_${String(index)}`));
+            assert.match(failure.stderr,new RegExp(`at .*diagnostic-${String(index)}\\.test\\.mjs`));
+        }
+        return true;
+    };
+
+    await assert.rejects(
+        testApplication({workspaceRoot,workspaceMode:'integrated',appId,appRoot}),
+        assertDiagnostics
+    );
+    await assert.rejects(
+        checkApplication({workspaceRoot,appId}),
+        assertDiagnostics
+    );
 });

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {Writable} from 'node:stream';
-import test from 'node:test';
+import test from '../src/testing.mjs';
 import {createReporter} from '../src/events.mjs';
 import {runProcess} from '../src/process.mjs';
 import {repositoryStatus} from '../src/repository.mjs';

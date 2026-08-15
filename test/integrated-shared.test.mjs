@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {appendFile,lstat,mkdir,readFile,realpath,symlink,writeFile} from 'node:fs/promises';
 import path from 'node:path';
-import test from 'node:test';
+import test from '../src/testing.mjs';
 import {
     buildApplication,
     checkApplication,
@@ -130,7 +130,7 @@ async function createSharedWorkspace(t,{mode='integrated',gateKey}={}){
         name:mode==='integrated'?'arcane-os':'external-fixture',
         private:true,
         type:'module',
-        scripts:{check:'node --test'}
+        scripts:{check:'arcane test'}
     });
     if(mode==='integrated'){
         await mkdir(path.join(workspaceRoot,'tools'),{recursive:true});
@@ -145,7 +145,7 @@ async function createSharedWorkspace(t,{mode='integrated',gateKey}={}){
         );
         await writeFile(
             path.join(workspaceRoot,'test','selected.test.mjs'),
-            "import test from 'node:test';\ntest('selected fixture',()=>{});\n"
+            "import test from 'arcane-os/testing';\ntest('selected fixture',()=>{});\n"
         );
     }
     return workspaceRoot;
@@ -200,7 +200,7 @@ test('external app scope preserves workspace-root and selected-app tests',async 
     await mkdir(path.join(workspaceRoot,'test'),{recursive:true});
     await writeFile(
         path.join(workspaceRoot,'test','workspace-root.test.mjs'),
-        "import test from 'node:test';\ntest('external root test remains selected',()=>{});\n"
+        "import test from 'arcane-os/testing';\ntest('external root test remains selected',()=>{});\n"
     );
 
     const result=await testApplication({

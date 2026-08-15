@@ -3,7 +3,7 @@ import {cp,mkdir,readFile,writeFile} from 'node:fs/promises';
 import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
-import test from 'node:test';
+import test from '../src/testing.mjs';
 import {createWorkspace} from '../src/scaffold.mjs';
 import {startDevServer} from '../src/dev-server.mjs';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';

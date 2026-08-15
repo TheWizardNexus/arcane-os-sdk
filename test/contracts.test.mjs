@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
-import test from 'node:test';
+import test from '../src/testing.mjs';
 import {repositoryRoot} from './helpers.mjs';
 import {normalizeRelativePath,parseSemver} from '../src/packager/core.mjs';
 import {listTargets} from '../src/targets/index.mjs';
@@ -46,6 +46,7 @@ test('published JSON schemas parse and declare immutable protocol versions',asyn
 test('package exposes both supported executable names and public contracts',async()=>{
     const packageDocument=JSON.parse(await readFile(path.join(repositoryRoot,'package.json'),'utf8'));
     const integratedProvider=await import('arcane-os/integrated-provider');
+    const testing=await import('arcane-os/testing');
     assert.deepEqual(packageDocument.bin,{
         arcane:'./bin/arcane.mjs',
         'arcane-os':'./bin/arcane.mjs'
@@ -57,8 +58,12 @@ test('package exposes both supported executable names and public contracts',asyn
     assert.equal(packageDocument.exports['./schemas/native-build-plan.json'],'./schemas/native-build-plan.schema.json');
     assert.equal(packageDocument.exports['./schemas/target-adapter.json'],'./schemas/target-adapter.schema.json');
     assert.equal(packageDocument.exports['./integrated-provider'],'./src/integrated-provider-loader.mjs');
+    assert.equal(packageDocument.exports['./testing'],'./src/testing.mjs');
+    assert.equal(packageDocument.dependencies['vanilla-test'],'2.1.0');
     assert.equal(typeof integratedProvider.loadArcaneIntegratedProvider,'function');
     assert.equal(integratedProvider.INTEGRATED_TOOLCHAIN_PROTOCOL,'arcane-integrated-toolchain/1');
+    assert.equal(typeof testing.test,'function');
+    assert.equal(typeof testing.runRegisteredTests,'function');
 });
 
 test('root SDK export exposes receipt authenticators and verified file readers',()=>{
@@ -256,19 +261,33 @@ test('native build plan schema publishes only the exact dev.2 target matrix',asy
 });
 
 test('CI and trusted publishing workflows retain their platform and authority gates',async()=>{
-    const [checkWorkflow,publishWorkflow]=await Promise.all([
+    const [checkWorkflow,promoteWorkflow,publishWorkflow]=await Promise.all([
         readFile(path.join(repositoryRoot,'.github','workflows','check.yml'),'utf8'),
+        readFile(path.join(repositoryRoot,'.github','workflows','promote-main.yml'),'utf8'),
         readFile(path.join(repositoryRoot,'.github','workflows','publish-dev.yml'),'utf8')
     ]);
+    assert.match(checkWorkflow,/pull_request:\s*\n\s+branches:\s*\n\s+- dev/u);
+    assert.match(checkWorkflow,/push:\s*\n\s+branches:\s*\n\s+- dev/u);
+    assert.doesNotMatch(checkWorkflow,/\n\s+- main\s*$/mu);
     assert.match(checkWorkflow,/os:\s*[\s\S]*ubuntu-latest[\s\S]*windows-latest/u);
     assert.match(checkWorkflow,/node:\s*[\s\S]*- 22[\s\S]*- 24/u);
     assert.match(checkWorkflow,/npm install --global --ignore-scripts \./u);
     assert.match(checkWorkflow,/\n\s+arcane --version\s*\n\s+arcane-os --help/u);
 
     assert.match(publishWorkflow,/id-token:\s*write/u);
-    assert.match(publishWorkflow,/if:\s*github\.ref == 'refs\/heads\/main'/u);
+    assert.match(publishWorkflow,/if:[^\n]*github\.ref == 'refs\/heads\/dev'/u);
     assert.match(publishWorkflow,/environment:\s*\n\s+name:\s*npm/u);
     assert.match(publishWorkflow,/test "\$GITHUB_REPOSITORY" = "TheWizardNexus\/arcane-os-sdk"/u);
-    assert.match(publishWorkflow,/test "\$GITHUB_REF" = "refs\/heads\/main"/u);
+    assert.match(publishWorkflow,/test "\$GITHUB_REF" = "refs\/heads\/dev"/u);
+    assert.match(publishWorkflow,/actions\/workflows\/check\.yml\/runs/u);
+    assert.match(publishWorkflow,/-f head_sha="\$GITHUB_SHA"/u);
+    assert.doesNotMatch(publishWorkflow,/npm run check/u);
     assert.match(publishWorkflow,/npm install --global npm@11\.16\.0/u);
+
+    assert.match(promoteWorkflow,/push:\s*\n\s+branches:\s*\n\s+- main/u);
+    assert.match(promoteWorkflow,/actions:\s*read/u);
+    assert.match(promoteWorkflow,/actions\/workflows\/check\.yml\/runs/u);
+    assert.match(promoteWorkflow,/-f branch=dev/u);
+    assert.match(promoteWorkflow,/-f head_sha="\$GITHUB_SHA"/u);
+    assert.doesNotMatch(promoteWorkflow,/npm (?:ci|run check)/u);
 });

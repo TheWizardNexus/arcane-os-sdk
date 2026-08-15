@@ -7,6 +7,8 @@ informational notice and is not itself a grant of commercial rights.
 
 Third-party material retains its own terms:
 
+- vanilla-test 2.1.0: MIT License; see its installed `licence` file.
+- ansi-colors-es6 5.0.0: MIT License; see its installed `LICENSE` file.
 - strong-type 1.1.0: MIT License; see runtime/strong-type/licence.
 - uPlot: MIT License; see runtime/arcane/modules/uPlot.LICENSE.txt.
 - Marked: MIT License; complete notice and terms reproduced below.

@@ -2,6 +2,12 @@
 
 ## 0.1.0-dev.2
 
+- Established `main` as the production channel and `dev` as the long-lived
+  development channel, with exact-SHA promotion evidence and separate root and
+  `/dev/` documentation views.
+- Migrated the SDK and generated application test runner to exact
+  `vanilla-test` 2.1.0 while preserving isolated files, cleanup, nested cases,
+  timeouts, cancellation, and nonzero failure status.
 - Synchronized the bundled browser runtime with Arcane OS 0.8.12 and retained
   its exact 149-file source inventory.
 - Added an integrated-only shared/Core development scope that runs one exact

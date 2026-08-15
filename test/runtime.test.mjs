@@ -10,7 +10,7 @@ import {
     writeFile
 } from 'node:fs/promises';
 import path from 'node:path';
-import test from 'node:test';
+import test from '../src/testing.mjs';
 import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
 import {
     authenticateRuntimeReceipt,

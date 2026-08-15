@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {cp,lstat,mkdir,readFile,realpath,writeFile} from 'node:fs/promises';
 import path from 'node:path';
-import test from 'node:test';
+import test from '../src/testing.mjs';
 import {
     NATIVE_BUILDER_PROTOCOL,
     authenticateNativeBuildPlan,

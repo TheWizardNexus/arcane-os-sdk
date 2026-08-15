@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFile,stat} from 'node:fs/promises';
 import path from 'node:path';
-import test from 'node:test';
+import test from '../src/testing.mjs';
 import {repositoryRoot} from './helpers.mjs';
 
 const siteRoot=path.join(repositoryRoot,'site');
@@ -134,7 +134,7 @@ test('Pages assets retain exact brand identities',async()=>{
     );
 });
 
-test('Pages workflow deploys only the static site with least authority',async()=>{
+test('Pages workflow deploys authenticated production and development static channels',async()=>{
     const [workflow,packageDocument,readme,robots,sitemap]=await Promise.all([
         readFile(path.join(repositoryRoot,'.github','workflows','pages.yml'),'utf8'),
         readFile(path.join(repositoryRoot,'package.json'),'utf8').then(JSON.parse),
@@ -143,18 +143,28 @@ test('Pages workflow deploys only the static site with least authority',async()=
         readSiteFile('sitemap.xml')
     ]);
     assert.match(workflow,/contents:\s*read/u);
+    assert.match(workflow,/actions:\s*read/u);
     assert.match(workflow,/pages:\s*write/u);
     assert.match(workflow,/id-token:\s*write/u);
     assert.match(workflow,/github\.repository == 'TheWizardNexus\/arcane-os-sdk'/u);
-    assert.match(workflow,/github\.ref == 'refs\/heads\/main'/u);
+    assert.match(workflow,/workflow_run:/u);
+    assert.match(workflow,/- Check/u);
+    assert.match(workflow,/- Promote main/u);
+    assert.match(workflow,/head_branch == 'dev'/u);
+    assert.match(workflow,/head_branch == 'main'/u);
+    assert.match(workflow,/head_sha/u);
     assert.match(workflow,/actions\/checkout@v7/u);
     assert.match(workflow,/actions\/configure-pages@v6/u);
     assert.match(workflow,/actions\/upload-pages-artifact@v5/u);
     assert.match(workflow,/actions\/deploy-pages@v5/u);
-    assert.match(workflow,/path: \.\/site/u);
+    assert.match(workflow,/build-pages-channels\.mjs/u);
+    assert.match(workflow,/--production production\/site/u);
+    assert.match(workflow,/--development "\$development_site"/u);
+    assert.match(workflow,/path: \.\/pages-artifact/u);
     assert.equal(packageDocument.homepage,'https://thewizardnexus.github.io/arcane-os-sdk/');
     assert.equal(packageDocument.files.some(entry=>entry.startsWith('site')),false);
     assert.match(readme,/https:\/\/thewizardnexus\.github\.io\/arcane-os-sdk\//u);
+    assert.match(readme,/https:\/\/thewizardnexus\.github\.io\/arcane-os-sdk\/dev\//u);
     assert.match(readme,/main\/site\/assets\/arcane-os-sdk-readme-header\.png/u);
     assert.match(readme,/https:\/\/github\.com\/TheWizardNexus\/arcane-os-sdk/u);
     assert.match(robots,/Sitemap: https:\/\/thewizardnexus\.github\.io\/arcane-os-sdk\/sitemap\.xml/u);

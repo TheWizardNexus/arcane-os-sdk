@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {mkdir,readFile,realpath,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import test from 'node:test';
+import test from '../src/testing.mjs';
 import {
     ARCANE_NATIVE_PROVIDER_PATHS,
     ARCANE_PORTABLE_PROVIDER_PATH,

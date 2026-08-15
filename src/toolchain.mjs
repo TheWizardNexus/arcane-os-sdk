@@ -1,5 +1,6 @@
 import path from 'node:path';
 import {readdir,lstat,realpath} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
 import {createWorkspace,initWorkspace} from './scaffold.mjs';
 import {
     discoverApps as discoverWorkspaceApps,
@@ -31,6 +32,94 @@ import {runRepositoryAction} from './repository.mjs';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 import {createEventQueue} from './event-queue.mjs';
 import {ARCANE_MACHINE_BUNDLE_VERSION} from './constants.mjs';
+
+const TEST_RUNNER_PATH=fileURLToPath(new URL('../bin/arcane-test.mjs',import.meta.url));
+const MAX_TEST_FAILURE_STREAM_BYTES=32*1024;
+const MAX_TEST_FAILURE_AGGREGATE_BYTES=256*1024;
+const MAX_TEST_FAILURE_MESSAGE_BYTES=24*1024;
+const TEST_OUTPUT_TRUNCATION_NOTICE='[... earlier test output omitted ...]\n';
+
+function normalizedTestOutput(value){
+    return typeof value==='string'?value.trim():'';
+}
+
+function boundedTestOutputTail(value,maxBytes){
+    const source=normalizedTestOutput(value);
+    const sourceBytes=Buffer.byteLength(source,'utf8');
+    if(sourceBytes<=maxBytes){
+        return {text:source,bytes:sourceBytes,truncated:false};
+    }
+    const noticeBytes=Buffer.byteLength(TEST_OUTPUT_TRUNCATION_NOTICE,'utf8');
+    if(maxBytes<noticeBytes){
+        return {text:'',bytes:0,truncated:sourceBytes>0};
+    }
+    const buffer=Buffer.from(source,'utf8');
+    let start=buffer.length-(maxBytes-noticeBytes);
+    while(start<buffer.length&&(buffer[start]&0xc0)===0x80){
+        start+=1;
+    }
+    const text=`${TEST_OUTPUT_TRUNCATION_NOTICE}${buffer.subarray(start).toString('utf8')}`;
+    return {text,bytes:Buffer.byteLength(text,'utf8'),truncated:true};
+}
+
+function failedTestOutputBudgets(stderr,stdout,maxBytes){
+    const desiredStderr=Math.min(
+        MAX_TEST_FAILURE_STREAM_BYTES,
+        Buffer.byteLength(normalizedTestOutput(stderr),'utf8')
+    );
+    const desiredStdout=Math.min(
+        MAX_TEST_FAILURE_STREAM_BYTES,
+        Buffer.byteLength(normalizedTestOutput(stdout),'utf8')
+    );
+    if(desiredStderr+desiredStdout<=maxBytes){
+        return {stderr:desiredStderr,stdout:desiredStdout};
+    }
+    const shared=Math.floor(maxBytes/2);
+    let stderrBudget=Math.min(desiredStderr,shared);
+    let stdoutBudget=Math.min(desiredStdout,shared);
+    let remaining=maxBytes-stderrBudget-stdoutBudget;
+    const additionalStderr=Math.min(remaining,desiredStderr-stderrBudget);
+    stderrBudget+=additionalStderr;
+    remaining-=additionalStderr;
+    stdoutBudget+=Math.min(remaining,desiredStdout-stdoutBudget);
+    return {stderr:stderrBudget,stdout:stdoutBudget};
+}
+
+function captureFailedTest(testFile,result,workspaceRoot,maxBytes){
+    const budgets=failedTestOutputBudgets(result.stderr,result.stdout,maxBytes);
+    const stderr=boundedTestOutputTail(result.stderr,budgets.stderr);
+    const stdout=boundedTestOutputTail(result.stdout,budgets.stdout);
+    return {
+        failure:Object.freeze({
+            testFile:path.relative(workspaceRoot,testFile).replaceAll('\\','/'),
+            exitCode:result.code,
+            signal:result.signal,
+            stdout:stdout.text,
+            stderr:stderr.text,
+            stdoutTruncated:stdout.truncated,
+            stderrTruncated:stderr.truncated
+        }),
+        bytes:stdout.bytes+stderr.bytes
+    };
+}
+
+function failedTestMessage(failures){
+    const summary=`${String(failures.length)} isolated test file${failures.length===1?'':'s'} failed.`;
+    const actionable=failures.find(failure=>failure.stderr||failure.stdout);
+    if(!actionable){
+        return summary;
+    }
+    const heading=`\n\n${actionable.testFile}:\n`;
+    const available=Math.max(
+        0,
+        MAX_TEST_FAILURE_MESSAGE_BYTES-Buffer.byteLength(`${summary}${heading}`,'utf8')
+    );
+    const diagnostic=boundedTestOutputTail(
+        actionable.stderr||actionable.stdout,
+        available
+    ).text;
+    return diagnostic?`${summary}${heading}${diagnostic}`:summary;
+}
 
 async function emit(onEvent,event){
     await onEvent?.(event);
@@ -389,17 +478,70 @@ export async function testApplication(options={}){
         });
         return {...workspace,passed:true,skipped:true,testFiles:[]};
     }
-    const result=await runProcess(process.execPath,['--test',...testFiles],{
-        cwd:workspace.workspaceRoot,
-        signal:options.signal,
-        onEvent:options.onEvent
-    });
+    const outputs=[];
+    const failures=[];
+    let failureOutputBytes=0;
+    const perFileFailureOutputBytes=Math.min(
+        MAX_TEST_FAILURE_STREAM_BYTES*2,
+        Math.floor(MAX_TEST_FAILURE_AGGREGATE_BYTES/testFiles.length)
+    );
+    for(const testFile of testFiles){
+        throwIfAborted(options.signal);
+        const result=await runProcess(
+            process.execPath,
+            [TEST_RUNNER_PATH,testFile],
+            {
+                cwd:workspace.workspaceRoot,
+                signal:options.signal,
+                onEvent:options.onEvent,
+                allowNonzero:true
+            }
+        );
+        if(result.code===0){
+            if(result.stdout.trim())outputs.push(result.stdout.trim());
+        }else if(result.code===1){
+            const captured=captureFailedTest(
+                testFile,
+                result,
+                workspace.workspaceRoot,
+                Math.min(
+                    perFileFailureOutputBytes,
+                    MAX_TEST_FAILURE_AGGREGATE_BYTES-failureOutputBytes
+                )
+            );
+            failures.push(captured.failure);
+            failureOutputBytes+=captured.bytes;
+        }else if(result.code!==0){
+            throw new ArcaneError(
+                ERROR_CODES.operationFailed,
+                `The isolated test runner exited with code ${String(result.code)} for ${path.basename(testFile)}.`,
+                {details:{testFile,result}}
+            );
+        }
+    }
+    if(failures.length>0){
+        throw new ArcaneError(
+            ERROR_CODES.operationFailed,
+            failedTestMessage(failures),
+            {
+                details:{
+                    testFiles:failures.map(failure=>failure.testFile),
+                    failures,
+                    outputBytes:failureOutputBytes,
+                    outputLimitBytes:MAX_TEST_FAILURE_AGGREGATE_BYTES,
+                    outputTruncated:failures.some(
+                        failure=>failure.stdoutTruncated||failure.stderrTruncated
+                    )
+                }
+            }
+        );
+    }
     return {
         ...workspace,
         passed:true,
         skipped:false,
         testFiles:testFiles.map(file=>path.relative(workspace.workspaceRoot,file).replaceAll('\\','/')),
-        output:result.stdout.trim()
+        output:outputs.join('\n')
     };
 }
 
