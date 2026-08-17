@@ -1,19 +1,14 @@
 # Arcane OS SDK repository instructions
 
-- `main` is the production branch. Do not develop directly on it or move it to a
-  commit that has not already passed the full `dev` branch check at that exact
-  SHA.
-- `dev` is the long-lived development working and integration branch. Pull
-  requests explicitly target `dev`; promotion fast-forwards `main` to the exact
-  already-green `dev` commit without a merge or squash commit.
-- Full continuous integration belongs to pushes on `dev` and pull requests
-  targeting `dev`. Promotion, publication, and documentation workflows
-  authenticate and reuse that exact-SHA evidence instead of rerunning it.
-- Repository administrators must protect `main`, `dev`, the workflow files, and
-  the `github-pages` and `npm` environments before treating this policy as a
-  production or publication boundary. The source-controlled post-push verifier
-  reports an invalid main move but cannot undo or prevent a ref update accepted
-  by GitHub.
+- Until the first official SDK release, work directly on the single canonical
+  `main` branch; do not create or use a development or feature branch.
+- After the first official release, ongoing work moves to the long-lived `dev`
+  branch and `main` remains the canonical released line. Activate that workflow
+  only as part of the official-release change, with matching checks,
+  publication rules, documentation channels, and branch protections.
+- Current continuous integration, development publication, and documentation
+  workflows authenticate `main`. Reuse exact-SHA evidence instead of rerunning
+  an unchanged check.
 - Use plain JavaScript and web standards. Do not introduce TypeScript or TSX.
 - Keep the CLI and graphical clients on one shared headless toolchain contract.
 - Every potentially blocking CLI operation must acknowledge first, own its work, stream progress or heartbeat events, support safe cancellation, and surface a nonzero exit status on failure.

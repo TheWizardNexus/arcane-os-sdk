@@ -10,8 +10,6 @@
 <p align="center">
   <a href="https://thewizardnexus.github.io/arcane-os-sdk/"><strong>Visit the Arcane OS SDK site</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://thewizardnexus.github.io/arcane-os-sdk/dev/"><strong>Development documentation</strong></a>
-  &nbsp;·&nbsp;
   <a href="https://github.com/TheWizardNexus/arcane-os-sdk"><strong>Open the GitHub repository</strong></a>
 </p>
 
@@ -160,6 +158,24 @@ arcane repo status|pull|push
 All commands support `--output human|json|ndjson`. Machine modes keep stdout
 structured. Every operation emits or reports acceptance before filesystem,
 network, hashing, test, process, or service work begins.
+
+## SDK test sets
+
+The repository suite uses exact `vanilla-test` 2.1.0 through the isolated Arcane
+test runner. `npm test` runs four non-overlapping sets in order, and every test
+file belongs to exactly one set:
+
+```text
+npm run test:unit
+npm run test:functional
+npm run test:integration
+npm run test:regression
+```
+
+Use a named set while iterating or `npm test` for the complete suite. Large
+fixtures stay inside one isolated file process and expose smaller nested cases,
+so the report shows the individual behaviors without repeating setup, builds,
+package installation, or assertions.
 
 ## Current target support
 

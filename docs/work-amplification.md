@@ -14,6 +14,19 @@ selects one explicit compatible `--arcane-root` and one app descriptor that
 already declares that target; a target list never causes provider discovery or
 additional builds.
 
+The SDK repository test cardinality is:
+
+```text
+1 repository x 4 named sets x each assigned test file exactly once
+```
+
+Unit, functional, integration, and regression scripts form one validated,
+non-overlapping inventory. The complete command adds three lightweight set
+coordinator launches compared with the former single discovery pass, but it
+does not repeat a test file, assertion, package installation, provider scan,
+build, or fixture. Smaller nested `vanilla-test` cases reuse their parent
+file's already-owned setup and cleanup boundary.
+
 Shared/Core development has a separate integrated-only cardinality:
 
 ```text

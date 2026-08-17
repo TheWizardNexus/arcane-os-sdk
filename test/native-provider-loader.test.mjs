@@ -48,40 +48,46 @@ function memoryStream(){
 test('loader imports only the fixed allowlisted provider path for every native target',async t=>{
     const arcaneRoot=await temporaryDirectory(t,{prefix:'arcane-provider-loader-'});
     const canonicalArcaneRoot=await realpath(arcaneRoot);
-    assert.equal(ARCANE_NATIVE_PROVIDER_PATHS.portable,ARCANE_PORTABLE_PROVIDER_PATH);
-    assert.equal(ARCANE_NATIVE_PROVIDER_PATHS['linux-x64'],ARCANE_NATIVE_PROVIDER_PATHS['linux-arm64']);
+    await t.test('portable alias and Linux architectures share their fixed paths',()=>{
+        assert.equal(ARCANE_NATIVE_PROVIDER_PATHS.portable,ARCANE_PORTABLE_PROVIDER_PATH);
+        assert.equal(ARCANE_NATIVE_PROVIDER_PATHS['linux-x64'],ARCANE_NATIVE_PROVIDER_PATHS['linux-arm64']);
+    });
     for(const relativeProviderPath of new Set(Object.values(ARCANE_NATIVE_PROVIDER_PATHS))){
         const fixedProviderPath=path.join(canonicalArcaneRoot,...relativeProviderPath);
         await mkdir(path.dirname(fixedProviderPath),{recursive:true});
         await writeFile(fixedProviderPath,'export default {};\n','utf8');
     }
     for(const [target,relativeProviderPath] of Object.entries(ARCANE_NATIVE_PROVIDER_PATHS)){
-        const fixedProviderPath=path.join(canonicalArcaneRoot,...relativeProviderPath);
-        const expectedProvider=provider([target]);
-        let importedSpecifier;
-        const loaded=await loadArcaneNativeProvider({
-            arcaneRoot,
-            target,
-            importModule:async specifier=>{
-                importedSpecifier=specifier;
-                return {arcaneNativeBuilderProvider:expectedProvider};
-            }
+        await t.test(`${target} imports and binds only its allowlisted provider`,async()=>{
+            const fixedProviderPath=path.join(canonicalArcaneRoot,...relativeProviderPath);
+            const expectedProvider=provider([target]);
+            let importedSpecifier;
+            const loaded=await loadArcaneNativeProvider({
+                arcaneRoot,
+                target,
+                importModule:async specifier=>{
+                    importedSpecifier=specifier;
+                    return {arcaneNativeBuilderProvider:expectedProvider};
+                }
+            });
+            assert.equal(importedSpecifier,pathToFileURL(fixedProviderPath).href);
+            assert.notEqual(loaded.nativeBuilder,expectedProvider);
+            assert.equal(loaded.nativeBuilder.protocol,expectedProvider.protocol);
+            assert.equal(typeof loaded.nativeBuilder.build,'function');
+            assert.equal(loaded.nativeBuilder.providerGeneration,loaded.providerGeneration);
+            assert.match(loaded.providerGeneration.generationSha256,/^[a-f0-9]{64}$/u);
+            assert.equal(loaded.providerPath,fixedProviderPath);
+            assert.equal(loaded.toolchainRoot,canonicalArcaneRoot);
         });
-        assert.equal(importedSpecifier,pathToFileURL(fixedProviderPath).href);
-        assert.notEqual(loaded.nativeBuilder,expectedProvider);
-        assert.equal(loaded.nativeBuilder.protocol,expectedProvider.protocol);
-        assert.equal(typeof loaded.nativeBuilder.build,'function');
-        assert.equal(loaded.nativeBuilder.providerGeneration,loaded.providerGeneration);
-        assert.match(loaded.providerGeneration.generationSha256,/^[a-f0-9]{64}$/u);
-        assert.equal(loaded.providerPath,fixedProviderPath);
-        assert.equal(loaded.toolchainRoot,canonicalArcaneRoot);
     }
 
-    const portable=await loadArcanePortableProvider({
-        arcaneRoot,
-        importModule:async()=>({arcaneNativeBuilderProvider:provider()})
+    await t.test('portable convenience loader resolves the portable allowlist entry',async()=>{
+        const portable=await loadArcanePortableProvider({
+            arcaneRoot,
+            importModule:async()=>({arcaneNativeBuilderProvider:provider()})
+        });
+        assert.equal(portable.providerPath,path.join(canonicalArcaneRoot,...ARCANE_PORTABLE_PROVIDER_PATH));
     });
-    assert.equal(portable.providerPath,path.join(canonicalArcaneRoot,...ARCANE_PORTABLE_PROVIDER_PATH));
 });
 
 test('loader rejects an Arcane checkout reached through a linked ancestor',async t=>{
@@ -106,21 +112,25 @@ test('loader rejects an Arcane checkout reached through a linked ancestor',async
 
 test('loader fails honestly when the provider is absent or violates the protocol',async t=>{
     const arcaneRoot=await temporaryDirectory(t,{prefix:'arcane-provider-missing-'});
-    await assert.rejects(
-        ()=>loadArcanePortableProvider({arcaneRoot}),
-        error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/does not contain/u.test(error.message)
-    );
+    await t.test('absent provider reports target unavailable',async()=>{
+        await assert.rejects(
+            ()=>loadArcanePortableProvider({arcaneRoot}),
+            error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/does not contain/u.test(error.message)
+        );
+    });
 
     const providerPath=path.join(arcaneRoot,...ARCANE_PORTABLE_PROVIDER_PATH);
     await mkdir(path.dirname(providerPath),{recursive:true});
     await writeFile(providerPath,'export default {};\n','utf8');
-    await assert.rejects(
-        ()=>loadArcanePortableProvider({arcaneRoot,importModule:async()=>({default:{}})}),
-        error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/arcane-native-builder\/1/u.test(error.message)
-    );
+    await t.test('protocol-invalid provider reports target unavailable',async()=>{
+        await assert.rejects(
+            ()=>loadArcanePortableProvider({arcaneRoot,importModule:async()=>({default:{}})}),
+            error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/arcane-native-builder\/1/u.test(error.message)
+        );
+    });
 });
 
-test('CLI requires an explicit Arcane root whenever it pairs a native provider',async()=>{
+test('CLI requires an explicit Arcane root whenever it pairs a native provider',async t=>{
     const stdout=memoryStream();
     const stderr=memoryStream();
     let loadCalls=0;
@@ -138,41 +148,45 @@ test('CLI requires an explicit Arcane root whenever it pairs a native provider',
         };
     };
 
-    const missing=await runCli(
-        ['native-doctor','--target','portable','--output','ndjson'],
-        {stdout,stderr,execute,loadNativeProvider}
-    );
-    assert.equal(missing,1);
-    assert.match(stdout.read(),/requires --arcane-root/u);
-    assert.equal(loadCalls,0);
+    await t.test('missing Arcane root fails before provider loading',async()=>{
+        const missing=await runCli(
+            ['native-doctor','--target','portable','--output','ndjson'],
+            {stdout,stderr,execute,loadNativeProvider}
+        );
+        assert.equal(missing,1);
+        assert.match(stdout.read(),/requires --arcane-root/u);
+        assert.equal(loadCalls,0);
+    });
 
-    const secondStdout=memoryStream();
-    const secondStderr=memoryStream();
-    const result=await runCli(
-        [
-            'native-prepare','--target','portable',
-            '--arcane-root','C:\\Arcane',
-            '--output','ndjson'
-        ],
-        {
-            cwd:'C:\\workspace',
-            stdout:secondStdout,
-            stderr:secondStderr,
-            execute,
-            loadNativeProvider
-        }
-    );
-    assert.equal(result,0,secondStdout.read());
-    assert.equal(loadCalls,1);
-    assert.equal(execution.command,'native-prepare');
-    assert.equal(execution.options.target,'portable');
-    assert.equal(execution.options.targetRequest.format,'portable');
-    assert.equal(execution.options.targetRequest.signing.mode,'unsigned-local-test');
-    assert.equal(execution.options.nativeBuilder.protocol,'arcane-native-builder/1');
-    assert.match(execution.options.toolchainRoot,/Arcane$/u);
+    await t.test('explicit Arcane root pairs a canonical portable prepare request',async()=>{
+        const secondStdout=memoryStream();
+        const secondStderr=memoryStream();
+        const result=await runCli(
+            [
+                'native-prepare','--target','portable',
+                '--arcane-root','C:\\Arcane',
+                '--output','ndjson'
+            ],
+            {
+                cwd:'C:\\workspace',
+                stdout:secondStdout,
+                stderr:secondStderr,
+                execute,
+                loadNativeProvider
+            }
+        );
+        assert.equal(result,0,secondStdout.read());
+        assert.equal(loadCalls,1);
+        assert.equal(execution.command,'native-prepare');
+        assert.equal(execution.options.target,'portable');
+        assert.equal(execution.options.targetRequest.format,'portable');
+        assert.equal(execution.options.targetRequest.signing.mode,'unsigned-local-test');
+        assert.equal(execution.options.nativeBuilder.protocol,'arcane-native-builder/1');
+        assert.match(execution.options.toolchainRoot,/Arcane$/u);
+    });
 });
 
-test('CLI pairs Windows and Linux x64 builds with canonical truthful requests',async()=>{
+test('CLI pairs Windows and Linux x64 builds with canonical truthful requests',async t=>{
     const stdout=memoryStream();
     const stderr=memoryStream();
     const executions=[];
@@ -189,65 +203,81 @@ test('CLI pairs Windows and Linux x64 builds with canonical truthful requests',a
         return {target:options.target};
     };
 
-    const missingRoot=await runCli(
-        ['build','--target','linux-x64','--output','ndjson'],
-        {stdout,stderr,execute,loadNativeProvider}
-    );
-    assert.equal(missingRoot,1);
-    assert.match(stdout.read(),/requires --arcane-root/u);
-    assert.equal(loadCalls.length,0);
+    await t.test('native build without an Arcane root fails before provider loading',async()=>{
+        const missingRoot=await runCli(
+            ['build','--target','linux-x64','--output','ndjson'],
+            {stdout,stderr,execute,loadNativeProvider}
+        );
+        assert.equal(missingRoot,1);
+        assert.match(stdout.read(),/requires --arcane-root/u);
+        assert.equal(loadCalls.length,0);
+    });
 
     for(const expected of [
         {target:'windows-x64',platform:'windows',architecture:'x64',format:'exe'},
         {target:'linux-x64',platform:'linux',architecture:'x64',format:'deb'}
     ]){
-        const operationStdout=memoryStream();
-        assert.equal(await runCli(
-            [
-                'build','--target',expected.target,'--arcane-root','C:\\Arcane',
-                '--output','ndjson'
-            ],
-            {stdout:operationStdout,stderr:memoryStream(),execute,loadNativeProvider}
-        ),0,operationStdout.read());
-        const request=executions.at(-1).options.targetRequest;
-        assert.deepEqual(request,{
-            target:expected.target,
-            platform:expected.platform,
-            architecture:expected.architecture,
-            format:expected.format,
-            signing:{mode:'unsigned-local-test',profileId:null}
+        await t.test(`${expected.target} build uses its canonical request`,async()=>{
+            const operationStdout=memoryStream();
+            assert.equal(await runCli(
+                [
+                    'build','--target',expected.target,'--arcane-root','C:\\Arcane',
+                    '--output','ndjson'
+                ],
+                {stdout:operationStdout,stderr:memoryStream(),execute,loadNativeProvider}
+            ),0,operationStdout.read());
+            const request=executions.at(-1).options.targetRequest;
+            assert.deepEqual(request,{
+                target:expected.target,
+                platform:expected.platform,
+                architecture:expected.architecture,
+                format:expected.format,
+                signing:{mode:'unsigned-local-test',profileId:null}
+            });
+            assert.equal(executions.at(-1).options.nativeBuilder.protocol,'arcane-native-builder/1');
         });
-        assert.equal(executions.at(-1).options.nativeBuilder.protocol,'arcane-native-builder/1');
     }
-    assert.deepEqual(loadCalls.map(call=>call.target),['windows-x64','linux-x64']);
+    await t.test('provider loading follows the requested target order',()=>{
+        assert.deepEqual(loadCalls.map(call=>call.target),['windows-x64','linux-x64']);
+    });
 });
 
-test('canonical CLI target requests bind every implemented format and signing profile',()=>{
-    assert.deepEqual(createNativeTargetRequest({target:'windows-x64'}),{
-        target:'windows-x64',
-        platform:'windows',
-        architecture:'x64',
-        format:'exe',
-        signing:{mode:'unsigned-local-test',profileId:null}
+test('canonical CLI target requests bind every implemented format and signing profile',async t=>{
+    await t.test('Windows x64 binds unsigned EXE',()=>{
+        assert.deepEqual(createNativeTargetRequest({target:'windows-x64'}),{
+            target:'windows-x64',
+            platform:'windows',
+            architecture:'x64',
+            format:'exe',
+            signing:{mode:'unsigned-local-test',profileId:null}
+        });
     });
-    assert.deepEqual(createNativeTargetRequest({target:'linux-x64'}),{
-        target:'linux-x64',
-        platform:'linux',
-        architecture:'x64',
-        format:'deb',
-        signing:{mode:'unsigned-local-test',profileId:null}
+    await t.test('Linux x64 binds unsigned DEB',()=>{
+        assert.deepEqual(createNativeTargetRequest({target:'linux-x64'}),{
+            target:'linux-x64',
+            platform:'linux',
+            architecture:'x64',
+            format:'deb',
+            signing:{mode:'unsigned-local-test',profileId:null}
+        });
     });
-    assert.throws(
-        ()=>createNativeTargetRequest({target:'linux-x64',format:'appimage'}),
-        error=>error.code==='ARCANE_USAGE'&&/does not support --format/u.test(error.message)
-    );
-    assert.deepEqual(createNativeTargetRequest({target:'linux-arm64'}),{
-        target:'linux-arm64',platform:'linux',architecture:'arm64',format:'deb',
-        signing:{mode:'unsigned-local-test',profileId:null}
+    await t.test('Linux x64 rejects an AppImage override',()=>{
+        assert.throws(
+            ()=>createNativeTargetRequest({target:'linux-x64',format:'appimage'}),
+            error=>error.code==='ARCANE_USAGE'&&/does not support --format/u.test(error.message)
+        );
     });
-    assert.deepEqual(createNativeTargetRequest({target:'android-arm64'}),{
-        target:'android-arm64',platform:'android',architecture:'arm64',format:'apk',
-        signing:{mode:'development',profileId:'arcane-android-development-v1'}
+    await t.test('Linux arm64 binds unsigned DEB',()=>{
+        assert.deepEqual(createNativeTargetRequest({target:'linux-arm64'}),{
+            target:'linux-arm64',platform:'linux',architecture:'arm64',format:'deb',
+            signing:{mode:'unsigned-local-test',profileId:null}
+        });
+    });
+    await t.test('Android arm64 binds development APK signing',()=>{
+        assert.deepEqual(createNativeTargetRequest({target:'android-arm64'}),{
+            target:'android-arm64',platform:'android',architecture:'arm64',format:'apk',
+            signing:{mode:'development',profileId:'arcane-android-development-v1'}
+        });
     });
 });
 
@@ -275,91 +305,115 @@ test('portable run rejects before workspace, package, toolchain, build, verify, 
         stderr:memoryStream(),
         loadNativeProvider:async()=>({nativeBuilder,toolchainRoot:path.dirname(workspaceRoot)})
     });
-    assert.equal(exitCode,1,stdout.read());
-    assert.deepEqual(calls,[]);
     const events=parseNdjson(stdout.read());
-    assert.equal(events.at(-1).data.error.code,'ARCANE_NATIVE_RUN_UNSUPPORTED');
-    assert.equal(events.some(event=>event.type.startsWith('package.')),false);
-    assert.equal(events.some(event=>event.type.startsWith('native.')),false);
-    for(const relative of ['dist','build']){
-        await assert.rejects(lstat(path.join(workspaceRoot,relative)),error=>error?.code==='ENOENT');
-    }
+    await t.test('portable run reports unsupported without calling the provider',()=>{
+        assert.equal(exitCode,1,stdout.read());
+        assert.deepEqual(calls,[]);
+        assert.equal(events.at(-1).data.error.code,'ARCANE_NATIVE_RUN_UNSUPPORTED');
+    });
+    await t.test('portable run emits no package or native work events',()=>{
+        assert.equal(events.some(event=>event.type.startsWith('package.')),false);
+        assert.equal(events.some(event=>event.type.startsWith('native.')),false);
+    });
+    await t.test('portable run creates neither dist nor build output',async()=>{
+        for(const relative of ['dist','build']){
+            await assert.rejects(lstat(path.join(workspaceRoot,relative)),error=>error?.code==='ENOENT');
+        }
+    });
 });
 
-test('target pairing requires the provider to declare the selected target',async()=>{
-    await assert.rejects(
-        ()=>describeTargets({target:'windows-x64',nativeBuilder:provider()}),
-        error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/does not declare support/u.test(error.message)
-    );
-    const paired=await describeTargets({target:'portable',nativeBuilder:provider()});
-    assert.equal(paired.targets.find(item=>item.id==='portable').status,'available');
+test('target pairing requires the provider to declare the selected target',async t=>{
+    await t.test('undeclared target is unavailable',async()=>{
+        await assert.rejects(
+            ()=>describeTargets({target:'windows-x64',nativeBuilder:provider()}),
+            error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/does not declare support/u.test(error.message)
+        );
+    });
+    await t.test('declared target is available',async()=>{
+        const paired=await describeTargets({target:'portable',nativeBuilder:provider()});
+        assert.equal(paired.targets.find(item=>item.id==='portable').status,'available');
+    });
 });
 
-test('integrated portable builds require an explicit external output root',()=>{
+test('integrated portable builds require an explicit external output root',async t=>{
     const integratedRoot=path.resolve('integrated-arcane-workspace');
     const externalRoot=path.resolve('external-arcane-workspace');
-    assert.throws(
-        ()=>resolvePortableBuildOutputRoot({
-            workspaceMode:'integrated',
-            workspaceRoot:integratedRoot
-        }),
-        error=>error.code==='ARCANE_USAGE'&&/requires --output-root/u.test(error.message)
-    );
-    assert.equal(
-        resolvePortableBuildOutputRoot({
-            workspaceMode:'external',
-            workspaceRoot:externalRoot
-        }),
-        path.join(externalRoot,'build','portable')
-    );
-    assert.equal(
-        resolveNativeBuildOutputRoot({
-            target:'windows-x64',
-            workspaceMode:'external',
-            workspaceRoot:externalRoot
-        }),
-        path.join(externalRoot,'build','windows-x64')
-    );
+    await t.test('integrated portable output must be explicit',()=>{
+        assert.throws(
+            ()=>resolvePortableBuildOutputRoot({
+                workspaceMode:'integrated',
+                workspaceRoot:integratedRoot
+            }),
+            error=>error.code==='ARCANE_USAGE'&&/requires --output-root/u.test(error.message)
+        );
+    });
+    await t.test('external workspaces default portable and native output under build',()=>{
+        assert.equal(
+            resolvePortableBuildOutputRoot({
+                workspaceMode:'external',
+                workspaceRoot:externalRoot
+            }),
+            path.join(externalRoot,'build','portable')
+        );
+        assert.equal(
+            resolveNativeBuildOutputRoot({
+                target:'windows-x64',
+                workspaceMode:'external',
+                workspaceRoot:externalRoot
+            }),
+            path.join(externalRoot,'build','windows-x64')
+        );
+    });
     for(const relative of ['.git','apps','apps/unrelated-app','dist','node_modules']){
+        await t.test(`external native output rejects reserved ${relative} path`,()=>{
+            assert.throws(
+                ()=>resolveNativeBuildOutputRoot({
+                    target:'windows-x64',
+                    workspaceMode:'external',
+                    workspaceRoot:externalRoot,
+                    outputRoot:path.join(externalRoot,...relative.split('/'))
+                }),
+                error=>error.code==='ARCANE_POLICY_DENIED'&&/dedicated build\/ namespace/u.test(error.message),
+                relative
+            );
+        });
+    }
+    await t.test('integrated native output must be outside the Arcane checkout',()=>{
         assert.throws(
             ()=>resolveNativeBuildOutputRoot({
                 target:'windows-x64',
-                workspaceMode:'external',
-                workspaceRoot:externalRoot,
-                outputRoot:path.join(externalRoot,...relative.split('/'))
+                workspaceMode:'integrated',
+                workspaceRoot:integratedRoot,
+                outputRoot:path.join(integratedRoot,'build','windows-x64')
             }),
-            error=>error.code==='ARCANE_POLICY_DENIED'&&/dedicated build\/ namespace/u.test(error.message),
-            relative
+            error=>error.code==='ARCANE_POLICY_DENIED'&&/must be outside/u.test(error.message)
         );
-    }
-    assert.throws(
-        ()=>resolveNativeBuildOutputRoot({
+    });
+    await t.test('integrated portable toolchain accepts the same checkout',()=>{
+        assert.doesNotThrow(()=>assertIntegratedPortableToolchain({
+            workspaceMode:'integrated',
+            workspaceRoot:integratedRoot,
+            toolchainRoot:integratedRoot
+        }));
+    });
+    await t.test('integrated portable toolchain rejects another checkout',()=>{
+        assert.throws(
+            ()=>assertIntegratedPortableToolchain({
+                workspaceMode:'integrated',
+                workspaceRoot:integratedRoot,
+                toolchainRoot:path.resolve('different-arcane-workspace')
+            }),
+            error=>error.code==='ARCANE_POLICY_DENIED'&&/same Arcane OS checkout/u.test(error.message)
+        );
+    });
+    await t.test('integrated native toolchain accepts the same checkout',()=>{
+        assert.doesNotThrow(()=>assertIntegratedNativeToolchain({
             target:'windows-x64',
             workspaceMode:'integrated',
             workspaceRoot:integratedRoot,
-            outputRoot:path.join(integratedRoot,'build','windows-x64')
-        }),
-        error=>error.code==='ARCANE_POLICY_DENIED'&&/must be outside/u.test(error.message)
-    );
-    assert.doesNotThrow(()=>assertIntegratedPortableToolchain({
-        workspaceMode:'integrated',
-        workspaceRoot:integratedRoot,
-        toolchainRoot:integratedRoot
-    }));
-    assert.throws(
-        ()=>assertIntegratedPortableToolchain({
-            workspaceMode:'integrated',
-            workspaceRoot:integratedRoot,
-            toolchainRoot:path.resolve('different-arcane-workspace')
-        }),
-        error=>error.code==='ARCANE_POLICY_DENIED'&&/same Arcane OS checkout/u.test(error.message)
-    );
-    assert.doesNotThrow(()=>assertIntegratedNativeToolchain({
-        target:'windows-x64',
-        workspaceMode:'integrated',
-        workspaceRoot:integratedRoot,
-        toolchainRoot:integratedRoot
-    }));
+            toolchainRoot:integratedRoot
+        }));
+    });
 });
 
 test('portable compatibility accepts newer compatible Core and rejects missing requirements',async t=>{
@@ -395,38 +449,52 @@ test('portable compatibility accepts newer compatible Core and rejects missing r
         supportedCapabilities:['storage.read'],
         supportedMethods:['storage.list']
     };
-    assert.doesNotThrow(()=>assertPortableToolchainCompatibility({prepared,toolchainReceipt:compatible}));
-    assert.throws(
-        ()=>assertPortableToolchainCompatibility({prepared,toolchainReceipt:{...compatible,version:'0.8.10'}}),
-        error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/required minimum 0\.8\.12/u.test(error.message)
-    );
-    assert.throws(
-        ()=>assertPortableToolchainCompatibility({
-            prepared:{
-                ...prepared,
-                workspaceMode:'integrated',
-                runtimeReceipt:null
-            },
-            toolchainReceipt:{...compatible,version:'0.8.10'}
-        }),
-        error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/required minimum 0\.8\.12/u.test(error.message)
-    );
-    assert.throws(
-        ()=>assertPortableToolchainCompatibility({prepared,toolchainReceipt:{...compatible,protocolVersion:'arcane/2'}}),
-        error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/requires arcane\/1/u.test(error.message)
-    );
-    assert.throws(
-        ()=>assertPortableToolchainCompatibility({prepared,toolchainReceipt:{...compatible,features:[]}}),
-        error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/required features: app\.receipts/u.test(error.message)
-    );
-    assert.throws(
-        ()=>assertPortableToolchainCompatibility({prepared,toolchainReceipt:{...compatible,supportedCapabilities:[]}}),
-        error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/required capabilities: storage\.read/u.test(error.message)
-    );
-    assert.throws(
-        ()=>assertPortableToolchainCompatibility({prepared,toolchainReceipt:{...compatible,supportedMethods:[]}}),
-        error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/required methods: storage\.list/u.test(error.message)
-    );
+    await t.test('compatible Core satisfies every portable requirement',()=>{
+        assert.doesNotThrow(()=>assertPortableToolchainCompatibility({prepared,toolchainReceipt:compatible}));
+    });
+    await t.test('installed runtime raises the external workspace Core floor',()=>{
+        assert.throws(
+            ()=>assertPortableToolchainCompatibility({prepared,toolchainReceipt:{...compatible,version:'0.8.10'}}),
+            error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/required minimum 0\.8\.12/u.test(error.message)
+        );
+    });
+    await t.test('current Core raises the integrated workspace Core floor',()=>{
+        assert.throws(
+            ()=>assertPortableToolchainCompatibility({
+                prepared:{
+                    ...prepared,
+                    workspaceMode:'integrated',
+                    runtimeReceipt:null
+                },
+                toolchainReceipt:{...compatible,version:'0.8.10'}
+            }),
+            error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/required minimum 0\.8\.12/u.test(error.message)
+        );
+    });
+    await t.test('protocol mismatch is unavailable',()=>{
+        assert.throws(
+            ()=>assertPortableToolchainCompatibility({prepared,toolchainReceipt:{...compatible,protocolVersion:'arcane/2'}}),
+            error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/requires arcane\/1/u.test(error.message)
+        );
+    });
+    await t.test('missing feature is unavailable',()=>{
+        assert.throws(
+            ()=>assertPortableToolchainCompatibility({prepared,toolchainReceipt:{...compatible,features:[]}}),
+            error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/required features: app\.receipts/u.test(error.message)
+        );
+    });
+    await t.test('missing capability is unavailable',()=>{
+        assert.throws(
+            ()=>assertPortableToolchainCompatibility({prepared,toolchainReceipt:{...compatible,supportedCapabilities:[]}}),
+            error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/required capabilities: storage\.read/u.test(error.message)
+        );
+    });
+    await t.test('missing method is unavailable',()=>{
+        assert.throws(
+            ()=>assertPortableToolchainCompatibility({prepared,toolchainReceipt:{...compatible,supportedMethods:[]}}),
+            error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&/required methods: storage\.list/u.test(error.message)
+        );
+    });
 });
 
 test('paired CLI build packages one selected app and its exact dependency closure as verified readers',async t=>{
@@ -526,78 +594,89 @@ test('paired CLI build packages one selected app and its exact dependency closur
     const stdout=memoryStream();
     const stderr=memoryStream();
 
-    const exitCode=await runCli(
-        [
-            'build','--target','portable',
-            '--workspace',workspaceRoot,
-            '--app',appId,
-            '--arcane-root',toolchainRoot,
-            '--output','ndjson'
-        ],
-        {
-            stdout,
-            stderr,
-            loadNativeProvider:async()=>({
-                nativeBuilder,
-                toolchainRoot:canonicalToolchainRoot
-            })
-        }
-    );
+    await t.test('portable build succeeds without stderr',async()=>{
+        const exitCode=await runCli(
+            [
+                'build','--target','portable',
+                '--workspace',workspaceRoot,
+                '--app',appId,
+                '--arcane-root',toolchainRoot,
+                '--output','ndjson'
+            ],
+            {
+                stdout,
+                stderr,
+                loadNativeProvider:async()=>({
+                    nativeBuilder,
+                    toolchainRoot:canonicalToolchainRoot
+                })
+            }
+        );
+        assert.equal(exitCode,0,stdout.read());
+        assert.equal(stderr.read(),'');
+    });
+    await t.test('portable build uses canonical toolchain, app, and output roots',()=>{
+        assert.equal(capture.prepare.toolchainRoot,canonicalToolchainRoot);
+        assert.equal(capture.build.appDescriptor.id,appId);
+        assert.equal(capture.build.outputRoot,path.join(canonicalWorkspaceRoot,'build','portable'));
+    });
+    await t.test('portable build exposes exactly one verified dependency reader',()=>{
+        assert.equal(capture.build.dependencyReleases.length,1);
+        assert.equal(capture.build.dependencyReleases[0].appDescriptor.id,'portable-dependency');
+        assert.equal(Object.hasOwn(capture.build.dependencyReleases[0],'workspaceRoot'),false);
+        assert.equal(Object.hasOwn(capture.build.dependencyReleases[0],'appRoot'),false);
+        assert.ok(capture.dependencyBytes.length>0);
+    });
+    await t.test('portable build exposes release readers without source paths',()=>{
+        assert.equal(Object.hasOwn(capture.build,'workspaceRoot'),false);
+        assert.equal(Object.hasOwn(capture.build,'appRoot'),false);
+        assert.equal(typeof capture.build.readAppReleaseFile,'function');
+        assert.equal(capture.readBytes.length,capture.build.appReleaseReceipt.files
+            .find(item=>item.path===capture.readPath).bytes);
+        assert.equal(capture.verify.artifactReceipt,artifactReceipt);
+    });
+    await t.test('portable build reports one validation and the exact packaged closure',()=>{
+        const events=parseNdjson(stdout.read());
+        assert.equal(events.filter(event=>event.type==='workspace.validate.started').length,1);
+        assert.equal(events.filter(event=>event.type==='runtime.verify.started').length,0);
+        assert.equal(events.filter(event=>event.type==='shared-payload.snapshot.started').length,1);
+        assert.equal(events.filter(event=>event.type==='runtime.snapshot.verified').length,1);
+        assert.equal(events.filter(event=>event.type==='workspace.application.validated').length,2);
+        assert.equal(events.at(-1).data.result.artifactReceipt.kind,'synthetic-portable-artifact');
+        assert.equal(events.at(-1).data.result.release.receipt.kind,'arcane-app-release-verification');
+        assert.deepEqual(
+            events.at(-1).data.result.dependencyReleases.map(item=>item.appId),
+            ['portable-dependency']
+        );
+    });
 
-    assert.equal(exitCode,0,stdout.read());
-    assert.equal(stderr.read(),'');
-    assert.equal(capture.prepare.toolchainRoot,canonicalToolchainRoot);
-    assert.equal(capture.build.appDescriptor.id,appId);
-    assert.equal(capture.build.outputRoot,path.join(canonicalWorkspaceRoot,'build','portable'));
-    assert.equal(capture.build.dependencyReleases.length,1);
-    assert.equal(capture.build.dependencyReleases[0].appDescriptor.id,'portable-dependency');
-    assert.equal(Object.hasOwn(capture.build.dependencyReleases[0],'workspaceRoot'),false);
-    assert.equal(Object.hasOwn(capture.build.dependencyReleases[0],'appRoot'),false);
-    assert.ok(capture.dependencyBytes.length>0);
-    assert.equal(Object.hasOwn(capture.build,'workspaceRoot'),false);
-    assert.equal(Object.hasOwn(capture.build,'appRoot'),false);
-    assert.equal(typeof capture.build.readAppReleaseFile,'function');
-    assert.equal(capture.readBytes.length,capture.build.appReleaseReceipt.files
-        .find(item=>item.path===capture.readPath).bytes);
-    assert.equal(capture.verify.artifactReceipt,artifactReceipt);
-    const events=parseNdjson(stdout.read());
-    assert.equal(events.filter(event=>event.type==='workspace.validate.started').length,1);
-    assert.equal(events.filter(event=>event.type==='runtime.verify.started').length,0);
-    assert.equal(events.filter(event=>event.type==='shared-payload.snapshot.started').length,1);
-    assert.equal(events.filter(event=>event.type==='runtime.snapshot.verified').length,1);
-    assert.equal(events.filter(event=>event.type==='workspace.application.validated').length,2);
-    assert.equal(events.at(-1).data.result.artifactReceipt.kind,'synthetic-portable-artifact');
-    assert.equal(events.at(-1).data.result.release.receipt.kind,'arcane-app-release-verification');
-    assert.deepEqual(
-        events.at(-1).data.result.dependencyReleases.map(item=>item.appId),
-        ['portable-dependency']
-    );
-
-    const runStdout=memoryStream();
-    const priorPrepareRequest=capture.prepare;
-    const priorBuildForRun=capture.build;
-    const runExitCode=await runCli(
-        [
-            'run','--target','portable',
-            '--workspace',workspaceRoot,
-            '--app',appId,
-            '--arcane-root',toolchainRoot,
-            '--output','ndjson'
-        ],
-        {
-            stdout:runStdout,
-            stderr:memoryStream(),
-            loadNativeProvider:async()=>({nativeBuilder,toolchainRoot:canonicalToolchainRoot})
-        }
-    );
-    assert.equal(runExitCode,1,runStdout.read());
-    assert.equal(capture.prepare,priorPrepareRequest);
-    assert.equal(capture.build,priorBuildForRun);
-    assert.equal(capture.run,undefined);
-    const runEvents=parseNdjson(runStdout.read());
-    assert.equal(runEvents.at(-1).data.error.code,'ARCANE_NATIVE_RUN_UNSUPPORTED');
-    assert.equal(runEvents.some(event=>event.type.startsWith('package.')),false);
-    assert.equal(runEvents.some(event=>event.type.startsWith('native.build.')),false);
+    await t.test('portable run rejects before another prepare, package, build, or launch',async()=>{
+        const runStdout=memoryStream();
+        const priorPrepareRequest=capture.prepare;
+        const priorBuildForRun=capture.build;
+        const runExitCode=await runCli(
+            [
+                'run','--target','portable',
+                '--workspace',workspaceRoot,
+                '--app',appId,
+                '--arcane-root',toolchainRoot,
+                '--output','ndjson'
+            ],
+            {
+                stdout:runStdout,
+                stderr:memoryStream(),
+                loadNativeProvider:async()=>({nativeBuilder,toolchainRoot:canonicalToolchainRoot})
+            }
+        );
+        assert.equal(runExitCode,1,runStdout.read());
+        assert.equal(capture.prepare,priorPrepareRequest);
+        assert.equal(capture.build,priorBuildForRun);
+        assert.equal(capture.run,undefined);
+        const runEvents=parseNdjson(runStdout.read());
+        assert.equal(runEvents.at(-1).data.error.code,'ARCANE_NATIVE_RUN_UNSUPPORTED');
+        assert.equal(runEvents.some(event=>event.type.startsWith('package.')),false);
+        assert.equal(runEvents.some(event=>event.type.startsWith('native.build.')),false);
+    });
 
     const windowsRequest=createNativeTargetRequest({target:'windows-x64'});
     const committedArtifact=Object.freeze({kind:'synthetic-windows-artifact',generation:'commit'});
@@ -617,22 +696,24 @@ test('paired CLI build packages one selected app and its exact dependency closur
             return {running:true};
         }
     });
-    await assert.rejects(
-        runApplication({
-            target:'windows-x64',
-            targetRequest:windowsRequest,
-            workspaceRoot,
-            appId,
-            toolchainRoot:canonicalToolchainRoot,
-            nativeBuilder:commitFailureProvider,
-            onEvent:event=>{
-                if(event.type==='native.build.committed')throw commitEventFailure;
-            }
-        }),
-        error=>error===commitEventFailure
-    );
-    assert.equal(committedSignal.aborted,true);
-    assert.equal(launchedAfterCommitFailure,false);
+    await t.test('commit event failure aborts the build signal before launch',async()=>{
+        await assert.rejects(
+            runApplication({
+                target:'windows-x64',
+                targetRequest:windowsRequest,
+                workspaceRoot,
+                appId,
+                toolchainRoot:canonicalToolchainRoot,
+                nativeBuilder:commitFailureProvider,
+                onEvent:event=>{
+                    if(event.type==='native.build.committed')throw commitEventFailure;
+                }
+            }),
+            error=>error===commitEventFailure
+        );
+        assert.equal(committedSignal.aborted,true);
+        assert.equal(launchedAfterCommitFailure,false);
+    });
 
     const launchedArtifact=Object.freeze({kind:'synthetic-windows-artifact',generation:'launch'});
     const launchEventFailure=new Error('The native run event sink rejected process delivery.');
@@ -653,24 +734,27 @@ test('paired CLI build packages one selected app and its exact dependency closur
             }
         }
     });
-    await assert.rejects(
-        runApplication({
-            target:'windows-x64',
-            targetRequest:windowsRequest,
-            workspaceRoot,
-            appId,
-            toolchainRoot:canonicalToolchainRoot,
-            nativeBuilder:launchFailureProvider,
-            onEvent:event=>{
-                if(event.type==='native.process.started')throw launchEventFailure;
-            }
-        }),
-        error=>error===launchEventFailure
-    );
-    assert.equal(launched,true);
-    assert.equal(launchCleaned,true);
-    assert.equal(launchSignalAborted,true);
+    await t.test('process event failure aborts and cleans the launched process',async()=>{
+        await assert.rejects(
+            runApplication({
+                target:'windows-x64',
+                targetRequest:windowsRequest,
+                workspaceRoot,
+                appId,
+                toolchainRoot:canonicalToolchainRoot,
+                nativeBuilder:launchFailureProvider,
+                onEvent:event=>{
+                    if(event.type==='native.process.started')throw launchEventFailure;
+                }
+            }),
+            error=>error===launchEventFailure
+        );
+        assert.equal(launched,true);
+        assert.equal(launchCleaned,true);
+        assert.equal(launchSignalAborted,true);
+    });
 
+    await t.test('authenticated toolchain downgrade is rejected before another build',async()=>{
     const mismatchStdout=memoryStream();
     const spoofedReceipt=Object.freeze({...toolchainReceipt,version:'0.8.12'});
     const mismatchedProvider=Object.freeze({
@@ -704,7 +788,9 @@ test('paired CLI build packages one selected app and its exact dependency closur
     const mismatchEvents=parseNdjson(mismatchStdout.read());
     assert.equal(mismatchEvents.at(-1).data.error.code,'ARCANE_TARGET_UNAVAILABLE');
     assert.match(mismatchEvents.at(-1).data.error.message,/0\.8\.10.*required minimum 0\.8\.12/u);
+    });
 
+    await t.test('output overlapping the toolchain is rejected',async()=>{
     const rejectedStdout=memoryStream();
     const rejected=await runCli(
         [
@@ -728,7 +814,9 @@ test('paired CLI build packages one selected app and its exact dependency closur
     const rejectedEvents=parseNdjson(rejectedStdout.read());
     assert.equal(rejectedEvents.at(-1).data.error.code,'ARCANE_POLICY_DENIED');
     assert.match(rejectedEvents.at(-1).data.error.message,/must not overlap/u);
+    });
 
+    await t.test('linked output is rejected before package or prepare work',async()=>{
     const linkedOutput=path.join(parent,'linked-output');
     await symlink(
         path.join(workspaceRoot,'apps'),
@@ -751,4 +839,5 @@ test('paired CLI build packages one selected app and its exact dependency closur
     assert.equal(linkedEvents.some(event=>event.type.startsWith('package.')),false);
     assert.equal(linkedEvents.at(-1).data.error.code,'ARCANE_POLICY_DENIED');
     assert.match(linkedEvents.at(-1).data.error.message,/linked or non-directory ancestor/u);
+    });
 });

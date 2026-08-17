@@ -1,49 +1,26 @@
-# SDK channels and publication
+# Development publication
 
-## Branch authority
+## Current branch stage
 
-The SDK has two long-lived channels:
+Until the first official SDK release, `main` is the single canonical working,
+integration, publication, and documentation branch. Pull requests and pushes
+target `main`, and the complete Node/platform matrix runs there. Do not use a
+separate development branch during this prerelease stage.
 
-| Branch | Channel | Authority |
-|---|---|---|
-| `dev` | Development | Ordinary implementation, pull-request integration, full CI, the npm `dev` tag, and development documentation. |
-| `main` | Production | The exact source revision selected for production and the production documentation root. |
-
-GitHub's repository default remains `main`, so contributors must explicitly
-select `dev` as the pull-request base. The full Node/platform matrix runs only
-for a push to `dev` or a pull request whose base branch is `dev`. A commit is
-promoted by fast-forwarding `main` to the exact commit SHA that already passed
-the `dev` push workflow. Do not squash, create a merge commit, amend, or rebuild
-the candidate during promotion: any of those operations creates a different SHA
-and the promotion verification fails closed.
-
-The `Promote main` workflow is a post-push verifier; it cannot prevent or undo a
-Git ref update that GitHub already accepted. It does not rerun the full matrix.
-It has only read
-access to Actions evidence and asks GitHub for a successful `Check` push run
-whose branch is `dev` and whose `head_sha` is exactly the new `main` SHA. Its
-successful result is the production source-channel receipt used by Pages.
-
-Administrative protection is a prerequisite, not optional follow-up work.
-Protect `dev` with the four `Check` matrix jobs. Protect `main` with those same
-exact-SHA check contexts, linear/fast-forward history, and a restricted push
-allowlist; do not require a merge method that manufactures a new commit. Protect
-the workflow files and restrict both the `github-pages` and `npm` environments
-to their intended branch and reviewer policies. Do not enable npm trusted
-publishing until those rules and workflow ownership are verified. Those GitHub
-rules are external authority and are not created by the repository files. Until
-an administrator applies and verifies them, `main` is only labeled as the
-production channel: it is not an enforced production boundary, and Pages or
-npm authority is not secure against a malicious or accidental direct update.
+After the first official release, ordinary work will move to a long-lived
+`dev` branch while `main` remains the canonical released line. That transition
+must be made as one explicit release change that updates branch protections,
+checks, trusted publication rules, documentation channels, and contributor
+instructions together. The future branch name alone grants no authority.
 
 ## Development npm publication
 
 The current unpublished npm version is `0.1.0-dev.2` and `publishConfig.tag` is
 `dev`, so an accidental publication does not become the default `latest`
-release. `publish-dev.yml` can run only when manually dispatched from `dev` in
+release. `publish-dev.yml` can run only when manually dispatched from `main` in
 `TheWizardNexus/arcane-os-sdk`. Before npm receives OIDC authority, the workflow
-authenticates a successful `Check` push run for that exact SHA. It reuses that
-evidence and does not install dependencies or rerun the same suite.
+authenticates a successful `Check` push run for that exact `main` SHA. It reuses
+that evidence instead of installing dependencies and rerunning the same suite.
 
 The unscoped package installs both `arcane` and `arcane-os`. The short command
 is the documented default; `arcane-os` is the collision-safe fallback. npm
@@ -61,72 +38,44 @@ as `arcane-os@0.1.0-dev.2` and verifies the locked runtime. A local directory
 Before the first development publish:
 
 1. Run `npm ci`, `npm run check`, and `npm run pack:inspect` from a clean clone
-   on `dev`, then push that unchanged commit and wait for `Check` to pass.
+   on `main`, push that unchanged commit, and wait for `Check` to pass.
 2. Review the tarball allowlist and all license notices.
 3. Ensure the Arcane OS monorepo package is marked private so it cannot publish
    the same npm name accidentally.
 4. Configure npm trusted publishing for the exact `publish-dev.yml` workflow and
-   its `npm` environment, then dispatch that workflow from the green `dev` SHA.
-5. Verify `dev` is the only dist-tag and add a second appropriate package owner.
+   its `npm` environment, then dispatch that workflow from the green `main` SHA.
+5. Verify `dev` is the only npm dist-tag and add a second appropriate package
+   owner. The npm tag is independent of the future Git development branch.
 
 Generated app CI uses `npm ci --ignore-scripts`, so its lock must exist and its
 dependency source must be reachable by the runner. A sibling local tarball is a
 workstation workflow, not a portable GitHub dependency source; switch to the
 exact registry release (or deliberately vendor the tarball) before remote CI.
 
-Stable versioning, the npm `latest` tag, and production npm publication remain a
-separate explicit release decision. `main` is the production source channel; it
-does not silently convert a `-dev` package into a stable npm release.
+Stable versioning, the npm `latest` tag, and official npm publication remain a
+separate explicit release decision. Current `main` development does not
+silently convert a `-dev` package into an official release.
 
-## Documentation channels
+## Documentation publication
 
-GitHub Pages publishes one atomic artifact containing both documentation views:
+GitHub Pages publishes the static `site/` tree from the newest successful
+`main` push `Check`. A completed Check triggers the Pages job, which resolves
+the newest successful receipt at deployment time so out-of-order completion
+cannot roll the site backward. It checks out that authenticated SHA without
+persistent credentials, validates the static tree, and uploads only `site/`.
+It does not rerun the SDK test suite or execute repository build code.
 
-- `https://thewizardnexus.github.io/arcane-os-sdk/` contains the `site/` tree
-  from the latest successful `main` promotion.
-- `https://thewizardnexus.github.io/arcane-os-sdk/dev/` contains the `site/`
-  tree from the latest successful `dev` push check.
-
-The development copy is generated with a persistent visible “Development
-documentation” banner, a `/dev/` canonical URL, `noindex, nofollow`, and SDK
-repository documentation/license links rewritten from `blob/main` to
-`blob/dev`. The source `site/` tree is not rewritten. A successful `dev` check
-requests a Pages refresh but cannot select new production bytes. A successful
-`main` promotion verification requests a production refresh. Every refresh
-resolves both channels from the latest successful workflow receipts so
-out-of-order workflow completion cannot roll either channel backward.
-
-The Pages assembly job can read Actions evidence and repository content but
-cannot deploy. It sparsely checks out the authenticated production site and the
-authenticated development site by exact SHA and selects the same Node 24 line
-covered by the development matrix. Crucially, the channel builder is executed
-from the production checkout, so development code cannot decide the production
-root layout. The builder rejects links, special entries, overlapping
-input/output paths, pre-existing output, and production-owned reserved paths;
-it writes an atomic artifact and records both SHAs in
-`.arcane-pages-channels.json`.
-
-The separate deployment job receives only `pages: write` and `id-token: write`.
-It checks out no branch and runs no repository script. GitHub's `github-pages`
-environment remains the final deployment authority.
+The deployment job holds only the read, Pages, and OIDC permissions required by
+that single checked artifact. The `github-pages` environment remains the final
+deployment authority. A separate `/dev/` documentation channel is deferred to
+the same explicit post-release branch transition described above.
 
 ## Work-amplification record
 
-The channel cardinality is two source sites and one Pages artifact. Each exact
-`dev` SHA has one full CI matrix (four jobs: two Node versions by two operating
-systems). Promotion and development publication add one small Actions-receipt
-lookup each and reuse that matrix result. Pages adds two receipt lookups, at
-most two sparse checkouts, one copy of each selected site, one development-only
-metadata/banner transformation, one invariant Node 24 setup, one artifact
-upload, and one deployment.
-
-When both channels select the same SHA, Pages performs one sparse checkout and
-uses its immutable bytes for both placements. For the current site, the measured
-copy boundary is 8 files and 1,941,299 bytes per channel; the representative
-two-channel cold path is therefore 16 source-file reads and 3,882,598 bytes
-before generated metadata and artifact compression. The local channel builder
-completed that work in 19 ms on the development workstation; hosted checkout,
-upload, and deployment time is network-bound and remains visible in Actions.
-Repetition of the two placements is justified because `/` and `/dev/` are
-distinct published locations and the development placement has deliberately
-different bytes.
+The prerelease branch cardinality is one checked `main` SHA, one static site,
+and one Pages artifact. The four-job Check matrix (two Node versions by two
+operating systems) owns validation for that SHA. Development publication and
+Pages each perform one small exact-SHA evidence lookup or authentication step
+and reuse the successful matrix result. Pages performs one checkout, one static
+tree validation, one artifact upload, and one deployment; it does not create a
+second site placement or run a second SDK check.
