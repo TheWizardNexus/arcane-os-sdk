@@ -3,7 +3,7 @@ import {fileURLToPath} from 'node:url';
 
 export const SDK_NAME='arcane-os';
 export const CLI_NAME='arcane';
-export const SDK_VERSION='0.1.0-dev.2';
+export const SDK_VERSION='0.1.0-dev.3';
 export const ARCANE_PROTOCOL='arcane/1';
 export const CLI_EVENT_PROTOCOL='arcane-cli-events/1';
 export const TARGET_ADAPTER_PROTOCOL='arcane-target-adapter/1';

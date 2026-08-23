@@ -51,7 +51,7 @@ format, or signing loop and does not produce app output.
 - Scaffold: approximately 15-25 files, less than 100 KiB, target under one
   second before an optional dependency installation.
 - Shared browser payload: 152 files / 3,277,152 bytes, comprising the exact
-  149-file / 3,238,186-byte dev.2 runtime receipt plus three SDK licensing files
+  149-file / 3,238,186-byte dev.3 runtime receipt plus three SDK licensing files
   / 38,966 bytes, verified once per exact SDK installation state.
 - Small browser package: app bytes plus the shared runtime, copied and inventoried
   once into an atomic staging directory.

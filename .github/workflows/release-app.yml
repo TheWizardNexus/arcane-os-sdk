@@ -1,0 +1,481 @@
+name: Build Arcane application release
+
+on:
+  workflow_call:
+    inputs:
+      app-id:
+        description: One exact Arcane application id from the caller repository.
+        required: true
+        type: string
+      workspace:
+        description: Caller-repository workspace containing the locked SDK and app.
+        required: false
+        default: .
+        type: string
+      artifact-name:
+        description: GitHub Actions artifact name for the verified release bundle and metadata.
+        required: false
+        default: arcane-app-release
+        type: string
+      attest:
+        description: Request GitHub build provenance; unsupported repository plans fail honestly.
+        required: false
+        default: false
+        type: boolean
+    outputs:
+      bundle-sha256:
+        description: SHA-256 of the exact uploaded Arcane application release bundle.
+        value: ${{ jobs.verify.outputs.bundle-sha256 }}
+      bundle-bytes:
+        description: Exact compressed byte length of the uploaded release bundle.
+        value: ${{ jobs.verify.outputs.bundle-bytes }}
+      descriptor-sha256:
+        description: Canonical authored descriptor SHA-256.
+        value: ${{ jobs.verify.outputs.descriptor-sha256 }}
+      descriptor-file-sha256:
+        description: Canonical authored descriptor file-byte SHA-256.
+        value: ${{ jobs.verify.outputs.descriptor-file-sha256 }}
+      descriptor-bytes:
+        description: Exact canonical authored descriptor file length.
+        value: ${{ jobs.verify.outputs.descriptor-bytes }}
+      package-sha256:
+        description: Authored descriptor package-projection SHA-256.
+        value: ${{ jobs.verify.outputs.package-sha256 }}
+      release-manifest-sha256:
+        description: Embedded release-manifest SHA-256.
+        value: ${{ jobs.verify.outputs.release-manifest-sha256 }}
+      release-policy-sha256:
+        description: Authored package-policy SHA-256.
+        value: ${{ jobs.verify.outputs.release-policy-sha256 }}
+      release-content-sha256:
+        description: Exact payload inventory SHA-256.
+        value: ${{ jobs.verify.outputs.release-content-sha256 }}
+      file-count:
+        description: Exact payload file count.
+        value: ${{ jobs.verify.outputs.file-count }}
+      total-bytes:
+        description: Exact payload byte count.
+        value: ${{ jobs.verify.outputs.total-bytes }}
+
+permissions: {}
+
+jobs:
+  build:
+    name: Build one verified app bundle without publication authority
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - name: Check out the exact caller revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Use Node.js 24
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Validate the caller-owned workspace boundary
+        shell: bash
+        env:
+          WORKSPACE: ${{ inputs.workspace }}
+        run: |
+          set -euo pipefail
+          repository="$(realpath -- "$GITHUB_WORKSPACE")"
+          selected="$(realpath -- "$WORKSPACE")"
+          case "$selected/" in
+            "$repository/"|"$repository/"*) ;;
+            *) echo "Workspace must stay inside the checked-out caller repository." >&2; exit 1 ;;
+          esac
+          test -f "$selected/package.json"
+          test -f "$selected/package-lock.json"
+      - name: Install the caller's exact dependency lock
+        working-directory: ${{ inputs.workspace }}
+        run: npm ci --ignore-scripts
+      - name: Require the release-bundle SDK generation
+        shell: bash
+        working-directory: ${{ inputs.workspace }}
+        run: |
+          node --input-type=module <<'NODE'
+          import packageDocument from 'arcane-os/package.json' with {type:'json'};
+          if(packageDocument.version !== '0.1.0-dev.3'){
+            throw new Error(`Expected arcane-os@0.1.0-dev.3, received ${packageDocument.version}.`);
+          }
+          NODE
+      - name: Check and package the selected application
+        shell: bash
+        working-directory: ${{ inputs.workspace }}
+        env:
+          APP_ID: ${{ inputs.app-id }}
+        run: |
+          set -euo pipefail
+          npm exec -- arcane check --workspace . --app "$APP_ID" --output ndjson
+          npm exec -- arcane package --workspace . --app "$APP_ID" --output ndjson
+      - name: Create the deterministic bundle
+        shell: bash
+        working-directory: ${{ inputs.workspace }}
+        env:
+          APP_ID: ${{ inputs.app-id }}
+          ARTIFACT_PATH: ${{ github.workspace }}/release/arcane-app-release.arcane-app.tar.gz
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/release"
+          npm exec -- arcane bundle \
+            --workspace . \
+            --app "$APP_ID" \
+            --artifact "$ARTIFACT_PATH" \
+            --output ndjson
+      - name: Verify the exact bytes selected for upload
+        shell: bash
+        working-directory: ${{ inputs.workspace }}
+        env:
+          APP_ID: ${{ inputs.app-id }}
+          ARTIFACT_PATH: ${{ github.workspace }}/release/arcane-app-release.arcane-app.tar.gz
+          METADATA_PATH: ${{ github.workspace }}/release/ARCANE_APP_BUNDLE_METADATA.json
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {writeFile} from 'node:fs/promises';
+          import {verifyAppReleaseBundle} from 'arcane-os/release-bundle';
+
+          const receipt=await verifyAppReleaseBundle({bundlePath:process.env.ARTIFACT_PATH});
+          if(receipt.app.id!==process.env.APP_ID){
+            throw new Error('The selected app id does not match the verified bundle.');
+          }
+          const metadata={
+            schemaVersion:1,
+            kind:'arcane-app-release-bundle-metadata',
+            sdk:receipt.sdk,
+            app:receipt.app,
+            artifact:receipt.consistency.artifact,
+            descriptor:receipt.consistency.descriptor,
+            release:receipt.consistency.release
+          };
+          await writeFile(process.env.METADATA_PATH,`${JSON.stringify(metadata,null,2)}\n`,{
+            encoding:'utf8',
+            flag:'wx'
+          });
+          NODE
+      - name: Upload the exact verified bundle and metadata
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: |
+            release/arcane-app-release.arcane-app.tar.gz
+            release/ARCANE_APP_BUNDLE_METADATA.json
+          if-no-files-found: error
+          retention-days: 30
+
+  verify:
+    name: Reverify the immutable uploaded artifact without caller code
+    if: always() && needs.build.result == 'success'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      bundle-sha256: ${{ steps.identity.outputs.bundle-sha256 }}
+      bundle-bytes: ${{ steps.identity.outputs.bundle-bytes }}
+      descriptor-sha256: ${{ steps.identity.outputs.descriptor-sha256 }}
+      descriptor-file-sha256: ${{ steps.identity.outputs.descriptor-file-sha256 }}
+      descriptor-bytes: ${{ steps.identity.outputs.descriptor-bytes }}
+      package-sha256: ${{ steps.identity.outputs.package-sha256 }}
+      release-manifest-sha256: ${{ steps.identity.outputs.release-manifest-sha256 }}
+      release-policy-sha256: ${{ steps.identity.outputs.release-policy-sha256 }}
+      release-content-sha256: ${{ steps.identity.outputs.release-content-sha256 }}
+      file-count: ${{ steps.identity.outputs.file-count }}
+      total-bytes: ${{ steps.identity.outputs.total-bytes }}
+    steps:
+      - name: Download the exact uploaded artifact by immutable id
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          path: verified-release
+          merge-multiple: true
+      - name: Check out only the immutable reusable-workflow SDK revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: trusted-sdk
+          persist-credentials: false
+      - name: Use supported Node.js 24
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Reverify uploaded bytes and publish their complete identity
+        id: identity
+        shell: bash
+        env:
+          ARTIFACT_PATH: ${{ github.workspace }}/verified-release/arcane-app-release.arcane-app.tar.gz
+          METADATA_PATH: ${{ github.workspace }}/verified-release/ARCANE_APP_BUNDLE_METADATA.json
+          TRUSTED_SDK_ROOT: ${{ github.workspace }}/trusted-sdk
+          EXPECTED_APP_ID: ${{ inputs.app-id }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {constants as fsConstants} from 'node:fs';
+          import {appendFile,lstat,open} from 'node:fs/promises';
+          import path from 'node:path';
+          import {pathToFileURL} from 'node:url';
+
+          const readOnlyNoFollow=fsConstants.O_RDONLY|(fsConstants.O_NOFOLLOW??0);
+          const identity=info=>({
+            device:String(info.dev),
+            inode:String(info.ino),
+            bytes:Number(info.size),
+            modifiedNanoseconds:String(info.mtimeNs),
+            changedNanoseconds:String(info.ctimeNs),
+            links:String(info.nlink)
+          });
+          const matches=(info,expected)=>
+            String(info.dev)===expected.device
+              &&String(info.ino)===expected.inode
+              &&Number(info.size)===expected.bytes
+              &&String(info.mtimeNs)===expected.modifiedNanoseconds
+              &&String(info.ctimeNs)===expected.changedNanoseconds
+              &&String(info.nlink)===expected.links;
+          async function readExactMetadata(filePath){
+            const before=await lstat(filePath,{bigint:true});
+            if(before.isSymbolicLink()||!before.isFile()||before.nlink!==1n
+              ||before.size<1n||before.size>65536n){
+              throw new Error('Downloaded bundle metadata must be a 1-65536 byte single-link regular file.');
+            }
+            const expected=identity(before);
+            const handle=await open(filePath,readOnlyNoFollow);
+            try{
+              const opened=await handle.stat({bigint:true});
+              if(!opened.isFile()||opened.nlink!==1n||!matches(opened,expected)){
+                throw new Error('Downloaded bundle metadata changed while it was opened.');
+              }
+              const bytes=Buffer.alloc(expected.bytes);
+              let position=0;
+              while(position<bytes.length){
+                const {bytesRead}=await handle.read(bytes,position,bytes.length-position,position);
+                if(bytesRead===0)throw new Error('Downloaded bundle metadata ended early.');
+                position+=bytesRead;
+              }
+              const probe=Buffer.alloc(1);
+              if((await handle.read(probe,0,1,expected.bytes)).bytesRead!==0){
+                throw new Error('Downloaded bundle metadata grew while it was read.');
+              }
+              const after=await handle.stat({bigint:true});
+              const current=await lstat(filePath,{bigint:true});
+              if(after.nlink!==1n||current.nlink!==1n||current.isSymbolicLink()
+                ||!current.isFile()||!matches(after,expected)||!matches(current,expected)){
+                throw new Error('Downloaded bundle metadata identity changed while it was read.');
+              }
+              return bytes;
+            }finally{
+              await handle.close();
+            }
+          }
+
+          const sdkModule=pathToFileURL(path.join(
+            process.env.TRUSTED_SDK_ROOT,
+            'src','release-bundle.mjs'
+          )).href;
+          const {verifyAppReleaseBundle}=await import(sdkModule);
+          const receipt=await verifyAppReleaseBundle({bundlePath:process.env.ARTIFACT_PATH});
+          if(receipt.app.id!==process.env.EXPECTED_APP_ID){
+            throw new Error('The uploaded bundle does not contain the selected app id.');
+          }
+          const metadataBytes=await readExactMetadata(process.env.METADATA_PATH);
+          const metadata=JSON.parse(metadataBytes.toString('utf8'));
+          if(!metadataBytes.equals(Buffer.from(`${JSON.stringify(metadata,null,2)}\n`))){
+            throw new Error('Downloaded bundle metadata is not canonical JSON.');
+          }
+          const expectedMetadata={
+            schemaVersion:1,
+            kind:'arcane-app-release-bundle-metadata',
+            sdk:receipt.sdk,
+            app:receipt.app,
+            artifact:receipt.consistency.artifact,
+            descriptor:receipt.consistency.descriptor,
+            release:receipt.consistency.release
+          };
+          if(JSON.stringify(metadata)!==JSON.stringify(expectedMetadata)){
+            throw new Error('Downloaded metadata does not match the independently verified bundle.');
+          }
+          const outputs={
+            'bundle-sha256':metadata.artifact.sha256,
+            'bundle-bytes':metadata.artifact.bytes,
+            'descriptor-sha256':metadata.descriptor.canonicalSha256,
+            'descriptor-file-sha256':metadata.descriptor.fileSha256,
+            'descriptor-bytes':metadata.descriptor.bytes,
+            'package-sha256':metadata.descriptor.packageSha256,
+            'release-manifest-sha256':metadata.release.manifestSha256,
+            'release-policy-sha256':metadata.release.policySha256,
+            'release-content-sha256':metadata.release.contentSha256,
+            'file-count':metadata.release.fileCount,
+            'total-bytes':metadata.release.totalBytes
+          };
+          await appendFile(
+            process.env.GITHUB_OUTPUT,
+            `${Object.entries(outputs).map(([key,value])=>`${key}=${value}`).join('\n')}\n`,
+            'utf8'
+          );
+          NODE
+
+  attest:
+    name: Attest verified bytes without executing caller code
+    if: inputs.attest && needs.verify.result == 'success'
+    needs: [build, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+    steps:
+      - name: Download the same immutable artifact verified by the prior job
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          path: verified-release
+          merge-multiple: true
+      - name: Check out only the immutable reusable-workflow SDK revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: trusted-sdk
+          persist-credentials: false
+      - name: Use supported Node.js 24
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Reverify downloaded bytes and complete metadata
+        shell: bash
+        env:
+          ARTIFACT_PATH: ${{ github.workspace }}/verified-release/arcane-app-release.arcane-app.tar.gz
+          METADATA_PATH: ${{ github.workspace }}/verified-release/ARCANE_APP_BUNDLE_METADATA.json
+          TRUSTED_SDK_ROOT: ${{ github.workspace }}/trusted-sdk
+          EXPECTED_APP_ID: ${{ inputs.app-id }}
+          EXPECTED_BUNDLE_SHA256: ${{ needs.verify.outputs.bundle-sha256 }}
+          EXPECTED_BUNDLE_BYTES: ${{ needs.verify.outputs.bundle-bytes }}
+          EXPECTED_DESCRIPTOR_SHA256: ${{ needs.verify.outputs.descriptor-sha256 }}
+          EXPECTED_DESCRIPTOR_FILE_SHA256: ${{ needs.verify.outputs.descriptor-file-sha256 }}
+          EXPECTED_DESCRIPTOR_BYTES: ${{ needs.verify.outputs.descriptor-bytes }}
+          EXPECTED_PACKAGE_SHA256: ${{ needs.verify.outputs.package-sha256 }}
+          EXPECTED_RELEASE_MANIFEST_SHA256: ${{ needs.verify.outputs.release-manifest-sha256 }}
+          EXPECTED_RELEASE_POLICY_SHA256: ${{ needs.verify.outputs.release-policy-sha256 }}
+          EXPECTED_RELEASE_CONTENT_SHA256: ${{ needs.verify.outputs.release-content-sha256 }}
+          EXPECTED_FILE_COUNT: ${{ needs.verify.outputs.file-count }}
+          EXPECTED_TOTAL_BYTES: ${{ needs.verify.outputs.total-bytes }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {constants as fsConstants} from 'node:fs';
+          import {lstat,open} from 'node:fs/promises';
+          import path from 'node:path';
+          import {pathToFileURL} from 'node:url';
+
+          const readOnlyNoFollow=fsConstants.O_RDONLY|(fsConstants.O_NOFOLLOW??0);
+          const identity=info=>({
+            device:String(info.dev),
+            inode:String(info.ino),
+            bytes:Number(info.size),
+            modifiedNanoseconds:String(info.mtimeNs),
+            changedNanoseconds:String(info.ctimeNs),
+            links:String(info.nlink)
+          });
+          const matches=(info,expected)=>
+            String(info.dev)===expected.device
+              &&String(info.ino)===expected.inode
+              &&Number(info.size)===expected.bytes
+              &&String(info.mtimeNs)===expected.modifiedNanoseconds
+              &&String(info.ctimeNs)===expected.changedNanoseconds
+              &&String(info.nlink)===expected.links;
+          async function readExactMetadata(filePath){
+            const before=await lstat(filePath,{bigint:true});
+            if(before.isSymbolicLink()||!before.isFile()||before.nlink!==1n
+              ||before.size<1n||before.size>65536n){
+              throw new Error('Downloaded bundle metadata must be a 1-65536 byte single-link regular file.');
+            }
+            const expected=identity(before);
+            const handle=await open(filePath,readOnlyNoFollow);
+            try{
+              const opened=await handle.stat({bigint:true});
+              if(!opened.isFile()||opened.nlink!==1n||!matches(opened,expected)){
+                throw new Error('Downloaded bundle metadata changed while it was opened.');
+              }
+              const bytes=Buffer.alloc(expected.bytes);
+              let position=0;
+              while(position<bytes.length){
+                const {bytesRead}=await handle.read(bytes,position,bytes.length-position,position);
+                if(bytesRead===0)throw new Error('Downloaded bundle metadata ended early.');
+                position+=bytesRead;
+              }
+              const probe=Buffer.alloc(1);
+              if((await handle.read(probe,0,1,expected.bytes)).bytesRead!==0){
+                throw new Error('Downloaded bundle metadata grew while it was read.');
+              }
+              const after=await handle.stat({bigint:true});
+              const current=await lstat(filePath,{bigint:true});
+              if(after.nlink!==1n||current.nlink!==1n||current.isSymbolicLink()
+                ||!current.isFile()||!matches(after,expected)||!matches(current,expected)){
+                throw new Error('Downloaded bundle metadata identity changed while it was read.');
+              }
+              return bytes;
+            }finally{
+              await handle.close();
+            }
+          }
+
+          const sdkModule=pathToFileURL(path.join(
+            process.env.TRUSTED_SDK_ROOT,
+            'src','release-bundle.mjs'
+          )).href;
+          const {verifyAppReleaseBundle}=await import(sdkModule);
+          const receipt=await verifyAppReleaseBundle({bundlePath:process.env.ARTIFACT_PATH});
+          if(receipt.app.id!==process.env.EXPECTED_APP_ID){
+            throw new Error('The attested bundle does not contain the selected app id.');
+          }
+          const metadataBytes=await readExactMetadata(process.env.METADATA_PATH);
+          const metadata=JSON.parse(metadataBytes.toString('utf8'));
+          if(!metadataBytes.equals(Buffer.from(`${JSON.stringify(metadata,null,2)}\n`))){
+            throw new Error('Downloaded bundle metadata is not canonical JSON.');
+          }
+          const expectedMetadata={
+            schemaVersion:1,
+            kind:'arcane-app-release-bundle-metadata',
+            sdk:receipt.sdk,
+            app:receipt.app,
+            artifact:receipt.consistency.artifact,
+            descriptor:receipt.consistency.descriptor,
+            release:receipt.consistency.release
+          };
+          if(JSON.stringify(metadata)!==JSON.stringify(expectedMetadata)){
+            throw new Error('Downloaded metadata does not match the independently verified bundle.');
+          }
+          const expectedOutputs={
+            EXPECTED_BUNDLE_SHA256:metadata.artifact.sha256,
+            EXPECTED_BUNDLE_BYTES:String(metadata.artifact.bytes),
+            EXPECTED_DESCRIPTOR_SHA256:metadata.descriptor.canonicalSha256,
+            EXPECTED_DESCRIPTOR_FILE_SHA256:metadata.descriptor.fileSha256,
+            EXPECTED_DESCRIPTOR_BYTES:String(metadata.descriptor.bytes),
+            EXPECTED_PACKAGE_SHA256:metadata.descriptor.packageSha256,
+            EXPECTED_RELEASE_MANIFEST_SHA256:metadata.release.manifestSha256,
+            EXPECTED_RELEASE_POLICY_SHA256:metadata.release.policySha256,
+            EXPECTED_RELEASE_CONTENT_SHA256:metadata.release.contentSha256,
+            EXPECTED_FILE_COUNT:String(metadata.release.fileCount),
+            EXPECTED_TOTAL_BYTES:String(metadata.release.totalBytes)
+          };
+          for(const [environmentName,expected] of Object.entries(expectedOutputs)){
+            if(process.env[environmentName]!==expected){
+              throw new Error(`${environmentName} does not match the downloaded verified bytes.`);
+            }
+          }
+          NODE
+      - name: Attest only the independently reverified bundle
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: verified-release/arcane-app-release.arcane-app.tar.gz

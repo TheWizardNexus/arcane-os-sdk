@@ -150,7 +150,18 @@ test('source server exposes only the selected app and SDK browser routes',async 
         '/ollama/api/version',
         '/arcane/..%2F..%2Fpackage.json',
         '/apps/served-app/%2e%2e%2f%2e%2e%2fpackage.json',
-        '/apps/served-app/%5c..%5cpackage.json'
+        '/apps/served-app/%5c..%5cpackage.json',
+        '/apps/served-app/CLOCK$/child.js',
+        '/apps/served-app/CONIN$.json',
+        '/apps/served-app/CONOUT$/child.js',
+        '/apps/served-app/COM%C2%B9.log',
+        '/apps/served-app/lpt%C2%B2/child.js',
+        '/apps/served-app/less%3Cthan.js',
+        '/apps/served-app/greater%3Ethan.js',
+        '/apps/served-app/double%22quote.js',
+        '/apps/served-app/vertical%7Cbar.js',
+        '/apps/served-app/question%3Fmark.js',
+        '/apps/served-app/asterisk%2A.js'
     ]){
         const response=await request(origin,deniedPath,{cookie});
         assert.ok([400,404].includes(response.status),`${deniedPath} returned ${response.status}`);

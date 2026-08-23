@@ -4,6 +4,7 @@ import {executeOperation} from '../toolchain.mjs';
 import {ArcaneError,ERROR_CODES,normalizeError} from '../errors.mjs';
 import {CLI_NAME,SDK_NAME,SDK_VERSION,OUTPUT_MODES} from '../constants.mjs';
 import {loadArcaneNativeProvider} from '../native-provider-loader.mjs';
+import {APP_BUNDLE_EXTENSION} from '../release-bundle.mjs';
 
 const VALUE_OPTIONS=new Set([
     'path',
@@ -19,6 +20,7 @@ const VALUE_OPTIONS=new Set([
     'output-root',
     'scope',
     'test-file',
+    'artifact',
     'output'
 ]);
 const FLAG_OPTIONS=new Set([
@@ -26,6 +28,7 @@ const FLAG_OPTIONS=new Set([
     'skip-tests',
     'dry-run',
     'require-local-ai',
+    'overwrite',
     'help',
     'version'
 ]);
@@ -43,6 +46,8 @@ Usage:
   ${CLI_NAME} check --scope shared
   ${CLI_NAME} package [--app <id>] [--dry-run]
   ${CLI_NAME} verify [--app <id>]
+  ${CLI_NAME} bundle [--app <id>] [--artifact <file>${APP_BUNDLE_EXTENSION}] [--overwrite]
+  ${CLI_NAME} verify-bundle <file${APP_BUNDLE_EXTENSION}>
   ${CLI_NAME} native-doctor --target <native-target> --arcane-root <directory>
   ${CLI_NAME} native-prepare --target <native-target> --arcane-root <directory>
   ${CLI_NAME} build --target <target> [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>]
@@ -178,6 +183,12 @@ function operationOptions(command,parsed,cwd){
     if(values['test-file']!==undefined&&command!=='test'){
         usage('--test-file is supported only by test --scope shared.');
     }
+    if(values.artifact!==undefined&&!['bundle','verify-bundle'].includes(command)){
+        usage('--artifact is supported only by bundle and verify-bundle.');
+    }
+    if(flags.has('overwrite')&&command!=='bundle'){
+        usage('--overwrite is supported only by bundle.');
+    }
 
     if(command==='new'){
         const appId=positionals[0];
@@ -243,6 +254,25 @@ function operationOptions(command,parsed,cwd){
     if(command==='verify'){
         noExtraPositionals(command,positionals);
         return common;
+    }
+    if(command==='bundle'){
+        noExtraPositionals(command,positionals);
+        return {
+            ...common,
+            artifactPath:values.artifact?path.resolve(cwd,values.artifact):undefined,
+            overwrite:flags.has('overwrite')
+        };
+    }
+    if(command==='verify-bundle'){
+        noExtraPositionals(command,positionals,1);
+        if(values.app)usage('verify-bundle does not accept --app.');
+        if(flags.has('overwrite'))usage('verify-bundle does not accept --overwrite.');
+        if(values.artifact&&positionals[0]){
+            usage('verify-bundle accepts either one file argument or --artifact, not both.');
+        }
+        const artifact=values.artifact??positionals[0];
+        if(!artifact)usage('verify-bundle requires one bundle file.');
+        return {artifactPath:path.resolve(cwd,artifact)};
     }
     if(command==='build'){
         noExtraPositionals(command,positionals);

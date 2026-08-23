@@ -101,11 +101,13 @@ function parseRequestTarget(rawUrl){
     let decoded;
     try{decoded=decodeURIComponent(rawPath);}
     catch{return null;}
-    if(!decoded.startsWith('/')||/[\x00-\x1f\x7f]/u.test(decoded)||decoded.includes('\\'))return null;
+    if(!decoded.startsWith('/')||/[\x00-\x1f\x7f]/u.test(decoded)
+        ||/[<>"|?*]/u.test(decoded)||decoded.includes('\\'))return null;
     const segments=decoded.split('/').filter(Boolean);
     if(segments.some(segment=>segment==='.'||segment==='..'||segment.includes(':')
         ||segment.endsWith('.')||segment.endsWith(' ')
-        ||/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu.test(segment)))return null;
+        ||/^(?:con|prn|aux|nul|clock\$|conin\$|conout\$|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$/iu
+            .test(segment)))return null;
     let parsed;
     try{parsed=new URL(raw,'http://127.0.0.1');}
     catch{return null;}

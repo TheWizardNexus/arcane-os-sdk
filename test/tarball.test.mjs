@@ -46,12 +46,14 @@ test('packed npm artifact installs and drives an external repository end to end'
         assert.equal(packed.code,0,packed.stderr);
         const packReport=JSON.parse(packed.stdout)[0];
         assert.equal(packReport.name,'arcane-os');
-        assert.equal(packReport.version,'0.1.0-dev.2');
+        assert.equal(packReport.version,'0.1.0-dev.3');
         assert.ok(packReport.files.some(file=>file.path==='bin/arcane.mjs'));
         assert.ok(packReport.files.some(file=>file.path==='runtime/ARCANE_RUNTIME_RELEASE.json'));
         assert.ok(packReport.files.some(file=>file.path==='runtime/arcane/modules/SpeechPlayback.js'));
         assert.ok(packReport.files.some(file=>file.path==='schemas/arcane-app.schema.json'));
         assert.ok(packReport.files.some(file=>file.path==='schemas/arcane-package.schema.json'));
+        assert.ok(packReport.files.some(file=>file.path==='schemas/arcane-app-bundle.schema.json'));
+        assert.ok(packReport.files.some(file=>file.path==='src/release-bundle.mjs'));
         assert.ok(packReport.files.some(file=>file.path==='src/templates/assets/app-icon.png'));
         assert.ok(packReport.files.some(file=>file.path==='NOTICE'));
         assert.ok(packReport.files.every(file=>!file.path.startsWith('test/')));
@@ -69,7 +71,7 @@ test('packed npm artifact installs and drives an external repository end to end'
             devDependencies:{'arcane-os':`file:${tarballPath}`}
         },null,2)}\n`);
         const harnessInstalled=await runNpm(
-            ['install','--ignore-scripts','--no-audit','--no-fund'],
+            ['install','--ignore-scripts','--dry-run=false','--no-audit','--no-fund'],
             {cwd:harnessRoot,timeout:60_000}
         );
         assert.equal(harnessInstalled.code,0,harnessInstalled.stderr);
@@ -104,12 +106,12 @@ test('packed npm artifact installs and drives an external repository end to end'
         const packageDocument=JSON.parse(await readFile(path.join(workspaceRoot,'package.json'),'utf8'));
         assert.match(packageDocument.devDependencies['arcane-os'],/^file:.+\.tgz$/u);
         const packageLock=JSON.parse(await readFile(path.join(workspaceRoot,'package-lock.json'),'utf8'));
-        assert.equal(packageLock.packages['node_modules/arcane-os'].version,'0.1.0-dev.2');
-        assert.match(packageLock.packages['node_modules/arcane-os'].resolved,/arcane-os-0\.1\.0-dev\.2\.tgz$/u);
+        assert.equal(packageLock.packages['node_modules/arcane-os'].version,'0.1.0-dev.3');
+        assert.match(packageLock.packages['node_modules/arcane-os'].resolved,/arcane-os-0\.1\.0-dev\.3\.tgz$/u);
         assert.match(packageLock.packages['node_modules/arcane-os'].integrity,/^sha512-/u);
 
         const cleanInstalled=await runNpm(
-            ['ci','--ignore-scripts','--no-audit','--no-fund'],
+            ['ci','--ignore-scripts','--dry-run=false','--no-audit','--no-fund'],
             {cwd:workspaceRoot,timeout:60_000}
         );
         assert.equal(cleanInstalled.code,0,cleanInstalled.stderr);
@@ -200,6 +202,31 @@ test('packed npm artifact installs and drives an external repository end to end'
         ],{cwd:workspaceRoot,timeout:60_000});
         assert.equal(verified.code,0,verified.stderr);
         assert.equal(JSON.parse(verified.stdout).result.release.verified,true);
+    });
+
+    await t.test('creates and verifies a deterministic external release bundle with the installed CLI',async()=>{
+        const artifactPath=path.join(workspaceRoot,'release','external-app.arcane-app.tar.gz');
+        const bundled=await runNode([
+            installedCli,
+            'bundle',
+            '--workspace',workspaceRoot,
+            '--artifact',artifactPath,
+            '--output','json'
+        ],{cwd:workspaceRoot,timeout:60_000});
+        assert.equal(bundled.code,0,`${bundled.stdout}\n${bundled.stderr}`);
+        const bundleResult=JSON.parse(bundled.stdout).result.bundle;
+        assert.match(bundleResult.bundleSha256,/^[0-9a-f]{64}$/u);
+        assert.equal(bundleResult.artifactReceipt.kind,'arcane-app-release-bundle-artifact');
+
+        const verified=await runNode([
+            installedCli,
+            'verify-bundle',artifactPath,
+            '--output','json'
+        ],{cwd:workspaceRoot,timeout:60_000});
+        assert.equal(verified.code,0,`${verified.stdout}\n${verified.stderr}`);
+        const verification=JSON.parse(verified.stdout).result;
+        assert.equal(verification.verified,true);
+        assert.equal(verification.bundleSha256,bundleResult.bundleSha256);
     });
 
     await t.test('builds a portable artifact through a loaded native provider',async()=>{

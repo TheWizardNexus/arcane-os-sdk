@@ -119,7 +119,8 @@ async function renamePackageDirectory(source,destination){
 
 const APP_ID_PATTERN=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const SAFE_SHARED_ID_PATTERN=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
-const WINDOWS_RESERVED_NAME=/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
+const WINDOWS_RESERVED_NAME=
+    /^(?:con|prn|aux|nul|clock\$|conin\$|conout\$|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$/iu;
 const FORBIDDEN_SEGMENTS=new Set([
     '.agents',
     '.codex',
@@ -128,6 +129,7 @@ const FORBIDDEN_SEGMENTS=new Set([
     'local'
 ]);
 const TEXT_CONTROL_PATTERN=/[\x00-\x1f\x7f]/;
+const WINDOWS_UNSAFE_FILENAME_CHARACTER_PATTERN=/[<>"|?*]/u;
 const OLLAMA_MODEL_IDENTIFIER=
     /^[A-Za-z0-9][A-Za-z0-9._/-]{0,191}(?::[A-Za-z0-9][A-Za-z0-9._-]{0,63})?$/;
 const MODEL_DEFINITION_PATTERN=/^(?:Modelfile|[A-Za-z0-9][A-Za-z0-9._-]{0,118}\.Modelfile)$/;
@@ -179,7 +181,7 @@ function immutableJsonCopy(value){
 }
 
 function compareText(left,right){
-    return String(left).localeCompare(String(right),'en');
+    return Buffer.compare(Buffer.from(String(left),'utf8'),Buffer.from(String(right),'utf8'));
 }
 
 function assertOnlyKeys(value,allowed,label){
@@ -215,6 +217,7 @@ export function normalizeRelativePath(value,label='path'){
 
     for(const segment of segments){
         if(!segment||segment==='.'||segment==='..'||segment.includes(':')
+            ||WINDOWS_UNSAFE_FILENAME_CHARACTER_PATTERN.test(segment)
             ||segment.endsWith('.')||segment.endsWith(' ')
             ||WINDOWS_RESERVED_NAME.test(segment)){
             fail(`Unsafe ${label}: ${value}`);
@@ -1767,7 +1770,8 @@ async function issueAppReleaseReceipt(root,release,identities,{
         packageBinding,
         descriptorAuthority:Object.freeze({
             descriptor:descriptorAuthority.descriptor,
-            descriptorSha256:descriptorAuthority.descriptorSha256
+            descriptorSha256:descriptorAuthority.descriptorSha256,
+            source:descriptorAuthority.source
         })
     }));
     return receipt;
@@ -1829,7 +1833,8 @@ export async function authenticateAppReleaseAuthority(receipt,{
     return Object.freeze({
         receipt,
         descriptor:authority.descriptor,
-        descriptorSha256:authority.descriptorSha256
+        descriptorSha256:authority.descriptorSha256,
+        source:authority.source
     });
 }
 

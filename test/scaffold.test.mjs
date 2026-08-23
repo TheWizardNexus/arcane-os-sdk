@@ -25,7 +25,7 @@ test('workspace scaffold creates a private external app using the exact SDK vers
     const packageDocument=JSON.parse(await readFile(path.join(targetPath,'package.json'),'utf8'));
     assert.equal(packageDocument.private,true);
     assert.equal(packageDocument.type,'module');
-    assert.equal(packageDocument.devDependencies['arcane-os'],'0.1.0-dev.2');
+    assert.equal(packageDocument.devDependencies['arcane-os'],'0.1.0-dev.3');
 
     const packager=JSON.parse(await readFile(path.join(targetPath,'arcane-packager.json'),'utf8'));
     assert.equal(packager.sharedPayloads['browser-runtime'].length,3);
@@ -43,7 +43,7 @@ test('workspace scaffold creates a private external app using the exact SDK vers
 
     const lock=JSON.parse(await readFile(path.join(targetPath,'arcane.lock.json'),'utf8'));
     assert.equal(lock.sdk.name,'arcane-os');
-    assert.equal(lock.sdk.version,'0.1.0-dev.2');
+    assert.equal(lock.sdk.version,'0.1.0-dev.3');
     assert.equal(lock.protocols.arcane,'arcane/1');
     assert.match(lock.runtime.contentSha256,/^[0-9a-f]{64}$/);
 

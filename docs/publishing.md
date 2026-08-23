@@ -15,7 +15,7 @@ instructions together. The future branch name alone grants no authority.
 
 ## Development npm publication
 
-The current unpublished npm version is `0.1.0-dev.2` and `publishConfig.tag` is
+The current unpublished npm version is `0.1.0-dev.3` and `publishConfig.tag` is
 `dev`, so an accidental publication does not become the default `latest`
 release. `publish-dev.yml` can run only when manually dispatched from `main` in
 `TheWizardNexus/arcane-os-sdk`. Before npm receives OIDC authority, the workflow
@@ -32,7 +32,7 @@ No npm publication has occurred yet. For local development, run
 with `npm install --save-dev --save-exact <path>`. Keep the tarball at the path
 recorded by `package-lock.json`; subsequent `npm ci` verifies its recorded npm
 integrity. Arcane separately requires the installed package to identify exactly
-as `arcane-os@0.1.0-dev.2` and verifies the locked runtime. A local directory
+as `arcane-os@0.1.0-dev.3` and verifies the locked runtime. A local directory
 `file:` install is intentionally unsupported because it may be linked.
 
 Before the first development publish:
@@ -51,6 +51,63 @@ Generated app CI uses `npm ci --ignore-scripts`, so its lock must exist and its
 dependency source must be reachable by the runner. A sibling local tarball is a
 workstation workflow, not a portable GitHub dependency source; switch to the
 exact registry release (or deliberately vendor the tarball) before remote CI.
+
+## Reusable application release workflow
+
+External app repositories can call `.github/workflows/release-app.yml` by an
+immutable SDK repository revision. The reusable workflow checks out the exact
+caller SHA, installs only the caller's committed dependency lock, requires
+`arcane-os@0.1.0-dev.3`, and checks, packages, bundles, independently verifies,
+and uploads one explicitly selected app. Every third-party action reference is
+pinned to a full commit SHA. The workflow never publishes npm, creates a GitHub
+Release, loops across apps, or changes Arcane admission state.
+
+The build job holds only `contents: read`; its caller-owned checks, package
+scripts, and adapters never receive `id-token: write` or `attestations: write`.
+It uploads the exact bundle together with canonical metadata. A fresh
+caller-code-free job downloads that upload by immutable artifact id, checks out
+the called workflow's exact SDK revision, directly imports its verifier under
+supported Node 24, binds the receipt app id to the requested app, and exposes
+the independently reverified artifact, descriptor, and release identities as
+the reusable workflow outputs. This post-upload boundary prevents a background
+caller process from making the published outputs describe pre-upload bytes.
+
+GitHub artifact attestation is an explicit `attest: true` input and is false by
+default because availability for private repositories depends on the caller's
+GitHub plan. A caller that requests an unsupported attestation fails instead of
+silently producing weaker provenance. GitHub does not let a called workflow
+raise the caller job's permission ceiling. An attesting caller must therefore
+grant these permissions on the reusable-workflow job itself (prefer this
+job-scoped grant over workflow-wide authority):
+
+```yaml
+jobs:
+  release-app:
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    uses: TheWizardNexus/arcane-os-sdk/.github/workflows/release-app.yml@<FULL_40_CHARACTER_COMMIT_SHA>
+    with:
+      app-id: example-app
+      attest: true
+```
+
+Without that caller grant, `attest: true` fails even when the repository plan
+supports artifact attestations. When requested, a fresh privileged job
+depends on the successful post-upload verifier, downloads the same immutable
+artifact id with the pinned `actions/download-artifact` revision, checks out only
+`job.workflow_repository` at `job.workflow_sha`, selects supported Node 24 via
+the pinned `actions/setup-node` revision, and directly imports the
+dependency-free verifier from those trusted SDK source bytes. It rechecks the
+app id, bundle structure, digest, byte length, complete
+canonical metadata, and every post-upload workflow output. No package manager,
+dependency resolution, caller checkout, or caller-owned code runs while that job
+holds OIDC and attestation permissions. Whether attested or not, the upload is a
+build output.
+Arcane must verify an approved provenance or independent signature and an
+Arcane-owned authorization-lock entry before installation; the archive's
+internal checksums alone do not grant authority.
 
 Stable versioning, the npm `latest` tag, and official npm publication remain a
 separate explicit release decision. Current `main` development does not

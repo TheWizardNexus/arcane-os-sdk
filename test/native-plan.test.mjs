@@ -95,7 +95,7 @@ function nativeProvider(toolchainReceipt,capture){
     });
 }
 
-test('native plan public boundary admits only the exact dev.2 target matrix before provider or toolchain work',async t=>{
+test('native plan public boundary admits only the exact dev.3 target matrix before provider or toolchain work',async t=>{
     const parent=await temporaryDirectory(t,{prefix:'arcane-native-target-matrix-'});
     const missingToolchainRoot=path.join(parent,'missing-toolchain');
     let authenticateCalls=0;

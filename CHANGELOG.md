@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.1.0-dev.3
+
+- Added an authored-descriptor-only external app release envelope with an exact
+  `ARCANE_APP_BUNDLE.json` contract and deterministic USTAR+gzip bytes.
+- Bound the canonical schema-2 descriptor, its schema-1 package projection,
+  the verified release manifest, and every payload file into one independently
+  verifiable archive without adding repository-only source or tooling beyond the
+  app-owned, authenticated release inventory.
+- Added dependency-free streaming bundle creation and one-pass verification
+  with explicit compressed, expanded, entry, file, control-document, path, and
+  expansion-ratio ceilings plus fail-closed hostile tar and gzip handling.
+- Hardened exact-length control, payload, and artifact reads with EOF growth
+  probes, final pathname/handle identity checks, and single-link enforcement;
+  concatenated gzip members and appended bytes now fail closed.
+- Added create-only link promotion, explicit literal-boolean overwrite with
+  create-only backup/restore and identity-bound rollback, post-promotion digest
+  revalidation, nonce-bound inspectable locks, surfaced cleanup degradation,
+  safe cancellation, progress events, root SDK and toolchain APIs, and
+  `arcane bundle` / `arcane verify-bundle` commands.
+- Defined NFC UTF-8 byte ordering for package and bundle inventories, pinned a
+  deterministic golden bundle digest to the supported Node/runner matrix,
+  rejected zero-byte releases, rejected case/prefix topology conflicts and the
+  complete portable Windows device-name set, and made SDK-generation
+  compatibility explicit.
+- Added complete receipt metadata for artifact digest/bytes; descriptor
+  canonical, file, and package digests/bytes; and release manifest, policy,
+  content, file-count, and payload-byte identities.
+- Added a reusable exact-SDK app release workflow with immutable action pins,
+  unprivileged caller-code build/upload, an always-run fresh post-upload verifier
+  that becomes the sole output source, and a conditional attestation job that
+  redownloads the same artifact id and compares every verified identity. The
+  privileged job uses supported Node 24 via the pinned `actions/setup-node`
+  revision and directly imports the dependency-free immutable SDK verifier
+  without package resolution or caller code; it retains no implicit npm,
+  GitHub Release, or Arcane-admission authority.
+- Added the bundle schema, canonical test-set ownership, packed-SDK end-to-end
+  coverage, deterministic repetition tests, and adversarial archive fixtures.
+
 ## 0.1.0-dev.2
 
 - Kept prerelease development, integration, publication evidence, and

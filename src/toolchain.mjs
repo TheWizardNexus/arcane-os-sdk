@@ -32,6 +32,11 @@ import {runRepositoryAction} from './repository.mjs';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 import {createEventQueue} from './event-queue.mjs';
 import {ARCANE_MACHINE_BUNDLE_VERSION} from './constants.mjs';
+import {
+    APP_BUNDLE_EXTENSION,
+    createAppReleaseBundle,
+    verifyAppReleaseBundle
+} from './release-bundle.mjs';
 
 const TEST_RUNNER_PATH=fileURLToPath(new URL('../bin/arcane-test.mjs',import.meta.url));
 const MAX_TEST_FAILURE_STREAM_BYTES=32*1024;
@@ -643,6 +648,59 @@ export async function verifyApplication(options={}){
     };
 }
 
+export async function bundleApplication(options={}){
+    assertApplicationScope(options,'Release bundling');
+    if(options.overwrite!==undefined&&typeof options.overwrite!=='boolean'){
+        throw new ArcaneError(ERROR_CODES.usage,'overwrite must be a literal boolean.');
+    }
+    const prepared=await preparedWorkspace(options);
+    const bundle=await ownedWork(
+        'bundle',
+        async({signal,onEvent})=>{
+            const verified=await verifyApp({
+                workspaceRoot:prepared.workspaceRoot,
+                appId:prepared.appId,
+                signal,
+                onEvent
+            });
+            await validatePreparedRuntime(prepared,{signal});
+            const releaseRoot=verified.receipt.canonicalLocation;
+            const outputPath=options.artifactPath??path.join(
+                path.dirname(releaseRoot),
+                `${prepared.appId}-${verified.version}${APP_BUNDLE_EXTENSION}`
+            );
+            return createAppReleaseBundle({
+                receipt:verified.receipt,
+                releaseRoot,
+                outputPath,
+                overwrite:options.overwrite,
+                signal,
+                onEvent
+            });
+        },
+        options
+    );
+    return {
+        workspaceRoot:prepared.workspaceRoot,
+        workspaceMode:prepared.workspaceMode,
+        appId:prepared.appId,
+        runtimeContentSha256:prepared.runtimeReceipt?.contentSha256??null,
+        bundle
+    };
+}
+
+export async function verifyBundleApplication(options={}){
+    return ownedWork(
+        'verify-bundle',
+        ({signal,onEvent})=>verifyAppReleaseBundle({
+            bundlePath:options.artifactPath,
+            signal,
+            onEvent
+        }),
+        options
+    );
+}
+
 function targetSelection(options){
     const target=options.target??options.targetRequest?.target;
     const registered=getTargetAdapter(target);
@@ -1227,6 +1285,8 @@ export async function executeOperation(command,options={}){
         check:checkApplication,
         package:packageApplication,
         verify:verifyApplication,
+        bundle:bundleApplication,
+        'verify-bundle':verifyBundleApplication,
         'native-doctor':doctorNativeTarget,
         'native-prepare':prepareNativeTarget,
         'native-verify':verifyNativeArtifact,
@@ -1254,6 +1314,8 @@ export function createToolchain(defaults={}){
         check:options=>checkApplication({...defaults,...options}),
         package:options=>packageApplication({...defaults,...options}),
         verify:options=>verifyApplication({...defaults,...options}),
+        bundle:options=>bundleApplication({...defaults,...options}),
+        verifyBundle:options=>verifyBundleApplication({...defaults,...options}),
         doctorNative:options=>doctorNativeTarget({...defaults,...options}),
         prepareNative:options=>prepareNativeTarget({...defaults,...options}),
         verifyNative:options=>verifyNativeArtifact({...defaults,...options}),

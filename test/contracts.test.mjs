@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from '../src/testing.mjs';
 import {repositoryRoot} from './helpers.mjs';
 import {normalizeRelativePath,parseSemver} from '../src/packager/core.mjs';
+import {validateAppBundlePath} from '../src/release-bundle.mjs';
 import {listTargets} from '../src/targets/index.mjs';
 import * as sdk from '../src/index.mjs';
 
@@ -24,6 +25,7 @@ test('published JSON schemas parse and declare immutable protocol versions',asyn
     const cases=new Map([
         ['arcane-app.schema.json',2],
         ['arcane-package.schema.json',1],
+        ['arcane-app-bundle.schema.json',1],
         ['arcane-lock.schema.json',1],
         ['cli-event.schema.json','arcane-cli-events/1'],
         ['native-build-plan.schema.json','arcane-native-build-plan/1'],
@@ -34,7 +36,8 @@ test('published JSON schemas parse and declare immutable protocol versions',asyn
         await t.test(`${fileName} declares its immutable protocol`,async()=>{
             const document=await readSchema(fileName);
             assert.equal(document.$schema,'https://json-schema.org/draft/2020-12/schema');
-            if(fileName==='arcane-app.schema.json'||fileName==='arcane-package.schema.json'||fileName==='arcane-lock.schema.json'){
+            if(fileName==='arcane-app.schema.json'||fileName==='arcane-package.schema.json'
+                ||fileName==='arcane-app-bundle.schema.json'||fileName==='arcane-lock.schema.json'){
                 assert.equal(document.properties.schemaVersion.const,expected);
             }else if(fileName==='cli-event.schema.json'){
                 assert.equal(document.properties.protocol.const,expected);
@@ -43,6 +46,40 @@ test('published JSON schemas parse and declare immutable protocol versions',asyn
             }
         });
     }
+    await t.test('app bundle schema requires a nonempty, nonzero payload',async()=>{
+        const document=await readSchema('arcane-app-bundle.schema.json');
+        assert.equal(document.properties.release.properties.fileCount.minimum,1);
+        assert.equal(document.properties.release.properties.totalBytes.minimum,1);
+        assert.equal(document.properties.payload.properties.fileCount.minimum,1);
+        assert.equal(document.properties.payload.properties.totalBytes.minimum,1);
+        assert.equal(document.properties.payload.properties.files.minItems,1);
+    });
+    await t.test('all published path contracts reject Windows aliases and unsafe filename characters',async()=>{
+        const documents=await Promise.all([
+            readSchema('arcane-app.schema.json'),
+            readSchema('arcane-package.schema.json'),
+            readSchema('arcane-app-bundle.schema.json')
+        ]);
+        for(const filePath of [
+            'CLOCK$',
+            'assets/CONIN$.json',
+            'CONOUT$/child.js',
+            'models/COM¹.modelfile',
+            'devices/lpt²/value.json',
+            'assets/less<than.js',
+            'assets/greater>than.js',
+            'assets/double"quote.js',
+            'assets/vertical|bar.js',
+            'assets/question?mark.js',
+            'assets/asterisk*.js'
+        ]){
+            for(const document of documents){
+                assert.equal(new RegExp(document.$defs.relativePath.pattern,'u').test(filePath),false,filePath);
+            }
+            assert.equal(accepts(value=>normalizeRelativePath(value,'schema test'),filePath),false,filePath);
+            assert.equal(accepts(value=>validateAppBundlePath(value,'schema test'),filePath),false,filePath);
+        }
+    });
 });
 
 test('package exposes both supported executable names and public contracts',async t=>{
@@ -59,6 +96,7 @@ test('package exposes both supported executable names and public contracts',asyn
     await t.test('exports every published JSON schema',()=>{
         assert.equal(packageDocument.exports['./schemas/arcane-app.json'],'./schemas/arcane-app.schema.json');
         assert.equal(packageDocument.exports['./schemas/arcane-package.json'],'./schemas/arcane-package.schema.json');
+        assert.equal(packageDocument.exports['./schemas/arcane-app-bundle.json'],'./schemas/arcane-app-bundle.schema.json');
         assert.equal(packageDocument.exports['./schemas/arcane-lock.json'],'./schemas/arcane-lock.schema.json');
         assert.equal(packageDocument.exports['./schemas/cli-event.json'],'./schemas/cli-event.schema.json');
         assert.equal(packageDocument.exports['./schemas/native-build-plan.json'],'./schemas/native-build-plan.schema.json');
@@ -67,6 +105,9 @@ test('package exposes both supported executable names and public contracts',asyn
     await t.test('exports the integrated provider and testing entry points',()=>{
         assert.equal(packageDocument.exports['./integrated-provider'],'./src/integrated-provider-loader.mjs');
         assert.equal(packageDocument.exports['./testing'],'./src/testing.mjs');
+    });
+    await t.test('exports the release-bundle implementation entry point',()=>{
+        assert.equal(packageDocument.exports['./release-bundle'],'./src/release-bundle.mjs');
     });
     await t.test('pins the Vanilla Test runtime',()=>{
         assert.equal(packageDocument.dependencies['vanilla-test'],'2.1.3');
@@ -96,6 +137,12 @@ test('root SDK export exposes receipt authenticators and verified file readers',
         assert.equal(typeof sdk.appDescriptorSha256,'function');
         assert.equal(typeof sdk.projectPackageManifest,'function');
         assert.equal(typeof sdk.projectNativeDescriptor,'function');
+    });
+    await t.test('exposes deterministic app release bundle creation and verification',()=>{
+        assert.equal(typeof sdk.createAppReleaseBundle,'function');
+        assert.equal(typeof sdk.verifyAppReleaseBundle,'function');
+        assert.equal(sdk.APP_BUNDLE_SCHEMA_VERSION,1);
+        assert.equal(sdk.APP_BUNDLE_FORMAT,'ustar+gzip');
     });
     await t.test('exposes native build-plan lifecycle functions',()=>{
         assert.equal(typeof sdk.createNativeBuildPlan,'function');
@@ -253,7 +300,7 @@ test('native build plan schema uses the packager semantic-version contract',asyn
     });
 });
 
-test('native build plan schema publishes only the exact dev.2 target matrix',async t=>{
+test('native build plan schema publishes only the exact dev.3 target matrix',async t=>{
     const schema=await readSchema('native-build-plan.schema.json');
     const variants=schema.$defs.targetRequest.oneOf.map(variant=>({
         target:variant.properties.target.const,
@@ -325,11 +372,23 @@ test('native build plan schema publishes only the exact dev.2 target matrix',asy
     });
 });
 
-test('CI and trusted publishing workflows retain their main-only authority gates',async t=>{
-    const [checkWorkflow,publishWorkflow]=await Promise.all([
+test('CI, reusable app release, and trusted publishing workflows retain narrow authority',async t=>{
+    const [checkWorkflow,publishWorkflow,appReleaseWorkflow,publishingGuide]=await Promise.all([
         readFile(path.join(repositoryRoot,'.github','workflows','check.yml'),'utf8'),
-        readFile(path.join(repositoryRoot,'.github','workflows','publish-dev.yml'),'utf8')
+        readFile(path.join(repositoryRoot,'.github','workflows','publish-dev.yml'),'utf8'),
+        readFile(path.join(repositoryRoot,'.github','workflows','release-app.yml'),'utf8'),
+        readFile(path.join(repositoryRoot,'docs','publishing.md'),'utf8')
     ]);
+    const buildStart=appReleaseWorkflow.indexOf('\n  build:');
+    const verifyStart=appReleaseWorkflow.indexOf('\n  verify:');
+    const attestStart=appReleaseWorkflow.indexOf('\n  attest:');
+    assert.ok(
+        buildStart>=0&&verifyStart>buildStart&&attestStart>verifyStart,
+        'release-app.yml must keep separate build, post-upload verification, and attest jobs'
+    );
+    const buildSection=appReleaseWorkflow.slice(buildStart,verifyStart);
+    const verifySection=appReleaseWorkflow.slice(verifyStart,attestStart);
+    const attestSection=appReleaseWorkflow.slice(attestStart);
     await t.test('Check runs only for main pull requests and pushes',()=>{
         assert.match(checkWorkflow,/pull_request:\s*\n\s+branches:\s*\n\s+- main/u);
         assert.match(checkWorkflow,/push:\s*\n\s+branches:\s*\n\s+- main/u);
@@ -364,5 +423,90 @@ test('CI and trusted publishing workflows retain their main-only authority gates
     });
     await t.test('trusted publishing uses the reviewed npm release',()=>{
         assert.match(publishWorkflow,/npm install --global npm@11\.16\.0/u);
+    });
+    await t.test('app release is reusable, single-app, and exact-SDK bound',()=>{
+        assert.match(appReleaseWorkflow,/workflow_call:/u);
+        assert.match(appReleaseWorkflow,/app-id:/u);
+        assert.match(appReleaseWorkflow,/Expected arcane-os@0\.1\.0-dev\.3/u);
+        assert.match(buildSection,/arcane check[^\n]*--app "\$APP_ID"/u);
+        assert.match(buildSection,/arcane package[^\n]*--app "\$APP_ID"/u);
+        assert.match(buildSection,/arcane bundle[\s\S]*--app "\$APP_ID"/u);
+        assert.match(buildSection,/verifyAppReleaseBundle/u);
+        for(const output of [
+            'bundle-sha256','bundle-bytes','descriptor-sha256','descriptor-file-sha256','descriptor-bytes',
+            'package-sha256','release-manifest-sha256','release-policy-sha256',
+            'release-content-sha256','file-count','total-bytes'
+        ]){
+            assert.match(appReleaseWorkflow,new RegExp(`^      ${output}:`,'mu'));
+            assert.match(
+                appReleaseWorkflow,
+                new RegExp(`value: \\$\\{\\{ jobs\\.verify\\.outputs\\.${output} \\}\\}`,'u')
+            );
+        }
+        assert.doesNotMatch(appReleaseWorkflow,/strategy:\s*\n\s+matrix:/u);
+    });
+    await t.test('caller code and post-upload verification have no attestation or OIDC authority',()=>{
+        assert.match(buildSection,/permissions:\s*\n\s+contents:\s*read/u);
+        assert.doesNotMatch(buildSection,/attestations:\s*write|id-token:\s*write/u);
+        assert.doesNotMatch(buildSection,/attest-build-provenance/u);
+        assert.match(verifySection,/permissions:\s*\n\s+contents:\s*read/u);
+        assert.doesNotMatch(verifySection,/attestations:\s*write|id-token:\s*write|attest-build-provenance/u);
+        assert.equal((appReleaseWorkflow.match(/attestations:\s*write/gu)??[]).length,1);
+        assert.equal((appReleaseWorkflow.match(/id-token:\s*write/gu)??[]).length,1);
+    });
+    await t.test('attesting callers grant the reusable job permission ceiling explicitly',()=>{
+        assert.match(
+            publishingGuide,
+            /jobs:\s*\n\s+release-app:\s*\n\s+permissions:\s*\n\s+contents:\s*read\s*\n\s+id-token:\s*write\s*\n\s+attestations:\s*write[\s\S]*attest:\s*true/u
+        );
+        assert.match(publishingGuide,/called workflow[\s\S]*caller job's permission ceiling/u);
+        assert.match(publishingGuide,/Without that caller grant,[^\n]*fails/u);
+    });
+    await t.test('fresh post-upload job is the sole identity source and executes no caller code',()=>{
+        assert.match(verifySection,/if: always\(\) && needs\.build\.result == 'success'/u);
+        assert.match(verifySection,/artifact-ids: \$\{\{ needs\.build\.outputs\.artifact-id \}\}/u);
+        assert.match(verifySection,/actions\/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0/u);
+        assert.match(verifySection,/repository: \$\{\{ job\.workflow_repository \}\}/u);
+        assert.match(verifySection,/ref: \$\{\{ job\.workflow_sha \}\}/u);
+        assert.match(verifySection,/node-version: 24/u);
+        assert.match(verifySection,/process\.env\.TRUSTED_SDK_ROOT[\s\S]*'src','release-bundle\.mjs'/u);
+        assert.match(verifySection,/receipt\.app\.id!==process\.env\.EXPECTED_APP_ID/u);
+        assert.match(verifySection,/appendFile[\s\S]*process\.env\.GITHUB_OUTPUT/u);
+        assert.doesNotMatch(
+            verifySection,
+            /\$\{\{ inputs\.workspace \}\}|npm (?:ci|install|exec)|node_modules|arcane check|arcane package|arcane bundle/u
+        );
+        assert.doesNotMatch(buildSection,/steps\.identity\.outputs/u);
+    });
+    await t.test('privileged attestation uses only downloaded and independently reverified bytes',()=>{
+        assert.match(attestSection,/if: inputs\.attest && needs\.verify\.result == 'success'/u);
+        assert.match(attestSection,/needs: \[build, verify\]/u);
+        assert.match(attestSection,/attestations:\s*write/u);
+        assert.match(attestSection,/id-token:\s*write/u);
+        assert.match(attestSection,/actions\/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0/u);
+        assert.match(attestSection,/artifact-ids: \$\{\{ needs\.build\.outputs\.artifact-id \}\}/u);
+        assert.match(attestSection,/repository: \$\{\{ job\.workflow_repository \}\}/u);
+        assert.match(attestSection,/ref: \$\{\{ job\.workflow_sha \}\}/u);
+        assert.match(attestSection,/TRUSTED_SDK_ROOT: \$\{\{ github\.workspace \}\}\/trusted-sdk/u);
+        assert.match(attestSection,/process\.env\.TRUSTED_SDK_ROOT[\s\S]*'src','release-bundle\.mjs'/u);
+        assert.match(attestSection,/node-version: 24/u);
+        assert.match(attestSection,/receipt\.app\.id!==process\.env\.EXPECTED_APP_ID/u);
+        assert.match(attestSection,/needs\.verify\.outputs\.bundle-sha256/u);
+        assert.match(attestSection,/verifyAppReleaseBundle/u);
+        assert.match(attestSection,/Downloaded metadata does not match the independently verified bundle/u);
+        assert.match(attestSection,/subject-path: verified-release\/arcane-app-release\.arcane-app\.tar\.gz/u);
+        assert.doesNotMatch(attestSection,/\$\{\{ inputs\.workspace \}\}|npm ci|arcane check|arcane package|arcane bundle/u);
+        assert.doesNotMatch(attestSection,/npm (?:ci|install|exec)|node_modules/u);
+        assert.equal(
+            (appReleaseWorkflow.match(/actions\/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0/gu)??[]).length,
+            2
+        );
+    });
+    await t.test('app release actions are immutable and no publishing authority is present',()=>{
+        const actionReferences=[...appReleaseWorkflow.matchAll(/uses:\s*([^\s#]+)/gu)]
+            .map(match=>match[1]);
+        assert.ok(actionReferences.length>=9);
+        assert.ok(actionReferences.every(reference=>/@[0-9a-f]{40}$/u.test(reference)));
+        assert.doesNotMatch(appReleaseWorkflow,/gh release|npm publish/u);
     });
 });

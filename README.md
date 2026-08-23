@@ -19,7 +19,7 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This is development software. Version `0.1.0-dev.2` synchronizes the Arcane
+This is development software. Version `0.1.0-dev.3` synchronizes the Arcane
 `0.8.12` runtime, but it is not a production or release-candidate claim. It has
 not yet been published to npm.
 
@@ -74,7 +74,7 @@ node ./bin/arcane.mjs new local-app --path ../local-app --target portable --git
 
 # From the generated app repository
 cd ../local-app
-npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.2.tgz
+npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.3.tgz
 npm run check
 npm ci
 ```
@@ -147,6 +147,8 @@ arcane check [--app <id>] [--scope app] [--skip-tests]
 arcane check --scope shared
 arcane package [--app <id>] [--dry-run]
 arcane verify [--app <id>]
+arcane bundle [--app <id>] [--artifact <file>.arcane-app.tar.gz] [--overwrite]
+arcane verify-bundle <file.arcane-app.tar.gz>
 arcane native-doctor --target <native-target> --arcane-root <directory>
 arcane native-prepare --target <native-target> --arcane-root <directory>
 arcane build --target <target> [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>]
@@ -158,6 +160,66 @@ arcane repo status|pull|push
 All commands support `--output human|json|ndjson`. Machine modes keep stdout
 structured. Every operation emits or reports acceptance before filesystem,
 network, hashing, test, process, or service work begins.
+
+## External application release bundles
+
+An authored schema-2 `arcane-app.json` can be sealed with one already packaged
+and verified browser release. The bundle contains only the canonical descriptor,
+the release manifest, and the exact `dist/<id>/` payload inventory:
+
+```bash
+npm exec -- arcane package --app my-app
+npm exec -- arcane bundle --app my-app
+npm exec -- arcane verify-bundle dist/my-app-1.0.0.arcane-app.tar.gz
+```
+
+`bundle` creates `dist/<id>-<version>.arcane-app.tar.gz` by default. It refuses
+an existing destination unless `--overwrite` is explicit, preserves the prior
+file until the promoted replacement has passed no-follow, single-link,
+byte-length, and SHA-256 revalidation, and restores the prior file on
+cancellation or pre-commit failure while the output identity remains owned by
+the operation. If the output path was replaced, the foreign identity and prior
+backup are both preserved for inspection. Operation locks carry a random nonce
+and filesystem identity; a replaced lock is preserved and reported as degraded
+cleanup instead of being removed by pathname.
+
+The archive uses one byte-exact USTAR+gzip encoding and publishes its v1 JSON
+contract at `arcane-os/schemas/arcane-app-bundle.json`. Verification rejects
+links, devices, extension headers, unsafe or colliding paths, alternate gzip
+members, noncanonical metadata, trailing data, expansion bombs, and every
+descriptor, policy, inventory, size, or hash mismatch. The envelope adds no
+repository-only source or tooling beyond the exact authenticated release
+inventory; each app owns its leak/source policy, and Arcane's source-free runtime
+gates remain separate. Source controls, payloads, and bundle artifacts must remain single-link regular files at their exact
+recorded length through a final identity check; an appended byte, concurrent
+growth, path replacement, or hard link fails closed. NFC paths use defined
+UTF-8 byte ordering, covered by one pinned golden bundle digest on every
+supported Node/runner combination. This SDK accepts only the explicitly listed
+`0.1.0-dev.3` bundle generation; structural validity does not imply cross-SDK
+compatibility, and a release with zero payload bytes cannot be created. Portable
+path validation rejects file/directory prefix conflicts, case-colliding prefix
+spellings, and Windows device aliases including superscript COM/LPT digits.
+
+Successful creation and verification return complete consistency metadata for
+the artifact digest/bytes, descriptor canonical/file/package digests and byte
+length, and release manifest/policy/content digests, file count, and payload
+bytes. Those values are consistency evidence for the exact archive, not
+installation authority.
+
+Internal hashes establish consistency, not permission to install. Arcane
+admission must also authenticate the archive through its approved repository
+provenance or independent signature and match that identity to an Arcane-owned
+authorization lock. The reusable `.github/workflows/release-app.yml` workflow
+builds one selected app in a `contents: read` job with no OIDC or attestation
+authority. An always-run fresh job downloads the uploaded artifact by immutable
+artifact id, checks out only the reusable workflow's exact SDK revision, uses
+supported Node 24, directly imports the trusted verifier, rechecks the selected
+app id and complete metadata, and becomes the sole source of reusable outputs.
+When requested, a third job downloads that same artifact id, independently
+repeats those checks against the post-upload outputs, and alone receives narrow
+OIDC/attestation permissions. No package manager, dependency resolution, caller
+checkout, check, or adapter runs with that authority. An unattested uploaded
+artifact is still not an authorized Arcane app by itself.
 
 ## SDK test sets
 
@@ -179,7 +241,7 @@ package installation, or assertions.
 
 ## Current target support
 
-Version `0.1.0-dev.2` exposes one browser target and five explicitly paired
+Version `0.1.0-dev.3` exposes one browser target and five explicitly paired
 native development targets: a verified non-runnable portable directory, a
 Windows x64 unsigned-local-test EXE bundle, Linux x64 and Linux ARM64
 unsigned-local-test DEBs, and an Android development-signed APK. The

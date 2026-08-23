@@ -63,6 +63,7 @@ export {
     assertNativeApplicationToolchainCompatibility,
     assertPortableToolchainCompatibility,
     buildApplication,
+    bundleApplication,
     checkApplication,
     createApplication,
     createToolchain,
@@ -81,6 +82,7 @@ export {
     runApplication,
     testApplication,
     verifyApplication,
+    verifyBundleApplication,
     verifyNativeArtifact
 } from './toolchain.mjs';
 export {createWorkspace,initWorkspace} from './scaffold.mjs';
@@ -128,3 +130,17 @@ export {
     readVerifiedAppReleaseFile,
     verifyApp
 } from './packager/core.mjs';
+export {
+    APP_BUNDLE_DESCRIPTOR_NAME,
+    APP_BUNDLE_EXTENSION,
+    APP_BUNDLE_FORMAT,
+    APP_BUNDLE_KIND,
+    APP_BUNDLE_LIMITS,
+    APP_BUNDLE_MANIFEST_NAME,
+    APP_BUNDLE_RELEASE_PATH,
+    APP_BUNDLE_SCHEMA_VERSION,
+    createAppReleaseBundle,
+    createCanonicalUstarHeader,
+    validateAppBundlePath,
+    verifyAppReleaseBundle
+} from './release-bundle.mjs';

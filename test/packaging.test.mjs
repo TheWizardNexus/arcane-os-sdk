@@ -5,6 +5,7 @@ import test from '../src/testing.mjs';
 import {createWorkspace} from '../src/scaffold.mjs';
 import {
     authenticateAppReleaseReceipt,
+    normalizeRelativePath,
     packageApp,
     readVerifiedAppReleaseFile,
     verifyApp
@@ -67,6 +68,8 @@ async function createExternalFixture(root){
     await writeFile(path.join(appRoot,'fixture-app.css'),'body { color: rgb(240, 240, 240); }\n');
     await mkdir(path.join(appRoot,'modules'));
     await writeFile(path.join(appRoot,'modules','App.js'),'export const ready=true;\n');
+    await writeFile(path.join(appRoot,'modules','z.js'),'export const latin=true;\n');
+    await writeFile(path.join(appRoot,'modules','é.js'),'export const accented=true;\n');
 
     const arcaneRoot=path.join(root,'node_modules','arcane-os','runtime','arcane');
     for(const directory of ['components','css','entities','img','modules']){
@@ -83,6 +86,24 @@ async function createExternalFixture(root){
         type:'module'
     });
 }
+
+test('packager rejects Windows device aliases and unsafe filename characters',()=>{
+    for(const filePath of [
+        'CLOCK$',
+        'assets/CONIN$.json',
+        'CONOUT$/child.js',
+        'models/COM¹.modelfile',
+        'devices/lpt²/value.json',
+        'assets/less<than.js',
+        'assets/greater>than.js',
+        'assets/double"quote.js',
+        'assets/vertical|bar.js',
+        'assets/question?mark.js',
+        'assets/asterisk*.js'
+    ]){
+        assert.throws(()=>normalizeRelativePath(filePath,'portable path'),/Unsafe portable path/u);
+    }
+});
 
 async function snapshotRelease(workspaceRoot){
     const releaseRoot=path.join(workspaceRoot,'dist','fixture-app');
@@ -121,6 +142,16 @@ test('external workspace packages deterministically and detects release tamperin
         'utf8'
     ));
     assert.deepEqual(first.receipt.files,releaseManifest.files);
+    const releasePaths=first.receipt.files.map(file=>file.path);
+    assert.deepEqual(
+        releasePaths,
+        [...releasePaths].sort((left,right)=>Buffer.compare(Buffer.from(left,'utf8'),Buffer.from(right,'utf8')))
+    );
+    assert.ok(
+        releasePaths.indexOf('apps/fixture-app/modules/z.js')
+            <releasePaths.indexOf('apps/fixture-app/modules/é.js'),
+        'NFC release paths must use defined UTF-8 byte order rather than locale collation'
+    );
     assert.ok(Object.isFrozen(first.receipt.files));
     assert.ok(Object.isFrozen(first.receipt.files[0]));
     assert.ok(Object.isFrozen(first.receipt.app));

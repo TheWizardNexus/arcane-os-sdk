@@ -1,5 +1,5 @@
 const SDK_NAME='arcane-os';
-const SDK_VERSION='0.1.0-dev.2';
+const SDK_VERSION='0.1.0-dev.3';
 
 function json(value){
     return `${JSON.stringify(value,null,2)}\n`;

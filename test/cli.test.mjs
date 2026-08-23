@@ -22,14 +22,15 @@ function memoryStream(){
 test('CLI help and version succeed through the shipped executable',async()=>{
     const help=await runCli(['--help']);
     assert.equal(help.code,0);
-    assert.match(help.stdout,/Arcane OS application SDK 0\.1\.0-dev\.2/);
+    assert.match(help.stdout,/Arcane OS application SDK 0\.1\.0-dev\.3/);
     assert.match(help.stdout,/external or integrated Arcane workspace/);
     assert.match(help.stdout,/arcane-os executables/);
     assert.match(help.stdout,/test --scope shared --test-file/);
+    assert.match(help.stdout,/verify-bundle <file[.]arcane-app[.]tar[.]gz>/);
 
     const version=await runCli(['--version']);
     assert.equal(version.code,0);
-    assert.equal(version.stdout.trim(),'0.1.0-dev.2');
+    assert.equal(version.stdout.trim(),'0.1.0-dev.3');
 });
 
 test('both installed command names execute the published CLI entry',async()=>{
@@ -45,7 +46,7 @@ test('both installed command names execute the published CLI entry',async()=>{
         assert.equal(invoked.code,0,invoked.stderr);
         const result=JSON.parse(invoked.stdout);
         assert.equal(result.ok,true);
-        assert.equal(result.result,'0.1.0-dev.2');
+        assert.equal(result.result,'0.1.0-dev.3');
     }
 });
 
@@ -204,12 +205,52 @@ test('CLI maps explicit app and shared development scopes without widening comma
     assert.equal(invocations[2].options.skipTests,false);
 });
 
+test('CLI maps one release bundle artifact without widening app selection',async()=>{
+    const invocations=[];
+    const execute=async(command,options)=>{
+        invocations.push({command,options});
+        return {ok:true};
+    };
+    for(const arguments_ of [
+        [
+            'bundle','--workspace','fixture','--app','selected-app',
+            '--artifact','release/selected.arcane-app.tar.gz','--overwrite'
+        ],
+        ['verify-bundle','release/selected.arcane-app.tar.gz']
+    ]){
+        const stdout=memoryStream();
+        const stderr=memoryStream();
+        const exitCode=await runCliInProcess(arguments_,{
+            cwd:'C:\\sdk-cli-fixture',
+            stdout:stdout.stream,
+            stderr:stderr.stream,
+            execute
+        });
+        assert.equal(exitCode,0,stderr.read());
+    }
+    assert.equal(invocations[0].command,'bundle');
+    assert.equal(invocations[0].options.appId,'selected-app');
+    assert.equal(invocations[0].options.overwrite,true);
+    assert.equal(
+        invocations[0].options.artifactPath,
+        path.resolve('C:\\sdk-cli-fixture','release/selected.arcane-app.tar.gz')
+    );
+    assert.equal(invocations[1].command,'verify-bundle');
+    assert.equal(invocations[1].options.appId,undefined);
+    assert.equal(invocations[1].options.overwrite,undefined);
+    assert.equal(invocations[1].options.artifactPath,invocations[0].options.artifactPath);
+});
+
 test('CLI rejects incomplete shared tests and shared output commands before execution',async()=>{
     for(const arguments_ of [
         ['test','--scope','shared'],
         ['test','--scope','shared','--test-file','test/one.test.mjs','--app','one'],
         ['check','--scope','shared','--skip-tests'],
         ['package','--scope','shared'],
+        ['bundle','--scope','shared'],
+        ['verify-bundle'],
+        ['verify-bundle','one.arcane-app.tar.gz','--artifact','two.arcane-app.tar.gz'],
+        ['verify-bundle','one.arcane-app.tar.gz','--overwrite'],
         ['build','--scope','shared','--target','browser']
     ]){
         const stdout=memoryStream();

@@ -66,6 +66,58 @@ because current Arcane native admission treats them as exact contracts. Native
 builders authenticate the schema-2 descriptor digest as a
 separate build input while exact v1 host artifacts remain unchanged.
 
+External repository delivery adds a distinct schema-1
+`arcane-app-release-bundle` envelope. Bundle creation accepts only a
+process-authenticated release receipt whose descriptor authority was an authored
+schema-2 `arcane-app.json`; a synthesized legacy descriptor remains valid for
+integrated packaging but cannot cross the external admission boundary. The
+archive contains exactly `ARCANE_APP_BUNDLE.json`, canonical `arcane-app.json`,
+`payload/ARCANE_APP_RELEASE.json`, and the release inventory beneath `payload/`
+in that order. The envelope adds no repository-only source or build tooling
+beyond that authenticated release inventory. Individual apps remain responsible
+for leak/source policy, and Arcane's source-free runtime gates remain separate.
+
+The byte contract is deterministic USTAR with regular 0644 files, zero owner
+ids and modification times, canonical UTF-8 paths and headers, exact zero
+padding, and exactly two terminal blocks, wrapped in one deterministic gzip
+member. NFC inventory paths use raw UTF-8 byte order, not host locale collation;
+the packager, bundle verifier, and Arcane importer share that ordering, while a
+pinned golden bundle digest runs across the supported Node and runner matrix.
+
+Verification parses the expanded stream without extraction, applies absolute
+size/cardinality and expansion-ratio ceilings, recompresses the stream to
+require the exact gzip encoding, and rejects appended bytes or concatenated
+members. Every source control, payload, staged archive, and verification input
+is opened no-follow as a single-link regular file, consumed at its recorded
+length with an EOF growth probe, and rechecked by handle and pathname identity.
+Every cumulative path prefix has one case-folded spelling and one file/directory
+kind; prefix topology conflicts and the complete portable Windows device-name
+set fail before creation or admission.
+The current SDK admits only the explicitly compatible `0.1.0-dev.3` bundle
+generation and rejects zero-byte payload releases.
+
+Promotion retains any prior output as an identity-bound backup until the new
+pathname has passed a second exact-length digest and single-link identity check
+and its immutable receipt is bound. Pre-commit failure restores that backup;
+post-commit backup or nonce-bound lock cleanup failure is surfaced as degraded
+cleanup and preserves the uncertain path for inspection. The receipt exposes
+artifact digest/bytes, descriptor canonical/file/package digests and bytes, and
+release manifest/policy/content digests, file count, and total payload bytes.
+These hashes prove internal consistency. Repository provenance or an
+independent signature plus an Arcane-owned authorization lock remains the
+separate installation authority.
+
+The reusable app-release workflow keeps caller checks and adapters in a
+`contents: read` build job. A fresh unprivileged job downloads the immutable
+upload by artifact id, checks the requested app id and complete identity with the
+exact called-workflow SDK, and alone supplies reusable outputs. Its conditional
+attestation job redownloads the same artifact id, repeats those checks against
+the post-upload outputs, and directly imports the dependency-free verifier from
+the trusted source checkout under supported Node 24 via the pinned
+`actions/setup-node` revision. No package-manager install, dependency
+resolution, caller checkout, or caller code runs while OIDC and
+attestation-write authority is present.
+
 ## Operation ownership
 
 An invocation defaults to one workspace, one app, one command, one target, one
@@ -144,7 +196,7 @@ through SDK-bound verified readers rather than accepting a mutable source path
 as authority. Build completion requires provider verification, and later
 verify/run calls receive the exact artifact receipt.
 
-The SDK `0.1.0-dev.2` runtime requires Arcane `0.8.12` or newer. Compatibility
+The SDK `0.1.0-dev.3` runtime requires Arcane `0.8.12` or newer. Compatibility
 is contractual rather than exact-version pinning: the prepared Core must meet
 the highest minimum declared by the runtime, selected app, and bundled app
 dependencies; keep each app's Arcane protocol generation; and provide every
