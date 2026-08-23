@@ -303,6 +303,57 @@ function fileObjectMatches(info,identity){
     return String(info.dev)===identity.device&&String(info.ino)===identity.inode;
 }
 
+function anchoredContentObjectMatches(info,identity){
+    return info.isFile()
+        &&fileObjectMatches(info,identity)
+        &&Number(info.size)===identity.bytes
+        &&String(info.nlink)===identity.links;
+}
+
+async function anchoredFileSha256(handle,identity,label,{signal}={}){
+    throwIfAborted(signal);
+    const before=await handle.stat({bigint:true});
+    if(!anchoredContentObjectMatches(before,identity)){
+        fail(`${label} did not retain its anchored file object before content verification.`);
+    }
+    const digest=createHash('sha256');
+    const buffer=Buffer.allocUnsafe(64*1024);
+    let position=0;
+    while(position<identity.bytes){
+        throwIfAborted(signal);
+        const requested=Math.min(buffer.length,identity.bytes-position);
+        const result=await handle.read(buffer,0,requested,position);
+        if(result.bytesRead===0)fail(`${label} ended before its anchored byte length.`);
+        digest.update(buffer.subarray(0,result.bytesRead));
+        position+=result.bytesRead;
+    }
+    throwIfAborted(signal);
+    const probe=Buffer.alloc(1);
+    const extra=await handle.read(probe,0,1,identity.bytes);
+    if(extra.bytesRead!==0)fail(`${label} grew beyond its anchored byte length.`);
+    throwIfAborted(signal);
+    const after=await handle.stat({bigint:true});
+    if(!anchoredContentObjectMatches(after,identity)){
+        fail(`${label} changed while its anchored content was verified.`);
+    }
+    throwIfAborted(signal);
+    return Object.freeze({
+        sha256:digest.digest('hex'),
+        before,
+        after
+    });
+}
+
+async function assertAnchoredContent(handle,identity,expectedSha256,label,{signal}={}){
+    const inspected=await anchoredFileSha256(handle,identity,label,{signal});
+    if(inspected.sha256!==expectedSha256){
+        fail(`${label} did not retain its anchored content identity.`);
+    }
+    if(!identityMatches(inspected.before,identity)||!identityMatches(inspected.after,identity)){
+        fail(`${label} did not retain its anchored metadata identity.`);
+    }
+}
+
 function isInside(parent,candidate){
     const relative=path.relative(parent,candidate);
     return relative===''||(!relative.startsWith('..')&&!path.isAbsolute(relative));
@@ -524,10 +575,17 @@ function createBundleManifest({descriptor,descriptorBytes,descriptorSha256,relea
 }
 
 class ArchiveFileWriter{
-    constructor(handle){
+    constructor(handle,state){
         this.handle=handle;
         this.digest=createHash('sha256');
         this.bytes=0;
+        this.state=state;
+        this.recordState();
+    }
+
+    recordState(){
+        this.state.contentBytes=this.bytes;
+        this.state.contentSha256=this.digest.copy().digest('hex');
     }
 
     async write(chunk){
@@ -536,12 +594,13 @@ class ArchiveFileWriter{
         while(offset<bytes.length){
             const result=await this.handle.write(bytes,offset,bytes.length-offset,null);
             if(result.bytesWritten===0)fail('Archive output stopped accepting bytes.');
+            this.digest.update(bytes.subarray(offset,offset+result.bytesWritten));
+            this.bytes+=result.bytesWritten;
             offset+=result.bytesWritten;
-        }
-        this.digest.update(bytes);
-        this.bytes+=bytes.length;
-        if(this.bytes>APP_BUNDLE_LIMITS.maxCompressedBytes){
-            fail('Compressed bundle exceeds its 512 MiB limit.',ERROR_CODES.policyDenied);
+            this.recordState();
+            if(this.bytes>APP_BUNDLE_LIMITS.maxCompressedBytes){
+                fail('Compressed bundle exceeds its 512 MiB limit.',ERROR_CODES.policyDenied);
+            }
         }
     }
 
@@ -595,7 +654,7 @@ async function* tarChunks(entries,{releaseRoot,signal,onEvent}={}){
 }
 
 async function writeDeterministicGzip(fileHandle,entries,options){
-    const writer=new ArchiveFileWriter(fileHandle);
+    const writer=new ArchiveFileWriter(fileHandle,options.stagingState);
     await writer.write(GZIP_HEADER);
     const crc=new Crc32Transform();
     const deflate=createDeflateRaw({level:9});
@@ -630,7 +689,7 @@ async function acquireArtifactLock(outputPath,{onEvent}={}){
     let documentBytes;
     let created=false;
     try{
-        handle=await open(lockPath,'wx',0o600);
+        handle=await open(lockPath,'wx+',0o600);
         created=true;
         const acquiredAtUtc=new Date().toISOString();
         const expiresAtUtc=new Date(Date.now()+2*60*60*1000).toISOString();
@@ -646,7 +705,6 @@ async function acquireArtifactLock(outputPath,{onEvent}={}){
         },null,2)}\n`,'utf8');
         await handle.writeFile(documentBytes);
         await handle.sync();
-        await emit(onEvent,Object.freeze({type:'bundle.lock.written',lockPath,nonce}));
         const opened=await handle.stat({bigint:true});
         if(!opened.isFile()||opened.nlink!==1n||Number(opened.size)!==documentBytes.length){
             fail('Artifact lock changed while it was acquired.',ERROR_CODES.policyDenied);
@@ -657,29 +715,33 @@ async function acquireArtifactLock(outputPath,{onEvent}={}){
             ||!identityMatches(current,lockIdentity)){
             fail('Artifact lock path changed while it was acquired.',ERROR_CODES.policyDenied);
         }
+        await emit(onEvent,Object.freeze({type:'bundle.lock.written',lockPath,nonce}));
+        lockIdentity=await anchoredSinglePathContentIdentity(
+            lockPath,
+            handle,
+            lockIdentity,
+            sha256(documentBytes),
+            'Acquired artifact lock'
+        );
         await handle.close();
         handle=null;
     }catch(error){
-        if(handle){
-            lockIdentity=await handle.stat({bigint:true}).then(fileIdentity,()=>lockIdentity);
-            await handle.close().catch(()=>{});
-            handle=null;
-        }
-        if(lockIdentity){
+        if(handle&&lockIdentity&&documentBytes){
             try{
-                const current=await lstat(lockPath,{bigint:true});
-                if(current.isFile()&&!current.isSymbolicLink()
-                    &&identityMatches(current,lockIdentity)){
-                    await rm(lockPath);
-                }else{
-                    appendErrorWarning(
-                        error,
-                        `Partial artifact lock was preserved at ${lockPath}; its identity changed before cleanup.`
-                    );
-                }
+                await anchoredSinglePathContentIdentity(
+                    lockPath,
+                    handle,
+                    lockIdentity,
+                    sha256(documentBytes),
+                    'Partial artifact lock cleanup'
+                );
+                await rm(lockPath);
             }catch(cleanupError){
                 if(cleanupError?.code!=='ENOENT'){
-                    appendErrorWarning(error,`Lock acquisition cleanup warning: ${cleanupError.message}`);
+                    appendErrorWarning(
+                        error,
+                        `Partial artifact lock was preserved at ${lockPath}; ${cleanupError.message}`
+                    );
                 }
             }
         }else if(created){
@@ -687,6 +749,17 @@ async function acquireArtifactLock(outputPath,{onEvent}={}){
                 error,
                 `Partial artifact lock was preserved at ${lockPath} because its FileHandle identity was unavailable; inspect its nonce and owner before recovery.`
             );
+        }
+        if(handle){
+            try{
+                await handle.close();
+            }catch(closeError){
+                appendErrorWarning(
+                    error,
+                    `Lock acquisition handle close warning: ${String(closeError?.message??closeError)}`
+                );
+            }
+            handle=null;
         }
         if(error?.code==='EEXIST'){
             fail(`Another bundle operation owns ${lockPath}. Inspect it before stale-lock recovery.`,ERROR_CODES.policyDenied);
@@ -734,7 +807,7 @@ async function acquireArtifactLock(outputPath,{onEvent}={}){
     };
 }
 
-async function inspectOutput(outputPath,{overwrite}){
+async function inspectOutput(outputPath,{overwrite,signal}){
     try{
         const info=await lstat(outputPath,{bigint:true});
         if(info.isSymbolicLink()||!info.isFile()||info.nlink!==1n){
@@ -746,11 +819,32 @@ async function inspectOutput(outputPath,{overwrite}){
         const opened=await openStableFile(outputPath,'existing bundle output',{
             maximum:APP_BUNDLE_LIMITS.maxCompressedBytes
         });
-        if(!identitiesEqual(opened.identity,fileIdentity(info))){
-            await opened.handle.close().catch(()=>{});
-            fail('Bundle output changed while its overwrite anchor was opened.',ERROR_CODES.policyDenied);
+        try{
+            if(!identitiesEqual(opened.identity,fileIdentity(info))){
+                fail('Bundle output changed while its overwrite anchor was opened.',ERROR_CODES.policyDenied);
+            }
+            const inspected=await anchoredFileSha256(
+                opened.handle,
+                opened.identity,
+                'Existing bundle output',
+                {signal}
+            );
+            if(!identityMatches(inspected.before,opened.identity)
+                ||!identityMatches(inspected.after,opened.identity)){
+                fail('Bundle output changed while its overwrite content was inspected.',ERROR_CODES.policyDenied);
+            }
+            return {...opened,contentSha256:inspected.sha256};
+        }catch(error){
+            try{
+                await opened.handle.close();
+            }catch(closeError){
+                appendErrorWarning(
+                    error,
+                    `Prior-output anchor close warning: ${String(closeError?.message??closeError)}`
+                );
+            }
+            throw error;
         }
-        return opened;
     }catch(error){
         if(error?.code==='ENOENT')return null;
         throw error;
@@ -830,6 +924,35 @@ async function anchoredLinkPairIdentity(firstPath,secondPath,handle,priorIdentit
     return linkedIdentity;
 }
 
+async function anchoredSinglePathContentIdentity(
+    filePath,
+    handle,
+    identity,
+    expectedSha256,
+    label,
+    options
+){
+    await assertAnchoredContent(handle,identity,expectedSha256,label,options);
+    const current=await anchoredSinglePathIdentity(filePath,handle,identity,label);
+    throwIfAborted(options?.signal);
+    return current;
+}
+
+async function anchoredLinkPairContentIdentity(
+    firstPath,
+    secondPath,
+    handle,
+    identity,
+    expectedSha256,
+    label,
+    options
+){
+    await assertAnchoredContent(handle,identity,expectedSha256,label,options);
+    const current=await anchoredLinkPairIdentity(firstPath,secondPath,handle,identity,label);
+    throwIfAborted(options?.signal);
+    return current;
+}
+
 function changedStagingCleanupIssue(temporary,message){
     return Object.freeze({
         scope:'artifact-staging',
@@ -843,7 +966,13 @@ function anchoredCleanupResult({issue=null,retryIdentity=null}={}){
     return Object.freeze({issue,retryIdentity});
 }
 
-async function cleanupAnchoredTemporary(temporary,handle,expectedIdentity){
+async function cleanupAnchoredTemporary(
+    temporary,
+    handle,
+    expectedIdentity,
+    expectedContentSha256,
+    expectedContentBytes
+){
     try{
         const anchored=await handle.stat({bigint:true});
         let current;
@@ -853,10 +982,11 @@ async function cleanupAnchoredTemporary(temporary,handle,expectedIdentity){
             if(error?.code==='ENOENT')return anchoredCleanupResult();
             throw error;
         }
+        let anchoredIdentity=fileIdentity(anchored);
         if(!anchored.isFile()||anchored.nlink!==1n
             ||current.isSymbolicLink()||!current.isFile()||current.nlink!==1n
-            ||!identityMatches(current,fileIdentity(anchored))
-            ||(expectedIdentity&&!identityMatches(current,expectedIdentity))){
+            ||!fileObjectMatches(current,anchoredIdentity)
+            ||Number(current.size)!==anchoredIdentity.bytes){
             return anchoredCleanupResult({
                 issue:changedStagingCleanupIssue(
                     temporary,
@@ -864,7 +994,36 @@ async function cleanupAnchoredTemporary(temporary,handle,expectedIdentity){
                 )
             });
         }
-        const anchoredIdentity=fileIdentity(anchored);
+        if(expectedContentSha256&&Number.isSafeInteger(expectedContentBytes)
+            &&expectedContentBytes>=0){
+            const contentIdentity=expectedIdentity??Object.freeze({
+                ...anchoredIdentity,
+                bytes:expectedContentBytes
+            });
+            try{
+                anchoredIdentity=await anchoredSinglePathContentIdentity(
+                    temporary,
+                    handle,
+                    contentIdentity,
+                    expectedContentSha256,
+                    'Verified bundle staging cleanup'
+                );
+            }catch(error){
+                return anchoredCleanupResult({
+                    issue:changedStagingCleanupIssue(
+                        temporary,
+                        `Preserved changed staging path ${temporary}; ${error.message}`
+                    )
+                });
+            }
+        }else{
+            return anchoredCleanupResult({
+                issue:changedStagingCleanupIssue(
+                    temporary,
+                    `Preserved staging path ${temporary}; no authoritative content identity was available for cleanup.`
+                )
+            });
+        }
         try{
             await rm(temporary);
         }catch(error){
@@ -895,14 +1054,79 @@ async function cleanupAnchoredTemporary(temporary,handle,expectedIdentity){
     }
 }
 
-async function cleanupOwnedTemporary(temporary,temporaryIdentity){
+async function cleanupOwnedTemporary(
+    temporary,
+    temporaryIdentity,
+    expectedContentSha256,
+    expectedContentBytes
+){
+    let opened;
+    const closeAnchor=async message=>{
+        if(!opened?.handle)return message;
+        const handle=opened.handle;
+        opened=null;
+        try{
+            await handle.close();
+            return message;
+        }catch(error){
+            const warning=`Retry-cleanup anchor close warning: ${String(error?.message??error)}`;
+            return message?`${message} ${warning}`:warning;
+        }
+    };
     try{
         const current=await lstat(temporary,{bigint:true});
-        if(!temporaryIdentity||current.isSymbolicLink()||!current.isFile()
-            ||current.nlink!==1n||!identityMatches(current,temporaryIdentity)){
+        if(!temporaryIdentity||!expectedContentSha256
+            ||!Number.isSafeInteger(expectedContentBytes)||expectedContentBytes<0
+            ||current.isSymbolicLink()||!current.isFile()||current.nlink!==1n
+            ||!fileObjectMatches(current,temporaryIdentity)
+            ||Number(current.size)!==temporaryIdentity.bytes
+            ||temporaryIdentity.bytes!==expectedContentBytes){
             return changedStagingCleanupIssue(
                 temporary,
                 `Preserved changed staging path ${temporary}; its complete no-follow single-link identity is not owned by this operation.`
+            );
+        }
+        opened=await openStableFile(temporary,'verified bundle staging retry cleanup',{
+            maximum:APP_BUNDLE_LIMITS.maxCompressedBytes
+        });
+        if(!fileObjectMatches(current,opened.identity)
+            ||!fileObjectMatches(current,temporaryIdentity)
+            ||opened.identity.bytes!==temporaryIdentity.bytes){
+            return changedStagingCleanupIssue(
+                temporary,
+                await closeAnchor(
+                    `Preserved changed staging path ${temporary}; its retry-cleanup file object is not owned by this operation.`
+                )
+            );
+        }
+        try{
+            await assertAnchoredContent(
+                opened.handle,
+                temporaryIdentity,
+                expectedContentSha256,
+                'Verified bundle staging retry cleanup'
+            );
+        }catch(error){
+            return changedStagingCleanupIssue(
+                temporary,
+                await closeAnchor(
+                    `Preserved changed staging path ${temporary}; ${error.message}`
+                )
+            );
+        }
+        const closeWarning=await closeAnchor(null);
+        if(closeWarning){
+            return changedStagingCleanupIssue(
+                temporary,
+                `Preserved changed staging path ${temporary}; ${closeWarning}`
+            );
+        }
+        const beforeRemove=await lstat(temporary,{bigint:true});
+        if(beforeRemove.isSymbolicLink()||!beforeRemove.isFile()||beforeRemove.nlink!==1n
+            ||!identityMatches(beforeRemove,temporaryIdentity)){
+            return changedStagingCleanupIssue(
+                temporary,
+                `Preserved changed staging path ${temporary}; its retry-cleanup identity changed before removal.`
             );
         }
         await rm(temporary);
@@ -917,10 +1141,12 @@ async function cleanupOwnedTemporary(temporary,temporaryIdentity){
             throw error;
         }
     }catch(error){
-        if(error?.code==='ENOENT')return null;
+        const closeWarning=await closeAnchor(null);
+        if(error?.code==='ENOENT'&&!closeWarning)return null;
         return changedStagingCleanupIssue(
             temporary,
             `Staging cleanup warning for ${temporary}: ${String(error?.message??error)}`
+                +(closeWarning?` ${closeWarning}`:'')
         );
     }
 }
@@ -929,8 +1155,16 @@ async function promoteArtifact(temporary,outputPath,{
     existingOutput,
     stagingState,
     anchorHandle,
-    onEvent
+    onEvent,
+    signal
 }){
+    await assertAnchoredContent(
+        anchorHandle,
+        stagingState.identity,
+        stagingState.contentSha256,
+        'Verified bundle staging',
+        {signal}
+    );
     await assertSingleLinkStaging(temporary,stagingState.identity);
     if(!existingOutput){
         let promoted=false;
@@ -940,7 +1174,15 @@ async function promoteArtifact(temporary,outputPath,{
                 outputPath,
                 replaced:false
             });
+            await assertAnchoredContent(
+                anchorHandle,
+                stagingState.identity,
+                stagingState.contentSha256,
+                'Verified bundle staging',
+                {signal}
+            );
             await assertSingleLinkStaging(temporary,stagingState.identity);
+            throwIfAborted(signal);
             await link(temporary,outputPath);
             promoted=true;
             stagingState.identity=await assertLinkedStagingPair(
@@ -949,6 +1191,7 @@ async function promoteArtifact(temporary,outputPath,{
                 stagingState.identity,
                 anchorHandle
             );
+            throwIfAborted(signal);
             await rm(temporary);
             stagingState.identity=await anchoredSinglePathIdentity(
                 outputPath,
@@ -960,7 +1203,9 @@ async function promoteArtifact(temporary,outputPath,{
                 outputPath,
                 backupPath:null,
                 backupIdentity:null,
+                backupContentSha256:null,
                 promotedIdentity:stagingState.identity,
+                promotedContentSha256:stagingState.contentSha256,
                 promoted,
                 replaced:false,
                 stagingPath:temporary,
@@ -979,7 +1224,9 @@ async function promoteArtifact(temporary,outputPath,{
                     outputPath,
                     backupPath:null,
                     backupIdentity:null,
+                    backupContentSha256:null,
                     promotedIdentity:stagingState.identity,
+                    promotedContentSha256:stagingState.contentSha256,
                     promoted,
                     stagingPath:temporary,
                     stagingState
@@ -997,16 +1244,20 @@ async function promoteArtifact(temporary,outputPath,{
     let outputVacated=false;
     let promoted=false;
     let backupIdentity=null;
+    const backupContentSha256=existingOutput.contentSha256;
     try{
-        const beforeBackup=await anchoredSinglePathIdentity(
+        const beforeBackup=await anchoredSinglePathContentIdentity(
             outputPath,
             existingOutput.handle,
             existingIdentity,
-            'Existing bundle output'
+            backupContentSha256,
+            'Existing bundle output',
+            {signal}
         );
         if(!identitiesEqual(beforeBackup,existingIdentity)){
             fail('Bundle output changed before atomic promotion; no file was overwritten.',ERROR_CODES.policyDenied);
         }
+        throwIfAborted(signal);
         await link(outputPath,backup);
         backupLinked=true;
         existingOutput.identity=await anchoredLinkPairIdentity(
@@ -1021,13 +1272,16 @@ async function promoteArtifact(temporary,outputPath,{
             outputPath,
             backupPath:backup
         });
-        existingOutput.identity=await anchoredLinkPairIdentity(
+        existingOutput.identity=await anchoredLinkPairContentIdentity(
             outputPath,
             backup,
             existingOutput.handle,
             existingOutput.identity,
-            'Bundle output backup'
+            backupContentSha256,
+            'Bundle output backup',
+            {signal}
         );
+        throwIfAborted(signal);
         await rm(outputPath);
         outputVacated=true;
         existingOutput.identity=await anchoredSinglePathIdentity(
@@ -1043,24 +1297,45 @@ async function promoteArtifact(temporary,outputPath,{
             backupPath:backup,
             replaced:true
         });
-        const stagedAfterEvent=await anchoredSinglePathIdentity(
+        const stagedAfterEvent=await anchoredSinglePathContentIdentity(
             temporary,
             anchorHandle,
             stagingState.identity,
-            'Verified bundle staging'
+            stagingState.contentSha256,
+            'Verified bundle staging',
+            {signal}
         );
         if(!identitiesEqual(stagedAfterEvent,stagingState.identity)){
             fail('Verified bundle staging changed before overwrite promotion.',ERROR_CODES.policyDenied);
         }
-        const backupAfterEvent=await anchoredSinglePathIdentity(
+        const backupAfterEvent=await anchoredSinglePathContentIdentity(
             backup,
             existingOutput.handle,
             backupIdentity,
-            'Preserved bundle backup'
+            backupContentSha256,
+            'Preserved bundle backup',
+            {signal}
         );
         if(!identitiesEqual(backupAfterEvent,backupIdentity)){
             fail('Preserved bundle backup changed before overwrite promotion.',ERROR_CODES.policyDenied);
         }
+        const reboundStaging=await anchoredSinglePathIdentity(
+            temporary,
+            anchorHandle,
+            stagedAfterEvent,
+            'Verified bundle staging'
+        );
+        const reboundBackup=await anchoredSinglePathIdentity(
+            backup,
+            existingOutput.handle,
+            backupAfterEvent,
+            'Preserved bundle backup'
+        );
+        if(!identitiesEqual(reboundStaging,stagedAfterEvent)
+            ||!identitiesEqual(reboundBackup,backupAfterEvent)){
+            fail('Bundle staging or preserved backup changed immediately before promotion.',ERROR_CODES.policyDenied);
+        }
+        throwIfAborted(signal);
         await link(temporary,outputPath);
         promoted=true;
         stagingState.identity=await assertLinkedStagingPair(
@@ -1069,6 +1344,7 @@ async function promoteArtifact(temporary,outputPath,{
             stagingState.identity,
             anchorHandle
         );
+        throwIfAborted(signal);
         await rm(temporary);
         stagingState.identity=await anchoredSinglePathIdentity(
             outputPath,
@@ -1080,7 +1356,9 @@ async function promoteArtifact(temporary,outputPath,{
             outputPath,
             backupPath:backup,
             backupIdentity,
+            backupContentSha256,
             promotedIdentity:stagingState.identity,
+            promotedContentSha256:stagingState.contentSha256,
             promoted,
             replaced:true,
             stagingPath:temporary,
@@ -1099,7 +1377,9 @@ async function promoteArtifact(temporary,outputPath,{
                 outputPath,
                 backupPath:backupLinked?backup:null,
                 backupIdentity,
+                backupContentSha256,
                 promotedIdentity:stagingState.identity,
+                promotedContentSha256:stagingState.contentSha256,
                 promoted,
                 stagingPath:temporary,
                 stagingState
@@ -1127,18 +1407,20 @@ async function promoteArtifact(temporary,outputPath,{
 async function removeUncommittedBackupLink({outputPath,backupPath,existingOutput}){
     const issues=[];
     try{
-        existingOutput.identity=await anchoredLinkPairIdentity(
+        existingOutput.identity=await anchoredLinkPairContentIdentity(
             outputPath,
             backupPath,
             existingOutput.handle,
             existingOutput.identity,
+            existingOutput.contentSha256,
             'Uncommitted bundle backup'
         );
         await rm(backupPath);
-        existingOutput.identity=await anchoredSinglePathIdentity(
+        existingOutput.identity=await anchoredSinglePathContentIdentity(
             outputPath,
             existingOutput.handle,
             existingOutput.identity,
+            existingOutput.contentSha256,
             'Existing output after backup cleanup'
         );
     }catch(error){
@@ -1151,6 +1433,7 @@ async function stableFileDigest(filePath,label,{signal}={}){
     const opened=await openStableFile(filePath,label,{
         maximum:APP_BUNDLE_LIMITS.maxCompressedBytes
     });
+    let operationError;
     try{
         const digest=createHash('sha256');
         const buffer=Buffer.allocUnsafe(64*1024);
@@ -1177,14 +1460,29 @@ async function stableFileDigest(filePath,label,{signal}={}){
             ||!identityMatches(canonical,opened.identity)){
             fail(`${label} changed while its promoted identity was verified.`);
         }
+        throwIfAborted(signal);
         return Object.freeze({
             path:canonicalPath,
             bytes:opened.identity.bytes,
             sha256:digest.digest('hex'),
             identity:opened.identity
         });
+    }catch(error){
+        operationError=error;
+        throw error;
     }finally{
-        await opened.handle.close().catch(()=>{});
+        try{
+            await opened.handle.close();
+        }catch(closeError){
+            if(operationError){
+                appendErrorWarning(
+                    operationError,
+                    `${label} handle close warning: ${String(closeError?.message??closeError)}`
+                );
+            }else{
+                throw closeError;
+            }
+        }
     }
 }
 
@@ -1193,7 +1491,7 @@ async function rollbackPromotion(transaction,{promotedHandle,backupHandle}={}){
     let outputAbsent=false;
     let recoverableBackupIdentity=null;
     if(transaction.backupPath){
-        if(!transaction.backupIdentity||!backupHandle){
+        if(!transaction.backupIdentity||!transaction.backupContentSha256||!backupHandle){
             issues.push(`preserve ${transaction.backupPath}; backup identity is unavailable before restore`);
             issues.push(`preserve promoted output path ${transaction.outputPath}; prior backup is not recoverable`);
             return issues;
@@ -1208,6 +1506,12 @@ async function rollbackPromotion(transaction,{promotedHandle,backupHandle}={}){
             if(!identitiesEqual(recoverableBackupIdentity,transaction.backupIdentity)){
                 throw new Error('Preserved bundle backup identity changed before restore.');
             }
+            await assertAnchoredContent(
+                backupHandle,
+                recoverableBackupIdentity,
+                transaction.backupContentSha256,
+                'Preserved bundle backup'
+            );
         }catch(error){
             if(error?.code==='ENOENT'){
                 issues.push(`preserved backup disappeared before restore: ${transaction.backupPath}`);
@@ -1228,12 +1532,32 @@ async function rollbackPromotion(transaction,{promotedHandle,backupHandle}={}){
                 issues.push(`preserve changed output path ${transaction.outputPath}; promoted handle identity is unavailable: ${error.message}`);
             }
         }
-        if(!transaction.promoted||!transaction.promotedIdentity
-            ||output.isSymbolicLink()||!output.isFile()
-            ||!identityMatches(output,transaction.promotedIdentity)
-            ||(promotedHandle&&(!anchored||!anchored.isFile()
-                ||!identityMatches(anchored,transaction.promotedIdentity)))){
-            issues.push(`preserve changed output path ${transaction.outputPath}; identity is not owned by this operation`);
+        let ownedContent=false;
+        if(transaction.promoted&&transaction.promotedIdentity
+            &&transaction.promotedContentSha256&&promotedHandle
+            &&!output.isSymbolicLink()&&output.isFile()
+            &&fileObjectMatches(output,transaction.promotedIdentity)
+            &&Number(output.size)===transaction.promotedIdentity.bytes
+            &&anchored?.isFile()
+            &&fileObjectMatches(anchored,transaction.promotedIdentity)
+            &&Number(anchored.size)===transaction.promotedIdentity.bytes){
+            try{
+                const reboundIdentity=await anchoredSinglePathContentIdentity(
+                    transaction.outputPath,
+                    promotedHandle,
+                    transaction.promotedIdentity,
+                    transaction.promotedContentSha256,
+                    'Promoted bundle output rollback'
+                );
+                ownedContent=identitiesEqual(reboundIdentity,transaction.promotedIdentity);
+            }catch(error){
+                issues.push(`preserve changed output path ${transaction.outputPath}; ${error.message}`);
+            }
+        }
+        if(!ownedContent){
+            if(!issues.some(issue=>issue.startsWith(`preserve changed output path ${transaction.outputPath};`))){
+                issues.push(`preserve changed output path ${transaction.outputPath}; identity is not owned by this operation`);
+            }
         }else{
             await rm(transaction.outputPath);
             outputAbsent=true;
@@ -1258,10 +1582,11 @@ async function rollbackPromotion(transaction,{promotedHandle,backupHandle}={}){
     }
     if(transaction.backupPath){
         try{
-            const backupIdentity=await anchoredSinglePathIdentity(
+            const backupIdentity=await anchoredSinglePathContentIdentity(
                 transaction.backupPath,
                 backupHandle,
                 recoverableBackupIdentity,
+                transaction.backupContentSha256,
                 'Preserved bundle backup'
             );
             if(!identitiesEqual(backupIdentity,recoverableBackupIdentity)){
@@ -1273,18 +1598,20 @@ async function rollbackPromotion(transaction,{promotedHandle,backupHandle}={}){
                 return issues;
             }
             await link(transaction.backupPath,transaction.outputPath);
-            const linkedIdentity=await anchoredLinkPairIdentity(
+            const linkedIdentity=await anchoredLinkPairContentIdentity(
                 transaction.outputPath,
                 transaction.backupPath,
                 backupHandle,
                 transaction.backupIdentity,
+                transaction.backupContentSha256,
                 'Create-only bundle restore'
             );
             await rm(transaction.backupPath);
-            await anchoredSinglePathIdentity(
+            await anchoredSinglePathContentIdentity(
                 transaction.outputPath,
                 backupHandle,
                 linkedIdentity,
+                transaction.backupContentSha256,
                 'Restored bundle output'
             );
         }catch(error){
@@ -1302,13 +1629,14 @@ async function rollbackPromotion(transaction,{promotedHandle,backupHandle}={}){
 async function finalizePromotion(transaction,{backupHandle}={}){
     if(!transaction.backupPath)return null;
     try{
-        if(!transaction.backupIdentity||!backupHandle){
+        if(!transaction.backupIdentity||!transaction.backupContentSha256||!backupHandle){
             throw new Error('Preserved artifact backup identity changed before cleanup.');
         }
-        const backupIdentity=await anchoredSinglePathIdentity(
+        const backupIdentity=await anchoredSinglePathContentIdentity(
             transaction.backupPath,
             backupHandle,
             transaction.backupIdentity,
+            transaction.backupContentSha256,
             'Preserved artifact backup'
         );
         if(!identitiesEqual(backupIdentity,transaction.backupIdentity)){
@@ -1982,14 +2310,18 @@ export async function createAppReleaseBundle({
     let handle;
     let existingOutput;
     let temporaryIdentity;
-    let stagingState;
+    const stagingState={
+        identity:null,
+        contentBytes:0,
+        contentSha256:sha256(Buffer.alloc(0))
+    };
     let committed=false;
     let promotion;
     let result;
     let operationError;
     const cleanupIssues=[];
     try{
-        existingOutput=await inspectOutput(output,{overwrite});
+        existingOutput=await inspectOutput(output,{overwrite,signal});
         await emit(onEvent,{
             type:'bundle.archive.started',
             outputPath:output,
@@ -1997,7 +2329,7 @@ export async function createAppReleaseBundle({
             version:descriptor.version,
             entryCount:entries.length
         });
-        handle=await open(temporary,'wx',0o600);
+        handle=await open(temporary,'wx+',0o600);
         const createdTemporary=await handle.stat({bigint:true});
         if(!createdTemporary.isFile()||createdTemporary.nlink!==1n){
             fail('New bundle staging is not an owned single-link regular file.',ERROR_CODES.policyDenied);
@@ -2005,10 +2337,21 @@ export async function createAppReleaseBundle({
         const encoded=await writeDeterministicGzip(handle,entries,{
             releaseRoot:canonicalReleaseRoot,
             signal,
-            onEvent
+            onEvent,
+            stagingState
         });
+        if(stagingState.contentSha256!==encoded.sha256
+            ||stagingState.contentBytes!==encoded.bytes){
+            fail('Archive writer did not retain its encoded content identity.');
+        }
         await handle.chmod(ARCHIVE_MODE);
         await handle.sync();
+        const encodedTemporary=await handle.stat({bigint:true});
+        if(!encodedTemporary.isFile()||encodedTemporary.nlink!==1n){
+            fail('Encoded bundle staging is not the originally created file object.',ERROR_CODES.policyDenied);
+        }
+        temporaryIdentity=fileIdentity(encodedTemporary);
+        stagingState.identity=temporaryIdentity;
         throwIfAborted(signal);
         await authenticateAppReleaseAuthority(receipt,{releaseRoot:canonicalReleaseRoot,signal});
         const verified=await verifyAppReleaseBundle({bundlePath:temporary,signal});
@@ -2028,7 +2371,9 @@ export async function createAppReleaseBundle({
         if(!identitiesEqual(temporaryIdentity,verified.artifactIdentity)){
             fail('Verified bundle staging changed after independent verification.');
         }
-        stagingState={identity:temporaryIdentity};
+        stagingState.identity=temporaryIdentity;
+        stagingState.contentBytes=verified.compressedBytes;
+        stagingState.contentSha256=verified.bundleSha256;
         await emit(onEvent,{
             type:'bundle.archive.verified',
             bundleSha256:verified.bundleSha256,
@@ -2039,7 +2384,8 @@ export async function createAppReleaseBundle({
             existingOutput,
             stagingState,
             anchorHandle:handle,
-            onEvent
+            onEvent,
+            signal
         });
         await emit(onEvent,{
             type:'bundle.archive.promoted',
@@ -2056,6 +2402,7 @@ export async function createAppReleaseBundle({
             ||!identityMatches(anchoredPromoted,promoted.identity)){
             fail('Promoted bundle digest was not read from the anchored staging object.');
         }
+        throwIfAborted(signal);
         const artifactReceipt=Object.freeze({
             ...verified,
             kind:'arcane-app-release-bundle-artifact',
@@ -2113,7 +2460,9 @@ export async function createAppReleaseBundle({
             const stagingCleanup=await cleanupAnchoredTemporary(
                 temporary,
                 handle,
-                stagingState?.identity??temporaryIdentity
+                stagingState?.identity??temporaryIdentity,
+                stagingState.contentSha256,
+                stagingState.contentBytes
             );
             if(stagingCleanup.issue)cleanupIssues.push(stagingCleanup.issue);
             retryStagingIdentity=stagingCleanup.retryIdentity;
@@ -2133,7 +2482,9 @@ export async function createAppReleaseBundle({
         if(!committed&&(!stagingCleanupHandled||retryStagingIdentity)){
             const stagingCleanup=await cleanupOwnedTemporary(
                 temporary,
-                retryStagingIdentity??stagingState?.identity??temporaryIdentity
+                retryStagingIdentity??stagingState?.identity??temporaryIdentity,
+                stagingState.contentSha256,
+                stagingState.contentBytes
             );
             if(stagingCleanup)cleanupIssues.push(stagingCleanup);
         }

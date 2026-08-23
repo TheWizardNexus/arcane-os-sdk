@@ -55,7 +55,15 @@ test('Check builds one npm tarball and executes those exact bytes on every suppo
     assert.match(workflow,/os: windows-2025[\s\S]*platform: win32[\s\S]*architecture: x64/u);
     assert.match(workflow,/os: ubuntu-24\.04[\s\S]*platform: linux[\s\S]*architecture: x64/u);
     assert.match(workflow,/os: macos-15[\s\S]*platform: darwin[\s\S]*architecture: arm64/u);
-    assert.match(workflow,/npm_config_cache: \$\{\{ runner\.temp \}\}\/arcane-sdk-npm-cache/u);
+    const exerciseStart=workflow.indexOf('  exercise_npm_release:');
+    const readinessStart=workflow.indexOf('  npm_release_ready:');
+    assert.ok(exerciseStart>=0&&readinessStart>exerciseStart);
+    const exerciseJob=workflow.slice(exerciseStart,readinessStart);
+    const cachePattern=/npm_config_cache: \$\{\{ runner\.temp \}\}\/arcane-sdk-npm-cache/gu;
+    assert.equal(exerciseJob.match(cachePattern)?.length,2);
+    assert.doesNotMatch(exerciseJob,/^    env:\s*\n      npm_config_cache:/mu);
+    assert.match(exerciseJob,/Install the exact Vanilla Test dependency\s*\n        env:\s*\n          npm_config_cache:/u);
+    assert.match(exerciseJob,/Exercise the downloaded tarball through Vanilla Test[\s\S]*npm_config_cache:/u);
     assert.match(workflow,/Use the pinned native test toolchain[\s\S]*node-version: 22\.23\.2/u);
     assert.match(workflow,/ARCANE_SDK_NPM_RELEASE_METADATA:[\s\S]*bin\/arcane-test\.mjs test\/tarball\.test\.mjs/u);
     assert.match(workflow,/npm_release_ready:[\s\S]*PACK_RESULT[\s\S]*MATRIX_RESULT/u);

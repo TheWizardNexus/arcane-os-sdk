@@ -503,10 +503,10 @@ test('bundle promotion is collision-safe, cancellable, and explicit about overwr
                 assert.equal(after.ino,before.ino);
                 assert.equal(after.size,before.size);
                 assert.equal(after.mtimeNs,before.mtimeNs);
-                assert.notEqual(after.ctimeNs,before.ctimeNs);
+                assert.equal(after.nlink,before.nlink);
             }
         }),
-        error=>/anchored two-link identity/u.test(error?.message??'')
+        error=>/anchored content identity/u.test(error?.message??'')
             &&/Backup cleanup warning/u.test(error.message)
     );
     assert.deepEqual(await readFile(backupLinkedPath),changedLinkedBytes);
@@ -514,7 +514,7 @@ test('bundle promotion is collision-safe, cancellable, and explicit about overwr
     await rm(changedBackupLink);
     await rm(backupLinkedPath);
 
-    const inPlaceTamper=Buffer.from('tampered after promotion');
+    let inPlaceTamper;
     await assert.rejects(
         createAppReleaseBundle({
             ...fixture,
@@ -523,17 +523,22 @@ test('bundle promotion is collision-safe, cancellable, and explicit about overwr
             onEvent:async event=>{
                 if(event.type==='bundle.archive.promoted'){
                     const before=await lstat(outputPath,{bigint:true});
-                    await appendFile(outputPath,inPlaceTamper);
+                    const beforeTimes=await lstat(outputPath);
+                    inPlaceTamper=await readFile(outputPath);
+                    inPlaceTamper[0]^=0xff;
+                    await writeFile(outputPath,inPlaceTamper);
+                    await utimes(outputPath,beforeTimes.atime,beforeTimes.mtime);
                     const after=await lstat(outputPath,{bigint:true});
                     assert.equal(after.dev,before.dev);
                     assert.equal(after.ino,before.ino);
+                    assert.equal(after.size,before.size);
                 }
             }
         }),
         error=>/Promoted bundle identity|promoted app release bundle/u.test(error?.message??'')
-            &&/Rollback warning: preserve changed output path/u.test(error.message)
+            &&/Rollback warning: preserve changed output path[\s\S]*anchored content identity/u.test(error.message)
     );
-    assert.deepEqual(await readFile(outputPath),Buffer.concat([original,inPlaceTamper]));
+    assert.deepEqual(await readFile(outputPath),inPlaceTamper);
     const inPlaceTamperBackups=(await readdir(workspaceRoot))
         .filter(name=>name.startsWith(`${path.basename(outputPath)}.backup-`));
     assert.equal(inPlaceTamperBackups.length,1);
@@ -660,8 +665,47 @@ test('bundle promotion is collision-safe, cancellable, and explicit about overwr
     );
     assert.deepEqual(leftovers,[]);
 
+    const entryFailurePath=path.join(workspaceRoot,`entry-failure${APP_BUNDLE_EXTENSION}`);
+    const entryFailure=new Error('entry callback failed after staging mutation');
+    let entryFailureStagingPath;
+    let entryFailureFirstByte;
+    await assert.rejects(
+        createAppReleaseBundle({
+            ...fixture,
+            outputPath:entryFailurePath,
+            onEvent:async event=>{
+                if(event.type!=='bundle.entry.written'||entryFailureStagingPath)return;
+                const temporary=(await readdir(workspaceRoot)).find(name=>
+                    name.startsWith(`.${path.basename(entryFailurePath)}.`)&&name.endsWith('.tmp')
+                );
+                assert.ok(temporary);
+                entryFailureStagingPath=path.join(workspaceRoot,temporary);
+                const before=await lstat(entryFailureStagingPath,{bigint:true});
+                const beforeTimes=await lstat(entryFailureStagingPath);
+                const changed=await readFile(entryFailureStagingPath);
+                assert.ok(changed.length>0);
+                changed[0]^=0xff;
+                entryFailureFirstByte=changed[0];
+                await writeFile(entryFailureStagingPath,changed);
+                await utimes(entryFailureStagingPath,beforeTimes.atime,beforeTimes.mtime);
+                const after=await lstat(entryFailureStagingPath,{bigint:true});
+                assert.equal(after.dev,before.dev);
+                assert.equal(after.ino,before.ino);
+                assert.equal(after.size,before.size);
+                throw entryFailure;
+            }
+        }),
+        error=>error===entryFailure
+            &&/Cleanup warning: Preserved changed staging path[\s\S]*anchored content identity/u.test(error.message)
+    );
+    await assert.rejects(readFile(entryFailurePath),{code:'ENOENT'});
+    const preservedEntryFailure=await readFile(entryFailureStagingPath);
+    assert.equal(preservedEntryFailure[0],entryFailureFirstByte);
+    await rm(entryFailureStagingPath);
+
     const tamperedPath=path.join(workspaceRoot,`tampered${APP_BUNDLE_EXTENSION}`);
     let tamperedStagingPath;
+    let tamperedStagingBytes;
     await assert.rejects(
         createAppReleaseBundle({
             ...fixture,
@@ -674,18 +718,58 @@ test('bundle promotion is collision-safe, cancellable, and explicit about overwr
                 assert.ok(temporary);
                 tamperedStagingPath=path.join(workspaceRoot,temporary);
                 const before=await lstat(tamperedStagingPath,{bigint:true});
-                await writeFile(tamperedStagingPath,'tampered after verification');
+                const beforeTimes=await lstat(tamperedStagingPath);
+                tamperedStagingBytes=await readFile(tamperedStagingPath);
+                tamperedStagingBytes[0]^=0xff;
+                await writeFile(tamperedStagingPath,tamperedStagingBytes);
+                await utimes(tamperedStagingPath,beforeTimes.atime,beforeTimes.mtime);
                 const after=await lstat(tamperedStagingPath,{bigint:true});
                 assert.equal(after.dev,before.dev);
                 assert.equal(after.ino,before.ino);
+                assert.equal(after.size,before.size);
             }
         }),
-        error=>/staging changed before atomic promotion/u.test(error?.message??'')
-            &&/Cleanup warning: Preserved changed staging path/u.test(error.message)
+        error=>/Verified bundle staging did not retain its anchored content identity/u.test(error?.message??'')
+            &&/Cleanup warning: Preserved changed staging path[\s\S]*anchored content identity/u.test(error.message)
     );
     await assert.rejects(readFile(tamperedPath),{code:'ENOENT'});
-    assert.equal(await readFile(tamperedStagingPath,'utf8'),'tampered after verification');
+    assert.deepEqual(await readFile(tamperedStagingPath),tamperedStagingBytes);
     await rm(tamperedStagingPath);
+
+    const failedCallbackPath=path.join(workspaceRoot,`failed-callback${APP_BUNDLE_EXTENSION}`);
+    const failedCallback=new Error('verified callback failed after staging mutation');
+    let failedCallbackStagingPath;
+    let failedCallbackStagingBytes;
+    await assert.rejects(
+        createAppReleaseBundle({
+            ...fixture,
+            outputPath:failedCallbackPath,
+            onEvent:async event=>{
+                if(event.type!=='bundle.archive.verified')return;
+                const temporary=(await readdir(workspaceRoot)).find(name=>
+                    name.startsWith(`.${path.basename(failedCallbackPath)}.`)&&name.endsWith('.tmp')
+                );
+                assert.ok(temporary);
+                failedCallbackStagingPath=path.join(workspaceRoot,temporary);
+                const before=await lstat(failedCallbackStagingPath,{bigint:true});
+                const beforeTimes=await lstat(failedCallbackStagingPath);
+                failedCallbackStagingBytes=await readFile(failedCallbackStagingPath);
+                failedCallbackStagingBytes[0]^=0xff;
+                await writeFile(failedCallbackStagingPath,failedCallbackStagingBytes);
+                await utimes(failedCallbackStagingPath,beforeTimes.atime,beforeTimes.mtime);
+                const after=await lstat(failedCallbackStagingPath,{bigint:true});
+                assert.equal(after.dev,before.dev);
+                assert.equal(after.ino,before.ino);
+                assert.equal(after.size,before.size);
+                throw failedCallback;
+            }
+        }),
+        error=>error===failedCallback
+            &&/Cleanup warning: Preserved changed staging path[\s\S]*anchored content identity/u.test(error.message)
+    );
+    await assert.rejects(readFile(failedCallbackPath),{code:'ENOENT'});
+    assert.deepEqual(await readFile(failedCallbackStagingPath),failedCallbackStagingBytes);
+    await rm(failedCallbackStagingPath);
 
     const replacedStagingOutput=path.join(workspaceRoot,`replaced-staging${APP_BUNDLE_EXTENSION}`);
     let replacedStagingPath;
@@ -704,7 +788,7 @@ test('bundle promotion is collision-safe, cancellable, and explicit about overwr
                 await writeFile(replacedStagingPath,'foreign staging replacement\n');
             }
         }),
-        error=>/staging changed before atomic promotion/u.test(error?.message??'')
+        error=>/staging (?:changed before atomic promotion|did not retain its anchored file object)/u.test(error?.message??'')
             &&/Cleanup warning: Preserved changed staging path/u.test(error.message)
     );
     await assert.rejects(readFile(replacedStagingOutput),{code:'ENOENT'});
@@ -728,7 +812,7 @@ test('bundle promotion is collision-safe, cancellable, and explicit about overwr
                 await writeFile(callbackStagingPath,'foreign callback staging\n');
             }
         }),
-        error=>/staging changed before atomic promotion/u.test(error?.message??'')
+        error=>/staging (?:changed before atomic promotion|did not retain its anchored file object)/u.test(error?.message??'')
             &&/Cleanup warning: Preserved changed staging path/u.test(error.message)
     );
     await assert.rejects(readFile(callbackStagingOutput),{code:'ENOENT'});
@@ -775,6 +859,81 @@ test('bundle locks preserve replacement leases and surface cleanup degradation',
         error=>error===callbackFailure
     );
     await assert.rejects(readFile(interruptedLock),{code:'ENOENT'});
+    const changedLockPath=path.join(workspaceRoot,`lock-changed${APP_BUNDLE_EXTENSION}`);
+    const changedLock=`${changedLockPath}.lock`;
+    const changedLockFailure=new Error('lock acquisition event changed the lease');
+    let changedLockBytes;
+    await assert.rejects(
+        createAppReleaseBundle({
+            ...fixture,
+            outputPath:changedLockPath,
+            onEvent:async event=>{
+                if(event.type!=='bundle.lock.written')return;
+                assert.equal(event.lockPath,changedLock);
+                const before=await lstat(changedLock,{bigint:true});
+                const beforeTimes=await lstat(changedLock);
+                changedLockBytes=await readFile(changedLock);
+                changedLockBytes[0]^=0xff;
+                await writeFile(changedLock,changedLockBytes);
+                await utimes(changedLock,beforeTimes.atime,beforeTimes.mtime);
+                const after=await lstat(changedLock,{bigint:true});
+                assert.equal(after.dev,before.dev);
+                assert.equal(after.ino,before.ino);
+                assert.equal(after.size,before.size);
+                throw changedLockFailure;
+            }
+        }),
+        error=>error===changedLockFailure
+            &&/Partial artifact lock was preserved[\s\S]*anchored content identity/u.test(error.message)
+    );
+    assert.deepEqual(await readFile(changedLock),changedLockBytes);
+    await rm(changedLock);
+    const returnedMutationPath=path.join(
+        workspaceRoot,
+        `lock-returned-mutation${APP_BUNDLE_EXTENSION}`
+    );
+    const returnedMutationLock=`${returnedMutationPath}.lock`;
+    let returnedMutationBytes;
+    await assert.rejects(
+        createAppReleaseBundle({
+            ...fixture,
+            outputPath:returnedMutationPath,
+            onEvent:async event=>{
+                if(event.type!=='bundle.lock.written')return;
+                returnedMutationBytes=await readFile(returnedMutationLock);
+                returnedMutationBytes[0]^=0xff;
+                await writeFile(returnedMutationLock,returnedMutationBytes);
+            }
+        }),
+        error=>/Acquired artifact lock did not retain its anchored content identity/u.test(
+            error?.message??''
+        )&&/Partial artifact lock was preserved/u.test(error.message)
+    );
+    assert.deepEqual(await readFile(returnedMutationLock),returnedMutationBytes);
+    await rm(returnedMutationLock);
+    const returnedReplacementPath=path.join(
+        workspaceRoot,
+        `lock-returned-replacement${APP_BUNDLE_EXTENSION}`
+    );
+    const returnedReplacementLock=`${returnedReplacementPath}.lock`;
+    await assert.rejects(
+        createAppReleaseBundle({
+            ...fixture,
+            outputPath:returnedReplacementPath,
+            onEvent:async event=>{
+                if(event.type!=='bundle.lock.written')return;
+                await rm(returnedReplacementLock);
+                await writeFile(returnedReplacementLock,'replacement lease returned by callback\n');
+            }
+        }),
+        error=>/Acquired artifact lock did not retain/u.test(error?.message??'')
+            &&/Partial artifact lock was preserved/u.test(error.message)
+    );
+    assert.equal(
+        await readFile(returnedReplacementLock,'utf8'),
+        'replacement lease returned by callback\n'
+    );
+    await rm(returnedReplacementLock);
     const result=await createAppReleaseBundle({
         ...fixture,
         outputPath,
