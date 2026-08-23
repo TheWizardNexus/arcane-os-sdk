@@ -15,8 +15,11 @@
   probes, final pathname/handle identity checks, and single-link enforcement;
   concatenated gzip members and appended bytes now fail closed.
 - Added create-only link promotion, explicit literal-boolean overwrite with
-  create-only backup/restore and identity-bound rollback, post-promotion digest
-  revalidation, nonce-bound inspectable locks, surfaced cleanup degradation,
+  create-only backup/restore, and rollback bound to the respective full
+  recorded identity tuples of both promoted output and prior backup, pinned by
+  open handles. Changed outputs preserve their backup, while a changed or
+  missing backup preserves the valid promoted output; added digest revalidation,
+  nonce-bound inspectable locks, surfaced cleanup degradation,
   safe cancellation, progress events, root SDK and toolchain APIs, and
   `arcane bundle` / `arcane verify-bundle` commands.
 - Defined NFC UTF-8 byte ordering for package and bundle inventories, pinned a

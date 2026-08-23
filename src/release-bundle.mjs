@@ -743,7 +743,14 @@ async function inspectOutput(outputPath,{overwrite}){
         if(!overwrite){
             fail('Bundle output already exists; pass overwrite: true or --overwrite to replace it.',ERROR_CODES.policyDenied);
         }
-        return fileIdentity(info);
+        const opened=await openStableFile(outputPath,'existing bundle output',{
+            maximum:APP_BUNDLE_LIMITS.maxCompressedBytes
+        });
+        if(!identitiesEqual(opened.identity,fileIdentity(info))){
+            await opened.handle.close().catch(()=>{});
+            fail('Bundle output changed while its overwrite anchor was opened.',ERROR_CODES.policyDenied);
+        }
+        return opened;
     }catch(error){
         if(error?.code==='ENOENT')return null;
         throw error;
@@ -758,14 +765,19 @@ async function assertSingleLinkStaging(temporary,temporaryIdentity){
     }
 }
 
-async function assertLinkedStagingPair(temporary,outputPath,temporaryIdentity){
-    const [staged,output]=await Promise.all([
+async function assertLinkedStagingPair(temporary,outputPath,temporaryIdentity,anchorHandle){
+    const [staged,output,anchored]=await Promise.all([
         lstat(temporary,{bigint:true}),
-        lstat(outputPath,{bigint:true})
+        lstat(outputPath,{bigint:true}),
+        anchorHandle.stat({bigint:true})
     ]);
+    const stagedIdentity=fileIdentity(staged);
     if(staged.isSymbolicLink()||output.isSymbolicLink()
-        ||!staged.isFile()||!output.isFile()
+        ||!staged.isFile()||!output.isFile()||!anchored.isFile()
         ||staged.nlink!==2n||output.nlink!==2n
+        ||anchored.nlink!==2n
+        ||!identityMatches(output,stagedIdentity)
+        ||!identityMatches(anchored,stagedIdentity)
         ||!fileObjectMatches(staged,temporaryIdentity)
         ||!fileObjectMatches(output,temporaryIdentity)
         ||Number(staged.size)!==temporaryIdentity.bytes
@@ -774,51 +786,153 @@ async function assertLinkedStagingPair(temporary,outputPath,temporaryIdentity){
         ||String(output.mtimeNs)!==temporaryIdentity.modifiedNanoseconds){
         fail('Bundle output and staging links did not retain the verified staging object.');
     }
+    return stagedIdentity;
 }
 
-async function cleanupOwnedTemporary(temporary,temporaryObjectIdentity){
+async function anchoredSinglePathIdentity(filePath,handle,priorIdentity,label){
+    const [current,anchored]=await Promise.all([
+        lstat(filePath,{bigint:true}),
+        handle.stat({bigint:true})
+    ]);
+    const currentIdentity=fileIdentity(current);
+    if(current.isSymbolicLink()||!current.isFile()||current.nlink!==1n
+        ||!anchored.isFile()||anchored.nlink!==1n
+        ||!identityMatches(anchored,currentIdentity)
+        ||(priorIdentity&&(priorIdentity.links==='1'
+            ?!identityMatches(current,priorIdentity)
+            :(!fileObjectMatches(current,priorIdentity)
+                ||Number(current.size)!==priorIdentity.bytes
+                ||String(current.mtimeNs)!==priorIdentity.modifiedNanoseconds)))){
+        fail(`${label} did not retain its anchored single-link identity.`);
+    }
+    return currentIdentity;
+}
+
+async function anchoredLinkPairIdentity(firstPath,secondPath,handle,priorIdentity,label){
+    const [first,second,anchored]=await Promise.all([
+        lstat(firstPath,{bigint:true}),
+        lstat(secondPath,{bigint:true}),
+        handle.stat({bigint:true})
+    ]);
+    const linkedIdentity=fileIdentity(first);
+    if(first.isSymbolicLink()||second.isSymbolicLink()
+        ||!first.isFile()||!second.isFile()||!anchored.isFile()
+        ||first.nlink!==2n||second.nlink!==2n||anchored.nlink!==2n
+        ||!identityMatches(second,linkedIdentity)
+        ||!identityMatches(anchored,linkedIdentity)
+        ||(priorIdentity.links==='2'
+            ?!identityMatches(first,priorIdentity)
+            :(!fileObjectMatches(first,priorIdentity)
+                ||Number(first.size)!==priorIdentity.bytes
+                ||String(first.mtimeNs)!==priorIdentity.modifiedNanoseconds))){
+        fail(`${label} did not retain its anchored two-link identity.`);
+    }
+    return linkedIdentity;
+}
+
+function changedStagingCleanupIssue(temporary,message){
+    return Object.freeze({
+        scope:'artifact-staging',
+        path:temporary,
+        message,
+        recovery:'Inspect the preserved staging path and remove it only after confirming its owner.'
+    });
+}
+
+function anchoredCleanupResult({issue=null,retryIdentity=null}={}){
+    return Object.freeze({issue,retryIdentity});
+}
+
+async function cleanupAnchoredTemporary(temporary,handle,expectedIdentity){
+    try{
+        const anchored=await handle.stat({bigint:true});
+        let current;
+        try{
+            current=await lstat(temporary,{bigint:true});
+        }catch(error){
+            if(error?.code==='ENOENT')return anchoredCleanupResult();
+            throw error;
+        }
+        if(!anchored.isFile()||anchored.nlink!==1n
+            ||current.isSymbolicLink()||!current.isFile()||current.nlink!==1n
+            ||!identityMatches(current,fileIdentity(anchored))
+            ||(expectedIdentity&&!identityMatches(current,expectedIdentity))){
+            return anchoredCleanupResult({
+                issue:changedStagingCleanupIssue(
+                    temporary,
+                    `Preserved changed staging path ${temporary}; it is not the exact file object held by the creation handle.`
+                )
+            });
+        }
+        const anchoredIdentity=fileIdentity(anchored);
+        try{
+            await rm(temporary);
+        }catch(error){
+            if(['EACCES','EBUSY','EPERM'].includes(error?.code)){
+                return anchoredCleanupResult({retryIdentity:anchoredIdentity});
+            }
+            throw error;
+        }
+        try{
+            await lstat(temporary,{bigint:true});
+            return anchoredCleanupResult({
+                issue:changedStagingCleanupIssue(
+                    temporary,
+                    `A staging path reappeared after anchored cleanup at ${temporary}.`
+                )
+            });
+        }catch(error){
+            if(error?.code==='ENOENT')return anchoredCleanupResult();
+            throw error;
+        }
+    }catch(error){
+        return anchoredCleanupResult({
+            issue:changedStagingCleanupIssue(
+                temporary,
+                `Anchored staging cleanup warning for ${temporary}: ${String(error?.message??error)}`
+            )
+        });
+    }
+}
+
+async function cleanupOwnedTemporary(temporary,temporaryIdentity){
     try{
         const current=await lstat(temporary,{bigint:true});
-        if(!temporaryObjectIdentity||current.isSymbolicLink()||!current.isFile()
-            ||current.nlink!==1n||!fileObjectMatches(current,temporaryObjectIdentity)){
-            return Object.freeze({
-                scope:'artifact-staging',
-                path:temporary,
-                message:`Preserved changed staging path ${temporary}; its no-follow single-link identity is not owned by this operation.`,
-                recovery:'Inspect the preserved staging path and remove it only after confirming its owner.'
-            });
+        if(!temporaryIdentity||current.isSymbolicLink()||!current.isFile()
+            ||current.nlink!==1n||!identityMatches(current,temporaryIdentity)){
+            return changedStagingCleanupIssue(
+                temporary,
+                `Preserved changed staging path ${temporary}; its complete no-follow single-link identity is not owned by this operation.`
+            );
         }
         await rm(temporary);
         try{
             await lstat(temporary,{bigint:true});
-            return Object.freeze({
-                scope:'artifact-staging',
-                path:temporary,
-                message:`A staging path reappeared after owned cleanup at ${temporary}.`,
-                recovery:'Inspect the replacement staging path and remove it only after confirming its owner.'
-            });
+            return changedStagingCleanupIssue(
+                temporary,
+                `A staging path reappeared after exact-identity cleanup at ${temporary}.`
+            );
         }catch(error){
             if(error?.code==='ENOENT')return null;
             throw error;
         }
     }catch(error){
         if(error?.code==='ENOENT')return null;
-        return Object.freeze({
-            scope:'artifact-staging',
-            path:temporary,
-            message:`Staging cleanup warning for ${temporary}: ${String(error?.message??error)}`,
-            recovery:'Inspect the preserved staging path and remove it only after confirming its owner.'
-        });
+        return changedStagingCleanupIssue(
+            temporary,
+            `Staging cleanup warning for ${temporary}: ${String(error?.message??error)}`
+        );
     }
 }
 
 async function promoteArtifact(temporary,outputPath,{
-    existingIdentity,
-    temporaryIdentity,
+    existingOutput,
+    stagingState,
+    anchorHandle,
     onEvent
 }){
-    await assertSingleLinkStaging(temporary,temporaryIdentity);
-    if(!existingIdentity){
+    await assertSingleLinkStaging(temporary,stagingState.identity);
+    if(!existingOutput){
         let promoted=false;
         try{
             await emit(onEvent,{
@@ -826,24 +940,31 @@ async function promoteArtifact(temporary,outputPath,{
                 outputPath,
                 replaced:false
             });
-            await assertSingleLinkStaging(temporary,temporaryIdentity);
+            await assertSingleLinkStaging(temporary,stagingState.identity);
             await link(temporary,outputPath);
             promoted=true;
-            await assertLinkedStagingPair(temporary,outputPath,temporaryIdentity);
+            stagingState.identity=await assertLinkedStagingPair(
+                temporary,
+                outputPath,
+                stagingState.identity,
+                anchorHandle
+            );
             await rm(temporary);
-            const current=await lstat(outputPath,{bigint:true});
-            if(current.isSymbolicLink()||!current.isFile()||current.nlink!==1n
-                ||!fileObjectMatches(current,temporaryIdentity)
-                ||Number(current.size)!==temporaryIdentity.bytes){
-                fail('Bundle output did not retain the verified staging identity during promotion.');
-            }
+            stagingState.identity=await anchoredSinglePathIdentity(
+                outputPath,
+                anchorHandle,
+                stagingState.identity,
+                'Bundle output'
+            );
             return Object.freeze({
                 outputPath,
                 backupPath:null,
                 backupIdentity:null,
-                promotedIdentity:fileIdentity(current),
+                promotedIdentity:stagingState.identity,
                 promoted,
-                replaced:false
+                replaced:false,
+                stagingPath:temporary,
+                stagingState
             });
         }catch(error){
             const failure=error?.code==='EEXIST'
@@ -858,9 +979,11 @@ async function promoteArtifact(temporary,outputPath,{
                     outputPath,
                     backupPath:null,
                     backupIdentity:null,
-                    promotedIdentity:temporaryIdentity,
-                    promoted
-                });
+                    promotedIdentity:stagingState.identity,
+                    promoted,
+                    stagingPath:temporary,
+                    stagingState
+                },{promotedHandle:anchorHandle});
                 if(rollbackIssues.length){
                     appendErrorWarning(failure,`Rollback warning: ${rollbackIssues.join('; ')}`);
                 }
@@ -868,81 +991,100 @@ async function promoteArtifact(temporary,outputPath,{
             throw failure;
         }
     }
+    const existingIdentity=existingOutput.identity;
     const backup=`${outputPath}.backup-${process.pid}-${randomBytes(6).toString('hex')}`;
     let backupLinked=false;
     let outputVacated=false;
     let promoted=false;
     let backupIdentity=null;
     try{
-        const beforeBackup=await lstat(outputPath,{bigint:true});
-        if(beforeBackup.isSymbolicLink()||!beforeBackup.isFile()||beforeBackup.nlink!==1n
-            ||!identityMatches(beforeBackup,existingIdentity)){
+        const beforeBackup=await anchoredSinglePathIdentity(
+            outputPath,
+            existingOutput.handle,
+            existingIdentity,
+            'Existing bundle output'
+        );
+        if(!identitiesEqual(beforeBackup,existingIdentity)){
             fail('Bundle output changed before atomic promotion; no file was overwritten.',ERROR_CODES.policyDenied);
         }
         await link(outputPath,backup);
         backupLinked=true;
+        existingOutput.identity=await anchoredLinkPairIdentity(
+            outputPath,
+            backup,
+            existingOutput.handle,
+            existingOutput.identity,
+            'Bundle output backup'
+        );
         await emit(onEvent,{
             type:'bundle.archive.backup-linked',
             outputPath,
             backupPath:backup
         });
-        const linkedOutput=await lstat(outputPath,{bigint:true});
-        const linkedBackup=await lstat(backup,{bigint:true});
-        if(linkedOutput.isSymbolicLink()||linkedBackup.isSymbolicLink()
-            ||!linkedOutput.isFile()||!linkedBackup.isFile()
-            ||linkedOutput.nlink!==2n||linkedBackup.nlink!==2n
-            ||!fileObjectMatches(linkedOutput,existingIdentity)
-            ||!fileObjectMatches(linkedBackup,existingIdentity)
-            ||Number(linkedOutput.size)!==existingIdentity.bytes
-            ||Number(linkedBackup.size)!==existingIdentity.bytes
-            ||String(linkedOutput.mtimeNs)!==existingIdentity.modifiedNanoseconds
-            ||String(linkedBackup.mtimeNs)!==existingIdentity.modifiedNanoseconds){
-            fail('Bundle output backup did not retain the prior artifact object.');
-        }
+        existingOutput.identity=await anchoredLinkPairIdentity(
+            outputPath,
+            backup,
+            existingOutput.handle,
+            existingOutput.identity,
+            'Bundle output backup'
+        );
         await rm(outputPath);
         outputVacated=true;
-        const preserved=await lstat(backup,{bigint:true});
-        if(preserved.isSymbolicLink()||!preserved.isFile()||preserved.nlink!==1n
-            ||!fileObjectMatches(preserved,existingIdentity)
-            ||Number(preserved.size)!==existingIdentity.bytes){
-            fail('Bundle output backup changed while the destination was vacated.');
-        }
-        backupIdentity=fileIdentity(preserved);
+        existingOutput.identity=await anchoredSinglePathIdentity(
+            backup,
+            existingOutput.handle,
+            existingOutput.identity,
+            'Vacated bundle output backup'
+        );
+        backupIdentity=existingOutput.identity;
         await emit(onEvent,{
             type:'bundle.archive.output-vacated',
             outputPath,
             backupPath:backup,
             replaced:true
         });
-        const [stagedAfterEvent,backupAfterEvent]=await Promise.all([
-            lstat(temporary,{bigint:true}),
-            lstat(backup,{bigint:true})
-        ]);
-        if(stagedAfterEvent.isSymbolicLink()||!stagedAfterEvent.isFile()
-            ||stagedAfterEvent.nlink!==1n||!identityMatches(stagedAfterEvent,temporaryIdentity)){
+        const stagedAfterEvent=await anchoredSinglePathIdentity(
+            temporary,
+            anchorHandle,
+            stagingState.identity,
+            'Verified bundle staging'
+        );
+        if(!identitiesEqual(stagedAfterEvent,stagingState.identity)){
             fail('Verified bundle staging changed before overwrite promotion.',ERROR_CODES.policyDenied);
         }
-        if(backupAfterEvent.isSymbolicLink()||!backupAfterEvent.isFile()
-            ||backupAfterEvent.nlink!==1n||!identityMatches(backupAfterEvent,backupIdentity)){
+        const backupAfterEvent=await anchoredSinglePathIdentity(
+            backup,
+            existingOutput.handle,
+            backupIdentity,
+            'Preserved bundle backup'
+        );
+        if(!identitiesEqual(backupAfterEvent,backupIdentity)){
             fail('Preserved bundle backup changed before overwrite promotion.',ERROR_CODES.policyDenied);
         }
         await link(temporary,outputPath);
         promoted=true;
-        await assertLinkedStagingPair(temporary,outputPath,temporaryIdentity);
+        stagingState.identity=await assertLinkedStagingPair(
+            temporary,
+            outputPath,
+            stagingState.identity,
+            anchorHandle
+        );
         await rm(temporary);
-        const currentOutput=await lstat(outputPath,{bigint:true});
-        if(currentOutput.isSymbolicLink()||!currentOutput.isFile()||currentOutput.nlink!==1n
-            ||!fileObjectMatches(currentOutput,temporaryIdentity)
-            ||Number(currentOutput.size)!==temporaryIdentity.bytes){
-            fail('Bundle output did not retain the verified staging identity during promotion.');
-        }
+        stagingState.identity=await anchoredSinglePathIdentity(
+            outputPath,
+            anchorHandle,
+            stagingState.identity,
+            'Bundle output'
+        );
         return Object.freeze({
             outputPath,
             backupPath:backup,
             backupIdentity,
-            promotedIdentity:fileIdentity(currentOutput),
+            promotedIdentity:stagingState.identity,
             promoted,
-            replaced:true
+            replaced:true,
+            stagingPath:temporary,
+            stagingState
         });
     }catch(error){
         const failure=error?.code==='EEXIST'
@@ -957,8 +1099,13 @@ async function promoteArtifact(temporary,outputPath,{
                 outputPath,
                 backupPath:backupLinked?backup:null,
                 backupIdentity,
-                promotedIdentity:temporaryIdentity,
-                promoted
+                promotedIdentity:stagingState.identity,
+                promoted,
+                stagingPath:temporary,
+                stagingState
+            },{
+                promotedHandle:anchorHandle,
+                backupHandle:existingOutput.handle
             });
             if(rollbackIssues.length){
                 appendErrorWarning(failure,`Rollback warning: ${rollbackIssues.join('; ')}`);
@@ -967,7 +1114,7 @@ async function promoteArtifact(temporary,outputPath,{
             const cleanupIssues=await removeUncommittedBackupLink({
                 outputPath,
                 backupPath:backup,
-                existingIdentity
+                existingOutput
             });
             if(cleanupIssues.length){
                 appendErrorWarning(failure,`Backup cleanup warning: ${cleanupIssues.join('; ')}`);
@@ -977,29 +1124,25 @@ async function promoteArtifact(temporary,outputPath,{
     }
 }
 
-async function removeUncommittedBackupLink({outputPath,backupPath,existingIdentity}){
+async function removeUncommittedBackupLink({outputPath,backupPath,existingOutput}){
     const issues=[];
     try{
-        const output=await lstat(outputPath,{bigint:true});
-        const backup=await lstat(backupPath,{bigint:true});
-        if(output.isSymbolicLink()||backup.isSymbolicLink()||!output.isFile()||!backup.isFile()
-            ||output.nlink!==2n||backup.nlink!==2n
-            ||!fileObjectMatches(output,existingIdentity)
-            ||!fileObjectMatches(backup,existingIdentity)
-            ||Number(output.size)!==existingIdentity.bytes
-            ||Number(backup.size)!==existingIdentity.bytes){
-            issues.push(`preserve ${backupPath}; backup link identity is uncertain`);
-            return issues;
-        }
+        existingOutput.identity=await anchoredLinkPairIdentity(
+            outputPath,
+            backupPath,
+            existingOutput.handle,
+            existingOutput.identity,
+            'Uncommitted bundle backup'
+        );
         await rm(backupPath);
-        const retained=await lstat(outputPath,{bigint:true});
-        if(retained.isSymbolicLink()||!retained.isFile()||retained.nlink!==1n
-            ||!fileObjectMatches(retained,existingIdentity)
-            ||Number(retained.size)!==existingIdentity.bytes){
-            issues.push(`existing output ${outputPath} did not retain its object after backup cleanup`);
-        }
+        existingOutput.identity=await anchoredSinglePathIdentity(
+            outputPath,
+            existingOutput.handle,
+            existingOutput.identity,
+            'Existing output after backup cleanup'
+        );
     }catch(error){
-        issues.push(`remove uncommitted backup ${backupPath}: ${error.message}`);
+        issues.push(`preserve uncommitted backup ${backupPath}: ${error.message}`);
     }
     return issues;
 }
@@ -1045,17 +1188,69 @@ async function stableFileDigest(filePath,label,{signal}={}){
     }
 }
 
-async function rollbackPromotion(transaction){
+async function rollbackPromotion(transaction,{promotedHandle,backupHandle}={}){
     const issues=[];
     let outputAbsent=false;
+    let recoverableBackupIdentity=null;
+    if(transaction.backupPath){
+        if(!transaction.backupIdentity||!backupHandle){
+            issues.push(`preserve ${transaction.backupPath}; backup identity is unavailable before restore`);
+            issues.push(`preserve promoted output path ${transaction.outputPath}; prior backup is not recoverable`);
+            return issues;
+        }
+        try{
+            recoverableBackupIdentity=await anchoredSinglePathIdentity(
+                transaction.backupPath,
+                backupHandle,
+                transaction.backupIdentity,
+                'Preserved bundle backup'
+            );
+            if(!identitiesEqual(recoverableBackupIdentity,transaction.backupIdentity)){
+                throw new Error('Preserved bundle backup identity changed before restore.');
+            }
+        }catch(error){
+            if(error?.code==='ENOENT'){
+                issues.push(`preserved backup disappeared before restore: ${transaction.backupPath}`);
+            }else{
+                issues.push(`preserve ${transaction.backupPath}; backup identity changed before restore: ${error.message}`);
+            }
+            issues.push(`preserve promoted output path ${transaction.outputPath}; prior backup is not recoverable`);
+            return issues;
+        }
+    }
     try{
         const output=await lstat(transaction.outputPath,{bigint:true});
-        if(!transaction.promoted||output.isSymbolicLink()||!output.isFile()
-            ||!fileObjectMatches(output,transaction.promotedIdentity)){
+        let anchored;
+        if(promotedHandle){
+            try{
+                anchored=await promotedHandle.stat({bigint:true});
+            }catch(error){
+                issues.push(`preserve changed output path ${transaction.outputPath}; promoted handle identity is unavailable: ${error.message}`);
+            }
+        }
+        if(!transaction.promoted||!transaction.promotedIdentity
+            ||output.isSymbolicLink()||!output.isFile()
+            ||!identityMatches(output,transaction.promotedIdentity)
+            ||(promotedHandle&&(!anchored||!anchored.isFile()
+                ||!identityMatches(anchored,transaction.promotedIdentity)))){
             issues.push(`preserve changed output path ${transaction.outputPath}; identity is not owned by this operation`);
         }else{
             await rm(transaction.outputPath);
             outputAbsent=true;
+            if(transaction.stagingPath&&transaction.stagingState&&promotedHandle){
+                try{
+                    transaction.stagingState.identity=await anchoredSinglePathIdentity(
+                        transaction.stagingPath,
+                        promotedHandle,
+                        transaction.promotedIdentity,
+                        'Rolled-back bundle staging'
+                    );
+                }catch(error){
+                    if(error?.code!=='ENOENT'){
+                        issues.push(`refresh rolled-back staging identity: ${error.message}`);
+                    }
+                }
+            }
         }
     }catch(error){
         if(error?.code==='ENOENT')outputAbsent=true;
@@ -1063,9 +1258,13 @@ async function rollbackPromotion(transaction){
     }
     if(transaction.backupPath){
         try{
-            const backup=await lstat(transaction.backupPath,{bigint:true});
-            if(!transaction.backupIdentity||backup.isSymbolicLink()||!backup.isFile()
-                ||backup.nlink!==1n||!identityMatches(backup,transaction.backupIdentity)){
+            const backupIdentity=await anchoredSinglePathIdentity(
+                transaction.backupPath,
+                backupHandle,
+                recoverableBackupIdentity,
+                'Preserved bundle backup'
+            );
+            if(!identitiesEqual(backupIdentity,recoverableBackupIdentity)){
                 issues.push(`preserve ${transaction.backupPath}; backup identity changed before restore`);
                 return issues;
             }
@@ -1074,25 +1273,20 @@ async function rollbackPromotion(transaction){
                 return issues;
             }
             await link(transaction.backupPath,transaction.outputPath);
-            const linkedOutput=await lstat(transaction.outputPath,{bigint:true});
-            const linkedBackup=await lstat(transaction.backupPath,{bigint:true});
-            if(linkedOutput.isSymbolicLink()||linkedBackup.isSymbolicLink()
-                ||!linkedOutput.isFile()||!linkedBackup.isFile()
-                ||linkedOutput.nlink!==2n||linkedBackup.nlink!==2n
-                ||!fileObjectMatches(linkedOutput,transaction.backupIdentity)
-                ||!fileObjectMatches(linkedBackup,transaction.backupIdentity)
-                ||Number(linkedOutput.size)!==transaction.backupIdentity.bytes
-                ||Number(linkedBackup.size)!==transaction.backupIdentity.bytes){
-                issues.push(`create-only restore ${transaction.outputPath} did not retain the backup object`);
-                return issues;
-            }
+            const linkedIdentity=await anchoredLinkPairIdentity(
+                transaction.outputPath,
+                transaction.backupPath,
+                backupHandle,
+                transaction.backupIdentity,
+                'Create-only bundle restore'
+            );
             await rm(transaction.backupPath);
-            const restored=await lstat(transaction.outputPath,{bigint:true});
-            if(restored.isSymbolicLink()||!restored.isFile()||restored.nlink!==1n
-                ||!fileObjectMatches(restored,transaction.backupIdentity)
-                ||Number(restored.size)!==transaction.backupIdentity.bytes){
-                issues.push(`restored output ${transaction.outputPath} did not retain the preserved artifact object`);
-            }
+            await anchoredSinglePathIdentity(
+                transaction.outputPath,
+                backupHandle,
+                linkedIdentity,
+                'Restored bundle output'
+            );
         }catch(error){
             if(error?.code==='EEXIST'){
                 issues.push(`preserve ${transaction.backupPath}; create-only restore found an occupied output path`);
@@ -1105,12 +1299,19 @@ async function rollbackPromotion(transaction){
     return issues;
 }
 
-async function finalizePromotion(transaction){
+async function finalizePromotion(transaction,{backupHandle}={}){
     if(!transaction.backupPath)return null;
     try{
-        const backup=await lstat(transaction.backupPath,{bigint:true});
-        if(!transaction.backupIdentity||backup.isSymbolicLink()||!backup.isFile()
-            ||backup.nlink!==1n||!identityMatches(backup,transaction.backupIdentity)){
+        if(!transaction.backupIdentity||!backupHandle){
+            throw new Error('Preserved artifact backup identity changed before cleanup.');
+        }
+        const backupIdentity=await anchoredSinglePathIdentity(
+            transaction.backupPath,
+            backupHandle,
+            transaction.backupIdentity,
+            'Preserved artifact backup'
+        );
+        if(!identitiesEqual(backupIdentity,transaction.backupIdentity)){
             throw new Error('Preserved artifact backup identity changed before cleanup.');
         }
         await rm(transaction.backupPath);
@@ -1779,15 +1980,16 @@ export async function createAppReleaseBundle({
     const temporary=path.join(path.dirname(output),`.${path.basename(output)}.${token}.tmp`);
     const releaseLock=await acquireArtifactLock(output,{onEvent});
     let handle;
-    let temporaryObjectIdentity;
+    let existingOutput;
     let temporaryIdentity;
+    let stagingState;
     let committed=false;
     let promotion;
     let result;
     let operationError;
     const cleanupIssues=[];
     try{
-        const existingIdentity=await inspectOutput(output,{overwrite});
+        existingOutput=await inspectOutput(output,{overwrite});
         await emit(onEvent,{
             type:'bundle.archive.started',
             outputPath:output,
@@ -1800,7 +2002,6 @@ export async function createAppReleaseBundle({
         if(!createdTemporary.isFile()||createdTemporary.nlink!==1n){
             fail('New bundle staging is not an owned single-link regular file.',ERROR_CODES.policyDenied);
         }
-        temporaryObjectIdentity=fileIdentity(createdTemporary);
         const encoded=await writeDeterministicGzip(handle,entries,{
             releaseRoot:canonicalReleaseRoot,
             signal,
@@ -1808,8 +2009,6 @@ export async function createAppReleaseBundle({
         });
         await handle.chmod(ARCHIVE_MODE);
         await handle.sync();
-        await handle.close();
-        handle=null;
         throwIfAborted(signal);
         await authenticateAppReleaseAuthority(receipt,{releaseRoot:canonicalReleaseRoot,signal});
         const verified=await verifyAppReleaseBundle({bundlePath:temporary,signal});
@@ -1821,12 +2020,15 @@ export async function createAppReleaseBundle({
             fail('Verified bundle staging is not a regular file.',ERROR_CODES.policyDenied);
         }
         temporaryIdentity=fileIdentity(temporaryInfo);
-        if(!fileObjectMatches(temporaryInfo,temporaryObjectIdentity)){
+        const anchoredTemporary=await handle.stat({bigint:true});
+        if(!anchoredTemporary.isFile()||anchoredTemporary.nlink!==1n
+            ||!identityMatches(anchoredTemporary,temporaryIdentity)){
             fail('Verified bundle staging is not the originally created file object.',ERROR_CODES.policyDenied);
         }
         if(!identitiesEqual(temporaryIdentity,verified.artifactIdentity)){
             fail('Verified bundle staging changed after independent verification.');
         }
+        stagingState={identity:temporaryIdentity};
         await emit(onEvent,{
             type:'bundle.archive.verified',
             bundleSha256:verified.bundleSha256,
@@ -1834,8 +2036,9 @@ export async function createAppReleaseBundle({
         });
         throwIfAborted(signal);
         promotion=await promoteArtifact(temporary,output,{
-            existingIdentity,
-            temporaryIdentity,
+            existingOutput,
+            stagingState,
+            anchorHandle:handle,
             onEvent
         });
         await emit(onEvent,{
@@ -1848,14 +2051,23 @@ export async function createAppReleaseBundle({
             ||promoted.bytes!==verified.compressedBytes){
             fail('Promoted bundle identity does not match the independently verified staging bytes.');
         }
+        const anchoredPromoted=await handle.stat({bigint:true});
+        if(!anchoredPromoted.isFile()||anchoredPromoted.nlink!==1n
+            ||!identityMatches(anchoredPromoted,promoted.identity)){
+            fail('Promoted bundle digest was not read from the anchored staging object.');
+        }
         const artifactReceipt=Object.freeze({
             ...verified,
             kind:'arcane-app-release-bundle-artifact',
             bundlePath:promoted.path,
             artifactIdentity:promoted.identity
         });
+        await handle.close();
+        handle=null;
         committed=true;
-        const backupCleanup=await finalizePromotion(promotion);
+        const backupCleanup=await finalizePromotion(promotion,{
+            backupHandle:existingOutput?.handle
+        });
         if(backupCleanup)cleanupIssues.push(backupCleanup);
         let eventDelivery;
         try{
@@ -1886,16 +2098,57 @@ export async function createAppReleaseBundle({
     }catch(error){
         operationError=error;
         if(promotion&&!committed){
-            const rollbackIssues=await rollbackPromotion(promotion);
+            const rollbackIssues=await rollbackPromotion(promotion,{
+                promotedHandle:handle,
+                backupHandle:existingOutput?.handle
+            });
             if(rollbackIssues.length){
                 appendErrorWarning(error,`Rollback warning: ${rollbackIssues.join('; ')}`);
             }
         }
     }finally{
-        await handle?.close().catch(()=>{});
-        if(!committed){
-            const stagingCleanup=await cleanupOwnedTemporary(temporary,temporaryObjectIdentity);
+        let stagingCleanupHandled=false;
+        let retryStagingIdentity=null;
+        if(!committed&&handle){
+            const stagingCleanup=await cleanupAnchoredTemporary(
+                temporary,
+                handle,
+                stagingState?.identity??temporaryIdentity
+            );
+            if(stagingCleanup.issue)cleanupIssues.push(stagingCleanup.issue);
+            retryStagingIdentity=stagingCleanup.retryIdentity;
+            stagingCleanupHandled=true;
+        }
+        if(handle){
+            try{
+                await handle.close();
+            }catch(error){
+                cleanupIssues.push(changedStagingCleanupIssue(
+                    temporary,
+                    `Staging creation handle close warning for ${temporary}: ${String(error?.message??error)}`
+                ));
+            }
+            handle=null;
+        }
+        if(!committed&&(!stagingCleanupHandled||retryStagingIdentity)){
+            const stagingCleanup=await cleanupOwnedTemporary(
+                temporary,
+                retryStagingIdentity??stagingState?.identity??temporaryIdentity
+            );
             if(stagingCleanup)cleanupIssues.push(stagingCleanup);
+        }
+        if(existingOutput?.handle){
+            try{
+                await existingOutput.handle.close();
+            }catch(error){
+                cleanupIssues.push(Object.freeze({
+                    scope:'artifact-backup-handle',
+                    path:promotion?.backupPath??output,
+                    message:`Prior-output anchor close warning: ${String(error?.message??error)}`,
+                    recovery:'Inspect the preserved prior-output path before removing it.'
+                }));
+            }
+            existingOutput.handle=null;
         }
         const lockCleanup=await releaseLock();
         if(lockCleanup)cleanupIssues.push(lockCleanup);

@@ -98,9 +98,15 @@ generation and rejects zero-byte payload releases.
 
 Promotion retains any prior output as an identity-bound backup until the new
 pathname has passed a second exact-length digest and single-link identity check
-and its immutable receipt is bound. Pre-commit failure restores that backup;
-post-commit backup or nonce-bound lock cleanup failure is surfaced as degraded
-cleanup and preserves the uncertain path for inspection. The receipt exposes
+and its immutable receipt is bound. Pre-commit failure restores that backup
+only when both the promoted pathname and prior backup retain their respective
+full recorded identity tuples, pinned by their open handles. A replaced or
+in-place-changed output is never removed during rollback; it and the prior
+backup remain available for inspection. A missing or changed backup likewise
+causes rollback to preserve the valid promoted output rather than delete it.
+Post-commit backup or
+nonce-bound lock cleanup failure is surfaced as degraded cleanup and preserves
+the uncertain path for inspection. The receipt exposes
 artifact digest/bytes, descriptor canonical/file/package digests and bytes, and
 release manifest/policy/content digests, file count, and total payload bytes.
 These hashes prove internal consistency. Repository provenance or an

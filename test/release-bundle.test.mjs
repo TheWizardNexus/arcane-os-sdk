@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {appendFile,link,mkdir,readFile,readdir,rm,writeFile} from 'node:fs/promises';
+import {
+    appendFile,
+    link,
+    lstat,
+    mkdir,
+    readFile,
+    readdir,
+    realpath,
+    rm,
+    utimes,
+    writeFile
+} from 'node:fs/promises';
 import path from 'node:path';
 import {gunzipSync,gzipSync} from 'node:zlib';
 
@@ -468,6 +479,42 @@ test('bundle promotion is collision-safe, cancellable, and explicit about overwr
     await rm(vacatedPath);
     await rm(path.join(workspaceRoot,vacatedBackups[0]));
 
+    const backupLinkedPath=path.join(workspaceRoot,`backup-linked${APP_BUNDLE_EXTENSION}`);
+    await createAppReleaseBundle({...fixture,outputPath:backupLinkedPath});
+    const fixedMtimeSeconds=1_700_000_000;
+    await utimes(backupLinkedPath,fixedMtimeSeconds,fixedMtimeSeconds);
+    let changedBackupLink;
+    let changedLinkedBytes;
+    await assert.rejects(
+        createAppReleaseBundle({
+            ...fixture,
+            outputPath:backupLinkedPath,
+            overwrite:true,
+            onEvent:async event=>{
+                if(event.type!=='bundle.archive.backup-linked')return;
+                changedBackupLink=event.backupPath;
+                const before=await lstat(event.outputPath,{bigint:true});
+                changedLinkedBytes=await readFile(event.outputPath);
+                changedLinkedBytes[0]^=0xff;
+                await writeFile(event.outputPath,changedLinkedBytes);
+                await utimes(event.outputPath,fixedMtimeSeconds,fixedMtimeSeconds);
+                const after=await lstat(event.outputPath,{bigint:true});
+                assert.equal(after.dev,before.dev);
+                assert.equal(after.ino,before.ino);
+                assert.equal(after.size,before.size);
+                assert.equal(after.mtimeNs,before.mtimeNs);
+                assert.notEqual(after.ctimeNs,before.ctimeNs);
+            }
+        }),
+        error=>/anchored two-link identity/u.test(error?.message??'')
+            &&/Backup cleanup warning/u.test(error.message)
+    );
+    assert.deepEqual(await readFile(backupLinkedPath),changedLinkedBytes);
+    assert.deepEqual(await readFile(changedBackupLink),changedLinkedBytes);
+    await rm(changedBackupLink);
+    await rm(backupLinkedPath);
+
+    const inPlaceTamper=Buffer.from('tampered after promotion');
     await assert.rejects(
         createAppReleaseBundle({
             ...fixture,
@@ -475,17 +522,27 @@ test('bundle promotion is collision-safe, cancellable, and explicit about overwr
             overwrite:true,
             onEvent:async event=>{
                 if(event.type==='bundle.archive.promoted'){
-                    await writeFile(outputPath,'tampered after promotion');
+                    const before=await lstat(outputPath,{bigint:true});
+                    await appendFile(outputPath,inPlaceTamper);
+                    const after=await lstat(outputPath,{bigint:true});
+                    assert.equal(after.dev,before.dev);
+                    assert.equal(after.ino,before.ino);
                 }
             }
         }),
-        /Promoted bundle identity|promoted app release bundle/u
+        error=>/Promoted bundle identity|promoted app release bundle/u.test(error?.message??'')
+            &&/Rollback warning: preserve changed output path/u.test(error.message)
     );
-    assert.deepEqual(await readFile(outputPath),original);
-    assert.equal(
-        (await readdir(workspaceRoot)).some(name=>name.includes('.backup-')),
-        false
+    assert.deepEqual(await readFile(outputPath),Buffer.concat([original,inPlaceTamper]));
+    const inPlaceTamperBackups=(await readdir(workspaceRoot))
+        .filter(name=>name.startsWith(`${path.basename(outputPath)}.backup-`));
+    assert.equal(inPlaceTamperBackups.length,1);
+    assert.deepEqual(
+        await readFile(path.join(workspaceRoot,inPlaceTamperBackups[0])),
+        original
     );
+    await rm(outputPath);
+    await rm(path.join(workspaceRoot,inPlaceTamperBackups[0]));
 
     const replacedPath=path.join(workspaceRoot,`path-replaced${APP_BUNDLE_EXTENSION}`);
     await createAppReleaseBundle({...fixture,outputPath:replacedPath});
@@ -510,6 +567,71 @@ test('bundle promotion is collision-safe, cancellable, and explicit about overwr
     assert.deepEqual(await readFile(path.join(workspaceRoot,preservedBackups[0])),replacedOriginal);
     await rm(replacedPath);
     await rm(path.join(workspaceRoot,preservedBackups[0]));
+
+    const replacedBothPath=path.join(workspaceRoot,`both-replaced${APP_BUNDLE_EXTENSION}`);
+    await createAppReleaseBundle({...fixture,outputPath:replacedBothPath});
+    let replacedBothBackup;
+    await assert.rejects(
+        createAppReleaseBundle({
+            ...fixture,
+            outputPath:replacedBothPath,
+            overwrite:true,
+            onEvent:async event=>{
+                if(event.type==='bundle.archive.output-vacated'&&event.replaced){
+                    replacedBothBackup=event.backupPath;
+                    return;
+                }
+                if(event.type!=='bundle.archive.promoted')return;
+                assert.ok(replacedBothBackup);
+                await rm(replacedBothBackup);
+                await writeFile(replacedBothBackup,'foreign backup replacement\n');
+                await rm(replacedBothPath);
+                await writeFile(replacedBothPath,'foreign output replacement\n');
+            }
+        }),
+        error=>/Rollback warning:[\s\S]*backup identity changed before restore/u.test(error?.message??'')
+            &&/preserve promoted output path[\s\S]*prior backup is not recoverable/u.test(error.message)
+    );
+    assert.equal(await readFile(replacedBothPath,'utf8'),'foreign output replacement\n');
+    assert.equal(await readFile(replacedBothBackup,'utf8'),'foreign backup replacement\n');
+    await rm(replacedBothPath);
+    await rm(replacedBothBackup);
+
+    const backupOnlyPath=path.join(workspaceRoot,`backup-only-replaced${APP_BUNDLE_EXTENSION}`);
+    await createAppReleaseBundle({...fixture,outputPath:backupOnlyPath});
+    let backupOnlyBackup;
+    let exactPromotedBytes;
+    let exactPromotedIdentity;
+    await assert.rejects(
+        createAppReleaseBundle({
+            ...fixture,
+            outputPath:backupOnlyPath,
+            overwrite:true,
+            onEvent:async event=>{
+                if(event.type==='bundle.archive.output-vacated'&&event.replaced){
+                    backupOnlyBackup=event.backupPath;
+                    return;
+                }
+                if(event.type!=='bundle.archive.promoted')return;
+                assert.ok(backupOnlyBackup);
+                exactPromotedBytes=await readFile(backupOnlyPath);
+                exactPromotedIdentity=await lstat(backupOnlyPath,{bigint:true});
+                await rm(backupOnlyBackup);
+                await writeFile(backupOnlyBackup,'foreign backup replacement only\n');
+                throw new Error('forced backup-only replacement failure');
+            }
+        }),
+        error=>/forced backup-only replacement failure/u.test(error?.message??'')
+            &&/Rollback warning:[\s\S]*prior backup is not recoverable/u.test(error.message)
+    );
+    const survivingPromotedIdentity=await lstat(backupOnlyPath,{bigint:true});
+    for(const field of ['dev','ino','size','nlink']){
+        assert.equal(survivingPromotedIdentity[field],exactPromotedIdentity[field],field);
+    }
+    assert.deepEqual(await readFile(backupOnlyPath),exactPromotedBytes);
+    assert.equal(await readFile(backupOnlyBackup,'utf8'),'foreign backup replacement only\n');
+    await rm(backupOnlyPath);
+    await rm(backupOnlyBackup);
 
     await assert.rejects(
         createAppReleaseBundle({
@@ -539,6 +661,7 @@ test('bundle promotion is collision-safe, cancellable, and explicit about overwr
     assert.deepEqual(leftovers,[]);
 
     const tamperedPath=path.join(workspaceRoot,`tampered${APP_BUNDLE_EXTENSION}`);
+    let tamperedStagingPath;
     await assert.rejects(
         createAppReleaseBundle({
             ...fixture,
@@ -549,12 +672,20 @@ test('bundle promotion is collision-safe, cancellable, and explicit about overwr
                     name.startsWith(`.${path.basename(tamperedPath)}.`)&&name.endsWith('.tmp')
                 );
                 assert.ok(temporary);
-                await writeFile(path.join(workspaceRoot,temporary),'tampered after verification');
+                tamperedStagingPath=path.join(workspaceRoot,temporary);
+                const before=await lstat(tamperedStagingPath,{bigint:true});
+                await writeFile(tamperedStagingPath,'tampered after verification');
+                const after=await lstat(tamperedStagingPath,{bigint:true});
+                assert.equal(after.dev,before.dev);
+                assert.equal(after.ino,before.ino);
             }
         }),
-        /staging changed before atomic promotion/u
+        error=>/staging changed before atomic promotion/u.test(error?.message??'')
+            &&/Cleanup warning: Preserved changed staging path/u.test(error.message)
     );
     await assert.rejects(readFile(tamperedPath),{code:'ENOENT'});
+    assert.equal(await readFile(tamperedStagingPath,'utf8'),'tampered after verification');
+    await rm(tamperedStagingPath);
 
     const replacedStagingOutput=path.join(workspaceRoot,`replaced-staging${APP_BUNDLE_EXTENSION}`);
     let replacedStagingPath;
@@ -618,7 +749,7 @@ test('bundle promotion is collision-safe, cancellable, and explicit about overwr
                 await writeFile(changedBackupPath,'changed preserved backup\n');
             }
         }),
-        /Preserved bundle backup changed before overwrite promotion/u
+        /Preserved bundle backup (?:changed before overwrite promotion|did not retain)/u
     );
     await assert.rejects(readFile(changedBackupOutput),{code:'ENOENT'});
     assert.equal(await readFile(changedBackupPath,'utf8'),'changed preserved backup\n');
@@ -651,7 +782,10 @@ test('bundle locks preserve replacement leases and surface cleanup degradation',
             if(event.type!=='bundle.archive.started')return;
             const acquired=JSON.parse(await readFile(lockPath,'utf8'));
             assert.match(acquired.nonce,/^[0-9a-f]{32}$/u);
-            assert.equal(acquired.artifactPath,outputPath);
+            assert.equal(
+                acquired.artifactPath,
+                path.join(await realpath(workspaceRoot),path.basename(outputPath))
+            );
             await rm(lockPath);
             await writeFile(lockPath,'replacement lease\n');
         }

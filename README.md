@@ -177,9 +177,12 @@ npm exec -- arcane verify-bundle dist/my-app-1.0.0.arcane-app.tar.gz
 an existing destination unless `--overwrite` is explicit, preserves the prior
 file until the promoted replacement has passed no-follow, single-link,
 byte-length, and SHA-256 revalidation, and restores the prior file on
-cancellation or pre-commit failure while the output identity remains owned by
-the operation. If the output path was replaced, the foreign identity and prior
-backup are both preserved for inspection. Operation locks carry a random nonce
+cancellation or pre-commit failure only while both the promoted pathname and
+prior backup retain their respective full recorded identity tuples, each
+pinned by an open handle. If the promoted path is replaced or changed in
+place, it and the prior backup are preserved; if the backup is changed or
+missing, the valid promoted output is preserved instead of being deleted.
+Operation locks carry a random nonce
 and filesystem identity; a replaced lock is preserved and reported as degraded
 cleanup instead of being removed by pathname.
 
