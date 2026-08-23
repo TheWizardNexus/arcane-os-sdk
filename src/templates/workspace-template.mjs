@@ -150,7 +150,7 @@ Every browser release also carries Arcane OS licensing material under \`licenses
         devDependencies:{
             [SDK_NAME]:SDK_VERSION
         },
-        engines:{node:'>=22.14.0'}
+        engines:{node:'>=22.23.2'}
     }));
     files.set('arcane-packager.json',json({
         schemaVersion:1,

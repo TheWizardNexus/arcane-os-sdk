@@ -79,8 +79,9 @@ function assertPackageMetadata(packageDocument){
     if(packageDocument.type!=='module'){
         fail('package.json type must be "module".');
     }
-    if(typeof packageDocument.version!=='string'||!/^[0-9]+\.[0-9]+\.[0-9]+-dev(?:\.[0-9A-Za-z-]+)*$/.test(packageDocument.version)){
-        fail('Development package version must be a SemVer version containing the -dev prerelease identifier.');
+    if(typeof packageDocument.version!=='string'
+        ||!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-dev(?:\.(0|[1-9][0-9]*))?$/.test(packageDocument.version)){
+        fail('Development package version must use the numeric MAJOR.MINOR.PATCH-dev[.NUMBER] policy.');
     }
     if(packageDocument.license!=='AGPL-3.0-only'){
         fail('package.json license must be AGPL-3.0-only.');
@@ -89,8 +90,8 @@ function assertPackageMetadata(packageDocument){
         ||packageDocument.bin?.['arcane-os']!=='./bin/arcane.mjs'){
         fail('package.json must expose ./bin/arcane.mjs as both arcane and arcane-os.');
     }
-    if(packageDocument.engines?.node!=='>=22.14.0'){
-        fail('package.json must require Node.js >=22.14.0.');
+    if(packageDocument.engines?.node!=='>=22.23.2'){
+        fail('package.json must require Node.js >=22.23.2.');
     }
     if(packageDocument.publishConfig?.access!=='public'
         ||packageDocument.publishConfig?.registry!=='https://registry.npmjs.org/'

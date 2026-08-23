@@ -21,7 +21,9 @@ event, cancellation, and browser run contracts.
 
 This is development software. Version `0.1.0-dev.4` synchronizes the Arcane
 `0.8.12` runtime, but it is not a production or release-candidate claim. It has
-not yet been published to npm.
+only the `dev` channel contract; query `npm view arcane-os@dev version` for
+current registry availability. Registry state is deliberately not baked into
+the immutable package documentation.
 
 ## Runtime synchronization
 
@@ -69,6 +71,9 @@ npm exec -- arcane targets
 npm exec -- arcane-os targets
 ```
 
+No global SDK install or standalone Arcane CLI is required. The application
+repository's exact npm dependency and lockfile own the CLI and toolchain version.
+
 Use `npx arcane-os@dev` for the initial bootstrap because it names this npm
 package explicitly; bare `npx arcane` outside an installed project could resolve
 a different package. Both installed commands invoke the same headless toolchain.
@@ -76,7 +81,7 @@ Project-local npm scripts use the SDK pinned by that app's `package-lock.json`,
 so normal repository work does not depend on whichever global command was
 installed last.
 
-### Local development before npm publication
+### Local development when the npm package is unavailable
 
 Pack the current SDK checkout, scaffold with its source CLI, and persist the
 tarball install in the app's package manifest and lock:
@@ -100,9 +105,9 @@ same location. npm records its integrity in `package-lock.json`, while Arcane
 still verifies the installed package name and exact version, the locked runtime
 identity, and the runtime bytes. Local directory `file:` dependencies are not
 accepted because npm may install them as links; use a packed `.tgz`. A GitHub
-runner also needs that tarball at the locked path. Once `arcane-os@dev` is
-published, replace the local declaration with the exact registry package and
-commit the regenerated lock.
+runner also needs that tarball at the locked path. When the registry exposes
+`arcane-os@dev`, replace the local declaration with the exact registry package
+and commit the regenerated lock.
 
 Generated repositories use `npm ci --ignore-scripts` in CI. Run dependency
 installation once and commit `package-lock.json` before enabling that workflow.

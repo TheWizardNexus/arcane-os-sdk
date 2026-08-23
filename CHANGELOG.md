@@ -8,6 +8,21 @@
 - Added an explicit, main-checkout-only runtime synchronization tool and moved
   upstream runtime provenance into a reviewable source configuration.
 - Added `security` to the external and integrated browser-runtime route contract.
+- Made the project-local npm package the canonical SDK distribution and added a
+  canonical manifest, checksum, SHA-256, and npm integrity contract for one
+  exact packed tarball.
+- Added build-once release readiness that runs the downloaded tarball through
+  the installed Vanilla Test lifecycle and `npm exec --offline -- arcane` on
+  Windows x64, Linux x64, and a real macOS arm64 runner at the declared Node
+  `22.23.2` floor with a fresh per-job npm cache. Older Node 22 builds are not
+  claimed because native Windows file-identity metadata is inconsistent there.
+- Changed development publication to consume the immutable matrix-tested
+  tarball instead of repacking source; the first npm publication remains an
+  explicit 2FA bootstrap blocker before trusted publishing can be configured.
+  Publication now requires an explicit standard-versus-dual-use policy decision,
+  fails closed when staged dual-use publishing is required, serializes
+  dispatches, rejects rollback and byte mismatches, and safely resumes through
+  npm publish-time scanning without republishing an immutable version.
 
 ## 0.1.0-dev.3
 

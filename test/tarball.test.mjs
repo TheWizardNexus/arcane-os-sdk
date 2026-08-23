@@ -3,6 +3,7 @@ import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';
+import {verifyNpmReleaseArtifact} from '../tools/npm-release-contract.mjs';
 import {
     repositoryRoot,
     runCommand,
@@ -23,30 +24,67 @@ function runNpm(arguments_,options){
 }
 
 test('packed npm artifact installs and drives an external repository end to end',{
-    timeout:180_000
+    timeout:300_000
 },async t=>{
     const temporary=await temporaryDirectory(t,{prefix:'arcane-tarball-'});
+    const releaseMetadataPath=process.env.ARCANE_SDK_NPM_RELEASE_METADATA;
     let tarballPath;
+    let releaseVerification;
+    let packedVersion;
     let harnessRoot;
     let workspaceRoot;
     let appRoot;
     let installedCli;
 
+    if(process.env.CI==='true'&&!releaseMetadataPath){
+        await t.test('defers release packing to the single CI producer',()=>{
+            assert.equal(releaseMetadataPath,undefined);
+        });
+        return;
+    }
+
     await t.test('packs the public SDK artifact with required runtime files',async()=>{
-        const packed=await runNpm(
-            [
-                'pack',
-                '--ignore-scripts',
-                '--dry-run=false',
-                '--json',
-                '--pack-destination',temporary
-            ],
-            {cwd:repositoryRoot,timeout:60_000}
-        );
-        assert.equal(packed.code,0,packed.stderr);
-        const packReport=JSON.parse(packed.stdout)[0];
+        let packReport;
+        if(releaseMetadataPath){
+            releaseVerification=await verifyNpmReleaseArtifact({
+                metadataPath:releaseMetadataPath,
+                requireCleanSource:process.env.CI==='true'
+            });
+            const {manifest}=releaseVerification;
+            tarballPath=releaseVerification.tarballPath;
+            packReport={
+                name:manifest.name,
+                version:manifest.version,
+                filename:manifest.artifact.file,
+                files:manifest.package.files.map(file=>({path:file.path,size:file.bytes}))
+            };
+            if(process.env.GITHUB_SHA){
+                assert.equal(manifest.source.commit,process.env.GITHUB_SHA);
+            }
+            if(process.env.ARCANE_SDK_EXPECTED_PLATFORM){
+                assert.equal(process.platform,process.env.ARCANE_SDK_EXPECTED_PLATFORM);
+            }
+            if(process.env.ARCANE_SDK_EXPECTED_ARCHITECTURE){
+                assert.equal(process.arch,process.env.ARCANE_SDK_EXPECTED_ARCHITECTURE);
+            }
+        }else{
+            const packed=await runNpm(
+                [
+                    'pack',
+                    '--ignore-scripts',
+                    '--dry-run=false',
+                    '--json',
+                    '--pack-destination',temporary
+                ],
+                {cwd:repositoryRoot,timeout:60_000}
+            );
+            assert.equal(packed.code,0,packed.stderr);
+            [packReport]=JSON.parse(packed.stdout);
+            tarballPath=path.join(temporary,packReport.filename);
+        }
         assert.equal(packReport.name,'arcane-os');
         assert.equal(packReport.version,'0.1.0-dev.4');
+        packedVersion=packReport.version;
         assert.ok(packReport.files.some(file=>file.path==='bin/arcane.mjs'));
         assert.ok(packReport.files.some(file=>file.path==='runtime/ARCANE_RUNTIME_RELEASE.json'));
         assert.ok(packReport.files.some(file=>file.path==='runtime/arcane/modules/SpeechPlayback.js'));
@@ -60,7 +98,6 @@ test('packed npm artifact installs and drives an external repository end to end'
         assert.ok(packReport.files.some(file=>file.path==='NOTICE'));
         assert.ok(packReport.files.every(file=>!file.path.startsWith('test/')));
         assert.ok(packReport.files.every(file=>!file.path.startsWith('.github/')));
-        tarballPath=path.join(temporary,packReport.filename);
     });
 
     await t.test('installs the tarball into a clean harness and scaffolds an external app',async()=>{
@@ -113,7 +150,7 @@ test('packed npm artifact installs and drives an external repository end to end'
         assert.match(packageLock.packages['node_modules/arcane-os'].integrity,/^sha512-/u);
 
         const cleanInstalled=await runNpm(
-            ['ci','--ignore-scripts','--dry-run=false','--no-audit','--no-fund'],
+            ['ci','--offline','--ignore-scripts','--dry-run=false','--no-audit','--no-fund'],
             {cwd:workspaceRoot,timeout:60_000}
         );
         assert.equal(cleanInstalled.code,0,cleanInstalled.stderr);
@@ -143,12 +180,68 @@ test('packed npm artifact installs and drives an external repository end to end'
     await t.test('exposes the target adapter through both executable names',async()=>{
         for(const executable of ['arcane','arcane-os']){
             const invoked=await runNpm(
-                ['exec','--',executable,'targets','--output','json'],
+                ['exec','--offline','--',executable,'targets','--output','json'],
                 {cwd:workspaceRoot,timeout:60_000}
             );
             assert.equal(invoked.code,0,invoked.stderr);
             assert.equal(parseLastJsonLine(invoked.stdout).result.protocol,'arcane-target-adapter/1');
         }
+    });
+
+    await t.test('runs the installed Arcane Vanilla Test lifecycle through npm-local CLI',async()=>{
+        const installedRunner=path.join(
+            workspaceRoot,'node_modules','arcane-os','bin','arcane-test.mjs'
+        );
+        const lifecycleTest=path.join(workspaceRoot,'packed-lifecycle.test.mjs');
+        await writeFile(lifecycleTest,`import assert from 'node:assert/strict';
+import {execFile} from 'node:child_process';
+import path from 'node:path';
+import {promisify} from 'node:util';
+import test from 'arcane-os/testing';
+
+const execute=promisify(execFile);
+const npmCli=process.env.npm_execpath??path.join(
+    path.dirname(process.execPath),'node_modules','npm','bin','npm-cli.js'
+);
+async function npmExec(arguments_){
+    const command=process.platform==='win32'?process.execPath:'npm';
+    const args=process.platform==='win32'?[npmCli,...arguments_]:arguments_;
+    try{
+        const result=await execute(command,args,{
+            cwd:process.cwd(),encoding:'utf8',maxBuffer:16*1024*1024,windowsHide:true
+        });
+        return {code:0,...result};
+    }catch(error){
+        return {code:error.code,stdout:error.stdout??'',stderr:error.stderr??''};
+    }
+}
+
+test('installed SDK lifecycle exercises its project-local Arcane CLI',async t=>{
+    await t.test('reports the packed SDK version',async()=>{
+        const result=await npmExec(['exec','--offline','--','arcane','version','--output','json']);
+        assert.equal(result.code,0,result.stderr);
+        const report=JSON.parse(result.stdout.trim().split(/\\r?\\n/u).at(-1));
+        assert.equal(report.ok,true);
+        assert.equal(report.command,'version');
+        assert.equal(report.result,${JSON.stringify(packedVersion)});
+    });
+    await t.test('rejects invalid CLI input with the shared status contract',async()=>{
+        const result=await npmExec([
+            'exec','--offline','--','arcane','definitely-invalid','--output','json'
+        ]);
+        assert.equal(result.code,1);
+        const report=JSON.parse(result.stdout.trim().split(/\\r?\\n/u).at(-1));
+        assert.equal(report.ok,false);
+        assert.equal(report.error.code,'ARCANE_USAGE');
+    });
+});
+`,'utf8');
+        const lifecycle=await runNode([installedRunner,lifecycleTest],{
+            cwd:workspaceRoot,
+            timeout:120_000
+        });
+        assert.equal(lifecycle.code,0,`${lifecycle.stdout}\n${lifecycle.stderr}`);
+        assert.match(lifecycle.stdout,/Result\s*:\s*.*PASSED/u);
     });
 
     await t.test('checks the external app through its generated package script',async()=>{
@@ -293,4 +386,15 @@ export default arcaneNativeBuilderProvider;
             await readFile(path.join(workspaceRoot,'apps','external-app','index.html'),'utf8')
         );
     });
+
+    if(releaseVerification){
+        await t.test('leaves the exact npm release tarball bytes unchanged',async()=>{
+            const after=await verifyNpmReleaseArtifact({
+                metadataPath:releaseMetadataPath,
+                tarballPath:releaseVerification.tarballPath,
+                requireCleanSource:process.env.CI==='true'
+            });
+            assert.equal(after.manifest.artifact.sha256,releaseVerification.manifest.artifact.sha256);
+        });
+    }
 });

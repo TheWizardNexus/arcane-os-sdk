@@ -395,12 +395,16 @@ test('CI, reusable app release, and trusted publishing workflows retain narrow a
         assert.doesNotMatch(checkWorkflow,/\n\s+- dev\s*$/mu);
     });
     await t.test('Check covers every supported Node and runner platform',()=>{
-        assert.match(checkWorkflow,/os:\s*[\s\S]*ubuntu-latest[\s\S]*windows-latest/u);
+        assert.match(checkWorkflow,/os:\s*[\s\S]*ubuntu-24\.04[\s\S]*windows-2025/u);
         assert.match(checkWorkflow,/node:\s*[\s\S]*- 22[\s\S]*- 24/u);
+        assert.match(checkWorkflow,/target: macos-arm64[\s\S]*os: macos-15[\s\S]*platform: darwin/u);
     });
-    await t.test('Check installs and exercises both command aliases',()=>{
-        assert.match(checkWorkflow,/npm install --global --ignore-scripts \./u);
-        assert.match(checkWorkflow,/\n\s+arcane --version\s*\n\s+arcane-os --help/u);
+    await t.test('Check installs and exercises one exact project-local npm artifact',()=>{
+        assert.match(checkWorkflow,/actions\/upload-artifact@[0-9a-f]{40}/u);
+        assert.match(checkWorkflow,/artifact-ids: \$\{\{ needs\.pack_npm_release\.outputs\['artifact-id'\] \}\}/u);
+        assert.match(checkWorkflow,/ARCANE_SDK_NPM_RELEASE_METADATA/u);
+        assert.match(checkWorkflow,/bin\/arcane-test\.mjs test\/tarball\.test\.mjs/u);
+        assert.doesNotMatch(checkWorkflow,/npm install --global/u);
     });
 
     await t.test('development publishing is manual and restricted to canonical main',()=>{
@@ -421,8 +425,12 @@ test('CI, reusable app release, and trusted publishing workflows retain narrow a
         assert.doesNotMatch(publishWorkflow,/npm run check/u);
         assert.doesNotMatch(publishWorkflow,/npm ci/u);
     });
-    await t.test('trusted publishing uses the reviewed npm release',()=>{
-        assert.match(publishWorkflow,/npm install --global npm@11\.16\.0/u);
+    await t.test('trusted publishing uses only the reviewed npm release artifact',()=>{
+        assert.match(publishWorkflow,/node-version: 26\.7\.0/u);
+        assert.match(publishWorkflow,/test "\$\(npm --version\)" = "11\.19\.0"/u);
+        assert.match(publishWorkflow,/actions\/download-artifact@[0-9a-f]{40}/u);
+        assert.match(publishWorkflow,/npm publish "\$RELEASE_ROOT\/arcane-os-\$\{VERSION\}\.tgz"/u);
+        assert.doesNotMatch(publishWorkflow,/npm install --global|npm pack(?:\s|$)/u);
     });
     await t.test('app release is reusable, single-app, and exact-SDK bound',()=>{
         assert.match(appReleaseWorkflow,/workflow_call:/u);

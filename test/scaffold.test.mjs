@@ -25,6 +25,7 @@ test('workspace scaffold creates a private external app using the exact SDK vers
     const packageDocument=JSON.parse(await readFile(path.join(targetPath,'package.json'),'utf8'));
     assert.equal(packageDocument.private,true);
     assert.equal(packageDocument.type,'module');
+    assert.equal(packageDocument.engines.node,'>=22.23.2');
     assert.equal(packageDocument.devDependencies['arcane-os'],'0.1.0-dev.4');
 
     const packager=JSON.parse(await readFile(path.join(targetPath,'arcane-packager.json'),'utf8'));
