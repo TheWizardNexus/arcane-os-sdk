@@ -869,7 +869,7 @@ test('bundle locks preserve replacement leases and surface cleanup degradation',
             outputPath:changedLockPath,
             onEvent:async event=>{
                 if(event.type!=='bundle.lock.written')return;
-                assert.equal(event.lockPath,changedLock);
+                assert.equal(await realpath(event.lockPath),await realpath(changedLock));
                 const before=await lstat(changedLock,{bigint:true});
                 const beforeTimes=await lstat(changedLock);
                 changedLockBytes=await readFile(changedLock);
