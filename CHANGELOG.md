@@ -6,7 +6,7 @@
   documentation on canonical `main`; the `dev` work branch remains deferred
   until the first official SDK release.
 - Migrated the SDK and generated application test runner to exact
-  `vanilla-test` 2.1.0 while preserving isolated files, cleanup, nested cases,
+  `vanilla-test` 2.1.3 while preserving isolated files, cleanup, nested cases,
   timeouts, cancellation, and nonzero failure status.
 - Organized the SDK suite into non-overlapping unit, functional, integration,
   and regression sets, with smaller visible cases that reuse their existing

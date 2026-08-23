@@ -161,7 +161,7 @@ network, hashing, test, process, or service work begins.
 
 ## SDK test sets
 
-The repository suite uses exact `vanilla-test` 2.1.0 through the isolated Arcane
+The repository suite uses exact `vanilla-test` 2.1.3 through the isolated Arcane
 test runner. `npm test` runs four non-overlapping sets in order, and every test
 file belongs to exactly one set:
 

@@ -69,7 +69,7 @@ test('package exposes both supported executable names and public contracts',asyn
         assert.equal(packageDocument.exports['./testing'],'./src/testing.mjs');
     });
     await t.test('pins the Vanilla Test runtime',()=>{
-        assert.equal(packageDocument.dependencies['vanilla-test'],'2.1.0');
+        assert.equal(packageDocument.dependencies['vanilla-test'],'2.1.3');
     });
     await t.test('integrated provider entry point exposes its public protocol',()=>{
         assert.equal(typeof integratedProvider.loadArcaneIntegratedProvider,'function');

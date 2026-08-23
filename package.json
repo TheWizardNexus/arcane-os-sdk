@@ -77,6 +77,6 @@
     "tag": "dev"
   },
   "dependencies": {
-    "vanilla-test": "2.1.0"
+    "vanilla-test": "2.1.3"
   }
 }
