@@ -91,8 +91,6 @@ jobs:
     needs: pack_npm_release
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
-    env:
-      npm_config_cache: ${{ runner.temp }}/arcane-sdk-npm-cache
     strategy:
       fail-fast: false
       matrix:
@@ -121,6 +119,8 @@ jobs:
           architecture: ${{ matrix.architecture }}
           package-manager-cache: false
       - name: Install the exact Vanilla Test dependency
+        env:
+          npm_config_cache: ${{ runner.temp }}/arcane-sdk-npm-cache
         run: npm ci --ignore-scripts
       - name: Download the one producer artifact by immutable id
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
@@ -132,6 +132,7 @@ jobs:
           ARCANE_SDK_NPM_RELEASE_METADATA: ${{ runner.temp }}/arcane-sdk-npm-release/${{ needs.pack_npm_release.outputs['manifest-filename'] }}
           ARCANE_SDK_EXPECTED_PLATFORM: ${{ matrix.platform }}
           ARCANE_SDK_EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
+          npm_config_cache: ${{ runner.temp }}/arcane-sdk-npm-cache
         run: node ./bin/arcane-test.mjs test/tarball.test.mjs
 
   npm_release_ready:
