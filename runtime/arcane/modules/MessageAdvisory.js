@@ -11,12 +11,28 @@ export function normalizeContentAdvisory(value){
     });
 }
 
-export async function inspectMessageRecords(messages,inspector){
+const unavailableAdvisory=normalizeContentAdvisory({
+    level:'unavailable',
+    title:'Safety check unavailable',
+    summary:'No safety conclusion was made for this message. Pause and review it manually before replying.',
+});
+
+export function unavailableMessageInspection(messages){
+    const advisories=new Map();
+    for(const message of Array.from(messages||[]))advisories.set(message,unavailableAdvisory);
+    return {advisories,failures:advisories.size};
+}
+
+export async function inspectMessageRecords(messages,inspector,{prepare}={}){
     const advisories=new Map();let failures=0;
     if(typeof inspector!=='function')return {advisories,failures};
-    for(const message of Array.from(messages||[])){
-        try{const advisory=normalizeContentAdvisory(await inspector(message));if(advisory)advisories.set(message,advisory);}
-        catch{failures+=1;advisories.set(message,normalizeContentAdvisory({level:'unavailable',title:'Safety check unavailable',summary:'No safety conclusion was made for this message. Pause and review it manually before replying.'}));}
+    const records=Array.from(messages||[]);
+    let context;
+    try{context=typeof prepare==='function'?await prepare(records):undefined;}
+    catch{return unavailableMessageInspection(records);}
+    for(const message of records){
+        try{const advisory=normalizeContentAdvisory(await inspector(message,context));if(advisory){if(advisory.level==='unavailable')failures+=1;advisories.set(message,advisory);}}
+        catch{failures+=1;advisories.set(message,unavailableAdvisory);}
     }
     return {advisories,failures};
 }

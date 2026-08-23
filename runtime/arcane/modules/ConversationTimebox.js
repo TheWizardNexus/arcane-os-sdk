@@ -2,7 +2,7 @@ const CONVERSATION_TIMEBOX_TOOL_NAME='conversation_timebox';
 const CONVERSATION_TIMEBOX_TICK_MS=1000;
 const MAX_DATE_MILLISECONDS=8_640_000_000_000_000;
 
-const CONVERSATION_TIMEBOX_OPENING_INSTRUCTION=`Before any other intake question, ask exactly one timing question: "Do you have a limited amount of time to talk right now?" Ask no other question in that opening reply, and wait for the answer before continuing the app's normal intake. The elapsed conversation timer is already visible. A time limit applies only to this conversation. Never infer, round, or invent a duration. When the user explicitly provides a positive whole number of minutes, call the conversation_timebox tool with action "set" and that exact duration. When the user explicitly says there is no limit or asks to remove it, call the tool with action "clear". If the duration is vague, ranged, fractional, or expressed without a clear whole-minute value, ask one focused question and do not call the tool yet. Adapt the pace and prioritize the most important next action within an active limit without skipping safety. A message that the agreed time check is due is a check-in, not a request to end: ask whether the user wants to end now or continue, and do not assume their choice or set another limit unless they explicitly state one.`;
+const CONVERSATION_TIMEBOX_OPENING_INSTRUCTION=`Before any other intake question, ask exactly one timing question: "Do you have a limited amount of time to talk right now?" Ask no other question in that opening reply, and wait for the answer before continuing the app's normal intake. The elapsed conversation timer is already visible. A time limit applies only to this conversation. Never infer, round, or invent a duration. The conversation_timebox tool is available on every turn. When the user explicitly sets a duration, call it with action "set" and convert the exact stated duration to whole milliseconds. When the user explicitly adds time, call it with action "adjust" and convert the exact added duration to whole milliseconds. When the user explicitly says there is no limit, asks to remove it, or chooses to continue after a due check without setting another duration, call it with action "clear". A duration is always sent as duration_milliseconds; for example, 75 seconds is 75000 and 10 minutes is 600000. If the duration is vague or ranged, ask one focused question and do not call the tool yet. The timebox tool must be the sole tool call for its response. Adapt the pace and prioritize the most important next action within an active limit without skipping safety. A message that the agreed time check is due is a check-in, not a request to end: ask whether the user wants to end now or continue, and do not assume their choice.`;
 
 const CONVERSATION_TIMEBOX_LIMIT_MESSAGE='The agreed conversation time check is due. Please ask whether I want to end now or continue, and do not assume my choice or set another limit unless I explicitly state one.';
 
@@ -10,20 +10,20 @@ const conversationTimeboxTool=Object.freeze({
     type:'function',
     function:Object.freeze({
         name:CONVERSATION_TIMEBOX_TOOL_NAME,
-        description:'Set, revise, or clear the current conversation time check only when the user explicitly states their availability. Use action "set" only with the exact positive whole number of minutes the user supplied. Use action "clear" only when the user explicitly says there is no limit or asks to remove it. Never infer, round, convert a vague range, or choose a default duration; ask one focused question instead.',
+        description:'Control the current conversation time check whenever the user explicitly sets, adds, removes, or continues past it. Use this as the sole tool call. Use action "set" to replace the deadline relative to now, "adjust" to add time to the active deadline, and "clear" to remove the deadline, including continuing after a due check without a new duration. Convert exact stated units to whole milliseconds; never infer, round, or choose a default.',
         parameters:Object.freeze({
             type:'object',
             additionalProperties:false,
             properties:Object.freeze({
                 action:Object.freeze({
                     type:'string',
-                    enum:Object.freeze(['set','clear']),
-                    description:'Set or revise an explicit time check, or clear an explicitly declined/removed limit.'
+                    enum:Object.freeze(['set','adjust','clear']),
+                    description:'Set a new deadline, add time to the active deadline, or clear the deadline.'
                 }),
-                duration_minutes:Object.freeze({
+                duration_milliseconds:Object.freeze({
                     type:'integer',
-                    minimum:1,
-                    description:'The exact positive whole number of minutes explicitly supplied by the user. Required only for action "set".'
+                    minimum:0,
+                    description:'The exact positive whole-millisecond duration. Required for "set" and "adjust"; ignored for "clear". Examples: 75 seconds = 75000; 10 minutes = 600000.'
                 })
             }),
             required:Object.freeze(['action'])
@@ -61,7 +61,7 @@ function parseToolArguments(value){
 
 function normalizeConversationTimeboxCommand(value){
     const input=parseToolArguments(value);
-    const allowed=new Set(['action','duration_minutes']);
+    const allowed=new Set(['action','duration_milliseconds']);
     const unsupported=Object.keys(input).find(function findUnsupportedTimeboxField(key){
         return !allowed.has(key);
     });
@@ -69,21 +69,18 @@ function normalizeConversationTimeboxCommand(value){
     if(unsupported){
         throw new TypeError(`Unsupported conversation timebox field: ${unsupported}`);
     }
-    if(input.action!=='set'&&input.action!=='clear'){
-        throw new TypeError('Conversation timebox action must be "set" or "clear".');
+    if(!['set','adjust','clear'].includes(input.action)){
+        throw new TypeError('Conversation timebox action must be "set", "adjust", or "clear".');
     }
     if(input.action==='clear'){
-        if(Object.hasOwn(input,'duration_minutes')){
-            throw new TypeError('A clear conversation timebox command must not include duration_minutes.');
-        }
         return Object.freeze({action:'clear'});
     }
-    if(!Number.isSafeInteger(input.duration_minutes)||input.duration_minutes<=0){
-        throw new TypeError('duration_minutes must be an explicit positive whole number.');
+    if(!Number.isSafeInteger(input.duration_milliseconds)||input.duration_milliseconds<=0){
+        throw new TypeError('duration_milliseconds must be an explicit positive whole number.');
     }
     return Object.freeze({
-        action:'set',
-        durationMinutes:input.duration_minutes
+        action:input.action,
+        durationMilliseconds:input.duration_milliseconds
     });
 }
 
@@ -110,14 +107,21 @@ function formatConversationElapsed(milliseconds=0){
         :`${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
 }
 
-function createConversationTimeboxControlMessage(action,minutes){
+function createConversationTimeboxControlMessage(action,milliseconds){
     if(action==='clear'){
         return 'I used the conversation controls to confirm that I do not have a time limit right now. The elapsed timer should keep running. The limit is already cleared; do not infer or set another limit unless I explicitly state one.';
     }
-    if(action!=='set'||!Number.isSafeInteger(minutes)||minutes<=0){
-        throw new TypeError('A timebox control message requires an explicit positive whole-minute duration.');
+    if(
+        !['set','adjust'].includes(action)
+        ||!Number.isSafeInteger(milliseconds)
+        ||milliseconds<=0
+    ){
+        throw new TypeError('A timebox control message requires an explicit positive whole-millisecond duration.');
     }
-    return `I used the conversation controls to set a check-in ${minutes} minute${minutes===1?'':'s'} from now. The timer is already set. Please adapt our pace and priorities to that limit, and do not reset it unless I explicitly revise it.`;
+    const duration=formatConversationElapsed(milliseconds);
+    return action==='adjust'
+        ?`I used the conversation controls to add ${duration} to the active check-in. The timer is already adjusted. Please adapt our pace and priorities to it.`
+        :`I used the conversation controls to set a check-in ${duration} from now. The timer is already set. Please adapt our pace and priorities to it, and do not reset it unless I explicitly revise it.`;
 }
 
 function conversationTimeboxSubmissionKey(context={}){
@@ -189,7 +193,7 @@ class ConversationTimebox{
     #disposed=false;
     #dueAtMs=null;
     #dueRevision=null;
-    #durationMinutes=null;
+    #durationMilliseconds=null;
     #intervalHandle=null;
     #listeners=new Set();
     #nowMs=null;
@@ -237,8 +241,8 @@ class ConversationTimebox{
         return CONVERSATION_TIMEBOX_LIMIT_MESSAGE;
     }
 
-    controlMessage(action,minutes){
-        return createConversationTimeboxControlMessage(action,minutes);
+    controlMessage(action,milliseconds){
+        return createConversationTimeboxControlMessage(action,milliseconds);
     }
 
     start(){
@@ -247,37 +251,56 @@ class ConversationTimebox{
             return this.snapshot();
         }
         const now=this.#readClock();
-        const intervalHandle=this.#schedule(
-            this.#tick.bind(this),
-            this.#tickMs
-        );
-        this.#startedAtMs=now;
-        this.#nowMs=now;
-        this.#intervalHandle=intervalHandle;
-        this.#notify('change');
+        this.#startAt(now,true);
         return this.snapshot();
     }
 
-    setLimitMinutes(minutes,{source='user'}={}){
+    setLimitMilliseconds(milliseconds,{source='user'}={}){
         this.#assertActive();
-        if(!Number.isSafeInteger(minutes)||minutes<=0){
-            throw new TypeError('Conversation time must be an explicit positive whole number of minutes.');
+        if(!Number.isSafeInteger(milliseconds)||milliseconds<=0){
+            throw new TypeError('Conversation time must be an explicit positive whole number of milliseconds.');
         }
         if(typeof source!=='string'||!source.trim()){
             throw new TypeError('Conversation timebox source must contain text.');
         }
+        const now=this.#readClock();
+        const dueAtMs=now+milliseconds;
+        if(!Number.isSafeInteger(dueAtMs)||dueAtMs>MAX_DATE_MILLISECONDS){
+            throw new RangeError('The requested conversation duration exceeds the supported date range.');
+        }
         if(this.#startedAtMs===null){
-            this.start();
+            this.#startAt(now,false);
+        }
+
+        this.#durationMilliseconds=milliseconds;
+        this.#setAtMs=now;
+        this.#dueAtMs=dueAtMs;
+        this.#dueRevision=null;
+        this.#revision++;
+        this.#nowMs=now;
+        this.#notify('change');
+        return this.snapshot();
+    }
+
+    adjustLimitMilliseconds(milliseconds,{source='user'}={}){
+        this.#assertActive();
+        if(!Number.isSafeInteger(milliseconds)||milliseconds<=0){
+            throw new TypeError('Conversation adjustment must be an explicit positive whole number of milliseconds.');
+        }
+        if(typeof source!=='string'||!source.trim()){
+            throw new TypeError('Conversation timebox source must contain text.');
+        }
+        if(this.#dueAtMs===null){
+            throw new Error('An active conversation time check is required before adding time.');
         }
 
         const now=this.#readClock();
-        const durationMs=minutes*60_000;
-        const dueAtMs=now+durationMs;
-        if(!Number.isSafeInteger(durationMs)||!Number.isSafeInteger(dueAtMs)||dueAtMs>MAX_DATE_MILLISECONDS){
-            throw new RangeError('The requested conversation duration exceeds the supported date range.');
+        const dueAtMs=Math.max(now,this.#dueAtMs)+milliseconds;
+        if(!Number.isSafeInteger(dueAtMs)||dueAtMs>MAX_DATE_MILLISECONDS){
+            throw new RangeError('The requested conversation adjustment exceeds the supported date range.');
         }
 
-        this.#durationMinutes=minutes;
+        this.#durationMilliseconds=dueAtMs-now;
         this.#setAtMs=now;
         this.#dueAtMs=dueAtMs;
         this.#dueRevision=null;
@@ -295,7 +318,7 @@ class ConversationTimebox{
         if(this.#startedAtMs===null){
             this.start();
         }
-        this.#durationMinutes=null;
+        this.#durationMilliseconds=null;
         this.#setAtMs=null;
         this.#dueAtMs=null;
         this.#dueRevision=null;
@@ -307,9 +330,18 @@ class ConversationTimebox{
 
     applyCommand(value){
         const command=normalizeConversationTimeboxCommand(value);
-        return command.action==='clear'
-            ?this.clearLimit({source:'tool'})
-            :this.setLimitMinutes(command.durationMinutes,{source:'tool'});
+        if(command.action==='clear'){
+            return this.clearLimit({source:'tool'});
+        }
+        return command.action==='adjust'
+            ?this.adjustLimitMilliseconds(
+                command.durationMilliseconds,
+                {source:'tool'}
+            )
+            :this.setLimitMilliseconds(
+                command.durationMilliseconds,
+                {source:'tool'}
+            );
     }
 
     subscribe(listener){
@@ -349,7 +381,7 @@ class ConversationTimebox{
             status,
             startedAtMs:this.#startedAtMs,
             elapsedMs,
-            durationMinutes:this.#durationMinutes,
+            durationMilliseconds:this.#durationMilliseconds,
             setAtMs:this.#setAtMs,
             dueAtMs:this.#dueAtMs,
             remainingMs,
@@ -385,6 +417,19 @@ class ConversationTimebox{
             throw new TypeError('Conversation timebox clock must return a supported non-negative integer timestamp.');
         }
         return this.#nowMs===null?now:Math.max(now,this.#nowMs);
+    }
+
+    #startAt(now,notify){
+        const intervalHandle=this.#schedule(
+            this.#tick.bind(this),
+            this.#tickMs
+        );
+        this.#startedAtMs=now;
+        this.#nowMs=now;
+        this.#intervalHandle=intervalHandle;
+        if(notify){
+            this.#notify('change');
+        }
     }
 
     #tick(){
@@ -435,6 +480,17 @@ function consumeConversationTimeboxCall(calls,controller){
 
     const argumentsValue=remainingCalls[CONVERSATION_TIMEBOX_TOOL_NAME];
     delete remainingCalls[CONVERSATION_TIMEBOX_TOOL_NAME];
+    if(Object.keys(remainingCalls).length){
+        const reason=new TypeError(
+            'The conversation timebox must be the sole tool call in a response.'
+        );
+        reason.code='CONVERSATION_TIMEBOX_MUST_BE_SOLE_CALL';
+        return Object.freeze({
+            handled:true,
+            remainingCalls:Object.freeze({}),
+            result:Object.freeze({status:'rejected',reason})
+        });
+    }
     try{
         return Object.freeze({
             handled:true,

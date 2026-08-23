@@ -64,7 +64,7 @@ async function configureIntegratedWorkspace(workspaceRoot){
                 {
                     source:'arcane',
                     destination:'arcane',
-                    include:['components','css','entities','img','modules'],
+                    include:['components','css','entities','img','modules','security'],
                     exclude:[]
                 },
                 {
@@ -79,7 +79,7 @@ async function configureIntegratedWorkspace(workspaceRoot){
     await rm(path.join(workspaceRoot,'arcane.lock.json'),{force:true});
 
     const arcaneRoot=path.join(workspaceRoot,'arcane');
-    for(const directory of ['components','css','entities','img','modules']){
+    for(const directory of ['components','css','entities','img','modules','security']){
         await mkdir(path.join(arcaneRoot,directory),{recursive:true});
     }
     await writeFile(

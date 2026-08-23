@@ -300,7 +300,7 @@ test('native build plan schema uses the packager semantic-version contract',asyn
     });
 });
 
-test('native build plan schema publishes only the exact dev.3 target matrix',async t=>{
+test('native build plan schema publishes only the exact dev.4 target matrix',async t=>{
     const schema=await readSchema('native-build-plan.schema.json');
     const variants=schema.$defs.targetRequest.oneOf.map(variant=>({
         target:variant.properties.target.const,
@@ -427,7 +427,7 @@ test('CI, reusable app release, and trusted publishing workflows retain narrow a
     await t.test('app release is reusable, single-app, and exact-SDK bound',()=>{
         assert.match(appReleaseWorkflow,/workflow_call:/u);
         assert.match(appReleaseWorkflow,/app-id:/u);
-        assert.match(appReleaseWorkflow,/Expected arcane-os@0\.1\.0-dev\.3/u);
+        assert.match(appReleaseWorkflow,/Expected arcane-os@0\.1\.0-dev\.4/u);
         assert.match(buildSection,/arcane check[^\n]*--app "\$APP_ID"/u);
         assert.match(buildSection,/arcane package[^\n]*--app "\$APP_ID"/u);
         assert.match(buildSection,/arcane bundle[\s\S]*--app "\$APP_ID"/u);

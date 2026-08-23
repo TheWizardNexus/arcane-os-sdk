@@ -10,13 +10,23 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {readRuntimeSource} from './runtime-source.mjs';
 
 const toolRoot=path.dirname(fileURLToPath(import.meta.url));
 const packageRoot=path.dirname(toolRoot);
 const runtimeRoot=path.join(packageRoot,'runtime');
 const manifestPath=path.join(runtimeRoot,'ARCANE_RUNTIME_RELEASE.json');
 const manifestName=path.basename(manifestPath);
+const sourceConfigPath=path.join(toolRoot,'runtime-source.json');
 const mode=process.argv[2]??'--verify';
+
+async function runtimeSource(){
+    try{
+        return await readRuntimeSource(sourceConfigPath);
+    }catch{
+        throw new Error('tools/runtime-source.json is invalid.');
+    }
+}
 
 async function sha256File(filePath){
     const hash=createHash('sha256');
@@ -73,16 +83,17 @@ async function inventory(){
 
 async function buildManifest(){
     const packageJson=JSON.parse(await readFile(path.join(packageRoot,'package.json'),'utf8'));
+    const upstream=await runtimeSource();
     const files=await inventory();
     return {
         schemaVersion:1,
         builder:'arcane-sdk-runtime-v1',
         sdkVersion:packageJson.version,
         source:{
-            repository:'https://github.com/TheWizardNexus/ARCANE-OS.git',
-            commit:'4382043c09285ea203aa6daba1732660966ac409',
-            bundleVersion:'0.8.12',
-            protocol:'arcane/1'
+            repository:upstream.repository,
+            commit:upstream.commit,
+            bundleVersion:upstream.bundleVersion,
+            protocol:upstream.protocol
         },
         fileCount:files.length,
         totalBytes:files.reduce((total,file)=>total+file.bytes,0),

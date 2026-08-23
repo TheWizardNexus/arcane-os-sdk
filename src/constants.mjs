@@ -3,12 +3,12 @@ import {fileURLToPath} from 'node:url';
 
 export const SDK_NAME='arcane-os';
 export const CLI_NAME='arcane';
-export const SDK_VERSION='0.1.0-dev.3';
+export const SDK_VERSION='0.1.0-dev.4';
 export const ARCANE_PROTOCOL='arcane/1';
 export const CLI_EVENT_PROTOCOL='arcane-cli-events/1';
 export const TARGET_ADAPTER_PROTOCOL='arcane-target-adapter/1';
 export const ARCANE_MACHINE_BUNDLE_VERSION='0.8.12';
-export const ARCANE_UPSTREAM_COMMIT='4382043c09285ea203aa6daba1732660966ac409';
+export const ARCANE_UPSTREAM_COMMIT='567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e';
 export const ARCANE_UPSTREAM_REPOSITORY='https://github.com/TheWizardNexus/ARCANE-OS.git';
 
 export const SDK_ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');

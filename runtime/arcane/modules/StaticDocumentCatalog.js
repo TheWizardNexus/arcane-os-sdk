@@ -27,8 +27,8 @@ const MEDIA_TYPES=new Set(['text/markdown','text/plain']);
 const SHA256_PATTERN=/^[a-f0-9]{64}$/;
 const TEXTUAL_CONTENT_TYPE=/^(?:text\/|application\/(?:javascript|json|xml|xhtml\+xml)(?:;|$)|image\/svg\+xml(?:;|$))/i;
 const SEARCH_FIELD_ORDER=Object.freeze([
-    'title','searchTerms','tags','headings','summary','category','audiences',
-    'platforms','sourcePath','path','language','id'
+    'title','searchTerms','tags','headings','summary','category','navigationGroup',
+    'navigationParent','audiences','platforms','sourcePath','path','language','id'
 ]);
 const SEARCH_STOP_WORDS=new Set([
     'a','an','and','are','as','at','be','by','do','does','for','from','how','i',
@@ -229,14 +229,60 @@ function normalizePathList(value,label){
     return Object.freeze(paths);
 }
 
+function normalizeNavigationMetadata(input,index){
+    const keys=['navigationParent','navigationGroup','navigationOrder'];
+    let supplied=0;
+    for(const key of keys){
+        if(input[key]!==undefined) supplied++;
+    }
+    if(supplied!==0&&supplied!==keys.length){
+        fail(
+            `Document record ${index+1} navigationParent, navigationGroup, and navigationOrder must be supplied together.`,
+            'STATIC_DOCUMENT_INVALID_CATALOG',
+        );
+    }
+    if(supplied===0){
+        return Object.freeze({
+            navigationGroup:'',
+            navigationOrder:0,
+            navigationParent:'',
+        });
+    }
+    const navigationParent=boundedText(
+        input.navigationParent,
+        `Document record ${index+1} navigationParent`,
+        128,
+    );
+    if(!ID_PATTERN.test(navigationParent)){
+        fail(
+            `Document record ${index+1} navigationParent must be a document id.`,
+            'STATIC_DOCUMENT_INVALID_CATALOG',
+        );
+    }
+    return Object.freeze({
+        navigationGroup:boundedText(
+            input.navigationGroup,
+            `Document record ${index+1} navigationGroup`,
+            128,
+        ),
+        navigationOrder:boundedInteger(
+            input.navigationOrder,
+            `Document record ${index+1} navigationOrder`,
+            {minimum:0,maximum:1000000},
+        ),
+        navigationParent,
+    });
+}
+
 function normalizeRecord(input,index,maxDocumentBytes){
     if(!isPlainRecord(input)) fail(`Document record ${index+1} must be a plain object.`,'STATIC_DOCUMENT_INVALID_CATALOG');
     assertKnownKeys(
         input,
         new Set([
             'audiences','byteSize','category','examples','headings','id','kind','language',
-            'mediaType','order','path','platforms','prerequisites','related','screenshots',
-            'searchTerms','sha256','sourcePath','summary','tags','title'
+            'mediaType','navigationGroup','navigationOrder','navigationParent','order','path',
+            'platforms','prerequisites','related','screenshots','searchTerms','sha256',
+            'sourcePath','summary','tags','title'
         ]),
         `Document record ${index+1}`,
     );
@@ -247,6 +293,7 @@ function normalizeRecord(input,index,maxDocumentBytes){
     const sha256=boundedText(input.sha256,`Document record ${index+1} SHA-256`,64).toLowerCase();
     if(!SHA256_PATTERN.test(sha256)) fail(`Document record ${index+1} has an invalid SHA-256 digest.`,'STATIC_DOCUMENT_INVALID_CATALOG');
     const path=relativePath(input.path,`Document record ${index+1} path`);
+    const navigation=normalizeNavigationMetadata(input,index);
     return Object.freeze({
         id,
         path,
@@ -264,6 +311,9 @@ function normalizeRecord(input,index,maxDocumentBytes){
             `Document record ${index+1} order`,
             {minimum:0,maximum:1000000},
         ),
+        navigationParent:navigation.navigationParent,
+        navigationGroup:navigation.navigationGroup,
+        navigationOrder:navigation.navigationOrder,
         audiences:normalizeTextList(input.audiences,`Document record ${index+1} audiences`),
         platforms:normalizeTextList(input.platforms,`Document record ${index+1} platforms`),
         prerequisites:normalizeIdentifierList(input.prerequisites,`Document record ${index+1} prerequisites`),
@@ -310,6 +360,7 @@ function normalizeStaticDocumentCatalog(input,options={}){
     const records=input.documents.map((record,index)=>normalizeRecord(record,index,maxDocumentBytes));
     const ids=new Set();
     const paths=new Set();
+    const recordsById=new Map();
     for(const record of records){
         const idKey=canonicalKey(record.id);
         const pathKey=canonicalKey(decodeURIComponent(record.path));
@@ -317,8 +368,32 @@ function normalizeStaticDocumentCatalog(input,options={}){
         if(paths.has(pathKey)) fail(`Static document catalog contains a case-colliding path: ${record.path}.`,'STATIC_DOCUMENT_CASE_COLLISION');
         ids.add(idKey);
         paths.add(pathKey);
+        recordsById.set(idKey,record);
     }
     for(const record of records){
+        if(record.navigationParent){
+            const recordIdKey=canonicalKey(record.id);
+            const parentIdKey=canonicalKey(record.navigationParent);
+            if(parentIdKey===recordIdKey){
+                fail(
+                    `Document ${record.id} cannot be its own navigation parent.`,
+                    'STATIC_DOCUMENT_INVALID_CATALOG',
+                );
+            }
+            if(!ids.has(parentIdKey)){
+                fail(
+                    `Document ${record.id} has an unknown navigation parent: ${record.navigationParent}.`,
+                    'STATIC_DOCUMENT_INVALID_CATALOG',
+                );
+            }
+            const parent=recordsById.get(parentIdKey);
+            if(parent?.navigationParent){
+                fail(
+                    `Document ${record.id} navigation parent must be a top-level document: ${record.navigationParent}.`,
+                    'STATIC_DOCUMENT_INVALID_CATALOG',
+                );
+            }
+        }
         for(const [label,references] of [
             ['prerequisites',record.prerequisites],
             ['related documents',record.related],
@@ -426,6 +501,8 @@ function searchIndex(record){
         audiences:record.audiences.map(normalizedSearchText),
         category:normalizedSearchText(record.category),
         id:normalizedSearchText(record.id),
+        navigationGroup:normalizedSearchText(record.navigationGroup),
+        navigationParent:normalizedSearchText(record.navigationParent),
         path:normalizedSearchText(record.path),
         sourcePath:normalizedSearchText(record.sourcePath),
         language:normalizedSearchText(record.language),
@@ -451,6 +528,10 @@ function fieldScore(index,phrase,tokens){
     if(index.summary.includes(phrase)){score+=18;matched.add('summary');}
     if(index.category===phrase){score+=40;matched.add('category');}
     else if(index.category.includes(phrase)){score+=16;matched.add('category');}
+    if(index.navigationGroup===phrase){score+=40;matched.add('navigationGroup');}
+    else if(index.navigationGroup.includes(phrase)){score+=16;matched.add('navigationGroup');}
+    if(index.navigationParent===phrase){score+=36;matched.add('navigationParent');}
+    else if(index.navigationParent.includes(phrase)){score+=14;matched.add('navigationParent');}
     if(index.audiences.some(function audienceEqualsPhrase(audience){return audience===phrase;})){score+=32;matched.add('audiences');}
     else if(index.audiences.some(function audienceIncludesPhrase(audience){return audience.includes(phrase);})){score+=12;matched.add('audiences');}
     if(index.platforms.some(function platformEqualsPhrase(platform){return platform===phrase;})){score+=32;matched.add('platforms');}
@@ -471,6 +552,8 @@ function fieldScore(index,phrase,tokens){
         if(index.headings.some(heading=>heading.includes(token))){score+=5;matched.add('headings');}
         if(index.summary.includes(token)){score+=3;matched.add('summary');}
         if(index.category.includes(token)){score+=6;matched.add('category');}
+        if(index.navigationGroup.includes(token)){score+=6;matched.add('navigationGroup');}
+        if(index.navigationParent.includes(token)){score+=6;matched.add('navigationParent');}
         if(index.audiences.some(function audienceIncludesToken(audience){return audience.includes(token);})){score+=6;matched.add('audiences');}
         if(index.platforms.some(function platformIncludesToken(platform){return platform.includes(token);})){score+=6;matched.add('platforms');}
         if(index.searchTerms.some(term=>term===token)){score+=18;matched.add('searchTerms');}
@@ -491,6 +574,39 @@ function bodyScore(value,phrase,tokens){
         if(body.includes(token))score+=6;
     }
     return score;
+}
+
+function boundedSearchResults(results,limit){
+    if(results.length<=limit)return results;
+    const collectionLimit=Math.max(1,Math.floor(limit/4));
+    const collectionCounts=new Map();
+    const selected=new Set();
+    const deferred=[];
+
+    for(const result of results){
+        if(selected.size>=limit)break;
+        if(!result.navigationParent){
+            selected.add(result);
+            continue;
+        }
+        const parent=canonicalKey(result.navigationParent);
+        const count=collectionCounts.get(parent)??0;
+        if(count>=collectionLimit){
+            deferred.push(result);
+            continue;
+        }
+        collectionCounts.set(parent,count+1);
+        selected.add(result);
+    }
+
+    for(const result of deferred){
+        if(selected.size>=limit)break;
+        selected.add(result);
+    }
+
+    return results.filter(function selectBoundedSearchResult(result){
+        return selected.has(result);
+    });
 }
 
 function relevantSliceStart(value,query,maximum){
@@ -784,7 +900,9 @@ function contextFooter(record){
  * decoded as UTF-8, and accepted only after exact size and SHA-256 checks.
  * Persistence is optional and entirely owned by the injected cache adapter.
  * Records may add inert source metadata (`mediaType`, `sourcePath`, `language`,
- * and `searchTerms`); manifests without those fields retain document defaults.
+ * and `searchTerms`) plus all-or-none navigation hierarchy metadata
+ * (`navigationParent`, `navigationGroup`, and `navigationOrder`); manifests
+ * without those fields retain document defaults.
  * Context metadata reports the verified digest and one-based excerpt lines.
  */
 export default class StaticDocumentCatalog{
@@ -797,6 +915,7 @@ export default class StaticDocumentCatalog{
     #manifest;
     #onCacheError;
     #recordsById;
+    #verifiedHydrations;
 
     constructor(manifest,options={}){
         const normalizedOptions=normalizeOptions(options);
@@ -812,6 +931,7 @@ export default class StaticDocumentCatalog{
         this.#onCacheError=normalizedOptions.onCacheError;
         this.#recordsById=new Map(this.#manifest.documents.map(record=>[record.id,record]));
         this.#indexes=new Map(this.#manifest.documents.map(record=>[record.id,searchIndex(record)]));
+        this.#verifiedHydrations=new Map();
     }
 
     get version(){return this.#manifest.version;}
@@ -851,11 +971,32 @@ export default class StaticDocumentCatalog{
             ||compareText(normalizedSearchText(left.title),normalizedSearchText(right.title))
             ||compareText(left.id,right.id)
         );
-        return Object.freeze(results.slice(0,settings.limit));
+        return Object.freeze(boundedSearchResults(results,settings.limit));
     }
 
     #cacheKey(record){
         return staticDocumentCacheKey(this.version,record.id,record.sha256);
+    }
+
+    #retainedHydration(record){
+        const key=this.#cacheKey(record);
+        const retained=this.#verifiedHydrations.get(key)??null;
+        if(!retained) return null;
+        this.#verifiedHydrations.delete(key);
+        this.#verifiedHydrations.set(key,retained);
+        return retained;
+    }
+
+    #retainHydration(record,text,url){
+        const key=this.#cacheKey(record);
+        const retained=Object.freeze({record,text,url,source:'cache'});
+        this.#verifiedHydrations.delete(key);
+        this.#verifiedHydrations.set(key,retained);
+        while(this.#verifiedHydrations.size>this.#limits.maxContextDocuments){
+            const oldest=this.#verifiedHydrations.keys().next().value;
+            this.#verifiedHydrations.delete(oldest);
+        }
+        return retained;
     }
 
     #cacheError(error,context){
@@ -881,6 +1022,8 @@ export default class StaticDocumentCatalog{
     }
 
     async #readCache(record,signal){
+        const retained=this.#retainedHydration(record);
+        if(retained) return retained;
         if(!this.#cache) return null;
         const key=this.#cacheKey(record);
         let entry;
@@ -908,12 +1051,7 @@ export default class StaticDocumentCatalog{
             ) fail('Cached document metadata is invalid.','STATIC_DOCUMENT_CACHE_INVALID');
             const bytes=encodeBytes(entry.text);
             const text=await verifiedText(bytes,record,this.#digest);
-            return Object.freeze({
-                record,
-                text,
-                url:this.#resolve(record).href,
-                source:'cache',
-            });
+            return this.#retainHydration(record,text,this.#resolve(record).href);
         }catch(error){
             await this.#removeInvalidCache(key,record,error);
             return null;
@@ -986,6 +1124,7 @@ export default class StaticDocumentCatalog{
         },{milliseconds:this.#limits.fetchTimeoutMs,signal:settings.signal});
         const text=await verifiedText(bytes,record,this.#digest);
         await this.#writeCache(record,text);
+        this.#retainHydration(record,text,url.href);
         return Object.freeze({record,text,url:url.href,source:'network'});
     }
 

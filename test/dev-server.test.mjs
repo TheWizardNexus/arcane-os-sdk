@@ -132,6 +132,11 @@ test('source server exposes only the selected app and SDK browser routes',async 
     assert.equal(theme.status,200);
     assert.match(theme.headers.get('content-type'),/^text\/css/);
 
+    const networkPolicy=await request(origin,'/arcane/security/arcane-network-policy.json',{cookie});
+    assert.equal(networkPolicy.status,200);
+    assert.match(networkPolicy.headers.get('content-type'),/^application\/json/);
+    assert.equal((await networkPolicy.json()).schemaVersion,1);
+
     const strongType=await request(origin,'/node_modules/strong-type/index.js',{cookie});
     assert.equal(strongType.status,200);
     assert.match(strongType.headers.get('content-type'),/^text\/javascript/);

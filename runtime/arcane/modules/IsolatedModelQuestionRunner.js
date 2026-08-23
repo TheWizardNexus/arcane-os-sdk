@@ -11,9 +11,10 @@ const RUN_REQUEST_KEYS=Object.freeze([
     'prompt',
     'systemPrompt',
     'options',
-    'think',
     'expectedModel'
 ]);
+const RUN_REQUEST_OPTIONAL_KEYS=Object.freeze(['onPhase','think']);
+const THINK_LEVELS=Object.freeze(['low','medium','high']);
 const SENTENCE_BOUNDARY=/[.!?]+(?:["'\u2019\u201d)\]}]+)?(?=\s|$)/gu;
 const WORD_OR_NUMBER=/[\p{L}\p{N}]/u;
 
@@ -222,7 +223,7 @@ class IsolatedModelQuestionRunner{
     }
 
     async runQuestion(input={}){
-        if(!hasExactKeys(input,RUN_REQUEST_KEYS,['onPhase'])){
+        if(!hasExactKeys(input,RUN_REQUEST_KEYS,RUN_REQUEST_OPTIONAL_KEYS)){
             throw codedError(
                 'INVALID_ISOLATED_MODEL_RUNNER_REQUEST',
                 'The isolated-model question request has unsupported or missing fields.',
@@ -230,10 +231,12 @@ class IsolatedModelQuestionRunner{
             );
         }
         const {model,prompt,systemPrompt,options,think,expectedModel,onPhase}=input;
+        const hasThink=Object.hasOwn(input,'think');
         validateExpectedModel(model,expectedModel);
         if(typeof prompt!=='string'
             ||typeof systemPrompt!=='string'
             ||!isPlainRecord(options)
+            ||(hasThink&&!THINK_LEVELS.includes(think))
             ||(onPhase!==undefined&&typeof onPhase!=='function')){
             throw codedError(
                 'INVALID_ISOLATED_MODEL_RUNNER_REQUEST',
@@ -241,7 +244,14 @@ class IsolatedModelQuestionRunner{
                 TypeError
             );
         }
-        const request={model,prompt,systemPrompt,options,think,expectedModel};
+        const request={
+            model,
+            prompt,
+            systemPrompt,
+            options,
+            ...(hasThink?{think}:{}),
+            expectedModel
+        };
         const streamOptions=onPhase===undefined?{}:{onPhase};
         const result=validateRunResult(
             await this.localAI.runIsolatedQuestion(request,streamOptions),

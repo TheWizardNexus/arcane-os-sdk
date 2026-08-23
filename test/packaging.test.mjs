@@ -28,7 +28,7 @@ async function createExternalFixture(root){
                 {
                     source:'node_modules/arcane-os/runtime/arcane',
                     destination:'arcane',
-                    include:['components','css','entities','img','modules'],
+                    include:['components','css','entities','img','modules','security'],
                     exclude:[]
                 },
                 {
@@ -72,7 +72,7 @@ async function createExternalFixture(root){
     await writeFile(path.join(appRoot,'modules','é.js'),'export const accented=true;\n');
 
     const arcaneRoot=path.join(root,'node_modules','arcane-os','runtime','arcane');
-    for(const directory of ['components','css','entities','img','modules']){
+    for(const directory of ['components','css','entities','img','modules','security']){
         await mkdir(path.join(arcaneRoot,directory),{recursive:true});
         await writeFile(path.join(arcaneRoot,directory,'fixture.txt'),`${directory}\n`);
     }
@@ -152,6 +152,7 @@ test('external workspace packages deterministically and detects release tamperin
             <releasePaths.indexOf('apps/fixture-app/modules/é.js'),
         'NFC release paths must use defined UTF-8 byte order rather than locale collation'
     );
+    assert.ok(releasePaths.includes('arcane/security/fixture.txt'));
     assert.ok(Object.isFrozen(first.receipt.files));
     assert.ok(Object.isFrozen(first.receipt.files[0]));
     assert.ok(Object.isFrozen(first.receipt.app));

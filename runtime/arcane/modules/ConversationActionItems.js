@@ -452,7 +452,7 @@ export function conversationActionItemsInstruction(selected=[],{
     completionToolName='complete_conversation_action_items'
 }={}){
     if(enabled!==true){
-        return '## Remembered follow-ups\nThe user disabled saved follow-ups. Do not create, save, revisit, or call a tool for remembered homework or action items. Inline optional next steps may still appear in a closeout, but must not be described as saved.';
+        return '## Remembered follow-ups\nThe user disabled saved follow-ups. Do not create, save, revisit, or call a tool for remembered homework or action items. Optional next steps may still appear in final_message, but must not be described as saved.';
     }
 
     const items=normalizeConversationActionItems(selected);
@@ -460,7 +460,7 @@ export function conversationActionItemsInstruction(selected=[],{
         throw invalid(`At most ${MAX_PRESENTED_ACTION_ITEMS} action item may be presented.`);
     }
     if(!items.length){
-        return '## Remembered follow-ups\nThere is no saved follow-up selected for this conversation. Populate remembered_actions in a closeout only for a commitment or optional homework the user explicitly agreed to carry forward. Do not turn ordinary suggestions into saved obligations.';
+        return '## Remembered follow-ups\nThere is no saved follow-up selected for this conversation. Populate remembered_actions alongside final_message only for a commitment or optional homework the user explicitly agreed to carry forward. Do not turn ordinary suggestions into saved obligations.';
     }
 
     const payload=items.map(item=>({id:item.id,text:item.text,basis:item.basis}));

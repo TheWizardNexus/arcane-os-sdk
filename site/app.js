@@ -9,7 +9,7 @@ node ./bin/arcane.mjs new local-app --path ../local-app --target portable --git
 
 # From the generated app repository
 cd ../local-app
-npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.3.tgz
+npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.4.tgz
 npm run check`,
     note: "Use a packed tarball today. Local directory dependencies may become links and are intentionally rejected."
   }),

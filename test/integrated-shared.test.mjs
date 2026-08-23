@@ -25,7 +25,7 @@ function sharedRoutes(mode){
             {
                 source:'node_modules/arcane-os/runtime/arcane',
                 destination:'arcane',
-                include:['components','css','entities','img','modules'],
+                include:['components','css','entities','img','modules','security'],
                 exclude:[]
             },
             {
@@ -46,7 +46,7 @@ function sharedRoutes(mode){
         {
             source:'arcane',
             destination:'arcane',
-            include:['components','css','entities','img','modules'],
+            include:['components','css','entities','img','modules','security'],
             exclude:[]
         },
         {

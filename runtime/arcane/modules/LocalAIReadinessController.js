@@ -1,7 +1,7 @@
 import {
     checkLocalAIReadiness,
     deriveLocalAIRequirements
-} from './LocalAIReadiness.js?v=3';
+} from './LocalAIReadiness.js?v=4';
 
 const SLOT_NAMES=Object.freeze(['llm','stt','tts']);
 

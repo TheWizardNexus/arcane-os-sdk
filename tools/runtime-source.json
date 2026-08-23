@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
+  "commit": "567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e",
+  "bundleVersion": "0.8.12",
+  "protocol": "arcane/1",
+  "runtimeDirectories": [
+    "components",
+    "css",
+    "entities",
+    "img",
+    "modules",
+    "security"
+  ],
+  "strongTypeFiles": [
+    "index.js",
+    "licence",
+    "package.json"
+  ],
+  "strongType": {
+    "version": "1.1.0",
+    "resolved": "https://registry.npmjs.org/strong-type/-/strong-type-1.1.0.tgz",
+    "integrity": "sha512-X5Z6riticuH5GnhUyzijfDi1SoXas8ODDyN7K8lJeQK+Jfi4dKdoJGL4CXTskY/ATBcN+rz5lROGn1tAUkOX7g==",
+    "files": [
+      {
+        "path": "index.js",
+        "sha256": "a7b76761aa83553f172846587cbc96809b648640e90d019ae94c2795418a02f4"
+      },
+      {
+        "path": "licence",
+        "sha256": "82b891ff5bdc521884c20023b4f468dce605aff5b0d6dc642cd2ce2849b55125"
+      },
+      {
+        "path": "package.json",
+        "sha256": "9ff67f61a7df3129162ba340f89018828dbbf82705caf022fdff974e6f6792f8"
+      }
+    ]
+  }
+}

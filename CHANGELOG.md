@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-dev.4
+
+- Synchronized the browser runtime to Arcane OS `0.8.12` commit
+  `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, including the shared network
+  policy modules and policy data required by standalone applications.
+- Added an explicit, main-checkout-only runtime synchronization tool and moved
+  upstream runtime provenance into a reviewable source configuration.
+- Added `security` to the external and integrated browser-runtime route contract.
+
 ## 0.1.0-dev.3
 
 - Added an authored-descriptor-only external app release envelope with an exact

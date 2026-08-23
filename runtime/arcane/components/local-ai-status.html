@@ -249,7 +249,7 @@
             title.textContent='Local AI is ready';
             summary.setAttribute('role','status');
             summary.textContent=userManaged
-                ?'The Android host admitted the selected model through your reachable Termux/Ollama service. Arcane does not manage its lifecycle.'
+                ?'The Android host admitted the selected model through your reachable Android Linux Terminal/Ollama service. Arcane does not manage its lifecycle.'
                 :'The selected local model and speech services are available.';
             readyForDismiss=true;
             scheduleReadyDismiss();
@@ -269,13 +269,27 @@
         return report;
     }
 
+    function positiveSafeInteger(value){
+        return Number.isSafeInteger(value)&&value>0
+            ?value
+            :null;
+    }
+
     function normalizeResult(value={}){
         if(typeof value==='boolean'){
-            return {required:true,ready:value,message:''};
+            return {
+                required:true,
+                ready:value,
+                activeParallelRequests:null,
+                message:''
+            };
         }
         return {
             required:Boolean(value?.required),
             ready:Boolean(value?.ready),
+            activeParallelRequests:positiveSafeInteger(
+                value?.activeParallelRequests
+            ),
             message:String(value?.message||value?.reason||value?.errorCode||'')
         };
     }
@@ -287,6 +301,7 @@
                 {
                     required:Boolean(requirements?.[key]?.required??requirements?.[key]),
                     ready:false,
+                    activeParallelRequests:null,
                     message:''
                 }
             ];
@@ -294,6 +309,18 @@
             return entry[1].required;
         });
         renderEntries(entries,state);
+    }
+
+    function serviceStatusText(result={},base=''){
+        const parallelRequests=positiveSafeInteger(
+            result.activeParallelRequests
+        );
+
+        if(parallelRequests===null){
+            return base;
+        }
+
+        return `${base} — numParallel ${parallelRequests}`;
     }
 
     function renderEntries(entries,state=''){
@@ -315,8 +342,11 @@
             status.textContent=state==='checking'
                 ?'Checking...'
                 :result.ready
-                    ?'Ready'
-                    :result.message||'Unavailable';
+                    ?serviceStatusText(result,'Ready')
+                    :serviceStatusText(
+                        result,
+                        result.message||'Unavailable'
+                    );
             item.append(name,status);
             fragment.append(item);
         }

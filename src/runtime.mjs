@@ -56,7 +56,7 @@ function validateRelease(value){
     if(value.schemaVersion!==1||value.builder!=='arcane-sdk-runtime-v1'){
         fail('Runtime manifest uses an unsupported schema or builder.');
     }
-    if(value.sdkVersion!=='0.1.0-dev.3')fail('Runtime manifest sdkVersion is incompatible with this SDK.');
+    if(value.sdkVersion!=='0.1.0-dev.4')fail('Runtime manifest sdkVersion is incompatible with this SDK.');
     if(!value.source||typeof value.source!=='object'
         ||Object.keys(value.source).sort(compareText).join('\0')!=='bundleVersion\0commit\0protocol\0repository'
         ||value.source.repository!=='https://github.com/TheWizardNexus/ARCANE-OS.git'

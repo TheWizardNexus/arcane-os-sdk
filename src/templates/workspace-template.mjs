@@ -1,5 +1,5 @@
 const SDK_NAME='arcane-os';
-const SDK_VERSION='0.1.0-dev.3';
+const SDK_VERSION='0.1.0-dev.4';
 
 function json(value){
     return `${JSON.stringify(value,null,2)}\n`;
@@ -161,7 +161,7 @@ Every browser release also carries Arcane OS licensing material under \`licenses
                 {
                     source:'node_modules/arcane-os/runtime/arcane',
                     destination:'arcane',
-                    include:['components','css','entities','img','modules'],
+                    include:['components','css','entities','img','modules','security'],
                     exclude:[]
                 },
                 {

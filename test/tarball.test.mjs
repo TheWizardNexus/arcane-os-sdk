@@ -46,10 +46,12 @@ test('packed npm artifact installs and drives an external repository end to end'
         assert.equal(packed.code,0,packed.stderr);
         const packReport=JSON.parse(packed.stdout)[0];
         assert.equal(packReport.name,'arcane-os');
-        assert.equal(packReport.version,'0.1.0-dev.3');
+        assert.equal(packReport.version,'0.1.0-dev.4');
         assert.ok(packReport.files.some(file=>file.path==='bin/arcane.mjs'));
         assert.ok(packReport.files.some(file=>file.path==='runtime/ARCANE_RUNTIME_RELEASE.json'));
         assert.ok(packReport.files.some(file=>file.path==='runtime/arcane/modules/SpeechPlayback.js'));
+        assert.ok(packReport.files.some(file=>file.path==='runtime/arcane/modules/ArcaneNetworkPolicy.js'));
+        assert.ok(packReport.files.some(file=>file.path==='runtime/arcane/security/arcane-network-policy.json'));
         assert.ok(packReport.files.some(file=>file.path==='schemas/arcane-app.schema.json'));
         assert.ok(packReport.files.some(file=>file.path==='schemas/arcane-package.schema.json'));
         assert.ok(packReport.files.some(file=>file.path==='schemas/arcane-app-bundle.schema.json'));
@@ -106,8 +108,8 @@ test('packed npm artifact installs and drives an external repository end to end'
         const packageDocument=JSON.parse(await readFile(path.join(workspaceRoot,'package.json'),'utf8'));
         assert.match(packageDocument.devDependencies['arcane-os'],/^file:.+\.tgz$/u);
         const packageLock=JSON.parse(await readFile(path.join(workspaceRoot,'package-lock.json'),'utf8'));
-        assert.equal(packageLock.packages['node_modules/arcane-os'].version,'0.1.0-dev.3');
-        assert.match(packageLock.packages['node_modules/arcane-os'].resolved,/arcane-os-0\.1\.0-dev\.3\.tgz$/u);
+        assert.equal(packageLock.packages['node_modules/arcane-os'].version,'0.1.0-dev.4');
+        assert.match(packageLock.packages['node_modules/arcane-os'].resolved,/arcane-os-0\.1\.0-dev\.4\.tgz$/u);
         assert.match(packageLock.packages['node_modules/arcane-os'].integrity,/^sha512-/u);
 
         const cleanInstalled=await runNpm(

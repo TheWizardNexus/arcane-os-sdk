@@ -3,28 +3,15 @@ import {
     MAX_CONVERSATION_ACTION_ITEM_CHARACTERS,
     MAX_CONVERSATION_REMEMBERED_ACTIONS,
     normalizeRememberedConversationActions
-} from './ConversationActionItems.js';
+} from './ConversationActionItems.js?v=2';
 
 const DEFAULT_TOOL_NAME='prepare_conversation_closing_report';
 const TOOL_NAME_PATTERN=/^[a-z][a-z0-9_]{0,63}$/;
-const REPORT_KINDS=Object.freeze([
-    'after_action_report',
-    'summary',
-    'homework',
-    'closing'
-]);
 const MAX_ARGUMENT_CHARACTERS=16*1024;
-const MAX_SUMMARY_CHARACTERS=2000;
-const MAX_CLOSING_CHARACTERS=1000;
-const MAX_LIST_ITEMS=6;
-const MAX_LIST_ITEM_CHARACTERS=500;
+const MAX_FINAL_MESSAGE_CHARACTERS=5000;
 const REPORT_FIELDS=Object.freeze(new Set([
-    'kind',
-    'outcome_summary',
-    'progress',
-    'optional_next_steps',
-    'remembered_actions',
-    'warm_closing'
+    'final_message',
+    'remembered_actions'
 ]));
 
 function invalid(message){
@@ -65,23 +52,26 @@ function boundedText(value,label,maximum,{required=false}={}){
     return normalized;
 }
 
-function boundedList(value,label){
-    if(value===undefined||value===null){
-        return Object.freeze([]);
-    }
-    if(!Array.isArray(value)||value.length>MAX_LIST_ITEMS){
-        throw invalid(`${label} must contain at most ${MAX_LIST_ITEMS} items.`);
+function boundedFinalMessage(value){
+    if(typeof value!=='string'){
+        throw invalid('final_message must be a string.');
     }
 
-    const items=[];
-    for(const entry of value){
-        const item=boundedText(entry,`${label} item`,MAX_LIST_ITEM_CHARACTERS);
-        if(item){
-            items.push(item);
-        }
+    const normalized=value
+        .replace(/\r\n?/g,'\n')
+        .replace(/[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f]+/g,' ')
+        .trim();
+
+    if(!normalized){
+        throw invalid('final_message is required.');
+    }
+    if(normalized.length>MAX_FINAL_MESSAGE_CHARACTERS){
+        throw invalid(
+            `final_message exceeds ${MAX_FINAL_MESSAGE_CHARACTERS} characters.`
+        );
     }
 
-    return Object.freeze(items);
+    return normalized;
 }
 
 function parseArguments(value){
@@ -103,18 +93,11 @@ function parseArguments(value){
     return value;
 }
 
-function escapeMarkdown(value){
+function escapeRawHTML(value){
     return value
         .replaceAll('&','&amp;')
         .replaceAll('<','&lt;')
-        .replaceAll('>','&gt;')
-        .replace(/([\\`*_{}\[\]()#+.!|~-])/g,'\\$1');
-}
-
-function markdownList(items){
-    return items.map(function formatClosingReportListItem(item){
-        return `- ${escapeMarkdown(item)}`;
-    }).join('\n');
+        .replaceAll('>','&gt;');
 }
 
 function deepFreeze(value){
@@ -154,27 +137,11 @@ export function createConversationClosingReportTool({
                 type:'object',
                 additionalProperties:false,
                 properties:{
-                    kind:{
+                    final_message:{
                         type:'string',
-                        enum:[...REPORT_KINDS],
-                        description:'Choose closing when advice or homework would be a poor fit.'
-                    },
-                    outcome_summary:{
-                        type:'string',
-                        maxLength:MAX_SUMMARY_CHARACTERS,
-                        description:'Optional concise account of what the conversation accomplished. Omit it for a simple closing.'
-                    },
-                    progress:{
-                        type:'array',
-                        maxItems:MAX_LIST_ITEMS,
-                        items:{type:'string',maxLength:MAX_LIST_ITEM_CHARACTERS},
-                        description:'Optional concrete progress or takeaways grounded only in the conversation.'
-                    },
-                    optional_next_steps:{
-                        type:'array',
-                        maxItems:MAX_LIST_ITEMS,
-                        items:{type:'string',maxLength:MAX_LIST_ITEM_CHARACTERS},
-                        description:'Optional next steps or homework. Omit this field when actions would be unhelpful, unsafe, or unwanted.'
+                        minLength:1,
+                        maxLength:MAX_FINAL_MESSAGE_CHARACTERS,
+                        description:'The complete final response shown to the user to close the conversation. When useful and grounded in the conversation, include a concise summary of what was accomplished, concrete progress or takeaways, and optional next steps or homework. Omit any of those elements when they would be inappropriate, unsafe, unwanted, or unsupported. Present next steps as choices, never obligations. If remembered_actions are included, mention them only as agreed follow-ups and never claim they were saved. End with a calm, warm closing that does not pressure the user or create new obligations.'
                     },
                     remembered_actions:{
                         type:'array',
@@ -185,24 +152,22 @@ export function createConversationClosingReportTool({
                             properties:{
                                 text:{
                                     type:'string',
-                                    maxLength:MAX_CONVERSATION_ACTION_ITEM_CHARACTERS
+                                    minLength:1,
+                                    maxLength:MAX_CONVERSATION_ACTION_ITEM_CHARACTERS,
+                                    description:'The follow-up the user explicitly agreed to carry into a later conversation.'
                                 },
                                 basis:{
                                     type:'string',
-                                    enum:[...CONVERSATION_ACTION_ITEM_BASES]
+                                    enum:[...CONVERSATION_ACTION_ITEM_BASES],
+                                    description:'Use exactly "user_commitment" when the user explicitly committed to act. Use exactly "optional_homework" only when the user explicitly agreed to carry optional homework forward.'
                                 }
                             },
                             required:['text','basis']
                         },
-                        description:'Follow-ups the user explicitly agreed to carry into a later conversation. Keep ordinary suggestions only in optional_next_steps.'
-                    },
-                    warm_closing:{
-                        type:'string',
-                        maxLength:MAX_CLOSING_CHARACTERS,
-                        description:'A calm closing message that does not pressure the user or create obligations.'
+                        description:'Optional machine-readable follow-ups for local Profile persistence. Include only commitments or optional homework the user explicitly agreed to carry into a later conversation. Do not include ordinary suggestions from final_message.'
                     }
                 },
-                required:['kind','warm_closing']
+                required:['final_message']
             }
         }
     });
@@ -231,7 +196,7 @@ export function conversationClosingReportInstruction({
         {required:true}
     );
 
-    return `## Conversation closeout\nWhen ${trigger}, call \`${toolName}\` as the sole tool call and do not also answer in prose. Do not call it after a routine answer, while requested work remains open, or merely because a response is long. Use only facts established in the conversation. Never diagnose, score, judge, or infer personal traits. A summary, progress note, optional next steps, or homework may be included when useful; omit every optional section that would be inappropriate or unsupported. Next steps are choices, never obligations. Populate remembered_actions only for a commitment or optional homework the user explicitly agreed to carry into a later conversation; never turn an ordinary suggestion into a saved obligation. Choose a simple closing when advice or homework would be a poor fit. The application displays and saves the result in the conversation; the tool does not send it elsewhere or perform any suggested action.`;
+    return `## Conversation closeout\nWhen ${trigger}, call \`${toolName}\` as the sole tool call and do not also answer in prose. Do not call it after a routine answer, while requested work remains open, or merely because a response is long. Use only facts established in the conversation. Never diagnose, score, judge, or infer personal traits. Put the complete user-facing closeout in final_message. Populate remembered_actions only for a commitment or optional homework the user explicitly agreed to carry into a later conversation; never turn an ordinary suggestion into a saved obligation or claim it was saved. The application separately requests consent before saving a remembered action, displays final_message in the conversation, and reports the save result. The tool does not send anything elsewhere or perform any suggested action.`;
 }
 
 export function normalizeConversationClosingReport(value){
@@ -242,32 +207,10 @@ export function normalizeConversationClosingReport(value){
         throw invalid(`Unexpected closing-report field: ${unexpectedField}.`);
     }
 
-    const kind=boundedText(source.kind,'kind',64,{required:true});
-
-    if(!REPORT_KINDS.includes(kind)){
-        throw invalid('The closing-report kind is invalid.');
-    }
-
     return Object.freeze({
-        kind,
-        outcomeSummary:boundedText(
-            source.outcome_summary,
-            'outcome_summary',
-            MAX_SUMMARY_CHARACTERS
-        ),
-        progress:boundedList(source.progress,'progress'),
-        optionalNextSteps:boundedList(
-            source.optional_next_steps,
-            'optional_next_steps'
-        ),
+        finalMessage:boundedFinalMessage(source.final_message),
         rememberedActions:normalizeRememberedConversationActions(
             source.remembered_actions||[]
-        ),
-        warmClosing:boundedText(
-            source.warm_closing,
-            'warm_closing',
-            MAX_CLOSING_CHARACTERS,
-            {required:true}
         )
     });
 }
@@ -314,62 +257,18 @@ export function classifyConversationClosingReportCalls(calls={}, {
     }
 }
 
-export function formatConversationClosingReport(value, {
-    title='Conversation closeout',
-    summaryLabel='What we covered',
-    progressLabel='Progress',
-    nextStepsLabel='Optional next steps',
-    rememberedActionsLabel='Remembered follow-ups',
-    includeRememberedActions=false
-}={}){
-    const normalizedInput=isPlainRecord(value)&&value.outcomeSummary!==undefined
+export function formatConversationClosingReport(value){
+    const normalizedInput=isPlainRecord(value)&&value.finalMessage!==undefined
         ?{
-            kind:value.kind,
-            outcome_summary:value.outcomeSummary,
-            progress:value.progress,
-            optional_next_steps:value.optionalNextSteps,
+            final_message:value.finalMessage,
             remembered_actions:value.rememberedActions,
-            warm_closing:value.warmClosing
         }
         :value;
-    const report=normalizeConversationClosingReport(normalizedInput);
-    const labels={
-        title:boundedText(title,'title',160,{required:true}),
-        summary:boundedText(summaryLabel,'summaryLabel',160,{required:true}),
-        progress:boundedText(progressLabel,'progressLabel',160,{required:true}),
-        nextSteps:boundedText(nextStepsLabel,'nextStepsLabel',160,{required:true}),
-        rememberedActions:boundedText(
-            rememberedActionsLabel,
-            'rememberedActionsLabel',
-            160,
-            {required:true}
-        )
-    };
-    const sections=[`## ${escapeMarkdown(labels.title)}`];
-
-    if(report.outcomeSummary){
-        sections.push(`### ${escapeMarkdown(labels.summary)}\n${escapeMarkdown(report.outcomeSummary)}`);
-    }
-    if(report.progress.length){
-        sections.push(`### ${escapeMarkdown(labels.progress)}\n${markdownList(report.progress)}`);
-    }
-    if(report.optionalNextSteps.length){
-        sections.push(`### ${escapeMarkdown(labels.nextSteps)}\n${markdownList(report.optionalNextSteps)}`);
-    }
-    if(includeRememberedActions===true&&report.rememberedActions.length){
-        const remembered=report.rememberedActions.map(action=>
-            action.basis==='optional_homework'
-                ?`${action.text} (optional)`
-                :action.text
-        );
-        sections.push(`### ${escapeMarkdown(labels.rememberedActions)}\n${markdownList(remembered)}`);
-    }
-
-    sections.push(escapeMarkdown(report.warmClosing));
-    return sections.join('\n\n');
+    return escapeRawHTML(
+        normalizeConversationClosingReport(normalizedInput).finalMessage
+    );
 }
 
 export {
-    DEFAULT_TOOL_NAME as CONVERSATION_CLOSING_REPORT_TOOL_NAME,
-    REPORT_KINDS as CONVERSATION_CLOSING_REPORT_KINDS
+    DEFAULT_TOOL_NAME as CONVERSATION_CLOSING_REPORT_TOOL_NAME
 };

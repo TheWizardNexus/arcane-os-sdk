@@ -11,6 +11,12 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
+import {
+    ARCANE_MACHINE_BUNDLE_VERSION,
+    ARCANE_UPSTREAM_COMMIT,
+    ARCANE_UPSTREAM_REPOSITORY,
+    SDK_VERSION
+} from '../src/constants.mjs';
 import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
 import {
     authenticateRuntimeReceipt,
@@ -57,6 +63,54 @@ test('bundled Arcane runtime matches its immutable release manifest',async()=>{
     assert.equal(events.at(0).type,'runtime.verify.started');
     assert.equal(events.at(-1).type,'runtime.verify.completed');
     assert.equal(events.filter(event=>event.type==='runtime.verify.progress').length,manifest.fileCount);
+});
+
+test('runtime provenance and shared network-policy closure are complete',async()=>{
+    const manifest=JSON.parse(await readFile(
+        path.join(repositoryRoot,'runtime','ARCANE_RUNTIME_RELEASE.json'),
+        'utf8'
+    ));
+    const sourceConfig=JSON.parse(await readFile(
+        path.join(repositoryRoot,'tools','runtime-source.json'),
+        'utf8'
+    ));
+    assert.equal(manifest.sdkVersion,SDK_VERSION);
+    assert.deepEqual(manifest.source,{
+        repository:ARCANE_UPSTREAM_REPOSITORY,
+        commit:ARCANE_UPSTREAM_COMMIT,
+        bundleVersion:ARCANE_MACHINE_BUNDLE_VERSION,
+        protocol:'arcane/1'
+    });
+    assert.deepEqual(sourceConfig.runtimeDirectories,[
+        'components','css','entities','img','modules','security'
+    ]);
+    assert.equal(sourceConfig.commit,manifest.source.commit);
+    assert.equal(sourceConfig.bundleVersion,manifest.source.bundleVersion);
+    const paths=new Set(manifest.files.map(file=>file.path));
+    assert.ok(paths.has('arcane/modules/ArcaneNetworkPolicy.js'));
+    assert.ok(paths.has('arcane/modules/ScamRiskPolicy.js'));
+    assert.ok(paths.has('arcane/security/arcane-network-policy.json'));
+
+    const networkPolicy={
+        schemaVersion:1,
+        generation:2,
+        domainRules:[{
+            id:'blocked-domain',
+            domain:'blocked.example',
+            reason:{code:'test',title:'Blocked',description:'Test policy.'},
+            source:{id:'test',label:'Test',reference:null}
+        }],
+        networkRules:[]
+    };
+    const {loadScamNetworkPolicy,assessScamRisk}=await import(
+        '../runtime/arcane/modules/ScamRiskPolicy.js'
+    );
+    await loadScamNetworkPolicy({
+        fetchImpl:async()=>({ok:true,json:async()=>networkPolicy})
+    });
+    assert.ok(assessScamRisk('Visit https://blocked.example now.').matches.some(
+        match=>match.id==='blocked-domain'
+    ));
 });
 
 test('runtime receipt rejects an added unverified file',async t=>{

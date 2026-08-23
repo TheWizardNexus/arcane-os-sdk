@@ -48,6 +48,12 @@ function freeze(value){
     return Object.freeze(value);
 }
 
+function positiveSafeInteger(value){
+    return Number.isSafeInteger(value)&&value>0
+        ?value
+        :null;
+}
+
 function preferenceSlot(preferences,index){
     const value=preferences[index];
 
@@ -112,14 +118,18 @@ export function deriveLocalAIRequirements(preferences){
     });
 }
 
-function healthBoolean(status,names){
+function explicitHealthBoolean(status,names){
     for(const name of names){
         if(Object.prototype.hasOwnProperty.call(status,name)){
             return status[name]===true;
         }
     }
 
-    return status.ready===true;
+    return null;
+}
+
+function healthBoolean(status,names){
+    return explicitHealthBoolean(status,names)??status.ready===true;
 }
 
 function healthText(status,names){
@@ -188,16 +198,25 @@ export function evaluateLocalSpeechHealth(status){
         status,
         ['voices','voicesExists','voices_exists']
     );
+    const transcriptionAvailable=explicitHealthBoolean(
+        status,
+        ['transcriptionAvailable','transcription_available']
+    );
+    const synthesisAvailable=explicitHealthBoolean(
+        status,
+        ['synthesisAvailable','synthesis_available']
+    );
     const sttReady=statusReady
         &&sttEngine?.toLowerCase()==='whisper.cpp'
-        &&ffmpeg
-        &&whisperCli
-        &&whisperServer
-        &&whisperModel;
+        &&(transcriptionAvailable??(
+            ffmpeg
+            &&whisperCli
+            &&whisperServer
+            &&whisperModel
+        ));
     const ttsReady=statusReady
         &&ttsEngine?.toLowerCase()==='kokoro-onnx'
-        &&kokoro
-        &&voices;
+        &&(synthesisAvailable??(kokoro&&voices));
 
     return freeze({
         reachable:true,
@@ -336,7 +355,26 @@ async function probeNativeOllama(arcane,selectedModel){
     }
 
     try{
-        const catalog=getCoreLocalModelCatalog(await arcane.localAI.status());
+        const status=await arcane.localAI.status();
+        const activeParallelRequests=positiveSafeInteger(
+            status?.ollama?.activeParallelRequests
+        );
+
+        if(status?.ollama?.available===false){
+            return freeze({
+                ready:false,
+                model,
+                ...(activeParallelRequests===null
+                    ?{}
+                    :{activeParallelRequests}),
+                errorCode:errorCode(
+                    {code:status.ollama.errorCode},
+                    'OLLAMA_UNAVAILABLE'
+                )
+            });
+        }
+
+        const catalog=getCoreLocalModelCatalog(status);
         const available=catalog.some(function matchesSelectedModel(entry){
             return entry.modelId===model;
         });
@@ -344,6 +382,9 @@ async function probeNativeOllama(arcane,selectedModel){
         return freeze({
             ready:available,
             model,
+            ...(activeParallelRequests===null
+                ?{}
+                :{activeParallelRequests}),
             errorCode:available?null:'OLLAMA_MODEL_UNAVAILABLE'
         });
     }catch(error){
@@ -432,13 +473,6 @@ function unavailableBrowserOllama(){
         ready:false,
         model:null,
         errorCode:'ARCANE_CORE_REQUIRED'
-    });
-}
-
-function unavailableUserManagedSpeech(){
-    return freeze({
-        ...evaluateLocalSpeechHealth(null),
-        errorCode:'ANDROID_LOCAL_SPEECH_UNAVAILABLE'
     });
 }
 
@@ -544,7 +578,7 @@ async function probeRequiredServices({
             ?mode==='native'
                 ?probeNativeSpeech(arcane)
                 :mode===USER_MANAGED_LOOPBACK_PROVIDER_MODE
-                    ?unavailableUserManagedSpeech()
+                    ?probeNativeSpeech(arcane)
                     :probeBrowserSpeech(fetchImpl,timeoutMs)
             :null
     ]);
@@ -553,9 +587,16 @@ async function probeRequiredServices({
 }
 
 function slotResults(requirements,services){
+    const activeParallelRequests=positiveSafeInteger(
+        services.ollama?.activeParallelRequests
+    );
+
     return freeze({
         llm:{
             ...requirements.llm,
+            ...(activeParallelRequests===null
+                ?{}
+                :{activeParallelRequests}),
             ready:requirements.llm.required
                 ?services.ollama?.ready===true
                 :null,
@@ -602,7 +643,13 @@ function unavailableSlots(slots){
 function recoveryServices(slots){
     const services=[];
 
-    if(slots.llm.required&&slots.llm.ready!==true){
+    if(
+        slots.llm.required
+        &&slots.llm.ready!==true
+        &&!['OLLAMA_MODEL_INVALID','OLLAMA_MODEL_UNAVAILABLE'].includes(
+            slots.llm.errorCode
+        )
+    ){
         services.push('ollama');
     }
 
@@ -672,14 +719,14 @@ function browserManualInstruction(services){
 
 function userManagedLoopbackInstruction(services){
     if(services.includes('ollama')&&services.includes('speech')){
-        return 'Start your Ollama service in Termux and make the selected model available. Local speech is not provided by this Android host.';
+        return 'Start your Ollama service in Android Linux Terminal, make the selected model available, and start the Arcane speech service on its configured loopback endpoint.';
     }
 
     if(services.includes('ollama')){
-        return 'Start your Ollama service in Termux and make the selected model available.';
+        return 'Start your Ollama service in Android Linux Terminal and make the selected model available.';
     }
 
-    return 'Local speech is not provided by this Android host.';
+    return 'Start the Arcane speech service on its configured loopback endpoint.';
 }
 
 function guidance(mode,slots){
@@ -749,9 +796,10 @@ function report({
  *
  * Managed native Arcane apps use capability-gated bridge methods and may
  * request one bounded recovery attempt before one re-probe. Android uses only
- * the admitted native status/chat provider for a user-managed loopback Ollama
- * service and never invokes lifecycle recovery. Ordinary browsers never probe
- * Ollama; browser speech health remains read-only and never invokes recovery.
+ * admitted native status/chat and speech-status methods for user-managed
+ * loopback services and never invokes lifecycle recovery. Ordinary browsers
+ * never probe Ollama; browser speech health remains read-only and never invokes
+ * recovery.
  */
 export async function checkLocalAIReadiness({
     preferences,

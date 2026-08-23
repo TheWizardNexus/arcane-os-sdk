@@ -1,6 +1,6 @@
 import Is from '../../node_modules/strong-type/index.js';
 import '../modules/DBOPFS.js';
-import '../modules/AI.js?v=7';
+import '../modules/AI.js?v=8';
 import {hasUserEntry} from '../modules/ChatRecords.js';
 import {normalizeMemoryContent} from '../modules/MemoryRecords.js';
 
@@ -10,13 +10,19 @@ const is = new Is(false);
  * Represents a single chat message.
  *
  * @typedef {Object} ChatMessage
- * @property {'system'|'user'|'assistant'} role
+ * @property {'system'|'user'|'assistant'|'tool'} role
  * Role of the message author.
  *
  * @property {string|number} content
  * Message text content.
  * @property {boolean} [memory_excluded]
  * Internal persistence marker omitted from model-facing messages.
+ * @property {boolean} [ui_hidden]
+ * Internal persistence marker for messages intentionally omitted from chat UI.
+ * @property {Array<Object>} [tool_calls]
+ * Assistant tool calls retained in the saved conversation log.
+ * @property {string} [tool_call_id]
+ * Matching tool-call identifier for a tool result.
  */
 
 /**
@@ -149,6 +155,8 @@ class ChatEntity{
         return Object.freeze(this.#messages.map(function publicChatMessage(message){
             const copy={...message};
             delete copy.memory_excluded;
+            delete copy.ui_hidden;
+            delete copy.timestamp;
             return Object.freeze(copy);
         }));
     }
@@ -197,18 +205,29 @@ class ChatEntity{
      *
      * @param {string} text
      * Message content from the user.
+     * @param {{hidden?:boolean}} options
+     * Hidden messages remain in the saved/model context but are not user-authored UI turns.
      */
-    addUserMessage(text=''){
+    addUserMessage(text='',{hidden=false}={}){
         if(!is.string(text)){
             throw new Error('user message must be string');
         }
+        if(!is.boolean(hidden)){
+            throw new Error('hidden must be boolean');
+        }
+
+        const message={
+            role:'user',
+            content:text,
+            timestamp:Date.now()
+        };
+        if(hidden){
+            message.ui_hidden=true;
+            message.memory_excluded=true;
+        }
 
         return this.#appendMessage(
-            {
-                role:'user',
-                content:text,
-                timestamp:Date.now()
-            }
+            message
         );
     }
 
@@ -250,6 +269,55 @@ class ChatEntity{
         return this.#appendMessage(
             message
         )
+    }
+
+    /**
+     * Adds an assistant tool call and its result as one hidden, atomic log exchange.
+     * The host application decides whether anything is rendered in the chat UI.
+     */
+    addToolExchange({id='',name='',arguments:argumentValue='',result=''}={}){
+        const toolCallId=String(id).trim();
+        const toolName=String(name).trim();
+        if(!toolCallId||!toolName){
+            throw new TypeError('Tool exchanges require an id and name.');
+        }
+
+        const serializedArguments=typeof argumentValue==='string'
+            ?argumentValue
+            :JSON.stringify(argumentValue);
+        const serializedResult=typeof result==='string'
+            ?result
+            :JSON.stringify(result);
+        if(typeof serializedArguments!=='string'||typeof serializedResult!=='string'){
+            throw new TypeError('Tool exchange arguments and results must be JSON-compatible.');
+        }
+
+        const timestamp=Date.now();
+        return this.#appendMessages([
+            {
+                role:'assistant',
+                content:'',
+                tool_calls:[
+                    {
+                        id:toolCallId,
+                        type:'function',
+                        function:{
+                            name:toolName,
+                            arguments:serializedArguments
+                        }
+                    }
+                ],
+                timestamp,
+                memory_excluded:true
+            },
+            {
+                role:'tool',
+                content:serializedResult,
+                tool_call_id:toolCallId,
+                timestamp,
+                memory_excluded:true
+            }
+        ]);
     }
 
     /**
@@ -448,7 +516,16 @@ ${JSON.stringify(transcript)}`
      * ```
      */
     async #appendMessage(message){
-        this.#messages.push(message);
+        return this.#appendMessages([message]);
+    }
+
+    async #appendMessages(messages){
+        const records=Array.from(messages||[]);
+        if(!records.length){
+            return false;
+        }
+
+        this.#messages.push(...records);
         this.#saved=false;
 
         if(!this.persist){
@@ -461,30 +538,37 @@ ${JSON.stringify(transcript)}`
 
         return this.#queuePersistence(async()=>{
             try{
-                const messageIndex=this.#messages.indexOf(message);
+                const messageIndex=this.#messages.indexOf(records[0]);
                 if(messageIndex<0){
                     return false;
                 }
+                const recordsAreContiguous=records.every(
+                    (record,index)=>this.#messages[messageIndex+index]===record
+                );
+                if(!recordsAreContiguous){
+                    throw new Error('Chat records changed before persistence completed.');
+                }
+                const lastMessageIndex=messageIndex+records.length-1;
                 if(this.#persistedMessageCount===messageIndex){
                     await dbopfs.set(
                         this.#tableName,
                         this.fileName,
-                        JSON.stringify(message)+'\n',
+                        records.map(record=>JSON.stringify(record)).join('\n')+'\n',
                         true
                     );
-                    this.#persistedMessageCount=messageIndex+1;
+                    this.#persistedMessageCount=lastMessageIndex+1;
                 }else{
                     const snapshot=this.#messages
-                        .slice(0,messageIndex+1)
+                        .slice(0,lastMessageIndex+1)
                         .map(entry=>({...entry}));
                     await this.#writeSnapshot(snapshot);
                 }
                 this.#saved=this.#persistedMessageCount===this.#messages.length;
                 return true;
             }catch(error){
-                const failedIndex=this.#messages.indexOf(message);
+                const failedIndex=this.#messages.indexOf(records[0]);
                 if(failedIndex>=0){
-                    this.#messages.splice(failedIndex,1);
+                    this.#messages.splice(failedIndex,records.length);
                 }
                 this.#saved=
                     this.#persistedMessageCount===this.#messages.length;

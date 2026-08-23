@@ -19,6 +19,7 @@ async function loadOptionalMailDependencies(){
 
 const MAX_SUBJECT_LENGTH=160;
 const MAX_MESSAGE_BYTES=25*1024*1024;
+const MAX_NATIVE_REPORT_BYTES=768*1024;
 const MAIL_TYPES=new Set(['error','report','crisis_detected']);
 const EMAIL_PATTERN=/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
 const ARCANE_APP_ID_PATTERN=/^[a-z0-9](?:[a-z0-9-]{0,62})$/;
@@ -28,7 +29,27 @@ function declaredApplicationId(document=globalThis.document){
     return ARCANE_APP_ID_PATTERN.test(value||'') ? value:'';
 }
 
-function defaultMailEndpoint(location=globalThis.location){
+function declaredMailBaseDomain(document=globalThis.document){
+    return normalizeBaseDomain(
+        document?.querySelector?.('meta[name="arcane-mail-base-domain"]')?.content,
+    );
+}
+
+function normalizeBaseDomain(value){
+    const domain=String(value||'').trim().toLowerCase();
+    if(!domain||domain.length>253
+        || !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(domain)){
+        return '';
+    }
+    return domain;
+}
+
+function hostedBaseDomain(hostname,configuredBaseDomain=''){
+    const configured=normalizeBaseDomain(configuredBaseDomain);
+    return configured&&(hostname===configured||hostname.endsWith(`.${configured}`)) ? configured:'';
+}
+
+function defaultMailEndpoint(location=globalThis.location,baseDomain=''){
     if(!location||!['http:','https:'].includes(location.protocol)){
         return '';
     }
@@ -38,7 +59,14 @@ function defaultMailEndpoint(location=globalThis.location){
         const authority=hostname==='::1' ? '[::1]':hostname;
         return `http://${authority}:8025/v1/mail`;
     }
-    return new URL('/v1/mail',location.origin).href;
+    if(loopback){
+        return new URL('/v1/mail',location.origin).href;
+    }
+    const root=hostedBaseDomain(hostname,baseDomain);
+    if(!root){
+        return '';
+    }
+    return `https://mail.${root}/v1/mail`;
 }
 
 export function resolveMailConfig(
@@ -54,7 +82,7 @@ export function resolveMailConfig(
         appKey:typeof supplied.appKey==='string' ? supplied.appKey:'',
         endpoint:typeof supplied.endpoint==='string'&&supplied.endpoint.trim()
             ? supplied.endpoint.trim()
-            : defaultMailEndpoint(location),
+            : defaultMailEndpoint(location,supplied.baseDomain||declaredMailBaseDomain(document)),
         requestTimeout:Number.isFinite(supplied.requestTimeout)
             ? supplied.requestTimeout
             : DEFAULT_MAIL_REQUEST_TIMEOUT_MS,
@@ -96,6 +124,13 @@ function assertMessageSize(report){
     );
     if(messageBytes>MAX_MESSAGE_BYTES){
         throw new Error('Generated report email content exceeds the 25 MiB limit');
+    }
+}
+
+function assertNativeReportSize(report){
+    const serialized=JSON.stringify(report);
+    if(utf8ByteLength(serialized)>MAX_NATIVE_REPORT_BYTES){
+        throw new RangeError('Native Arcane mail reports cannot exceed 786,432 serialized bytes');
     }
 }
 
@@ -162,9 +197,24 @@ class Mail {
     }
 
     #assertConfigured(){
-        if(!this.endpoint||!this.appName){
+        if(!this.appName||(!this.endpoint&&typeof globalThis.Arcane?.mail?.send!=='function')){
             throw new Error('Mail transport is not configured');
         }
+    }
+
+    async #deliver(report,reportKey){
+        if(typeof globalThis.Arcane?.mail?.send==='function'){
+            assertNativeReportSize(report);
+            return globalThis.Arcane.mail.send({report,reportKey});
+        }
+        return sendMailReport({
+            appKey:this.appKey,
+            appName:this.appName,
+            endpoint:this.endpoint,
+            report,
+            reportKey,
+            requestTimeout:this.requestTimeout,
+        });
     }
 
     async send(to=[], subject='', payload={}, messageStyle='', messageType='') {
@@ -210,14 +260,7 @@ class Mail {
             };
             assertMessageSize(reportPayload.report);
 
-            const delivery=await sendMailReport({
-                appKey:this.appKey,
-                appName:this.appName,
-                endpoint:this.endpoint,
-                report:reportPayload.report,
-                reportKey,
-                requestTimeout:this.requestTimeout,
-            });
+            const delivery=await this.#deliver(reportPayload.report,reportKey);
             return { ...delivery,reportKey };
         }
 
@@ -293,14 +336,7 @@ Email: ${profile.email || 'not provided'}`;
             console.warn('Unable to store the generated mail report; continuing with delivery.',error);
         }
 
-        const delivery=await sendMailReport({
-            appKey:this.appKey,
-            appName:this.appName,
-            endpoint:this.endpoint,
-            report:reportPayload.report,
-            reportKey,
-            requestTimeout:this.requestTimeout,
-        });
+        const delivery=await this.#deliver(reportPayload.report,reportKey);
         
         return {
             ...delivery,

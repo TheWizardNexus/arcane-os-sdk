@@ -22,7 +22,7 @@ function memoryStream(){
 test('CLI help and version succeed through the shipped executable',async()=>{
     const help=await runCli(['--help']);
     assert.equal(help.code,0);
-    assert.match(help.stdout,/Arcane OS application SDK 0\.1\.0-dev\.3/);
+    assert.match(help.stdout,/Arcane OS application SDK 0\.1\.0-dev\.4/);
     assert.match(help.stdout,/external or integrated Arcane workspace/);
     assert.match(help.stdout,/arcane-os executables/);
     assert.match(help.stdout,/test --scope shared --test-file/);
@@ -30,7 +30,7 @@ test('CLI help and version succeed through the shipped executable',async()=>{
 
     const version=await runCli(['--version']);
     assert.equal(version.code,0);
-    assert.equal(version.stdout.trim(),'0.1.0-dev.3');
+    assert.equal(version.stdout.trim(),'0.1.0-dev.4');
 });
 
 test('both installed command names execute the published CLI entry',async()=>{
@@ -46,7 +46,7 @@ test('both installed command names execute the published CLI entry',async()=>{
         assert.equal(invoked.code,0,invoked.stderr);
         const result=JSON.parse(invoked.stdout);
         assert.equal(result.ok,true);
-        assert.equal(result.result,'0.1.0-dev.3');
+        assert.equal(result.result,'0.1.0-dev.4');
     }
 });
 

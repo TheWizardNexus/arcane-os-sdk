@@ -57,6 +57,8 @@ const EMAIL_REGEX =
  * @property {string|number} phone
  * @property {string} license_key
  * @property {string} subscription_key
+ * @property {number} current_time
+ * @property {number} last_successful_time
  * @property {string|number} contact_1
  * @property {string|number} contact_2
  * @property {string|number} contact_3
@@ -71,6 +73,8 @@ const EMAIL_REGEX =
  * @property {boolean} initialSpeechMuted
  * @property {boolean} conversationClosingReportEnabled
  * @property {boolean} conversationActionItemsEnabled
+ * @property {number} firstBootUp
+ * @property {boolean} questionnaireShown
  * @property {string|number} skin
  * @property {boolean} preferrsLocal
  * @property {boolean} developer
@@ -108,6 +112,8 @@ class UserEntity {
             'language',
             'license_key',
             'subscription_key',
+            'current_time',
+            'last_successful_time',
 
             'contact_1',
             'contact_2',
@@ -124,6 +130,8 @@ class UserEntity {
             'initialSpeechMuted',
             'conversationClosingReportEnabled',
             'conversationActionItemsEnabled',
+            'firstBootUp',
+            'questionnaireShown',
             'skin',
             'developer',
             'prefersLocal',
@@ -139,6 +147,8 @@ class UserEntity {
     #phone = '';
     #license_key = '';
     #subscription_key = '';
+    #current_time = 0;
+    #last_successful_time = 0;
     #language = '';
 
     #contact_1 = '';
@@ -156,6 +166,8 @@ class UserEntity {
     #initialSpeechMuted = true;
     #conversationClosingReportEnabled = true;
     #conversationActionItemsEnabled = true;
+    #firstBootUp = 0;
+    #questionnaireShown = false;
     #skin = 'default';
     #developer = false;
     #prefersLocal = false;
@@ -280,6 +292,38 @@ class UserEntity {
         }
 
         this.#subscription_key = v;
+
+        this.#persist();
+    }
+
+    /** @returns {number} */
+    get current_time(){
+        return this.#current_time;
+    }
+
+    /** @param {number} v */
+    set current_time(v){
+        if(!is.number(v)){
+            throw new Error('current_time must be number');
+        }
+
+        this.#current_time = v;
+
+        this.#persist();
+    }
+
+    /** @returns {number} */
+    get last_successful_time(){
+        return this.#last_successful_time;
+    }
+
+    /** @param {number} v */
+    set last_successful_time(v){
+        if(!is.number(v)){
+            throw new Error('last_successful_time must be number');
+        }
+
+        this.#last_successful_time = v;
 
         this.#persist();
     }
@@ -559,6 +603,49 @@ class UserEntity {
         }
 
         this.#conversationActionItemsEnabled = v;
+
+        this.#persist();
+    }
+
+
+
+    /** @returns {number} */
+    get firstBootUp(){
+        return this.#firstBootUp;
+    }
+
+    /** @param {number} v */
+    set firstBootUp(v){
+        if(
+            typeof v!=='number'
+            ||!Number.isFinite(v)
+            ||!Number.isSafeInteger(v)
+            ||v<0
+        ){
+            throw new Error(
+                'firstBootUp must be a non-negative finite integer timestamp'
+            );
+        }
+
+        this.#firstBootUp = v;
+
+        this.#persist();
+    }
+
+
+
+    /** @returns {boolean} */
+    get questionnaireShown(){
+        return this.#questionnaireShown;
+    }
+
+    /** @param {boolean} v */
+    set questionnaireShown(v){
+        if(!is.boolean(v)){
+            throw new Error('questionnaireShown must be boolean');
+        }
+
+        this.#questionnaireShown = v;
 
         this.#persist();
     }

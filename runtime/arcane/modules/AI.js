@@ -6,6 +6,74 @@ import {normalizeOllamaModelIdentifier} from './OllamaModelIdentifier.js';
 let credentials='include';
 credentials='omit';
 
+const ARCANE_AI_REQUEST_DIAGNOSTIC_LABEL=
+    '[Arcane AI] exact outbound inference request';
+const ARCANE_AI_RESPONSE_DIAGNOSTIC_LABEL=
+    '[Arcane AI] exact inbound inference response';
+const ARCANE_AI_DIAGNOSTIC_WARNING=
+    'may contain private conversation or document content.';
+
+function snapshotAIConsolePayload(payload){
+    const serialized=JSON.stringify(payload);
+    return serialized===undefined?payload:JSON.parse(serialized);
+}
+
+function reportAIExchangeToConsole(label,{
+    id,
+    operation='',
+    service='',
+    transport='',
+    destination='',
+    payload
+}={}){
+    try{
+        console.info(
+            `${label}; ${ARCANE_AI_DIAGNOSTIC_WARNING}`,
+            {
+                id,
+                operation,
+                service,
+                transport,
+                destination,
+                payload:snapshotAIConsolePayload(payload)
+            }
+        );
+    }catch(error){
+        console.warn('Arcane AI console instrumentation failed:',error);
+    }
+}
+
+function reportAIRequestToConsole({request={},...metadata}={}){
+    reportAIExchangeToConsole(
+        ARCANE_AI_REQUEST_DIAGNOSTIC_LABEL,
+        {...metadata,payload:request}
+    );
+}
+
+function reportAIResponseToConsole({response,...metadata}={}){
+    reportAIExchangeToConsole(
+        ARCANE_AI_RESPONSE_DIAGNOSTIC_LABEL,
+        {...metadata,payload:response}
+    );
+}
+
+function isAIRequestAbort(error,signal){
+    return signal?.aborted
+        ||error?.name==='AbortError'
+        ||error?.code==='ARCANE_REQUEST_ABORTED'
+        ||error?.code==='AI_REQUEST_ABORTED';
+}
+
+function normalizeAIRequestAbort(error){
+    if(error?.code==='AI_REQUEST_ABORTED'){
+        return error;
+    }
+    const normalized=new Error('The AI request was cancelled.',{cause:error});
+    normalized.name='AbortError';
+    normalized.code='AI_REQUEST_ABORTED';
+    return normalized;
+}
+
 class AI {
     // This is the enum section for inference configuration
     #service = {
@@ -381,35 +449,86 @@ class AI {
         }
 
         const requiredName=toolChoice?.function?.name;
-        const selectedTools=requiredName
-            ?tools.filter(function isRequiredOllamaTool(tool){
-                return tool?.function?.name===requiredName;
-            })
-            :tools;
+        const requiredToolCount=requiredName
+            ?tools.filter(tool=>tool?.function?.name===requiredName).length
+            :0;
 
-        if(requiredName&&selectedTools.length!==1){
+        if(requiredName&&requiredToolCount!==1){
             const error=new Error(`Required AI tool "${requiredName}" is not available.`);
             error.code='AI_REQUIRED_TOOL_UNAVAILABLE';
             throw error;
         }
 
-        return selectedTools;
+        return tools;
     }
 
     #ollamaMessages(messages=[],toolChoice='auto'){
+        const toolNamesByCallId=new Map();
         const sanitizedMessages=messages.map(function sanitizeOllamaMessage(message){
-            return {
-                role:String(message?.role??''),
-                content:String(message?.content??'')
-            };
+            const role=String(message?.role??'');
+            const content=String(message?.content??'');
+
+            if(role==='assistant'&&Array.isArray(message?.tool_calls)){
+                const toolCalls=message.tool_calls.map(function sanitizeOllamaToolCall(call){
+                    const name=String(call?.function?.name??'').trim();
+                    const callId=String(call?.id??'').trim();
+                    let argumentValue=call?.function?.arguments;
+                    if(typeof argumentValue==='string'){
+                        try{
+                            argumentValue=JSON.parse(argumentValue);
+                        }catch{
+                            argumentValue={};
+                        }
+                    }
+                    if(
+                        !argumentValue
+                        ||typeof argumentValue!=='object'
+                        ||Array.isArray(argumentValue)
+                    ){
+                        argumentValue={};
+                    }
+                    if(callId&&name){
+                        toolNamesByCallId.set(callId,name);
+                    }
+                    return {
+                        type:'function',
+                        function:{name,arguments:argumentValue}
+                    };
+                });
+
+                return {
+                    role,
+                    content,
+                    tool_calls:toolCalls
+                };
+            }
+
+            if(role==='tool'){
+                const callId=String(message?.tool_call_id??'').trim();
+                const toolName=String(
+                    message?.tool_name
+                    ??message?.name
+                    ??toolNamesByCallId.get(callId)
+                    ??''
+                ).trim();
+                if(!toolName){
+                    throw new TypeError('Ollama tool results require a matching tool name.');
+                }
+                return {role,tool_name:toolName,content};
+            }
+
+            return {role,content};
         });
         const requiredName=toolChoice?.function?.name;
+        const instruction=requiredName
+            ?`Call the ${requiredName} function now with concise values for every required field. Do not answer in prose.`
+            :toolChoice==='none'
+                ?'Do not call a function in this request. Follow the response instructions and answer in the requested format.'
+                :'';
 
-        if(!requiredName){
+        if(!instruction){
             return sanitizedMessages;
         }
-
-        const instruction=`Call the ${requiredName} function now with concise values for every required field. Do not answer in prose.`;
         const firstMessage=sanitizedMessages[0];
 
         if(firstMessage?.role==='system'){
@@ -426,6 +545,78 @@ class AI {
             {role:'system',content:instruction},
             ...sanitizedMessages
         ];
+    }
+
+    #structuredOutputFormat(value=false){
+        if(value===false||value===null||value===undefined){
+            return null;
+        }
+        if(value===true||value==='json'){
+            return 'json';
+        }
+        if(
+            typeof value==='object'
+            &&!Array.isArray(value)
+            &&(
+                Object.getPrototypeOf(value)===Object.prototype
+                ||Object.getPrototypeOf(value)===null
+            )
+        ){
+            return value;
+        }
+
+        const error=new TypeError(
+            'AI structured output must be enabled with true, json, or a JSON Schema object.'
+        );
+        error.code='AI_STRUCTURED_OUTPUT_INVALID';
+        throw error;
+    }
+
+    #openAIResponseFormat(structuredOutputFormat){
+        if(structuredOutputFormat==='json'){
+            return {type:'json_object'};
+        }
+        if(structuredOutputFormat){
+            return {
+                type:'json_schema',
+                json_schema:{
+                    name:'structured_response',
+                    strict:true,
+                    schema:structuredOutputFormat
+                }
+            };
+        }
+        return null;
+    }
+
+    #reportRequest(requestHandler,request,id,metadata={}){
+        if(typeof requestHandler!=='function'){
+            throw new TypeError('AI request diagnostics require a function.');
+        }
+
+        try{
+            Promise.resolve(requestHandler(request,id)).catch(
+                error=>console.warn('AI request diagnostics failed:',error)
+            );
+        }catch(error){
+            console.warn('AI request diagnostics failed:',error);
+        }
+
+        reportAIRequestToConsole({
+            id,
+            service:this.llmService,
+            request,
+            ...metadata
+        });
+    }
+
+    #reportResponse(response,id,metadata={}){
+        reportAIResponseToConsole({
+            id,
+            service:this.llmService,
+            response,
+            ...metadata
+        });
     }
 
     #assertRequiredOllamaToolCall(toolCalls=[],toolChoice='auto'){
@@ -492,6 +683,48 @@ class AI {
     }
 
 
+    async streamRequest({
+        messages=[],
+        structuredOutput=false,
+        localOnly=false,
+        onChunk=function ignoreStreamChunk(){},
+        onComplete=function finishIgnoredStream(){},
+        tools=[],
+        toolChoice='auto',
+        onToolCall=function ignoreEarlyFunction(){},
+        onRequest=function ignoreStreamRequest(){},
+        parallelToolCalls=true,
+        id=Date.now(),
+        seeThinking=false,
+        signal=null
+    }={}){
+        if(localOnly!==true&&localOnly!==false){
+            throw new TypeError('AI localOnly must be a boolean.');
+        }
+        if(localOnly&&this.llmService!=='OLLAMA'){
+            const error=new Error(
+                'This AI request requires a configured local model.'
+            );
+            error.code='AI_LOCAL_MODEL_REQUIRED';
+            throw error;
+        }
+
+        return this.streamMessage(
+            messages,
+            onChunk,
+            onComplete,
+            tools,
+            toolChoice,
+            onToolCall,
+            parallelToolCalls,
+            id,
+            seeThinking,
+            signal,
+            onRequest,
+            structuredOutput
+        );
+    }
+
     async streamMessage(
         messages=[],
         streamHandler=function ignoreStreamChunk(){},
@@ -501,17 +734,38 @@ class AI {
         earlyFunctionTrigger=function ignoreEarlyFunction(){},
         parallel_tool_calls=true,
         id=Date.now(),
-        seeThinking=false
+        seeThinking=false,
+        signal=null,
+        requestHandler=function ignoreStreamRequest(){},
+        structuredOutput=false
     ){
         let speechTurnCompleted=false;
 
         try{
             this.#assertServiceConfigured(this.llmService);
+            if(signal&&(
+                typeof signal.aborted!=='boolean'
+                ||typeof signal.addEventListener!=='function'
+            )){
+                throw new TypeError('AI request signal must be an AbortSignal.');
+            }
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort();
+            }
+            const structuredOutputFormat=this.#structuredOutputFormat(
+                structuredOutput
+            );
 
         const request={
             model:this.model,
             messages:messages, 
             stream:true
+        }
+
+        if(structuredOutputFormat){
+            request.response_format=this.#openAIResponseFormat(
+                structuredOutputFormat
+            );
         }
 
         if(tools.length){
@@ -524,8 +778,6 @@ class AI {
             request.reasoning_effort=this.reasoningEffort;
         }
 
-        const body = JSON.stringify(request);
-
         let isThinking=true;
         let isWaiting=true;
 
@@ -536,6 +788,7 @@ class AI {
         if(nativeOllama){
             let nativeContent='';
             const nativeToolCalls={};
+            const nativeResponseChunks=[];
             const triggeredTools=new Set();
             const ollamaTools=this.#ollamaTools(tools,tool_choice);
             const ollamaMessages=this.#ollamaMessages(messages,tool_choice);
@@ -544,6 +797,7 @@ class AI {
                 messages:ollamaMessages,
                 stream:true,
                 ...(this.reasoningEffort?{think:this.reasoningEffort}:{}),
+                ...(structuredOutputFormat?{format:structuredOutputFormat}:{}),
                 ...(ollamaTools.length?{tools:ollamaTools}:{})
             };
 
@@ -578,10 +832,19 @@ class AI {
                 }
             }
 
+            this.#reportRequest(requestHandler,ollamaRequest,id,{
+                operation:'stream',
+                transport:'native',
+                destination:'Arcane.ollama.chat'
+            });
             const nativeResponse=await nativeOllama.chat(
                 ollamaRequest,
                 {
                     onChunk:function receiveNativeOllamaChunk(chunk){
+                        if(signal?.aborted){
+                            return;
+                        }
+                        nativeResponseChunks.push(chunk);
                         const message=chunk?.message||{};
                         const thinking=seeThinking
                             ?String(message.thinking||'')
@@ -599,9 +862,22 @@ class AI {
                         }
 
                         receiveNativeToolCalls(message);
-                    }
+                    },
+                    signal
                 }
             );
+            this.#reportResponse(
+                {chunks:nativeResponseChunks,final:nativeResponse},
+                id,
+                {
+                    operation:'stream',
+                    transport:'native',
+                    destination:'Arcane.ollama.chat'
+                }
+            );
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort();
+            }
             receiveNativeToolCalls(nativeResponse?.message);
             this.#assertRequiredOllamaToolCall(
                 Object.keys(nativeToolCalls).map(function createToolCallName(name){
@@ -622,6 +898,12 @@ class AI {
             return nativeResult;
         }
 
+        this.#reportRequest(requestHandler,request,id,{
+            operation:'stream',
+            transport:'http',
+            destination:this.url
+        });
+        const body = JSON.stringify(request);
         let response;
 
         try{
@@ -631,10 +913,17 @@ class AI {
                     method:'POST',
                     credentials,
                     headers:this.#serviceHeaders[this.llmService],
-                    body
+                    body,
+                    ...(signal?{signal}:{})
                 }
             );
         }catch(err){
+            if(signal?.aborted||err?.name==='AbortError'){
+                const error=new Error('The AI request was cancelled.',{cause:err});
+                error.name='AbortError';
+                error.code='AI_REQUEST_ABORTED';
+                throw error;
+            }
             const error=new Error(
                 'Unable to reach the AI service.',
                 {cause:err}
@@ -647,6 +936,7 @@ class AI {
 
         let chunkString='';
         let chunkCache='';
+        const responseEvents=[];
         const streamedToolCalls=new Map();
         const triggeredTools=new Set();
         const decoder = new TextDecoder('utf-8');
@@ -698,6 +988,10 @@ class AI {
             while(true){
                 const {done,value:chunk}=await reader.read();
 
+                if(signal?.aborted){
+                    throw normalizeAIRequestAbort();
+                }
+
                 if(done){
                     break;
                 }
@@ -713,12 +1007,14 @@ class AI {
                         chunkCache+=delta;
 
                         if (chunkCache.trim() === '[DONE]') {
+                            responseEvents.push('[DONE]');
                             chunkCache = '';
                             return;
                         }
 
                         try{
                             const resp=JSON.parse(chunkCache)||{};
+                            responseEvents.push(resp);
                             //console.log(JSON.stringify(resp));
                             //console.log(resp)
                             const choice = resp.choices?.[0] || {};
@@ -767,9 +1063,20 @@ class AI {
                     }
                 );
             }
+        }catch(error){
+            if(isAIRequestAbort(error,signal)){
+                throw normalizeAIRequestAbort(error);
+            }
+            throw error;
         }finally{
             reader.releaseLock();
         }
+
+        this.#reportResponse(responseEvents,id,{
+            operation:'stream',
+            transport:'http',
+            destination:this.url
+        });
 
         const tool_funcs={};
         const orderedToolCalls=[...streamedToolCalls.values()].sort(
@@ -802,6 +1109,11 @@ class AI {
         //sync
         speechTurnCompleted=true;
         return streamResult;
+        }catch(error){
+            if(isAIRequestAbort(error,signal)){
+                throw normalizeAIRequestAbort(error);
+            }
+            throw error;
         }finally{
             if(!speechTurnCompleted){
                 this.stopAudio();
@@ -809,16 +1121,64 @@ class AI {
         }
     }
 
+    async fetchRequest({
+        messages=[],
+        structuredOutput=false,
+        localOnly=false,
+        tools=[],
+        toolChoice='auto',
+        parallelToolCalls=true,
+        id=Date.now(),
+        signal=null,
+        onRequest=function ignoreFetchRequest(){},
+        onResponse=function ignoreFetchResponse(){}
+    }={}){
+        if(localOnly!==true&&localOnly!==false){
+            throw new TypeError('AI localOnly must be a boolean.');
+        }
+        if(localOnly&&this.llmService!=='OLLAMA'){
+            const error=new Error(
+                'This AI request requires a configured local model.'
+            );
+            error.code='AI_LOCAL_MODEL_REQUIRED';
+            throw error;
+        }
+
+        return this.fetch(
+            messages,
+            onResponse,
+            structuredOutput,
+            tools,
+            toolChoice,
+            parallelToolCalls,
+            id,
+            onRequest,
+            signal
+        );
+    }
+
     async fetch(
         messages=[],
         responseHandler=function ignoreFetchResponse(){},
-        json=false,
+        structuredOutput=false,
         tools=[],
         tool_choice='auto',
         parallel_tool_calls=true,
         id=Date.now(),
+        requestHandler=function ignoreFetchRequest(){},
+        signal=null,
     ){
         this.#assertServiceConfigured(this.llmService);
+        if(signal&&(
+            typeof signal.aborted!=='boolean'
+            ||typeof signal.addEventListener!=='function'
+        )){
+            throw new TypeError('AI request signal must be an AbortSignal.');
+        }
+        if(signal?.aborted){
+            throw normalizeAIRequestAbort();
+        }
+        const structuredOutputFormat=this.#structuredOutputFormat(structuredOutput);
 
         const request={
             model:this.model,
@@ -826,8 +1186,10 @@ class AI {
             stream:false
         }
 
-        if(json){
-            request.response_format={ type: "json_object" };
+        if(structuredOutputFormat){
+            request.response_format=this.#openAIResponseFormat(
+                structuredOutputFormat
+            );
         }
 
         if(tools.length){
@@ -845,14 +1207,39 @@ class AI {
         if(nativeOllama){
             const ollamaTools=this.#ollamaTools(tools,tool_choice);
             const ollamaMessages=this.#ollamaMessages(messages,tool_choice);
-            const nativeResponse=await nativeOllama.chat({
+            const nativeRequest={
                 model:this.model,
                 messages:ollamaMessages,
                 stream:false,
                 ...(this.reasoningEffort?{think:this.reasoningEffort}:{}),
-                ...(json&&!ollamaTools.length?{format:'json'}:{}),
+                ...(structuredOutputFormat?{format:structuredOutputFormat}:{}),
                 ...(ollamaTools.length?{tools:ollamaTools}:{})
+            };
+            this.#reportRequest(requestHandler,nativeRequest,id,{
+                operation:'fetch',
+                transport:'native',
+                destination:'Arcane.ollama.chat'
             });
+            let nativeResponse;
+            try{
+                nativeResponse=await nativeOllama.chat(
+                    nativeRequest,
+                    {signal}
+                );
+            }catch(error){
+                if(isAIRequestAbort(error,signal)){
+                    throw normalizeAIRequestAbort(error);
+                }
+                throw error;
+            }
+            this.#reportResponse(nativeResponse,id,{
+                operation:'fetch',
+                transport:'native',
+                destination:'Arcane.ollama.chat'
+            });
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort();
+            }
             this.#assertRequiredOllamaToolCall(
                 Array.isArray(nativeResponse?.message?.tool_calls)
                     ?nativeResponse.message.tool_calls
@@ -864,10 +1251,18 @@ class AI {
                 id
             );
 
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort();
+            }
             await responseHandler(responseJSON,id,false);
             return responseJSON;
         }
 
+        this.#reportRequest(requestHandler,request,id,{
+            operation:'fetch',
+            transport:'http',
+            destination:this.url
+        });
         const body = JSON.stringify(request);
         
         let response;
@@ -879,10 +1274,14 @@ class AI {
                     method: 'POST',
                     credentials: credentials,
                     headers: this.#serviceHeaders[this.llmService],
-                    body: body
+                    body: body,
+                    ...(signal?{signal}:{})
                 }
             );
         }catch(err){
+            if(isAIRequestAbort(err,signal)){
+                throw normalizeAIRequestAbort(err);
+            }
             const error=new Error(
                 'Unable to reach the AI service.',
                 {cause:err}
@@ -901,7 +1300,23 @@ class AI {
             );
         }
 
-        const responseJSON=await response.json();
+        let responseJSON;
+        try{
+            responseJSON=await response.json();
+        }catch(error){
+            if(isAIRequestAbort(error,signal)){
+                throw normalizeAIRequestAbort(error);
+            }
+            throw error;
+        }
+        this.#reportResponse(responseJSON,id,{
+            operation:'fetch',
+            transport:'http',
+            destination:this.url
+        });
+        if(signal?.aborted){
+            throw normalizeAIRequestAbort();
+        }
 
         if(!response.id){
             response.id=id;

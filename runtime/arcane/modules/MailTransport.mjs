@@ -1,4 +1,5 @@
 export const DEFAULT_MAIL_REQUEST_TIMEOUT_MS=590_000;
+export const MAX_MAIL_RESPONSE_BYTES=65_536;
 
 export function normalizeMailEndpoint(endpoint,base=globalThis.location?.href){
     if(typeof endpoint!=='string'||!endpoint.trim()){
@@ -73,6 +74,44 @@ function parseDeliveryResponse(response,responseText){
     };
 }
 
+async function readBoundedResponseText(response){
+    const declaredLength=response.headers?.get?.('content-length');
+    if(declaredLength!==null&&declaredLength!==undefined&&declaredLength!==''){
+        const parsedLength=Number(declaredLength);
+        if(!Number.isSafeInteger(parsedLength)||parsedLength<0||parsedLength>MAX_MAIL_RESPONSE_BYTES){
+            throw new Error(`Mail server response cannot exceed ${MAX_MAIL_RESPONSE_BYTES.toLocaleString('en-US')} bytes`);
+        }
+    }
+
+    if(!response.body||typeof response.body.getReader!=='function'){
+        throw new Error('Mail server returned an unreadable success response');
+    }
+
+    const reader=response.body.getReader();
+    const decoder=new TextDecoder();
+    let byteLength=0;
+    let text='';
+    try{
+        while(true){
+            const { done,value }=await reader.read();
+            if(done) break;
+            if(!(value instanceof Uint8Array)){
+                throw new Error('Mail server returned an unreadable success response');
+            }
+            byteLength+=value.byteLength;
+            if(byteLength>MAX_MAIL_RESPONSE_BYTES){
+                await reader.cancel().catch(() => {});
+                throw new Error(`Mail server response cannot exceed ${MAX_MAIL_RESPONSE_BYTES.toLocaleString('en-US')} bytes`);
+            }
+            text+=decoder.decode(value,{stream:true});
+        }
+        text+=decoder.decode();
+        return text;
+    }finally{
+        reader.releaseLock();
+    }
+}
+
 export async function sendMailReport({
     appKey,
     appName,
@@ -129,11 +168,11 @@ export async function sendMailReport({
             }
         );
 
-        const responseText=await response.text();
         if(!response.ok){
             throw new Error(`Mail server rejected the request (${response.status})`);
         }
 
+        const responseText=await readBoundedResponseText(response);
         return parseDeliveryResponse(response,responseText);
     }finally{
         clearTimeout(timeout);
