@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="Copyable Arcane OS SDK examples for external apps, integrated workspaces, packaging, bundles, automation output, and native targets.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/examples/"><link rel="icon" type="image/png" href="../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../styles.css">
+  <meta property="og:type" content="website"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Examples · Arcane OS SDK"><meta property="og:description" content="Complete, focused command sequences with their expected result."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/examples/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — developer command examples">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Examples · Arcane OS SDK"><meta name="twitter:description" content="Focused Arcane SDK workflows ready to adapt."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — developer command examples">
+  <title>Examples | Arcane OS SDK</title><script src="../app.js" defer></script>
+</head>
+<body data-page="examples">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../" aria-label="Arcane OS SDK documentation home"><img src="../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../">Overview</a><a href="../guides/">Guides</a><a href="./" aria-current="page">Examples</a><a href="../playground/">Playground</a><a href="../testing/">Testing</a><a href="../reference/">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../">Docs</a><span aria-hidden="true">/</span><span aria-current="page">Examples</span></nav><p class="eyebrow">Copy, adapt, verify</p><h1>Complete examples with a visible result.</h1><p class="doc-lead">Every example stays within one workspace, app, target, and artifact boundary. Replace paths and application IDs; keep the boundary explicit.</p></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar" aria-label="Example navigation"><p>Examples</p><nav><a href="hello-world/">Hello World</a><a href="#external">External app</a><a href="#integrated">Integrated app</a><a href="#bundle">Release bundle</a><a href="#automation">Automation output</a><a href="#native">Native target</a></nav></aside>
+      <article class="prose">
+        <section class="featured-example" aria-labelledby="hello-example-title"><div><p class="step-label">Start here</p><h2 id="hello-example-title">Hello World: source to executable</h2><p>Open a complete project with its npm-local SDK dependency, HTML and JavaScript, package descriptors, focused test, browser loop, and Windows x64 development build.</p></div><a class="button button-primary" href="hello-world/">Build Hello World</a></section>
+        <section id="external"><p class="step-label">Example 02</p><h2>Create and check an external app</h2><p>Before the SDK is published, pack the canonical source checkout and pin that exact tarball in the generated repository.</p><div class="code-block"><div class="code-bar"><span>PowerShell or POSIX shell</span><button type="button" data-copy-button>Copy</button></div><pre><code># In arcane-os-sdk
+npm run pack:local
+node ./bin/arcane.mjs new field-notes --path ../field-notes --git
+
+# In field-notes
+npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.4.tgz
+npm run doctor
+npm run check
+npm run dev</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>Result:</strong> one external browser application with a committed lockfile and a loopback development server.</p></section>
+        <section id="integrated"><p class="step-label">Example 03</p><h2>Check one integrated application</h2><p>Invoke the SDK from source; do not add the SDK package as a dependency of Arcane OS.</p><div class="code-block"><div class="code-bar"><span>From arcane-os-sdk</span><button type="button" data-copy-button>Copy</button></div><pre><code>node ./bin/arcane.mjs doctor --workspace "../Arcane OS"
+node ./bin/arcane.mjs test --workspace "../Arcane OS" --app calculator
+node ./bin/arcane.mjs check --workspace "../Arcane OS" --app calculator</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>Result:</strong> evidence for the selected built-in application, not a claim about every Arcane app.</p></section>
+        <section id="bundle"><p class="step-label">Example 04</p><h2>Package and verify an exchange bundle</h2><p>Package first, then bundle the already verified release. Use the filename printed by the command.</p><div class="code-block"><div class="code-bar"><span>External application repository</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm exec -- arcane check --app field-notes
+npm exec -- arcane package --app field-notes
+npm exec -- arcane verify --app field-notes
+npm exec -- arcane bundle --app field-notes
+npm exec -- arcane verify-bundle dist/field-notes-0.1.0.arcane-app.tar.gz</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>Result:</strong> one deterministic bundle whose ordered inventory, byte sizes, and hashes agree.</p></section>
+        <section id="automation"><p class="step-label">Example 05</p><h2>Consume stable automation output</h2><p>Use JSON for one final envelope and NDJSON when an event stream should be processed line by line. Human mode remains the interactive default.</p><div class="code-block"><div class="code-bar"><span>Machine-readable output</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm exec -- arcane doctor --output json
+npm exec -- arcane check --output ndjson</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>Result:</strong> stable protocol-framed data on standard output; diagnostic prose stays out of the machine channel.</p></section>
+        <section id="native"><p class="step-label">Example 06</p><h2>Run one native development target</h2><p>The descriptor must already declare <code>windows-x64</code>. The explicit Arcane root supplies the compatible provider.</p><div class="code-block"><div class="code-bar"><span>Windows x64</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm exec -- arcane native-doctor --target windows-x64 --arcane-root "../Arcane OS"
+
+npm exec -- arcane run --target windows-x64 --arcane-root "../Arcane OS" --output-root "../arcane-native-output"</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>Result:</strong> a built, exact-SHA-verified, readiness-checked Windows development artifact launched through one process-owned receipt.</p></section>
+        <section class="next-panel" aria-labelledby="adapt-title"><div><p class="eyebrow">Need a custom command?</p><h2 id="adapt-title">Build it in the playground.</h2><p>Choose a profile, operation, and target to generate a safe starting command and descriptor preview locally in your browser.</p></div><a class="button button-primary" href="../playground/">Open playground</a></section>
+      </article>
+      <aside class="on-this-page" aria-label="On this page"><p>On this page</p><nav><a href="hello-world/">Hello World</a><a href="#external">External app</a><a href="#integrated">Integrated app</a><a href="#bundle">Bundle</a><a href="#automation">Automation</a><a href="#native">Native</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../" aria-label="Arcane OS SDK documentation home"><img src="../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Examples name their boundary and expected result.</p><nav aria-label="Footer navigation"><a href="../architecture/">Architecture</a><a href="../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "hello-world",
+  "displayName": "Arcane Hello World",
+  "version": "0.1.0",
+  "entry": "index.html",
+  "strategy": "static",
+  "security": {
+    "connectOrigins": [],
+    "frameOrigins": [],
+    "mediaOrigins": []
+  },
+  "include": [
+    "hello-world.css",
+    "index.html",
+    "img/icon.png",
+    "manifest.json",
+    "modules"
+  ],
+  "exclude": [],
+  "shared": [
+    "browser-runtime"
+  ]
+}
+

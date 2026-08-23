@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="arcane-app-id" content="hello-world">
+    <base href="../../">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="rgb(23, 34, 56)">
+    <title>Arcane Hello World</title>
+    <link rel="manifest" href="./apps/hello-world/manifest.json">
+    <link rel="stylesheet" href="./arcane/css/theme.css?v=1">
+    <link rel="stylesheet" href="./arcane/css/primitives.css?v=1">
+    <link rel="stylesheet" href="./apps/hello-world/hello-world.css?v=1">
+    <script type="module" src="./arcane/modules/ThemeBootstrap.js?v=1"></script>
+</head>
+<body>
+    <main class="app-shell">
+        <section class="arcane-card" aria-labelledby="app-title">
+            <header class="arcane-card__header">
+                <div>
+                    <p class="eyebrow">Arcane application</p>
+                    <h1 id="app-title">Hello, Arcane World!</h1>
+                </div>
+            </header>
+            <div class="arcane-card__body">
+                <p id="app-status" role="status" aria-live="polite">Ready to say hello.</p>
+                <button id="app-action" class="arcane-button" type="button">Say hello</button>
+            </div>
+        </section>
+    </main>
+    <script type="module" src="./apps/hello-world/modules/App.js?v=1"></script>
+</body>
+</html>
+

@@ -1,0 +1,21 @@
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--background, rgb(13, 18, 32));
+    color: var(--text-color, rgb(235, 241, 255));
+}
+
+.app-shell {
+    box-sizing: border-box;
+    width: min(52rem, 100%);
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+.eyebrow {
+    color: var(--accent-color, rgb(116, 167, 255));
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+

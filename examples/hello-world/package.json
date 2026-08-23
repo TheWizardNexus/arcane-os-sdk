@@ -1,0 +1,23 @@
+{
+  "name": "arcane-hello-world",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "doctor": "arcane doctor",
+    "dev": "arcane dev",
+    "test": "arcane test",
+    "check": "arcane check",
+    "package": "arcane package",
+    "build": "arcane build --target windows-x64",
+    "run": "arcane run --target windows-x64",
+    "build:browser": "arcane build --target browser",
+    "run:browser": "arcane run --target browser"
+  },
+  "devDependencies": {
+    "arcane-os": "0.1.0-dev.4"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  }
+}
+

@@ -65,6 +65,57 @@ npm exec -- arcane package --output ndjson`,
   })
 });
 
+async function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const field = document.createElement("textarea");
+  field.value = text;
+  field.setAttribute("readonly", "");
+  field.style.position = "fixed";
+  field.style.opacity = "0";
+  document.body.append(field);
+  field.select();
+  const copied = document.execCommand("copy");
+  field.remove();
+  if (!copied) throw new Error("Copy command was declined.");
+}
+
+function setupCopyButtons() {
+  const buttons = [...document.querySelectorAll("[data-copy-button]")];
+  const timers = new WeakMap();
+
+  function announce(status, message) {
+    const activeTimer = timers.get(status);
+    if (activeTimer) window.clearTimeout(activeTimer);
+    status.textContent = message;
+    const timer = window.setTimeout(function clearCopyStatus() {
+      status.textContent = "";
+      timers.delete(status);
+    }, 2600);
+    timers.set(status, timer);
+  }
+
+  for (const button of buttons) {
+    const block = button.closest(".code-block");
+    const source = block?.querySelector("pre code");
+    const status = block?.querySelector("[data-copy-status]");
+    if (!source || !status) continue;
+
+    async function handleCopyButton() {
+      try {
+        await copyText(source.textContent);
+        announce(status, "Copied.");
+      } catch {
+        announce(status, "Copy failed. Select the text manually.");
+      }
+    }
+
+    button.addEventListener("click", handleCopyButton);
+  }
+}
+
 function setupNavigation() {
   const header = document.querySelector("[data-site-header]");
   const toggle = document.querySelector("[data-nav-toggle]");
@@ -150,23 +201,6 @@ function setupCommandLab() {
     }, 2600);
   };
 
-  const copyText = async (text) => {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      return;
-    }
-    const field = document.createElement("textarea");
-    field.value = text;
-    field.setAttribute("readonly", "");
-    field.style.position = "fixed";
-    field.style.opacity = "0";
-    document.body.append(field);
-    field.select();
-    const copied = document.execCommand("copy");
-    field.remove();
-    if (!copied) throw new Error("Copy command was declined.");
-  };
-
   tabs.forEach((tab, index) => {
     tab.addEventListener("click", () => select(tab.dataset.commandTab));
     tab.addEventListener("keydown", (event) => {
@@ -191,6 +225,107 @@ function setupCommandLab() {
   });
 
   select(activeKey);
+}
+
+function setupPlayground() {
+  const form = document.querySelector("[data-playground-form]");
+  const workspace = document.querySelector("[data-playground-workspace]");
+  const app = document.querySelector("[data-playground-app]");
+  const operation = document.querySelector("[data-playground-operation]");
+  const target = document.querySelector("[data-playground-target]");
+  const root = document.querySelector("[data-playground-root]");
+  const command = document.querySelector("[data-playground-command]");
+  const descriptor = document.querySelector("[data-playground-descriptor]");
+  const note = document.querySelector("[data-playground-note]");
+  const status = document.querySelector("[data-playground-status]");
+  if (!form || !workspace || !app || !operation || !target || !root || !command || !descriptor || !note || !status) return;
+
+  const nativeTargets = new Set(["portable", "windows-x64", "linux-x64", "linux-arm64", "android-arm64"]);
+  const targetOperations = new Set(["build", "run"]);
+  const appPattern = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/u;
+  const rootPattern = /^[a-zA-Z0-9 ._\\/:+-]+$/u;
+
+  function targetFlags(targetName) {
+    if (targetName === "linux-x64" || targetName === "linux-arm64") {
+      return ["--format deb", "--signing unsigned-local-test"];
+    }
+    if (targetName === "android-arm64") {
+      return ["--format apk", "--signing development"];
+    }
+    return [];
+  }
+
+  function renderPlayground() {
+    const profile = workspace.value;
+    const appId = app.value.trim();
+    const action = operation.value;
+    const targetName = target.value;
+    const arcaneRoot = root.value.trim();
+    const usesTarget = targetOperations.has(action);
+    const usesNativeRoot = usesTarget && nativeTargets.has(targetName);
+
+    target.disabled = !usesTarget;
+    root.disabled = !usesNativeRoot && profile !== "integrated";
+    command.textContent = "";
+    note.textContent = "";
+    status.textContent = "";
+
+    if (!appPattern.test(appId)) {
+      descriptor.textContent = "";
+      status.textContent = "Use a lowercase kebab-case application ID, such as hello-world.";
+      return;
+    }
+    if ((usesNativeRoot || profile === "integrated") && (!arcaneRoot || !rootPattern.test(arcaneRoot))) {
+      descriptor.textContent = "";
+      status.textContent = "Use a simple local checkout path without quotes or shell operators.";
+      return;
+    }
+    if (action === "run" && targetName === "portable") {
+      descriptor.textContent = JSON.stringify({id: appId, targets: ["browser", "portable"]}, null, 2);
+      status.textContent = "Portable output is verified but cannot run. Choose Build target or select a runnable target.";
+      return;
+    }
+
+    const parts = profile === "integrated"
+      ? ["node ./bin/arcane.mjs", action, `--workspace \"${arcaneRoot}\"`, `--app ${appId}`]
+      : ["npm exec -- arcane", action];
+
+    if (usesTarget) parts.push(`--target ${targetName}`);
+    if (usesNativeRoot) parts.push(`--arcane-root \"${arcaneRoot}\"`);
+    if (profile === "integrated" && usesNativeRoot) parts.push("--output-root \"..\\arcane-native-output\"");
+    if (usesTarget) parts.push(...targetFlags(targetName));
+
+    const descriptorTargets = usesTarget && targetName !== "browser" ? ["browser", targetName].sort() : ["browser"];
+    command.textContent = parts.join(" ");
+    descriptor.textContent = JSON.stringify({
+      id: appId,
+      targets: descriptorTargets
+    }, null, 2);
+
+    if (!usesTarget) {
+      note.textContent = "This operation stays in the browser/package workflow and does not select a native provider.";
+    } else if (targetName === "browser") {
+      note.textContent = "Browser output is packaged and verified without an Arcane OS native provider checkout.";
+    } else if (targetName === "portable") {
+      note.textContent = "Portable output is a verified app-scoped directory and has no executable run path.";
+    } else if (targetName === "windows-x64") {
+      note.textContent = "Windows output is unsigned local-development evidence, not a production release.";
+    } else if (targetName === "android-arm64") {
+      note.textContent = "Android uses a development-signed APK and run requires one connected physical ARM64 device.";
+    } else {
+      note.textContent = "Linux output is an unsigned-local-test DEB built on a compatible native toolchain.";
+    }
+  }
+
+  function preventPlaygroundSubmit(event) {
+    event.preventDefault();
+    renderPlayground();
+  }
+
+  form.addEventListener("input", renderPlayground);
+  form.addEventListener("change", renderPlayground);
+  form.addEventListener("submit", preventPlaygroundSubmit);
+  renderPlayground();
 }
 
 function createRandom(seed) {
@@ -350,5 +485,7 @@ function setupSpaceMotion() {
 }
 
 setupNavigation();
+setupCopyButtons();
 setupCommandLab();
+setupPlayground();
 setupSpaceMotion();

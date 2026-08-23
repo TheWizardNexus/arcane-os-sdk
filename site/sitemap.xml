@@ -3,4 +3,16 @@
   <url>
     <loc>https://thewizardnexus.github.io/arcane-os-sdk/</loc>
   </url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/quick-start/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/guides/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/guides/external-app/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/guides/integrated-workspace/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/guides/native-builds/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/examples/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/examples/hello-world/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/playground/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/testing/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/architecture/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/compatibility/</loc></url>
 </urlset>

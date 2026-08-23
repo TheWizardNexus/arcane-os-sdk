@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 2,
+  "id": "hello-world",
+  "displayName": "Arcane Hello World",
+  "description": "Minimal Arcane OS Hello World application.",
+  "version": "0.1.0",
+  "publisher": {
+    "id": "the-wizard-nexus",
+    "name": "The Wizard Nexus"
+  },
+  "package": {
+    "entry": "index.html",
+    "strategy": "static",
+    "include": [
+      "hello-world.css",
+      "index.html",
+      "img/icon.png",
+      "manifest.json",
+      "modules"
+    ],
+    "exclude": [],
+    "shared": [
+      "browser-runtime"
+    ]
+  },
+  "permissions": {
+    "capabilities": [],
+    "methods": []
+  },
+  "security": {
+    "connectOrigins": [],
+    "frameOrigins": [],
+    "mediaOrigins": []
+  },
+  "native": {
+    "type": "app",
+    "icon": "img/icon.png",
+    "order": 100,
+    "bundledApps": []
+  },
+  "requirements": {
+    "arcaneProtocol": "arcane/1",
+    "minimumCoreVersion": "0.8.12",
+    "features": []
+  },
+  "targets": [
+    "browser",
+    "windows-x64"
+  ]
+}
+

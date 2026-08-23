@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "appsRoot": "apps",
+  "distRoot": "dist",
+  "sharedPayloads": {
+    "browser-runtime": [
+      {
+        "source": "node_modules/arcane-os/runtime/arcane",
+        "destination": "arcane",
+        "include": [
+          "components",
+          "css",
+          "entities",
+          "img",
+          "modules",
+          "security"
+        ],
+        "exclude": []
+      },
+      {
+        "source": "node_modules/arcane-os/runtime/strong-type",
+        "destination": "node_modules/strong-type",
+        "include": [
+          "index.js",
+          "licence",
+          "package.json"
+        ],
+        "exclude": []
+      },
+      {
+        "source": "node_modules/arcane-os",
+        "destination": "licenses/arcane-os",
+        "include": [
+          "LICENSE",
+          "COMMERCIAL-LICENSE.md",
+          "NOTICE"
+        ],
+        "exclude": []
+      }
+    ]
+  }
+}
+

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "sdk": {
+    "name": "arcane-os",
+    "version": "0.1.0-dev.4"
+  },
+  "runtime": {
+    "manifest": "node_modules/arcane-os/runtime/ARCANE_RUNTIME_RELEASE.json",
+    "contentSha256": "7b1b583b4adf6a6ec794da6f0c03c553cdee79784dab75094d83ee24f9637098",
+    "upstreamCommit": "567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e"
+  },
+  "protocols": {
+    "arcane": "arcane/1",
+    "cliEvents": "arcane-cli-events/1",
+    "targetAdapter": "arcane-target-adapter/1"
+  }
+}
+

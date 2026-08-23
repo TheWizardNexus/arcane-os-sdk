@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#040915">
   <meta name="color-scheme" content="dark">
-  <meta name="description" content="Build, test, package, and manage Arcane OS applications inside or outside the Arcane checkout with the arcane-os SDK and CLI.">
+  <meta name="description" content="Arcane OS SDK developer documentation for scaffolding, testing, packaging, and building Arcane applications inside or outside Arcane OS.">
   <meta name="robots" content="index, follow">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
   <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/">
@@ -13,327 +13,141 @@
   <link rel="stylesheet" href="styles.css">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Arcane OS SDK">
-  <meta property="og:title" content="Arcane OS SDK — one app toolchain inside or outside Arcane OS">
-  <meta property="og:description" content="One headless toolchain for scaffolding, testing, packaging, verification, repository operations, and ArcaneOllama readiness.">
+  <meta property="og:title" content="Arcane OS SDK developer documentation">
+  <meta property="og:description" content="Build, test, package, and verify one Arcane application with one shared toolchain contract.">
   <meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/">
   <meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png">
   <meta property="og:image:width" content="2172">
   <meta property="og:image:height" content="724">
   <meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Arcane OS SDK">
-  <meta name="twitter:description" content="Use one Arcane app workflow inside or outside the Arcane OS repository.">
+  <meta name="twitter:title" content="Arcane OS SDK developer documentation">
+  <meta name="twitter:description" content="One documented workflow for external apps, integrated Arcane work, native targets, and automation.">
   <meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png">
-  <title>Arcane OS SDK | Build Arcane apps inside or outside Arcane OS</title>
+  <meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane OS SDK | Developer documentation</title>
   <script src="app.js" defer></script>
 </head>
-<body>
+<body data-page="overview">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <canvas id="space-canvas" aria-hidden="true"></canvas>
   <div class="space-haze" aria-hidden="true"></div>
 
   <header class="site-header" data-site-header>
-    <a class="brand" href="#top" aria-label="Arcane OS SDK home">
+    <a class="brand" href="./" aria-label="Arcane OS SDK documentation home">
       <img src="assets/arcane-sigil-512.png" alt="" width="48" height="48">
-      <span>
-        <strong>Arcane OS</strong>
-        <small>SDK</small>
-      </span>
+      <span><strong>Arcane OS</strong><small>SDK docs</small></span>
     </a>
-
     <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle>
-      <span class="nav-toggle-line" aria-hidden="true"></span>
-      <span class="nav-toggle-line" aria-hidden="true"></span>
-      <span class="nav-toggle-line" aria-hidden="true"></span>
+      <span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span>
       <span class="visually-hidden">Open navigation</span>
     </button>
-
     <nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation>
-      <a href="#workflow">Workflow</a>
-      <a href="#commands">Commands</a>
-      <a href="#targets">Targets</a>
-      <a href="#architecture">Architecture</a>
-      <a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">
-        GitHub <span aria-hidden="true">↗</span>
-      </a>
+      <a href="./" aria-current="page">Overview</a>
+      <a href="guides/">Guides</a>
+      <a href="examples/">Examples</a>
+      <a href="playground/">Playground</a>
+      <a href="testing/">Testing</a>
+      <a href="reference/">Reference</a>
+      <a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a>
     </nav>
   </header>
 
   <main id="main-content">
-    <section id="top" class="hero section-shell" aria-labelledby="hero-title">
+    <section class="hero section-shell" aria-labelledby="hero-title">
       <div class="hero-copy">
         <p class="eyebrow"><span class="status-light" aria-hidden="true"></span> Development SDK · 0.1.0-dev.4</p>
-        <h1 id="hero-title">Build Arcane apps <span>inside or outside Arcane OS.</span></h1>
-        <p class="hero-lead">
-          Keep proprietary applications in their own repositories, or work against Arcane's live shared runtime,
-          while one toolchain preserves paths, theme contracts, packaging, and structured automation.
-        </p>
+        <h1 id="hero-title">Build one Arcane app. <span>Keep every boundary explicit.</span></h1>
+        <p class="hero-lead">Scaffold, develop, test, package, and verify an application in its own repository or inside the Arcane checkout. The CLI, CI, and future graphical tools all use the same headless contract.</p>
         <div class="hero-actions">
-          <a class="button button-primary" href="#commands">Start with the CLI</a>
-          <a class="button button-secondary" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">
-            View the repository <span aria-hidden="true">↗</span>
-          </a>
+          <a class="button button-primary" href="quick-start/">Start the quick guide</a>
+          <a class="button button-secondary" href="playground/">Open the playground</a>
         </div>
         <div class="hero-notices">
-          <p class="development-notice"><strong>Development state</strong><span>Not yet published to npm. Browser plus five explicitly paired native development targets are available.</span></p>
+          <p class="development-notice"><strong>Development state</strong><span>Not yet published to npm. Use the checked local tarball workflow until the development package is available.</span></p>
           <button class="motion-toggle" type="button" data-motion-toggle aria-pressed="false">Pause background motion</button>
         </div>
-        <ul class="hero-facts" aria-label="SDK highlights">
-          <li><strong>Two profiles</strong><span>external and integrated</span></li>
-          <li><strong>Verified</strong><span>runtime and releases</span></li>
-          <li><strong>One API</strong><span>CLI, CI, future GUI, and Codex</span></li>
-        </ul>
       </div>
 
-      <div class="hero-system" aria-hidden="true">
-        <div class="orbit orbit-outer" aria-hidden="true"></div>
-        <div class="orbit orbit-middle" aria-hidden="true"></div>
-        <div class="orbit orbit-inner" aria-hidden="true"></div>
-        <div class="target-node node-desktop" aria-hidden="true"><span class="desktop-glyph"></span></div>
-        <div class="target-node node-terminal" aria-hidden="true"><span class="terminal-glyph">›_</span></div>
-        <div class="target-node node-package" aria-hidden="true"><span class="package-glyph"></span></div>
-        <div class="target-node node-mobile" aria-hidden="true"><span class="mobile-glyph"></span></div>
-        <div class="sigil-core" aria-hidden="true">
-          <span class="core-glow"></span>
-          <img src="assets/arcane-sigil-512.png" alt="" width="512" height="512">
+      <figure class="hero-visual">
+        <div class="hero-system" aria-hidden="true">
+          <div class="orbit orbit-outer"></div><div class="orbit orbit-middle"></div><div class="orbit orbit-inner"></div>
+          <div class="target-node node-desktop"><span class="desktop-glyph"></span></div>
+          <div class="target-node node-terminal"><span class="terminal-glyph">›_</span></div>
+          <div class="target-node node-package"><span class="package-glyph"></span></div>
+          <div class="target-node node-mobile"><span class="mobile-glyph"></span></div>
+          <div class="sigil-core"><span class="core-glow"></span><img src="assets/arcane-sigil-512.png" alt="" width="512" height="512"></div>
         </div>
-        <p class="system-label"><span>arcane/1</span> shared toolchain contract</p>
-      </div>
+        <figcaption id="system-caption" class="system-label"><span>arcane/1</span> shared toolchain contract</figcaption>
+      </figure>
     </section>
 
-    <section class="signal-strip section-shell" aria-label="SDK operating principles">
-      <article>
-        <span class="signal-index">01</span>
-        <div><strong>Source stays where it belongs</strong><small>Private apps stay separate; built-in work can use Arcane's live runtime.</small></div>
-      </article>
-      <article>
-        <span class="signal-index">02</span>
-        <div><strong>Bytes stay accountable</strong><small>Hash inventories and receipts bind the runtime and each release.</small></div>
-      </article>
-      <article>
-        <span class="signal-index">03</span>
-        <div><strong>Targets stay honest</strong><small>The portable directory is never labeled as an executable; unavailable builders fail clearly.</small></div>
-      </article>
-    </section>
-
-    <section id="workflow" class="content-section section-shell" aria-labelledby="workflow-title">
-      <div class="section-heading">
-        <p class="eyebrow">One application workflow</p>
-        <h2 id="workflow-title">The selected application remains the unit of work.</h2>
-        <p>Use a pinned runtime in an independent repository or Arcane's live runtime in its integrated checkout.</p>
+    <section class="quick-command section-shell" aria-labelledby="quick-command-title">
+      <div>
+        <p class="eyebrow">Local quick start</p>
+        <h2 id="quick-command-title">Use the current checked SDK bytes.</h2>
+        <p>Before npm publication, pack this checkout and install the resulting tarball into the generated app. The lockfile records the package integrity.</p>
+        <a class="text-link" href="quick-start/">Read every setup step <span aria-hidden="true">→</span></a>
       </div>
-
-      <ol class="workflow-grid">
-        <li>
-          <span class="step-number">01</span>
-          <h3>Scaffold or enroll</h3>
-          <p>Create the Arcane repository shape or add only the missing files to an existing project.</p>
-          <code>arcane new my-app --target portable --git</code>
-        </li>
-        <li>
-          <span class="step-number">02</span>
-          <h3>Develop and check</h3>
-          <p>Serve and validate one app by default, or select the integrated shared/Core profile with <code>--scope shared</code> for one exact focused test or canonical check.</p>
-          <code>arcane dev</code>
-        </li>
-        <li>
-          <span class="step-number">03</span>
-          <h3>Package or build</h3>
-          <p>Package a deterministic browser release, or build exactly one declared portable, Windows, Linux, or Android development target.</p>
-          <code>arcane package / arcane build</code>
-        </li>
-        <li>
-          <span class="step-number">04</span>
-          <h3>Distribute independently</h3>
-          <p>Push source to its private repository and publish only the artifact channel appropriate for that app.</p>
-          <code>arcane repo push</code>
-        </li>
-      </ol>
-
-      <aside class="boundary-callout">
-        <div class="callout-mark" aria-hidden="true">A</div>
-        <div>
-          <h3>One headless engine, every control surface</h3>
-          <p>The CLI, generated CI, future Arcane Developer control panel, and Codex all consume the same operations,
-            structured events, cancellation behavior, and exit status. The graphical control panel will not become a second build system.</p>
-        </div>
-      </aside>
-    </section>
-
-    <section id="commands" class="content-section section-shell" aria-labelledby="commands-title">
-      <div class="section-heading">
-        <p class="eyebrow">Command center</p>
-        <h2 id="commands-title">A stable CLI for people, automation, and AI.</h2>
-        <p>Use <code>arcane</code> inside an installed project. <code>arcane-os</code> is the equivalent collision-safe fallback.</p>
-      </div>
-
-      <div class="command-lab">
-        <div class="command-tabs" role="tablist" aria-label="Command examples">
-          <button id="command-tab-today" type="button" role="tab" aria-selected="true" aria-controls="command-panel" data-command-tab="today">Local today</button>
-          <button id="command-tab-loop" type="button" role="tab" aria-selected="false" aria-controls="command-panel" data-command-tab="loop">App loop</button>
-          <button id="command-tab-registry" type="button" role="tab" aria-selected="false" aria-controls="command-panel" data-command-tab="registry">After npm publish</button>
-          <button id="command-tab-automation" type="button" role="tab" aria-selected="false" aria-controls="command-panel" data-command-tab="automation">Automation</button>
-        </div>
-        <div id="command-panel" class="terminal-panel" role="tabpanel" aria-labelledby="command-tab-today" tabindex="0">
-          <div class="terminal-bar">
-            <span class="terminal-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-            <span data-command-title>Local development before npm publication</span>
-            <button type="button" class="copy-button" data-copy-command>Copy</button>
-          </div>
-          <pre><code data-command-output># From the arcane-os-sdk checkout
-npm ci
+      <div class="code-block code-block-compact">
+        <div class="code-bar"><span>PowerShell or shell</span><button type="button" data-copy-button>Copy</button></div>
+        <pre><code>npm ci
 npm run check
 npm run pack:local
-node ./bin/arcane.mjs new local-app --path ../local-app --git
-
-# From the generated app repository
-cd ../local-app
-npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.4.tgz
-npm run check</code></pre>
-          <p class="command-note" data-command-note>Use a packed tarball today. Local directory dependencies may become links and are intentionally rejected.</p>
-          <span class="copy-status" role="status" aria-live="polite" data-copy-status></span>
-        </div>
+node ./bin/arcane.mjs new local-app --path ../local-app --target portable --git</code></pre>
+        <span class="copy-status" role="status" aria-live="polite" data-copy-status></span>
       </div>
     </section>
 
-    <section id="targets" class="content-section section-shell" aria-labelledby="targets-title">
-      <div class="section-heading split-heading">
-        <div>
-          <p class="eyebrow">Platform contract</p>
-          <h2 id="targets-title">Explicit targets. Honest development boundaries.</h2>
-        </div>
-        <p>The adapter protocol supports browser plus five explicitly paired native development targets without overstating production readiness.</p>
-      </div>
-
-      <div class="target-table-wrap" role="region" aria-label="Arcane OS SDK target support" tabindex="0">
-        <table>
-          <thead>
-            <tr><th scope="col">Target</th><th scope="col">Formats</th><th scope="col">Status</th><th scope="col">Next boundary</th></tr>
-          </thead>
-          <tbody>
-            <tr><th scope="row">Browser</th><td>Directory</td><td><span class="status-chip status-live">Available</span></td><td>Verified package and loopback run</td></tr>
-            <tr><th scope="row">Portable</th><td>Core directory</td><td><span class="status-chip status-live">Available</span></td><td>Explicit <code>--arcane-root</code>; verified, not executable</td></tr>
-            <tr><th scope="row">Windows x64</th><td>EXE bundle</td><td><span class="status-chip status-live">Available</span></td><td>Explicit <code>--arcane-root</code>; unsigned-local-test</td></tr>
-            <tr><th scope="row">Linux x64</th><td>DEB</td><td><span class="status-chip status-live">Available</span></td><td>Explicit <code>--arcane-root</code>; unsigned-local-test</td></tr>
-            <tr><th scope="row">Linux ARM64</th><td>DEB</td><td><span class="status-chip status-live">Available</span></td><td>Explicit <code>--arcane-root</code>; compatible native ARM64 toolchain and remote evidence workflow</td></tr>
-            <tr><th scope="row">Android ARM64</th><td>APK only</td><td><span class="status-chip status-live">Available</span></td><td>Explicit <code>--arcane-root</code>; development-signed, no native ABI; physical/native ARM64 device for run</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="honesty-note"><strong>Development evidence stays development evidence.</strong> Every native target requires an explicit compatible <code>--arcane-root</code> and matching scaffold descriptor. Portable cannot run directly. Windows and both Linux DEBs are unsigned-local-test; Android is a development-signed, architecture-neutral APK with no native ABI. Linux ARM64 has exact-SHA native workflow evidence for AArch64 build, retained verification, sandboxed WebKit readiness, and owned cancellation. Android has exact-SHA physical ARM64/API 37 evidence for build, process-bound readiness, cancellation, uninstall, and absence. AAB, release signing, publishing, and update continuity remain deferred.</p>
-    </section>
-
-    <section id="ollama" class="content-section section-shell feature-split" aria-labelledby="ollama-title">
-      <div class="feature-copy">
-        <p class="eyebrow">ArcaneOllama readiness</p>
-        <h2 id="ollama-title">Check the managed service without bypassing Arcane Core.</h2>
-        <p><code>arcane doctor</code> performs a read-only host assessment. Product applications still use the capability-gated
-          Arcane bridge rather than connecting directly to the raw Ollama loopback endpoint.</p>
-        <ul class="check-list">
-          <li>Verifies the SDK runtime inventory</li>
-          <li>Checks the exact managed-service registration on supported hosts</li>
-          <li>Requires the canonical readiness probe response</li>
-          <li>Keeps Ollama optional for packaging and non-AI applications</li>
-        </ul>
-        <a class="text-link" href="https://github.com/TheWizardNexus/arcane-os-sdk#arcaneollama" target="_blank" rel="noreferrer">Read the ArcaneOllama boundary <span aria-hidden="true">→</span></a>
-      </div>
-      <div class="readiness-card" aria-label="Example of the ArcaneOllama readiness contract">
-        <div class="readiness-header"><span>doctor / expected contract</span><span class="ready-pill">example</span></div>
-        <dl>
-          <div><dt>service</dt><dd>ArcaneOllama</dd></div>
-          <div><dt>registration</dt><dd>verified</dd></div>
-          <div><dt>probe</dt><dd>canonical</dd></div>
-          <div><dt>endpoint</dt><dd>Core-owned</dd></div>
-        </dl>
-        <div class="readiness-pulse" aria-hidden="true"><i></i><span></span></div>
-        <code>arcane doctor --output json</code>
-      </div>
-    </section>
-
-    <section id="architecture" class="content-section section-shell" aria-labelledby="architecture-title">
+    <section class="page-routes section-shell" aria-labelledby="routes-title">
       <div class="section-heading">
-        <p class="eyebrow">Architecture that can grow</p>
-        <h2 id="architecture-title">Trust facts are verified once and carried forward.</h2>
-        <p>The SDK is arranged around explicit boundaries shared by the CLI, native builders, and a future graphical control panel.</p>
+        <p class="eyebrow">Documentation by task</p>
+        <h2 id="routes-title">Go to the page that answers your question.</h2>
+        <p>The homepage stays short. Detailed workflows, contracts, and evidence live on focused pages with stable links.</p>
       </div>
-      <div class="principle-grid">
-        <article>
-          <span class="principle-icon" aria-hidden="true">◎</span>
-          <h3>Immutable receipts</h3>
-          <p>Runtime and release identities bind canonical locations, complete inventories, policy, and exact bytes.</p>
-        </article>
-        <article>
-          <span class="principle-icon" aria-hidden="true">↯</span>
-          <h3>Responsive ownership</h3>
-          <p>Operations acknowledge first, serialize events, support cancellation, and surface failures to every client.</p>
-        </article>
-        <article>
-          <span class="principle-icon" aria-hidden="true">◇</span>
-          <h3>Explicit target inputs</h3>
-          <p>Paired native providers accept one release, descriptor, toolchain root, target request, and output root.</p>
-        </article>
-      </div>
-      <div class="architecture-line" aria-label="External app repository flows through the shared toolchain into verified browser and native targets">
-        <span>App repository</span><i aria-hidden="true"></i><span>Shared toolchain</span><i aria-hidden="true"></i><span>Verified target</span>
+      <div class="route-grid">
+        <a class="route-card route-card-featured" href="quick-start/"><span>01 · Start</span><h3>Quick start</h3><p>Install the checked SDK, scaffold one app, run its check, and open the browser development loop.</p><strong>About 10 minutes →</strong></a>
+        <a class="route-card" href="guides/"><span>02 · Build</span><h3>Guides</h3><p>Choose external, integrated, or native development and follow one bounded workflow.</p><strong>Choose a workflow →</strong></a>
+        <a class="route-card" href="examples/hello-world/"><span>03 · Copy</span><h3>Hello World</h3><p>Open the maintained application project and follow ordinary HTML and JavaScript through a Windows development executable.</p><strong>Build the example →</strong></a>
+        <a class="route-card" href="playground/"><span>04 · Explore</span><h3>Playground</h3><p>Build a command and preview a schema-2 app descriptor without sending data or executing a shell.</p><strong>Configure a command →</strong></a>
+        <a class="route-card" href="testing/"><span>05 · Prove</span><h3>Testing</h3><p>Understand the four SDK suites and the Vanilla Test lanes for JavaScript, Rust, and C#.</p><strong>Open the test strategy →</strong></a>
+        <a class="route-card" href="reference/"><span>06 · Look up</span><h3>Reference</h3><p>Find CLI syntax, output modes, target formats, file contracts, and exact failure boundaries.</p><strong>Open reference →</strong></a>
       </div>
     </section>
 
-    <section id="roadmap" class="content-section section-shell" aria-labelledby="roadmap-title">
+    <section class="workflow-choice section-shell" aria-labelledby="workflow-choice-title">
       <div class="section-heading split-heading">
-        <div>
-          <p class="eyebrow">Development roadmap</p>
-          <h2 id="roadmap-title">Six development targets are available. Promotion work remains.</h2>
-        </div>
-        <a class="text-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/roadmap.md" target="_blank" rel="noreferrer">Open the full roadmap <span aria-hidden="true">↗</span></a>
+        <div><p class="eyebrow">Two workspace profiles</p><h2 id="workflow-choice-title">Source stays where it belongs.</h2></div>
+        <p>Both profiles share the same toolchain. The difference is who owns the workspace, runtime source, and release.</p>
       </div>
-      <div class="roadmap-grid">
-        <article class="roadmap-current">
-          <span>Current</span><h3>External and integrated app toolchain</h3>
-          <p>Scaffold, check, test, serve, and package independently; build one declared portable, Windows x64, Linux x64, Linux ARM64, or Android ARM64 development artifact through an explicit compatible Arcane OS checkout.</p>
+      <div class="choice-grid">
+        <article>
+          <span class="choice-index">External</span>
+          <h3>Independent application repository</h3>
+          <p>Pin the SDK and synchronized runtime, keep proprietary source outside Arcane OS, and publish one deterministic application bundle.</p>
+          <a class="text-link" href="guides/external-app/">External app guide <span aria-hidden="true">→</span></a>
         </article>
         <article>
-          <span>Proven</span><h3>Contract-based compatibility</h3>
-          <p>Newer Core versions work when they retain every declared protocol, feature, capability, and method contract.</p>
-        </article>
-        <article>
-          <span>Next promotion</span><h3>Formats, signing, and update continuity</h3>
-          <p>Add Linux AppImage, RPM, and production signing, plus Android AAB, release signing, store publishing, and update continuity, only through separate evidence-backed work.</p>
+          <span class="choice-index">Integrated</span>
+          <h3>Arcane OS checkout</h3>
+          <p>Work on one built-in app or one exact shared/Core check without adding an SDK self-dependency to Arcane OS.</p>
+          <a class="text-link" href="guides/integrated-workspace/">Integrated guide <span aria-hidden="true">→</span></a>
         </article>
       </div>
     </section>
 
-    <section id="licensing" class="license-section section-shell" aria-labelledby="license-title">
-      <div>
-        <p class="eyebrow">Distribution boundary</p>
-        <h2 id="license-title">Keep source ownership and runtime licensing distinct.</h2>
-      </div>
-      <p>The synchronized Arcane runtime and packager are currently AGPL-3.0-only. A separate commercial agreement is required before treating the existing commercial notice as permission to distribute a closed-source app that bundles that runtime.</p>
-      <a class="text-link" href="https://github.com/TheWizardNexus/arcane-os-sdk#licensing" target="_blank" rel="noreferrer">Review licensing notes <span aria-hidden="true">↗</span></a>
-    </section>
-
-    <section class="final-cta section-shell" aria-labelledby="cta-title">
-      <img src="assets/arcane-sigil-512.png" alt="" width="112" height="112">
-      <p class="eyebrow">Arcane applications, everywhere they belong</p>
-      <h2 id="cta-title">Your app repository. Arcane’s contract.</h2>
-      <p>Run browser, Windows x64, Linux x64, Linux ARM64, and physical-device Android ARM64 development paths; portable remains a verified non-runnable payload.</p>
-      <div class="hero-actions">
-        <a class="button button-primary" href="#commands">See the commands</a>
-        <a class="button button-secondary" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">Explore on GitHub <span aria-hidden="true">↗</span></a>
-      </div>
+    <section class="quality-band section-shell" aria-labelledby="quality-title">
+      <div><p class="eyebrow">One test contract</p><h2 id="quality-title">Test the language you actually ship.</h2></div>
+      <div class="language-pills" aria-label="Vanilla Test language lanes"><span>JavaScript</span><span>Rust</span><span>C#</span></div>
+      <p>The SDK repository currently pins Vanilla Test 2.1.3 for its JavaScript suite. Vanilla Test also provides native and browser paths for Rust and C#, so native code can keep its tests in its own language instead of copying behavior into a second harness.</p>
+      <a class="button button-secondary" href="testing/">See test sets and evidence</a>
     </section>
   </main>
 
   <footer class="site-footer section-shell">
-    <a class="brand footer-brand" href="#top" aria-label="Back to top">
-      <img src="assets/arcane-sigil-512.png" alt="" width="40" height="40">
-      <span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span>
-    </a>
-    <p>Development software · Browser plus five explicitly paired native targets available · Not production or npm-published</p>
-    <nav aria-label="Footer navigation">
-      <a href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">Repository</a>
-      <a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/architecture.md" target="_blank" rel="noreferrer">Architecture</a>
-      <a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a>
-    </nav>
+    <a class="brand footer-brand" href="./" aria-label="Arcane OS SDK documentation home"><img src="assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a>
+    <p>Development software · Not yet npm-published · Native output remains development-only until its release gates pass.</p>
+    <nav aria-label="Footer navigation"><a href="architecture/">Architecture</a><a href="compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav>
   </footer>
 </body>
 </html>

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="Arcane OS SDK testing guide covering unit, functional, integration, and regression sets plus exact-artifact evidence boundaries.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/testing/"><link rel="icon" type="image/png" href="../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../styles.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Testing · Arcane OS SDK"><meta property="og:description" content="Four non-overlapping SDK test sets and honest artifact evidence."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/testing/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Testing · Arcane OS SDK"><meta name="twitter:description" content="Choose the smallest Arcane SDK test set that proves the changed boundary."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Testing | Arcane OS SDK</title><script src="../app.js" defer></script>
+</head>
+<body data-page="testing">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../" aria-label="Arcane OS SDK documentation home"><img src="../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../">Overview</a><a href="../guides/">Guides</a><a href="../examples/">Examples</a><a href="../playground/">Playground</a><a href="./" aria-current="page">Testing</a><a href="../reference/">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/tree/main/test" target="_blank" rel="noreferrer">Tests <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../">Docs</a><span aria-hidden="true">/</span><span aria-current="page">Testing</span></nav><p class="eyebrow">Evidence by boundary</p><h1>Small sets. No repeated cases.</h1><p class="doc-lead">The SDK uses exact Vanilla Test 2.1.3 and keeps every test file in one named set. Run a focused set while iterating; run the complete check before delivery.</p></header>
+    <section class="suite-grid section-shell" aria-label="SDK test sets">
+      <article><span>01</span><h2>Unit</h2><p>Descriptors, schemas, contracts, target definitions, and host-independent helpers.</p><code>npm run test:unit</code></article>
+      <article><span>02</span><h2>Functional</h2><p>CLI behavior, scaffold output, development server, packaging, runtime sync, events, and Pages.</p><code>npm run test:functional</code></article>
+      <article><span>03</span><h2>Integration</h2><p>Integrated workspaces, native plans/providers, release bundles, shared payloads, and tarball boundaries.</p><code>npm run test:integration</code></article>
+      <article><span>04</span><h2>Regression</h2><p>Channel workflows, generated providers, runner behavior, and test-set partition guarantees.</p><code>npm run test:regression</code></article>
+    </section>
+    <div class="docs-layout section-shell docs-layout-wide">
+      <article class="prose">
+        <section id="commands"><h2>Run the right amount</h2><div class="code-block"><div class="code-bar"><span>SDK checkout</span><button type="button" data-copy-button>Copy</button></div><pre><code># One set while iterating
+npm run test:functional
+
+# All four sets
+npm test
+
+# Source checks, runtime manifest, and all test sets
+npm run check</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div></section>
+        <section id="app-tests"><h2>Generated app tests stay with the app</h2><p>An external project runs <code>npm run test</code> or <code>npm run check</code> through its pinned SDK. Integrated app scope selects only the chosen <code>apps/&lt;id&gt;/test/</code> tree; shared/Core scope requires one exact test file or Arcane's canonical development check.</p><div class="code-block"><div class="code-bar"><span>Focused integrated shared test</span><button type="button" data-copy-button>Copy</button></div><pre><code>node ..\arcane-os-sdk\bin\arcane.mjs test `
+  --workspace "..\Arcane OS" `
+  --scope shared `
+  --test-file test/component-contracts.test.mjs</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div></section>
+        <section id="evidence"><h2>Source evidence is not artifact evidence</h2><div class="evidence-ladder"><div><strong>Source check</strong><span>Code and contract behavior.</span></div><div><strong>Browser package</strong><span>Allowlist, inventory, hashes, and served entry.</span></div><div><strong>Native artifact</strong><span>Exact target bytes, provider verification, and real-host launch.</span></div><div><strong>Release</strong><span>Publisher, distribution, update, and promotion gates.</span></div></div><p>A green source suite cannot stand in for a Windows EXE, Linux DEB, Android APK, or production release. Test the artifact that carries the claim.</p></section>
+        <section class="callout callout-info"><strong>Language ownership</strong><p>The SDK repository's suite is JavaScript. Native components should keep behavior tests in the language they ship while reporting through the shared evidence conventions; duplicating implementation behavior in a second language is not a substitute for testing the real code.</p></section>
+      </article>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../" aria-label="Arcane OS SDK documentation home"><img src="../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Every test file belongs to one set and runs once per complete suite.</p><nav aria-label="Footer navigation"><a href="../architecture/">Architecture</a><a href="../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>
+
