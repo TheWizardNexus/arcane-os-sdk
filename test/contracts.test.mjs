@@ -126,6 +126,10 @@ test('root SDK export exposes receipt authenticators and verified file readers',
 
 test('package schema string rules match the packager validators',async t=>{
     const schema=await readSchema('arcane-package.schema.json');
+    assert.ok(schema.required.includes('security'));
+    assert.deepEqual(schema.properties.security.required,[
+        'connectOrigins','frameOrigins','mediaOrigins'
+    ]);
     const semver=new RegExp(schema.properties.version.pattern);
     for(const version of [
         '0.1.0',

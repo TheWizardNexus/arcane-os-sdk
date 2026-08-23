@@ -48,6 +48,11 @@ async function createExternalFixture(root){
         version:'0.1.0',
         entry:'index.html',
         strategy:'static',
+        security:{
+            connectOrigins:['https://api.example.com'],
+            frameOrigins:[],
+            mediaOrigins:[]
+        },
         include:['fixture-app.css','index.html','manifest.json','modules'],
         exclude:[],
         shared:['browser-runtime']
@@ -119,6 +124,12 @@ test('external workspace packages deterministically and detects release tamperin
     assert.ok(Object.isFrozen(first.receipt.files));
     assert.ok(Object.isFrozen(first.receipt.files[0]));
     assert.ok(Object.isFrozen(first.receipt.app));
+    assert.ok(Object.isFrozen(first.receipt.app.security));
+    assert.deepEqual(first.receipt.app.security,{
+        connectOrigins:['https://api.example.com'],
+        frameOrigins:[],
+        mediaOrigins:[]
+    });
     assert.ok(Object.isFrozen(first.receipt.app.localAIModelPolicy));
     assert.throws(()=>first.receipt.files.push({}),TypeError);
     const releaseRoot=path.join(workspaceRoot,'dist','fixture-app');
@@ -180,6 +191,20 @@ test('external workspace packages deterministically and detects release tamperin
     await assert.rejects(
         verifyApp({workspaceRoot,appId:'fixture-app'}),
         /hash|integrity|inventory|bytes|release/i
+    );
+});
+
+test('release verification binds the exact authored security policy',async t=>{
+    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-security-package-'});
+    await createExternalFixture(workspaceRoot);
+    await packageApp({workspaceRoot,appId:'fixture-app'});
+    const configPath=path.join(workspaceRoot,'apps','fixture-app','arcane-package.json');
+    const config=JSON.parse(await readFile(configPath,'utf8'));
+    config.security.connectOrigins=['https://changed.example.com'];
+    await writeJson(configPath,config);
+    await assert.rejects(
+        verifyApp({workspaceRoot,appId:'fixture-app'}),
+        /identity|policy|security/u
     );
 });
 

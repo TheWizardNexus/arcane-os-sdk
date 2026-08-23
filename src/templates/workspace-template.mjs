@@ -265,6 +265,11 @@ jobs:
         version:'0.1.0',
         entry:'index.html',
         strategy:'static',
+        security:{
+            connectOrigins:[],
+            frameOrigins:[],
+            mediaOrigins:[]
+        },
         include:packageInclude,
         exclude:[],
         shared:['browser-runtime']

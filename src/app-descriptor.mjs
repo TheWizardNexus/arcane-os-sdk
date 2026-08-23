@@ -359,6 +359,11 @@ export function projectPackageManifest(descriptor){
         version:value.version,
         entry:value.package.entry,
         strategy:value.package.strategy,
+        security:{
+            connectOrigins:[...value.security.connectOrigins],
+            frameOrigins:[...value.security.frameOrigins],
+            mediaOrigins:[...value.security.mediaOrigins]
+        },
         ...(value.package.localAIModelPolicy?{localAIModelPolicy:value.package.localAIModelPolicy}:{}),
         include:[...value.package.include],
         exclude:[...value.package.exclude],
@@ -409,7 +414,11 @@ export function projectNativeDescriptor(descriptor,{source}={}){
 
 function synthesizedDescriptor(packageManifest,nativeDescriptor){
     const native=nativeDescriptor??{};
-    const security=native.security??{};
+    if(packageManifest.security!==undefined&&native.security!==undefined
+        &&!isDeepStrictEqual(packageManifest.security,native.security)){
+        fail('Legacy package and native registry security policies do not match.');
+    }
+    const security=packageManifest.security??native.security??{};
     return validateAppDescriptor({
         schemaVersion:APP_DESCRIPTOR_SCHEMA_VERSION,
         id:packageManifest.id,

@@ -567,6 +567,7 @@ export function validateAppConfig(value,appId,rootConfig,configPath=`apps/${appI
             'version',
             'entry',
             'strategy',
+            'security',
             'localAIModelPolicy',
             'include',
             'exclude',
@@ -600,6 +601,7 @@ export function validateAppConfig(value,appId,rootConfig,configPath=`apps/${appI
     const localAIModelPolicy=value.localAIModelPolicy===undefined
         ?Object.freeze({verified_only:true,models:Object.freeze([])})
         :validateLocalAIModelPolicy(value.localAIModelPolicy,`${appId}/${APP_CONFIG_NAME}.localAIModelPolicy`);
+    const security=validateAppSecurity(value.security,appId);
 
     for(const model of localAIModelPolicy.models){
         if(isAlwaysForbidden(model.definition)||isExcluded(model.definition,exclude)
@@ -646,12 +648,59 @@ export function validateAppConfig(value,appId,rootConfig,configPath=`apps/${appI
         version:value.version,
         entry,
         strategy:value.strategy,
+        security,
         localAIModelPolicy,
         include:Object.freeze(include),
         exclude:Object.freeze(exclude),
         shared:Object.freeze([...value.shared]),
         adapter,
         configPath
+    });
+}
+
+function validateOriginList(value,label,{allowLoopbackHttp=false,allowHttpsScheme=false}={}){
+    if(!Array.isArray(value)||value.length>16){
+        fail(`${label} must be an array with at most 16 origins.`);
+    }
+    const origins=value.map((origin,index)=>{
+        if(typeof origin!=='string'||origin!==origin.trim()){
+            fail(`${label}[${index}] is invalid.`);
+        }
+        if(origin==='https:'&&allowHttpsScheme)return origin;
+        let parsed;
+        try{
+            parsed=new URL(origin);
+        }catch{
+            fail(`${label}[${index}] is not a valid URL origin.`);
+        }
+        if(parsed.origin!==origin||parsed.hostname.endsWith('.')||parsed.username||parsed.password
+            ||parsed.pathname!=='/'||parsed.search||parsed.hash){
+            fail(`${label}[${index}] must be a canonical allowed origin.`);
+        }
+        if(parsed.protocol==='http:'){
+            if(!allowLoopbackHttp||!['127.0.0.1','[::1]'].includes(parsed.hostname)){
+                fail(`${label}[${index}] may use HTTP only for a numeric loopback host.`);
+            }
+        }else if(parsed.protocol!=='https:'){
+            fail(`${label}[${index}] must use HTTPS or an approved loopback HTTP origin.`);
+        }
+        return parsed.origin;
+    });
+    if(new Set(origins).size!==origins.length)fail(`${label} must not contain duplicates.`);
+    if(JSON.stringify(origins)!==JSON.stringify([...origins].sort(compareText))){
+        fail(`${label} must be sorted for deterministic projection.`);
+    }
+    return Object.freeze(origins);
+}
+
+function validateAppSecurity(value,appId){
+    if(!isPlainObject(value))fail(`${appId}/${APP_CONFIG_NAME}.security must be an object.`);
+    const label=`${appId}/${APP_CONFIG_NAME}.security`;
+    assertOnlyKeys(value,new Set(['connectOrigins','frameOrigins','mediaOrigins']),label);
+    return Object.freeze({
+        connectOrigins:validateOriginList(value.connectOrigins,`${label}.connectOrigins`,{allowLoopbackHttp:true}),
+        frameOrigins:validateOriginList(value.frameOrigins,`${label}.frameOrigins`,{allowHttpsScheme:appId==='browser'}),
+        mediaOrigins:validateOriginList(value.mediaOrigins,`${label}.mediaOrigins`)
     });
 }
 
@@ -1671,6 +1720,7 @@ function appReleasePackageBinding(config){
         version:config.version,
         entry:config.entry,
         strategy:config.strategy,
+        security:config.security,
         localAIModelPolicy:config.localAIModelPolicy??{verified_only:true,models:[]},
         include:[...(config.include??[])],
         exclude:[...(config.exclude??[])],
@@ -1879,6 +1929,7 @@ async function packagePolicySha256(context,{signal}={}){
         }));
     const policy={
         strategy:config.strategy,
+        security:config.security,
         localAIModelPolicy:{...config.localAIModelPolicy},
         include:[...config.include].sort(compareText),
         exclude:[...config.exclude].sort(compareText),
@@ -1908,6 +1959,7 @@ async function writeReleaseManifest(root,context,version,{signal,onEvent}={}){
             version,
             entry:config.entry,
             start:`./apps/${config.id}/${config.entry}`,
+            security:config.security,
             localAIModelPolicy:{...config.localAIModelPolicy}
         },
         policySha256:await packagePolicySha256(context,{signal}),
@@ -1942,6 +1994,7 @@ function expectedReleaseApp(context,version){
         version,
         entry:config.entry,
         start:`./apps/${config.id}/${config.entry}`,
+        security:config.security,
         localAIModelPolicy:{...config.localAIModelPolicy}
     };
 }

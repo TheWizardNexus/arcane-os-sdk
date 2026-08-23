@@ -47,6 +47,7 @@ test('canonical descriptor projects exact browser and native compatibility input
         version:'1.2.3',
         entry:'index.html',
         strategy:'static',
+        security:{connectOrigins:[],frameOrigins:[],mediaOrigins:[]},
         include:['img/icon.png','index.html','manifest.json','modules'],
         exclude:[],
         shared:['browser-runtime']
@@ -121,6 +122,7 @@ test('legacy package-only apps remain browser-only without invented publisher at
         version:'0.1.0',
         entry:'index.html',
         strategy:'static',
+        security:{connectOrigins:[],frameOrigins:[],mediaOrigins:[]},
         include:['index.html'],
         exclude:[],
         shared:['browser-runtime']
@@ -142,6 +144,7 @@ test('legacy registry apps expose every implemented native development target',a
         version:'0.1.0',
         entry:'index.html',
         strategy:'static',
+        security:{connectOrigins:[],frameOrigins:[],mediaOrigins:[]},
         include:['img/icon.png','index.html'],
         exclude:[],
         shared:['browser-runtime']
@@ -164,6 +167,45 @@ test('legacy registry apps expose every implemented native development target',a
     assert.deepEqual(loaded.descriptor.targets,[
         'android-arm64','browser','linux-arm64','linux-x64','portable','windows-x64'
     ]);
+});
+
+test('legacy package and native registry security policies must agree exactly',async t=>{
+    const workspaceRoot=await temporaryDirectory(t);
+    const appRoot=path.join(workspaceRoot,'apps','legacy-native');
+    await mkdir(appRoot,{recursive:true});
+    const manifest={
+        schemaVersion:1,
+        id:'legacy-native',
+        displayName:'Legacy Native',
+        version:'0.1.0',
+        entry:'index.html',
+        strategy:'static',
+        security:{connectOrigins:[],frameOrigins:[],mediaOrigins:[]},
+        include:['index.html'],
+        exclude:[],
+        shared:['browser-runtime']
+    };
+    await mkdir(path.join(workspaceRoot,'machine_bundles','arcane-os-machine-bundle'),{recursive:true});
+    await writeFile(path.join(workspaceRoot,'machine_bundles','arcane-os-machine-bundle','arcane-apps.json'),JSON.stringify({
+        apps:{
+            'legacy-native':{
+                description:'A legacy native Arcane application.',
+                icon:null,
+                order:100,
+                type:'app',
+                capabilities:[],
+                security:{
+                    connectOrigins:['https://native.example.com'],
+                    frameOrigins:[],
+                    mediaOrigins:[]
+                }
+            }
+        }
+    }));
+    await assert.rejects(
+        loadAppDescriptor({workspaceRoot,appRoot,appId:'legacy-native',packageManifest:manifest}),
+        /security policies do not match/u
+    );
 });
 
 test('authored descriptor must project exactly to the compatibility package manifest',async t=>{

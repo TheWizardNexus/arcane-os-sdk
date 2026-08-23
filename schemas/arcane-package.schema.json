@@ -12,6 +12,7 @@
     "version",
     "entry",
     "strategy",
+    "security",
     "include",
     "shared"
   ],
@@ -43,6 +44,26 @@
     },
     "localAIModelPolicy": {
       "$ref": "#/$defs/localAIModelPolicy"
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "connectOrigins",
+        "frameOrigins",
+        "mediaOrigins"
+      ],
+      "properties": {
+        "connectOrigins": {
+          "$ref": "#/$defs/connectOriginList"
+        },
+        "frameOrigins": {
+          "$ref": "#/$defs/frameOriginList"
+        },
+        "mediaOrigins": {
+          "$ref": "#/$defs/httpsOriginList"
+        }
+      }
     },
     "include": {
       "allOf": [
@@ -128,6 +149,33 @@
       "uniqueItems": true,
       "items": {
         "$ref": "#/$defs/literalRelativePath"
+      }
+    },
+    "connectOriginList": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?:https://[^/?#]+|http://(?:127\\.0\\.0\\.1|\\[::1\\])(?::[0-9]{1,5})?)$"
+      }
+    },
+    "httpsOriginList": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^https://[^/?#]+$"
+      }
+    },
+    "frameOriginList": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?:https:|https://[^/?#]+)$"
       }
     },
     "localAIModelPolicy": {

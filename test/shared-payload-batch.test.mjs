@@ -25,6 +25,7 @@ async function createApp(workspaceRoot,appId,displayName){
         version:'0.1.0',
         entry:'index.html',
         strategy:'static',
+        security:{connectOrigins:[],frameOrigins:[],mediaOrigins:[]},
         include:['index.html'],
         exclude:[],
         shared:['browser-runtime']
