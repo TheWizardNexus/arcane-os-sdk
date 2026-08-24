@@ -586,7 +586,10 @@ export default arcaneNativeBuilderProvider;
         );
     });
 
-    await t.test('executes the named-import graph in real Chrome through the installed tarball runner',async()=>{
+    await t.test('executes the named-import graph in real Chrome through the installed tarball runner',{
+        // The installed contract owns 270s, its process owns 300s, and this wrapper owns teardown/reporting.
+        timeout:330_000
+    },async()=>{
         const contractSource=path.join(repositoryRoot,'test','browser-import-map.contract.mjs');
         const contractPath=path.join(workspaceRoot,'browser-import-map.contract.test.mjs');
         await copyFile(contractSource,contractPath);

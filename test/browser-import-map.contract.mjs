@@ -74,6 +74,27 @@ async function exists(filePath){
     }
 }
 
+async function assertSameRegularFileIdentity({actualPath,expectedPath,inspect=lstat}){
+    const [actualInfo,expectedInfo]=await Promise.all([
+        inspect(actualPath,{bigint:true}),
+        inspect(expectedPath,{bigint:true})
+    ]);
+    assert.equal(
+        actualInfo.isSymbolicLink(),
+        false,
+        `Resolved file must not be a final symbolic link: ${actualPath}`
+    );
+    assert.equal(actualInfo.isFile(),true,`Resolved path must be a regular file: ${actualPath}`);
+    assert.equal(
+        expectedInfo.isSymbolicLink(),
+        false,
+        `Expected file must not be a final symbolic link: ${expectedPath}`
+    );
+    assert.equal(expectedInfo.isFile(),true,`Expected path must be a regular file: ${expectedPath}`);
+    assert.equal(actualInfo.dev,expectedInfo.dev,'Resolved file must be on the expected device.');
+    assert.equal(actualInfo.ino,expectedInfo.ino,'Resolved file must have the expected physical identity.');
+}
+
 async function realFileInventory(root,relativeRoot=''){
     const absolute=relativeRoot
         ?path.join(root,...relativeRoot.split('/'))
@@ -1124,9 +1145,44 @@ if(process.env.ARCANE_BROWSER_LIFECYCLE_SELF_TEST==='1'){
     const workspaceName=JSON.parse(await readFile(path.join(workspaceRoot,'package.json'),'utf8')).name;
     assert.equal(workspaceName,'arcane-external-app');
     assert.equal(await exists(path.join(workspaceRoot,'node_modules','arcane-os','package.json')),true);
-    assert.equal(
-        fileURLToPath(import.meta.resolve('arcane-os/toolchain')),
-        path.join(workspaceRoot,'node_modules','arcane-os','src','toolchain.mjs')
+    const resolvedToolchainPath=fileURLToPath(import.meta.resolve('arcane-os/toolchain'));
+    const expectedToolchainPath=path.join(
+        workspaceRoot,'node_modules','arcane-os','src','toolchain.mjs'
+    );
+    await assertSameRegularFileIdentity({
+        actualPath:resolvedToolchainPath,
+        expectedPath:expectedToolchainPath
+    });
+
+    const identityProbeRoot=await mkdtemp(path.join(os.tmpdir(),'arcane-toolchain-identity-'));
+    t.after(()=>rm(identityProbeRoot,{recursive:true,force:true}));
+    const decoyToolchainPath=path.join(identityProbeRoot,'toolchain.mjs');
+    await writeFile(decoyToolchainPath,await readFile(expectedToolchainPath));
+    assert.deepEqual(
+        await readFile(decoyToolchainPath),
+        await readFile(expectedToolchainPath)
+    );
+    await assert.rejects(
+        assertSameRegularFileIdentity({
+            actualPath:resolvedToolchainPath,
+            expectedPath:decoyToolchainPath
+        }),
+        /expected physical identity/u
+    );
+
+    const expectedToolchainInfo=await lstat(expectedToolchainPath,{bigint:true});
+    await assert.rejects(
+        assertSameRegularFileIdentity({
+            actualPath:resolvedToolchainPath,
+            expectedPath:expectedToolchainPath,
+            inspect:async filePath=>filePath===resolvedToolchainPath?{
+                dev:expectedToolchainInfo.dev,
+                ino:expectedToolchainInfo.ino,
+                isFile:()=>false,
+                isSymbolicLink:()=>true
+            }:expectedToolchainInfo
+        }),
+        /must not be a final symbolic link/u
     );
     await assertChromeLifecycleContracts();
 
