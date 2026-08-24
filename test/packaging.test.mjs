@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {cp,mkdir,readFile,readdir,rm,unlink,writeFile} from 'node:fs/promises';
+import {cp,lstat,mkdir,readFile,readdir,rm,unlink,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {createWorkspace} from '../src/scaffold.mjs';
@@ -545,14 +545,24 @@ test('public import-map operation is available through dispatch and the headless
     });
 
     const dispatched=await executeOperation('import-map',{workspaceRoot,appId});
-    assert.equal(dispatched.workspaceRoot,workspaceRoot);
+    const [requestedIdentity,dispatchedIdentity]=await Promise.all([
+        lstat(workspaceRoot,{bigint:true}),
+        lstat(dispatched.workspaceRoot,{bigint:true})
+    ]);
+    assert.equal(requestedIdentity.isDirectory(),true);
+    assert.equal(dispatchedIdentity.isDirectory(),true);
+    assert.equal(requestedIdentity.dev,dispatchedIdentity.dev);
+    assert.equal(requestedIdentity.ino,dispatchedIdentity.ino);
     assert.equal(dispatched.appId,appId);
     assert.equal(dispatched.importMap.committed,true);
 
     const toolchain=createToolchain({workspaceRoot,appId});
     assert.equal(typeof toolchain.importMap,'function');
     const headless=await toolchain.importMap();
-    assert.equal(headless.workspaceRoot,workspaceRoot);
+    const headlessIdentity=await lstat(headless.workspaceRoot,{bigint:true});
+    assert.equal(headlessIdentity.isDirectory(),true);
+    assert.equal(headlessIdentity.dev,requestedIdentity.dev);
+    assert.equal(headlessIdentity.ino,requestedIdentity.ino);
     assert.equal(headless.appId,appId);
     assert.equal(headless.importMap.committed,true);
 });
@@ -592,7 +602,9 @@ test('package release fails closed when import-map cleanup reports a warning',as
     );
 });
 
-test('package rejects terminal import-map listener removal, truncation, and mismatch',async t=>{
+// Each case performs a complete authenticated package traversal. Keep the
+// default watchdog per case while admitting their measured serialized sum.
+test('package rejects terminal import-map listener removal, truncation, and mismatch',{timeout:60_000},async t=>{
     const cases=[
         {
             name:'removed-artifact',
@@ -608,34 +620,36 @@ test('package rejects terminal import-map listener removal, truncation, and mism
         }
     ];
     for(const scenario of cases){
-        const appId=`listener-${scenario.name}`;
-        const workspaceRoot=await authenticatedWorkspace(t,{
-            prefix:`arcane-terminal-${scenario.name}-`,
-            appId
-        });
-        const appRoot=path.join(workspaceRoot,'apps',appId);
-        let mutated=false;
+        await t.test(scenario.name,async child=>{
+            const appId=`listener-${scenario.name}`;
+            const workspaceRoot=await authenticatedWorkspace(child,{
+                prefix:`arcane-terminal-${scenario.name}-`,
+                appId
+            });
+            const appRoot=path.join(workspaceRoot,'apps',appId);
+            let mutated=false;
 
-        await assert.rejects(
-            packageApp({
-                workspaceRoot,
-                appId,
-                onEvent:async event=>{
-                    if(mutated||event.type!=='import-map.completed')return;
-                    await scenario.mutate({
-                        entryPath:path.join(appRoot,'index.html'),
-                        mapPath:path.join(appRoot,'modules','arcane.importmap.json')
-                    });
-                    mutated=true;
-                }
-            }),
-            /import-map (?:artifact|entry).*(?:changed|unavailable)|does not bind/iu
-        );
-        assert.equal(mutated,true);
-        await assert.rejects(
-            readFile(path.join(workspaceRoot,'dist',appId,'ARCANE_APP_RELEASE.json')),
-            {code:'ENOENT'}
-        );
+            await assert.rejects(
+                packageApp({
+                    workspaceRoot,
+                    appId,
+                    onEvent:async event=>{
+                        if(mutated||event.type!=='import-map.completed')return;
+                        await scenario.mutate({
+                            entryPath:path.join(appRoot,'index.html'),
+                            mapPath:path.join(appRoot,'modules','arcane.importmap.json')
+                        });
+                        mutated=true;
+                    }
+                }),
+                /import-map (?:artifact|entry).*(?:changed|unavailable)|does not bind/iu
+            );
+            assert.equal(mutated,true);
+            await assert.rejects(
+                readFile(path.join(workspaceRoot,'dist',appId,'ARCANE_APP_RELEASE.json')),
+                {code:'ENOENT'}
+            );
+        });
     }
 });
 

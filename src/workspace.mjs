@@ -71,6 +71,80 @@ async function assertRealDirectory(directory,label){
     if(info.isSymbolicLink()||!info.isDirectory())fail(`${label} must be a real directory: ${directory}.`);
 }
 
+function sameDirectoryIdentity(left,right){
+    return left.device===right.device&&left.inode===right.inode;
+}
+
+function sameDirectoryPath(left,right){
+    const normalize=value=>{
+        const resolved=path.resolve(value);
+        return process.platform==='win32'?resolved.toLocaleLowerCase('en-US'):resolved;
+    };
+    return normalize(left)===normalize(right);
+}
+
+async function captureRealDirectoryIdentity(directory,label){
+    const requested=path.resolve(directory);
+    let requestedInfo;
+    try{requestedInfo=await lstat(requested,{bigint:true});}
+    catch(error){
+        if(error?.code==='ENOENT')fail(`${label} does not exist: ${requested}.`);
+        throw error;
+    }
+    if(requestedInfo.isSymbolicLink()||!requestedInfo.isDirectory()){
+        fail(`${label} must be a real directory: ${requested}.`);
+    }
+    const canonical=await realpath(requested);
+    const canonicalInfo=await lstat(canonical,{bigint:true});
+    const requestedIdentity=Object.freeze({
+        device:requestedInfo.dev,
+        inode:requestedInfo.ino
+    });
+    const canonicalIdentity=Object.freeze({
+        device:canonicalInfo.dev,
+        inode:canonicalInfo.ino
+    });
+    if(canonicalInfo.isSymbolicLink()||!canonicalInfo.isDirectory()
+        ||!sameDirectoryIdentity(requestedIdentity,canonicalIdentity)){
+        fail(`${label} must resolve to one physical directory: ${requested}.`);
+    }
+    return Object.freeze({
+        requested,
+        requestedIdentity,
+        canonical,
+        identity:canonicalIdentity
+    });
+}
+
+async function assertRealDirectoryIdentity(captured,label){
+    let canonical;
+    let requestedInfo;
+    let canonicalInfo;
+    try{
+        [canonical,requestedInfo,canonicalInfo]=await Promise.all([
+            realpath(captured.requested),
+            lstat(captured.requested,{bigint:true}),
+            lstat(captured.canonical,{bigint:true})
+        ]);
+    }catch(error){
+        if(error?.code==='ENOENT'){
+            fail(`${label} changed while focused validation was active.`,
+                'ARCANE_INTEGRITY_FAILED');
+        }
+        throw error;
+    }
+    const requestedIdentity={device:requestedInfo.dev,inode:requestedInfo.ino};
+    const canonicalIdentity={device:canonicalInfo.dev,inode:canonicalInfo.ino};
+    if(!sameDirectoryPath(canonical,captured.canonical)
+        ||requestedInfo.isSymbolicLink()||!requestedInfo.isDirectory()
+        ||canonicalInfo.isSymbolicLink()||!canonicalInfo.isDirectory()
+        ||!sameDirectoryIdentity(requestedIdentity,captured.requestedIdentity)
+        ||!sameDirectoryIdentity(requestedIdentity,captured.identity)
+        ||!sameDirectoryIdentity(canonicalIdentity,captured.identity)){
+        fail(`${label} changed while focused validation was active.`,'ARCANE_INTEGRITY_FAILED');
+    }
+}
+
 function classifyRootConfig(config){
     const validated=validatePackagerRootConfig(config,ROOT_CONFIG_NAME);
     const routes=validated.sharedPayloads['browser-runtime'];
@@ -392,15 +466,26 @@ export async function validateDiscoveredApplication({
     onEvent
 }={}){
     throwIfAborted(signal);
-    if(!app||typeof app.appId!=='string'||typeof app.appRoot!=='string'
+    if(!app||typeof app.appId!=='string'||!APP_ID_PATTERN.test(app.appId)
+        ||typeof app.appRoot!=='string'
         ||!app.manifest||!app.descriptor){
         fail('A discovered Arcane application is required for focused validation.');
     }
-    const canonicalWorkspaceRoot=path.resolve(workspaceRoot);
+    const capturedWorkspace=await captureRealDirectoryIdentity(workspaceRoot,'Workspace');
+    const canonicalWorkspaceRoot=capturedWorkspace.canonical;
+    const capturedAppsRoot=await captureRealDirectoryIdentity(
+        path.join(canonicalWorkspaceRoot,'apps'),
+        'Workspace apps root'
+    );
     const expectedAppRoot=path.join(canonicalWorkspaceRoot,'apps',app.appId);
-    if(path.resolve(app.appRoot)!==expectedAppRoot){
+    const [capturedExpectedApp,capturedDiscoveredApp]=await Promise.all([
+        captureRealDirectoryIdentity(expectedAppRoot,`apps/${app.appId}`),
+        captureRealDirectoryIdentity(app.appRoot,`Discovered app ${app.appId}`)
+    ]);
+    if(!sameDirectoryIdentity(capturedExpectedApp.identity,capturedDiscoveredApp.identity)){
         fail(`Discovered app ${app.appId} does not belong to the selected workspace.`);
     }
+    const canonicalAppRoot=capturedExpectedApp.canonical;
     let config=workspaceConfig;
     if(!config){
         const profile=await inspectWorkspaceProfile(canonicalWorkspaceRoot);
@@ -412,7 +497,7 @@ export async function validateDiscoveredApplication({
     if(!isObject(config?.sharedPayloads)){
         fail('The selected Arcane workspace configuration is unavailable for focused validation.');
     }
-    const configPath=path.join(app.appRoot,APP_CONFIG_NAME);
+    const configPath=path.join(canonicalAppRoot,APP_CONFIG_NAME);
     const rawManifest=await readJson(
         configPath,
         `apps/${app.appId}/${APP_CONFIG_NAME}`
@@ -423,7 +508,7 @@ export async function validateDiscoveredApplication({
     }
     const loadedDescriptor=await loadAppDescriptor({
         workspaceRoot:canonicalWorkspaceRoot,
-        appRoot:app.appRoot,
+        appRoot:canonicalAppRoot,
         appId:app.appId,
         packageManifest:rawManifest
     });
@@ -436,13 +521,13 @@ export async function validateDiscoveredApplication({
     }
     const freshApp=Object.freeze({
         appId:app.appId,
-        appRoot:app.appRoot,
+        appRoot:canonicalAppRoot,
         manifest,
         descriptor,
         descriptorSource:loadedDescriptor.source,
         descriptorPath:loadedDescriptor.descriptorPath
     });
-    const entryPath=path.join(app.appRoot,manifest.entry);
+    const entryPath=path.join(canonicalAppRoot,manifest.entry);
     const info=await lstat(entryPath);
     if(info.isSymbolicLink()||!info.isFile()){
         fail(`apps/${app.appId}/${manifest.entry} must be a real file.`);
@@ -452,12 +537,19 @@ export async function validateDiscoveredApplication({
         strictStyles:workspaceMode==='external',
         allowMissingManagedImportMap
     });
+    const assertCapturedDirectories=()=>Promise.all([
+        assertRealDirectoryIdentity(capturedWorkspace,'Workspace'),
+        assertRealDirectoryIdentity(capturedAppsRoot,'Workspace apps root'),
+        assertRealDirectoryIdentity(capturedExpectedApp,`apps/${app.appId}`),
+        assertRealDirectoryIdentity(capturedDiscoveredApp,`Discovered app ${app.appId}`)
+    ]);
+    await assertCapturedDirectories();
     const receipt=Object.freeze({
         valid:true,
         workspaceRoot:canonicalWorkspaceRoot,
         workspaceMode,
         appId:app.appId,
-        appRoot:app.appRoot,
+        appRoot:canonicalAppRoot,
         app:freshApp
     });
     await emit(onEvent,{
@@ -465,6 +557,7 @@ export async function validateDiscoveredApplication({
         workspaceRoot:canonicalWorkspaceRoot,
         appId:app.appId
     });
+    await assertCapturedDirectories();
     return receipt;
 }
 

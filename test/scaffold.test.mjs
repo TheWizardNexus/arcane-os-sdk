@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {cp,lstat,mkdir,readFile,writeFile} from 'node:fs/promises';
+import {cp,lstat,mkdir,readFile,rename,symlink,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {createWorkspace,initWorkspace} from '../src/scaffold.mjs';
@@ -130,7 +130,9 @@ test('workspace scaffold creates a private external app using the exact SDK vers
 
 test('workspace validation ignores required-element decoys inside classic-script raw text',async t=>{
     const parent=await temporaryDirectory(t);
-    const workspaceRoot=path.join(parent,'html-decoy-workspace');
+    const physicalParent=path.join(parent,'physical');
+    const workspaceRoot=path.join(physicalParent,'html-decoy-workspace');
+    await mkdir(physicalParent);
     await createWorkspace({
         targetPath:workspaceRoot,
         appId:'html-decoy',
@@ -139,9 +141,12 @@ test('workspace validation ignores required-element decoys inside classic-script
     const entryPath=path.join(workspaceRoot,'apps','html-decoy','index.html');
     const valid=await readFile(entryPath,'utf8');
     const selected=await resolveWorkspace({workspaceRoot,appId:'html-decoy'});
+    const aliasParent=path.join(parent,'alias');
+    await symlink(physicalParent,aliasParent,process.platform==='win32'?'junction':'dir');
+    const aliasRoot=path.join(aliasParent,'html-decoy-workspace');
     const validate=()=>validateDiscoveredApplication({
-        workspaceRoot,
-        workspaceMode:'external',
+        workspaceRoot:aliasRoot,
+        workspaceMode:selected.config.workspaceMode,
         workspaceConfig:selected.config,
         app:selected.app
     });
@@ -182,6 +187,58 @@ test('workspace validation ignores required-element decoys inside classic-script
     }
     await writeFile(entryPath,valid,'utf8');
     assert.equal((await validate()).valid,true);
+
+    const foreignRoot=path.join(parent,'foreign-workspace');
+    await mkdir(path.join(foreignRoot,'apps','html-decoy'),{recursive:true});
+    await assert.rejects(
+        validateDiscoveredApplication({
+            workspaceRoot:foreignRoot,
+            workspaceMode:'external',
+            workspaceConfig:selected.config,
+            app:selected.app
+        }),
+        /does not belong to the selected workspace/u
+    );
+
+    const linkedAppRoot=path.join(parent,'linked-app-root');
+    await symlink(
+        selected.app.appRoot,
+        linkedAppRoot,
+        process.platform==='win32'?'junction':'dir'
+    );
+    await assert.rejects(
+        validateDiscoveredApplication({
+            workspaceRoot:selected.workspaceRoot,
+            workspaceMode:'external',
+            workspaceConfig:selected.config,
+            app:{...selected.app,appRoot:linkedAppRoot}
+        }),
+        /must be a real directory/u
+    );
+
+    const appsRoot=path.join(workspaceRoot,'apps');
+    const retiredAppsRoot=path.join(workspaceRoot,'retired-apps');
+    let retargeted=false;
+    await assert.rejects(
+        validateDiscoveredApplication({
+            workspaceRoot:aliasRoot,
+            workspaceMode:selected.config.workspaceMode,
+            workspaceConfig:selected.config,
+            app:selected.app,
+            onEvent:async event=>{
+                if(retargeted||event.type!=='workspace.application.validated')return;
+                await rename(appsRoot,retiredAppsRoot);
+                await symlink(
+                    retiredAppsRoot,
+                    appsRoot,
+                    process.platform==='win32'?'junction':'dir'
+                );
+                retargeted=true;
+            }
+        }),
+        error=>error?.code==='ARCANE_INTEGRITY_FAILED'
+    );
+    assert.equal(retargeted,true);
 });
 
 test('create refuses a nonempty target and init preserves existing authored files',async t=>{
@@ -327,33 +384,37 @@ test('workspace template rejects forged SDK browser receipt identities and diges
     }
 });
 
-test('every native scaffold includes a real raster icon and declares browser plus its selected target',async t=>{
+// Five full authenticated scaffolds are serialized here. Each target retains the
+// default watchdog while the aggregate admits their measured Windows runtime.
+test('every native scaffold includes a real raster icon and declares browser plus its selected target',{timeout:60_000},async t=>{
     const parent=await temporaryDirectory(t);
     for(const target of ['portable','windows-x64','linux-x64','linux-arm64','android-arm64']){
-        const appId=`scaffold-${target}`;
-        const targetPath=path.join(parent,appId);
-        const receipt=await createWorkspace({targetPath,appId,target});
-        const appRoot=path.join(targetPath,'apps',appId);
-        const descriptor=JSON.parse(await readFile(path.join(appRoot,'arcane-app.json'),'utf8'));
-        const packageManifest=JSON.parse(await readFile(path.join(appRoot,'arcane-package.json'),'utf8'));
-        const icon=await readFile(path.join(appRoot,'img','icon.png'));
-        const readme=await readFile(path.join(targetPath,'README.md'),'utf8');
-        const packageDocument=JSON.parse(await readFile(path.join(targetPath,'package.json'),'utf8'));
+        await t.test(target,async()=>{
+            const appId=`scaffold-${target}`;
+            const targetPath=path.join(parent,appId);
+            const receipt=await createWorkspace({targetPath,appId,target});
+            const appRoot=path.join(targetPath,'apps',appId);
+            const descriptor=JSON.parse(await readFile(path.join(appRoot,'arcane-app.json'),'utf8'));
+            const packageManifest=JSON.parse(await readFile(path.join(appRoot,'arcane-package.json'),'utf8'));
+            const icon=await readFile(path.join(appRoot,'img','icon.png'));
+            const readme=await readFile(path.join(targetPath,'README.md'),'utf8');
+            const packageDocument=JSON.parse(await readFile(path.join(targetPath,'package.json'),'utf8'));
 
-        assert.equal(receipt.target,target);
-        assert.deepEqual(descriptor.targets,['browser',target].sort());
-        assert.equal(descriptor.native.icon,'img/icon.png');
-        assert.ok(descriptor.package.include.includes('img/icon.png'));
-        assert.deepEqual(projectPackageManifest(descriptor),packageManifest);
-        assert.deepEqual([...icon.subarray(0,8)],[137,80,78,71,13,10,26,10]);
-        assert.equal(packageDocument.scripts.build,`arcane build --target ${target}`);
-        assert.equal(
-            packageDocument.scripts.run,
-            `arcane run --target ${target==='portable'?'browser':target}`
-        );
-        assert.equal(packageDocument.scripts['build:browser'],'arcane build --target browser');
-        assert.equal(packageDocument.scripts['run:browser'],'arcane run --target browser');
-        assert.match(readme,/npm run build -- --arcane-root/u);
+            assert.equal(receipt.target,target);
+            assert.deepEqual(descriptor.targets,['browser',target].sort());
+            assert.equal(descriptor.native.icon,'img/icon.png');
+            assert.ok(descriptor.package.include.includes('img/icon.png'));
+            assert.deepEqual(projectPackageManifest(descriptor),packageManifest);
+            assert.deepEqual([...icon.subarray(0,8)],[137,80,78,71,13,10,26,10]);
+            assert.equal(packageDocument.scripts.build,`arcane build --target ${target}`);
+            assert.equal(
+                packageDocument.scripts.run,
+                `arcane run --target ${target==='portable'?'browser':target}`
+            );
+            assert.equal(packageDocument.scripts['build:browser'],'arcane build --target browser');
+            assert.equal(packageDocument.scripts['run:browser'],'arcane run --target browser');
+            assert.match(readme,/npm run build -- --arcane-root/u);
+        });
     }
 });
 
