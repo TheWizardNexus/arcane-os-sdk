@@ -16,7 +16,9 @@ import {
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
+import {performance} from 'node:perf_hooks';
 import {fileURLToPath} from 'node:url';
+import {inspect} from 'node:util';
 import test from 'arcane-os/testing';
 import {
     developApplication,
@@ -26,9 +28,19 @@ import {
 } from 'arcane-os/toolchain';
 
 const APP_ID='external-app';
-const CHROME_TIMEOUT_MS=60_000;
+const CHROME_CAPTURE_TIMEOUT_MS=50_000;
+const CHROME_EXECUTION_TIMEOUT_MS=60_000;
+const BROWSER_REPORT_TIMEOUT_MS=60_000;
 const CHROME_VIRTUAL_TIME_BUDGET_MS=45_000;
 const CHROME_OUTPUT_LIMIT=16*1024*1024;
+const CHROME_IDENTITY_OUTPUT_LIMIT=16*1024;
+const CHROME_IDENTITY_LIMIT=128;
+const CHROME_STDOUT_TAIL_LIMIT=2*1024;
+const CHROME_STDERR_TAIL_LIMIT=4*1024;
+const REPORT_ERROR_SUMMARY_LIMIT=512;
+const PROBE_FAILURE_SUMMARY_LIMIT=8*1024;
+const ERROR_NAME_LIMIT=64;
+const ERROR_CODE_LIMIT=128;
 const REPORT_LIMIT=128*1024;
 const SERVER_CLEANUP_TIMEOUT_MS=3_500;
 const TASKKILL_TIMEOUT_MS=3_000;
@@ -472,7 +484,7 @@ async function createSentinel(){
     return {
         token,
         url:`http://127.0.0.1:${address.port}${requestPath}`,
-        next(){
+        next(label='browser probe'){
             if(reports.length>0)return Promise.resolve(reports.shift());
             return new Promise((resolve,reject)=>{
                 const waiter={resolve,reject};
@@ -480,8 +492,10 @@ async function createSentinel(){
                 const timer=setTimeout(()=>{
                     const index=waiters.indexOf(waiter);
                     if(index>=0)waiters.splice(index,1);
-                    reject(new Error(`Real Chrome did not report within ${CHROME_TIMEOUT_MS}ms.`));
-                },CHROME_TIMEOUT_MS);
+                    reject(new Error(
+                        `${label} did not deliver its browser report within ${BROWSER_REPORT_TIMEOUT_MS}ms.`
+                    ));
+                },BROWSER_REPORT_TIMEOUT_MS);
                 waiter.resolve=value=>{
                     clearTimeout(timer);
                     resolve(value);
@@ -618,10 +632,13 @@ async function terminateProcessTree(child,{
     taskkillDrainTimeout=TASKKILL_DRAIN_TIMEOUT_MS,
     chromeDrainTimeout=CHROME_DRAIN_TIMEOUT_MS
 }={}){
-    if(!child?.pid)return;
+    if(!child)return;
     trackProcessClose(child);
     let terminationError=null;
-    if(platform==='win32'){
+    if(!child.pid){
+        // A ChildProcess can emit `error` before a PID is assigned. It still owns
+        // a close lifecycle, so drain it instead of rejecting while it is live.
+    }else if(platform==='win32'){
         try{
             await runWindowsTaskkill(child.pid,{
                 spawnProcess,
@@ -655,7 +672,7 @@ async function terminateProcessTree(child,{
     try{
         await waitForProcessClose(child,{
             timeout:chromeDrainTimeout,
-            label:`Google Chrome process tree ${child.pid}`
+            label:`Google Chrome process tree ${child.pid??'without a PID'}`
         });
     }catch(error){drainError=error;}
     if(terminationError&&drainError){
@@ -668,61 +685,217 @@ async function terminateProcessTree(child,{
     if(drainError)throw drainError;
 }
 
+function redactDiagnosticText(value,redactions=[]){
+    let text=String(value??'');
+    const secrets=[...new Set(redactions.map(value=>String(value??'')).filter(Boolean))]
+        .sort((left,right)=>right.length-left.length);
+    for(const secret of secrets)text=text.split(secret).join('[redacted]');
+    return text;
+}
+
+function boundedUtf8Tail(value,limit){
+    const bytes=Buffer.from(String(value??''));
+    if(bytes.length<=limit)return bytes.toString();
+    let start=bytes.length-limit;
+    while(start<bytes.length&&(bytes[start]&0xc0)===0x80)start+=1;
+    return bytes.subarray(start).toString();
+}
+
+function boundedOutputRecord(chunks,{limit,redactions=[],observedBytes,suppressTail=false}){
+    const raw=Buffer.concat(chunks);
+    const bytes=observedBytes??raw.length;
+    const redacted=suppressTail?'':redactDiagnosticText(raw.toString(),redactions);
+    const tail=suppressTail
+        ?'[suppressed after output limit]'
+        :boundedUtf8Tail(redacted,limit);
+    return Object.freeze({
+        bytes,
+        retainedBytes:raw.length,
+        droppedBytes:Math.max(0,bytes-raw.length),
+        tailBytes:Buffer.byteLength(tail),
+        truncated:suppressTail||bytes>raw.length||Buffer.byteLength(redacted)>limit,
+        tail
+    });
+}
+
+function boundedProcessDiagnostics({
+    stdout,stderr,stdoutBytes,stderrBytes,suppressedStream,redactions=[]
+}){
+    const record=(stream,chunks,bytes,limit)=>boundedOutputRecord(chunks,{
+        limit,
+        redactions,
+        observedBytes:bytes,
+        suppressTail:suppressedStream===stream
+    });
+    return Object.freeze({
+        stdout:record('stdout',stdout,stdoutBytes,CHROME_STDOUT_TAIL_LIMIT),
+        stderr:record('stderr',stderr,stderrBytes,CHROME_STDERR_TAIL_LIMIT)
+    });
+}
+
+function formatOutputRecord(label,record){
+    const scope=record.truncated?'bounded tail':'complete output';
+    return `${label}: ${record.bytes} bytes observed, ${record.retainedBytes} retained, `+
+        `${record.droppedBytes} dropped; ${scope} ${record.tailBytes} bytes\n`+
+        (record.tail||'[empty]');
+}
+
+function boundedFailureSummary(error,{redactions=[],limit=PROBE_FAILURE_SUMMARY_LIMIT}={}){
+    return boundedUtf8Head(redactDiagnosticText(error?.message??error,redactions),limit);
+}
+
+function sanitizedErrorProjection(error,{redactions=[],limit=PROBE_FAILURE_SUMMARY_LIMIT}={}){
+    const clean=(value,size)=>boundedUtf8Head(
+        redactDiagnosticText(value,redactions).replace(/[\u0000-\u001f\u007f]/gu,'?'),
+        size
+    );
+    const projection=new Error(
+        boundedFailureSummary(error,{redactions,limit})||'[no error message]'
+    );
+    projection.name=clean(error?.name??'Error',ERROR_NAME_LIMIT)||'Error';
+    if(error?.stack)projection.stack=boundedUtf8Head(
+        redactDiagnosticText(error.stack,redactions),
+        limit
+    );
+    if(typeof error?.code==='string'||typeof error?.code==='number'){
+        projection.code=clean(error.code,ERROR_CODE_LIMIT);
+    }
+    return projection;
+}
+
+function assertSafeDiagnostic(error,secrets,label='diagnostic error'){
+    const rendered=[
+        error?.message,
+        error?.stack,
+        JSON.stringify(error),
+        inspect(error,{depth:8,showHidden:true})
+    ].join('\n');
+    for(const secret of secrets.filter(Boolean)){
+        assert.equal(rendered.includes(secret),false,`${label} retained a secret.`);
+    }
+}
+
+function boundedProcessError(message,{
+    label,startedAt,stdout,stderr,stdoutBytes,stderrBytes,suppressedStream,
+    redactions=[],elapsedMs:measuredElapsedMs,cause,
+    clock=performance.now.bind(performance)
+}){
+    const elapsedMs=measuredElapsedMs??Math.max(0,Math.round(clock()-startedAt));
+    const diagnostics=boundedProcessDiagnostics({
+        stdout,stderr,stdoutBytes,stderrBytes,suppressedStream,redactions
+    });
+    const error=new Error(
+        `${label} ${message} after ${elapsedMs}ms.\n`+
+        `${formatOutputRecord('stdout',diagnostics.stdout)}\n`+
+        formatOutputRecord('stderr',diagnostics.stderr)
+    );
+    if(cause)error.cause=sanitizedErrorProjection(cause,{redactions});
+    Object.assign(error,{elapsedMs,diagnostics});
+    return error;
+}
+
 function runBounded(command,args,{
-    timeout=CHROME_TIMEOUT_MS,
+    timeout=CHROME_EXECUTION_TIMEOUT_MS,
     maxOutput=CHROME_OUTPUT_LIMIT,
-    env=process.env
+    env=process.env,
+    label='Google Chrome',
+    redactions=[],
+    spawnProcess=spawn,
+    terminateProcess=terminateProcessTree,
+    clock=performance.now.bind(performance)
 }={}){
     return new Promise((resolve,reject)=>{
         let settled=false;
         let outputBytes=0;
+        let stdoutBytes=0;
+        let stderrBytes=0;
         const stdout=[];
         const stderr=[];
-        const child=trackProcessClose(spawn(command,args,{
-            stdio:['ignore','pipe','pipe'],
-            windowsHide:true,
-            detached:process.platform!=='win32',
-            env
-        }));
-        const timer=setTimeout(()=>{
+        const startedAt=clock();
+        let child;
+        const processError=(message,options={})=>boundedProcessError(message,{
+            label,
+            startedAt,
+            stdout,
+            stderr,
+            stdoutBytes,
+            stderrBytes,
+            redactions,
+            clock,
+            ...options
+        });
+        try{
+            child=trackProcessClose(spawnProcess(command,args,{
+                stdio:['ignore','pipe','pipe'],
+                windowsHide:true,
+                detached:process.platform!=='win32',
+                env
+            }));
+        }catch(error){
+            reject(processError(
+                `could not start: ${boundedFailureSummary(error,{redactions})}`,
+                {cause:error}
+            ));
+            return;
+        }
+        const rejectAfterDrain=(primary,context)=>{
+            void terminateProcess(child).then(
+                ()=>reject(primary),
+                drainError=>{
+                    const error=new AggregateError(
+                        [
+                            sanitizedErrorProjection(primary,{redactions}),
+                            sanitizedErrorProjection(drainError,{redactions})
+                        ],
+                        `${label} ${context}.\nExecution failure: ${primary.message}\n`+
+                        `Drain failure: ${boundedFailureSummary(drainError,{redactions})}`
+                    );
+                    error.elapsedMs=primary.elapsedMs;
+                    error.diagnostics=primary.diagnostics;
+                    reject(error);
+                }
+            );
+        };
+        const abort=(primary,context)=>{
             if(settled)return;
             settled=true;
-            const timeoutError=new Error(`Google Chrome exceeded the ${timeout}ms execution limit.`);
-            void terminateProcessTree(child).then(
-                ()=>reject(timeoutError),
-                drainError=>reject(new AggregateError(
-                    [timeoutError,drainError],
-                    'Google Chrome timed out and its process tree did not drain.'
-                ))
+            clearTimeout(timer);
+            rejectAfterDrain(primary,context);
+        };
+        const timer=setTimeout(()=>{
+            const timeoutError=processError(
+                `exceeded the ${timeout}ms execution limit`,
+                {}
             );
+            abort(timeoutError,'timed out and its process tree did not drain');
         },timeout);
-        const collect=(target,chunk)=>{
+        const collect=(stream,target,chunk)=>{
             if(settled)return;
-            outputBytes+=chunk.length;
+            const bytes=Buffer.byteLength(chunk);
+            outputBytes+=bytes;
+            if(stream==='stdout')stdoutBytes+=bytes;
+            else stderrBytes+=bytes;
             if(outputBytes>maxOutput){
-                settled=true;
-                clearTimeout(timer);
-                const outputError=new Error(
-                    `Google Chrome exceeded the ${maxOutput}-byte output limit.`
+                const outputError=processError(
+                    `exceeded the ${maxOutput}-byte output limit`,
+                    {suppressedStream:stream}
                 );
-                void terminateProcessTree(child).then(
-                    ()=>reject(outputError),
-                    drainError=>reject(new AggregateError(
-                        [outputError,drainError],
-                        'Google Chrome exceeded its output limit and its process tree did not drain.'
-                    ))
+                abort(
+                    outputError,
+                    'exceeded its output limit and its process tree did not drain'
                 );
                 return;
             }
             target.push(chunk);
         };
-        child.stdout.on('data',chunk=>collect(stdout,chunk));
-        child.stderr.on('data',chunk=>collect(stderr,chunk));
+        child.stdout.on('data',chunk=>collect('stdout',stdout,chunk));
+        child.stderr.on('data',chunk=>collect('stderr',stderr,chunk));
         child.once('error',error=>{
-            if(settled)return;
-            settled=true;
-            clearTimeout(timer);
-            reject(error);
+            const executionError=processError(
+                `failed to execute: ${boundedFailureSummary(error,{redactions})}`,
+                {cause:error}
+            );
+            abort(executionError,'failed and its process tree did not drain');
         });
         child.once('close',(code,signal)=>{
             if(settled)return;
@@ -731,6 +904,7 @@ function runBounded(command,args,{
             resolve({
                 code,
                 signal,
+                elapsedMs:Math.max(0,Math.round(clock()-startedAt)),
                 stdout:Buffer.concat(stdout).toString('utf8'),
                 stderr:Buffer.concat(stderr).toString('utf8')
             });
@@ -759,6 +933,67 @@ async function selectRegularChromeCandidate({configured,candidates,inspect=lstat
         return candidate;
     }
     return null;
+}
+
+function chromeIdentityProbeError(message,result,{redactions=[]}={}){
+    return boundedProcessError(message,{
+        label:'Google Chrome identity probe',
+        elapsedMs:result?.elapsedMs??0,
+        stdout:[Buffer.from(String(result?.stdout??''))],
+        stderr:[Buffer.from(String(result?.stderr??''))],
+        redactions
+    });
+}
+
+function validateChromeIdentityProbeResult(result,{redactions=[]}={}){
+    if(result?.code!==0||result?.signal!==null){
+        throw chromeIdentityProbeError(
+            `exited with code ${String(result?.code)} and signal ${String(result?.signal)}`,
+            result,
+            {redactions}
+        );
+    }
+    return result;
+}
+
+function parseChromeIdentityMetadata(result,{redactions=[]}={}){
+    validateChromeIdentityProbeResult(result,{redactions});
+    let metadata;
+    try{metadata=JSON.parse(result.stdout);}
+    catch{
+        throw chromeIdentityProbeError('returned invalid JSON metadata',result,{redactions});
+    }
+    if(!metadata||typeof metadata!=='object'||Array.isArray(metadata)){
+        throw chromeIdentityProbeError('returned non-object JSON metadata',result,{redactions});
+    }
+    for(const field of ['ProductName','FileDescription']){
+        if(!/^Google Chrome(?: for Testing)?$/u.test(String(metadata[field]??''))){
+            throw chromeIdentityProbeError(
+                `returned an invalid ${field} field`,
+                result,
+                {redactions}
+            );
+        }
+    }
+    return metadata;
+}
+
+function canonicalChromeIdentity(value){
+    const text=String(value??'');
+    if(/\b(?:Edge|Chromium)\b/iu.test(text)){
+        throw new Error('Google Chrome returned a conflicting browser identity.');
+    }
+    const matches=[...text.matchAll(
+        /\bGoogle Chrome(?: for Testing)?\s+\d+(?:\.\d+){2,}\b/gu
+    )];
+    if(matches.length!==1){
+        throw new Error('Google Chrome returned an ambiguous or invalid identity.');
+    }
+    const identity=matches[0][0];
+    if(Buffer.byteLength(identity)>CHROME_IDENTITY_LIMIT){
+        throw new Error(`Google Chrome identity exceeds ${CHROME_IDENTITY_LIMIT} bytes.`);
+    }
+    return identity;
 }
 
 async function findGoogleChrome(){
@@ -799,25 +1034,22 @@ async function findGoogleChrome(){
             ],
             {
                 timeout:5_000,
-                maxOutput:1024*1024,
+                maxOutput:CHROME_IDENTITY_OUTPUT_LIMIT,
+                label:'Google Chrome identity probe',
                 env:{...process.env,ARCANE_CHROME_IDENTITY_PATH:chromePath}
             }
         );
-        assert.equal(inspected.code,0,inspected.stderr||inspected.stdout);
-        const metadata=JSON.parse(inspected.stdout.trim());
-        assert.match(metadata.ProductName,/^Google Chrome(?: for Testing)?$/u);
-        assert.match(metadata.FileDescription,/^Google Chrome(?: for Testing)?$/u);
-        identity=`${metadata.ProductName} ${metadata.ProductVersion}`;
+        const metadata=parseChromeIdentityMetadata(inspected);
+        identity=canonicalChromeIdentity(`${metadata.ProductName} ${metadata.ProductVersion}`);
     }else{
         const version=await runBounded(chromePath,['--version'],{
             timeout:5_000,
-            maxOutput:1024*1024
+            maxOutput:CHROME_IDENTITY_OUTPUT_LIMIT,
+            label:'Google Chrome identity probe'
         });
-        assert.equal(version.code,0,version.stderr||version.stdout);
-        identity=`${version.stdout}\n${version.stderr}`.trim();
+        validateChromeIdentityProbeResult(version);
+        identity=canonicalChromeIdentity(`${version.stdout}\n${version.stderr}`);
     }
-    assert.match(identity,/\bGoogle Chrome(?: for Testing)?\s+\d+(?:\.\d+){2,}\b/u);
-    assert.doesNotMatch(identity,/Edge|Chromium/u);
     return {
         chromePath,
         identity,
@@ -844,7 +1076,7 @@ function withDeadline(work,{timeout,label}){
     });
 }
 
-async function completeWithCleanup(operation,cleanup,message){
+async function completeWithCleanup(operation,cleanup,message,{redactions=[]}={}){
     let value;
     let operationError=null;
     try{value=await operation();}
@@ -853,73 +1085,218 @@ async function completeWithCleanup(operation,cleanup,message){
     try{await cleanup();}
     catch(error){cleanupError=error;}
     if(operationError&&cleanupError){
-        throw new AggregateError([operationError,cleanupError],message);
+        throw new AggregateError(
+            [
+                sanitizedErrorProjection(operationError,{redactions}),
+                sanitizedErrorProjection(cleanupError,{redactions})
+            ],
+            `${message}\nOperation failure: `+
+            `${boundedFailureSummary(operationError,{redactions})}\nCleanup failure: `+
+            boundedFailureSummary(cleanupError,{redactions})
+        );
     }
-    if(operationError)throw operationError;
-    if(cleanupError)throw cleanupError;
+    if(operationError)throw sanitizedErrorProjection(operationError,{redactions});
+    if(cleanupError)throw sanitizedErrorProjection(cleanupError,{redactions});
     return value;
 }
 
-async function settleCleanup(cleanups,message){
+async function settleCleanup(cleanups,message,{redactions=[]}={}){
     const results=await Promise.allSettled(
         cleanups.map(cleanup=>Promise.resolve().then(cleanup))
     );
     const failures=results
         .filter(result=>result.status==='rejected')
         .map(result=>result.reason);
-    if(failures.length===1)throw failures[0];
-    if(failures.length>1)throw new AggregateError(failures,message);
+    if(failures.length===1){
+        throw sanitizedErrorProjection(failures[0],{redactions});
+    }
+    if(failures.length>1){
+        const summaries=failures.map(
+            (failure,index)=>`Cleanup ${index+1}: ${boundedFailureSummary(failure,{redactions})}`
+        );
+        throw new AggregateError(
+            failures.map(failure=>sanitizedErrorProjection(failure,{redactions})),
+            `${message}\n${summaries.join('\n')}`
+        );
+    }
 }
 
-async function launchChrome({chromePath,url}){
+function chromeLaunchArguments({
+    profile,
+    url,
+    platform=process.platform,
+    isRoot=typeof process.getuid==='function'&&process.getuid()===0
+}){
+    return [
+        '--headless=new',
+        '--dump-dom',
+        `--timeout=${CHROME_CAPTURE_TIMEOUT_MS}`,
+        '--disable-background-networking',
+        '--disable-component-update',
+        '--disable-default-apps',
+        '--disable-extensions',
+        '--disable-features=MediaRouter,DialMediaRouteProvider,OptimizationHints',
+        '--disable-gpu',
+        '--disable-sync',
+        '--metrics-recording-only',
+        '--no-default-browser-check',
+        '--no-first-run',
+        '--password-store=basic',
+        `--virtual-time-budget=${CHROME_VIRTUAL_TIME_BUDGET_MS}`,
+        `--user-data-dir=${profile}`,
+        ...(platform==='darwin'?['--use-mock-keychain']:[]),
+        ...(isRoot?['--no-sandbox']:[]),
+        url
+    ];
+}
+
+function validateChromeProcessResult(result,{label,redactions=[]}){
+    const rejectResult=message=>{
+        throw boundedProcessError(message,{
+            label,
+            elapsedMs:result.elapsedMs,
+            stdout:[Buffer.from(result.stdout)],
+            stderr:[Buffer.from(result.stderr)],
+            redactions
+        });
+    };
+    if(result.code!==0||result.signal!==null){
+        rejectResult(
+            `exited with code ${String(result.code)} and signal ${String(result.signal)}`
+        );
+    }
+    if(!/<html\b/iu.test(result.stdout)){
+        rejectResult('did not emit an HTML document');
+    }
+    if(!/data-arcane-browser-contract="passed"/u.test(result.stdout)){
+        rejectResult('did not emit the passed DOM contract marker');
+    }
+    return result;
+}
+
+async function launchChrome({chromePath,chromeIdentity,url,stage,redactions=[]}){
     const profile=await mkdtemp(path.join(os.tmpdir(),'arcane-google-chrome-'));
+    const label=`${stage} using ${chromeIdentity}`;
+    const executionRedactions=[...redactions,profile];
     return completeWithCleanup(async()=>{
-        const args=[
-            '--headless=new',
-            '--dump-dom',
-            '--disable-background-networking',
-            '--disable-component-update',
-            '--disable-default-apps',
-            '--disable-extensions',
-            '--disable-features=MediaRouter,OptimizationHints',
-            '--disable-gpu',
-            '--disable-sync',
-            '--metrics-recording-only',
-            '--no-default-browser-check',
-            '--no-first-run',
-            '--password-store=basic',
-            `--virtual-time-budget=${CHROME_VIRTUAL_TIME_BUDGET_MS}`,
-            `--user-data-dir=${profile}`,
-            ...(typeof process.getuid==='function'&&process.getuid()===0?['--no-sandbox']:[]),
-            url
-        ];
-        const result=await runBounded(chromePath,args);
-        assert.equal(result.code,0,`${result.stdout.slice(-2000)}\n${result.stderr.slice(-4000)}`);
-        assert.match(result.stdout,/<html\b/iu);
-        return result;
+        const args=chromeLaunchArguments({profile,url});
+        const result=await runBounded(chromePath,args,{
+            label,
+            redactions:executionRedactions
+        });
+        validateChromeProcessResult(result,{label,redactions:executionRedactions});
+        return Object.freeze({
+            ...result,
+            stage,
+            chromeIdentity,
+            htmlDocument:true,
+            domContractPassed:true
+        });
     },()=>withDeadline(
         ()=>rm(profile,{recursive:true,force:true,maxRetries:5,retryDelay:100}),
         {
             timeout:PROFILE_CLEANUP_TIMEOUT_MS,
-            label:`Google Chrome profile cleanup ${profile}`
+            label:`${stage} profile cleanup`
         }
-    ),'Google Chrome execution and profile cleanup both failed.');
+    ),`${stage} execution and profile cleanup both failed.`,{
+        redactions:executionRedactions
+    });
 }
 
-async function runBrowserProbe({sentinel,chromePath,url}){
-    const results=await Promise.allSettled([
-        sentinel.next(),
-        launchChrome({chromePath,url})
-    ]);
-    const failures=results.filter(result=>result.status==='rejected');
-    if(failures.length===1)throw failures[0].reason;
-    if(failures.length>1){
-        throw new AggregateError(
-            failures.map(result=>result.reason),
-            'The browser report and Google Chrome execution both failed.'
-        );
+function boundedUtf8Head(value,limit){
+    const bytes=Buffer.from(String(value??''),'utf8');
+    if(bytes.length<=limit)return bytes.toString('utf8');
+    let end=limit;
+    while(end>0&&(bytes[end]&0xc0)===0x80)end-=1;
+    return bytes.subarray(0,end).toString('utf8');
+}
+
+function browserReportSummary(report,{redactions=[]}={}){
+    const detail=report?.error&&typeof report.error==='object'
+        ?`${String(report.error.name??'Error')}: ${String(report.error.message??'')}`
+        :'none';
+    return Object.freeze({
+        ok:report?.ok===true,
+        error:boundedUtf8Head(redactDiagnosticText(detail,redactions),REPORT_ERROR_SUMMARY_LIMIT)
+    });
+}
+
+function createProbeError(message,{errors=[],probe,redactions=[]}){
+    const projected=errors.map(({error,limit})=>
+        sanitizedErrorProjection(error,{redactions,limit})
+    );
+    const diagnostic=projected.length>1
+        ?new AggregateError(projected,message)
+        :new Error(message);
+    if(projected.length===1)diagnostic.cause=projected[0];
+    diagnostic.probe=Object.freeze({
+        ...probe,
+        report:Object.freeze(probe.report),
+        chrome:Object.freeze(probe.chrome)
+    });
+    return diagnostic;
+}
+
+function settleBrowserProbeResults({
+    stage,chromeIdentity,results,reportElapsedMs,chromeElapsedMs,elapsedMs,redactions=[]
+}){
+    const [reportResult,chromeResult]=results;
+    if(results.every(result=>result.status==='fulfilled')){
+        return results.map(result=>result.value);
     }
-    return results.map(result=>result.value);
+    const snapshot=(result,elapsed,includeSummary=false)=>({
+        status:result.status,
+        elapsedMs:elapsed,
+        ...(includeSummary&&result.status==='fulfilled'
+            ?{summary:browserReportSummary(result.value,{redactions})}:{})
+    });
+    const report=snapshot(reportResult,reportElapsedMs,true);
+    const chrome=snapshot(chromeResult,chromeElapsedMs);
+    const failures=[
+        ...(reportResult.status==='rejected'
+            ?[{label:'report',error:reportResult.reason,limit:REPORT_ERROR_SUMMARY_LIMIT}]:[]),
+        ...(chromeResult.status==='rejected'
+            ?[{label:'Chrome',error:chromeResult.reason,limit:PROBE_FAILURE_SUMMARY_LIMIT}]:[])
+    ];
+    const summaries=failures.map(({label,error,limit})=>
+        `${label}: ${boundedFailureSummary(error,{redactions,limit})}`
+    );
+    if(report.summary)summaries.unshift(
+        `report: ok=${String(report.summary.ok)}, error=${report.summary.error}`
+    );
+    throw createProbeError(
+        `${stage} using ${chromeIdentity} failed after ${elapsedMs}ms; `+
+        `report ${report.status} after ${reportElapsedMs}ms and Chrome ${chrome.status} `+
+        `after ${chromeElapsedMs}ms. ${summaries.join(' ')}`,
+        {
+            errors:failures,
+            redactions,
+            probe:{stage,chromeIdentity,report,chrome,elapsedMs}
+        }
+    );
+}
+
+async function runBrowserProbe({sentinel,chromePath,chromeIdentity,chromeMajor,url,stage}){
+    const startedAt=performance.now();
+    let reportElapsedMs=null;
+    let chromeElapsedMs=null;
+    const elapsed=()=>Math.max(0,Math.round(performance.now()-startedAt));
+    const redactions=[sentinel.token,sentinel.url];
+    const results=await Promise.allSettled([
+        sentinel.next(stage).finally(()=>{reportElapsedMs=elapsed();}),
+        launchChrome({
+            chromePath,chromeIdentity,url,stage,redactions
+        }).finally(()=>{chromeElapsedMs=elapsed();})
+    ]);
+    const settled=settleBrowserProbeResults({
+        stage,chromeIdentity,results,reportElapsedMs,chromeElapsedMs,
+        elapsedMs:elapsed(),redactions
+    });
+    assertBrowserReportSafely(settled[0],{
+        chromeMajor,stage,chromeIdentity,reportElapsedMs,chromeElapsedMs,
+        elapsedMs:elapsed(),redactions
+    });
+    return settled;
 }
 
 function assertBrowserReport(report,{chromeMajor}){
@@ -959,6 +1336,33 @@ function assertBrowserReport(report,{chromeMajor}){
     }
 }
 
+function assertBrowserReportSafely(report,{
+    chromeMajor,stage,chromeIdentity,reportElapsedMs,chromeElapsedMs,elapsedMs,redactions=[]
+}){
+    try{
+        assertBrowserReport(report,{chromeMajor});
+        return report;
+    }catch(error){
+        const summary=browserReportSummary(report,{redactions});
+        throw createProbeError(
+            `${stage} delivered an invalid browser report after ${reportElapsedMs}ms `+
+            `using ${chromeIdentity} (ok=${String(summary.ok)}, error=${summary.error}). `+
+            boundedFailureSummary(error,{redactions}),
+            {
+                errors:[{error,limit:PROBE_FAILURE_SUMMARY_LIMIT}],
+                redactions,
+                probe:{
+                    stage,
+                    chromeIdentity,
+                    report:{status:'fulfilled',elapsedMs:reportElapsedMs,summary},
+                    chrome:{status:'fulfilled',elapsedMs:chromeElapsedMs},
+                    elapsedMs
+                }
+            }
+        );
+    }
+}
+
 class FakeProcess extends EventEmitter{
     constructor({pid,onKill}={}){
         super();
@@ -968,6 +1372,8 @@ class FakeProcess extends EventEmitter{
         this.closed=false;
         this.kills=[];
         this.onKill=onKill;
+        this.stdout=new EventEmitter();
+        this.stderr=new EventEmitter();
     }
 
     kill(signal){
@@ -985,157 +1391,274 @@ class FakeProcess extends EventEmitter{
 }
 
 async function assertChromeLifecycleContracts(){
+    assert.ok(CHROME_VIRTUAL_TIME_BUDGET_MS<CHROME_CAPTURE_TIMEOUT_MS);
+    assert.ok(CHROME_CAPTURE_TIMEOUT_MS<CHROME_EXECUTION_TIMEOUT_MS);
+    assert.ok(CHROME_CAPTURE_TIMEOUT_MS<BROWSER_REPORT_TIMEOUT_MS);
+    for(const [platform,isRoot,required,excluded] of [
+        ['darwin',false,'--use-mock-keychain','--no-sandbox'],
+        ['linux',true,'--no-sandbox','--use-mock-keychain']
+    ]){
+        const args=chromeLaunchArguments({
+            profile:'/tmp/arcane-profile',url:'http://127.0.0.1:4173/',platform,isRoot
+        });
+        assert.equal(args.filter(value=>value===`--timeout=${CHROME_CAPTURE_TIMEOUT_MS}`).length,1);
+        assert.ok(args.includes(`--virtual-time-budget=${CHROME_VIRTUAL_TIME_BUDGET_MS}`));
+        assert.ok(args.includes('--disable-features=MediaRouter,DialMediaRouteProvider,OptimizationHints'));
+        assert.ok(args.includes(required));
+        assert.equal(args.includes(excluded),false);
+        assert.equal(args.at(-1),'http://127.0.0.1:4173/');
+    }
+    const chromeIdentity='Google Chrome 150.0.0.0';
+    const secret='arcane-diagnostic-secret';
+    const endpoint=`http://127.0.0.1/arcane-browser-contract/${secret}`;
+    const profile='/tmp/arcane-secret-profile';
+    const redactions=[secret,endpoint,profile];
+    const safe=error=>(assertSafeDiagnostic(error,redactions),true);
+    const safeThrow=(run,pattern,check=()=>{})=>assert.throws(run,error=>{
+        assert.match(error.message,pattern);check(error);
+        return safe(error);
+    });
+    const safeReject=(promise,pattern,check=()=>{})=>assert.rejects(promise,error=>{
+        if(pattern)assert.match(error.message,pattern);check(error);
+        return safe(error);
+    });
+    assert.equal(
+        canonicalChromeIdentity(`${'x'.repeat(CHROME_IDENTITY_OUTPUT_LIMIT*2)} ${chromeIdentity}`),
+        chromeIdentity
+    );
+    const identityResult={code:1,signal:null,elapsedMs:12,
+        stdout:`prefix ${secret}`,stderr:`suffix ${endpoint}`};
+    for(const [run,pattern] of [
+        [()=>canonicalChromeIdentity(`${secret} Chromium ${chromeIdentity} ${endpoint}`),
+            /conflicting browser identity/u],
+        [
+            ()=>canonicalChromeIdentity(
+                `${secret} Google Chrome ${'1234567890.'.repeat(20)}1 ${endpoint}`
+            ),
+            /identity exceeds 128 bytes/u
+        ],
+        [()=>validateChromeIdentityProbeResult(identityResult,{redactions}),
+            /identity probe exited with code 1/u],
+        [
+            ()=>parseChromeIdentityMetadata(
+                {...identityResult,code:0,stdout:`{${secret}`},
+                {redactions}
+            ),
+            /invalid JSON metadata/u
+        ],
+        [
+            ()=>parseChromeIdentityMetadata({
+                ...identityResult,
+                code:0,
+                stdout:JSON.stringify({
+                    ProductName:secret,
+                    ProductVersion:'150.0.0.0',
+                    FileDescription:'Google Chrome'
+                })
+            },{redactions}),
+            /invalid ProductName field/u
+        ]
+    ])safeThrow(run,pattern);
+    const report={ok:true};
+    const chrome={code:0,stdout:'<html data-arcane-browser-contract="passed"></html>'};
+    const reportFailure=new Error(`${endpoint} report failure`);
+    const chromeFailure=new Error(`${profile} Chrome failure`);
+    const settlements=[
+        [{status:'fulfilled',value:report},{status:'fulfilled',value:chrome}],
+        [{status:'rejected',reason:reportFailure},{status:'fulfilled',value:chrome}],
+        [
+            {status:'fulfilled',value:{ok:false,error:{message:endpoint},token:secret}},
+            {status:'rejected',reason:chromeFailure}
+        ],
+        [{status:'rejected',reason:reportFailure},{status:'rejected',reason:chromeFailure}]
+    ];
+    for(const [index,results] of settlements.entries()){
+        const options={
+            stage:index%2?'distribution browser probe':'source browser probe',
+            chromeIdentity,results,reportElapsedMs:120+index,
+            chromeElapsedMs:180+index,elapsedMs:180+index,redactions
+        };
+        if(index===0){
+            assert.deepEqual(settleBrowserProbeResults(options),[report,chrome]);
+        }else safeThrow(()=>settleBrowserProbeResults(options),/browser probe|failed/u,error=>{
+            assert.equal(error.probe.report.status,results[0].status);
+            assert.equal(error.probe.chrome.status,results[1].status);
+            assert.equal(error.probe.elapsedMs,180+index);
+        });
+    }
+    safeThrow(
+        ()=>assertBrowserReportSafely({
+            ok:false,token:secret,extra:profile,error:{name:'SyntheticError',message:endpoint}
+        },{
+            chromeMajor:150,stage:'source browser probe',chromeIdentity,
+            reportElapsedMs:125,chromeElapsedMs:185,elapsedMs:185,redactions
+        }),
+        /invalid browser report/u,
+        error=>assert.deepEqual(Object.keys(error.probe.report.summary),['ok','error'])
+    );
+    const timeoutChild=new FakeProcess({pid:4001});
+    let timeoutTerminated=false;
+    const timeoutRun=runBounded('synthetic-chrome',[],{
+        timeout:10,label:`source browser probe using ${chromeIdentity}`,redactions,
+        spawnProcess:()=>timeoutChild,
+        terminateProcess:async child=>{
+            timeoutTerminated=true;
+            child.close(null,'SIGKILL');
+        }
+    });
+    timeoutChild.stdout.emit('data',Buffer.from(`${'s'.repeat(5000)}${secret}`));
+    await safeReject(timeoutRun,/execution limit/u,error=>{
+        assert.equal(timeoutTerminated&&timeoutChild.closed,true);
+        assert.ok(error.diagnostics.stdout.tailBytes<=CHROME_STDOUT_TAIL_LIMIT);
+        assert.match(error.diagnostics.stdout.tail,/\[redacted\]/u);
+    });
+    const kept=Buffer.from(`safe:${secret.slice(0,10)}`);
+    const overflow=Buffer.from(`${secret.slice(10)}:${'x'.repeat(32)}`);
+    const outputChild=new FakeProcess({pid:4002});
+    let outputTerminated=false;
+    const outputRun=runBounded('synthetic-chrome',[],{
+        timeout:1_000,maxOutput:kept.length,
+        label:`distribution browser probe using ${chromeIdentity}`,redactions,
+        spawnProcess:()=>outputChild,
+        terminateProcess:async child=>{
+            outputTerminated=true;
+            child.close(null,'SIGKILL');
+        }
+    });
+    outputChild.stderr.emit('data',kept);
+    outputChild.stderr.emit('data',overflow);
+    await safeReject(outputRun,/output limit/u,error=>{
+        const output=error.diagnostics.stderr;
+        assert.equal(outputTerminated&&outputChild.closed,true);
+        assert.deepEqual(
+            [output.bytes,output.retainedBytes,output.droppedBytes],
+            [kept.length+overflow.length,kept.length,overflow.length]
+        );
+        assert.equal(output.tail,'[suppressed after output limit]');
+        assert.equal(output.tail.includes(secret.slice(0,10)),false);
+        assert.equal(output.tail.includes(secret.slice(10)),false);
+    });
+    for(const pid of [4003,undefined]){
+        const child=new FakeProcess({pid});
+        let terminated=false;
+        const failed=runBounded('synthetic-chrome',[],{
+            timeout:1_000,label:`source browser probe using ${chromeIdentity}`,redactions,
+            spawnProcess:()=>child,
+            ...(pid?{terminateProcess:async process=>{
+                terminated=true;
+                process.close(-2);
+            }}:{})
+        });
+        child.stderr.emit('data',Buffer.from(`${secret}:stderr`));
+        child.emit('error',new Error(`${endpoint} child error`));
+        if(!pid)queueMicrotask(()=>child.close(-2));
+        await safeReject(failed,/failed to execute/u,error=>{
+            assert.equal(child.closed,true);
+            if(pid)assert.equal(terminated,true);
+            assert.ok(error.cause);
+        });
+    }
+    const drainChild=new FakeProcess({pid:4004});
+    const drainRun=runBounded('synthetic-chrome',[],{
+        timeout:1_000,label:`source browser probe using ${chromeIdentity}`,redactions,
+        spawnProcess:()=>drainChild,
+        terminateProcess:async()=>{throw new Error(`${secret} drain failure`);}
+    });
+    drainChild.emit('error',new Error(`${endpoint} child failure`));
+    await safeReject(drainRun,/did not drain/u,error=>{
+        assert.ok(error instanceof AggregateError);
+        assert.equal(error.errors.length,2);
+    });
+    drainChild.close(-2);
+    await safeReject(runBounded('synthetic-chrome',[],{
+        label:`source browser probe using ${chromeIdentity}`,redactions,
+        spawnProcess:()=>{throw new Error(`${secret} spawn failure`);}
+    }),/could not start/u);
+    for(const [result,pattern] of [
+        [{code:1,signal:null,elapsedMs:25,stdout:secret,stderr:endpoint},/exited with code 1/u],
+        [{code:0,signal:null,elapsedMs:26,stdout:secret,stderr:''},/HTML document/u],
+        [
+            {code:0,signal:null,elapsedMs:27,stdout:`<html>${secret}</html>`,stderr:''},
+            /passed DOM contract marker/u
+        ]
+    ])safeThrow(
+        ()=>validateChromeProcessResult(result,{
+            label:`source browser probe using ${chromeIdentity}`,
+            redactions
+        }),
+        pattern,
+        error=>assert.ok(error.diagnostics.stdout.tailBytes<=CHROME_STDOUT_TAIL_LIMIT)
+    );
     const terminationOptions={
-        platform:'win32',
-        taskkillTimeout:10,
-        taskkillDrainTimeout:50,
-        chromeDrainTimeout:50
+        platform:'win32',taskkillTimeout:10,taskkillDrainTimeout:50,chromeDrainTimeout:50
     };
-
-    const nonzeroChrome=new FakeProcess({
-        pid:4101,
-        onKill:process=>{
-            process.close(null,'SIGKILL');
-            return true;
-        }
-    });
-    let nonzeroKiller;
-    await assert.rejects(
-        terminateProcessTree(nonzeroChrome,{
+    for(const [kind,pattern] of [
+        ['nonzero',/taskkill failed.*exit 1/iu],
+        ['spawn-error',/taskkill could not start/iu],
+        ['timeout',/taskkill exceeded 10ms/iu]
+    ]){
+        const closeOnKill=process=>(process.close(null,'SIGKILL'),true);
+        const child=new FakeProcess({pid:4100+kind.length,onKill:closeOnKill});
+        let killer;
+        await assert.rejects(terminateProcessTree(child,{
             ...terminationOptions,
             spawnProcess:()=>{
-                nonzeroKiller=new FakeProcess({pid:5101});
-                queueMicrotask(()=>nonzeroKiller.close(1));
-                return nonzeroKiller;
-            }
-        }),
-        /taskkill failed.*exit 1/iu
-    );
-    assert.deepEqual(nonzeroChrome.kills,['SIGKILL']);
-
-    const spawnErrorChrome=new FakeProcess({
-        pid:4102,
-        onKill:process=>{
-            process.close(null,'SIGKILL');
-            return true;
-        }
-    });
-    let spawnErrorKiller;
-    await assert.rejects(
-        terminateProcessTree(spawnErrorChrome,{
-            ...terminationOptions,
-            spawnProcess:()=>{
-                spawnErrorKiller=new FakeProcess({pid:5102});
-                queueMicrotask(()=>{
-                    spawnErrorKiller.emit('error',new Error('synthetic taskkill spawn failure'));
-                    spawnErrorKiller.close(-2);
+                killer=new FakeProcess({pid:5100+kind.length,onKill:closeOnKill});
+                if(kind==='nonzero')queueMicrotask(()=>killer.close(1));
+                if(kind==='spawn-error')queueMicrotask(()=>{
+                    killer.emit('error',new Error('synthetic taskkill spawn failure'));
+                    killer.close(-2);
                 });
-                return spawnErrorKiller;
+                return killer;
             }
-        }),
-        /taskkill could not start/iu
-    );
-    assert.deepEqual(spawnErrorChrome.kills,['SIGKILL']);
-
-    const timeoutChrome=new FakeProcess({
-        pid:4103,
-        onKill:process=>{
-            process.close(null,'SIGKILL');
-            return true;
-        }
+        }),pattern);
+        assert.deepEqual(child.kills,['SIGKILL']);
+        if(kind==='timeout')assert.deepEqual(killer.kills,['SIGKILL']);
+    }
+    const unixChild=new FakeProcess({
+        pid:4104,onKill:process=>(process.close(null,'SIGKILL'),true)
     });
-    let timeoutKiller;
-    await assert.rejects(
-        terminateProcessTree(timeoutChrome,{
-            ...terminationOptions,
-            spawnProcess:()=>{
-                timeoutKiller=new FakeProcess({
-                    pid:5103,
-                    onKill:process=>{
-                        process.close(null,'SIGKILL');
-                        return true;
-                    }
-                });
-                return timeoutKiller;
-            }
-        }),
-        /taskkill exceeded 10ms/iu
-    );
-    assert.deepEqual(timeoutKiller.kills,['SIGKILL']);
-    assert.deepEqual(timeoutChrome.kills,['SIGKILL']);
-
-    const groupFailure=new Error('synthetic process-group termination failure');
-    const unixChrome=new FakeProcess({
-        pid:4104,
-        onKill:process=>{
-            process.close(null,'SIGKILL');
-            return true;
-        }
-    });
-    await assert.rejects(
-        terminateProcessTree(unixChrome,{
-            platform:'linux',
-            killGroup:()=>{throw groupFailure;},
-            chromeDrainTimeout:50
-        }),
-        error=>{
-            assert.equal(error,groupFailure);
-            return true;
-        }
-    );
-    assert.deepEqual(unixChrome.kills,['SIGKILL']);
-
+    await assert.rejects(terminateProcessTree(unixChild,{
+        platform:'linux',
+        killGroup:()=>{throw new Error('synthetic process-group termination failure');},
+        chromeDrainTimeout:50
+    }),/synthetic process-group termination failure/u);
+    assert.deepEqual(unixChild.kills,['SIGKILL']);
     const exitedLeader=new FakeProcess({pid:4105});
     exitedLeader.exitCode=0;
-    let exitedLeaderGroupKill=null;
+    let groupKill;
     await terminateProcessTree(exitedLeader,{
-        platform:'linux',
-        killGroup:(pid,signal)=>{
-            exitedLeaderGroupKill={pid,signal};
-            exitedLeader.close(0);
-        },
-        chromeDrainTimeout:50
+        platform:'linux',chromeDrainTimeout:50,
+        killGroup:(pid,signal)=>(groupKill={pid,signal},exitedLeader.close(0))
     });
-    assert.deepEqual(exitedLeaderGroupKill,{pid:-4105,signal:'SIGKILL'});
-    assert.equal(exitedLeader.closed,true);
-
-    const cleanupOne=new Error('synthetic application cleanup failure');
-    const cleanupTwo=new Error('synthetic sentinel cleanup failure');
-    await assert.rejects(
-        settleCleanup([
-            async()=>{throw cleanupOne;},
-            async()=>{throw cleanupTwo;}
-        ],'Synthetic browser cleanup failed.'),
-        error=>{
-            assert.ok(error instanceof AggregateError);
-            assert.deepEqual(error.errors,[cleanupOne,cleanupTwo]);
-            return true;
-        }
-    );
-
-    const chromeFailure=new Error('synthetic Chrome failure');
-    const profileFailure=new Error('synthetic profile cleanup failure');
-    await assert.rejects(
-        completeWithCleanup(
-            async()=>{throw chromeFailure;},
-            async()=>{throw profileFailure;},
-            'Synthetic Chrome and profile cleanup both failed.'
-        ),
-        error=>{
-            assert.ok(error instanceof AggregateError);
-            assert.deepEqual(error.errors,[chromeFailure,profileFailure]);
-            return true;
-        }
-    );
-    await assert.rejects(
-        withDeadline(()=>new Promise(()=>{}),{
-            timeout:10,
-            label:'Synthetic profile cleanup'
-        }),
-        /Synthetic profile cleanup exceeded 10ms/u
-    );
+    assert.deepEqual(groupKill,{pid:-4105,signal:'SIGKILL'});
+    const operationFailure=new Error(`${endpoint} operation failure`);
+    const cleanupFailure=new Error(`${profile} cleanup failure`);
+    const singleFailure=new Error(`${endpoint} single cleanup failure`);
+    singleFailure.code=`ARCANE_${secret}`;
+    singleFailure.cause=new Error(profile);
+    singleFailure.custom={endpoint};
+    for(const operation of [
+        ()=>completeWithCleanup(async()=>{throw operationFailure;},async()=>{},
+            'Synthetic operation failed.',{redactions}),
+        ()=>completeWithCleanup(async()=>true,async()=>{throw cleanupFailure;},
+            'Synthetic cleanup failed.',{redactions}),
+        ()=>completeWithCleanup(async()=>{throw operationFailure;},
+            async()=>{throw cleanupFailure;},'Synthetic operation and cleanup failed.',{redactions}),
+        ()=>settleCleanup([async()=>{throw singleFailure;}],
+            'Synthetic single cleanup failed.',{redactions}),
+        ()=>settleCleanup([async()=>{throw operationFailure;},async()=>{throw cleanupFailure;}],
+            'Synthetic cleanup failed.',{redactions})
+    ])await safeReject(operation,null,error=>{
+        assert.notEqual(error,operationFailure);
+        assert.notEqual(error,cleanupFailure);
+        assert.equal(error.custom,undefined);
+    });
+    await assert.rejects(withDeadline(()=>new Promise(()=>{}),{
+        timeout:10,
+        label:'Synthetic profile cleanup'
+    }),/Synthetic profile cleanup exceeded 10ms/u);
 }
-
 if(process.env.ARCANE_BROWSER_LIFECYCLE_SELF_TEST==='1'){
     await assertChromeLifecycleContracts();
 }else test('installed SDK resolves its authenticated named browser graph identically in dev and dist',{
@@ -1223,7 +1746,9 @@ if(process.env.ARCANE_BROWSER_LIFECYCLE_SELF_TEST==='1'){
         await settleCleanup([
             ...[...instances].map(instance=>()=>closeApplicationServer(instance)),
             ()=>sentinel.close()
-        ],'Browser contract teardown left owned resources open.');
+        ],'Browser contract teardown left owned resources open.',{
+            redactions:[sentinel.token,sentinel.url]
+        });
     });
     await configureProbe(workspaceRoot,sentinel.url,sentinel.token);
     const trapBaseline=await writeHostileDependencies(workspaceRoot);
@@ -1241,11 +1766,16 @@ if(process.env.ARCANE_BROWSER_LIFECYCLE_SELF_TEST==='1'){
         const [report,chromeRun]=await runBrowserProbe({
             sentinel,
             chromePath:chrome.chromePath,
-            url:source.url
+            chromeIdentity:chrome.identity,
+            chromeMajor:chrome.major,
+            url:source.url,
+            stage:'source browser probe'
         });
         sourceReport=report;
-        assertBrowserReport(sourceReport,{chromeMajor:chrome.major});
-        assert.match(chromeRun.stdout,/data-arcane-browser-contract="passed"/u);
+        assert.equal(chromeRun.stage,'source browser probe');
+        assert.equal(chromeRun.chromeIdentity,chrome.identity);
+        assert.equal(chromeRun.htmlDocument,true);
+        assert.equal(chromeRun.domContractPassed,true);
     }finally{
         if(source){
             await closeApplicationServer(source);
@@ -1274,11 +1804,16 @@ if(process.env.ARCANE_BROWSER_LIFECYCLE_SELF_TEST==='1'){
         const [report,chromeRun]=await runBrowserProbe({
             sentinel,
             chromePath:chrome.chromePath,
-            url:distribution.url
+            chromeIdentity:chrome.identity,
+            chromeMajor:chrome.major,
+            url:distribution.url,
+            stage:'distribution browser probe'
         });
         distributionReport=report;
-        assertBrowserReport(distributionReport,{chromeMajor:chrome.major});
-        assert.match(chromeRun.stdout,/data-arcane-browser-contract="passed"/u);
+        assert.equal(chromeRun.stage,'distribution browser probe');
+        assert.equal(chromeRun.chromeIdentity,chrome.identity);
+        assert.equal(chromeRun.htmlDocument,true);
+        assert.equal(chromeRun.domContractPassed,true);
     }finally{
         if(distribution){
             await closeApplicationServer(distribution);
