@@ -4,6 +4,8 @@ This is the smallest complete Arcane OS SDK project that starts as HTML, CSS, an
 
 The copy in this SDK repository is a maintained example. A real Arcane application owns its own repository and installs `arcane-os` as an exact npm development dependency. Its commands use the project-local CLI through npm scripts or `npm exec -- arcane`; a separate global SDK install is not required.
 
+After publication, `npm install --global arcane-os` exposes `arcane` as an optional shell convenience. The exact project-local install and npm lockfile remain the reproducible default. A global install does not replace the application's pinned SDK dependency, install or start services, or provide prebuilt Arcane Core or Arcane Ollama binaries. Native components remain outputs of an explicit CLI build against the required Arcane OS source and toolchain.
+
 ## After the SDK is published to npm
 
 ```powershell

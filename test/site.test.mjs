@@ -142,6 +142,13 @@ test('documentation describes the npm-local source-to-executable contract truthf
     assert.match(external,/npm run pack:local[\s\S]*npm install --save-dev --save-exact [^\n]*[.]tgz/u);
     assert.match(external,/packaged HTML, CSS, and JavaScript/u);
     assert.match(hello,/project-local <code>arcane-os<\/code> npm dependency/u);
+    assert.match(hello,/exact project-local install remains the reproducible default/u);
+    assert.match(hello,/npm install --global arcane-os/u);
+    assert.match(hello,/npm install --global arcane-os<\/code> also exposes <code>arcane/u);
+    assert.match(hello,/does not install or start services/u);
+    assert.match(hello,/prebuilt Arcane Core or Arcane Ollama binaries/u);
+    assert.match(hello,/Native components remain outputs of an explicit/u);
+    assert.doesNotMatch(hello,/No global CLI/u);
     assert.match(hello,/node_modules\/[\s\S]*arcane-os\/runtime\//u);
     assert.match(hello,/dist\/hello-world\/[\s\S]*arcane\//u);
     assert.match(hello,/exactly 152 files under <code>arcane\/<\/code>/u);
@@ -332,6 +339,11 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         assert.match(script,/globalThis[.]Arcane[.]app[.]current\(\)/u);
         assert.match(script,/directoryPicker[.]select\(/u);
         assert.match(readme,/project-local CLI/u);
+        assert.match(readme,/npm install --global arcane-os/u);
+        assert.match(readme,/npm install --global arcane-os` exposes `arcane/u);
+        assert.match(readme,/reproducible default/u);
+        assert.match(readme,/does not replace the application's pinned SDK dependency/u);
+        assert.match(readme,/prebuilt Arcane Core or Arcane Ollama binaries/u);
         assert.match(readme,/intentionally omits `package-lock[.]json`/u);
         assert.match(readme,/node_modules\/arcane-os\/runtime\//u);
         assert.match(readme,/dist\/hello-world\/[\s\S]*arcane\//u);
