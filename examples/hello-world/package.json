@@ -14,7 +14,7 @@
     "run:browser": "arcane run --target browser"
   },
   "devDependencies": {
-    "arcane-os": "0.1.0-dev.4"
+    "arcane-os": "0.1.0-dev.5"
   },
   "engines": {
     "node": ">=22.23.2"

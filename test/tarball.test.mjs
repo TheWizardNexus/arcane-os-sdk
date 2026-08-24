@@ -3,6 +3,7 @@ import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';
+import {SDK_VERSION} from '../src/constants.mjs';
 import {verifyNpmReleaseArtifact} from '../tools/npm-release-contract.mjs';
 import {
     repositoryRoot,
@@ -90,7 +91,7 @@ test('packed npm artifact installs and drives an external repository end to end'
             tarballPath=path.join(temporary,packReport.filename);
         }
         assert.equal(packReport.name,'arcane-os');
-        assert.equal(packReport.version,'0.1.0-dev.4');
+        assert.equal(packReport.version,SDK_VERSION);
         packedVersion=packReport.version;
         assert.ok(packReport.files.some(file=>file.path==='bin/arcane.mjs'));
         assert.ok(packReport.files.some(file=>file.path==='runtime/ARCANE_RUNTIME_RELEASE.json'));
@@ -212,8 +213,8 @@ process.stdout.write(JSON.stringify({
         const packageDocument=JSON.parse(await readFile(path.join(workspaceRoot,'package.json'),'utf8'));
         assert.match(packageDocument.devDependencies['arcane-os'],/^file:.+\.tgz$/u);
         const packageLock=JSON.parse(await readFile(path.join(workspaceRoot,'package-lock.json'),'utf8'));
-        assert.equal(packageLock.packages['node_modules/arcane-os'].version,'0.1.0-dev.4');
-        assert.match(packageLock.packages['node_modules/arcane-os'].resolved,/arcane-os-0\.1\.0-dev\.4\.tgz$/u);
+        assert.equal(packageLock.packages['node_modules/arcane-os'].version,SDK_VERSION);
+        assert.ok(packageLock.packages['node_modules/arcane-os'].resolved.endsWith(`arcane-os-${SDK_VERSION}.tgz`));
         assert.match(packageLock.packages['node_modules/arcane-os'].integrity,/^sha512-/u);
 
         const cleanInstalled=await runNpm(

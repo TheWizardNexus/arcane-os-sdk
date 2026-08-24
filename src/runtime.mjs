@@ -3,6 +3,7 @@ import {constants as FS_CONSTANTS} from 'node:fs';
 import {lstat,open,readdir,realpath} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {SDK_VERSION} from './constants.mjs';
 
 export const RUNTIME_MANIFEST_NAME='ARCANE_RUNTIME_RELEASE.json';
 const SHA256_PATTERN=/^[a-f0-9]{64}$/;
@@ -56,7 +57,7 @@ function validateRelease(value){
     if(value.schemaVersion!==1||value.builder!=='arcane-sdk-runtime-v1'){
         fail('Runtime manifest uses an unsupported schema or builder.');
     }
-    if(value.sdkVersion!=='0.1.0-dev.4')fail('Runtime manifest sdkVersion is incompatible with this SDK.');
+    if(value.sdkVersion!==SDK_VERSION)fail('Runtime manifest sdkVersion is incompatible with this SDK.');
     if(!value.source||typeof value.source!=='object'
         ||Object.keys(value.source).sort(compareText).join('\0')!=='bundleVersion\0commit\0protocol\0repository'
         ||value.source.repository!=='https://github.com/TheWizardNexus/ARCANE-OS.git'

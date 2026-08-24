@@ -36,7 +36,7 @@ This repository contains two related, explicitly versioned surfaces:
 
 | Surface | Source identity | Meaning |
 | --- | --- | --- |
-| SDK and CLI | `arcane-os` `0.1.0-dev.4` | The Node.js toolchain and package exports in this checkout. |
+| SDK and CLI | `arcane-os` `0.1.0-dev.5` | The Node.js toolchain and package exports in this checkout. |
 | Browser runtime | Arcane OS commit `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, bundle `0.8.12`, protocol `arcane/1` | The exact 155-file runtime snapshot shipped under `runtime/`. |
 | Core reference snapshot | Arcane OS commit `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, protocol `arcane/1` | The application-facing Core contract derived into `docs/reference/core/`. Canonical inventory and focused-member content was verified unchanged at Arcane OS `main` commit `13f3ce0ae34f77a3495331c8b4c30b1bb105f8ed`; SDK-local provenance, link, and package-boundary annotations are added explicitly. |
 

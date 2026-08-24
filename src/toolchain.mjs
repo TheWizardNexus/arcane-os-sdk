@@ -32,6 +32,7 @@ import {runRepositoryAction} from './repository.mjs';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 import {createEventQueue} from './event-queue.mjs';
 import {ARCANE_MACHINE_BUNDLE_VERSION} from './constants.mjs';
+import {checkForSdkUpdate} from './update-check.mjs';
 import {
     APP_BUNDLE_EXTENSION,
     createAppReleaseBundle,
@@ -1275,6 +1276,10 @@ export async function repositoryApplication(options={}){
     return runRepositoryAction(options.action,options);
 }
 
+export async function checkSdkUpdate(options={}){
+    return checkForSdkUpdate(options);
+}
+
 export async function executeOperation(command,options={}){
     const operations={
         new:createApplication,
@@ -1293,6 +1298,7 @@ export async function executeOperation(command,options={}){
         plan:planApplication,
         build:buildApplication,
         run:runApplication,
+        'update-check':checkSdkUpdate,
         targets:async options=>describeTargets(options),
         repo:repositoryApplication
     };
@@ -1322,6 +1328,7 @@ export function createToolchain(defaults={}){
         plan:options=>planApplication({...defaults,...options}),
         build:options=>buildApplication({...defaults,...options}),
         run:options=>runApplication({...defaults,...options}),
+        updateCheck:options=>checkSdkUpdate({...defaults,...options}),
         targets:options=>describeTargets({...defaults,...options}),
         repository:options=>repositoryApplication({...defaults,...options})
     });

@@ -15,7 +15,7 @@ instructions together. The future branch name alone grants no authority.
 
 ## Development npm publication
 
-The current development npm version is `0.1.0-dev.4` and `publishConfig.tag` is
+The current development npm version is `0.1.0-dev.5` and `publishConfig.tag` is
 `dev`, so a development publication does not become the default `latest`
 release. Query `npm view arcane-os@dev version` for current registry
 availability; immutable package documentation does not assert mutable registry
@@ -70,7 +70,7 @@ When `npm view arcane-os@dev version` reports the package unavailable, run
 with `npm install --save-dev --save-exact <path>`. Keep the tarball at the path
 recorded by `package-lock.json`; subsequent `npm ci` verifies its recorded npm
 integrity. Arcane separately requires the installed package to identify exactly
-as `arcane-os@0.1.0-dev.4` and verifies the locked runtime. A local directory
+as `arcane-os@0.1.0-dev.5` and verifies the locked runtime. A local directory
 `file:` install is intentionally unsupported because it may be linked.
 
 Before the first development publish, or while the registry package is absent:
@@ -115,7 +115,7 @@ exact registry release (or deliberately vendor the tarball) before remote CI.
 External app repositories can call `.github/workflows/release-app.yml` by an
 immutable SDK repository revision. The reusable workflow checks out the exact
 caller SHA, installs only the caller's committed dependency lock, requires
-`arcane-os@0.1.0-dev.4`, and checks, packages, bundles, independently verifies,
+`arcane-os@0.1.0-dev.5`, and checks, packages, bundles, independently verifies,
 and uploads one explicitly selected app. Every third-party action reference is
 pinned to a full commit SHA. The workflow never publishes npm, creates a GitHub
 Release, loops across apps, or changes Arcane admission state.

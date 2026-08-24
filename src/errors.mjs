@@ -5,6 +5,7 @@ export const ERROR_CODES=Object.freeze({
     targetUnavailable:'ARCANE_TARGET_UNAVAILABLE',
     targetDeferred:'ARCANE_TARGET_DEFERRED',
     nativeRunUnsupported:'ARCANE_NATIVE_RUN_UNSUPPORTED',
+    updateCheckFailed:'ARCANE_UPDATE_CHECK_FAILED',
     policyDenied:'ARCANE_POLICY_DENIED',
     integrityFailed:'ARCANE_INTEGRITY_FAILED',
     operationFailed:'ARCANE_OPERATION_FAILED',

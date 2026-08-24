@@ -1,5 +1,4 @@
-const SDK_NAME='arcane-os';
-const SDK_VERSION='0.1.0-dev.4';
+import {SDK_NAME,SDK_VERSION} from '../constants.mjs';
 
 function json(value){
     return `${JSON.stringify(value,null,2)}\n`;

@@ -19,7 +19,7 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This is development software. Version `0.1.0-dev.4` synchronizes the Arcane
+This is development software. Version `0.1.0-dev.5` synchronizes the Arcane
 `0.8.12` runtime, but it is not a production or release-candidate claim. It has
 only the `dev` channel contract; query `npm view arcane-os@dev version` for
 current registry availability. Registry state is deliberately not baked into
@@ -131,7 +131,7 @@ node ./bin/arcane.mjs new local-app --path ../local-app --target portable --git
 
 # From the generated app repository
 cd ../local-app
-npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.4.tgz
+npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.5.tgz
 npm run check
 npm ci
 ```
@@ -255,7 +255,7 @@ recorded length through a final identity check; an appended byte, concurrent
 growth, path replacement, or hard link fails closed. NFC paths use defined
 UTF-8 byte ordering, covered by one pinned golden bundle digest on every
 supported Node/runner combination. This SDK accepts only the explicitly listed
-`0.1.0-dev.4` bundle generation; structural validity does not imply cross-SDK
+`0.1.0-dev.5` bundle generation; structural validity does not imply cross-SDK
 compatibility, and a release with zero payload bytes cannot be created. Portable
 path validation rejects file/directory prefix conflicts, case-colliding prefix
 spellings, and Windows device aliases including superscript COM/LPT digits.
@@ -301,7 +301,7 @@ package installation, or assertions.
 
 ## Current target support
 
-Version `0.1.0-dev.4` exposes one browser target and five explicitly paired
+Version `0.1.0-dev.5` exposes one browser target and five explicitly paired
 native development targets: a verified non-runnable portable directory, a
 Windows x64 unsigned-local-test EXE bundle, Linux x64 and Linux ARM64
 unsigned-local-test DEBs, and an Android development-signed APK. The

@@ -25,6 +25,14 @@ export {
 
 export {createReporter} from './events.mjs';
 export {
+    SDK_UPDATE_REGISTRY,
+    SDK_UPDATE_TIMEOUT_MS,
+    checkForSdkUpdate,
+    compareSdkVersions,
+    updateTagForVersion,
+    validateUpdateRegistry
+} from './update-check.mjs';
+export {
     ARCANE_EVENT_STACK_PROTOCOL,
     arcaneEvents,
     createDOMInstrumentation,
@@ -87,6 +95,7 @@ export {
     buildApplication,
     bundleApplication,
     checkApplication,
+    checkSdkUpdate,
     createApplication,
     createToolchain,
     describeTargets,

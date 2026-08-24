@@ -101,8 +101,8 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import packageDocument from 'arcane-os/package.json' with {type:'json'};
-          if(packageDocument.version !== '0.1.0-dev.4'){
-            throw new Error(`Expected arcane-os@0.1.0-dev.4, received ${packageDocument.version}.`);
+          if(packageDocument.version !== '0.1.0-dev.5'){
+            throw new Error(`Expected arcane-os@0.1.0-dev.5, received ${packageDocument.version}.`);
           }
           NODE
       - name: Check and package the selected application

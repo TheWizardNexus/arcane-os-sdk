@@ -52,6 +52,7 @@ Usage:
   ${CLI_NAME} native-prepare --target <native-target> --arcane-root <directory>
   ${CLI_NAME} build --target <target> [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>]
   ${CLI_NAME} run [--target <target>] [--app <id>] [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>]
+  ${CLI_NAME} update-check
   ${CLI_NAME} targets
   ${CLI_NAME} repo status|pull|push
 
@@ -311,6 +312,10 @@ function operationOptions(command,parsed,cwd){
         };
     }
     if(command==='targets'){
+        noExtraPositionals(command,positionals);
+        return {};
+    }
+    if(command==='update-check'){
         noExtraPositionals(command,positionals);
         return {};
     }

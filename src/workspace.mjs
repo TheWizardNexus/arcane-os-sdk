@@ -5,11 +5,13 @@ import {
     validateRootConfig as validatePackagerRootConfig
 } from './packager/core.mjs';
 import {appDescriptorSha256,loadAppDescriptor} from './app-descriptor.mjs';
+import {
+    SDK_NAME as EXPECTED_SDK_NAME,
+    SDK_VERSION as EXPECTED_SDK_VERSION
+} from './constants.mjs';
 
 const APP_ID_PATTERN=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const SHA256_PATTERN=/^[a-f0-9]{64}$/;
-const EXPECTED_SDK_NAME='arcane-os';
-const EXPECTED_SDK_VERSION='0.1.0-dev.4';
 const LOCAL_TARBALL_PATTERN=/^file:.+\.tgz$/iu;
 const ROOT_CONFIG_NAME='arcane-packager.json';
 const APP_CONFIG_NAME='arcane-package.json';

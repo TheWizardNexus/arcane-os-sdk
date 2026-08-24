@@ -1,9 +1,15 @@
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import packageDocument from '../package.json' with {type:'json'};
 
-export const SDK_NAME='arcane-os';
+if(packageDocument.name!=='arcane-os'||typeof packageDocument.version!=='string'
+    ||!/^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/u.test(packageDocument.version)){
+    throw new Error('The Arcane SDK package identity is invalid.');
+}
+
+export const SDK_NAME=packageDocument.name;
 export const CLI_NAME='arcane';
-export const SDK_VERSION='0.1.0-dev.4';
+export const SDK_VERSION=packageDocument.version;
 export const ARCANE_PROTOCOL='arcane/1';
 export const CLI_EVENT_PROTOCOL='arcane-cli-events/1';
 export const TARGET_ADAPTER_PROTOCOL='arcane-target-adapter/1';

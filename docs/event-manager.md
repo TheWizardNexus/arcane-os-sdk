@@ -159,7 +159,7 @@ The npm artifact bundles the exact `event-pubsub` and `strong-type` pair because
 use must preserve that physical sibling layout and provide import-map entries
 for the public SDK entry and `event-pubsub`.
 
-The current `0.1.0-dev.4` hash-pinned Arcane browser runtime does not yet
+The current `0.1.0-dev.5` hash-pinned Arcane browser runtime does not yet
 bootstrap or package this SDK-authored module. Built-in Shell, Provisioner, and
 native Arcane application instrumentation therefore belongs in the downstream
 Arcane OS integration work; this SDK release does not claim automatic coverage

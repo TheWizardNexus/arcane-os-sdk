@@ -4,6 +4,8 @@ import path from 'node:path';
 import {Writable} from 'node:stream';
 import test from '../src/testing.mjs';
 import {createNativeTargetRequest,runCli as runCliInProcess} from '../src/cli/main.mjs';
+import {SDK_VERSION} from '../src/constants.mjs';
+import {ArcaneError,ERROR_CODES} from '../src/errors.mjs';
 import {parseNdjson,repositoryRoot,runCli,runNode} from './helpers.mjs';
 
 function memoryStream(){
@@ -22,7 +24,7 @@ function memoryStream(){
 test('CLI help and version succeed through the shipped executable',async()=>{
     const help=await runCli(['--help']);
     assert.equal(help.code,0);
-    assert.match(help.stdout,/Arcane OS application SDK 0\.1\.0-dev\.4/);
+    assert.ok(help.stdout.includes(`Arcane OS application SDK ${SDK_VERSION}`));
     assert.match(help.stdout,/external or integrated Arcane workspace/);
     assert.match(help.stdout,/arcane-os executables/);
     assert.match(help.stdout,/test --scope shared --test-file/);
@@ -30,7 +32,57 @@ test('CLI help and version succeed through the shipped executable',async()=>{
 
     const version=await runCli(['--version']);
     assert.equal(version.code,0);
-    assert.equal(version.stdout.trim(),'0.1.0-dev.4');
+    assert.equal(version.stdout.trim(),SDK_VERSION);
+});
+
+test('CLI update checking is explicit, structured, and fails honestly',async t=>{
+    await t.test('dispatch',async()=>{
+        const stdout=memoryStream();
+        const stderr=memoryStream();
+        const invocations=[];
+        const exitCode=await runCliInProcess(['update-check','--output','ndjson'],{
+            stdout:stdout.stream,
+            stderr:stderr.stream,
+            execute:async(command,options)=>{
+                invocations.push({command,options});
+                await options.onEvent({type:'update.check.started',message:'Checking npm dev.'});
+                return {status:'current',updateAvailable:false};
+            }
+        });
+        assert.equal(exitCode,0,stderr.read());
+        assert.equal(invocations.length,1);
+        assert.equal(invocations[0].command,'update-check');
+        assert.deepEqual(Object.keys(invocations[0].options).sort(),['onEvent','signal']);
+        const events=parseNdjson(stdout.read());
+        assert.equal(events.some(event=>event.type==='update.check.started'),true);
+        assert.equal(events.at(-1).type,'operation.completed');
+    });
+    await t.test('explicit failure',async()=>{
+        const stdout=memoryStream();
+        const stderr=memoryStream();
+        const exitCode=await runCliInProcess(['update-check','--output','ndjson'],{
+            stdout:stdout.stream,
+            stderr:stderr.stream,
+            execute:async()=>{
+                throw new ArcaneError(ERROR_CODES.updateCheckFailed,'Registry offline.');
+            }
+        });
+        assert.equal(exitCode,1);
+        assert.equal(stderr.read(),'');
+        const events=parseNdjson(stdout.read());
+        assert.equal(events.at(-1).type,'operation.failed');
+        assert.equal(events.at(-1).data.error.code,ERROR_CODES.updateCheckFailed);
+    });
+    await t.test('unexpected positional argument',async()=>{
+        let executed=false;
+        const exitCode=await runCliInProcess(['update-check','unexpected'],{
+            stdout:memoryStream().stream,
+            stderr:memoryStream().stream,
+            execute:async()=>{executed=true;}
+        });
+        assert.equal(exitCode,1);
+        assert.equal(executed,false);
+    });
 });
 
 test('both installed command names execute the published CLI entry',async()=>{
@@ -46,7 +98,7 @@ test('both installed command names execute the published CLI entry',async()=>{
         assert.equal(invoked.code,0,invoked.stderr);
         const result=JSON.parse(invoked.stdout);
         assert.equal(result.ok,true);
-        assert.equal(result.result,'0.1.0-dev.4');
+        assert.equal(result.result,SDK_VERSION);
     }
 });
 

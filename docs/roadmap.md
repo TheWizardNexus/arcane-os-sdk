@@ -11,7 +11,8 @@ one unbounded build.
   package name before the first `arcane-os` publication.
 - Decide and document the license that permits proprietary applications to
   bundle the synchronized Arcane runtime.
-- Publish `0.1.0-dev.4` under only the npm `dev` tag, verify the tarball and
+- Publish one fresh, never-reused prerelease candidate under only the npm `dev`
+  tag, verify the tarball and
   provenance, add a second appropriate npm owner, and configure the exact
   trusted-publisher workflow.
 
