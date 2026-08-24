@@ -599,6 +599,20 @@ test('browser remap edges reject query and fragment suffixes that cannot match e
     }
 });
 
+test('invalid application HTML fails before runtime inventory traversal',async t=>{
+    const workspaceRoot=await temporaryDirectory(t);
+    const appRoot=await createApplication(workspaceRoot,'invalid-html-first');
+    const entryPath=path.join(appRoot,'index.html');
+    const invalid='<script type="module" src="./modules/App.js"></script>\n';
+    await writeFile(entryPath,invalid,'utf8');
+    await assert.rejects(
+        generateImportMap({workspaceRoot,appId:'invalid-html-first'}),
+        error=>error?.code==='ARCANE_IMPORT_MAP_INVALID'
+            &&/exactly one active <base/iu.test(error.message)
+    );
+    assert.equal(await readFile(entryPath,'utf8'),invalid);
+});
+
 test('HTML inspection honors template/raw-text boundaries, entities, duplicates, and early base order',async t=>{
     const workspaceRoot=await temporaryDirectory(t);
     await copyShippedRuntime(workspaceRoot);

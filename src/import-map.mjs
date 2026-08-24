@@ -2205,6 +2205,9 @@ async function generateImportMapUnlocked({
     const entryState=await readRealFileState(entryPath,'Import-map application entry');
     entryState.directoryState=entryDirectoryState;
     const html=entryState.bytes.toString('utf8');
+    // Reject malformed application structure before traversing the substantially larger runtime
+    // graph. The real generated map is rendered and revalidated again before commit.
+    renderManagedHtml(html,'{"imports":{}}\n');
     let runtime;
     if(workspaceRuntimeReceipt){
         await authenticateWorkspaceRuntimeReceipt(workspaceRuntimeReceipt,{

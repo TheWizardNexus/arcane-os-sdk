@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {lstat,mkdir,readFile,readdir,rm,symlink,writeFile} from 'node:fs/promises';
+import {lstat,mkdir,readFile,readdir,realpath,rename,rm,symlink,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {withWorkspaceOperationLock} from '../src/workspace-operation-lock.mjs';
@@ -502,4 +502,68 @@ test('static workspace and lock-directory links fail closed without touching the
     );
     assert.equal(await readFile(sentinel,'utf8'),'unchanged\n');
     assert.equal(await pathExists(path.join(outside,'workspace-operation.lock.json')),false);
+});
+
+test('identity-equivalent Windows namespace aliases preserve the workspace boundary',async t=>{
+    if(process.platform!=='win32')return;
+    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-operation-windows-alias-'});
+    const alias=`\\\\?\\${workspaceRoot}`;
+    const canonical=await realpath(workspaceRoot);
+    assert.notEqual(path.resolve(alias).toLocaleLowerCase('en-US'),canonical.toLocaleLowerCase('en-US'));
+    await withWorkspaceOperationLock({
+        workspaceRoot:alias,
+        operation:'windows-namespace-alias'
+    },async lease=>{
+        assert.equal(lease.workspaceRoot,canonical);
+        assert.equal(await realpath(alias),canonical);
+    });
+    await assertLockAbsent(workspaceRoot);
+});
+
+test('a physical workspace beneath a stable linked ancestor binds to its canonical identity',async t=>{
+    const root=await temporaryDirectory(t,{prefix:'arcane-operation-ancestor-alias-'});
+    const physicalParent=path.join(root,'physical-parent');
+    const workspaceRoot=path.join(physicalParent,'workspace');
+    const aliasParent=path.join(root,'runner-alias');
+    await mkdir(workspaceRoot,{recursive:true});
+    await symlink(physicalParent,aliasParent,process.platform==='win32'?'junction':'dir');
+    const aliasedWorkspace=path.join(aliasParent,'workspace');
+    const canonical=await realpath(workspaceRoot);
+    await withWorkspaceOperationLock({
+        workspaceRoot:aliasedWorkspace,
+        operation:'stable-ancestor-alias'
+    },async lease=>{
+        assert.equal(lease.workspaceRoot,canonical);
+        assert.equal(await pathExists(path.join(workspaceRoot,LOCK_RELATIVE)),true);
+    });
+    await assertLockAbsent(workspaceRoot);
+});
+
+test('retargeting an admitted linked ancestor fails closed without touching its replacement',async t=>{
+    const root=await temporaryDirectory(t,{prefix:'arcane-operation-ancestor-swap-'});
+    const originalParent=path.join(root,'original-parent');
+    const replacementParent=path.join(root,'replacement-parent');
+    const originalWorkspace=path.join(originalParent,'workspace');
+    const replacementWorkspace=path.join(replacementParent,'workspace');
+    const aliasParent=path.join(root,'runner-alias');
+    const retiredAlias=path.join(root,'retired-runner-alias');
+    await mkdir(originalWorkspace,{recursive:true});
+    await mkdir(replacementWorkspace,{recursive:true});
+    await symlink(originalParent,aliasParent,process.platform==='win32'?'junction':'dir');
+    await assert.rejects(
+        withWorkspaceOperationLock({
+            workspaceRoot:path.join(aliasParent,'workspace'),
+            operation:'ancestor-alias-swap'
+        },async()=>{
+            await rename(aliasParent,retiredAlias);
+            await symlink(
+                replacementParent,
+                aliasParent,
+                process.platform==='win32'?'junction':'dir'
+            );
+        }),
+        error=>error?.code==='ARCANE_POLICY_DENIED'
+    );
+    await assertLockAbsent(originalWorkspace);
+    assert.equal(await pathExists(path.join(replacementWorkspace,'.arcane')),false);
 });

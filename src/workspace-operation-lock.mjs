@@ -98,8 +98,21 @@ function exactKeys(value,expected){
 
 async function captureRealDirectoryChain(directory,label){
     const resolved=path.resolve(directory);
-    const root=path.parse(resolved).root;
-    const relative=path.relative(root,resolved);
+    let requestedIdentity;
+    try{requestedIdentity=await lstat(resolved,{bigint:true});}
+    catch(error){
+        if(error?.code==='ENOENT'){
+            fail(`${label} does not exist.`, 'ARCANE_POLICY_DENIED');
+        }
+        throw error;
+    }
+    if(requestedIdentity.isSymbolicLink()||!requestedIdentity.isDirectory()){
+        fail(`${label} must be a physical directory, not a symbolic link or junction.`,
+            'ARCANE_POLICY_DENIED');
+    }
+    const canonical=await realpath(resolved);
+    const root=path.parse(canonical).root;
+    const relative=path.relative(root,canonical);
     const segments=relative===''?[]:relative.split(path.sep).filter(Boolean);
     const records=[];
     let current=root;
@@ -119,12 +132,18 @@ async function captureRealDirectoryChain(directory,label){
         }
         records.push(Object.freeze({path:current,identity:info}));
     }
-    const canonical=await realpath(resolved);
-    if(!samePath(canonical,resolved)){
-        fail(`${label} must not resolve through a symbolic link or junction.`,
+    const identity=records.at(-1).identity;
+    if(!sameLocation(requestedIdentity,identity)){
+        fail(`${label} must resolve to its captured directory identity.`,
             'ARCANE_POLICY_DENIED');
     }
-    return Object.freeze({canonical,records:Object.freeze(records)});
+    return Object.freeze({
+        requested:resolved,
+        requestedIdentity,
+        canonical,
+        identity,
+        records:Object.freeze(records)
+    });
 }
 
 async function assertDirectoryChain(chain,label){
@@ -144,8 +163,22 @@ async function assertDirectoryChain(chain,label){
                 'ARCANE_POLICY_DENIED');
         }
     }
-    const canonical=await realpath(chain.canonical);
-    if(!samePath(canonical,chain.canonical)){
+    let canonical;
+    let requestedIdentity;
+    try{
+        canonical=await realpath(chain.requested);
+        requestedIdentity=await lstat(chain.requested,{bigint:true});
+    }catch(error){
+        if(error?.code==='ENOENT'){
+            fail(`${label} changed while its operation boundary was active.`,
+                'ARCANE_POLICY_DENIED');
+        }
+        throw error;
+    }
+    if(!samePath(canonical,chain.canonical)
+        ||requestedIdentity.isSymbolicLink()||!requestedIdentity.isDirectory()
+        ||!sameLocation(requestedIdentity,chain.requestedIdentity)
+        ||!sameLocation(requestedIdentity,chain.identity)){
         fail(`${label} changed while its operation boundary was active.`,
             'ARCANE_POLICY_DENIED');
     }

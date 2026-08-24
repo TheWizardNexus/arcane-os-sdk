@@ -577,12 +577,13 @@ test('package release fails closed when import-map cleanup reports a warning',as
                 assert.ok(backup,'entry backup must exist at the cleanup boundary');
                 const backupPath=path.join(appRoot,backup);
                 await rm(backupPath);
-                await writeFile(backupPath,'cleanup-warning injection\n');
+                await mkdir(backupPath);
                 tamperedBackup=true;
             }
         }),
         error=>error?.code==='ARCANE_IMPORT_MAP_CLEANUP_FAILED'
-            &&/cleanup warnings|not assembled/iu.test(error.message)
+            &&/Import-map application entry backup changed before transaction cleanup\./u
+                .test(error.message)
     );
     assert.equal(tamperedBackup,true);
     await assert.rejects(
