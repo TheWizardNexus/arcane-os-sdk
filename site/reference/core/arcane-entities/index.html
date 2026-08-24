@@ -7,7 +7,7 @@
   <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-entities/"><link rel="icon" type="image/png" href="../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../styles.css"><link rel="stylesheet" href="../../reference.css">
   <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane Shared Entities · Arcane OS SDK"><meta property="og:description" content="The modules under arcane/entities/ provide shared JavaScript records, value objects, validation helpers, and contract vocabularies for Arcane applications.…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-entities/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
   <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane Shared Entities · Arcane OS SDK"><meta name="twitter:description" content="The modules under arcane/entities/ provide shared JavaScript records, value objects, validation helpers, and contract vocabularies for Arcane applications.…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <title>Arcane Shared Entities | Arcane OS SDK</title><script src="../../../app.js" defer></script>
+  <title>Arcane Shared Entities | Arcane OS SDK</title><script src="../../../app.js" defer></script><script src="../../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -15,7 +15,7 @@
   <main id="main-content">
     <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Core</a><span aria-hidden="true">/</span><span aria-current="page">Arcane Shared Entities</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-shared-entities">Arcane Shared Entities</h1><p class="doc-lead">The modules under arcane/entities/ provide shared JavaScript records, value objects, validation helpers, and contract vocabularies for Arcane applications.…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
-      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../">Core map</a><a href="../arcane-api/">Arcane API</a><a href="../arcane-events/">Events</a><a href="../arcane-ai-contracts/">AI contracts</a><a href="./" aria-current="page">Entity exports</a><a href="../ollama-module/">Ollama module</a><a href="../reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../../ai/">Normalized AI</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../">Core map</a><a href="../arcane-api/">Arcane API</a><a href="../capabilities/">Capabilities and admission</a><a href="../reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../arcane-events/">Events</a><a href="../arcane-ai-contracts/">AI contracts</a><a href="./" aria-current="page">Entity exports</a><a href="../ollama-module/">Ollama internals (advanced)</a><a href="../reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/core/arcane-entities.md"><h2 id="purpose">Purpose</h2>
 <p>The modules under <code>arcane/entities/</code> provide shared JavaScript records, value
 objects, validation helpers, and contract vocabularies for Arcane applications.
@@ -94,13 +94,13 @@ decisions remain authoritative in the linked contract documents.</p>
 <td><code>arcane/entities/IntentEnvelope.js#IntentEnvelopeValidationError</code></td>
 <td>class</td>
 <td><code>IntentEnvelopeValidationError</code></td>
-<td>Privacy-safe validation error with stable <code>code</code> and structural <code>path</code> fields; see the <a href="https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/intent-envelope.md#errors" target="_blank" rel="noreferrer">intent-envelope contract</a>.</td>
+<td>Privacy-safe validation error with stable <code>code</code> and structural <code>path</code> fields; see the <a href="../../runtime-entities/#intentenvelopejs">intent-envelope contract</a>.</td>
 </tr>
 <tr>
 <td><code>arcane/entities/IntentEnvelope.js#createIntentEnvelope</code></td>
 <td>function</td>
 <td><code>createIntentEnvelope</code></td>
-<td>Validates an intake payload separately from trusted identity, time, and provenance context, then returns an immutable v1 envelope; see the <a href="https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/intent-envelope.md#creation-authority-boundary" target="_blank" rel="noreferrer">creation authority boundary</a>.</td>
+<td>Validates an intake payload separately from trusted identity, time, and provenance context, then returns an immutable v1 envelope; see the <a href="../../runtime-entities/#intentenvelopejs">creation authority boundary</a>.</td>
 </tr>
 <tr>
 <td><code>arcane/entities/IntentEnvelope.js#rehydrateIntentEnvelope</code></td>
@@ -118,7 +118,7 @@ decisions remain authoritative in the linked contract documents.</p>
 <td><code>arcane/entities/IntentEnvelope.js#intentEnvelopeAuditProjection</code></td>
 <td>function</td>
 <td><code>intentEnvelopeAuditProjection</code></td>
-<td>Produces a frozen, bounded structural projection that excludes original expression and other documented content fields; see the <a href="https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/intent-envelope.md#public-api" target="_blank" rel="noreferrer">public API contract</a>.</td>
+<td>Produces a frozen, bounded structural projection that excludes original expression and other documented content fields; see the <a href="../../runtime-entities/#intentenvelopejs">public API contract</a>.</td>
 </tr>
 <tr>
 <td><code>arcane/entities/IntentEnvelope.js#intentEnvelopeContract</code></td>
@@ -184,13 +184,13 @@ decisions remain authoritative in the linked contract documents.</p>
 <td><code>arcane/entities/TWiNPolicyDecision.js#TWiNPolicyDecisionValidationError</code></td>
 <td>class</td>
 <td><code>TWiNPolicyDecisionValidationError</code></td>
-<td>Privacy-safe policy-decision validation error with stable <code>code</code> and structural <code>path</code> fields; see the <a href="https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/twin-policy-decision.md#failure-and-recovery" target="_blank" rel="noreferrer">TWiN error contract</a>.</td>
+<td>Privacy-safe policy-decision validation error with stable <code>code</code> and structural <code>path</code> fields; see the <a href="../../runtime-entities/#twinpolicydecisionjs">TWiN error contract</a>.</td>
 </tr>
 <tr>
 <td><code>arcane/entities/TWiNPolicyDecision.js#createTWiNPolicyDecision</code></td>
 <td>function</td>
 <td><code>createTWiNPolicyDecision</code></td>
-<td>Validates an evaluator payload separately from trusted decision and policy provenance, then returns an immutable v1 decision; see the <a href="https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/twin-policy-decision.md#trusted-creation-boundary" target="_blank" rel="noreferrer">trusted creation boundary</a>.</td>
+<td>Validates an evaluator payload separately from trusted decision and policy provenance, then returns an immutable v1 decision; see the <a href="../../runtime-entities/#twinpolicydecisionjs">trusted creation boundary</a>.</td>
 </tr>
 <tr>
 <td><code>arcane/entities/TWiNPolicyDecision.js#rehydrateTWiNPolicyDecision</code></td>
@@ -208,7 +208,7 @@ decisions remain authoritative in the linked contract documents.</p>
 <td><code>arcane/entities/TWiNPolicyDecision.js#twinPolicyDecisionAuditProjection</code></td>
 <td>function</td>
 <td><code>twinPolicyDecisionAuditProjection</code></td>
-<td>Produces a frozen structural audit projection that omits requirement targets and values; see <a href="https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/twin-policy-decision.md#privacy-and-audit-behavior" target="_blank" rel="noreferrer">privacy and audit behavior</a>.</td>
+<td>Produces a frozen structural audit projection that omits requirement targets and values; see <a href="../../runtime-entities/#twinpolicydecisionjs">privacy and audit behavior</a>.</td>
 </tr>
 <tr>
 <td><code>arcane/entities/TWiNPolicyDecision.js#twinPolicyDecisionContract</code></td>
@@ -256,10 +256,10 @@ govern persistence, networking, native execution, and protected data.</p>
 <p>Changing an export name, kind, meaning, enum, accepted shape, serialization, or
 validation invariant is a public-contract change. Update the implementation,
 this inventory, its focused tests, and any linked versioned contract together.</p>
-<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/core/arcane-entities.md" target="_blank" rel="noreferrer"><code>docs/reference/core/arcane-entities.md</code> <span aria-hidden="true">↗</span></a></p></article>
+</article>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#purpose">Purpose</a><a href="#export-inventory">Export inventory</a><a href="#compatibility-boundary">Compatibility boundary</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>

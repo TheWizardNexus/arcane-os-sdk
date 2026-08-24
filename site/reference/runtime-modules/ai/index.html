@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structured output, streaming, and queued audio playback.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai/"><link rel="icon" type="image/png" href="../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../styles.css"><link rel="stylesheet" href="../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="AI.js · Arcane OS SDK"><meta property="og:description" content="Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structured output, streaming, and queued audio playback."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="AI.js · Arcane OS SDK"><meta name="twitter:description" content="Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structured output, streaming, and queued audio playback."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>AI.js | Arcane OS SDK</title><script src="../../../app.js" defer></script><script src="../../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../">Overview</a><a href="../../../guides/">Guides</a><a href="../../../examples/">Examples</a><a href="../../../playground/">Playground</a><a href="../../../testing/">Testing</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="../../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Runtime modules</a><span aria-hidden="true">/</span><span aria-current="page">AI.js</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="aijs-module">AI.js</h1><p class="doc-lead">Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structured output, streaming, and queued audio playback.</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../../ai/">Normalized AI</a><a href="../">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="runtime/arcane/modules/AI.js"><aside class="callout callout-info"><strong>Normalized application path.</strong> Use this renderer module or provider-neutral <code>globalThis.Arcane.ai.chat()</code> before selecting any provider-specific API.</aside><h2 id="overview">Overview</h2><p>Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structured output, streaming, and queued audio playback.</p><ul class="module-contract-summary"><li><strong>Artifact</strong><br><code>AI.js</code> · esm</li><li><strong>Classification</strong><br>public first party</li><li><strong>Availability</strong><br>Browser + native bridge + cloud</li><li><strong>Normalization</strong><br>High-level chat/speech behavior is normalized; provider diagnostics and media errors remain mixed.</li></ul><h2 id="import-and-lifecycle">Import and lifecycle</h2><div class="code-block reference-code"><div class="code-bar"><span>JavaScript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import ai from &#39;/arcane/modules/AI.js&#39;;
+</code></pre></div><p>Browser import listens for user-entity-loaded, installs window.ai once the user is ready, emits ai-ready, and may perform HTTP/native AI, microphone, and audio-playback side effects.</p><p><strong>Application-facing behavior:</strong> default AI; setAI(), streamRequest(), streamMessage(), fetchRequest(), fetch(), streamTTS(), finishTTS(), fetchSTT(), stopAudio(), resumeAudio(), playAudio(); installs window.ai and emits ai-ready.</p><details><summary>Protocol and host implementation</summary><p>OpenAI HTTPS, Arcane.ollama, Arcane.speech, Android WebView bridge This detail does not widen the application-facing API or grant authority.</p></details><h2 id="exports-signatures-parameters-results">Exports, signatures, parameters, and results</h2><div class="table-wrap" role="region" aria-label="Exact module bindings" tabindex="0"><table><thead><tr><th>Binding</th><th>Form</th><th>Declaration or signature</th><th>Parameter syntax</th></tr></thead><tbody><tr><td><code>default</code></td><td>default · class</td><td><code>class AI</code></td><td><code>—</code></td></tr></tbody></table></div><div class="table-wrap" role="region" aria-label="Reviewed callable surface" tabindex="0"><table><thead><tr><th>Callable</th><th>Kind</th><th>Exact public signature</th><th>Parameter syntax</th></tr></thead><tbody><tr><td><code>AI.setAI</code></td><td>public-member</td><td><code>setAI(
+        llmService,
+        sttService,
+        ttsService,
+        model,
+        modelTTS,
+        modelSTT
+    )</code></td><td><code>
+        llmService,
+        sttService,
+        ttsService,
+        model,
+        modelTTS,
+        modelSTT
+    </code></td></tr><tr><td><code>AI.streamRequest</code></td><td>public-member</td><td><code>async streamRequest({
+        messages=[],
+        structuredOutput=false,
+        localOnly=false,
+        onChunk=function ignoreStreamChunk(){},
+        onComplete=function finishIgnoredStream(){},
+        tools=[],
+        toolChoice=&#39;auto&#39;,
+        onToolCall=function ignoreEarlyFunction(){},
+        onRequest=function ignoreStreamRequest(){},
+        parallelToolCalls=true,
+        id=Date.now(),
+        seeThinking=false,
+        signal=null
+    }={})</code></td><td><code>{
+        messages=[],
+        structuredOutput=false,
+        localOnly=false,
+        onChunk=function ignoreStreamChunk(){},
+        onComplete=function finishIgnoredStream(){},
+        tools=[],
+        toolChoice=&#39;auto&#39;,
+        onToolCall=function ignoreEarlyFunction(){},
+        onRequest=function ignoreStreamRequest(){},
+        parallelToolCalls=true,
+        id=Date.now(),
+        seeThinking=false,
+        signal=null
+    }={}</code></td></tr><tr><td><code>AI.streamMessage</code></td><td>public-member</td><td><code>async streamMessage(
+        messages=[],
+        streamHandler=function ignoreStreamChunk(){},
+        streamComplete=function finishIgnoredStream(){},
+        tools=[],
+        tool_choice=&#39;auto&#39;,
+        earlyFunctionTrigger=function ignoreEarlyFunction(){},
+        parallel_tool_calls=true,
+        id=Date.now(),
+        seeThinking=false,
+        signal=null,
+        requestHandler=function ignoreStreamRequest(){},
+        structuredOutput=false
+    )</code></td><td><code>
+        messages=[],
+        streamHandler=function ignoreStreamChunk(){},
+        streamComplete=function finishIgnoredStream(){},
+        tools=[],
+        tool_choice=&#39;auto&#39;,
+        earlyFunctionTrigger=function ignoreEarlyFunction(){},
+        parallel_tool_calls=true,
+        id=Date.now(),
+        seeThinking=false,
+        signal=null,
+        requestHandler=function ignoreStreamRequest(){},
+        structuredOutput=false
+    </code></td></tr><tr><td><code>AI.fetchRequest</code></td><td>public-member</td><td><code>async fetchRequest({
+        messages=[],
+        structuredOutput=false,
+        localOnly=false,
+        tools=[],
+        toolChoice=&#39;auto&#39;,
+        parallelToolCalls=true,
+        id=Date.now(),
+        signal=null,
+        onRequest=function ignoreFetchRequest(){},
+        onResponse=function ignoreFetchResponse(){}
+    }={})</code></td><td><code>{
+        messages=[],
+        structuredOutput=false,
+        localOnly=false,
+        tools=[],
+        toolChoice=&#39;auto&#39;,
+        parallelToolCalls=true,
+        id=Date.now(),
+        signal=null,
+        onRequest=function ignoreFetchRequest(){},
+        onResponse=function ignoreFetchResponse(){}
+    }={}</code></td></tr><tr><td><code>AI.fetch</code></td><td>public-member</td><td><code>async fetch(
+        messages=[],
+        responseHandler=function ignoreFetchResponse(){},
+        structuredOutput=false,
+        tools=[],
+        tool_choice=&#39;auto&#39;,
+        parallel_tool_calls=true,
+        id=Date.now(),
+        requestHandler=function ignoreFetchRequest(){},
+        signal=null,
+    )</code></td><td><code>
+        messages=[],
+        responseHandler=function ignoreFetchResponse(){},
+        structuredOutput=false,
+        tools=[],
+        tool_choice=&#39;auto&#39;,
+        parallel_tool_calls=true,
+        id=Date.now(),
+        requestHandler=function ignoreFetchRequest(){},
+        signal=null,
+    </code></td></tr><tr><td><code>AI.streamTTS</code></td><td>public-member</td><td><code>streamTTS(
+        text=&#39;&#39;,
+        end=false
+    )</code></td><td><code>
+        text=&#39;&#39;,
+        end=false
+    </code></td></tr><tr><td><code>AI.finishTTS</code></td><td>public-member</td><td><code>finishTTS()</code></td><td><code>—</code></td></tr><tr><td><code>AI.fetchSTT</code></td><td>public-member</td><td><code>async fetchSTT(
+        audioFile,
+        responseHandler=(text=&#39;&#39;)=&gt;{}
+    )</code></td><td><code>
+        audioFile,
+        responseHandler=(text=&#39;&#39;)=&gt;{}
+    </code></td></tr><tr><td><code>AI.stopAudio</code></td><td>public-member</td><td><code>stopAudio()</code></td><td><code>—</code></td></tr><tr><td><code>AI.resumeAudio</code></td><td>public-member</td><td><code>async resumeAudio(audioContext=null,fromUserGesture=true)</code></td><td><code>audioContext=null,fromUserGesture=true</code></td></tr><tr><td><code>AI.playAudio</code></td><td>public-member</td><td><code>async playAudio(
+        audioChunks=[],
+        audioContext=&lt;internal default&gt;,
+        sourceNode=null,
+        audioType=this.audioType,
+        speechJob=null
+    )</code></td><td><code>
+        audioChunks=[],
+        audioContext=&lt;internal default&gt;,
+        sourceNode=null,
+        audioType=this.audioType,
+        speechJob=null
+    </code></td></tr></tbody></table></div><div class="table-wrap" role="region" aria-label="Exported class and object members" tabindex="0"><table><thead><tr><th>Member</th><th>Kind</th><th>Exact public declaration</th><th>Parameter syntax</th></tr></thead><tbody><tr><td><code>AI.constructor</code></td><td>constructor</td><td><code>constructor(
+        llmService=&#39;&#39;,
+        sttService=&#39;&#39;,
+        ttsService=&#39;&#39;,
+        model=&#39;&#39;,
+        modelTTS=&#39;&#39;,
+        modelSTT=&#39;&#39;
+    )</code></td><td><code>
+        llmService=&#39;&#39;,
+        sttService=&#39;&#39;,
+        ttsService=&#39;&#39;,
+        model=&#39;&#39;,
+        modelTTS=&#39;&#39;,
+        modelSTT=&#39;&#39;
+    </code></td></tr><tr><td><code>AI.ready</code></td><td>field</td><td><code>ready=false;</code></td><td>—</td></tr><tr><td><code>AI.muted</code></td><td>field</td><td><code>muted=false;</code></td><td>—</td></tr><tr><td><code>AI.llmService</code></td><td>field</td><td><code>llmService = &#39;&#39;;</code></td><td>—</td></tr><tr><td><code>AI.sttService</code></td><td>field</td><td><code>sttService = &#39;&#39;;</code></td><td>—</td></tr><tr><td><code>AI.ttsService</code></td><td>field</td><td><code>ttsService = &#39;&#39;;</code></td><td>—</td></tr><tr><td><code>AI.model</code></td><td>field</td><td><code>model    = &#39;&#39;;</code></td><td>—</td></tr><tr><td><code>AI.modelTTS</code></td><td>field</td><td><code>modelTTS = &#39;&#39;;</code></td><td>—</td></tr><tr><td><code>AI.modelSTT</code></td><td>field</td><td><code>modelSTT = &#39;&#39;;</code></td><td>—</td></tr><tr><td><code>AI.reasoningEffort</code></td><td>field</td><td><code>reasoningEffort = &#39;&#39;;</code></td><td>—</td></tr><tr><td><code>AI.audioFormat</code></td><td>field</td><td><code>audioFormat = &#39;opus&#39;;</code></td><td>—</td></tr><tr><td><code>AI.audioType</code></td><td>field</td><td><code>audioType   = &#39;audio/ogg; codecs=opus&#39;;</code></td><td>—</td></tr><tr><td><code>AI.voiceSpeed</code></td><td>field</td><td><code>voiceSpeed = 1.0;</code></td><td>—</td></tr><tr><td><code>AI.audioMessageChunks</code></td><td>field</td><td><code>audioMessageChunks=&#39;&#39;;</code></td><td>—</td></tr><tr><td><code>AI.sourceNodes</code></td><td>field</td><td><code>sourceNodes=[];</code></td><td>—</td></tr><tr><td><code>AI.isSpeaking</code></td><td>field</td><td><code>isSpeaking=false;</code></td><td>—</td></tr><tr><td><code>AI.audioContext</code></td><td>field</td><td><code>audioContext=null;</code></td><td>—</td></tr><tr><td><code>AI.currentSpeechJob</code></td><td>field</td><td><code>currentSpeechJob=null;</code></td><td>—</td></tr><tr><td><code>AI.speechGeneration</code></td><td>field</td><td><code>speechGeneration=0;</code></td><td>—</td></tr><tr><td><code>AI.speechJobs</code></td><td>field</td><td><code>speechJobs=[];</code></td><td>—</td></tr><tr><td><code>AI.speechAwaitingGesture</code></td><td>field</td><td><code>speechAwaitingGesture=false;</code></td><td>—</td></tr><tr><td><code>AI.speechPlaybackStarting</code></td><td>field</td><td><code>speechPlaybackStarting=false;</code></td><td>—</td></tr><tr><td><code>AI.speechResumeAttempt</code></td><td>field</td><td><code>speechResumeAttempt=0;</code></td><td>—</td></tr><tr><td><code>AI.speechResumePending</code></td><td>field</td><td><code>speechResumePending=false;</code></td><td>—</td></tr><tr><td><code>AI.speechSynthesisTail</code></td><td>field</td><td><code>speechSynthesisTail=Promise.resolve();</code></td><td>—</td></tr><tr><td><code>AI.speechUnlockHandler</code></td><td>field</td><td><code>speechUnlockHandler=null;</code></td><td>—</td></tr><tr><td><code>AI.url</code></td><td>get</td><td><code>get url()</code></td><td><code>—</code></td></tr><tr><td><code>AI.url</code></td><td>set</td><td><code>set url(value)</code></td><td><code>value</code></td></tr><tr><td><code>AI.urlTTS</code></td><td>get</td><td><code>get urlTTS()</code></td><td><code>—</code></td></tr><tr><td><code>AI.urlTTS</code></td><td>set</td><td><code>set urlTTS(value)</code></td><td><code>value</code></td></tr><tr><td><code>AI.urlSTT</code></td><td>get</td><td><code>get urlSTT()</code></td><td><code>—</code></td></tr><tr><td><code>AI.urlSTT</code></td><td>set</td><td><code>set urlSTT(value)</code></td><td><code>value</code></td></tr><tr><td><code>AI.license</code></td><td>get</td><td><code>get license()</code></td><td><code>—</code></td></tr><tr><td><code>AI.license</code></td><td>set</td><td><code>set license(value)</code></td><td><code>value</code></td></tr><tr><td><code>AI.configured</code></td><td>get</td><td><code>get configured()</code></td><td><code>—</code></td></tr><tr><td><code>AI.setAI</code></td><td>method</td><td><code>setAI(
+        llmService,
+        sttService,
+        ttsService,
+        model,
+        modelTTS,
+        modelSTT
+    )</code></td><td><code>
+        llmService,
+        sttService,
+        ttsService,
+        model,
+        modelTTS,
+        modelSTT
+    </code></td></tr><tr><td><code>AI.streamRequest</code></td><td>async method</td><td><code>async streamRequest({
+        messages=[],
+        structuredOutput=false,
+        localOnly=false,
+        onChunk=function ignoreStreamChunk(){},
+        onComplete=function finishIgnoredStream(){},
+        tools=[],
+        toolChoice=&#39;auto&#39;,
+        onToolCall=function ignoreEarlyFunction(){},
+        onRequest=function ignoreStreamRequest(){},
+        parallelToolCalls=true,
+        id=Date.now(),
+        seeThinking=false,
+        signal=null
+    }={})</code></td><td><code>{
+        messages=[],
+        structuredOutput=false,
+        localOnly=false,
+        onChunk=function ignoreStreamChunk(){},
+        onComplete=function finishIgnoredStream(){},
+        tools=[],
+        toolChoice=&#39;auto&#39;,
+        onToolCall=function ignoreEarlyFunction(){},
+        onRequest=function ignoreStreamRequest(){},
+        parallelToolCalls=true,
+        id=Date.now(),
+        seeThinking=false,
+        signal=null
+    }={}</code></td></tr><tr><td><code>AI.streamMessage</code></td><td>async method</td><td><code>async streamMessage(
+        messages=[],
+        streamHandler=function ignoreStreamChunk(){},
+        streamComplete=function finishIgnoredStream(){},
+        tools=[],
+        tool_choice=&#39;auto&#39;,
+        earlyFunctionTrigger=function ignoreEarlyFunction(){},
+        parallel_tool_calls=true,
+        id=Date.now(),
+        seeThinking=false,
+        signal=null,
+        requestHandler=function ignoreStreamRequest(){},
+        structuredOutput=false
+    )</code></td><td><code>
+        messages=[],
+        streamHandler=function ignoreStreamChunk(){},
+        streamComplete=function finishIgnoredStream(){},
+        tools=[],
+        tool_choice=&#39;auto&#39;,
+        earlyFunctionTrigger=function ignoreEarlyFunction(){},
+        parallel_tool_calls=true,
+        id=Date.now(),
+        seeThinking=false,
+        signal=null,
+        requestHandler=function ignoreStreamRequest(){},
+        structuredOutput=false
+    </code></td></tr><tr><td><code>AI.fetchRequest</code></td><td>async method</td><td><code>async fetchRequest({
+        messages=[],
+        structuredOutput=false,
+        localOnly=false,
+        tools=[],
+        toolChoice=&#39;auto&#39;,
+        parallelToolCalls=true,
+        id=Date.now(),
+        signal=null,
+        onRequest=function ignoreFetchRequest(){},
+        onResponse=function ignoreFetchResponse(){}
+    }={})</code></td><td><code>{
+        messages=[],
+        structuredOutput=false,
+        localOnly=false,
+        tools=[],
+        toolChoice=&#39;auto&#39;,
+        parallelToolCalls=true,
+        id=Date.now(),
+        signal=null,
+        onRequest=function ignoreFetchRequest(){},
+        onResponse=function ignoreFetchResponse(){}
+    }={}</code></td></tr><tr><td><code>AI.fetch</code></td><td>async method</td><td><code>async fetch(
+        messages=[],
+        responseHandler=function ignoreFetchResponse(){},
+        structuredOutput=false,
+        tools=[],
+        tool_choice=&#39;auto&#39;,
+        parallel_tool_calls=true,
+        id=Date.now(),
+        requestHandler=function ignoreFetchRequest(){},
+        signal=null,
+    )</code></td><td><code>
+        messages=[],
+        responseHandler=function ignoreFetchResponse(){},
+        structuredOutput=false,
+        tools=[],
+        tool_choice=&#39;auto&#39;,
+        parallel_tool_calls=true,
+        id=Date.now(),
+        requestHandler=function ignoreFetchRequest(){},
+        signal=null,
+    </code></td></tr><tr><td><code>AI.streamTTS</code></td><td>method</td><td><code>streamTTS(
+        text=&#39;&#39;,
+        end=false
+    )</code></td><td><code>
+        text=&#39;&#39;,
+        end=false
+    </code></td></tr><tr><td><code>AI.finishTTS</code></td><td>method</td><td><code>finishTTS()</code></td><td><code>—</code></td></tr><tr><td><code>AI.fetchSTT</code></td><td>async method</td><td><code>async fetchSTT(
+        audioFile,
+        responseHandler=(text=&#39;&#39;)=&gt;{}
+    )</code></td><td><code>
+        audioFile,
+        responseHandler=(text=&#39;&#39;)=&gt;{}
+    </code></td></tr><tr><td><code>AI.stopAudio</code></td><td>method</td><td><code>stopAudio()</code></td><td><code>—</code></td></tr><tr><td><code>AI.resumeAudio</code></td><td>async method</td><td><code>async resumeAudio(audioContext=null,fromUserGesture=true)</code></td><td><code>audioContext=null,fromUserGesture=true</code></td></tr><tr><td><code>AI.playAudio</code></td><td>async method</td><td><code>async playAudio(
+        audioChunks=[],
+        audioContext=&lt;internal default&gt;,
+        sourceNode=null,
+        audioType=this.audioType,
+        speechJob=null
+    )</code></td><td><code>
+        audioChunks=[],
+        audioContext=&lt;internal default&gt;,
+        sourceNode=null,
+        audioType=this.audioType,
+        speechJob=null
+    </code></td></tr><tr><td><code>AI.nextSentance</code></td><td>method</td><td><code>nextSentance(job=this.currentSpeechJob)</code></td><td><code>job=this.currentSpeechJob</code></td></tr></tbody></table></div><h3 id="parameters-and-results">Parameter meanings and results</h3><p>AI(llmService, sttService, ttsService, model, modelTTS, modelSTT) selects providers and models. fetchRequest(options) returns OpenAI-compatible JSON, streamRequest(options) reports chunks, completion, and tool calls through callbacks, and the speech methods manage STT, TTS, and queued playback.</p><h2 id="events-side-effects-and-errors">Events, side effects, and errors</h2><h3 id="literal-custom-events">Source-literal <code>CustomEvent</code> dispatches</h3><ul><li><code>ai-ready</code></li></ul><h3 id="lifecycle-event-flow">Lifecycle and event flow</h3><ul><li>consumes user-entity-loaded</li><li>emits ai-ready</li></ul><h3 id="direct-coded-failures">Direct coded failures</h3><ul><li><code>AI_NATIVE_LOCAL_REQUIRED</code></li><li><code>AI_PROVIDER_NOT_CONFIGURED</code></li><li><code>AI_MODEL_INVALID</code></li><li><code>AI_REQUEST_FAILED</code></li><li><code>AI_ANDROID_NATIVE_SPEECH_UNAVAILABLE</code></li><li><code>AI_REQUIRED_TOOL_UNAVAILABLE</code></li><li><code>AI_STRUCTURED_OUTPUT_INVALID</code></li><li><code>AI_REQUIRED_TOOL_CALL_MISSING</code></li><li><code>AI_LOCAL_MODEL_REQUIRED</code></li><li><code>AI_REQUEST_ABORTED</code></li><li><code>AI_SERVICE_UNREACHABLE</code></li><li><code>AI_LOCAL_MODEL_REQUIRED</code></li><li><code>AI_SERVICE_UNREACHABLE</code></li></ul><h3 id="exported-error-subclasses">Exported Error subclasses</h3><p>This artifact exports no Error subclass.</p><h3 id="documented-failure-behavior">Documented failure behavior</h3><ul><li>AI_NATIVE_LOCAL_REQUIRED</li><li>AI_PROVIDER_NOT_CONFIGURED</li><li>AI_MODEL_INVALID</li><li>AI_LOCAL_MODEL_REQUIRED</li><li>AI_STRUCTURED_OUTPUT_INVALID</li><li>AI_REQUIRED_TOOL_UNAVAILABLE</li><li>AI_REQUIRED_TOOL_CALL_MISSING</li><li>AI_SERVICE_UNREACHABLE</li><li>AI_REQUEST_FAILED</li><li>AI_REQUEST_ABORTED</li><li>AI_ANDROID_NATIVE_SPEECH_UNAVAILABLE</li></ul><h2 id="availability-and-capabilities">Availability and capabilities</h2><p><strong>Browser + native bridge + cloud.</strong> High-level chat/speech behavior is normalized; provider diagnostics and media errors remain mixed.</p><p>Normalizes configured OpenAI HTTPS and admitted Arcane.ollama.chat or Arcane.speech paths; local AI requires an external admitted Core service and never silently falls back to cloud.</p><h2 id="example">Behavior example</h2><div class="code-block reference-code"><div class="code-bar"><span>JavaScript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import AI from &#39;/arcane/modules/AI.js&#39;;
+
+const ai=window.ai?.ready
+    ?window.ai
+    :await new Promise(resolve=&gt;addEventListener(&#39;ai-ready&#39;,event=&gt;resolve(event.detail.db),{once:true}));
+if(!ai.configured) throw new Error(&#39;Configure an AI provider first.&#39;);
+const response=await ai.fetchRequest({
+    messages:[{role:&#39;user&#39;,content:&#39;Answer in one sentence.&#39;}]
+});
+console.log(response.choices?.[0]?.message?.content);
+</code></pre></div><h2 id="related">Related reference</h2><ul><li><a href="../">Module index</a></li><li><a href="../../ai/">Normalized AI decision guide</a></li><li><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a></li><li><a href="../../core/reference/arcane-api/core-and-events/#arcaneruntimecurrent">Arcane.runtime.current()</a></li><li><a href="../../core/reference/arcane-api/namespaces/#arcaneai">Arcane.ai namespace</a></li></ul></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#overview">Overview</a><a href="#import-and-lifecycle">Import and lifecycle</a><a href="#exports-signatures-parameters-results">Exports, signatures, parameters, and results</a><a href="#events-side-effects-and-errors">Events, side effects, and errors</a><a href="#availability-and-capabilities">Availability and capabilities</a><a href="#example">Example</a><a href="#related">Related reference</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+</body>
+</html>

@@ -235,11 +235,11 @@ Seeking never rewrites DOM, storage, native state, processes, or network state.
 
 ```javascript
 await events.playback({
-    stack=null,
-    fromSequence=1,
-    toSequence=Number.MAX_SAFE_INTEGER,
-    speed=0,
-    mode='review',
+    stack:null,
+    fromSequence:1,
+    toSequence:Number.MAX_SAFE_INTEGER,
+    speed:0,
+    mode:'review',
     signal,
     onRecord
 });

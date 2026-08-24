@@ -1,16 +1,104 @@
 import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {readdir,readFile,stat} from 'node:fs/promises';
 import path from 'node:path';
 import {projectPackageManifest,validateAppDescriptor} from '../src/app-descriptor.mjs';
 import test from '../src/testing.mjs';
-import {verifyReferenceSite} from '../tools/build-reference-site.mjs';
+import {
+    createReferenceSite,
+    publicContractSyntax,
+    runtimeModuleSlug,
+    verifyReferenceSite
+} from '../tools/build-reference-site.mjs';
+import {extractRuntimeReferenceContracts} from '../tools/reference-contract-extractor.mjs';
+import {
+    behaviorExampleEvidence,
+    createReferenceModuleContractMap
+} from '../tools/reference-module-contracts.mjs';
+import {
+    filterModuleSearchRecords,
+    moduleMatchesSearch,
+    normalizeModuleSearch
+} from '../site/reference/reference.js';
 import {repositoryRoot} from './helpers.mjs';
 import '../examples/hello-world/apps/hello-world/test/app.test.mjs';
 
 const siteRoot=path.join(repositoryRoot,'site');
 const exampleRoot=path.join(repositoryRoot,'examples','hello-world');
 const canonicalRoot='https://thewizardnexus.github.io/arcane-os-sdk/';
+const runtimeContractSummary=Object.freeze({
+    artifactCount:80,
+    esmModuleCount:74,
+    esmExportCount:282,
+    exportForms:Object.freeze({
+        function:148,
+        variable:54,
+        class:10,
+        alias:25,
+        're-export':4,
+        default:41
+    }),
+    reviewedCallableCount:124,
+    reviewedModuleCount:51,
+    literalCustomEventCount:11,
+    directCodedFailureCount:34,
+    exportedErrorSubclassCount:3,
+    publicMemberCount:407
+});
+const behaviorEvidenceCommit='567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e';
+const expectedBehaviorEvidence=Object.freeze({
+    'AI.js':['6090c5a563c66f972267fec30184c85fbf3ec7de','test/ai.test.mjs','7593bb20967881622d5634829f2e6f05511659cc'],
+    'AnsiText.js':['097512451032ffbbceecdc3b02e3af6453e89e90','test/terminal.test.mjs','26fec62b4819635a279922c2e297130748400c4c'],
+    'AppDataScope.js':['9943961bd8c4cf93655eece17f14b29ea817357a','test/dbls-app-isolation.test.mjs','583d396c16c5209c8fdaaea3744931816b814e99'],
+    'CalculatorEngine.js':['4434d5ad287f94136c054e4cc1b2423387331c06','test/utility-apps.test.mjs','2ddee94c58e751b0e6bec58955431d7994628757'],
+    'ConfiguredAIChatSession.js':['21d48eb2af74494b9ee14fca889e571d184d535a','test/configured-ai-chat-session.test.mjs','28f29b2ca5e62aa76952d61adf570155f31a906c'],
+    'DirectoryPicker.js':['506e54471d775404de55b3166b79a466af64d646','test/directory-picker.test.mjs','27230080a0d589212de442a17849233cdb80eb0c'],
+    'IsolatedModelQuestionRunner.js':['94c6df9e7661b507a495223facb31cd0d3ac7ede','test/isolated-model-question-runner.test.mjs','e94dd4b80b492ce5ff12ae83818915c5c44c298d'],
+    'Ollama.js':['fcfd7942e9c706088b23be44180427774763d92a','test/ollama.test.mjs','35187394154e95c883432c203bc79aa8c2a13367'],
+    'SpeechPlayback.js':['20d4935deeb97d1be4221f5859897fafd6bb6449','test/speech-playback.test.mjs','6f7307973f35b50ffbc6d5109ab3f558a202a45f'],
+    'TerminalClient.js':['35d9c6502979331538d69c63f96b73b792ce014c','test/terminal.test.mjs','26fec62b4819635a279922c2e297130748400c4c'],
+    'ThemeBootstrap.js':['9a0fb2d9729141175b835f7c95a208a650c66d2e','test/theme-manager-system-appearance.test.mjs','53a5cc666c6c6db4f5e11b77e5975723946e10c7']
+});
+const expectedCapabilityStrings=Object.freeze([
+    'ai.inference',
+    'ai.models.manage',
+    'ai.models.read',
+    'ai.runtime.manage',
+    'ai.settings.manage',
+    'appearance.read',
+    'appearance.write',
+    'applications.launch',
+    'applications.read',
+    'development.manage',
+    'development.read',
+    'diagnostics.read',
+    'environment.protected.read',
+    'environment.read',
+    'environment.write',
+    'external.open',
+    'filesystem.directory.select',
+    'firewall.manage',
+    'firewall.read',
+    'identity.read',
+    'installation.read',
+    'mail.send',
+    'network.status.read',
+    'preferences.read',
+    'preferences.write',
+    'provisioning.manage',
+    'repository.kempo.read',
+    'repository.kempo.write',
+    'repository.spellwire.read',
+    'requirements.read',
+    'session.control',
+    'storage.read',
+    'storage.write',
+    'system.metrics.read',
+    'system.read',
+    'terminal.execute',
+    'users.manage'
+]);
 const htmlCache=new Map();
 const staticPageRoutes=new Map([
     ['index.html',''],
@@ -93,6 +181,140 @@ function escapeHtmlSource(value){
         .replaceAll('>','&gt;');
 }
 
+function decodeReferenceHtml(value){
+    return value
+        .replace(/&#x([0-9a-f]+);/giu,(_,digits)=>String.fromCodePoint(Number.parseInt(digits,16)))
+        .replace(/&#([0-9]+);/gu,(_,digits)=>String.fromCodePoint(Number.parseInt(digits,10)))
+        .replaceAll('&quot;','"')
+        .replaceAll('&apos;',"'")
+        .replaceAll('&lt;','<')
+        .replaceAll('&gt;','>')
+        .replaceAll('&amp;','&');
+}
+
+function referencePlanHash(plan){
+    const hash=createHash('sha256');
+    const outputs=[...plan.expectedFiles].sort(([left],[right])=>left.localeCompare(right,'en'));
+    for(const [output,bytes] of outputs){
+        hash.update(output);
+        hash.update('\0');
+        hash.update(bytes);
+        hash.update('\0');
+    }
+    return hash.digest('hex');
+}
+
+function gitBlobOid(bytes){
+    return createHash('sha1')
+        .update(`blob ${String(bytes.byteLength)}\0`)
+        .update(bytes)
+        .digest('hex');
+}
+
+function moduleExample(html){
+    const start=html.indexOf('<h2 id="example">');
+    const end=html.indexOf('<h2 id="related">',start);
+    assert.ok(start>=0&&end>start,'The module page must have an example followed by related links.');
+    const section=html.slice(start,end);
+    const source=section.match(
+        /<pre><code class="language-(javascript|html)">([\s\S]*?)<\/code><\/pre>/u
+    );
+    return source?{
+        language:source[1],
+        source:decodeReferenceHtml(source[2])
+    }:null;
+}
+
+function htmlCellText(value){
+    return decodeReferenceHtml(value.replace(/<[^>]*>/gu,''));
+}
+
+function contractTableRows(html,label){
+    const table=html.match(new RegExp(
+        `aria-label="${escapePattern(label)}"[\\s\\S]*?<tbody>([\\s\\S]*?)<\\/tbody>`,
+        'u'
+    ));
+    if(!table)return [];
+    return [...table[1].matchAll(/<tr>([\s\S]*?)<\/tr>/gu)].map(row=>
+        [...row[1].matchAll(/<td>([\s\S]*?)<\/td>/gu)].map(cell=>
+            htmlCellText(cell[1])
+        )
+    );
+}
+
+function contractListItems(html,startId,endId){
+    const start=html.indexOf(`id="${startId}"`);
+    const end=html.indexOf(`id="${endId}"`,start+1);
+    assert.ok(start>=0&&end>start,`${startId} must precede ${endId}.`);
+    return [...html.slice(start,end).matchAll(/<li>([\s\S]*?)<\/li>/gu)]
+        .map(item=>htmlCellText(item[1]));
+}
+
+function bindingSignature(binding){
+    if(binding.rawSignature)return binding.rawSignature;
+    if(['alias','re-export'].includes(binding.form))return binding.rawDeclaration;
+    return [binding.declarationKind??binding.valueKind??binding.form,binding.name]
+        .filter(Boolean).join(' ');
+}
+
+function expectedStructuralMemberRows(sourceContract){
+    const rows=[];
+    const constructors=new Set();
+    const fields=new Set();
+    for(const binding of sourceContract.exports){
+        const classContract=binding.classContract;
+        if(!classContract)continue;
+        const owner=classContract.name??binding.localName??binding.name;
+        if(classContract.constructor){
+            const key=`${owner}:${classContract.constructor.range.start}`;
+            if(!constructors.has(key)){
+                constructors.add(key);
+                rows.push([
+                    `${owner}.constructor`,
+                    publicContractSyntax(classContract.constructor.rawSignature),
+                    publicContractSyntax(classContract.constructor.parameters)
+                ]);
+            }
+        }
+        for(const field of classContract.fields){
+            const key=`${owner}:${field.range.start}`;
+            if(fields.has(key))continue;
+            fields.add(key);
+            rows.push([
+                `${owner}.${field.name}`,
+                publicContractSyntax(field.rawDeclaration),
+                '—'
+            ]);
+        }
+    }
+    return rows;
+}
+
+function assertModuleExamplesParse(examples){
+    const parser=`import vm from 'node:vm';
+let input='';
+for await (const chunk of process.stdin) input+=chunk;
+for(const [name,source] of JSON.parse(input)){
+    try{new vm.SourceTextModule(source,{identifier:name});}
+    catch(error){
+        process.stderr.write(name+': '+error.stack+'\\n');
+        process.exitCode=1;
+    }
+}`;
+    const result=spawnSync(
+        process.execPath,
+        ['--experimental-vm-modules','--input-type=module','--eval',parser],
+        {
+            input:JSON.stringify(examples),
+            encoding:'utf8',
+            maxBuffer:16*1024*1024,
+            timeout:30_000,
+            windowsHide:true
+        }
+    );
+    assert.equal(result.status,0,result.stderr||result.error?.message);
+}
+
 async function assertLocalReference(sourceFile,reference){
     if(externalReference(reference))return;
     const [pathAndQuery,rawFragment='']=reference.split('#',2);
@@ -170,14 +392,18 @@ test('the complete API reference is a first-party generated Pages corpus',async 
     assert.deepEqual(manifest.counts,{
         markdownPages:24,
         collectionPages:2,
-        htmlPages:26,
+        generatedPages:82,
+        runtimeModulePages:80,
+        htmlPages:108,
         inventories:4
     });
     assert.equal(manifest.pages.filter(page=>page.kind==='markdown').length,24);
     assert.equal(manifest.pages.filter(page=>page.kind==='collection').length,2);
-    assert.equal(new Set(manifest.pages.map(page=>page.source)).size,26);
-    assert.equal(new Set(manifest.pages.map(page=>page.output)).size,26);
-    assert.equal(new Set(manifest.pages.map(page=>page.route)).size,26);
+    assert.equal(manifest.pages.filter(page=>page.kind==='runtime-module').length,80);
+    assert.equal(manifest.pages.filter(page=>page.kind==='generated').length,2);
+    assert.equal(new Set(manifest.pages.map(page=>page.source)).size,108);
+    assert.equal(new Set(manifest.pages.map(page=>page.output)).size,108);
+    assert.equal(new Set(manifest.pages.map(page=>page.route)).size,108);
 
     await t.test('the landing and rendered documents keep detailed navigation on Pages',async()=>{
         const landing=await readSiteFile('reference/index.html');
@@ -190,14 +416,12 @@ test('the complete API reference is a first-party generated Pages corpus',async 
             assert.doesNotMatch(html,/href="(?!https?:)[^"]+[.]md(?:[?#][^"]*)?"/iu,page.output);
             assert.doesNotMatch(html,/href="javascript:/iu,page.output);
             assert.doesNotMatch(html,/<script(?![^>]*\bsrc=)[^>]*>/iu,page.output);
-            const sourceLinks=html.match(/<a\b[^>]*class="[^"]*reference-source-link[^"]*"[^>]*>/gu)??[];
-            assert.equal(sourceLinks.length,1,page.output);
-            assert.match(sourceLinks[0],/target="_blank"/u,page.output);
-            assert.match(sourceLinks[0],/rel="noreferrer"/u,page.output);
+            assert.doesNotMatch(html,/reference-source-link/u,page.output);
+            assert.doesNotMatch(html,/github[.]com\/TheWizardNexus\/(?:arcane-os-sdk|ARCANE-OS)/iu,page.output);
+            assert.doesNotMatch(html,/Developer Reference Maintenance SOP|repository-only|npm run model:ensure/iu,page.output);
             const ids=[...html.matchAll(/\bid="([^"]+)"/gu)].map(match=>match[1]);
             assert.equal(new Set(ids).size,ids.length,`${page.output} contains duplicate element ids.`);
-            const source=await readFile(path.join(repositoryRoot,...page.source.split('/')),'utf8');
-            if(source.includes('```')){
+            if(html.includes('<pre><code')){
                 assert.match(html,/class="[^"]*\bcode-block\b[^"]*"/u,page.output);
                 assert.match(html,/data-copy-button/u,page.output);
                 assert.match(html,/data-copy-status/u,page.output);
@@ -251,6 +475,476 @@ test('the complete API reference is a first-party generated Pages corpus',async 
         assert.match(events,/<summary>/u);
         assert.match(protocols,/<details>/u);
         assert.match(protocols,/<summary>/u);
+    });
+});
+
+test('generated runtime reference contracts are exhaustive and reader-first',async t=>{
+    const [firstPlan,secondPlan,runtimeInventory,sourceContracts]=await Promise.all([
+        createReferenceSite(),
+        createReferenceSite(),
+        readJson(path.join(repositoryRoot,'docs','reference','inventory','runtime-modules.json')),
+        extractRuntimeReferenceContracts({repositoryRoot})
+    ]);
+    const records=runtimeInventory.artifacts;
+    const modulePages=firstPlan.manifest.pages.filter(page=>page.kind==='runtime-module');
+    const pagesBySource=new Map(modulePages.map(page=>[page.source,page]));
+    const sourceByName=new Map(sourceContracts.modules.map(contract=>[contract.name,contract]));
+    const overlays=createReferenceModuleContractMap(records);
+
+    await t.test('repeated plans and source extraction have the exact stable census',()=>{
+        const verified=spawnSync(
+            process.execPath,
+            [
+                '--experimental-vm-modules',
+                path.join(repositoryRoot,'tools','reference-contract-extractor.mjs'),
+                '--verify-runtime'
+            ],
+            {
+                cwd:repositoryRoot,
+                encoding:'utf8',
+                maxBuffer:16*1024*1024,
+                timeout:30_000,
+                windowsHide:true
+            }
+        );
+        assert.equal(verified.status,0,verified.stderr||verified.error?.message);
+        const verifiedSummary=JSON.parse(verified.stdout);
+        assert.equal(verifiedSummary.schemaVersion,1);
+        assert.match(verifiedSummary.hash,/^[0-9a-f]{64}$/u);
+        assert.deepEqual(
+            Object.fromEntries(Object.entries(verifiedSummary).filter(
+                ([key])=>!['schemaVersion','hash'].includes(key)
+            )),
+            runtimeContractSummary
+        );
+        assert.equal(referencePlanHash(firstPlan),referencePlanHash(secondPlan));
+        assert.deepEqual(firstPlan.manifest,secondPlan.manifest);
+        assert.deepEqual(sourceContracts.summary,runtimeContractSummary);
+        assert.deepEqual(firstPlan.manifest.runtimeContracts.summary,runtimeContractSummary);
+        assert.equal(firstPlan.manifest.runtimeContracts.hash,sourceContracts.hash);
+        assert.match(sourceContracts.hash,/^[0-9a-f]{64}$/u);
+        assert.equal(sourceContracts.modules.length,80);
+        assert.deepEqual(sourceContracts.modules.map(module=>module.name),records.map(record=>record.name));
+        assert.deepEqual(records.reduce((counts,record)=>{
+            counts[record.kind]=(counts[record.kind]??0)+1;
+            return counts;
+        },{}),{
+            esm:74,
+            worker:1,
+            'classic-script':3,
+            license:1,
+            stylesheet:1
+        });
+    });
+
+    await t.test('curated overlays and behavior evidence have exact inventory parity',async()=>{
+        assert.equal(overlays.size,80);
+        assert.deepEqual([...overlays.keys()],records.map(record=>record.name));
+        assert.equal([...overlays.values()].filter(record=>record.classification==='public-first-party').length,73);
+        assert.equal([...overlays.values()].filter(record=>record.classification==='vendor').length,5);
+        assert.equal([...overlays.values()].filter(record=>record.classification==='host-internal').length,1);
+        assert.equal([...overlays.values()].filter(record=>record.classification==='internal-worker').length,1);
+        assert.deepEqual(
+            Object.keys(behaviorExampleEvidence).sort(),
+            Object.keys(expectedBehaviorEvidence).sort()
+        );
+        for(const [name,[sourceBlob,testPath,testBlob]] of Object.entries(expectedBehaviorEvidence)){
+            assert.deepEqual(behaviorExampleEvidence[name],{
+                repository:'TheWizardNexus/ARCANE-OS',
+                commit:behaviorEvidenceCommit,
+                sourceBlob,
+                testPath,
+                testBlob
+            });
+            assert.equal(
+                gitBlobOid(await readFile(path.join(repositoryRoot,'runtime','arcane','modules',name))),
+                sourceBlob,
+                `${name}: pinned source blob`
+            );
+        }
+    });
+
+    await t.test('every runtime artifact owns one complete local contract page',()=>{
+        assert.equal(modulePages.length,80);
+        assert.equal(pagesBySource.size,80);
+        assert.equal(modulePages.filter(page=>Object.hasOwn(page,'behaviorEvidence')).length,11);
+        const totals={
+            exports:0,
+            reviewedCallables:0,
+            publicMembers:0,
+            literalCustomEvents:0,
+            directCodedFailures:0,
+            exportedErrorSubclasses:0
+        };
+        let renderedBehaviorExamples=0;
+        for(const record of records){
+            const sourceContract=sourceByName.get(record.name);
+            const overlay=overlays.get(record.name);
+            const page=pagesBySource.get(record.file);
+            assert.ok(sourceContract,record.name);
+            assert.ok(overlay,record.name);
+            assert.ok(page,record.file);
+            assert.equal(page.output,`site/reference/runtime-modules/${runtimeModuleSlug(record.name)}/index.html`);
+            assert.equal(page.route,`reference/runtime-modules/${runtimeModuleSlug(record.name)}/`);
+            assert.equal(page.moduleClassification,overlay.classification);
+            assert.deepEqual(page.contractCounts,{
+                exports:sourceContract.exports.length,
+                reviewedCallables:sourceContract.reviewedCallables.length,
+                publicMembers:sourceContract.publicMembers.length,
+                literalCustomEvents:sourceContract.events.length,
+                directCodedFailures:sourceContract.directCodedFailures.length,
+                exportedErrorSubclasses:sourceContract.errorSubclasses.length
+            });
+            for(const key of Object.keys(totals))totals[key]+=page.contractCounts[key];
+
+            const html=firstPlan.expectedFiles.get(page.output).toString('utf8');
+            const decoded=decodeReferenceHtml(html);
+            for(const id of [
+                'overview',
+                'import-and-lifecycle',
+                'exports-signatures-parameters-results',
+                'parameters-and-results',
+                'events-side-effects-and-errors',
+                'availability-and-capabilities',
+                'example',
+                'related'
+            ])assert.match(html,new RegExp(`\\bid="${id}"`,'u'),`${record.name}: ${id}`);
+            const bindingRows=contractTableRows(html,'Exact module bindings');
+            assert.equal(bindingRows.length,sourceContract.exports.length,`${record.name}: binding rows`);
+            for(const [index,binding] of sourceContract.exports.entries()){
+                assert.equal(bindingRows[index][0],binding.name,`${record.name}: binding ${index} name`);
+                assert.equal(
+                    bindingRows[index][2],
+                    publicContractSyntax(bindingSignature(binding)),
+                    `${record.name}: binding ${binding.name} signature`
+                );
+                assert.equal(
+                    bindingRows[index][3],
+                    publicContractSyntax(binding.parameters),
+                    `${record.name}: binding ${binding.name} parameters`
+                );
+            }
+            const callableRows=contractTableRows(html,'Reviewed callable surface');
+            assert.equal(callableRows.length,sourceContract.reviewedCallables.length,`${record.name}: callable rows`);
+            for(const [index,callable] of sourceContract.reviewedCallables.entries()){
+                const publicName=callable.owner
+                    ?`${callable.owner}.${callable.name}`
+                    :callable.exportName??callable.name;
+                assert.equal(callableRows[index][0],publicName,`${record.name}: callable ${index} name`);
+                assert.equal(
+                    callableRows[index][2],
+                    publicContractSyntax(callable.rawSignature),
+                    `${record.name}: callable ${publicName} signature`
+                );
+                assert.equal(
+                    callableRows[index][3],
+                    publicContractSyntax(callable.parameters),
+                    `${record.name}: callable ${publicName} parameters`
+                );
+            }
+            const expectedMemberRows=[
+                ...expectedStructuralMemberRows(sourceContract),
+                ...sourceContract.publicMembers.map(member=>[
+                    `${member.owner}.${member.name}`,
+                    publicContractSyntax(member.rawSignature??member.rawDeclaration),
+                    publicContractSyntax(member.parameters)
+                ])
+            ];
+            const memberRows=contractTableRows(html,'Exported class and object members');
+            assert.equal(memberRows.length,expectedMemberRows.length,`${record.name}: member rows`);
+            for(const [index,[name,signature,parameters]] of expectedMemberRows.entries()){
+                assert.equal(memberRows[index][0],name,`${record.name}: member ${index} name`);
+                assert.equal(memberRows[index][2],signature,`${record.name}: member ${name} signature`);
+                assert.equal(memberRows[index][3],parameters,`${record.name}: member ${name} parameters`);
+            }
+            assert.deepEqual(
+                contractListItems(html,'literal-custom-events','lifecycle-event-flow'),
+                sourceContract.events.map(event=>event.name),
+                `${record.name}: literal CustomEvent list`
+            );
+            assert.deepEqual(
+                contractListItems(html,'direct-coded-failures','exported-error-subclasses'),
+                sourceContract.directCodedFailures.map(failure=>failure.code),
+                `${record.name}: coded failure list`
+            );
+            assert.deepEqual(
+                contractListItems(html,'exported-error-subclasses','documented-failure-behavior'),
+                sourceContract.errorSubclasses.map(error=>
+                    `${error.name??error.exportNames.join('/')} extends ${error.base}`
+                ),
+                `${record.name}: Error subclass list`
+            );
+            for(const value of [
+                record.name,
+                record.availability,
+                record.normalization,
+                overlay.lifecycleSideEffects,
+                overlay.paramsResults,
+                overlay.capabilitiesCore,
+                ...overlay.events,
+                ...overlay.errors
+            ])assert.ok(decoded.includes(value),`${record.name}: ${value}`);
+            for(const binding of sourceContract.exports){
+                assert.match(html,new RegExp(`<code>${escapePattern(binding.name)}</code>`,'u'),`${record.name}: ${binding.name}`);
+            }
+            for(const callable of sourceContract.reviewedCallables){
+                const publicName=callable.owner
+                    ?`${callable.owner}.${callable.name}`
+                    :callable.exportName??callable.name;
+                assert.ok(decoded.includes(publicName),`${record.name}: ${publicName}`);
+            }
+            for(const member of sourceContract.publicMembers){
+                assert.ok(decoded.includes(`${member.owner}.${member.name}`),`${record.name}: ${member.owner}.${member.name}`);
+            }
+            for(const event of sourceContract.events){
+                assert.ok(decoded.includes(event.name),`${record.name}: ${event.name}`);
+            }
+            for(const failure of sourceContract.directCodedFailures){
+                assert.ok(decoded.includes(failure.code),`${record.name}: ${failure.code}`);
+            }
+            for(const errorClass of sourceContract.errorSubclasses){
+                assert.ok(decoded.includes(`${errorClass.name} extends ${errorClass.base}`),`${record.name}: ${errorClass.name}`);
+            }
+            const contractStart=html.indexOf('<h2 id="exports-signatures-parameters-results">');
+            const contractEnd=html.indexOf('<h3 id="parameters-and-results">',contractStart);
+            assert.ok(contractStart>=0&&contractEnd>contractStart,record.name);
+            assert.doesNotMatch(
+                decodeReferenceHtml(html.slice(contractStart,contractEnd)),
+                /#[A-Za-z_$][A-Za-z0-9_$]*/u,
+                record.name
+            );
+            assert.doesNotMatch(
+                decoded,
+                /Validation evidence|current catalog does not|exact source path|Missing export|Object[.]keys|Runtime module loaded|structured member signatures and event\/error claims/iu,
+                record.name
+            );
+
+            const expectedEvidence=expectedBehaviorEvidence[record.name];
+            if(expectedEvidence){
+                renderedBehaviorExamples+=1;
+                assert.deepEqual(page.behaviorEvidence,{
+                    source:{
+                        repository:'TheWizardNexus/ARCANE-OS',
+                        commit:behaviorEvidenceCommit,
+                        path:record.file.replace(/^runtime\//u,''),
+                        blob:expectedEvidence[0],
+                        sha256:page.sourceSha256
+                    },
+                    test:{
+                        repository:'TheWizardNexus/ARCANE-OS',
+                        commit:behaviorEvidenceCommit,
+                        path:expectedEvidence[1],
+                        blob:expectedEvidence[2]
+                    }
+                });
+                assert.match(html,/<h2 id="example">Behavior example<\/h2>/u,record.name);
+            }else{
+                assert.equal(Object.hasOwn(page,'behaviorEvidence'),false,record.name);
+                assert.doesNotMatch(html,/<h2 id="example">Behavior example<\/h2>/u,record.name);
+            }
+        }
+        assert.deepEqual(totals,{
+            exports:282,
+            reviewedCallables:124,
+            publicMembers:407,
+            literalCustomEvents:11,
+            directCodedFailures:34,
+            exportedErrorSubclasses:3
+        });
+        assert.equal(renderedBehaviorExamples,11);
+    });
+
+    await t.test('reader navigation contains no source detours or private signatures',()=>{
+        const outputs=['site/reference/index.html',...firstPlan.manifest.pages.map(page=>page.output)];
+        for(const output of outputs){
+            const html=firstPlan.expectedFiles.get(output).toString('utf8');
+            assert.doesNotMatch(html,/href="[^"]*[.]md(?:[?#][^"]*)?"/iu,output);
+            assert.doesNotMatch(html,/github[.]com\/TheWizardNexus\/(?:arcane-os-sdk|ARCANE-OS)/iu,output);
+            assert.doesNotMatch(html,/reference-source-link|Canonical source|exact source path/iu,output);
+            assert.doesNotMatch(
+                html,
+                /Developer Reference Maintenance SOP|repository-only|npm run model:ensure|during this import|pinned upstream|id="version-scope-and-provenance"/iu,
+                output
+            );
+            for(const code of html.matchAll(/<pre><code[^>]*>([\s\S]*?)<\/code><\/pre>/gu)){
+                assert.doesNotMatch(
+                    decodeReferenceHtml(code[1]),
+                    /(?:https?:\/\/)?(?:127[.]0[.]0[.]1|localhost):11434/iu,
+                    output
+                );
+            }
+        }
+    });
+
+    await t.test('normalized AI is the primary path and AI.js stays default-only',()=>{
+        const landing=firstPlan.expectedFiles.get('site/reference/index.html').toString('utf8');
+        const guide=decodeReferenceHtml(firstPlan.expectedFiles.get('site/reference/ai/index.html').toString('utf8'));
+        const aiModule=decodeReferenceHtml(firstPlan.expectedFiles.get('site/reference/runtime-modules/ai/index.html').toString('utf8'));
+        const ollamaModule=decodeReferenceHtml(firstPlan.expectedFiles.get('site/reference/runtime-modules/ollama/index.html').toString('utf8'));
+        assert.ok(landing.indexOf('href="ai/"')>=0);
+        assert.ok(landing.indexOf('href="ai/"')<landing.indexOf('href="arcane-ollama/"'));
+        assert.match(guide,/<strong>Application default[.]<\/strong> Start with normalized AI/iu);
+        assert.match(guide,/globalThis[.]Arcane[.]ai/iu);
+        assert.match(guide,/<code>AI[.]js<\/code> has one export: its default <code>AI<\/code> class/iu);
+        assert.deepEqual(sourceByName.get('AI.js').exports.map(record=>record.name),['default']);
+        assert.match(aiModule,/import AI from '\/arcane\/modules\/AI[.]js'/u);
+        assert.doesNotMatch(aiModule,/import\s*\{[^}]*\bAI\b[^}]*\}\s*from/u);
+        assert.match(aiModule,/ai-ready/u);
+        assert.match(ollamaModule,/Advanced provider-specific surface/iu);
+        assert.match(ollamaModule,/never authorizes a renderer to contact Ollama port 11434 directly/iu);
+    });
+
+    await t.test('the module index search is exact, bounded, and complete',()=>{
+        assert.deepEqual(normalizeModuleSearch('  AI.js / Speech  '),['ai','js','speech']);
+        assert.deepEqual(filterModuleSearchRecords(records),records);
+        for(const [kind,count] of [
+            ['esm',74],
+            ['classic-script',3],
+            ['worker',1],
+            ['stylesheet',1],
+            ['license',1]
+        ])assert.equal(filterModuleSearchRecords(records,'',{kind}).length,count,kind);
+        const ai=records.find(record=>record.name==='AI.js');
+        assert.equal(moduleMatchesSearch(ai,'provider speech cloud'),true);
+        assert.equal(moduleMatchesSearch(ai,'provider speech cloud',{kind:'worker'}),false);
+        assert.deepEqual(
+            filterModuleSearchRecords(records,'directory select').map(record=>record.name),
+            ['DirectoryPicker.js']
+        );
+        assert.deepEqual(filterModuleSearchRecords(records,'[no regex execution]'),[]);
+        const script=firstPlan.expectedFiles.get('site/reference/reference.js').toString('utf8');
+        assert.match(script,/data-module-search-input/u);
+        assert.match(script,/data-module-kind/u);
+        assert.doesNotMatch(script,/innerHTML|\beval\s*\(|(?:fetch|XMLHttpRequest)\s*\(/u);
+    });
+
+    await t.test('Core publishes all 113 methods including owning-app extensions',()=>{
+        const coreOutputs=firstPlan.manifest.pages
+            .filter(page=>page.output.startsWith('site/reference/core/'))
+            .map(page=>firstPlan.expectedFiles.get(page.output).toString('utf8'));
+        const core=decodeReferenceHtml(coreOutputs.join('\n'));
+        assert.match(core,/150 records: 113 callable methods, 35 namespaces, one <code>Arcane[.]Error<\/code> constructor, and one protocol value/iu);
+        for(const member of [
+            'Arcane.localAI.inspectIsolatedModel',
+            'Arcane.localAI.runIsolatedQuestion',
+            'Arcane.repository.kempo.snapshot',
+            'Arcane.repository.kempo.begin',
+            'Arcane.repository.kempo.score',
+            'Arcane.repository.kempo.publish',
+            'Arcane.repository.spellwire.snapshot'
+        ])assert.ok(core.includes(member),member);
+        const isolated=htmlCellText(firstPlan.expectedFiles.get(
+            'site/reference/core/reference/arcane-api/ai-and-ollama/index.html'
+        ).toString('utf8'));
+        assert.match(isolated,/Kempo-only, ai[.]inference, admitted desktop Core/u);
+        assert.match(isolated,/\{model, expectedModel, contextTokens\}/u);
+        assert.match(isolated,/\{schemaVersion:1, model, defaults:\{systemPromptPresent:false,messageCount:0\}, admission\}/u);
+        assert.match(isolated,/Client timeout is 45 seconds/u);
+        assert.match(isolated,/request is exact \{model,prompt,systemPrompt,options,expectedModel,think[?]\}/u);
+        assert.match(isolated,/\{schemaVersion:1,model,answer,startedAt,completedAt,elapsedMs,isolation\}/u);
+        for(const phase of ['unload_before','verify_before','chat','unload_after','verify_after']){
+            assert.ok(isolated.includes(phase),phase);
+        }
+        assert.match(isolated,/method is exclusive, Core-only/u);
+        assert.match(isolated,/No Android projection/u);
+        assert.match(isolated,/uses a 50-minute client timeout/u);
+        const repositories=htmlCellText(firstPlan.expectedFiles.get(
+            'site/reference/core/reference/arcane-api/applications-terminal-capabilities/index.html'
+        ).toString('utf8'));
+        assert.match(repositories,/Arcane[.]repository[.]kempo[.]snapshot[(]runId[?][)]/u);
+        assert.match(repositories,/Arcane[.]repository[.]kempo[.]begin[(]\{runId,briefVersion\}[)]/u);
+        assert.match(repositories,/Arcane[.]repository[.]kempo[.]score[(]\{runId,questionId,score,letterScores\}[)]/u);
+        assert.match(repositories,/Arcane[.]repository[.]kempo[.]publish[(]\{document\}[)]/u);
+        assert.match(repositories,/\{repositoryId,branch,remoteHead,identity,catalog,runs,validation\}/u);
+        assert.match(repositories,/\{repositoryId,branch,remoteHead,commit,identity,pushed,verified:true,run\}/u);
+        assert.match(repositories,/Requires repository[.]kempo[.]write, the matching bound application ID, admitted Core, and a 50-minute client timeout[.] Kempo mutations are exclusive[.]/u);
+        assert.match(repositories,/Arcane[.]repository[.]spellwire[.]snapshot[(][)]/u);
+        assert.match(repositories,/\{repositoryId:'spellwire',branch:'main',remoteHead,fetchedAt,files\}/u);
+        assert.equal((repositories.match(/50-minute client timeout/gu)??[]).length,5);
+        assert.match(repositories,/no Android projection/u);
+        const namespaces=htmlCellText(firstPlan.expectedFiles.get(
+            'site/reference/core/reference/arcane-api/namespaces/index.html'
+        ).toString('utf8'));
+        assert.match(namespaces,/exact app ID kempo-bound; snapshot requires repository[.]kempo[.]read, while the three exclusive mutations require repository[.]kempo[.]write/u);
+        assert.match(namespaces,/exact app ID spellwire-bound, and requires repository[.]spellwire[.]read/u);
+    });
+
+    await t.test('all 37 capability policies and four capability-free methods are explicit',()=>{
+        const capabilities=firstPlan.expectedFiles.get('site/reference/core/capabilities/index.html').toString('utf8');
+        const records=[...capabilities.matchAll(
+            /<h2 id="capability-[^"]+"><code>([^<]+)<\/code><\/h2><p><strong>Exact RPC method names:<\/strong> ([\s\S]*?)<\/p>/gu
+        )];
+        assert.deepEqual(records.map(match=>match[1]),expectedCapabilityStrings);
+        const gatedMethods=records.flatMap(match=>
+            [...match[2].matchAll(/<code>([^<]+)<\/code>/gu)].map(method=>method[1])
+        );
+        assert.equal(gatedMethods.length,102);
+        assert.equal(new Set(gatedMethods).size,102);
+        const freeSection=capabilities.match(
+            /<h2 id="capability-free-rpc-methods">([\s\S]*?)<\/table>/u
+        )?.[1]??'';
+        assert.deepEqual(
+            [...freeSection.matchAll(/<td><code>([^<]+)<\/code><\/td>/gu)].map(match=>match[1]),
+            ['app.current','capabilities.list','system.ping','version.current']
+        );
+        const aiStart=capabilities.indexOf('<h2 id="capability-aiinference">');
+        const aiEnd=capabilities.indexOf('<h2 id="capability-aimodelsmanage">',aiStart);
+        const aiPolicy=decodeReferenceHtml(capabilities.slice(aiStart,aiEnd));
+        assert.match(
+            aiPolicy,
+            /Android projects localai[.]status, ollama[.]chat, speech[.]status, speech[.]synthesize, and speech[.]transcribe only to exact application IDs boss and precrisis[.]/u
+        );
+        assert.match(aiPolicy,/correlated ollama[.]chunk event/u);
+    });
+
+    await t.test('every rendered JavaScript block and classic inline example parses',()=>{
+        const examples=[];
+        for(const page of firstPlan.manifest.pages){
+            const html=firstPlan.expectedFiles.get(page.output).toString('utf8');
+            let blockIndex=0;
+            for(const block of html.matchAll(
+                /<pre><code class="language-(?:javascript|js|mjs)">([\s\S]*?)<\/code><\/pre>/gu
+            )){
+                blockIndex+=1;
+                examples.push([
+                    `${page.output} JavaScript block ${blockIndex}`,
+                    decodeReferenceHtml(block[1])
+                ]);
+            }
+        }
+        const renderedJavaScriptBlockCount=examples.length;
+        assert.equal(renderedJavaScriptBlockCount,549);
+        let javaScriptModuleExamples=0;
+        let classicInlineExamples=0;
+        for(const record of records){
+            const page=pagesBySource.get(record.file);
+            const html=firstPlan.expectedFiles.get(page.output).toString('utf8');
+            const example=moduleExample(html);
+            if(['esm','worker'].includes(record.kind)){
+                assert.equal(example?.language,'javascript',record.name);
+                javaScriptModuleExamples+=1;
+            }else if(record.kind==='classic-script'){
+                assert.equal(example?.language,'html',record.name);
+                assert.ok(
+                    example.source.includes(`<script src="/arcane/modules/${record.name}"></script>`),
+                    record.name
+                );
+                const inline=[...example.source.matchAll(
+                    /<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gu
+                )].map(match=>match[1].trim()).filter(Boolean);
+                assert.equal(inline.length,1,record.name);
+                examples.push([`${record.name} inline script`,inline[0]]);
+                classicInlineExamples+=1;
+            }else if(record.kind==='stylesheet'){
+                assert.equal(example?.language,'html',record.name);
+            }else{
+                assert.equal(example,null,record.name);
+            }
+        }
+        assert.equal(javaScriptModuleExamples,75);
+        assert.equal(classicInlineExamples,3);
+        assert.equal(examples.length,552);
+        assertModuleExamplesParse(examples);
     });
 });
 

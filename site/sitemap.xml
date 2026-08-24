@@ -12,7 +12,9 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/examples/hello-world/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/playground/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/testing/</loc></url>
+  <!-- generated:reference-routes:start -->
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/arcane-ollama/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/availability-and-normalization/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/behavioral-testing/</loc></url>
@@ -22,6 +24,7 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-api/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-entities/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-events/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/capabilities/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/ollama-module/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/ai-and-ollama/</loc></url>
@@ -38,7 +41,88 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-components/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-entities/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai-preference-runtime/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai-preference-tuple/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai-response-length/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai-response-url-policy/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ansi-text/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/api-model-database/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/app-data-scope/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/appearance-preferences/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/arcane-communication-bridge/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/arcane-navigation-policy/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/arcane-network-policy/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/async-boundary/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/browser-test-suite/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/calculator-engine/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/case-evidence-indexer/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/chart-library/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/chat-records/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/communication-app-controller/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/communication-hub/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/communication-preferences/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/communication-provider-registry/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/component-contracts/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/configured-ai-chat-session/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/conversation-action-items/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/conversation-closing-report/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/conversation-timebox/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/core-local-model-catalog/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/data-maintenance/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/dbls/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/dbopfs-worker/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/dbopfs/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/development-workspace/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/directory-picker/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/document-navigation/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/errors/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/gif-encoder/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/html-import/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/in-memory-communication-provider/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/isolated-model-question-runner/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/local-ai-readiness-controller/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/local-ai-readiness/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/mail-transport/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/mail/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/marked-min/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/md/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/memory-records/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/message-advisory/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/model-definition/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ollama-model-identifier/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ollama-settings/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ollama/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/open-meteo-weather-provider/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/preference-store/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/qr-code-min/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/questionnaire/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/record-link-index/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/record-passage-index/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/record-review-store/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/revocable-projection-ledger/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/risk-signal-analyzer/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/scam-risk-policy/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/scoped-opfs-cache/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/screen-capture/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/speech-playback/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/static-document-catalog/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/system-appearance/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/system-platform-presentation/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/system-tool-registry/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/terminal-client/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/terminal-command-registry/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/theme-bootstrap/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/theme-manager/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/time-guard/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/tool-call-router/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/u-plot-iife-min/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/u-plot-license/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/u-plot-min/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/wait-for-component/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/you-tube-media/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/sdk-api/</loc></url>
+<!-- generated:reference-routes:end -->
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/architecture/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/compatibility/</loc></url>
 </urlset>
