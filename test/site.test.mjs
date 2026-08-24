@@ -60,6 +60,13 @@ function escapePattern(value){
     return value.replace(/[.*+?^${}()|[\]\\]/gu,'\\$&');
 }
 
+function escapeHtmlSource(value){
+    return value
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;');
+}
+
 async function assertLocalReference(sourceFile,reference){
     if(externalReference(reference))return;
     const [pathAndQuery,rawFragment='']=reference.split('#',2);
@@ -124,7 +131,7 @@ test('Pages routes are semantic, canonical, and project-path safe',async t=>{
     }
 });
 
-test('documentation describes the npm-local source-to-executable contract truthfully',async()=>{
+test('documentation describes the consumer source-to-executable contract truthfully',async()=>{
     const [home,quickStart,external,hello,native,reference]=await Promise.all([
         readSiteFile('index.html'),
         readSiteFile('quick-start/index.html'),
@@ -141,24 +148,26 @@ test('documentation describes the npm-local source-to-executable contract truthf
     assert.match(quickStart,/without repeating the complete check/u);
     assert.match(external,/npm run pack:local[\s\S]*npm install --save-dev --save-exact [^\n]*[.]tgz/u);
     assert.match(external,/packaged HTML, CSS, and JavaScript/u);
-    assert.match(hello,/project-local <code>arcane-os<\/code> npm dependency/u);
-    assert.match(hello,/exact project-local install remains the reproducible default/u);
+    assert.match(hello,/npx arcane-os new hello-world/u);
+    assert.match(hello,/npm install/u);
     assert.match(hello,/npm install --global arcane-os/u);
-    assert.match(hello,/npm install --global arcane-os<\/code> also exposes <code>arcane/u);
-    assert.match(hello,/does not install or start services/u);
-    assert.match(hello,/prebuilt Arcane Core or Arcane Ollama binaries/u);
-    assert.match(hello,/Native components remain outputs of an explicit/u);
-    assert.doesNotMatch(hello,/No global CLI/u);
+    assert.match(hello,/What Arcane adds/u);
     assert.match(hello,/node_modules\/[\s\S]*arcane-os\/runtime\//u);
     assert.match(hello,/dist\/hello-world\/[\s\S]*arcane\//u);
-    assert.match(hello,/exactly 152 files under <code>arcane\/<\/code>/u);
+    assert.match(hello,/hello-world[.]css/u);
     assert.match(hello,/AppDataScope[.]js/u);
     assert.match(hello,/DirectoryPicker[.]js/u);
+    assert.match(hello,/ThemeBootstrap[.]js/u);
     assert.match(hello,/globalThis[.]Arcane/u);
     assert.match(hello,/filesystem[.]directory[.]select/u);
+    assert.match(hello,/npm run dev/u);
+    assert.match(hello,/npm run package/u);
+    assert.match(hello,/npm run build/u);
     assert.match(hello,/build\/windows-x64\/hello-world\/ArcaneApp-hello-world[.]exe/u);
-    assert.match(hello,/Choose build or run/u);
-    assert.match(hello,/unsigned local-development output, not a production release/u);
+    assert.doesNotMatch(
+        hello,
+        /not yet published|after publication|pack:local|[.]tgz|0[.]1[.]0-dev|current development checkout|receipt|exactly 152|strong-type|CI shape|--arcane-root|source sync|Arcane Ollama|prebuilt Arcane Core/iu
+    );
     assert.match(native,/portable[\s\S]*Not directly runnable[\s\S]*Unsigned local test/u);
     assert.match(native,/Architecture-neutral APK/u);
     assert.match(reference,/<code>native-prepare<\/code>/u);
@@ -299,11 +308,13 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         assert.equal(createHash('sha256').update(exampleIcon).digest('hex'),createHash('sha256').update(templateIcon).digest('hex'));
     });
     await t.test('source uses the shared theme before named app behavior',async()=>{
-        const [html,script,readme,workflow]=await Promise.all([
+        const [html,style,script,readme,workflow,tutorial]=await Promise.all([
             readFile(path.join(appRoot,'index.html'),'utf8'),
+            readFile(path.join(appRoot,'hello-world.css'),'utf8'),
             readFile(path.join(appRoot,'modules','App.js'),'utf8'),
             readFile(path.join(exampleRoot,'README.md'),'utf8'),
-            readFile(path.join(exampleRoot,'.github','workflows','check.yml'),'utf8')
+            readFile(path.join(exampleRoot,'.github','workflows','check.yml'),'utf8'),
+            readSiteFile('examples/hello-world/index.html')
         ]);
         const theme=html.indexOf('./arcane/css/theme.css');
         const primitives=html.indexOf('./arcane/css/primitives.css');
@@ -338,16 +349,24 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         assert.match(script,/globalThis[.]Arcane[?][.]runtime[?][.]current/u);
         assert.match(script,/globalThis[.]Arcane[.]app[.]current\(\)/u);
         assert.match(script,/directoryPicker[.]select\(/u);
-        assert.match(readme,/project-local CLI/u);
+        for(const source of [html,style,script]){
+            assert.equal(tutorial.includes(escapeHtmlSource(source.trim())),true);
+        }
+        assert.match(readme,/project-local development dependency/u);
         assert.match(readme,/npm install --global arcane-os/u);
-        assert.match(readme,/npm install --global arcane-os` exposes `arcane/u);
-        assert.match(readme,/reproducible default/u);
-        assert.match(readme,/does not replace the application's pinned SDK dependency/u);
-        assert.match(readme,/prebuilt Arcane Core or Arcane Ollama binaries/u);
-        assert.match(readme,/intentionally omits `package-lock[.]json`/u);
+        assert.match(readme,/What the SDK adds/u);
         assert.match(readme,/node_modules\/arcane-os\/runtime\//u);
         assert.match(readme,/dist\/hello-world\/[\s\S]*arcane\//u);
+        assert.match(readme,/AppDataScope[.]js/u);
+        assert.match(readme,/DirectoryPicker[.]js/u);
+        assert.match(readme,/npm run dev/u);
+        assert.match(readme,/npm run package/u);
+        assert.match(readme,/npm run build/u);
         assert.match(readme,/build\/windows-x64\/hello-world\/ArcaneApp-hello-world[.]exe/u);
+        assert.doesNotMatch(
+            readme,
+            /not yet published|after publication|pack:local|[.]tgz|0[.]1[.]0-dev|receipt|exactly 152|strong-type|CI shape|--arcane-root|source sync|Arcane Ollama|prebuilt Arcane Core/iu
+        );
         assert.match(workflow,/npm ci --ignore-scripts/u);
     });
 });

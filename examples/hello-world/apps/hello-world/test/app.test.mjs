@@ -206,7 +206,9 @@ test('application demonstrates shared browser and executable Arcane surfaces',as
     assert.match(html,/Hello, Arcane World!/u);
     assert.match(html,/>Say hello<\/button>/u);
     assert.match(html,/id="native-action"[\s\S]*disabled/u);
-    assert.match(html,/Choose a folder \(executable\)/u);
+    assert.match(html,/Works in the browser/u);
+    assert.match(html,/Executable feature/u);
+    assert.match(html,/>Choose a folder<\/button>/u);
     assert.match(script,/\.\.\/\.\.\/\.\.\/arcane\/modules\/ThemeBootstrap[.]js[?]v=1/u);
     assert.match(script,/\.\.\/\.\.\/\.\.\/arcane\/modules\/AppDataScope[.]js[?]v=1/u);
     assert.match(script,/\.\.\/\.\.\/\.\.\/arcane\/modules\/DirectoryPicker[.]js[?]v=1/u);

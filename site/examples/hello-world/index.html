@@ -2,118 +2,164 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
-  <meta name="description" content="Build the Arcane OS SDK Hello World example from HTML and JavaScript through a verified Windows x64 development executable.">
+  <meta name="description" content="Build an Arcane OS Hello World app with HTML, CSS, JavaScript, the browser runtime, and a Windows executable.">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
   <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/examples/hello-world/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Hello World · Arcane OS SDK"><meta property="og:description" content="A complete npm-local Arcane application from source to Windows development executable."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/examples/hello-world/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Hello World · Arcane OS SDK"><meta name="twitter:description" content="Source, check, browser run, and a verified Windows development executable."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Hello World · Arcane OS SDK"><meta property="og:description" content="Create a real Arcane app, run it in a browser, and build its Windows executable."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/examples/hello-world/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Hello World · Arcane OS SDK"><meta name="twitter:description" content="HTML, CSS, and JavaScript from first command to Windows executable."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
   <title>Hello World | Arcane OS SDK</title><script src="../../app.js" defer></script>
 </head>
 <body data-page="examples">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../" aria-current="page">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../../reference/">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/tree/main/examples/hello-world" target="_blank" rel="noreferrer">Source <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Examples</a><span aria-hidden="true">/</span><span aria-current="page">Hello World</span></nav><p class="eyebrow">First complete project</p><h1>Hello World: source to executable.</h1><p class="doc-lead">The application is ordinary HTML, CSS, and JavaScript. The project-local <code>arcane-os</code> npm dependency supplies the CLI, synchronized runtime, package checks, and native build orchestration.</p><div class="doc-meta"><span>One app</span><span>Browser + Windows x64</span><span>Local or global CLI</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Examples</a><span aria-hidden="true">/</span><span aria-current="page">Hello World</span></nav><p class="eyebrow">Your first Arcane app</p><h1>Hello World: browser to executable.</h1><p class="doc-lead">Build a small application with ordinary HTML, CSS, and JavaScript. Along the way, use Arcane styling, app-scoped browser storage, executable identity, and a native folder picker.</p><div class="doc-meta"><span>HTML + CSS + JavaScript</span><span>Browser + Windows x64</span><span>Project-local SDK</span></div></header>
     <div class="docs-layout section-shell">
-      <aside class="docs-sidebar" aria-label="Example navigation"><p>Hello World</p><nav><a href="#create">Create</a><a href="#shape">Project shape</a><a href="#source">Source</a><a href="#descriptor">Descriptor</a><a href="#check">Check and run</a><a href="#executable">Executable</a></nav></aside>
+      <aside class="docs-sidebar" aria-label="Example navigation"><p>Hello World</p><nav><a href="#install">Install</a><a href="#shape">Project shape</a><a href="#arcane-adds">What Arcane adds</a><a href="#source">Source</a><a href="#permissions">Permissions</a><a href="#browser">Run in browser</a><a href="#package">Package</a><a href="#executable">Build executable</a></nav></aside>
       <article class="prose">
-        <section class="callout callout-info" aria-labelledby="npm-model-title"><strong id="npm-model-title">The SDK belongs in npm; the app belongs in its own repository.</strong><p>The maintained copy lives in the SDK repository as documentation. A real app pins the SDK in <code>devDependencies</code>, commits its npm lockfile, and uses <code>npm exec -- arcane</code> or the generated npm scripts. That exact project-local install remains the reproducible default. After publication, <code>npm install --global arcane-os</code> also exposes <code>arcane</code> as an optional shell convenience; it does not replace the app's exact dependency or lockfile.</p></section>
-        <section class="callout callout-warning" aria-labelledby="global-cli-boundary-title"><strong id="global-cli-boundary-title">The optional global CLI is tooling, not a native-runtime installer.</strong><p>Installing the package globally does not install or start services, and it does not provide prebuilt Arcane Core or Arcane Ollama binaries. Native components remain outputs of an explicit <code>arcane build …</code> action against the required Arcane OS source and toolchain.</p></section>
+        <section id="install"><p class="step-label">Step 01</p><h2>Create and install the project</h2><p>Scaffold the application, enter its directory, and install the exact SDK dependency recorded by the project.</p><div class="code-block"><div class="code-bar"><span>PowerShell</span><button type="button" data-copy-button>Copy</button></div><pre><code>npx arcane-os new hello-world --path ./hello-world --display-name "Arcane Hello World" --target windows-x64 --git
+Set-Location ./hello-world
+npm install</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p>The generated npm scripts use that project-local installation. If you also want the <code>arcane</code> command everywhere in your shell, <code>npm install --global arcane-os</code> is an optional convenience.</p></section>
 
-        <section id="create"><p class="step-label">Step 01</p><h2>Create the application repository</h2><p>After the development package is published, npm can bootstrap and then install the exact SDK version declared by the scaffold.</p><div class="code-block"><div class="code-bar"><span>PowerShell</span><button type="button" data-copy-button>Copy</button></div><pre><code>npx arcane-os@dev new hello-world --path .\hello-world --target windows-x64 --git
-Set-Location .\hello-world
-npm install</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><div class="callout callout-warning"><strong>Current development checkout</strong><p><code>arcane-os</code> is not yet published. Today, run <code>npm run pack:local</code> in the SDK checkout and install the resulting <code>.tgz</code> through npm. The <a href="../../quick-start/">quick-start guide</a> shows that exact temporary path.</p></div></section>
-
-        <section id="shape"><p class="step-label">Step 02</p><h2>Know the project and runtime shapes</h2><p>After <code>npm install</code>, app-owned source and npm-installed SDK runtime sit beside one another. Developers do not author or copy <code>arcane/</code>; the SDK owns it and its <a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/runtime/ARCANE_RUNTIME_RELEASE.json" target="_blank" rel="noreferrer">runtime receipt <span aria-hidden="true">↗</span></a> inventories every path and hash.</p><div class="file-tree"><pre><code>hello-world/
-├── apps/hello-world/                    # app-owned source
+        <section id="shape"><p class="step-label">Step 02</p><h2>See the files your app uses</h2><p>You write the files under <code>apps/hello-world/</code>. npm installs the SDK under <code>node_modules/arcane-os/</code>. The app imports the Arcane CSS and JavaScript files shown here.</p><div class="file-tree"><pre><code>hello-world/
+├── apps/hello-world/
 │   ├── img/icon.png
 │   ├── modules/App.js
-│   ├── test/app.test.mjs
 │   ├── arcane-app.json
 │   ├── arcane-package.json
 │   ├── hello-world.css
 │   ├── index.html
 │   └── manifest.json
-├── node_modules/                        # npm-generated
-│   └── arcane-os/runtime/
-│       ├── ARCANE_RUNTIME_RELEASE.json  # every runtime path + hash
-│       ├── arcane/                      # SDK-supplied /arcane runtime
-│       │   ├── components/              # 39 files
-│       │   ├── css/                     # all 7 files
-│       │   │   ├── communications.css
-│       │   │   ├── dashboard-config.css
-│       │   │   ├── document-site.css
-│       │   │   ├── layout.css
-│       │   │   ├── primitives.css
-│       │   │   ├── theme.css
-│       │   │   └── utility-workspace.css
-│       │   ├── entities/                # 15 files
-│       │   ├── img/                     # 10 files
-│       │   ├── modules/                 # 80 files
-│       │   │   ├── AppDataScope.js
-│       │   │   ├── DirectoryPicker.js
-│       │   │   ├── ThemeBootstrap.js
-│       │   │   └── … 77 more
-│       │   └── security/
-│       │       └── arcane-network-policy.json
-│       └── strong-type/
-│           ├── index.js
-│           ├── licence
-│           └── package.json
-├── package-lock.json                    # npm-generated in a real app
-├── arcane-packager.json                 # app-owned runtime route policy
-├── arcane.lock.json                     # app-owned runtime pin
-└── package.json                         # app-owned SDK pin and scripts</code></pre></div><p>The pinned runtime currently contains exactly 152 files under <code>arcane/</code>. During <code>npm run dev</code>, the owned server maps the installed directory to <code>/arcane/</code>. During <code>npm run package</code>, it becomes a physical release directory:</p><div class="file-tree"><pre><code>dist/hello-world/                         # generated browser release
-├── ARCANE_APP_RELEASE.json
-├── index.html                           # generated redirect
-├── apps/hello-world/                    # five public app files
-├── arcane/
-│   ├── components/                      # 39 files
-│   ├── css/                             # 7 files
-│   ├── entities/                        # 15 files
-│   ├── img/                             # 10 files
-│   ├── modules/                         # 80 files
-│   └── security/                        # arcane-network-policy.json
-├── node_modules/strong-type/            # 3 files
-└── licenses/arcane-os/                  # SDK license notices</code></pre></div></section>
+├── node_modules/arcane-os/runtime/arcane/
+│   ├── css/
+│   │   ├── primitives.css
+│   │   └── theme.css
+│   └── modules/
+│       ├── AppDataScope.js
+│       ├── DirectoryPicker.js
+│       └── ThemeBootstrap.js
+├── arcane-packager.json
+├── arcane.lock.json
+├── package.json
+└── package-lock.json</code></pre></div><p>When you package the browser app, those same runtime files are copied beside your application:</p><div class="file-tree"><pre><code>dist/hello-world/
+├── apps/hello-world/
+│   ├── modules/App.js
+│   ├── hello-world.css
+│   ├── index.html
+│   └── manifest.json
+└── arcane/
+    ├── css/
+    │   ├── primitives.css
+    │   └── theme.css
+    └── modules/
+        ├── AppDataScope.js
+        ├── DirectoryPicker.js
+        └── ThemeBootstrap.js</code></pre></div></section>
 
-        <section id="source"><p class="step-label">Step 03</p><h2>Write the smallest visible app</h2><p>The document establishes the app identity and release-root URL base, then loads the shared Arcane theme before the app stylesheet and module. The page offers an ordinary browser greeting and one button that only the injected executable host can enable.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/index.html</span><button type="button" data-copy-button>Copy</button></div><pre><code>&lt;!doctype html&gt;
+        <section id="arcane-adds"><p class="step-label">Step 03</p><h2>What Arcane adds</h2><ul><li><strong>CLI:</strong> <code>arcane</code> creates, checks, serves, packages, and builds the application.</li><li><strong>Browser runtime:</strong> theme and primitive styles provide the card and buttons; <code>AppDataScope</code> gives this app its own storage key.</li><li><strong>Executable host:</strong> the injected <code>globalThis.Arcane</code> bridge reports the app identity and host environment.</li><li><strong>Native capability:</strong> <code>DirectoryPicker</code> opens the operating-system folder selector only when the app is running as an executable.</li></ul></section>
+
+        <section id="source"><p class="step-label">Step 04</p><h2>Write the visible application</h2><p>The page deliberately labels what works in every browser and what becomes available in the executable.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/index.html</span><button type="button" data-copy-button>Copy</button></div><pre><code>&lt;!doctype html&gt;
 &lt;html lang="en"&gt;
 &lt;head&gt;
-  &lt;meta charset="utf-8"&gt;
-  &lt;meta name="arcane-app-id" content="hello-world"&gt;
-  &lt;base href="../../"&gt;
-  &lt;meta name="viewport" content="width=device-width, initial-scale=1"&gt;
-  &lt;meta name="theme-color" content="rgb(23, 34, 56)"&gt;
-  &lt;title&gt;Arcane Hello World&lt;/title&gt;
-  &lt;link rel="manifest" href="./apps/hello-world/manifest.json"&gt;
-  &lt;link rel="stylesheet" href="./arcane/css/theme.css?v=1"&gt;
-  &lt;link rel="stylesheet" href="./arcane/css/primitives.css?v=1"&gt;
-  &lt;link rel="stylesheet" href="./apps/hello-world/hello-world.css?v=1"&gt;
-  &lt;script type="module" src="./arcane/modules/ThemeBootstrap.js?v=1"&gt;&lt;/script&gt;
+    &lt;meta charset="utf-8"&gt;
+    &lt;meta name="arcane-app-id" content="hello-world"&gt;
+    &lt;base href="../../"&gt;
+    &lt;meta name="viewport" content="width=device-width, initial-scale=1"&gt;
+    &lt;meta name="theme-color" content="rgb(23, 34, 56)"&gt;
+    &lt;title&gt;Arcane Hello World&lt;/title&gt;
+    &lt;link rel="manifest" href="./apps/hello-world/manifest.json"&gt;
+    &lt;link rel="stylesheet" href="./arcane/css/theme.css?v=1"&gt;
+    &lt;link rel="stylesheet" href="./arcane/css/primitives.css?v=1"&gt;
+    &lt;link rel="stylesheet" href="./apps/hello-world/hello-world.css?v=1"&gt;
+    &lt;script type="module" src="./arcane/modules/ThemeBootstrap.js?v=1"&gt;&lt;/script&gt;
 &lt;/head&gt;
 &lt;body&gt;
-  &lt;main class="app-shell"&gt;
-    &lt;section class="arcane-card" aria-labelledby="app-title"&gt;
-      &lt;header class="arcane-card__header"&gt;
-        &lt;div&gt;
-          &lt;p class="eyebrow"&gt;Arcane application&lt;/p&gt;
-          &lt;h1 id="app-title"&gt;Hello, Arcane World!&lt;/h1&gt;
-        &lt;/div&gt;
-      &lt;/header&gt;
-      &lt;div class="arcane-card__body"&gt;
-        &lt;p id="app-environment" class="app-environment"&gt;Loading the Arcane web runtime.&lt;/p&gt;
-        &lt;p id="app-status" role="status" aria-live="polite"&gt;Ready to say hello.&lt;/p&gt;
-        &lt;div class="app-actions"&gt;
-          &lt;button id="app-action" class="arcane-button" type="button"&gt;Say hello&lt;/button&gt;
-          &lt;button id="native-action" class="arcane-button arcane-button--secondary" type="button" disabled&gt;Choose a folder (executable)&lt;/button&gt;
-        &lt;/div&gt;
-      &lt;/div&gt;
-    &lt;/section&gt;
-  &lt;/main&gt;
-  &lt;script type="module" src="./apps/hello-world/modules/App.js?v=1"&gt;&lt;/script&gt;
+    &lt;main class="app-shell"&gt;
+        &lt;section class="arcane-card" aria-labelledby="app-title"&gt;
+            &lt;header class="arcane-card__header"&gt;
+                &lt;div&gt;
+                    &lt;p class="eyebrow"&gt;Arcane application&lt;/p&gt;
+                    &lt;h1 id="app-title"&gt;Hello, Arcane World!&lt;/h1&gt;
+                &lt;/div&gt;
+            &lt;/header&gt;
+            &lt;div class="arcane-card__body"&gt;
+                &lt;div class="app-features"&gt;
+                    &lt;section class="app-feature" aria-labelledby="browser-feature-title"&gt;
+                        &lt;h2 id="browser-feature-title"&gt;Works in the browser&lt;/h2&gt;
+                        &lt;p&gt;Arcane supplies the theme, button styles, and an app-scoped storage key.&lt;/p&gt;
+                        &lt;p id="app-status" role="status" aria-live="polite"&gt;Ready to say hello.&lt;/p&gt;
+                        &lt;button id="app-action" class="arcane-button" type="button"&gt;Say hello&lt;/button&gt;
+                    &lt;/section&gt;
+                    &lt;section class="app-feature" aria-labelledby="executable-feature-title"&gt;
+                        &lt;h2 id="executable-feature-title"&gt;Executable feature&lt;/h2&gt;
+                        &lt;p id="app-environment" class="app-environment"&gt;Checking for the Arcane executable host.&lt;/p&gt;
+                        &lt;p&gt;Arcane enables the native folder picker only inside the executable.&lt;/p&gt;
+                        &lt;div class="app-actions"&gt;
+                            &lt;button
+                                id="native-action"
+                                class="arcane-button arcane-button--secondary"
+                                type="button"
+                                disabled
+                            &gt;Choose a folder&lt;/button&gt;
+                        &lt;/div&gt;
+                    &lt;/section&gt;
+                &lt;/div&gt;
+            &lt;/div&gt;
+        &lt;/section&gt;
+    &lt;/main&gt;
+    &lt;script type="module" src="./apps/hello-world/modules/App.js?v=1"&gt;&lt;/script&gt;
 &lt;/body&gt;
-&lt;/html&gt;</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><div class="code-block"><div class="code-bar"><span>apps/hello-world/modules/App.js</span><button type="button" data-copy-button>Copy</button></div><pre><code>import arcaneThemeReady from '../../../arcane/modules/ThemeBootstrap.js?v=1';
+&lt;/html&gt;</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div>
+
+        <p>The app stylesheet lays out the browser and executable features as two simple cards.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/hello-world.css</span><button type="button" data-copy-button>Copy</button></div><pre><code>body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--background, rgb(13, 18, 32));
+    color: var(--text-color, rgb(235, 241, 255));
+}
+
+.app-shell {
+    box-sizing: border-box;
+    width: min(52rem, 100%);
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+.eyebrow {
+    color: var(--accent-color, rgb(116, 167, 255));
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.app-environment {
+    color: var(--muted-text-color, rgb(177, 190, 216));
+}
+
+.app-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1rem;
+}
+
+.app-feature {
+    padding: 1rem;
+    border: 1px solid var(--border-color, rgb(57, 72, 103));
+    border-radius: 0.75rem;
+}
+
+.app-feature h2 {
+    margin-top: 0;
+    font-size: 1.1rem;
+}
+
+.app-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div>
+
+        <p><code>App.js</code> shows both Arcane environments. The greeting, theme, identity, and app-scoped storage work in the browser. The executable branch reads the injected host identity and enables the folder picker.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/modules/App.js</span><button type="button" data-copy-button>Copy</button></div><pre><code>import arcaneThemeReady from '../../../arcane/modules/ThemeBootstrap.js?v=1';
 import {
     resolveApplicationId,
     resolveApplicationLocalStorageKey
@@ -201,60 +247,36 @@ async function chooseDirectory(){
 
 action?.addEventListener('click',sayHello);
 nativeAction?.addEventListener('click',chooseDirectory);
-void describeEnvironment();</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><div class="callout callout-info"><strong>Why the paths differ</strong><p>HTML references such as <code>./arcane/css/theme.css</code> resolve against the declared release-root <code>&lt;base&gt;</code>. Static imports resolve from <code>apps/hello-world/modules/App.js</code>, so they climb three levels to <code>../../../arcane/modules/</code>. The executable's <code>globalThis.Arcane</code> bridge is injected by the host; it is not another file inside <code>arcane/</code>.</p></div></section>
+void describeEnvironment();</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div></section>
 
-        <section id="descriptor"><p class="step-label">Step 04</p><h2>Declare what may be packaged and built</h2><p>The schema-2 descriptor is the app-owned identity and policy. Browser greeting and scoped storage need no native grant. The executable declares a read-only saved-theme preference, its host identity lookup, and the capability-gated operating-system folder selector.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/arcane-app.json · complete descriptor</span><button type="button" data-copy-button>Copy</button></div><pre><code>{
-  "schemaVersion": 2,
-  "id": "hello-world",
-  "displayName": "Arcane Hello World",
-  "description": "Minimal Arcane OS Hello World application.",
-  "version": "0.1.0",
-  "publisher": {
-    "id": "the-wizard-nexus",
-    "name": "The Wizard Nexus"
-  },
-  "package": {
-    "entry": "index.html",
-    "strategy": "static",
-    "include": ["hello-world.css", "index.html", "img/icon.png", "manifest.json", "modules"],
-    "exclude": [],
-    "shared": ["browser-runtime"]
-  },
+        <section id="permissions"><p class="step-label">Step 05</p><h2>Allow the executable features</h2><p>The scaffold creates <code>apps/hello-world/arcane-app.json</code>. These permissions allow the app to read its host identity and open the folder selector:</p><div class="code-block"><div class="code-bar"><span>arcane-app.json · permissions</span><button type="button" data-copy-button>Copy</button></div><pre><code>{
   "permissions": {
-    "capabilities": ["filesystem.directory.select", "preferences.read"],
-    "methods": ["app.current", "filesystem.directory.select", "preferences.get"]
-  },
-  "security": {
-    "connectOrigins": [],
-    "frameOrigins": [],
-    "mediaOrigins": []
-  },
-  "native": {
-    "type": "app",
-    "icon": "img/icon.png",
-    "order": 100,
-    "bundledApps": []
-  },
-  "requirements": {
-    "arcaneProtocol": "arcane/1",
-    "minimumCoreVersion": "0.8.12",
-    "features": []
-  },
-  "targets": ["browser", "windows-x64"]
+    "capabilities": [
+      "filesystem.directory.select",
+      "preferences.read"
+    ],
+    "methods": [
+      "app.current",
+      "filesystem.directory.select",
+      "preferences.get"
+    ]
+  }
 }</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div></section>
 
-        <section id="check"><p class="step-label">Step 05</p><h2>Check it, then use the browser loop</h2><p>The scripts resolve the CLI from the app's npm dependency. <code>check</code> validates the workspace, locked SDK runtime, descriptor projection, package policy, and focused app tests.</p><div class="code-block"><div class="code-bar"><span>Application repository</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run check
-npm run dev</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>Result:</strong> a checked browser app at the loopback URL printed by the owned development server.</p></section>
+        <section id="browser"><p class="step-label">Step 06</p><h2>Check it and run it in a browser</h2><div class="code-block"><div class="code-bar"><span>Application repository</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run check
+npm run dev</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>You will see:</strong> an Arcane-styled page with a working <strong>Say hello</strong> button. Each click updates an app-scoped greeting count. The native folder button stays disabled and the page explains why.</p></section>
 
-        <section id="executable"><p class="step-label">Step 06</p><h2>Build the Windows development executable</h2><p>The current native provider lives behind one explicit compatible Arcane OS checkout. Building authenticates the browser release, prepares the provider once, compiles one target, and verifies the resulting bundle.</p><div class="code-block"><div class="code-bar"><span>Leave a verified executable bundle</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm exec -- arcane native-doctor --target windows-x64 --arcane-root "..\Arcane OS"
-npm run build -- --arcane-root "..\Arcane OS"</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>Output:</strong> <code>build/windows-x64/hello-world/ArcaneApp-hello-world.exe</code>. Keep the complete containing directory.</p><div class="code-block"><div class="code-bar"><span>Or build, verify, and launch in one operation</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run run -- --arcane-root "..\Arcane OS"</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><div class="callout callout-warning"><strong>Choose build or run.</strong><p><code>run</code> already performs build → verify → launch in one receipt-owning process. Do not run it immediately after the separate build against the same default output. The Windows result is unsigned local-development output, not a production release.</p></div></section>
+        <section id="package"><p class="step-label">Step 07</p><h2>Package the browser application</h2><div class="code-block"><div class="code-bar"><span>Create and verify dist/hello-world</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run package
+npm exec -- arcane verify</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>Output:</strong> <code>dist/hello-world/</code>, containing the application and the Arcane browser runtime it imports.</p></section>
 
-        <section class="next-panel" aria-labelledby="hello-source-title"><div><p class="eyebrow">Copy the complete project</p><h2 id="hello-source-title">Every source file is in the SDK repository.</h2><p>The example includes descriptors, package policy, focused tests, CI shape, and the native icon—not only the two visible source snippets.</p></div><a class="button button-primary" href="https://github.com/TheWizardNexus/arcane-os-sdk/tree/main/examples/hello-world" target="_blank" rel="noreferrer">Open source <span aria-hidden="true">↗</span></a></section>
+        <section id="executable"><p class="step-label">Step 08</p><h2>Build the Windows executable</h2><p>The installed SDK contains the native sources and build tooling. The project script compiles them for the selected target and packages your application.</p><div class="code-block"><div class="code-bar"><span>Build</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run build</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>Output:</strong> <code>build/windows-x64/hello-world/ArcaneApp-hello-world.exe</code>. Keep the executable with the other files in its containing directory.</p><div class="code-block"><div class="code-bar"><span>Build, verify, and launch</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run run</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>You will see:</strong> the same greeting app, now reporting its Arcane application name, version, and executable host. <strong>Choose a folder</strong> opens the operating-system folder selector and displays the selected path.</p></section>
+
+        <section class="next-panel" aria-labelledby="hello-source-title"><div><p class="eyebrow">Run the maintained example</p><h2 id="hello-source-title">The complete project is in the SDK repository.</h2><p>Open the source to copy the descriptors, icon, tests, and runnable application files.</p></div><a class="button button-primary" href="https://github.com/TheWizardNexus/arcane-os-sdk/tree/main/examples/hello-world" target="_blank" rel="noreferrer">Open source <span aria-hidden="true">↗</span></a></section>
         <nav class="page-pagination" aria-label="Page navigation"><a href="../"><span>Previous</span><strong>All examples</strong></a><a href="../../guides/native-builds/"><span>Next</span><strong>Native builds</strong></a></nav>
       </article>
-      <aside class="on-this-page" aria-label="On this page"><p>On this page</p><nav><a href="#create">Create</a><a href="#shape">Project shape</a><a href="#source">Source</a><a href="#descriptor">Descriptor</a><a href="#check">Check and run</a><a href="#executable">Executable</a></nav></aside>
+      <aside class="on-this-page" aria-label="On this page"><p>On this page</p><nav><a href="#install">Install</a><a href="#shape">Project shape</a><a href="#arcane-adds">What Arcane adds</a><a href="#source">Source</a><a href="#permissions">Permissions</a><a href="#browser">Run in browser</a><a href="#package">Package</a><a href="#executable">Build executable</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>The SDK is npm-local; application source stays independently owned.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Build Arcane applications with HTML, CSS, and JavaScript.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
 </body>
 </html>

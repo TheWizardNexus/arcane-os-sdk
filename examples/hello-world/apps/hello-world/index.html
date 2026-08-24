@@ -23,16 +23,26 @@
                 </div>
             </header>
             <div class="arcane-card__body">
-                <p id="app-environment" class="app-environment">Loading the Arcane web runtime.</p>
-                <p id="app-status" role="status" aria-live="polite">Ready to say hello.</p>
-                <div class="app-actions">
-                    <button id="app-action" class="arcane-button" type="button">Say hello</button>
-                    <button
-                        id="native-action"
-                        class="arcane-button arcane-button--secondary"
-                        type="button"
-                        disabled
-                    >Choose a folder (executable)</button>
+                <div class="app-features">
+                    <section class="app-feature" aria-labelledby="browser-feature-title">
+                        <h2 id="browser-feature-title">Works in the browser</h2>
+                        <p>Arcane supplies the theme, button styles, and an app-scoped storage key.</p>
+                        <p id="app-status" role="status" aria-live="polite">Ready to say hello.</p>
+                        <button id="app-action" class="arcane-button" type="button">Say hello</button>
+                    </section>
+                    <section class="app-feature" aria-labelledby="executable-feature-title">
+                        <h2 id="executable-feature-title">Executable feature</h2>
+                        <p id="app-environment" class="app-environment">Checking for the Arcane executable host.</p>
+                        <p>Arcane enables the native folder picker only inside the executable.</p>
+                        <div class="app-actions">
+                            <button
+                                id="native-action"
+                                class="arcane-button arcane-button--secondary"
+                                type="button"
+                                disabled
+                            >Choose a folder</button>
+                        </div>
+                    </section>
                 </div>
             </div>
         </section>

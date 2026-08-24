@@ -23,6 +23,23 @@ body {
     color: var(--muted-text-color, rgb(177, 190, 216));
 }
 
+.app-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1rem;
+}
+
+.app-feature {
+    padding: 1rem;
+    border: 1px solid var(--border-color, rgb(57, 72, 103));
+    border-radius: 0.75rem;
+}
+
+.app-feature h2 {
+    margin-top: 0;
+    font-size: 1.1rem;
+}
+
 .app-actions {
     display: flex;
     flex-wrap: wrap;
