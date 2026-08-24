@@ -24,6 +24,28 @@ export {
 } from './errors.mjs';
 
 export {createReporter} from './events.mjs';
+export {
+    ARCANE_EVENT_STACK_PROTOCOL,
+    arcaneEvents,
+    createDOMInstrumentation,
+    createEventManager,
+    DEFAULT_DOM_EVENT_TYPES,
+    describeDOMTarget,
+    DOM_INTERACTION_EVENT,
+    DOM_MUTATION_EVENT,
+    DOM_OBSERVATION_STARTED_EVENT,
+    DOM_OBSERVATION_STOPPED_EVENT,
+    domSelector,
+    EventManager,
+    parseEventStack,
+    PLAYBACK_CANCELLED_EVENT,
+    PLAYBACK_COMPLETED_EVENT,
+    PLAYBACK_FAILED_EVENT,
+    PLAYBACK_RECORD_EVENT,
+    PLAYBACK_STARTED_EVENT,
+    TIME_TRAVEL_OVERFLOW_EVENT,
+    TIME_TRAVEL_SEEK_EVENT
+} from './event-manager.mjs';
 export {runProcess} from './process.mjs';
 export {
     DEFAULT_TEST_TIMEOUT_MS,

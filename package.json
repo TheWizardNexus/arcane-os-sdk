@@ -12,6 +12,7 @@
     ".": "./src/index.mjs",
     "./toolchain": "./src/toolchain.mjs",
     "./events": "./src/events.mjs",
+    "./event-manager": "./src/event-manager.mjs",
     "./testing": "./src/testing.mjs",
     "./targets": "./src/targets/index.mjs",
     "./native": "./src/native-plan.mjs",
@@ -25,6 +26,7 @@
     "./schemas/arcane-app-bundle.json": "./schemas/arcane-app-bundle.schema.json",
     "./schemas/arcane-lock.json": "./schemas/arcane-lock.schema.json",
     "./schemas/cli-event.json": "./schemas/cli-event.schema.json",
+    "./schemas/event-stack.json": "./schemas/event-stack.schema.json",
     "./schemas/native-build-plan.json": "./schemas/native-build-plan.schema.json",
     "./schemas/target-adapter.json": "./schemas/target-adapter.schema.json",
     "./package.json": "./package.json"
@@ -44,7 +46,7 @@
   "scripts": {
     "test": "npm run test:unit && npm run test:functional && npm run test:integration && npm run test:regression",
     "test:unit": "node ./bin/arcane-test.mjs test/app-descriptor.test.mjs test/app-schema.test.mjs test/contracts.test.mjs test/doctor.test.mjs test/targets.test.mjs",
-    "test:functional": "node ./bin/arcane-test.mjs test/cli.test.mjs test/dev-server.test.mjs test/events.test.mjs test/packaging.test.mjs test/runtime-sync.test.mjs test/runtime.test.mjs test/scaffold.test.mjs test/site.test.mjs",
+    "test:functional": "node ./bin/arcane-test.mjs test/cli.test.mjs test/dev-server.test.mjs test/dom-event-instrumentation.test.mjs test/event-manager.test.mjs test/events.test.mjs test/packaging.test.mjs test/reference-completeness.test.mjs test/runtime-api-behavior.test.mjs test/runtime-sync.test.mjs test/runtime.test.mjs test/scaffold.test.mjs test/site.test.mjs",
     "test:integration": "node ./bin/arcane-test.mjs test/integrated-shared.test.mjs test/integrated-workspace.test.mjs test/native-plan.test.mjs test/native-provider-loader.test.mjs test/npm-release.test.mjs test/release-bundle.test.mjs test/shared-payload-batch.test.mjs test/tarball.test.mjs",
     "test:regression": "node ./bin/arcane-test.mjs test/channel-workflows.test.mjs test/native-provider-generation.test.mjs test/testing.test.mjs test/test-sets.test.mjs",
     "check": "node tools/check-source.mjs && node tools/runtime-manifest.mjs --verify && npm test",
@@ -82,6 +84,12 @@
     "tag": "dev"
   },
   "dependencies": {
+    "event-pubsub": "6.1.0",
+    "strong-type": "2.0.0",
     "vanilla-test": "2.1.3"
-  }
+  },
+  "bundleDependencies": [
+    "event-pubsub",
+    "strong-type"
+  ]
 }

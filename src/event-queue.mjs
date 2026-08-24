@@ -1,3 +1,37 @@
+import {AsyncLocalStorage} from 'node:async_hooks';
+import {arcaneEvents} from './event-manager.mjs';
+
+const deliveryStorage=new AsyncLocalStorage();
+
+function deliveryOccurrence(event){
+    const active=deliveryStorage.getStore();
+    if(active&&!active.closed&&Object.is(active.event,event)){
+        return active;
+    }
+    return {
+        event,
+        managers:new Set(),
+        pending:0,
+        closed:false
+    };
+}
+
+function mirror(manager,event,eventMetadata,occurrence){
+    if(!manager||!event||typeof event!=='object'||occurrence.managers.has(manager)){
+        return;
+    }
+    occurrence.managers.add(manager);
+    try{
+        const result=manager.forward(event,eventMetadata);
+        if(result&&typeof result.then==='function'){
+            void Promise.resolve(result).catch(()=>{});
+        }
+    }catch{
+        // Central instrumentation is observational. Its subscribers must not
+        // replace the queue callback's backpressure or failure semantics.
+    }
+}
+
 function callbackError(value){
     if(value instanceof Error){
         return value;
@@ -5,8 +39,16 @@ function callbackError(value){
     return new Error(`The event callback failed: ${String(value)}`,{cause:value});
 }
 
-export function createEventQueue(onEvent,{onFailure}={}){
+export function createEventQueue(onEvent,{
+    onFailure,
+    eventManager=arcaneEvents,
+    eventMetadata={source:'sdk',category:'operation'}
+}={}){
     const callback=typeof onEvent==='function'?onEvent:null;
+    const manager=eventManager===null?null:eventManager;
+    if(manager&&typeof manager.forward!=='function'){
+        throw new TypeError('The central event manager must provide forward(event, metadata).');
+    }
     let firstError=null;
     let tail=Promise.resolve();
     const pendingKeys=new Set();
@@ -33,7 +75,7 @@ export function createEventQueue(onEvent,{onFailure}={}){
     };
 
     const enqueue=(event,{coalesce}={})=>{
-        if(!callback||firstError){
+        if((!callback&&!manager)||firstError){
             return tail;
         }
         if(coalesce&&pendingKeys.has(coalesce)){
@@ -42,17 +84,25 @@ export function createEventQueue(onEvent,{onFailure}={}){
         if(coalesce){
             pendingKeys.add(coalesce);
         }
-        const task=tail.then(async()=>{
+        const occurrence=deliveryOccurrence(event);
+        occurrence.pending+=1;
+        const task=tail.then(()=>deliveryStorage.run(occurrence,async()=>{
             if(firstError){
                 return;
             }
+            const current=Object.freeze(event);
+            mirror(manager,current,eventMetadata,occurrence);
             try{
-                await callback(Object.freeze(event));
+                await callback?.(current);
             }catch(error){
                 capture(error);
             }
-        });
+        }));
         tail=task.finally(()=>{
+            occurrence.pending-=1;
+            if(occurrence.pending===0){
+                occurrence.closed=true;
+            }
             if(coalesce){
                 pendingKeys.delete(coalesce);
             }

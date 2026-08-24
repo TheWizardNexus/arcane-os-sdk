@@ -134,6 +134,14 @@ backpressure and heartbeats coalesce. Callback failure cancels owned work, drain
 the queue, and reaches the caller or CLI exit status. Packaging preserves prior
 output until verified replacement.
 
+Each normalized queue event is also mirrored exactly once through the shared
+`arcaneEvents` `EventManager`. That synchronous `event-pubsub` route is the
+canonical cross-cutting instrumentation surface, but it does not replace the
+owned asynchronous callback path or its backpressure. Time-travel history and
+DOM observation remain explicitly disabled unless a bounded diagnostic session
+enables them. See [event-manager.md](event-manager.md) for the record, redaction,
+DOM coverage, and effect-isolated playback boundaries.
+
 For `--scope shared`, the cardinality changes to one integrated workspace, one
 named operation, and either one exact test file or one development check. The
 same owned event queue and process supervisor provide acknowledgement, bounded

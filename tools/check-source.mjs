@@ -109,6 +109,7 @@ function assertPackageMetadata(packageDocument){
         '.',
         './toolchain',
         './events',
+        './event-manager',
         './targets',
         './native',
         './integrated-provider',
@@ -118,6 +119,7 @@ function assertPackageMetadata(packageDocument){
         './schemas/arcane-package.json',
         './schemas/arcane-lock.json',
         './schemas/cli-event.json',
+        './schemas/event-stack.json',
         './schemas/native-build-plan.json',
         './schemas/target-adapter.json',
         './package.json'

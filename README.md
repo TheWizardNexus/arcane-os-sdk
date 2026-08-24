@@ -25,6 +25,24 @@ only the `dev` channel contract; query `npm view arcane-os@dev version` for
 current registry availability. Registry state is deliberately not baked into
 the immutable package documentation.
 
+## Central event instrumentation
+
+Use `arcane-os/event-manager` as the primary instrumentation surface for new
+SDK code. Its shared `arcaneEvents` bus is powered by `event-pubsub`; SDK-owned
+operation queues already mirror their normalized events through it while
+preserving awaited delivery and cancellation. An opt-in `timeTravel` flag adds
+timestamped causal event stacks, bounded snapshots, export/import, seek and safe
+review playback. Attaching a DOM root records interactions and mutation records,
+including supported open shadow roots. Source-stack capture is a separate,
+off-by-default diagnostic option.
+
+Recording is off by default. A session is complete until its configured event
+limit; reaching that limit appends an overflow marker and disables recording
+instead of silently evicting history. Review [the EventManager guide](docs/event-manager.md)
+before enabling DOM values, node content, event details, source stacks, or live
+event redispatch. Password targets, text-entry details, clipboard data, URL
+attributes, and common credential keys are excluded or redacted by default.
+
 ## Runtime synchronization
 
 SDK maintainers update the pinned browser runtime only from Arcane's canonical,

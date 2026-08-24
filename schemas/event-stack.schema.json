@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://thewizardnexus.github.io/arcane-os-sdk/schemas/event-stack.schema.json",
+  "title": "Arcane Event Stack",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "sessionId",
+    "createdAt",
+    "events"
+  ],
+  "properties": {
+    "protocol": {
+      "const": "arcane-event-stack/1"
+    },
+    "sessionId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    }
+  },
+  "$defs": {
+    "nullableString": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol",
+        "sessionId",
+        "id",
+        "sequence",
+        "timestamp",
+        "monotonicMs",
+        "type",
+        "source",
+        "category",
+        "correlationId",
+        "causationId",
+        "parentSequence",
+        "depth",
+        "stack",
+        "payload",
+        "metadata",
+        "status",
+        "completedAt",
+        "durationMs",
+        "error"
+      ],
+      "properties": {
+        "protocol": {
+          "const": "arcane-event-stack/1"
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "monotonicMs": {
+          "type": "number"
+        },
+        "type": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "correlationId": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "causationId": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "parentSequence": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stack": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "payload": {
+          "type": "array"
+        },
+        "metadata": {
+          "type": "object"
+        },
+        "status": {
+          "enum": [
+            "dispatching",
+            "completed",
+            "failed"
+          ]
+        },
+        "completedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "durationMs": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "error": {}
+      }
+    }
+  }
+}

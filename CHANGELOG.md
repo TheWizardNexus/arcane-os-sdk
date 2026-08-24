@@ -2,6 +2,20 @@
 
 ## 0.1.0-dev.4
 
+- Added the central `event-pubsub`-backed `EventManager` as the preferred SDK
+  instrumentation route, with exact dependency pins, public package exports,
+  and versioned `arcane-event-stack/1` JSON records.
+- Added opt-in time-travel recording with UTC and monotonic time, nested
+  causation, bounded snapshots and history, off-by-default sanitized source
+  stacks, redaction, strict export/import, seek, abortable speed-controlled
+  review playback, visible overflow, and explicit terminal outcomes.
+- Added optional capture-phase DOM interaction and mutation observation across
+  supported open shadow roots, with composed-event deduplication, sensitive
+  input handling, and an explicit safe-review boundary that does not claim live
+  DOM restoration or privileged-effect replay.
+- Mirrored owned SDK operation-queue events through the central manager exactly
+  once without weakening awaited delivery, backpressure, cancellation, or
+  callback-failure ownership.
 - Synchronized the browser runtime to Arcane OS `0.8.12` commit
   `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, including the shared network
   policy modules and policy data required by standalone applications.

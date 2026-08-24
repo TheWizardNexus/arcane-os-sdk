@@ -100,6 +100,14 @@ test('packed npm artifact installs and drives an external repository end to end'
         assert.ok(packReport.files.some(file=>file.path==='schemas/arcane-app.schema.json'));
         assert.ok(packReport.files.some(file=>file.path==='schemas/arcane-package.schema.json'));
         assert.ok(packReport.files.some(file=>file.path==='schemas/arcane-app-bundle.schema.json'));
+        assert.ok(packReport.files.some(file=>file.path==='schemas/event-stack.schema.json'));
+        assert.ok(packReport.files.some(file=>file.path==='src/event-manager.mjs'));
+        assert.ok(packReport.files.some(file=>file.path==='node_modules/event-pubsub/index.js'));
+        assert.ok(packReport.files.some(file=>file.path==='node_modules/event-pubsub/package.json'));
+        assert.ok(packReport.files.some(file=>file.path==='node_modules/event-pubsub/licence'));
+        assert.ok(packReport.files.some(file=>file.path==='node_modules/strong-type/index.js'));
+        assert.ok(packReport.files.some(file=>file.path==='node_modules/strong-type/package.json'));
+        assert.ok(packReport.files.some(file=>file.path==='node_modules/strong-type/licence'));
         assert.ok(packReport.files.some(file=>file.path==='src/release-bundle.mjs'));
         assert.ok(packReport.files.some(file=>file.path==='src/templates/assets/app-icon.png'));
         assert.ok(packReport.files.some(file=>file.path==='NOTICE'));
@@ -114,6 +122,7 @@ test('packed npm artifact installs and drives an external repository end to end'
             name:'packed-sdk-harness',
             private:true,
             type:'module',
+            dependencies:{'strong-type':'2.0.1'},
             devDependencies:{'arcane-os':`file:${tarballPath}`}
         },null,2)}\n`);
         const harnessInstalled=await runNpm(
@@ -132,6 +141,57 @@ test('packed npm artifact installs and drives an external repository end to end'
             '--output','json'
         ],{cwd:temporary});
         assert.equal(scaffolded.code,0,scaffolded.stderr);
+    });
+
+    await t.test('isolates bundled event dependencies and imports installed event contracts',async()=>{
+        const cleanInstalled=await runNpm(
+            ['ci','--offline','--ignore-scripts','--dry-run=false','--no-audit','--no-fund'],
+            {cwd:harnessRoot,timeout:60_000}
+        );
+        assert.equal(cleanInstalled.code,0,cleanInstalled.stderr);
+        const installedPackageRoot=path.join(harnessRoot,'node_modules','arcane-os');
+        const consumerStrongType=JSON.parse(await readFile(
+            path.join(harnessRoot,'node_modules','strong-type','package.json'),
+            'utf8'
+        ));
+        const bundledEventPubSub=JSON.parse(await readFile(
+            path.join(installedPackageRoot,'node_modules','event-pubsub','package.json'),
+            'utf8'
+        ));
+        const bundledStrongType=JSON.parse(await readFile(
+            path.join(installedPackageRoot,'node_modules','strong-type','package.json'),
+            'utf8'
+        ));
+        assert.equal(consumerStrongType.version,'2.0.1');
+        assert.equal(bundledEventPubSub.version,'6.1.0');
+        assert.equal(bundledEventPubSub.dependencies['strong-type'],'2.0.0');
+        assert.equal(bundledStrongType.version,'2.0.0');
+
+        const imported=await runNode([
+            '--input-type=module',
+            '--eval',
+            `const eventManager=await import('arcane-os/event-manager');
+const eventStackSchema=await import('arcane-os/schemas/event-stack.json',{with:{type:'json'}});
+const manager=eventManager.createEventManager({timeTravel:true,sessionId:'packed-artifact'});
+let observed=null;
+manager.once('packed.artifact.proof',value=>{observed=value;});
+manager.emit('packed.artifact.proof',42);
+process.stdout.write(JSON.stringify({
+    protocol:eventManager.ARCANE_EVENT_STACK_PROTOCOL,
+    schemaProtocol:eventStackSchema.default.properties.protocol.const,
+    observed,
+    eventCount:manager.eventCount,
+    eventType:manager.history[0]?.type
+}));`
+        ],{cwd:harnessRoot,timeout:60_000});
+        assert.equal(imported.code,0,imported.stderr);
+        assert.deepEqual(JSON.parse(imported.stdout),{
+            protocol:'arcane-event-stack/1',
+            schemaProtocol:'arcane-event-stack/1',
+            observed:42,
+            eventCount:1,
+            eventType:'packed.artifact.proof'
+        });
     });
 
     await t.test('records an exact tarball install that survives a clean npm ci',async()=>{

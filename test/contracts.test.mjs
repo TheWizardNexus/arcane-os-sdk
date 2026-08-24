@@ -28,6 +28,7 @@ test('published JSON schemas parse and declare immutable protocol versions',asyn
         ['arcane-app-bundle.schema.json',1],
         ['arcane-lock.schema.json',1],
         ['cli-event.schema.json','arcane-cli-events/1'],
+        ['event-stack.schema.json','arcane-event-stack/1'],
         ['native-build-plan.schema.json','arcane-native-build-plan/1'],
         ['target-adapter.schema.json','arcane-target-adapter/1']
     ]);
@@ -40,6 +41,8 @@ test('published JSON schemas parse and declare immutable protocol versions',asyn
                 ||fileName==='arcane-app-bundle.schema.json'||fileName==='arcane-lock.schema.json'){
                 assert.equal(document.properties.schemaVersion.const,expected);
             }else if(fileName==='cli-event.schema.json'){
+                assert.equal(document.properties.protocol.const,expected);
+            }else if(fileName==='event-stack.schema.json'){
                 assert.equal(document.properties.protocol.const,expected);
             }else{
                 assert.equal(document.properties.protocol.const,expected);
@@ -99,6 +102,7 @@ test('package exposes both supported executable names and public contracts',asyn
         assert.equal(packageDocument.exports['./schemas/arcane-app-bundle.json'],'./schemas/arcane-app-bundle.schema.json');
         assert.equal(packageDocument.exports['./schemas/arcane-lock.json'],'./schemas/arcane-lock.schema.json');
         assert.equal(packageDocument.exports['./schemas/cli-event.json'],'./schemas/cli-event.schema.json');
+        assert.equal(packageDocument.exports['./schemas/event-stack.json'],'./schemas/event-stack.schema.json');
         assert.equal(packageDocument.exports['./schemas/native-build-plan.json'],'./schemas/native-build-plan.schema.json');
         assert.equal(packageDocument.exports['./schemas/target-adapter.json'],'./schemas/target-adapter.schema.json');
     });
@@ -111,6 +115,11 @@ test('package exposes both supported executable names and public contracts',asyn
     });
     await t.test('pins the Vanilla Test runtime',()=>{
         assert.equal(packageDocument.dependencies['vanilla-test'],'2.1.3');
+    });
+    await t.test('pins and bundles the event dispatch runtime',()=>{
+        assert.equal(packageDocument.dependencies['event-pubsub'],'6.1.0');
+        assert.equal(packageDocument.dependencies['strong-type'],'2.0.0');
+        assert.deepEqual(packageDocument.bundleDependencies,['event-pubsub','strong-type']);
     });
     await t.test('integrated provider entry point exposes its public protocol',()=>{
         assert.equal(typeof integratedProvider.loadArcaneIntegratedProvider,'function');

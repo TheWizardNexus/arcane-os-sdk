@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import {Writable} from 'node:stream';
 import test from '../src/testing.mjs';
+import {arcaneEvents,createEventManager} from '../src/event-manager.mjs';
+import {createEventQueue} from '../src/event-queue.mjs';
 import {createReporter} from '../src/events.mjs';
 import {runProcess} from '../src/process.mjs';
 import {repositoryStatus} from '../src/repository.mjs';
@@ -198,6 +200,87 @@ test('repository status keeps its three process producers serialized',async()=>{
     assert.equal(active,0);
     assert.equal(delivered.filter(type=>type==='process.starting').length,3);
     assert.equal(delivered.filter(type=>type==='process.completed').length,3);
+});
+
+test('central subscriber failures cannot replace queue callback backpressure or failure',async()=>{
+    const type='sdk.queue.subscriber-failure-audit';
+    const subscriberFailure=new Error('Public event subscriber failed.');
+    const callbackFailure=new Error('Authoritative queue callback failed.');
+    const throwingSubscriber=()=>{throw subscriberFailure;};
+    const delivered=[];
+    let active=0;
+    let maximumActive=0;
+    arcaneEvents.on(type,throwingSubscriber);
+    try{
+        const queue=createEventQueue(async event=>{
+            active+=1;
+            maximumActive=Math.max(maximumActive,active);
+            delivered.push(`start:${String(event.sequence)}`);
+            await delay(10);
+            delivered.push(`finish:${String(event.sequence)}`);
+            active-=1;
+            if(event.fail){
+                throw callbackFailure;
+            }
+        });
+
+        await Promise.all([
+            queue.send({type,sequence:1}),
+            queue.send({type,sequence:2})
+        ]);
+        assert.deepEqual(delivered,[
+            'start:1','finish:1',
+            'start:2','finish:2'
+        ]);
+        assert.equal(maximumActive,1);
+        assert.equal(active,0);
+        assert.equal(queue.error,null);
+
+        await assert.rejects(
+            queue.send({type,sequence:3,fail:true}),
+            error=>error===callbackFailure
+        );
+        assert.equal(queue.error,callbackFailure);
+        assert.equal(delivered.at(-1),'finish:3');
+    }finally{
+        arcaneEvents.off(type,throwingSubscriber);
+    }
+});
+
+test('queue mirroring is once per propagation occurrence without suppressing object reuse',async()=>{
+    const type='sdk.queue.delivery-occurrence-audit';
+    const firstManager=createEventManager();
+    const secondManager=createEventManager();
+    const firstDeliveries=[];
+    const secondDeliveries=[];
+    firstManager.on(type,event=>firstDeliveries.push(event));
+    secondManager.on(type,event=>secondDeliveries.push(event));
+
+    const sameManagerOuter=createEventQueue(null,{eventManager:firstManager});
+    const sameManagerInner=createEventQueue(
+        event=>sameManagerOuter.send(event),
+        {eventManager:firstManager}
+    );
+    const reused={type,message:'the same object may represent later deliveries'};
+    await sameManagerInner.send(reused);
+    await sameManagerInner.send(reused);
+    assert.equal(firstDeliveries.length,2);
+    assert.equal(firstDeliveries[0],reused);
+    assert.equal(firstDeliveries[1],reused);
+
+    const secondManagerOuter=createEventQueue(null,{eventManager:secondManager});
+    const crossManagerInner=createEventQueue(
+        event=>secondManagerOuter.send(event),
+        {eventManager:firstManager}
+    );
+    await crossManagerInner.send(reused);
+    assert.equal(firstDeliveries.length,3);
+    assert.equal(secondDeliveries.length,1);
+    assert.equal(secondDeliveries[0],reused);
+
+    const concurrentQueue=createEventQueue(null,{eventManager:firstManager});
+    await Promise.all([concurrentQueue.send(reused),concurrentQueue.send(reused)]);
+    assert.equal(firstDeliveries.length,5);
 });
 
 test('process event rejection stops owned work and is never unhandled',async t=>{
