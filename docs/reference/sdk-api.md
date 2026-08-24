@@ -1,10 +1,16 @@
 # Arcane OS SDK JavaScript API
 
-The npm package exposes a Node.js ESM control plane. It is not a browser-importable renderer API. Use the synchronized modules under `/arcane/` for application code and use `globalThis.Arcane` for capability-gated native calls.
+The npm package exposes a Node.js ESM control plane. It is not a browser-importable renderer API. Application code uses named modules from the managed browser map, such as `arcane/ThemeBootstrap`, uses the focused `arcane-os/event-manager` browser entry when needed, and calls `globalThis.Arcane` for capability-gated host behavior.
 
 This page is the canonical inventory for every JavaScript name reachable through `package.json#exports`. The same binding can appear at the root and a focused subpath; those entrypoints are listed together. The root workspace `discoverApps` and the low-level packager `discoverApps` are intentionally separate records because they are different functions.
 
 ## Import map
+
+This table is the Node `package.json#exports` map: it defines package
+entrypoints for SDK/tooling code. It is distinct from the generated browser
+import map that resolves application-facing `arcane/*` modules and the focused
+EventManager entry. See [browser runtime delivery](protocols.md#browser-runtime-delivery)
+for that 85-entry physical-runtime contract.
 
 | Specifier | Purpose |
 | --- | --- |
@@ -2634,6 +2640,13 @@ Frozen registry of stable SDK error-code strings.
 registry, timeout, HTTP, or response failure; caller cancellation remains the
 separate `ERROR_CODES.cancelled` value.
 
+The import-map operation also reports the stable operation-specific strings
+`ARCANE_IMPORT_MAP_INVALID`, `ARCANE_IMPORT_MAP_UNRESOLVED`, and
+`ARCANE_IMPORT_MAP_COLLISION`; package assembly can additionally report
+`ARCANE_IMPORT_MAP_CLEANUP_FAILED`. They are normalized `ArcaneError.code`
+values, but are not properties added to this frozen general registry in SDK
+`0.1.0`.
+
 ### Value and import
 
 ```text
@@ -3417,9 +3430,12 @@ async function usecreateApplication(...arguments_) {
 
 Returns a frozen convenience object that applies shared defaults to every headless application operation.
 
-The object includes `updateCheck(options)`, which merges defaults with the
-explicit call options and invokes `checkSdkUpdate()` once. Constructing the
-toolchain does not check, poll, schedule, download, install, or mutate anything.
+The object includes `importMap(options)`, which merges defaults with explicit
+call options and performs one selected app's authenticated map refresh. The
+equivalent generic route is `execute('import-map', options)`. It also includes
+`updateCheck(options)`, which invokes `checkSdkUpdate()` once. Constructing the
+toolchain does not check, poll, schedule, download, install, regenerate, or
+mutate anything.
 
 ### Signature and result
 
@@ -3440,14 +3456,15 @@ import {createToolchain} from 'arcane-os';
 
 const toolchain = createToolchain({
     workspaceRoot: process.cwd(),
+    appId:'hello-world',
     onEvent(event) {
         console.info(event.type);
     }
 });
 
-// Only this explicit call performs the single bounded registry request.
-const status = await toolchain.updateCheck();
-console.log(status.status);
+// Only this explicit call refreshes the managed map and HTML entry.
+const result = await toolchain.importMap();
+console.log(result.importMap.entryCount); // 85 in SDK 0.1.0
 ```
 
 ## describeTargets()
@@ -3512,9 +3529,18 @@ async function usedevelopApplication(...arguments_) {
 
 Dispatches one named headless SDK operation with normalized acceptance, events, cancellation, and failure.
 
+The exact command `'import-map'` dispatches one app-scoped authenticated refresh
+and returns `{workspaceRoot, workspaceMode, appId, importMap}`. A normal
+`importMap` value binds the generated imports and the committed map/HTML file
+hashes; the canonical integrated-legacy layout returns its documented skip
+record instead. This route mutates the two managed application files and has no
+supported dry-run.
+
 The exact command `'update-check'` dispatches one `checkSdkUpdate(options)`
-call. Dispatch never installs a recurring task and never causes another command
-to check for updates implicitly.
+call. Dispatch never installs a recurring task, polls application state, or
+causes another command to check for updates implicitly. There is no exported
+`importMapApplication()` or `generateImportMap()` binding and no
+`arcane-os/import-map` package subpath.
 
 ### Signature and result
 
@@ -3533,8 +3559,11 @@ Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states 
 ```javascript
 import {executeOperation} from 'arcane-os';
 
-const result = await executeOperation('update-check');
-console.log(result.status, result.registryVersion);
+const result = await executeOperation('import-map', {
+    workspaceRoot:process.cwd(),
+    appId:'hello-world'
+});
+console.log(result.importMap.committed, result.importMap.entryCount);
 ```
 
 ## packageApplication()

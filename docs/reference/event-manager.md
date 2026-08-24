@@ -16,7 +16,10 @@ The API is capability-first:
 
 All 20 JavaScript exports are available from both `arcane-os` and
 `arcane-os/event-manager`. The bindings are identical, so choose the focused
-subpath when event instrumentation is the only SDK capability you need.
+subpath when event instrumentation is the only SDK capability you need. Node
+can resolve either package entrypoint. The generated browser map intentionally
+exposes only the focused `arcane-os/event-manager` entry, not the Node package
+root.
 
 ## Quick start
 
@@ -53,15 +56,21 @@ bounded, export intentionally, then call `clearHistory()`.
 
 | Capability | Node | Browser renderer | Native/Core host | Remote or cloud | Normalization |
 | --- | --- | --- | --- | --- | --- |
-| Pub/sub, semantic instrumentation, parse/export, seek, playback | Yes | Yes, through a bundler or import map | Only when the SDK module runs in that JavaScript host | No automatic transport | Same synchronous API; optional immutable JSON-like snapshots |
+| Pub/sub, semantic instrumentation, parse/export, seek, playback | Yes | Yes, through a bundler or the managed Arcane import map | Only when the SDK module runs in that JavaScript host | No automatic transport | Same synchronous API; optional immutable JSON-like snapshots |
 | DOM selectors and target descriptions | With DOM-like values or a test shim | Yes | No native UI observation | No | Stable diagnostic descriptors |
 | DOM interaction and mutation capture | No native DOM | Yes | No | No | DOM activity becomes semantic event-stack records |
 | Event-stack schema | Yes | Yes | Data contract only | Can be transported explicitly by the developer | `arcane-event-stack/1` |
 
-An unbundled browser must serve and map `arcane-os` and `event-pubsub`. The
-hash-pinned Arcane browser runtime does not automatically inject this SDK-authored
-module into Shell, Provisioner, Core, or built-in apps. There is no transparent
-fallback to `arcane/1`, HTTP, WebSocket, Ollama, or a cloud event service.
+In an external or physical-v1 integrated workspace, the managed browser map
+resolves `arcane-os/event-manager` to
+`./arcane/sdk/event-manager.mjs` and its private bare dependency
+`event-pubsub` to
+`./arcane/sdk/dependencies/event-pubsub/index.js`. The canonical
+integrated-legacy workspace retains its older physical routes instead. The
+hash-pinned Arcane browser runtime does not inject this SDK-authored module into
+Shell, Provisioner, Core, or built-in apps. There is no transparent fallback to
+the Node package root, `arcane/1`, HTTP, WebSocket, Ollama, or a cloud event
+service.
 
 ## Export summary
 

@@ -19,6 +19,7 @@ high-level page links to the relevant deep section instead of repeating it.
 | Use the Node.js package API | [SDK JavaScript API](sdk-api.md) |
 | Publish central events, capture bounded time-travel history, or observe the DOM | [EventManager and event-stack reference](event-manager.md) |
 | Use the `arcane` command | [CLI reference](cli.md) |
+| Generate named browser imports or inspect the authenticated physical runtime | [`arcane import-map`](cli.md#arcane-import-map) and [browser runtime delivery](protocols.md#browser-runtime-delivery) |
 | Choose browser, native, cloud, or cross-host behavior | [Availability and normalization](availability-and-normalization.md) |
 | Import a shipped renderer module | [Runtime module catalog](runtime-modules.md) |
 | Use a shared entity | [Runtime entity modules](runtime-entities.md) and [exact export contracts](core/arcane-entities.md) |
@@ -36,7 +37,7 @@ This repository contains two related, explicitly versioned surfaces:
 
 | Surface | Source identity | Meaning |
 | --- | --- | --- |
-| SDK and CLI | `arcane-os` `0.1.0-dev.5` | The Node.js toolchain and package exports in this checkout. |
+| SDK and CLI | `arcane-os` `0.1.0` | The Node.js toolchain and package exports in this checkout. |
 | Browser runtime | Arcane OS commit `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, bundle `0.8.12`, protocol `arcane/1` | The exact 155-file runtime snapshot shipped under `runtime/`. |
 | Core reference snapshot | Arcane OS commit `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, protocol `arcane/1` | The application-facing Core contract derived into `docs/reference/core/`. Canonical inventory and focused-member content was verified unchanged at Arcane OS `main` commit `13f3ce0ae34f77a3495331c8b4c30b1bb105f8ed`; SDK-local provenance, link, and package-boundary annotations are added explicitly. |
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.1.0-dev.5",
+  "sdkVersion": "0.1.0",
   "environment": {
     "runtime": "Node.js",
     "minimumVersion": "22.23.2",

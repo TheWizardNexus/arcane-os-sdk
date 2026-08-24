@@ -386,7 +386,7 @@ test('the complete API reference is a first-party generated Pages corpus',async 
     const manifest=await loadReferenceManifest();
     assert.equal(manifest.schema,'arcane-reference-site/1');
     assert.deepEqual(manifest.versions,{
-        sdk:'0.1.0-dev.5',
+        sdk:'0.1.0',
         runtime:'0.8.12',
         protocol:'arcane/1'
     });
@@ -476,6 +476,65 @@ test('the complete API reference is a first-party generated Pages corpus',async 
         assert.match(events,/<summary>/u);
         assert.match(protocols,/<details>/u);
         assert.match(protocols,/<summary>/u);
+    });
+
+    await t.test('the shipped import-map command and physical browser contract are complete',async()=>{
+        const [cli,protocols,eventManager,sdk,packageApi]=await Promise.all([
+            readSiteFile('reference/cli/index.html'),
+            readSiteFile('reference/protocols/index.html'),
+            readSiteFile('reference/event-manager/index.html'),
+            readSiteFile('reference/sdk-api/index.html'),
+            readJson(path.join(repositoryRoot,'docs','reference','inventory','package-api.json'))
+        ]);
+        const decodedCli=decodeReferenceHtml(cli);
+        const decodedProtocols=decodeReferenceHtml(protocols);
+        const decodedEvents=decodeReferenceHtml(eventManager);
+        const decodedSdk=decodeReferenceHtml(sdk);
+
+        assert.match(cli,/<h2 id="arcane-import-map"><code>arcane import-map<\/code><\/h2>/u);
+        assert.match(decodedCli,/arcane import-map \[--workspace <directory>\] \[--app <id>\]/u);
+        assert.match(decodedCli,/apps\/<id>\/modules\/arcane[.]importmap[.]json/u);
+        assert.match(decodedCli,/data-arcane-import-map/u);
+        assert.match(decodedCli,/entryCount:85/u);
+        assert.match(decodedCli,/integrated-legacy/u);
+        assert.match(cli,/There is no supported <code>--dry-run<\/code> for <code>import-map<\/code>/u);
+        assert.match(decodedCli,/no\s+watcher, polling, scheduled refresh, download, or self-update/u);
+        for(const code of [
+            'ARCANE_IMPORT_MAP_INVALID',
+            'ARCANE_IMPORT_MAP_UNRESOLVED',
+            'ARCANE_IMPORT_MAP_COLLISION',
+            'ARCANE_IMPORT_MAP_CLEANUP_FAILED'
+        ])assert.match(decodedCli,new RegExp(code,'u'));
+
+        assert.match(protocols,/id="sdk-package-and-cli-protocols"/u);
+        assert.match(protocols,/id="browser-runtime-delivery"/u);
+        assert.match(decodedProtocols,/import ollama from 'arcane\/Ollama';/u);
+        assert.match(decodedProtocols,/exactly 85 entries/u);
+        assert.match(protocols,/73 named\s+<code>arcane\/[*]<\/code> modules/u);
+        assert.match(protocols,/nine <code>arcane\/entities\/[*]<\/code> modules/u);
+        assert.match(decodedProtocols,/arcane-os\/event-manager[\s\S]*[.]\/arcane\/sdk\/event-manager[.]mjs/u);
+        assert.match(decodedProtocols,/event-pubsub[\s\S]*[.]\/arcane\/sdk\/dependencies\/event-pubsub\/index[.]js/u);
+        assert.match(decodedProtocols,/[.]\/node_modules\/strong-type\/index[.]js[\s\S]*[.]\/arcane\/dependencies\/strong-type\/index[.]js/u);
+        assert.match(decodedProtocols,/163 files in all/u);
+        assert.match(decodedProtocols,/manifestSha256: 43baaec850291c28795f6c194001deb5febab88ccab1b033bce6597dd6f6f08f/u);
+        assert.match(decodedProtocols,/contentSha256: 0caa302bc07d4a45f5290504ec62ddce98fdf5e3412f916c10aae3d51b1e5f7c/u);
+        assert.match(decodedProtocols,/sourceIdentities/u);
+        assert.match(decodedProtocols,/bounded handled-error transaction/u);
+
+        assert.match(decodedEvents,/arcane\/sdk\/event-manager[.]mjs/u);
+        assert.match(decodedEvents,/arcane\/sdk\/dependencies\/event-pubsub\/index[.]js/u);
+        assert.match(decodedSdk,/toolchain[.]importMap\(/u);
+        assert.match(decodedSdk,/executeOperation\('import-map'/u);
+        assert.match(
+            sdk,
+            /There is no exported\s+<code>importMapApplication\(\)<\/code> or <code>generateImportMap\(\)<\/code> binding/u
+        );
+        assert.equal(packageApi.sdkVersion,'0.1.0');
+        assert.equal(packageApi.memberCount,158);
+        assert.equal(packageApi.members.some(member=>[
+            'importMapApplication','generateImportMap'
+        ].includes(member.name)),false);
+        assert.doesNotMatch(sdk,/id="importmapapplication"/u);
     });
 });
 
@@ -914,7 +973,7 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
             }
         }
         const renderedJavaScriptBlockCount=examples.length;
-        assert.equal(renderedJavaScriptBlockCount,549);
+        assert.equal(renderedJavaScriptBlockCount,550);
         let javaScriptModuleExamples=0;
         let classicInlineExamples=0;
         for(const record of records){
@@ -944,7 +1003,7 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
         }
         assert.equal(javaScriptModuleExamples,75);
         assert.equal(classicInlineExamples,3);
-        assert.equal(examples.length,552);
+        assert.equal(examples.length,553);
         assertModuleExamplesParse(examples);
     });
 });

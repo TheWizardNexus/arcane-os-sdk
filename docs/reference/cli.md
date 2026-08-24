@@ -16,6 +16,7 @@ and exits nonzero on failure. Machine output is defined by
 | `arcane new <id>` | Creates one external app workspace. |
 | `arcane init [id]` | Initializes one app in an external or integrated workspace without rewriting unrelated files. |
 | `arcane doctor` | Reads and reports Node/tooling, SDK runtime, workspace, optional Arcane source recognition, and supported managed ArcaneOllama readiness. |
+| `arcane import-map` | Authenticates and refreshes one app's managed browser import map and matching HTML entry. |
 | `arcane dev` | Starts one owned browser development server for one selected app. |
 | `arcane test` | Runs one app test boundary or one explicit integrated shared test file. |
 | `arcane check` | Validates one app boundary or the canonical integrated shared check. |
@@ -161,6 +162,88 @@ failure into a failed doctor result.
 ```bash
 npm exec -- arcane doctor --workspace . --arcane-root "../Arcane OS"
 ```
+
+## `arcane import-map`
+
+### Overview
+
+Authenticates one selected application's physical browser runtime, generates
+its standard browser import map, and commits the map artifact and matching
+managed HTML entry as one bounded refresh.
+
+```text
+arcane import-map [--workspace <directory>] [--app <id>]
+```
+
+`--workspace` defaults to the current directory. `--app` selects one app when
+the workspace does not already identify exactly one. The command accepts no
+positional arguments and supports app scope only. `arcane-os import-map` is the
+identical executable alias.
+
+The generated artifact is
+`apps/<id>/modules/arcane.importmap.json`. Its exact JSON is also installed in
+the app entry as `<script type="importmap" data-arcane-import-map>` before
+module loading. In SDK `0.1.0`, the authenticated physical-v1 runtime produces
+85 entries and intentionally has no package-root mapping.
+
+### Result and safety
+
+Success returns the normal selected-workspace wrapper:
+
+```javascript
+{
+    workspaceRoot,
+    workspaceMode, // 'external' or 'integrated'
+    appId,
+    importMap:{
+        appId,
+        artifactPath,
+        artifactRelativePath,
+        entryPath,
+        imports,
+        entryCount:85,
+        excludedModules:['modules/CaseEvidenceIndexer.js'],
+        files:[
+            {role:'artifact',path,bytes,sha256},
+            {role:'entry',path,bytes,sha256}
+        ],
+        cleanupWarnings,
+        committed:true
+    }
+}
+```
+
+The two file records bind the committed byte length and SHA-256 for the artifact
+and HTML entry. A post-commit observer failure preserves delivery as a successful
+receipt with `eventDelivery.status === 'degraded'` and
+`ARCANE_EVENT_DELIVERY_FAILED`; it does not roll back valid application bytes.
+Packaging refuses a committed refresh that reports cleanup warnings.
+
+The canonical integrated-legacy workspace has a deliberate compatibility
+result instead of an artifact: `importMap.skipped` is `true`,
+`importMap.compatibility` is `'integrated-legacy'`, and the reason states that
+the physical two-route browser runtime is retained.
+
+`new` and `init` generate the map during scaffolding. `dev` refreshes it once
+before binding; non-dry-run `package` and browser `build` refresh it before
+collection. Paired native packaging refreshes each packaged app. `test`,
+`check`, `verify`, `bundle`, and browser `run` do not regenerate it. There is no
+watcher, polling, scheduled refresh, download, or self-update behavior.
+
+There is no supported `--dry-run` for `import-map`: do not pass that parser-wide
+flag because this command performs the real commit. Import-map-specific failures
+use `ARCANE_IMPORT_MAP_INVALID`, `ARCANE_IMPORT_MAP_UNRESOLVED`, or
+`ARCANE_IMPORT_MAP_COLLISION`; packaging can additionally report
+`ARCANE_IMPORT_MAP_CLEANUP_FAILED`. Workspace, policy, usage, busy, and
+cancellation failures retain their normal SDK codes.
+
+### Example
+
+```bash
+npm exec -- arcane import-map --workspace . --app hello-world --output json
+```
+
+Deep details: [authenticated browser delivery and receipts](protocols.md#browser-runtime-delivery).
 
 ## `arcane dev`
 
@@ -471,9 +554,9 @@ Success returns:
 ```javascript
 {
     packageName:'arcane-os',
-    currentVersion:'0.1.0-dev.4',
-    registryVersion:'0.1.0-dev.5',
-    tag:'dev',
+    currentVersion:'0.1.0',
+    registryVersion:'0.1.1',
+    tag:'latest',
     status:'update-available', // or 'current' or 'ahead'
     updateAvailable:true,
     registry:'https://registry.npmjs.org',

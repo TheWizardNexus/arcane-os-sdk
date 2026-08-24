@@ -23,7 +23,7 @@ const referenceSourceRoot=path.join(repositoryRoot,'docs','reference');
 const referenceOutputRoot=path.join(repositoryRoot,'site','reference');
 const canonicalRoot='https://thewizardnexus.github.io/arcane-os-sdk/';
 const publishedVersions=Object.freeze({
-    sdk:'0.1.0-dev.5',
+    sdk:'0.1.0',
     runtime:'0.8.12',
     protocol:'arcane/1'
 });
@@ -891,7 +891,7 @@ function publicReferenceMarkdown(markdown,source){
     if(source==='docs/reference/README.md'){
         output=output.replace(
             /\n## Version scope and provenance[\s\S]*?\n## MDN-style page contract/u,
-            '\n## Version scope\n\nThis site documents SDK `0.1.0-dev.5`, runtime bundle `0.8.12`, and protocol `arcane/1`. Native availability still depends on the selected Core satisfying the current build plan\'s feature, capability, method, provider, and application-identity checks. A matching protocol label alone is not authority or compatibility.\n\n## MDN-style page contract'
+            '\n## Version scope\n\nThis site documents SDK `0.1.0`, runtime bundle `0.8.12`, and protocol `arcane/1`. Native availability still depends on the selected Core satisfying the current build plan\'s feature, capability, method, provider, and application-identity checks. A matching protocol label alone is not authority or compatibility.\n\n## MDN-style page contract'
         );
         output=output.replace(/\n## Source, receipts, and licensing[\s\S]*$/u,'\n');
     }

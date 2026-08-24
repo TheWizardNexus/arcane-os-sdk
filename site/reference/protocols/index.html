@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../">Reference home</a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Protocol and host architecture</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="protocol-and-host-architecture">Protocol and host architecture</h1><p class="doc-lead">This is the deep reference behind the compact availability notes elsewhere. Application developers normally call one documented API and do not choose a wire…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Protocol and host architecture</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="protocol-and-host-architecture">Protocol and host architecture</h1><p class="doc-lead">This is the deep reference behind the compact availability notes elsewhere. Application developers normally call one documented API and do not choose a wire…</p><div class="doc-meta"><span>SDK 0.1.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="./" aria-current="page">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/protocols.md"><p>This is the deep reference behind the compact availability notes elsewhere.
@@ -55,6 +55,13 @@ a nonzero CLI status.</p>
 <p>These protocols normalize orchestration and evidence. They do not normalize a
 Windows EXE, Linux DEB, Android APK, and portable directory into the same
 artifact kind.</p>
+<p>Managed browser imports have three supported control-plane entrypoints. The CLI
+uses <code>arcane import-map</code>; Node callers use
+<code>executeOperation(&#39;import-map&#39;, options)</code> or
+<code>createToolchain(defaults).importMap(options)</code>. These are three routes to the
+same app-scoped operation, not three import-map formats. There is no exported
+<code>importMapApplication()</code> function, <code>generateImportMap()</code> function, or
+<code>arcane-os/import-map</code> package subpath.</p>
 <h2 id="central-events-and-time-travel-data">Central events and time-travel data</h2>
 <p><code>arcane-os/event-manager</code> is host-neutral JavaScript. Its live event path is
 synchronous, in-process <code>event-pubsub</code>; it does not select WebView2,
@@ -82,15 +89,99 @@ and grants no Core capability, app admission, or provider authority.</p>
 <p>See <a href="../event-manager/">EventManager and time-travel review</a> for the callable
 surface, DOM privacy defaults, playback modes, and recovery behavior.</p>
 <h2 id="browser-runtime-delivery">Browser runtime delivery</h2>
-<p>External and integrated workspaces keep the same application URLs. Runtime ESM
-is served beneath <code>/arcane</code>, the vendored dependency beneath
-<code>/node_modules/strong-type</code>, and license material beneath
-<code>/licenses/arcane-os</code>. A browser import such as:</p>
-<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import ollama from &#39;/arcane/modules/Ollama.js&#39;;
+<p>External and modern integrated workspaces keep the same application URLs and a
+browser-standard import map. Each selected app owns
+<code>apps/&lt;id&gt;/modules/arcane.importmap.json</code>; the exact canonical JSON is also
+embedded in its HTML entry as a managed <code>&lt;script type=&quot;importmap&quot; data-arcane-import-map&gt;</code>. The map follows <code>&lt;base&gt;</code> and precedes module scripts,
+classic scripts, and module preloads, so application code can use stable named
+imports such as:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import ollama from &#39;arcane/Ollama&#39;;
 </code></pre></div>
-<p>uses browser ESM in every renderer. The imported module can be pure browser
-logic, standard-Web-API logic, or a client of <code>globalThis.Arcane</code>. Import
-transport and host RPC are separate layers.</p>
+<p>The authenticated physical-v1 tree lives entirely beneath <code>arcane/</code>. It
+contains 155 pinned Arcane runtime files plus eight SDK browser-runtime files:
+163 files in all. Runtime <code>strong-type</code> 1.1 stays under
+<code>arcane/dependencies/strong-type/</code>; the focused SDK event surface lives under
+<code>arcane/sdk/</code>, with <code>event-pubsub</code> 6.1 and its sibling <code>strong-type</code> 2.0 under
+<code>arcane/sdk/dependencies/</code>. This URL-key separation prevents the runtime and SDK
+dependency versions from aliasing one another. Development serves the selected
+app plus that authenticated tree. Packaging copies the same map, app entry, and
+physical bytes into <code>dist/&lt;id&gt;</code>; targets never resolve through the consumer
+workspace&#39;s root <code>node_modules/</code>.</p>
+<p>In SDK <code>0.1.0</code>, the generated map has exactly 85 entries: 73 named
+<code>arcane/*</code> modules, nine <code>arcane/entities/*</code> modules, and these three focused or
+compatibility mappings:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Browser specifier</th>
+<th>Physical target</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>arcane-os/event-manager</code></td>
+<td><code>./arcane/sdk/event-manager.mjs</code></td>
+</tr>
+<tr>
+<td><code>event-pubsub</code></td>
+<td><code>./arcane/sdk/dependencies/event-pubsub/index.js</code></td>
+</tr>
+<tr>
+<td><code>./node_modules/strong-type/index.js</code></td>
+<td><code>./arcane/dependencies/strong-type/index.js</code></td>
+</tr>
+</tbody></table>
+</div>
+<p>There is no <code>arcane-os</code> package-root mapping, bare <code>strong-type</code> mapping, or
+catch-all <code>arcane/</code> prefix. Host-internal <code>CaseEvidenceIndexer.js</code> is explicitly
+excluded; classic scripts, workers, stylesheets, and other non-ESM assets use
+their documented URL or host loading contract rather than invented package
+bindings.</p>
+<p>The imported module can be pure browser logic, standard-Web-API logic, or a
+client of <code>globalThis.Arcane</code>. Import-map resolution is not a new Arcane wire
+protocol, Core capability, network authority, or provider fallback. Import
+transport and host RPC remain separate layers.</p>
+<p>The canonical integrated-legacy Arcane OS root is the documented exception. It
+retains its physical <code>/arcane</code> and <code>/node_modules/strong-type</code> routes, returns
+an <code>integrated-legacy</code> skip receipt, and does not create the managed map pair.</p>
+<details><summary>Refresh lifecycle and two-file commit behavior</summary>
+<p>Scaffolding (<code>new</code> and <code>init</code>) creates the map. <code>dev</code> refreshes once before
+binding. Non-dry-run <code>package</code>, browser <code>build</code>, and paired native packaging
+refresh before collecting source. <code>test</code>, <code>check</code>, <code>verify</code>, <code>bundle</code>, and
+browser <code>run</code> do not refresh. Dry-run packaging/build validates an existing map
+without rewriting it, and <code>import-map</code> itself has no supported dry-run.</p>
+<p>Generation stages the artifact and HTML entry beside their destinations,
+checks directory and file identity under the workspace-operation lock, and
+uses backups to restore the prior pair after a handled pre-commit failure.
+Success reports <code>committed: true</code> and SHA-256/byte-length records for both
+files. Cleanup failures after commit remain warnings on the valid receipt;
+packaging rejects them rather than publishing ambiguous state. This is a
+bounded handled-error transaction, not a claim of one filesystem-atomic rename
+for both files and not a durable crash journal.</p>
+<p>No app watches, polls, downloads, or self-updates this map. An active operation&#39;s
+heartbeat is event telemetry only and never regenerates browser state.</p>
+</details>
+<details><summary>SDK browser-runtime admission and exact receipt fields</summary>
+<p><code>arcane.lock.json.sdkBrowserRuntime</code> persists the trusted manifest path,
+<code>manifestSha256</code>, <code>contentSha256</code>, <code>builder</code>, <code>sdkVersion</code>, and <code>source</code> record.
+For SDK <code>0.1.0</code> those identities are:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">manifest: node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json
+manifestSha256: 43baaec850291c28795f6c194001deb5febab88ccab1b033bce6597dd6f6f08f
+contentSha256: 0caa302bc07d4a45f5290504ec62ddce98fdf5e3412f916c10aae3d51b1e5f7c
+builder: arcane-sdk-browser-runtime-v1
+sdkVersion: 0.1.0
+source.protocol: arcane-sdk-browser-runtime/1
+source.browserEntry: arcane-os/event-manager
+</code></pre></div>
+<p>The <code>source</code> record also binds the <code>arcane-os-sdk</code> authority/repository and the
+exact <code>event-pubsub</code> 6.1.0 and <code>strong-type</code> 2.0.0 package identities. Before a
+workspace tree is admitted, the same-process verifier returns
+<code>schemaVersion</code>, <code>kind</code>, <code>canonicalLocation</code>, <code>rootIdentity</code>, <code>manifestPath</code>,
+<code>manifestSha256</code>, <code>manifestIdentity</code>, <code>builder</code>, <code>sdkVersion</code>, <code>source</code>,
+<code>files</code>, <code>fileCount</code>, <code>totalBytes</code>, <code>contentSha256</code>, <code>identities</code>,
+<code>sourceIdentities</code>, and <code>directories</code>. Those object-identity-bound verifier
+receipts are authority inside the issuing process; reconstructing the same JSON
+does not recreate authority.</p>
+</details>
 <h2 id="arcane-application-protocol">Arcane application protocol</h2>
 <p><code>globalThis.Arcane.protocol</code> is <code>arcane/1</code>. The shared API wraps transport
 selection, request ids, JSON-safe values, promise settlement, <code>Arcane.Error</code>,
@@ -158,7 +249,7 @@ mutation workflows.</p>
 Arcane normalizes the outer promise/error and stream lifecycle. <code>chatText</code>,
 <code>generateText</code>, and <code>readiness</code> are helper-level normalizers.</p>
 <h2 id="explicit-cloud-provider-path">Explicit cloud provider path</h2>
-<p><code>/arcane/modules/AI.js</code> can use an explicitly selected and configured cloud
+<p><code>arcane/AI</code> can use an explicitly selected and configured cloud
 profile over HTTPS. That path is not Core transport fallback. The module adapts
 the selected provider into its high-level application behavior, while provider
 diagnostics and optional fields can remain provider-specific. Native policy and
@@ -192,11 +283,14 @@ and identity-bound receipt checks all pass;</li>
 this Core or that this SDK will accept a future Core.</li>
 </ul>
 <h2 id="receipt-and-generation-boundaries">Receipt and generation boundaries</h2>
-<p>SDK runtime, app releases, bundles, native plans, providers, and artifacts use
-identity-bound receipts. A receipt binds the exact location, filesystem
-identity, bytes/inventory hashes, policy, toolchain, platform/architecture,
-signer/trust result where applicable, and generation. Mutation invalidates the
-receipt before bytes or authority change.</p>
+<p>SDK runtime, app releases, import-map artifact/entry pairs, bundles, native
+plans, providers, and artifacts use identity-bound receipts. The import-map
+receipt binds each committed relative path, byte length, and SHA-256 in
+addition to its exact imports, entry count, exclusions, and cleanup state. A
+runtime or release receipt binds the exact location, filesystem identity,
+bytes/inventory hashes, policy, toolchain, platform/architecture, signer/trust
+result where applicable, and generation. Mutation invalidates the receipt
+before bytes or authority change.</p>
 <p>Process-local receipts do not authorize reuse across Shell, Core, providers, or
 other processes. Cross-process reuse requires an authenticated shared host or
 broker with retained handles and peer-process/generation binding.</p>
@@ -204,6 +298,6 @@ broker with retained handles and peer-process/generation binding.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#layer-map">Layer map</a><a href="#sdk-package-and-cli-protocols">SDK package and CLI protocols</a><a href="#central-events-and-time-travel-data">Central events and time-travel data</a><a href="#browser-runtime-delivery">Browser runtime delivery</a><a href="#arcane-application-protocol">Arcane application protocol</a><a href="#native-host-transports">Native host transports</a><a href="#development-and-remote-http-transport">Development and remote HTTP transport</a><a href="#core-dispatch-and-capability-admission">Core dispatch and capability admission</a><a href="#arcane-ollama-protocol-path">Arcane Ollama protocol path</a><a href="#explicit-cloud-provider-path">Explicit cloud provider path</a><a href="#events-streaming-and-cancellation">Events, streaming, and cancellation</a><a href="#cross-kernel-normalization-boundary">Cross-kernel normalization boundary</a><a href="#receipt-and-generation-boundaries">Receipt and generation boundaries</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>

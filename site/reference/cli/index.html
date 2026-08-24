@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../">Reference home</a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane CLI reference</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-cli-reference">Arcane CLI reference</h1><p class="doc-lead">The arcane and arcane-os executables invoke the same headless SDK toolchain. Use the command name that is unambiguous in the current project; project-local…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane CLI reference</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-cli-reference">Arcane CLI reference</h1><p class="doc-lead">The arcane and arcane-os executables invoke the same headless SDK toolchain. Use the command name that is unambiguous in the current project; project-local…</p><div class="doc-meta"><span>SDK 0.1.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="./" aria-current="page">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/cli.md"><p>The <code>arcane</code> and <code>arcane-os</code> executables invoke the same headless SDK toolchain.
@@ -42,6 +42,10 @@ and exits nonzero on failure. Machine output is defined by
 <tr>
 <td><code>arcane doctor</code></td>
 <td>Reads and reports Node/tooling, SDK runtime, workspace, optional Arcane source recognition, and supported managed ArcaneOllama readiness.</td>
+</tr>
+<tr>
+<td><code>arcane import-map</code></td>
+<td>Authenticates and refreshes one app&#39;s managed browser import map and matching HTML entry.</td>
 </tr>
 <tr>
 <td><code>arcane dev</code></td>
@@ -282,8 +286,71 @@ failure into a failed doctor result.</p>
 <h3 id="example-2">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm exec -- arcane doctor --workspace . --arcane-root &quot;../Arcane OS&quot;
 </code></pre></div>
-<h2 id="arcane-dev"><code>arcane dev</code></h2>
+<h2 id="arcane-import-map"><code>arcane import-map</code></h2>
 <h3 id="overview-3">Overview</h3>
+<p>Authenticates one selected application&#39;s physical browser runtime, generates
+its standard browser import map, and commits the map artifact and matching
+managed HTML entry as one bounded refresh.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane import-map [--workspace &lt;directory&gt;] [--app &lt;id&gt;]
+</code></pre></div>
+<p><code>--workspace</code> defaults to the current directory. <code>--app</code> selects one app when
+the workspace does not already identify exactly one. The command accepts no
+positional arguments and supports app scope only. <code>arcane-os import-map</code> is the
+identical executable alias.</p>
+<p>The generated artifact is
+<code>apps/&lt;id&gt;/modules/arcane.importmap.json</code>. Its exact JSON is also installed in
+the app entry as <code>&lt;script type=&quot;importmap&quot; data-arcane-import-map&gt;</code> before
+module loading. In SDK <code>0.1.0</code>, the authenticated physical-v1 runtime produces
+85 entries and intentionally has no package-root mapping.</p>
+<h3 id="result-and-safety">Result and safety</h3>
+<p>Success returns the normal selected-workspace wrapper:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const result = {
+    workspaceRoot,
+    workspaceMode, // &#39;external&#39; or &#39;integrated&#39;
+    appId,
+    importMap:{
+        appId,
+        artifactPath,
+        artifactRelativePath,
+        entryPath,
+        imports,
+        entryCount:85,
+        excludedModules:[&#39;modules/CaseEvidenceIndexer.js&#39;],
+        files:[
+            {role:&#39;artifact&#39;,path,bytes,sha256},
+            {role:&#39;entry&#39;,path,bytes,sha256}
+        ],
+        cleanupWarnings,
+        committed:true
+    }
+};
+</code></pre></div>
+<p>The two file records bind the committed byte length and SHA-256 for the artifact
+and HTML entry. A post-commit observer failure preserves delivery as a successful
+receipt with <code>eventDelivery.status === &#39;degraded&#39;</code> and
+<code>ARCANE_EVENT_DELIVERY_FAILED</code>; it does not roll back valid application bytes.
+Packaging refuses a committed refresh that reports cleanup warnings.</p>
+<p>The canonical integrated-legacy workspace has a deliberate compatibility
+result instead of an artifact: <code>importMap.skipped</code> is <code>true</code>,
+<code>importMap.compatibility</code> is <code>&#39;integrated-legacy&#39;</code>, and the reason states that
+the physical two-route browser runtime is retained.</p>
+<p><code>new</code> and <code>init</code> generate the map during scaffolding. <code>dev</code> refreshes it once
+before binding; non-dry-run <code>package</code> and browser <code>build</code> refresh it before
+collection. Paired native packaging refreshes each packaged app. <code>test</code>,
+<code>check</code>, <code>verify</code>, <code>bundle</code>, and browser <code>run</code> do not regenerate it. There is no
+watcher, polling, scheduled refresh, download, or self-update behavior.</p>
+<p>There is no supported <code>--dry-run</code> for <code>import-map</code>: do not pass that parser-wide
+flag because this command performs the real commit. Import-map-specific failures
+use <code>ARCANE_IMPORT_MAP_INVALID</code>, <code>ARCANE_IMPORT_MAP_UNRESOLVED</code>, or
+<code>ARCANE_IMPORT_MAP_COLLISION</code>; packaging can additionally report
+<code>ARCANE_IMPORT_MAP_CLEANUP_FAILED</code>. Workspace, policy, usage, busy, and
+cancellation failures retain their normal SDK codes.</p>
+<h3 id="example-3">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm exec -- arcane import-map --workspace . --app hello-world --output json
+</code></pre></div>
+<p>Deep details: <a href="../protocols/#browser-runtime-delivery">authenticated browser delivery and receipts</a>.</p>
+<h2 id="arcane-dev"><code>arcane dev</code></h2>
+<h3 id="overview-4">Overview</h3>
 <p>Starts one loopback development server for one selected app and maps the exact
 workspace/runtime routes. It is a development convenience, not a production
 security boundary.</p>
@@ -294,11 +361,11 @@ security boundary.</p>
 owns the server until cancellation, and restores failure to the process exit.
 The default host is loopback. Exposing another interface is an explicit
 development choice and does not add authentication.</p>
-<h3 id="example-3">Example</h3>
+<h3 id="example-4">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm exec -- arcane dev --app hello-world --port 8000
 </code></pre></div>
 <h2 id="arcane-test"><code>arcane test</code></h2>
-<h3 id="overview-4">Overview</h3>
+<h3 id="overview-5">Overview</h3>
 <p>Runs exactly one test scope.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane test [--app &lt;id&gt;] [--scope app]
 arcane test --scope shared --test-file &lt;repo-relative.test.mjs&gt;
@@ -309,14 +376,14 @@ app tests, or only the selected integrated app&#39;s tests. Shared scope is
 integrated-only and admits one exact repository-relative <code>.test.mjs</code> through
 Arcane&#39;s fixed provider. It cannot run an arbitrary command, glob every test,
 or cross into another app.</p>
-<h3 id="example-4">Example</h3>
+<h3 id="example-5">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">node ../arcane-os-sdk/bin/arcane.mjs test \
   --workspace &quot;../Arcane OS&quot; \
   --scope shared \
   --test-file test/component-contracts.test.mjs
 </code></pre></div>
 <h2 id="arcane-check"><code>arcane check</code></h2>
-<h3 id="overview-5">Overview</h3>
+<h3 id="overview-6">Overview</h3>
 <p>Runs the canonical validation boundary for one app, or the one canonical
 integrated shared development check.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane check [--app &lt;id&gt;] [--scope app] [--skip-tests]
@@ -326,11 +393,11 @@ arcane check --scope shared
 <p><code>--skip-tests</code> is app-scope-only and skips the selected app test stage without
 weakening descriptor, runtime, or source checks. Shared check owns Arcane&#39;s
 canonical development check and does not accept a custom command.</p>
-<h3 id="example-5">Example</h3>
+<h3 id="example-6">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm exec -- arcane check --app hello-world
 </code></pre></div>
 <h2 id="arcane-package"><code>arcane package</code></h2>
-<h3 id="overview-6">Overview</h3>
+<h3 id="overview-7">Overview</h3>
 <p>Creates and authenticates one browser release beneath <code>dist/&lt;id&gt;/</code>, preserving
 the prior output until the replacement is verified.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane package [--app &lt;id&gt;] [--dry-run]
@@ -339,11 +406,11 @@ the prior output until the replacement is verified.</p>
 <p>The result includes the release root, manifest, positive inventory, hashes,
 byte counts, policy identity, and a process-authenticated release receipt.
 <code>--dry-run</code> plans the selected package without replacing output.</p>
-<h3 id="example-6">Example</h3>
+<h3 id="example-7">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm exec -- arcane package --app hello-world
 </code></pre></div>
 <h2 id="arcane-verify"><code>arcane verify</code></h2>
-<h3 id="overview-7">Overview</h3>
+<h3 id="overview-8">Overview</h3>
 <p>Authenticates one existing browser release against the app descriptor, package
 policy, exact inventory, file identities, byte lengths, and hashes.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane verify [--app &lt;id&gt;]
@@ -352,11 +419,11 @@ policy, exact inventory, file identities, byte lengths, and hashes.</p>
 <p>Verification proves consistency for the exact observed release state. It does
 not prove publisher authorization, native signing, installation, launch, or
 release acceptance.</p>
-<h3 id="example-7">Example</h3>
+<h3 id="example-8">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm exec -- arcane verify --app hello-world
 </code></pre></div>
 <h2 id="arcane-bundle"><code>arcane bundle</code></h2>
-<h3 id="overview-8">Overview</h3>
+<h3 id="overview-9">Overview</h3>
 <p>Seals one already packaged and authenticated external app into the deterministic
 <code>.arcane-app.tar.gz</code> contract.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane bundle [--app &lt;id&gt;] [--artifact &lt;file&gt;.arcane-app.tar.gz] [--overwrite]
@@ -366,11 +433,11 @@ release acceptance.</p>
 is refused unless <code>--overwrite</code> is explicit. Even then, the prior artifact is
 retained until the promoted bytes pass final exact-length, hash, link, and
 filesystem-identity checks.</p>
-<h3 id="example-8">Example</h3>
+<h3 id="example-9">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm exec -- arcane bundle --app hello-world
 </code></pre></div>
 <h2 id="arcane-verify-bundle"><code>arcane verify-bundle</code></h2>
-<h3 id="overview-9">Overview</h3>
+<h3 id="overview-10">Overview</h3>
 <p>Parses and authenticates one release bundle without extracting it.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane verify-bundle &lt;file.arcane-app.tar.gz&gt;
 </code></pre></div>
@@ -379,11 +446,11 @@ filesystem-identity checks.</p>
 portable paths, expansion limits, canonical descriptor, release policy,
 inventory, bytes, and hashes. Internal consistency is not installation
 authority.</p>
-<h3 id="example-9">Example</h3>
+<h3 id="example-10">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm exec -- arcane verify-bundle dist/hello-world-1.0.0.arcane-app.tar.gz
 </code></pre></div>
 <h2 id="arcane-native-doctor"><code>arcane native-doctor</code></h2>
-<h3 id="overview-10">Overview</h3>
+<h3 id="overview-11">Overview</h3>
 <p>Loads one fixed native provider from one explicit Arcane OS checkout and
 diagnoses the selected target/host prerequisites without building an app.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane native-doctor --target &lt;native-target&gt; --arcane-root &lt;directory&gt;
@@ -392,25 +459,25 @@ diagnoses the selected target/host prerequisites without building an app.</p>
 <p>This is a <strong>Node</strong> orchestration command with <strong>Native</strong> provider behavior. The
 provider fails honestly when the selected platform, architecture, or toolchain
 is unavailable; it never returns a browser package as a substitute.</p>
-<h3 id="example-10">Example</h3>
+<h3 id="example-11">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm exec -- arcane native-doctor \
   --target windows-x64 \
   --arcane-root &quot;../Arcane OS&quot;
 </code></pre></div>
 <h2 id="arcane-native-prepare"><code>arcane native-prepare</code></h2>
-<h3 id="overview-11">Overview</h3>
+<h3 id="overview-12">Overview</h3>
 <p>Runs the provider&#39;s standalone toolchain-integrity preparation diagnostic for
 one target. It is not a prerequisite command to repeat immediately before
 <code>build</code>; <code>build</code> prepares and retains its own process-owned receipt.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane native-prepare --target &lt;native-target&gt; --arcane-root &lt;directory&gt;
 </code></pre></div>
-<h3 id="example-11">Example</h3>
+<h3 id="example-12">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm exec -- arcane native-prepare \
   --target linux-x64 \
   --arcane-root &quot;../Arcane OS&quot;
 </code></pre></div>
 <h2 id="arcane-build"><code>arcane build</code></h2>
-<h3 id="overview-12">Overview</h3>
+<h3 id="overview-13">Overview</h3>
 <p>Packages one app, prepares one provider, creates one immutable plan, builds one
 target, and retained-verifies one result.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane build --target &lt;target&gt; [--arcane-root &lt;directory&gt;] [--output-root &lt;directory&gt;] [--format &lt;format&gt;] [--signing &lt;mode&gt;] [--dry-run]
@@ -422,14 +489,14 @@ Windows x64 EXE bundle, Linux x64/ARM64 DEB, or development-signed Android APK.
 The output remains target-specific inside the common plan/receipt contract.
 <code>--dry-run</code> is implemented for the browser build path. Native builds reject it
 rather than returning a fictional native artifact plan.</p>
-<h3 id="example-12">Example</h3>
+<h3 id="example-13">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm exec -- arcane build \
   --target windows-x64 \
   --arcane-root &quot;../Arcane OS&quot; \
   --output-root &quot;../arcane-native-output&quot;
 </code></pre></div>
 <h2 id="arcane-run"><code>arcane run</code></h2>
-<h3 id="overview-13">Overview</h3>
+<h3 id="overview-14">Overview</h3>
 <p>For <code>--target browser</code>, verifies the existing current <code>dist/&lt;app&gt;</code> release
 and starts its packaged server; it does not package or rebuild that release.
 For a paired native target, performs package, prepare, plan, build, retained
@@ -443,14 +510,14 @@ existing verified release (run <code>arcane package</code> first). Windows, Linu
 Android providers expose supported paired native run paths. Portable output is
 a verified directory and intentionally cannot run. Android run requires one
 connected physical/native ARM64 device for the current target.</p>
-<h3 id="example-13">Example</h3>
+<h3 id="example-14">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm exec -- arcane run \
   --target linux-x64 \
   --arcane-root &quot;../Arcane OS&quot; \
   --output-root &quot;../arcane-native-output&quot;
 </code></pre></div>
 <h2 id="arcane-update-check"><code>arcane update-check</code></h2>
-<h3 id="overview-14">Overview</h3>
+<h3 id="overview-15">Overview</h3>
 <p>Performs one explicit, on-demand check of the installed Arcane SDK version
 against its matching npm distribution tag.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane update-check
@@ -471,9 +538,9 @@ version selects <code>latest</code>.</p>
 <p>Success returns:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const result = {
     packageName:&#39;arcane-os&#39;,
-    currentVersion:&#39;0.1.0-dev.4&#39;,
-    registryVersion:&#39;0.1.0-dev.5&#39;,
-    tag:&#39;dev&#39;,
+    currentVersion:&#39;0.1.0&#39;,
+    registryVersion:&#39;0.1.1&#39;,
+    tag:&#39;latest&#39;,
     status:&#39;update-available&#39;, // or &#39;current&#39; or &#39;ahead&#39;
     updateAvailable:true,
     registry:&#39;https://registry.npmjs.org&#39;,
@@ -494,11 +561,11 @@ versions emit <code>update.check.failed</code> and terminate as <code>operation.
 <p><code>SIGINT</code> or <code>SIGTERM</code> cancels the owned request. Cancellation terminates as
 <code>operation.cancelled</code> with exit status <code>130</code>; it does not masquerade as an update
 failure. Output framing follows the global human/JSON/NDJSON contract above.</p>
-<h3 id="example-14">Example</h3>
+<h3 id="example-15">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm exec -- arcane update-check --output json
 </code></pre></div>
 <h2 id="arcane-targets"><code>arcane targets</code></h2>
-<h3 id="overview-15">Overview</h3>
+<h3 id="overview-16">Overview</h3>
 <p>Lists the current target descriptors without building. Descriptors report
 protocol, id, display name, declared status, platforms, architectures, formats,
 signing modes, advertised adapter methods, and the reason a target is deferred
@@ -506,11 +573,11 @@ or requires pairing. The <code>methods</code> list describes the adapter interfa
 not a live runnable/readiness probe. Use <code>native-doctor</code> for an explicit
 provider/host assessment, and note that portable output intentionally rejects
 run even though adapters share the common method shape.</p>
-<h3 id="example-15">Example</h3>
+<h3 id="example-16">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm exec -- arcane targets --output json
 </code></pre></div>
 <h2 id="arcane-repo"><code>arcane repo</code></h2>
-<h3 id="overview-16">Overview</h3>
+<h3 id="overview-17">Overview</h3>
 <p>Runs one repository action for the selected application workspace.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane repo status|pull|push
 </code></pre></div>
@@ -519,7 +586,7 @@ run even though adapters share the common method shape.</p>
 remote and credentials, stream the owned child process, and surface nonzero
 failure. The command does not create credentials, choose another repository, or
 loop across workspaces.</p>
-<h3 id="example-16">Example</h3>
+<h3 id="example-17">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm exec -- arcane repo status
 </code></pre></div>
 <h2 id="machine-output">Machine output</h2>
@@ -539,9 +606,9 @@ documented JavaScript operations directly when that lower-level lifecycle is
 required; do not present those names as user commands or infer them from the
 parser&#39;s recognized option set.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#command-inventory">Command inventory</a><a href="#parser-wide-options">Parser-wide options</a><a href="#output-and-exit-contract">Output and exit contract</a><a href="#arcane-new">arcane new</a><a href="#arcane-init">arcane init</a><a href="#arcane-doctor">arcane doctor</a><a href="#arcane-dev">arcane dev</a><a href="#arcane-test">arcane test</a><a href="#arcane-check">arcane check</a><a href="#arcane-package">arcane package</a><a href="#arcane-verify">arcane verify</a><a href="#arcane-bundle">arcane bundle</a><a href="#arcane-verify-bundle">arcane verify-bundle</a><a href="#arcane-native-doctor">arcane native-doctor</a><a href="#arcane-native-prepare">arcane native-prepare</a><a href="#arcane-build">arcane build</a><a href="#arcane-run">arcane run</a><a href="#arcane-update-check">arcane update-check</a><a href="#arcane-targets">arcane targets</a><a href="#arcane-repo">arcane repo</a><a href="#machine-output">Machine output</a><a href="#programmatic-only-operation-names">Programmatic-only operation names</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#command-inventory">Command inventory</a><a href="#parser-wide-options">Parser-wide options</a><a href="#output-and-exit-contract">Output and exit contract</a><a href="#arcane-new">arcane new</a><a href="#arcane-init">arcane init</a><a href="#arcane-doctor">arcane doctor</a><a href="#arcane-import-map">arcane import-map</a><a href="#arcane-dev">arcane dev</a><a href="#arcane-test">arcane test</a><a href="#arcane-check">arcane check</a><a href="#arcane-package">arcane package</a><a href="#arcane-verify">arcane verify</a><a href="#arcane-bundle">arcane bundle</a><a href="#arcane-verify-bundle">arcane verify-bundle</a><a href="#arcane-native-doctor">arcane native-doctor</a><a href="#arcane-native-prepare">arcane native-prepare</a><a href="#arcane-build">arcane build</a><a href="#arcane-run">arcane run</a><a href="#arcane-update-check">arcane update-check</a><a href="#arcane-targets">arcane targets</a><a href="#arcane-repo">arcane repo</a><a href="#machine-output">Machine output</a><a href="#programmatic-only-operation-names">Programmatic-only operation names</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>

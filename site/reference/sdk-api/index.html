@@ -2,23 +2,28 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
-  <meta name="description" content="The npm package exposes a Node.js ESM control plane. It is not a browser-importable renderer API. Use the synchronized modules under /arcane/ for applicatio…">
+  <meta name="description" content="The npm package exposes a Node.js ESM control plane. It is not a browser-importable renderer API. Application code uses named modules from the managed brows…">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
   <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/sdk-api/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane OS SDK JavaScript API · Arcane OS SDK"><meta property="og:description" content="The npm package exposes a Node.js ESM control plane. It is not a browser-importable renderer API. Use the synchronized modules under /arcane/ for applicatio…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/sdk-api/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane OS SDK JavaScript API · Arcane OS SDK"><meta name="twitter:description" content="The npm package exposes a Node.js ESM control plane. It is not a browser-importable renderer API. Use the synchronized modules under /arcane/ for applicatio…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane OS SDK JavaScript API · Arcane OS SDK"><meta property="og:description" content="The npm package exposes a Node.js ESM control plane. It is not a browser-importable renderer API. Application code uses named modules from the managed brows…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/sdk-api/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane OS SDK JavaScript API · Arcane OS SDK"><meta name="twitter:description" content="The npm package exposes a Node.js ESM control plane. It is not a browser-importable renderer API. Application code uses named modules from the managed brows…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
   <title>Arcane OS SDK JavaScript API | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../">Reference home</a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane. It is not a browser-importable renderer API. Use the synchronized modules under /arcane/ for applicatio…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane. It is not a browser-importable renderer API. Application code uses named modules from the managed brows…</p><div class="doc-meta"><span>SDK 0.1.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="./" aria-current="page">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/sdk-api.md"><p>The npm package exposes a Node.js ESM control plane. It is not a browser-importable renderer API. Use the synchronized modules under <code>/arcane/</code> for application code and use <code>globalThis.Arcane</code> for capability-gated native calls.</p>
+      <article class="prose reference-prose" data-reference-source="docs/reference/sdk-api.md"><p>The npm package exposes a Node.js ESM control plane. It is not a browser-importable renderer API. Application code uses named modules from the managed browser map, such as <code>arcane/ThemeBootstrap</code>, uses the focused <code>arcane-os/event-manager</code> browser entry when needed, and calls <code>globalThis.Arcane</code> for capability-gated host behavior.</p>
 <p>This page is the canonical inventory for every JavaScript name reachable through <code>package.json#exports</code>. The same binding can appear at the root and a focused subpath; those entrypoints are listed together. The root workspace <code>discoverApps</code> and the low-level packager <code>discoverApps</code> are intentionally separate records because they are different functions.</p>
 <h2 id="import-map">Import map</h2>
+<p>This table is the Node <code>package.json#exports</code> map: it defines package
+entrypoints for SDK/tooling code. It is distinct from the generated browser
+import map that resolves application-facing <code>arcane/*</code> modules and the focused
+EventManager entry. See <a href="../protocols/#browser-runtime-delivery">browser runtime delivery</a>
+for that 85-entry physical-runtime contract.</p>
 <div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
 <tr>
@@ -2566,6 +2571,12 @@ console.log(error.code, error.message);
 <code>&#39;ARCANE_UPDATE_CHECK_FAILED&#39;</code>. It identifies a bounded update-check validation,
 registry, timeout, HTTP, or response failure; caller cancellation remains the
 separate <code>ERROR_CODES.cancelled</code> value.</p>
+<p>The import-map operation also reports the stable operation-specific strings
+<code>ARCANE_IMPORT_MAP_INVALID</code>, <code>ARCANE_IMPORT_MAP_UNRESOLVED</code>, and
+<code>ARCANE_IMPORT_MAP_COLLISION</code>; package assembly can additionally report
+<code>ARCANE_IMPORT_MAP_CLEANUP_FAILED</code>. They are normalized <code>ArcaneError.code</code>
+values, but are not properties added to this frozen general registry in SDK
+<code>0.1.0</code>.</p>
 <h4 id="value-and-import-34">Value and import</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">const ERROR_CODES
 </code></pre></div>
@@ -3038,9 +3049,12 @@ async function usecreateApplication(...arguments_) {
 <h3 id="createtoolchain">createToolchain()</h3>
 <h4 id="overview-113">Overview</h4>
 <p>Returns a frozen convenience object that applies shared defaults to every headless application operation.</p>
-<p>The object includes <code>updateCheck(options)</code>, which merges defaults with the
-explicit call options and invokes <code>checkSdkUpdate()</code> once. Constructing the
-toolchain does not check, poll, schedule, download, install, or mutate anything.</p>
+<p>The object includes <code>importMap(options)</code>, which merges defaults with explicit
+call options and performs one selected app&#39;s authenticated map refresh. The
+equivalent generic route is <code>execute(&#39;import-map&#39;, options)</code>. It also includes
+<code>updateCheck(options)</code>, which invokes <code>checkSdkUpdate()</code> once. Constructing the
+toolchain does not check, poll, schedule, download, install, regenerate, or
+mutate anything.</p>
 <h4 id="signature-and-result-74">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createToolchain(defaults={})
 </code></pre></div>
@@ -3052,14 +3066,15 @@ toolchain does not check, poll, schedule, download, install, or mutate anything.
 
 const toolchain = createToolchain({
     workspaceRoot: process.cwd(),
+    appId:&#39;hello-world&#39;,
     onEvent(event) {
         console.info(event.type);
     }
 });
 
-// Only this explicit call performs the single bounded registry request.
-const status = await toolchain.updateCheck();
-console.log(status.status);
+// Only this explicit call refreshes the managed map and HTML entry.
+const result = await toolchain.importMap();
+console.log(result.importMap.entryCount); // 85 in SDK 0.1.0
 </code></pre></div>
 <h3 id="describetargets">describeTargets()</h3>
 <h4 id="overview-114">Overview</h4>
@@ -3096,9 +3111,17 @@ async function usedevelopApplication(...arguments_) {
 <h3 id="executeoperation">executeOperation()</h3>
 <h4 id="overview-116">Overview</h4>
 <p>Dispatches one named headless SDK operation with normalized acceptance, events, cancellation, and failure.</p>
+<p>The exact command <code>&#39;import-map&#39;</code> dispatches one app-scoped authenticated refresh
+and returns <code>{workspaceRoot, workspaceMode, appId, importMap}</code>. A normal
+<code>importMap</code> value binds the generated imports and the committed map/HTML file
+hashes; the canonical integrated-legacy layout returns its documented skip
+record instead. This route mutates the two managed application files and has no
+supported dry-run.</p>
 <p>The exact command <code>&#39;update-check&#39;</code> dispatches one <code>checkSdkUpdate(options)</code>
-call. Dispatch never installs a recurring task and never causes another command
-to check for updates implicitly.</p>
+call. Dispatch never installs a recurring task, polls application state, or
+causes another command to check for updates implicitly. There is no exported
+<code>importMapApplication()</code> or <code>generateImportMap()</code> binding and no
+<code>arcane-os/import-map</code> package subpath.</p>
 <h4 id="signature-and-result-77">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async executeOperation(command, options={})
 </code></pre></div>
@@ -3108,8 +3131,11 @@ to check for updates implicitly.</p>
 <h4 id="example-116">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {executeOperation} from &#39;arcane-os&#39;;
 
-const result = await executeOperation(&#39;update-check&#39;);
-console.log(result.status, result.registryVersion);
+const result = await executeOperation(&#39;import-map&#39;, {
+    workspaceRoot:process.cwd(),
+    appId:&#39;hello-world&#39;
+});
+console.log(result.importMap.committed, result.importMap.entryCount);
 </code></pre></div>
 <h3 id="packageapplication">packageApplication()</h3>
 <h4 id="overview-117">Overview</h4>
@@ -3964,6 +3990,6 @@ console.log(stack.sessionId, stack.events.length);
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>

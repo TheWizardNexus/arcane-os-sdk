@@ -136,6 +136,17 @@ test('the public package API inventory matches every JavaScript export and MDN e
             }
             assert.ok(Array.isArray(member.entrypoints)&&member.entrypoints.length>0);
         }
+        assert.equal(
+            inventory.members.some(member=>[
+                'importMapApplication','generateImportMap'
+            ].includes(member.name)),
+            false
+        );
+        for(const name of ['createToolchain','executeOperation']){
+            const record=inventory.members.find(member=>member.name===name);
+            assert.ok(record,name);
+            assert.deepEqual(record.entrypoints,['arcane-os','arcane-os/toolchain']);
+        }
     });
 
     await t.test('every JavaScript export is documented in both directions',async()=>{

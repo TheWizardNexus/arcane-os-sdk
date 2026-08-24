@@ -47,6 +47,14 @@ These protocols normalize orchestration and evidence. They do not normalize a
 Windows EXE, Linux DEB, Android APK, and portable directory into the same
 artifact kind.
 
+Managed browser imports have three supported control-plane entrypoints. The CLI
+uses `arcane import-map`; Node callers use
+`executeOperation('import-map', options)` or
+`createToolchain(defaults).importMap(options)`. These are three routes to the
+same app-scoped operation, not three import-map formats. There is no exported
+`importMapApplication()` function, `generateImportMap()` function, or
+`arcane-os/import-map` package subpath.
+
 ## Central events and time-travel data
 
 `arcane-os/event-manager` is host-neutral JavaScript. Its live event path is
@@ -83,18 +91,105 @@ surface, DOM privacy defaults, playback modes, and recovery behavior.
 
 ## Browser runtime delivery
 
-External and integrated workspaces keep the same application URLs. Runtime ESM
-is served beneath `/arcane`, the vendored dependency beneath
-`/node_modules/strong-type`, and license material beneath
-`/licenses/arcane-os`. A browser import such as:
+External and modern integrated workspaces keep the same application URLs and a
+browser-standard import map. Each selected app owns
+`apps/<id>/modules/arcane.importmap.json`; the exact canonical JSON is also
+embedded in its HTML entry as a managed `<script type="importmap"
+data-arcane-import-map>`. The map follows `<base>` and precedes module scripts,
+classic scripts, and module preloads, so application code can use stable named
+imports such as:
 
 ```javascript
-import ollama from '/arcane/modules/Ollama.js';
+import ollama from 'arcane/Ollama';
 ```
 
-uses browser ESM in every renderer. The imported module can be pure browser
-logic, standard-Web-API logic, or a client of `globalThis.Arcane`. Import
-transport and host RPC are separate layers.
+The authenticated physical-v1 tree lives entirely beneath `arcane/`. It
+contains 155 pinned Arcane runtime files plus eight SDK browser-runtime files:
+163 files in all. Runtime `strong-type` 1.1 stays under
+`arcane/dependencies/strong-type/`; the focused SDK event surface lives under
+`arcane/sdk/`, with `event-pubsub` 6.1 and its sibling `strong-type` 2.0 under
+`arcane/sdk/dependencies/`. This URL-key separation prevents the runtime and SDK
+dependency versions from aliasing one another. Development serves the selected
+app plus that authenticated tree. Packaging copies the same map, app entry, and
+physical bytes into `dist/<id>`; targets never resolve through the consumer
+workspace's root `node_modules/`.
+
+In SDK `0.1.0`, the generated map has exactly 85 entries: 73 named
+`arcane/*` modules, nine `arcane/entities/*` modules, and these three focused or
+compatibility mappings:
+
+| Browser specifier | Physical target |
+| --- | --- |
+| `arcane-os/event-manager` | `./arcane/sdk/event-manager.mjs` |
+| `event-pubsub` | `./arcane/sdk/dependencies/event-pubsub/index.js` |
+| `./node_modules/strong-type/index.js` | `./arcane/dependencies/strong-type/index.js` |
+
+There is no `arcane-os` package-root mapping, bare `strong-type` mapping, or
+catch-all `arcane/` prefix. Host-internal `CaseEvidenceIndexer.js` is explicitly
+excluded; classic scripts, workers, stylesheets, and other non-ESM assets use
+their documented URL or host loading contract rather than invented package
+bindings.
+
+The imported module can be pure browser logic, standard-Web-API logic, or a
+client of `globalThis.Arcane`. Import-map resolution is not a new Arcane wire
+protocol, Core capability, network authority, or provider fallback. Import
+transport and host RPC remain separate layers.
+
+The canonical integrated-legacy Arcane OS root is the documented exception. It
+retains its physical `/arcane` and `/node_modules/strong-type` routes, returns
+an `integrated-legacy` skip receipt, and does not create the managed map pair.
+
+<details>
+<summary>Refresh lifecycle and two-file commit behavior</summary>
+
+Scaffolding (`new` and `init`) creates the map. `dev` refreshes once before
+binding. Non-dry-run `package`, browser `build`, and paired native packaging
+refresh before collecting source. `test`, `check`, `verify`, `bundle`, and
+browser `run` do not refresh. Dry-run packaging/build validates an existing map
+without rewriting it, and `import-map` itself has no supported dry-run.
+
+Generation stages the artifact and HTML entry beside their destinations,
+checks directory and file identity under the workspace-operation lock, and
+uses backups to restore the prior pair after a handled pre-commit failure.
+Success reports `committed: true` and SHA-256/byte-length records for both
+files. Cleanup failures after commit remain warnings on the valid receipt;
+packaging rejects them rather than publishing ambiguous state. This is a
+bounded handled-error transaction, not a claim of one filesystem-atomic rename
+for both files and not a durable crash journal.
+
+No app watches, polls, downloads, or self-updates this map. An active operation's
+heartbeat is event telemetry only and never regenerates browser state.
+
+</details>
+
+<details>
+<summary>SDK browser-runtime admission and exact receipt fields</summary>
+
+`arcane.lock.json.sdkBrowserRuntime` persists the trusted manifest path,
+`manifestSha256`, `contentSha256`, `builder`, `sdkVersion`, and `source` record.
+For SDK `0.1.0` those identities are:
+
+```text
+manifest: node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json
+manifestSha256: 43baaec850291c28795f6c194001deb5febab88ccab1b033bce6597dd6f6f08f
+contentSha256: 0caa302bc07d4a45f5290504ec62ddce98fdf5e3412f916c10aae3d51b1e5f7c
+builder: arcane-sdk-browser-runtime-v1
+sdkVersion: 0.1.0
+source.protocol: arcane-sdk-browser-runtime/1
+source.browserEntry: arcane-os/event-manager
+```
+
+The `source` record also binds the `arcane-os-sdk` authority/repository and the
+exact `event-pubsub` 6.1.0 and `strong-type` 2.0.0 package identities. Before a
+workspace tree is admitted, the same-process verifier returns
+`schemaVersion`, `kind`, `canonicalLocation`, `rootIdentity`, `manifestPath`,
+`manifestSha256`, `manifestIdentity`, `builder`, `sdkVersion`, `source`,
+`files`, `fileCount`, `totalBytes`, `contentSha256`, `identities`,
+`sourceIdentities`, and `directories`. Those object-identity-bound verifier
+receipts are authority inside the issuing process; reconstructing the same JSON
+does not recreate authority.
+
+</details>
 
 ## Arcane application protocol
 
@@ -190,7 +285,7 @@ Arcane normalizes the outer promise/error and stream lifecycle. `chatText`,
 
 ## Explicit cloud provider path
 
-`/arcane/modules/AI.js` can use an explicitly selected and configured cloud
+`arcane/AI` can use an explicitly selected and configured cloud
 profile over HTTPS. That path is not Core transport fallback. The module adapts
 the selected provider into its high-level application behavior, while provider
 diagnostics and optional fields can remain provider-specific. Native policy and
@@ -231,11 +326,14 @@ The common contract ends where platform truth must remain different:
 
 ## Receipt and generation boundaries
 
-SDK runtime, app releases, bundles, native plans, providers, and artifacts use
-identity-bound receipts. A receipt binds the exact location, filesystem
-identity, bytes/inventory hashes, policy, toolchain, platform/architecture,
-signer/trust result where applicable, and generation. Mutation invalidates the
-receipt before bytes or authority change.
+SDK runtime, app releases, import-map artifact/entry pairs, bundles, native
+plans, providers, and artifacts use identity-bound receipts. The import-map
+receipt binds each committed relative path, byte length, and SHA-256 in
+addition to its exact imports, entry count, exclusions, and cleanup state. A
+runtime or release receipt binds the exact location, filesystem identity,
+bytes/inventory hashes, policy, toolchain, platform/architecture, signer/trust
+result where applicable, and generation. Mutation invalidates the receipt
+before bytes or authority change.
 
 Process-local receipts do not authorize reuse across Shell, Core, providers, or
 other processes. Cross-process reuse requires an authenticated shared host or
