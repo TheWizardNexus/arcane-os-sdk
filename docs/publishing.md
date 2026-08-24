@@ -16,19 +16,22 @@ dependency and invoke its local CLI with `npm exec -- arcane`. A separate
 global installer, standalone SDK executable, NuGet package, Homebrew formula,
 or OS package is not part of this release surface.
 
-`Check` validates the source once, then one unprivileged producer packs one
-`.tgz` under pinned Node and npm versions. The producer writes a canonical
-manifest containing the source SHA, clean-checkout flag, package inventory,
-byte length, SHA-256, npm SHA-1 shasum, and SHA-512 integrity. Windows x64,
-Linux x64, and a real macOS arm64 runner use the declared Node `22.23.2` floor
-and each download that same Actions
-artifact by immutable artifact id. They never repack it. Each runner verifies
-the receipt, installs the tarball into a disposable project, exercises
+`Check` validates only package-publication authority once: package metadata,
+the executable and `.gitattributes` boundary, both authenticated runtime
+receipts, and the focused npm identity/channel/provenance contract. One
+unprivileged producer then packs one `.tgz` under pinned Node and npm versions.
+The producer writes a canonical manifest containing the source SHA,
+clean-checkout flag, package inventory, byte length, SHA-256, npm SHA-1 shasum,
+and SHA-512 integrity. One Ubuntu x64 consumer at the declared Node `22.23.2`
+floor downloads that Actions artifact by immutable artifact id, verifies the
+receipt, installs the tarball into a disposable project, exercises
 `npm exec --offline -- arcane`, and runs one small capability contract through
-the installed package's `arcane-test.mjs`. A final readiness job verifies the
-same artifact's identity, integrity, shasum, license inventory, and content
-boundary once. Browser/process simulations, Pages, Examples, and presentation
-work are post-registry follow-through rather than npm publication gates.
+the installed package's `arcane-test.mjs`. It never repacks. A final readiness
+job verifies the same artifact's identity, integrity, shasum, license inventory,
+and content boundary once. Golden snapshots, broad integration/regression and
+platform matrices, browser/process simulations, Pages, Examples, and
+presentation work are normal or post-registry checks rather than npm
+publication gates.
 
 `publish-dev.yml` can run only when manually dispatched from `main` in
 `TheWizardNexus/arcane-os-sdk`. Dispatch requires an authorized npm content
@@ -72,8 +75,9 @@ as `arcane-os@0.1.0-dev.5` and verifies the locked runtime. A local directory
 
 The first-version bootstrap established these permanent audit boundaries:
 
-1. Push the intended clean `main` commit and require the complete Check workflow,
-   including the exact-artifact Windows/Linux/macOS matrix, to pass.
+1. Push the intended clean `main` commit and require the npm-critical Check
+   workflow—package authority, one producer, one installed Linux capability
+   smoke, and one identity/legal verifier—to pass.
 2. Review the uploaded tarball inventory, manifest, checksum, and license
    notices. Ensure the Arcane OS monorepo package is private so it cannot publish
    the same npm name accidentally.
@@ -189,8 +193,9 @@ work and do not change the canonical source branch.
 ## Work-amplification record
 
 The release graph is one checked `main` SHA and one npm release candidate. One
-source-validation job runs the suite once; one producer creates the tarball;
-three small installed-package consumers execute those exact bytes on Windows,
-Linux, and macOS; and one readiness job verifies identity and legal inventory.
+package-authority job runs the narrow source policy and publication contract;
+one producer creates the tarball; one Ubuntu consumer executes those exact
+installed bytes; and one readiness job verifies identity and legal inventory.
 OIDC publication reuses that successful exact-SHA artifact without rebuilding.
-Pages and broader presentation work follow registry verification separately.
+Platform matrices, full product regressions, Pages, and broader presentation
+work remain outside registry publication and run separately when warranted.

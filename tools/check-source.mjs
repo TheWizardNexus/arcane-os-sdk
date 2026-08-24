@@ -40,6 +40,14 @@ function fail(message){
     throw new Error(message);
 }
 
+function parseOptions(args=process.argv.slice(2)){
+    if(args.length===0)return Object.freeze({packageOnly:false});
+    if(args.length===1&&args[0]==='--package-only'){
+        return Object.freeze({packageOnly:true});
+    }
+    fail('Usage: node tools/check-source.mjs [--package-only]');
+}
+
 function toPosix(relativePath){
     return relativePath.split(path.sep).join('/');
 }
@@ -167,6 +175,7 @@ async function assertRuntimeGitAttributes(){
 }
 
 async function main(){
+    const {packageOnly}=parseOptions();
     const packagePath=path.join(REPOSITORY_ROOT,'package.json');
     const packageDocument=JSON.parse(await readFile(packagePath,'utf8'));
     assertPackageMetadata(packageDocument);
@@ -184,6 +193,11 @@ async function main(){
     const binSource=await readFile(binPath,'utf8');
     if(!binSource.startsWith('#!/usr/bin/env node\n')){
         fail('bin/arcane.mjs must begin with #!/usr/bin/env node and an LF newline.');
+    }
+
+    if(packageOnly){
+        process.stdout.write('Package source policy passed.\n');
+        return;
     }
 
     const files=await collectFiles(REPOSITORY_ROOT);

@@ -403,7 +403,7 @@ test('CI, reusable app release, and trusted publishing workflows retain narrow a
         assert.match(checkWorkflow,/push:\s*\n\s+branches:\s*\n\s+- main/u);
         assert.doesNotMatch(checkWorkflow,/\n\s+- dev\s*$/mu);
     });
-    await t.test('Check validates source once and smokes every supported package platform',()=>{
+    await t.test('Check validates package authority once and runs one Linux installed smoke',()=>{
         assert.match(checkWorkflow,/source_validation:[\s\S]*runs-on: ubuntu-24\.04/u);
         assert.equal(checkWorkflow.match(/npm run check:release/gu)?.length,1);
         assert.doesNotMatch(checkWorkflow,/npm run check(?:\s|$)/mu);
@@ -414,9 +414,15 @@ test('CI, reusable app release, and trusted publishing workflows retain narrow a
             ),
             /matrix:/u
         );
-        assert.match(checkWorkflow,/target: windows-x64[\s\S]*os: windows-2025/u);
-        assert.match(checkWorkflow,/target: linux-x64[\s\S]*os: ubuntu-24\.04/u);
-        assert.match(checkWorkflow,/target: macos-arm64[\s\S]*os: macos-15[\s\S]*platform: darwin/u);
+        const smokeStart=checkWorkflow.indexOf('  installed_capability_smoke:');
+        const readinessStart=checkWorkflow.indexOf('  npm_release_ready:');
+        assert.ok(smokeStart>=0&&readinessStart>smokeStart);
+        const smokeSection=checkWorkflow.slice(smokeStart,readinessStart);
+        assert.match(smokeSection,/name: Installed capability smoke \/ linux-x64/u);
+        assert.match(smokeSection,/runs-on: ubuntu-24\.04/u);
+        assert.match(smokeSection,/ARCANE_SDK_EXPECTED_PLATFORM: linux/u);
+        assert.match(smokeSection,/ARCANE_SDK_EXPECTED_ARCHITECTURE: x64/u);
+        assert.doesNotMatch(smokeSection,/matrix:|windows-2025|macos-15/u);
     });
     await t.test('Check installs and exercises one exact project-local npm artifact',()=>{
         assert.match(checkWorkflow,/actions\/upload-artifact@[0-9a-f]{40}/u);
