@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict';
+import {cp,mkdir,mkdtemp,readFile,rm,unlink,writeFile} from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import test from '../src/testing.mjs';
-import {assessArcaneOllama} from '../src/doctor.mjs';
+import {SDK_NAME,SDK_VERSION} from '../src/constants.mjs';
+import {assessArcaneOllama,runDoctor} from '../src/doctor.mjs';
+import {verifyRuntime} from '../src/runtime.mjs';
+import {verifySdkBrowserRuntime} from '../src/sdk-browser-runtime.mjs';
+import {workspaceTemplate} from '../src/templates/workspace-template.mjs';
+import {materializeWorkspaceRuntime} from '../src/workspace-runtime.mjs';
+
+const repositoryRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 
 const serviceHost='C:\\Program Files\\Ollama\\ArcaneOllamaService.exe';
 const readyProbe=JSON.stringify({
@@ -40,6 +51,142 @@ function windowsRunner({command=`"${serviceHost}"`,probeCode=0,probeOutput=ready
         throw new Error(`Unexpected command: ${executable} ${args.join(' ')}`);
     };
     return {calls,run};
+}
+
+async function writeTemplateFiles(workspaceRoot,files){
+    for(const [relative,content] of files){
+        const destination=path.join(workspaceRoot,...relative.split('/'));
+        await mkdir(path.dirname(destination),{recursive:true});
+        await writeFile(destination,content);
+    }
+}
+
+async function externalDoctorWorkspace(t){
+    const workspaceRoot=await mkdtemp(path.join(os.tmpdir(),'arcane-doctor-external-'));
+    t.after(()=>rm(workspaceRoot,{recursive:true,force:true}));
+    const [runtimeReceipt,sdkBrowserRuntimeReceipt]=await Promise.all([
+        verifyRuntime(),
+        verifySdkBrowserRuntime()
+    ]);
+    const template=workspaceTemplate({
+        appId:'doctor-app',
+        displayName:'Doctor App',
+        runtimeRelease:runtimeReceipt,
+        sdkBrowserRuntimeRelease:sdkBrowserRuntimeReceipt
+    });
+    await writeTemplateFiles(workspaceRoot,template.files);
+    await materializeWorkspaceRuntime({
+        workspaceRoot,
+        runtimeRoot:runtimeReceipt.canonicalLocation,
+        runtimeReceipt,
+        browserRuntimeRoot:sdkBrowserRuntimeReceipt.canonicalLocation,
+        sdkBrowserRuntimeReceipt
+    });
+
+    const installedRoot=path.join(workspaceRoot,'node_modules','arcane-os');
+    await mkdir(path.join(installedRoot,'src'),{recursive:true});
+    await Promise.all([
+        cp(path.join(repositoryRoot,'runtime'),path.join(installedRoot,'runtime'),{recursive:true}),
+        cp(
+            path.join(repositoryRoot,'browser-runtime'),
+            path.join(installedRoot,'browser-runtime'),
+            {recursive:true}
+        ),
+        cp(
+            path.join(repositoryRoot,'node_modules','event-pubsub'),
+            path.join(installedRoot,'node_modules','event-pubsub'),
+            {recursive:true}
+        ),
+        cp(
+            path.join(repositoryRoot,'node_modules','strong-type'),
+            path.join(installedRoot,'node_modules','strong-type'),
+            {recursive:true}
+        ),
+        cp(
+            path.join(repositoryRoot,'src','event-manager.mjs'),
+            path.join(installedRoot,'src','event-manager.mjs')
+        ),
+        cp(
+            path.join(repositoryRoot,'src','dom-event-instrumentation.mjs'),
+            path.join(installedRoot,'src','dom-event-instrumentation.mjs')
+        ),
+        writeFile(
+            path.join(installedRoot,'package.json'),
+            `${JSON.stringify({name:SDK_NAME,version:SDK_VERSION,type:'module'},null,2)}\n`
+        )
+    ]);
+    return {workspaceRoot,installedRoot};
+}
+
+async function integratedLegacyDoctorWorkspace(t){
+    const workspaceRoot=await mkdtemp(path.join(os.tmpdir(),'arcane-doctor-integrated-'));
+    t.after(()=>rm(workspaceRoot,{recursive:true,force:true}));
+    const appId='legacy-app';
+    const template=workspaceTemplate({
+        appId,
+        displayName:'Legacy App',
+        appOnly:true,
+        namedImports:false
+    });
+    await writeTemplateFiles(workspaceRoot,template.files);
+    await writeFile(
+        path.join(workspaceRoot,'package.json'),
+        `${JSON.stringify({name:'arcane-os',private:true,type:'module'},null,2)}\n`
+    );
+    await writeFile(
+        path.join(workspaceRoot,'arcane-packager.json'),
+        `${JSON.stringify({
+            schemaVersion:1,
+            appsRoot:'apps',
+            distRoot:'dist',
+            sharedPayloads:{
+                'browser-runtime':[
+                    {
+                        source:'arcane',
+                        destination:'arcane',
+                        include:['components','css','entities','img','modules','security'],
+                        exclude:[]
+                    },
+                    {
+                        source:'node_modules/strong-type',
+                        destination:'node_modules/strong-type',
+                        include:['index.js','licence','package.json'],
+                        exclude:[]
+                    }
+                ]
+            }
+        },null,2)}\n`
+    );
+    await Promise.all([
+        mkdir(path.join(workspaceRoot,'arcane'),{recursive:true}),
+        mkdir(path.join(workspaceRoot,'node_modules','strong-type'),{recursive:true})
+    ]);
+    return {workspaceRoot,appId};
+}
+
+async function doctor(workspaceRoot,appId='doctor-app'){
+    return runDoctor({
+        workspaceRoot,
+        appId,
+        platform:'linux',
+        run:async(command,args)=>{
+            if(command==='npm'&&args[0]==='--version'){
+                return {code:0,stdout:'10.9.3\n',stderr:''};
+            }
+            if(command==='git'&&args[0]==='--version'){
+                return {code:0,stdout:'git version 2.50.1\n',stderr:''};
+            }
+            throw new Error(`Unexpected doctor command: ${command} ${args.join(' ')}`);
+        }
+    });
+}
+
+function workspaceChecks(report){
+    const selected=report.checks.filter(item=>item.id==='workspace'||item.id==='workspace-runtime');
+    assert.deepEqual(selected.map(item=>item.id),['workspace','workspace-runtime']);
+    assert.equal(report.checks.filter(item=>item.id==='workspace').length,1);
+    assert.equal(report.checks.filter(item=>item.id==='workspace-runtime').length,1);
+    return selected;
 }
 
 test('ArcaneOllama doctor check is explicit on unsupported hosts',async()=>{
@@ -134,4 +281,165 @@ test('ArcaneOllama rejects nonzero and noncanonical probe results',async t=>{
             assert.equal(result.details.probeVerified,false);
         });
     }
+});
+
+test('doctor authenticates both external runtime authorities and their physical projection',async t=>{
+    const {workspaceRoot}=await externalDoctorWorkspace(t);
+    const report=await doctor(workspaceRoot);
+    const [workspace,runtime]=workspaceChecks(report);
+
+    assert.equal(report.ok,true,JSON.stringify(report.checks,null,2));
+    assert.equal(report.checks.find(item=>item.id==='sdk-runtime')?.status,'pass');
+    assert.equal(workspace.status,'pass');
+    assert.equal(workspace.details.workspaceMode,'external');
+    assert.equal(runtime.status,'pass');
+    assert.equal(runtime.details.fileCount,163);
+    assert.match(runtime.details.runtimeManifestSha256,/^[a-f0-9]{64}$/u);
+    assert.match(runtime.details.runtimeContentSha256,/^[a-f0-9]{64}$/u);
+    assert.match(runtime.details.browserManifestSha256,/^[a-f0-9]{64}$/u);
+    assert.match(runtime.details.browserContentSha256,/^[a-f0-9]{64}$/u);
+});
+
+test('doctor fails closed on missing, corrupt, or unadmitted installed SDK browser authority',async t=>{
+    const cases=[
+        {
+            name:'missing browser receipt',
+            mutate:({installedRoot})=>unlink(path.join(
+                installedRoot,
+                'browser-runtime',
+                'ARCANE_SDK_BROWSER_RELEASE.json'
+            )),
+            expected:['fail','skipped']
+        },
+        {
+            name:'corrupt browser receipt',
+            mutate:({installedRoot})=>writeFile(path.join(
+                installedRoot,
+                'browser-runtime',
+                'ARCANE_SDK_BROWSER_RELEASE.json'
+            ),'{not-json\n'),
+            expected:['fail','skipped']
+        },
+        {
+            name:'missing receipted browser closure file',
+            mutate:({installedRoot})=>unlink(path.join(
+                installedRoot,
+                'browser-runtime',
+                'event-manager.mjs'
+            )),
+            expected:['pass','fail']
+        },
+        {
+            name:'corrupt receipted browser closure file',
+            mutate:({installedRoot})=>writeFile(path.join(
+                installedRoot,
+                'browser-runtime',
+                'event-manager.mjs'
+            ),'export default "tampered";\n'),
+            expected:['pass','fail']
+        },
+        {
+            name:'corrupt declared SDK browser source identity',
+            mutate:({installedRoot})=>writeFile(path.join(
+                installedRoot,
+                'src',
+                'event-manager.mjs'
+            ),'export default "tampered source";\n'),
+            expected:['pass','fail']
+        },
+        {
+            name:'corrupt installed Arcane upstream byte',
+            mutate:({installedRoot})=>writeFile(path.join(
+                installedRoot,
+                'runtime',
+                'arcane',
+                'modules',
+                'MD.js'
+            ),'export default "tampered upstream";\n'),
+            expected:['pass','fail']
+        },
+        {
+            name:'browser authority not admitted by the workspace lock',
+            mutate:async({workspaceRoot})=>{
+                const lockPath=path.join(workspaceRoot,'arcane.lock.json');
+                const lock=JSON.parse(await readFile(lockPath,'utf8'));
+                lock.sdkBrowserRuntime.manifestSha256='0'.repeat(64);
+                await writeFile(lockPath,`${JSON.stringify(lock,null,2)}\n`);
+            },
+            expected:['fail','skipped']
+        }
+    ];
+
+    for(const item of cases){
+        await t.test(item.name,async child=>{
+            const fixture=await externalDoctorWorkspace(child);
+            await item.mutate(fixture);
+            const report=await doctor(fixture.workspaceRoot);
+            assert.deepEqual(workspaceChecks(report).map(check=>check.status),item.expected);
+            assert.equal(report.ok,false);
+        });
+    }
+});
+
+test('doctor rejects missing or corrupt projected Arcane, dependency, and SDK browser bytes',async t=>{
+    const cases=[
+        {
+            name:'missing projected SDK browser entry',
+            mutate:workspaceRoot=>unlink(path.join(workspaceRoot,'arcane','sdk','event-manager.mjs'))
+        },
+        {
+            name:'corrupt projected SDK dependency',
+            mutate:workspaceRoot=>writeFile(
+                path.join(workspaceRoot,'arcane','sdk','dependencies','event-pubsub','index.js'),
+                'throw new Error("tampered SDK dependency");\n'
+            )
+        },
+        {
+            name:'corrupt projected Arcane module',
+            mutate:workspaceRoot=>writeFile(
+                path.join(workspaceRoot,'arcane','modules','MD.js'),
+                'export default "tampered Arcane module";\n'
+            )
+        },
+        {
+            name:'corrupt projected Arcane strong-type dependency',
+            mutate:workspaceRoot=>writeFile(
+                path.join(workspaceRoot,'arcane','dependencies','strong-type','index.js'),
+                'export default "tampered runtime dependency";\n'
+            )
+        }
+    ];
+
+    for(const item of cases){
+        await t.test(item.name,async child=>{
+            const {workspaceRoot}=await externalDoctorWorkspace(child);
+            await item.mutate(workspaceRoot);
+            const report=await doctor(workspaceRoot);
+            const [workspace,runtime]=workspaceChecks(report);
+            assert.equal(workspace.status,'pass');
+            assert.equal(runtime.status,'fail');
+            assert.equal(report.ok,false);
+        });
+    }
+});
+
+test('doctor preserves unchanged integrated legacy runtime compatibility',async t=>{
+    const {workspaceRoot,appId}=await integratedLegacyDoctorWorkspace(t);
+    const report=await doctor(workspaceRoot,appId);
+    const [workspace,runtime]=workspaceChecks(report);
+
+    assert.equal(report.ok,true);
+    assert.equal(workspace.status,'pass');
+    assert.equal(workspace.details.workspaceMode,'integrated');
+    assert.equal(runtime.status,'pass');
+    assert.equal(runtime.details.layout,'integrated-legacy');
+});
+
+test('doctor emits deterministic skipped workspace checks when no workspace is selected',async t=>{
+    const workspaceRoot=await mkdtemp(path.join(os.tmpdir(),'arcane-doctor-none-'));
+    t.after(()=>rm(workspaceRoot,{recursive:true,force:true}));
+    const report=await doctor(workspaceRoot);
+
+    assert.deepEqual(workspaceChecks(report).map(check=>check.status),['skipped','skipped']);
+    assert.equal(report.ok,true);
 });

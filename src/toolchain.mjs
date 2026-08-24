@@ -11,7 +11,17 @@ import {
 } from './workspace.mjs';
 import {loadArcaneIntegratedProvider} from './integrated-provider-loader.mjs';
 import {startDevServer} from './dev-server.mjs';
-import {authenticateRuntimeReceipt,loadRuntimeRelease,verifyRuntime} from './runtime.mjs';
+import {authenticateRuntimeReceipt,verifyRuntime} from './runtime.mjs';
+import {
+    authenticateSdkBrowserRuntimeReceipt,
+    verifySdkBrowserRuntime
+} from './sdk-browser-runtime.mjs';
+import {
+    authenticateWorkspaceRuntimeReceipt,
+    verifyWorkspaceRuntime
+} from './workspace-runtime.mjs';
+import {generateImportMap} from './import-map.mjs';
+import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
 import {
     authenticateSharedPayloadSnapshot,
     packageApp,
@@ -147,12 +157,32 @@ function withEventDeliveryFailure(result,error){
     return {...result,eventDelivery};
 }
 
-function isNativeCommitEvent(_label,event){
-    return event?.type==='native.build.committed'
-        ||(event?.phase==='publish'&&event?.status==='completed');
+function isOuterCommitEvent(label,event){
+    if(label==='build')return event?.type==='native.build.committed';
+    return label==='bundle'&&event?.type==='bundle.committed'
+        &&event?.phase==='publish'&&event?.status==='completed';
 }
 
-async function ownedWork(label,work,{signal,onEvent,heartbeatMs=5000}={}){
+function isAppReleaseReceipt(value){
+    return value?.kind==='arcane-app-release-verification'
+        &&typeof value?.contentSha256==='string';
+}
+
+function hasAuthenticatedOuterResult(label,result){
+    if(label==='import-map')return result?.committed===true;
+    if(label==='package')return isAppReleaseReceipt(result?.receipt);
+    if(label==='bundle')return result?.artifactReceipt?.kind
+        ==='arcane-app-release-bundle-artifact';
+    if(label!=='build')return false;
+    return nativeArtifactReceipt(result)!=null||isAppReleaseReceipt(result?.release?.receipt);
+}
+
+async function ownedWork(label,work,{
+    signal,
+    onEvent,
+    heartbeatMs=5000,
+    workspaceRoot
+}={}){
     throwIfAborted(signal);
     const controller=new AbortController();
     const forwardAbort=()=>controller.abort(signal?.reason);
@@ -168,7 +198,7 @@ async function ownedWork(label,work,{signal,onEvent,heartbeatMs=5000}={}){
         }
     });
     const forwardEvent=async event=>{
-        if(isNativeCommitEvent(label,event))committed=true;
+        if(isOuterCommitEvent(label,event))committed=true;
         try{
             await events.send(event);
         }catch(error){
@@ -202,11 +232,21 @@ async function ownedWork(label,work,{signal,onEvent,heartbeatMs=5000}={}){
             );
         },Math.max(1000,heartbeatMs));
         heartbeat.unref?.();
-        const result=await work({
+        const execute=workspaceOperationLease=>work({
             signal:controller.signal,
-            onEvent:forwardEvent
+            onEvent:forwardEvent,
+            workspaceOperationLease
         });
-        if(nativeArtifactReceipt(result))committed=true;
+        const mutating=new Set(['import-map','package','bundle','build','run']).has(label);
+        const result=mutating&&workspaceRoot
+            ?await withWorkspaceOperationLock({
+                workspaceRoot,
+                operation:label,
+                signal:controller.signal,
+                onEvent:forwardEvent
+            },execute)
+            :await execute();
+        if(hasAuthenticatedOuterResult(label,result))committed=true;
         stopProducers();
         if(!committed||label==='run')throwIfAborted(controller.signal);
         try{
@@ -335,6 +375,7 @@ async function preparedWorkspace(options){
     const workspace=await validateWorkspace({
         workspaceRoot:options.workspaceRoot,
         appId:options.appId,
+        allowMissingManagedImportMap:Boolean(options.allowMissingManagedImportMap),
         signal:options.signal,
         onEvent:options.onEvent
     });
@@ -342,6 +383,9 @@ async function preparedWorkspace(options){
     const runtimeRoot=external
         ?path.join(workspace.workspaceRoot,'node_modules','arcane-os','runtime')
         :workspace.workspaceRoot;
+    const browserRuntimeRoot=external
+        ?path.join(workspace.workspaceRoot,'node_modules','arcane-os','browser-runtime')
+        :null;
     const runtimeReceipt=external&&!options.deferRuntimeVerification
         ?await verifyRuntime({
             runtimeRoot,
@@ -349,9 +393,34 @@ async function preparedWorkspace(options){
             onEvent:options.onEvent
         })
         :null;
+    const sdkBrowserRuntimeReceipt=external&&!options.deferRuntimeVerification
+        ?await verifySdkBrowserRuntime({
+            browserRuntimeRoot,
+            signal:options.signal,
+            onEvent:options.onEvent
+        })
+        :null;
+    const workspaceRuntimeReceipt=external&&!options.deferRuntimeVerification
+        ?await verifyWorkspaceRuntime({
+            workspaceRoot:workspace.workspaceRoot,
+            runtimeRoot,
+            runtimeReceipt,
+            browserRuntimeRoot,
+            sdkBrowserRuntimeReceipt,
+            signal:options.signal,
+            onEvent:options.onEvent
+        })
+        :null;
+    const runtimeVerificationState=external&&!options.deferRuntimeVerification
+        ?Object.freeze({runtimeReceipt,sdkBrowserRuntimeReceipt,workspaceRuntimeReceipt})
+        :null;
     return {
         runtimeReceipt,
+        sdkBrowserRuntimeReceipt,
+        workspaceRuntimeReceipt,
+        runtimeVerificationState,
         runtimeRoot,
+        browserRuntimeRoot,
         workspaceMode:workspace.workspaceMode,
         descriptor:workspace.app.descriptor,
         descriptorSource:workspace.app.descriptorSource,
@@ -360,6 +429,12 @@ async function preparedWorkspace(options){
         appRoot:workspace.appRoot,
         validation:workspace
     };
+}
+
+function forwardedRuntimeVerificationState(options,prepared){
+    return Object.hasOwn(options,'runtimeVerificationState')
+        ?options.runtimeVerificationState
+        :prepared.runtimeVerificationState??undefined;
 }
 
 function compareRuntimeInventory(left,right){
@@ -373,47 +448,119 @@ async function externalRuntimeSnapshotReceipt(prepared,sharedPayloadSnapshot,sha
         sharedPayloadIds,
         signal
     });
-    const release=await loadRuntimeRelease({runtimeRoot:prepared.runtimeRoot});
-    const runtimePrefix='node_modules/arcane-os/runtime/';
-    const files=sharedPayloadSnapshot.files
-        .filter(file=>file.source.startsWith(runtimePrefix))
+    const runtimeReceipt=await verifyRuntime({
+        runtimeRoot:prepared.runtimeRoot,
+        signal,
+        onEvent
+    });
+    const sdkBrowserRuntimeReceipt=await verifySdkBrowserRuntime({
+        browserRuntimeRoot:prepared.browserRuntimeRoot,
+        signal,
+        onEvent
+    });
+    const workspaceRuntimeReceipt=await verifyWorkspaceRuntime({
+        workspaceRoot:prepared.workspaceRoot,
+        runtimeRoot:prepared.runtimeRoot,
+        runtimeReceipt,
+        browserRuntimeRoot:prepared.browserRuntimeRoot,
+        sdkBrowserRuntimeReceipt,
+        signal,
+        onEvent
+    });
+    const retained=sharedPayloadSnapshot.files
+        .filter(file=>file.source.startsWith('arcane/'))
         .map(file=>Object.freeze({
-            path:file.source.slice(runtimePrefix.length),
+            path:file.source.slice('arcane/'.length),
             bytes:file.bytes,
             sha256:file.sha256
         }))
         .sort(compareRuntimeInventory);
-    const expected=[...release.files].sort(compareRuntimeInventory);
-    if(JSON.stringify(files)!==JSON.stringify(expected)){
+    const upstreamFiles=runtimeReceipt.files.map(file=>Object.freeze({
+        path:file.path.startsWith('arcane/')
+            ?file.path.slice('arcane/'.length)
+            :`dependencies/strong-type/${file.path.slice('strong-type/'.length)}`,
+        sourcePath:file.path,
+        bytes:file.bytes,
+        sha256:file.sha256
+    })).sort(compareRuntimeInventory);
+    const sdkFiles=sdkBrowserRuntimeReceipt.files.map(file=>Object.freeze({
+        path:`sdk/${file.path}`,
+        sourcePath:file.path,
+        bytes:file.bytes,
+        sha256:file.sha256
+    })).sort(compareRuntimeInventory);
+    const expected=[...upstreamFiles,...sdkFiles]
+        .map(file=>Object.freeze({path:file.path,bytes:file.bytes,sha256:file.sha256}))
+        .sort(compareRuntimeInventory);
+    if(JSON.stringify(retained)!==JSON.stringify(expected)){
         throw new ArcaneError(
             ERROR_CODES.integrityFailed,
-            'The retained shared payload does not match the installed Arcane runtime manifest.'
+            'The retained shared payload does not match the composed Arcane and SDK browser runtime receipts.'
         );
     }
     const receipt=Object.freeze({
         schemaVersion:1,
         kind:'arcane-sdk-runtime-shared-payload',
         canonicalLocation:prepared.runtimeRoot,
-        source:Object.freeze({...release.source}),
-        files:Object.freeze(files),
-        fileCount:release.fileCount,
-        totalBytes:release.totalBytes,
-        contentSha256:release.contentSha256,
+        source:Object.freeze({...runtimeReceipt.source}),
+        sources:Object.freeze({
+            arcane:Object.freeze({
+                manifestSha256:runtimeReceipt.manifestSha256,
+                contentSha256:runtimeReceipt.contentSha256,
+                source:runtimeReceipt.source
+            }),
+            sdkBrowser:Object.freeze({
+                manifestSha256:sdkBrowserRuntimeReceipt.manifestSha256,
+                contentSha256:sdkBrowserRuntimeReceipt.contentSha256,
+                source:sdkBrowserRuntimeReceipt.source
+            })
+        }),
+        files:Object.freeze(runtimeReceipt.files.map(file=>Object.freeze({...file}))),
+        fileCount:runtimeReceipt.fileCount,
+        totalBytes:runtimeReceipt.totalBytes,
+        contentSha256:runtimeReceipt.contentSha256,
+        browserFiles:Object.freeze(sdkBrowserRuntimeReceipt.files.map(
+            file=>Object.freeze({...file})
+        )),
+        browserFileCount:sdkBrowserRuntimeReceipt.fileCount,
+        browserTotalBytes:sdkBrowserRuntimeReceipt.totalBytes,
+        browserContentSha256:sdkBrowserRuntimeReceipt.contentSha256,
+        sharedFiles:Object.freeze(retained),
+        sharedFileCount:retained.length,
+        sharedTotalBytes:retained.reduce((total,file)=>total+file.bytes,0),
         sharedPayloadContentSha256:sharedPayloadSnapshot.contentSha256
     });
     await emit(onEvent,{
         type:'runtime.snapshot.verified',
         contentSha256:receipt.contentSha256,
         fileCount:receipt.fileCount,
-        totalBytes:receipt.totalBytes
+        totalBytes:receipt.totalBytes,
+        browserContentSha256:receipt.browserContentSha256,
+        browserFileCount:receipt.browserFileCount,
+        browserTotalBytes:receipt.browserTotalBytes
     });
-    return receipt;
+    return Object.freeze({
+        receipt,
+        runtimeVerificationState:Object.freeze({
+            runtimeReceipt,
+            sdkBrowserRuntimeReceipt,
+            workspaceRuntimeReceipt
+        })
+    });
 }
 
 async function validatePreparedRuntime(prepared,{signal}={}){
     if(prepared.workspaceMode==='external'){
-        return authenticateRuntimeReceipt(prepared.runtimeReceipt,{
+        await authenticateRuntimeReceipt(prepared.runtimeReceipt,{
             runtimeRoot:prepared.runtimeRoot,
+            signal
+        });
+        await authenticateSdkBrowserRuntimeReceipt(prepared.sdkBrowserRuntimeReceipt,{
+            browserRuntimeRoot:prepared.browserRuntimeRoot,
+            signal
+        });
+        return authenticateWorkspaceRuntimeReceipt(prepared.workspaceRuntimeReceipt,{
+            workspaceRoot:prepared.workspaceRoot,
             signal
         });
     }
@@ -426,6 +573,47 @@ async function validatePreparedRuntime(prepared,{signal}={}){
         throw new ArcaneError(ERROR_CODES.workspaceInvalid,'The integrated Arcane workspace profile changed during the operation.');
     }
     return validation;
+}
+
+async function refreshPreparedImportMap(prepared,{signal,onEvent,workspaceOperationLease}={}){
+    if(prepared.workspaceMode==='integrated'
+        &&prepared.validation.config.browserRuntimeLayout==='integrated-legacy'){
+        const receipt=Object.freeze({
+            appId:prepared.appId,
+            skipped:true,
+            compatibility:'integrated-legacy',
+            reason:'The canonical integrated Arcane OS root retains its physical two-route browser runtime.'
+        });
+        await emit(onEvent,{type:'import-map.compatibility.skipped',...receipt});
+        return receipt;
+    }
+    return generateImportMap({
+        workspaceRoot:prepared.workspaceRoot,
+        appId:prepared.appId,
+        appRoot:prepared.appRoot,
+        entry:prepared.validation.app.manifest.entry,
+        workspaceRuntimeReceipt:prepared.workspaceRuntimeReceipt,
+        workspaceOperationLease,
+        signal,
+        onEvent
+    });
+}
+
+async function importMapApplication(options={}){
+    assertApplicationScope(options,'Import-map generation');
+    const prepared=await preparedWorkspace({...options,allowMissingManagedImportMap:true});
+    const importMap=await ownedWork(
+        'import-map',
+        context=>refreshPreparedImportMap(prepared,context),
+        {...options,workspaceRoot:prepared.workspaceRoot}
+    );
+    await validatePreparedRuntime(prepared,{signal:options.signal});
+    return {
+        workspaceRoot:prepared.workspaceRoot,
+        workspaceMode:prepared.workspaceMode,
+        appId:prepared.appId,
+        importMap
+    };
 }
 
 export async function createApplication(options={}){
@@ -587,12 +775,21 @@ export async function checkApplication(options={}){
 
 export async function developApplication(options={}){
     assertApplicationScope(options,'Development serving');
-    const prepared=await preparedWorkspace(options);
+    const prepared=await preparedWorkspace({...options,allowMissingManagedImportMap:true});
+    await withWorkspaceOperationLock({
+        workspaceRoot:prepared.workspaceRoot,
+        operation:'dev-refresh',
+        signal:options.signal,
+        onEvent:options.onEvent
+    },workspaceOperationLease=>refreshPreparedImportMap(prepared,{
+        ...options,
+        workspaceOperationLease
+    }));
     const server=await startDevServer({
         workspaceRoot:prepared.workspaceRoot,
         appId:prepared.appId,
         mode:'source',
-        runtimeReceipt:prepared.runtimeReceipt,
+        workspaceRuntimeReceipt:prepared.workspaceRuntimeReceipt,
         workspaceMode:prepared.workspaceMode,
         host:options.host,
         port:options.port,
@@ -604,18 +801,23 @@ export async function developApplication(options={}){
 
 export async function packageApplication(options={}){
     assertApplicationScope(options,'Packaging');
-    const prepared=await preparedWorkspace(options);
+    const prepared=await preparedWorkspace({
+        ...options,
+        allowMissingManagedImportMap:!options.dryRun
+    });
     const release=await ownedWork(
         'package',
-        ({signal,onEvent})=>packageApp({
-            workspaceRoot:prepared.workspaceRoot,
-            appId:prepared.appId,
-            dryRun:Boolean(options.dryRun),
-            signal,
-            onEvent,
-            validateSourceState:({signal}={})=>validatePreparedRuntime(prepared,{signal})
-        }),
-        options
+        ({signal,onEvent,workspaceOperationLease})=>packageApp({
+                workspaceRoot:prepared.workspaceRoot,
+                appId:prepared.appId,
+                dryRun:Boolean(options.dryRun),
+                signal,
+                onEvent,
+                workspaceOperationLease,
+                runtimeVerificationState:forwardedRuntimeVerificationState(options,prepared),
+                validateSourceState:({signal}={})=>validatePreparedRuntime(prepared,{signal})
+            }),
+        {...options,workspaceRoot:prepared.workspaceRoot}
     );
     return {
         workspaceRoot:prepared.workspaceRoot,
@@ -634,10 +836,11 @@ export async function verifyApplication(options={}){
         ({signal,onEvent})=>verifyApp({
             workspaceRoot:prepared.workspaceRoot,
             appId:prepared.appId,
+            runtimeVerificationState:forwardedRuntimeVerificationState(options,prepared),
             signal,
             onEvent
         }),
-        options
+        {...options,workspaceRoot:prepared.workspaceRoot}
     );
     await validatePreparedRuntime(prepared,{signal:options.signal});
     return {
@@ -661,6 +864,7 @@ export async function bundleApplication(options={}){
             const verified=await verifyApp({
                 workspaceRoot:prepared.workspaceRoot,
                 appId:prepared.appId,
+                runtimeVerificationState:forwardedRuntimeVerificationState(options,prepared),
                 signal,
                 onEvent
             });
@@ -679,7 +883,7 @@ export async function bundleApplication(options={}){
                 onEvent
             });
         },
-        options
+        {...options,workspaceRoot:prepared.workspaceRoot}
     );
     return {
         workspaceRoot:prepared.workspaceRoot,
@@ -1005,7 +1209,12 @@ function pathsOverlap(left,right){
     return sameOrDescendant(left,right)||sameOrDescendant(right,left);
 }
 
-async function packageNativeRelease(prepared,app,{sharedPayloadSnapshot,signal,onEvent}={}){
+async function packageNativeRelease(prepared,app,{
+    sharedPayloadSnapshot,
+    workspaceOperationLease,
+    signal,
+    onEvent
+}={}){
     const sourceState={
         ...prepared,
         appId:app.appId,
@@ -1017,6 +1226,8 @@ async function packageNativeRelease(prepared,app,{sharedPayloadSnapshot,signal,o
         workspaceRoot:prepared.workspaceRoot,
         appId:app.appId,
         sharedPayloadSnapshot,
+        runtimeVerificationState:prepared.runtimeVerificationState??undefined,
+        workspaceOperationLease,
         signal,
         onEvent,
         validateSourceState:({signal:validationSignal}={})=>validateDiscoveredApplication({
@@ -1040,7 +1251,11 @@ async function packageNativeRelease(prepared,app,{sharedPayloadSnapshot,signal,o
     });
 }
 
-async function executePairedNativeBuild(options,adapter,{signal,onEvent}={}){
+async function executePairedNativeBuild(options,adapter,{
+    signal,
+    onEvent,
+    workspaceOperationLease
+}={}){
     const target=options.target??options.targetRequest?.target;
     const initialPrepared=await preparedWorkspace({
         ...options,
@@ -1085,7 +1300,7 @@ async function executePairedNativeBuild(options,adapter,{signal,onEvent}={}){
         signal,
         onEvent
     });
-    const runtimeReceipt=initialPrepared.workspaceMode==='external'
+    const externalRuntimeState=initialPrepared.workspaceMode==='external'
         ?await externalRuntimeSnapshotReceipt(
             initialPrepared,
             sharedPayloadSnapshot,
@@ -1093,7 +1308,13 @@ async function executePairedNativeBuild(options,adapter,{signal,onEvent}={}){
             {signal,onEvent}
         )
         :null;
-    const prepared={...initialPrepared,runtimeReceipt};
+    const prepared={
+        ...initialPrepared,
+        runtimeReceipt:externalRuntimeState?.receipt??null,
+        runtimeVerificationState:externalRuntimeState?.runtimeVerificationState??null,
+        workspaceRuntimeReceipt:
+            externalRuntimeState?.runtimeVerificationState.workspaceRuntimeReceipt??null
+    };
     const selectedRelease=await packageNativeRelease(prepared,{
         appId:prepared.appId,
         appRoot:prepared.appRoot,
@@ -1102,13 +1323,13 @@ async function executePairedNativeBuild(options,adapter,{signal,onEvent}={}){
         descriptorSource:prepared.validation.app.descriptorSource,
         descriptorPath:prepared.validation.app.descriptorPath,
         validation:prepared.validation
-    },{sharedPayloadSnapshot,signal,onEvent});
+    },{sharedPayloadSnapshot,workspaceOperationLease,signal,onEvent});
     const dependencyReleases=[];
     for(const dependency of dependencyApps){
         dependencyReleases.push(await packageNativeRelease(
             prepared,
             dependency,
-            {sharedPayloadSnapshot,signal,onEvent}
+            {sharedPayloadSnapshot,workspaceOperationLease,signal,onEvent}
         ));
     }
     const toolchainReceipt=await adapter.prepare({
@@ -1189,17 +1410,22 @@ export async function buildApplication(options={}){
             options
         );
     }
-    const prepared=await preparedWorkspace(options);
+    const prepared=await preparedWorkspace({
+        ...options,
+        allowMissingManagedImportMap:!options.dryRun
+    });
     const result=await ownedWork(
         'build',
-        ({signal,onEvent})=>buildTarget({
-            ...options,
-            ...prepared,
-            signal,
-            onEvent,
-            validateSourceState:({signal}={})=>validatePreparedRuntime(prepared,{signal})
-        }),
-        options
+        ({signal,onEvent,workspaceOperationLease})=>buildTarget({
+                ...options,
+                ...prepared,
+                runtimeVerificationState:forwardedRuntimeVerificationState(options,prepared),
+                signal,
+                onEvent,
+                workspaceOperationLease,
+                validateSourceState:({signal}={})=>validatePreparedRuntime(prepared,{signal})
+            }),
+        {...options,workspaceRoot:prepared.workspaceRoot}
     );
     return {
         ...result,
@@ -1250,7 +1476,12 @@ export async function runApplication(options={}){
         );
     }
     const prepared=await preparedWorkspace(selectedOptions);
-    return runTarget({...selectedOptions,...prepared,target});
+    return runTarget({
+        ...selectedOptions,
+        ...prepared,
+        runtimeVerificationState:forwardedRuntimeVerificationState(selectedOptions,prepared),
+        target
+    });
 }
 
 export async function describeTargets(options={}){
@@ -1285,6 +1516,7 @@ export async function executeOperation(command,options={}){
         new:createApplication,
         init:initializeApplication,
         doctor:doctorApplication,
+        'import-map':importMapApplication,
         dev:developApplication,
         test:testApplication,
         check:checkApplication,
@@ -1315,6 +1547,7 @@ export function createToolchain(defaults={}){
         create:options=>createApplication({...defaults,...options}),
         init:options=>initializeApplication({...defaults,...options}),
         doctor:options=>doctorApplication({...defaults,...options}),
+        importMap:options=>importMapApplication({...defaults,...options}),
         dev:options=>developApplication({...defaults,...options}),
         test:options=>testApplication({...defaults,...options}),
         check:options=>checkApplication({...defaults,...options}),

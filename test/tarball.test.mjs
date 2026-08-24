@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
-import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {copyFile,mkdir,readFile,readdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 import test from '../src/testing.mjs';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';
 import {SDK_VERSION} from '../src/constants.mjs';
@@ -12,6 +14,39 @@ import {
     parseLastJsonLine,
     temporaryDirectory
 } from './helpers.mjs';
+
+const SDK_BROWSER_RUNTIME_FILES=Object.freeze([
+    'dependencies/event-pubsub/index.js',
+    'dependencies/event-pubsub/licence',
+    'dependencies/event-pubsub/package.json',
+    'dependencies/strong-type/index.js',
+    'dependencies/strong-type/licence',
+    'dependencies/strong-type/package.json',
+    'dom-event-instrumentation.mjs',
+    'event-manager.mjs'
+]);
+const SDK_BROWSER_RUNTIME_PACKAGE_FILES=Object.freeze([
+    'ARCANE_SDK_BROWSER_RELEASE.json',
+    ...SDK_BROWSER_RUNTIME_FILES
+].map(file=>`browser-runtime/${file}`).sort());
+
+async function realFileInventory(root,relativeRoot=''){
+    const files=[];
+    const entries=await readdir(path.join(root,...relativeRoot.split('/').filter(Boolean)),{
+        withFileTypes:true
+    });
+    entries.sort((left,right)=>left.name<right.name?-1:left.name>right.name?1:0);
+    for(const entry of entries){
+        assert.equal(entry.isSymbolicLink(),false,`Installed browser runtime links ${entry.name}.`);
+        const relative=relativeRoot?`${relativeRoot}/${entry.name}`:entry.name;
+        if(entry.isDirectory())files.push(...await realFileInventory(root,relative));
+        else{
+            assert.equal(entry.isFile(),true,`Installed browser runtime contains ${relative}.`);
+            files.push(relative);
+        }
+    }
+    return files.sort();
+}
 
 function runNpm(arguments_,options){
     if(process.platform==='win32'){
@@ -25,7 +60,7 @@ function runNpm(arguments_,options){
 }
 
 test('packed npm artifact installs and drives an external repository end to end',{
-    timeout:300_000
+    timeout:600_000
 },async t=>{
     const temporary=await temporaryDirectory(t,{prefix:'arcane-tarball-'});
     const releaseMetadataPath=process.env.ARCANE_SDK_NPM_RELEASE_METADATA;
@@ -112,6 +147,13 @@ test('packed npm artifact installs and drives an external repository end to end'
         assert.ok(packReport.files.some(file=>file.path==='src/release-bundle.mjs'));
         assert.ok(packReport.files.some(file=>file.path==='src/templates/assets/app-icon.png'));
         assert.ok(packReport.files.some(file=>file.path==='NOTICE'));
+        assert.deepEqual(
+            packReport.files
+                .map(file=>file.path)
+                .filter(file=>file.startsWith('browser-runtime/'))
+                .sort(),
+            SDK_BROWSER_RUNTIME_PACKAGE_FILES
+        );
         assert.ok(packReport.files.every(file=>!file.path.startsWith('test/')));
         assert.ok(packReport.files.every(file=>!file.path.startsWith('.github/')));
     });
@@ -142,6 +184,73 @@ test('packed npm artifact installs and drives an external repository end to end'
             '--output','json'
         ],{cwd:temporary});
         assert.equal(scaffolded.code,0,scaffolded.stderr);
+    });
+
+    await t.test('authenticates the exact installed SDK browser runtime closure',async()=>{
+        const installedPackageRoot=path.join(harnessRoot,'node_modules','arcane-os');
+        const browserRuntimeRoot=path.join(installedPackageRoot,'browser-runtime');
+        assert.deepEqual(
+            (await realFileInventory(browserRuntimeRoot)).map(file=>`browser-runtime/${file}`),
+            SDK_BROWSER_RUNTIME_PACKAGE_FILES
+        );
+        const manifestBytes=await readFile(
+            path.join(browserRuntimeRoot,'ARCANE_SDK_BROWSER_RELEASE.json')
+        );
+        const manifest=JSON.parse(manifestBytes.toString('utf8'));
+        assert.equal(manifest.schemaVersion,1);
+        assert.equal(manifest.builder,'arcane-sdk-browser-runtime-v1');
+        assert.equal(manifest.sdkVersion,SDK_VERSION);
+        assert.equal(manifest.fileCount,SDK_BROWSER_RUNTIME_FILES.length);
+        assert.deepEqual(manifest.files.map(file=>file.path),SDK_BROWSER_RUNTIME_FILES);
+        assert.deepEqual(manifest.source,{
+            authority:'arcane-os-sdk',
+            repository:'https://github.com/TheWizardNexus/arcane-os-sdk.git',
+            protocol:'arcane-sdk-browser-runtime/1',
+            browserEntry:'arcane-os/event-manager',
+            dependencies:[
+                {
+                    name:'event-pubsub',
+                    version:'6.1.0',
+                    resolved:'https://registry.npmjs.org/event-pubsub/-/event-pubsub-6.1.0.tgz',
+                    integrity:'sha512-FEMlhTxwqGM0hztTixG6FhVFXqp7Eq1ltk5mSreK6Mhy3xWWpLAzEUR6OMvMdNqT3jgSxA8JDhnhyAG3X4Xy7Q=='
+                },
+                {
+                    name:'strong-type',
+                    version:'2.0.0',
+                    resolved:'https://registry.npmjs.org/strong-type/-/strong-type-2.0.0.tgz',
+                    integrity:'sha512-HHrY9qYC7yn+5mlewiI3k9RQM9gZqGQsqbomZcd10Ks0h4RlX01nnkWbCe4AsVPCI6KaFvpkWm1nHMD+Ykup6g=='
+                }
+            ]
+        });
+        for(const file of manifest.files){
+            const snapshot=await readFile(path.join(browserRuntimeRoot,...file.path.split('/')));
+            const source=await readFile(path.join(installedPackageRoot,...file.sourcePath.split('/')));
+            assert.deepEqual(snapshot,source,`${file.path} diverged from ${file.sourcePath}.`);
+        }
+
+        const browserRuntimeApi=await import(pathToFileURL(path.join(
+            installedPackageRoot,'src','sdk-browser-runtime.mjs'
+        )).href);
+        const receipt=await browserRuntimeApi.verifySdkBrowserRuntime({browserRuntimeRoot});
+        await browserRuntimeApi.authenticateSdkBrowserRuntimeReceipt(receipt,{browserRuntimeRoot});
+        assert.equal(receipt.kind,'arcane-sdk-browser-runtime-verification');
+        assert.equal(receipt.sdkVersion,SDK_VERSION);
+        assert.equal(receipt.fileCount,SDK_BROWSER_RUNTIME_FILES.length);
+        assert.equal(receipt.contentSha256,manifest.contentSha256);
+        assert.deepEqual(receipt.source,manifest.source);
+        assert.deepEqual(receipt.files,manifest.files);
+        const generatedLock=JSON.parse(await readFile(
+            path.join(workspaceRoot,'arcane.lock.json'),
+            'utf8'
+        ));
+        assert.deepEqual(generatedLock.sdkBrowserRuntime,{
+            manifest:'node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json',
+            manifestSha256:createHash('sha256').update(manifestBytes).digest('hex'),
+            contentSha256:manifest.contentSha256,
+            builder:manifest.builder,
+            sdkVersion:manifest.sdkVersion,
+            source:manifest.source
+        });
     });
 
     await t.test('isolates bundled event dependencies and imports installed event contracts',async()=>{
@@ -475,6 +584,24 @@ export default arcaneNativeBuilderProvider;
             ),'utf8'),
             await readFile(path.join(workspaceRoot,'apps','external-app','index.html'),'utf8')
         );
+    });
+
+    await t.test('executes the named-import graph in real Chrome through the installed tarball runner',async()=>{
+        const contractSource=path.join(repositoryRoot,'test','browser-import-map.contract.mjs');
+        const contractPath=path.join(workspaceRoot,'browser-import-map.contract.test.mjs');
+        await copyFile(contractSource,contractPath);
+        assert.deepEqual(await readFile(contractPath),await readFile(contractSource));
+        const installedRunner=path.join(
+            workspaceRoot,'node_modules','arcane-os','bin','arcane-test.mjs'
+        );
+        const browserContract=await runNode([installedRunner,contractPath],{
+            cwd:workspaceRoot,
+            timeout:300_000,
+            env:process.env
+        });
+        assert.equal(browserContract.code,0,browserContract.stderr||browserContract.stdout);
+        assert.match(browserContract.stdout,/Test Total : 1/u);
+        assert.match(browserContract.stdout,/Passed :[^\r\n]*1/u);
     });
 
     if(releaseVerification){

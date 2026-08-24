@@ -40,8 +40,7 @@ body {
     font-size: 1.1rem;
 }
 
-.app-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
+.app-feature code {
+    font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
+    overflow-wrap: anywhere;
 }

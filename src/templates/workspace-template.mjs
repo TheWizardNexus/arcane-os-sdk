@@ -1,4 +1,8 @@
 import {SDK_NAME,SDK_VERSION} from '../constants.mjs';
+import {
+    SDK_BROWSER_RUNTIME_CONTENT_SHA256,
+    SDK_BROWSER_RUNTIME_MANIFEST_SHA256
+} from '../sdk-browser-runtime.mjs';
 
 function json(value){
     return `${JSON.stringify(value,null,2)}\n`;
@@ -23,7 +27,9 @@ export function workspaceTemplate({
     appId,
     displayName,
     runtimeRelease,
+    sdkBrowserRuntimeRelease,
     appOnly=false,
+    namedImports=true,
     minimumCoreVersion='0.8.12',
     target='browser',
     appIcon
@@ -42,6 +48,23 @@ export function workspaceTemplate({
     const packageName=`arcane-${appId}`;
     const runtimeContentSha256=runtimeRelease?.contentSha256;
     const upstreamCommit=runtimeRelease?.source?.commit;
+    const browserManifestSha256=sdkBrowserRuntimeRelease?.manifestSha256;
+    const browserContentSha256=sdkBrowserRuntimeRelease?.contentSha256;
+    const browserSource=sdkBrowserRuntimeRelease?.source;
+    const expectedBrowserDependencies=[
+        {
+            name:'event-pubsub',
+            version:'6.1.0',
+            resolved:'https://registry.npmjs.org/event-pubsub/-/event-pubsub-6.1.0.tgz',
+            integrity:'sha512-FEMlhTxwqGM0hztTixG6FhVFXqp7Eq1ltk5mSreK6Mhy3xWWpLAzEUR6OMvMdNqT3jgSxA8JDhnhyAG3X4Xy7Q=='
+        },
+        {
+            name:'strong-type',
+            version:'2.0.0',
+            resolved:'https://registry.npmjs.org/strong-type/-/strong-type-2.0.0.tgz',
+            integrity:'sha512-HHrY9qYC7yn+5mlewiI3k9RQM9gZqGQsqbomZcd10Ks0h4RlX01nnkWbCe4AsVPCI6KaFvpkWm1nHMD+Ykup6g=='
+        }
+    ];
     const packageInclude=[`${appId}.css`,'index.html'];
     if(native)packageInclude.push('img/icon.png');
     packageInclude.push('manifest.json','modules');
@@ -72,7 +95,36 @@ appropriate.
     if(!appOnly&&(typeof upstreamCommit!=='string'||!/^[a-f0-9]{40}$/.test(upstreamCommit))){
         throw new Error('The SDK runtime release does not contain a valid upstream commit.');
     }
+    if(!appOnly&&(
+        browserManifestSha256!==SDK_BROWSER_RUNTIME_MANIFEST_SHA256
+        ||browserContentSha256!==SDK_BROWSER_RUNTIME_CONTENT_SHA256
+        ||sdkBrowserRuntimeRelease?.builder!=='arcane-sdk-browser-runtime-v1'
+        ||sdkBrowserRuntimeRelease?.sdkVersion!==SDK_VERSION
+        ||browserSource?.protocol!=='arcane-sdk-browser-runtime/1'
+        ||browserSource?.authority!=='arcane-os-sdk'
+        ||browserSource?.repository!=='https://github.com/TheWizardNexus/arcane-os-sdk.git'
+        ||browserSource?.browserEntry!=='arcane-os/event-manager'
+        ||!Array.isArray(browserSource?.dependencies)
+        ||browserSource.dependencies.length!==expectedBrowserDependencies.length
+        ||browserSource.dependencies.some((actual,index)=>{
+            const expected=expectedBrowserDependencies[index];
+            return !actual||Object.keys(actual).sort().join('\0')
+                    !==['name','version','resolved','integrity'].sort().join('\0')
+                ||actual.name!==expected.name||actual.version!==expected.version
+                ||actual.resolved!==expected.resolved||actual.integrity!==expected.integrity;
+        })
+    )){
+        throw new Error('The SDK browser runtime release does not contain a valid trusted identity.');
+    }
 
+    const importMapMarkup=namedImports?`    <script type="importmap" data-arcane-import-map>
+{
+  "imports": {}
+}
+    </script>
+`:'';
+    const bootstrapMarkup=namedImports?'':
+        '    <script type="module" src="./arcane/modules/ThemeBootstrap.js?v=1"></script>\n';
     const files=new Map();
     files.set('.gitignore',[
         'node_modules/',
@@ -96,7 +148,7 @@ appropriate.
 
 - Use plain JavaScript, HTML, and CSS; do not introduce TypeScript or TSX.
 - Keep reusable mechanisms in Arcane OS and app-specific behavior under \`apps/${appId}/\`.
-- Keep \`arcane/css/theme.css\` and \`ThemeBootstrap.js\` loaded before app styles and modules.
+- Keep \`arcane/css/theme.css\` before app styles and import \`arcane/ThemeBootstrap\` before app code runs.
 - Use \`rgb(...)\` or \`rgba(...)\` for new CSS colors.
 - Build one named app and one explicit target at a time. Native targets may be unavailable until their adapters are installed.
 - Run \`npm run check\` before committing.
@@ -113,20 +165,32 @@ npm run doctor
 npm run dev
 \`\`\`
 
-Open the loopback URL printed by the development server. The source server exposes this app and the SDK's browser runtime; it does not expose an Ollama HTTP endpoint.
+Open the loopback URL printed by the development server. The source server exposes this app and its authenticated physical \`arcane/\` runtime; it does not expose an Ollama HTTP endpoint.
 
 Commit the generated \`package-lock.json\` after dependency installation. CI intentionally uses \`npm ci\` and therefore requires that lock. Before the SDK is published, install a locally packed \`${SDK_NAME}\` \`.tgz\` with \`npm install --save-dev --save-exact <path-to-tarball>\`; keep that tarball at the lock file's relative path for repeatable local \`npm ci\` runs.
 
-## Check and package
+## Check and release the browser package
 
 \`\`\`sh
 npm run check
+npm run import-map
 npm run package
+npm run verify
+npm run bundle
 npm run run
 \`\`\`
 
-The browser release is written to \`dist/${appId}\`. Native providers accept only
-explicit targets and fail honestly when their platform toolchain is unavailable.
+The explicit \`import-map\` command refreshes
+\`apps/${appId}/modules/arcane.importmap.json\` and the managed inline browser
+import map in \`index.html\`. Development, package, and build refresh it
+automatically. Named \`arcane/*\` imports resolve against the physical workspace
+\`arcane/\` tree. Packaging copies the same authenticated bytes and specifier map
+to \`dist/${appId}\`, \`verify\` authenticates that directory, \`bundle\` creates
+its distributable archive, and \`run\` launches the verified packaged browser
+release.
+
+Native targets are provider-supplied and must be scaffolded and selected
+explicitly; this browser workflow does not imply a standalone native executable.
 ${nativeGuide}
 
 Every browser release also carries Arcane OS licensing material under \`licenses/arcane-os/\`. Review those terms before distribution.
@@ -140,11 +204,16 @@ Every browser release also carries Arcane OS licensing material under \`licenses
             dev:'arcane dev',
             test:'arcane test',
             check:'arcane check',
+            'import-map':'arcane import-map',
             package:'arcane package',
+            verify:'arcane verify',
+            bundle:'arcane bundle',
             build:`arcane build --target ${buildTarget}`,
             run:`arcane run --target ${runTarget}`,
-            'build:browser':'arcane build --target browser',
-            'run:browser':'arcane run --target browser'
+            ...(native?{
+                'build:browser':'arcane build --target browser',
+                'run:browser':'arcane run --target browser'
+            }:{})
         },
         devDependencies:{
             [SDK_NAME]:SDK_VERSION
@@ -158,15 +227,9 @@ Every browser release also carries Arcane OS licensing material under \`licenses
         sharedPayloads:{
             'browser-runtime':[
                 {
-                    source:'node_modules/arcane-os/runtime/arcane',
+                    source:'arcane',
                     destination:'arcane',
-                    include:['components','css','entities','img','modules','security'],
-                    exclude:[]
-                },
-                {
-                    source:'node_modules/arcane-os/runtime/strong-type',
-                    destination:'node_modules/strong-type',
-                    include:['index.js','licence','package.json'],
+                    include:['components','css','dependencies','entities','img','modules','sdk','security'],
                     exclude:[]
                 },
                 {
@@ -185,6 +248,14 @@ Every browser release also carries Arcane OS licensing material under \`licenses
             manifest:'node_modules/arcane-os/runtime/ARCANE_RUNTIME_RELEASE.json',
             contentSha256:runtimeContentSha256,
             upstreamCommit
+        },
+        sdkBrowserRuntime:{
+            manifest:'node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json',
+            manifestSha256:browserManifestSha256,
+            contentSha256:browserContentSha256,
+            builder:sdkBrowserRuntimeRelease?.builder,
+            sdkVersion:sdkBrowserRuntimeRelease?.sdkVersion,
+            source:sdkBrowserRuntimeRelease?.source
         },
         protocols:{
             arcane:'arcane/1',
@@ -288,15 +359,14 @@ jobs:
     <meta charset="utf-8">
     <meta name="arcane-app-id" content="${html(appId)}">
     <base href="../../">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+${importMapMarkup}    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="rgb(23, 34, 56)">
     <title>${html(name)}</title>
     <link rel="manifest" href="./apps/${html(appId)}/manifest.json">
     <link rel="stylesheet" href="./arcane/css/theme.css?v=1">
     <link rel="stylesheet" href="./arcane/css/primitives.css?v=1">
     <link rel="stylesheet" href="./apps/${html(appId)}/${html(appId)}.css?v=1">
-    <script type="module" src="./arcane/modules/ThemeBootstrap.js?v=1"></script>
-</head>
+${bootstrapMarkup}</head>
 <body>
     <main class="app-shell">
         <section class="arcane-card" aria-labelledby="app-title">
@@ -337,12 +407,49 @@ jobs:
     text-transform: uppercase;
 }
 `);
-    files.set(`apps/${appId}/modules/App.js`,`const appName=${JSON.stringify(name)};
+    if(namedImports){
+        files.set(`apps/${appId}/modules/arcane.importmap.json`,json({imports:{}}));
+    }
+    const themeSpecifier=namedImports
+        ?'arcane/ThemeBootstrap':'../../../arcane/modules/ThemeBootstrap.js';
+    const appDataSpecifier=namedImports
+        ?'arcane/AppDataScope':'../../../arcane/modules/AppDataScope.js';
+    files.set(`apps/${appId}/modules/App.js`,`import arcaneThemeReady from '${themeSpecifier}';
+import {
+    resolveApplicationId,
+    resolveApplicationLocalStorageKey
+} from '${appDataSpecifier}';
+
+const appName=${JSON.stringify(name)};
 const action=document.querySelector('#app-action');
 const status=document.querySelector('#app-status');
 
+await arcaneThemeReady;
+
+const appId=await resolveApplicationId();
+const countKey=resolveApplicationLocalStorageKey('hello-count',{applicationId:appId});
+
+function loadHelloCount(){
+    try{
+        const value=Number(globalThis.localStorage?.getItem(countKey)??0);
+        return Number.isSafeInteger(value)&&value>=0?value:0;
+    }catch{
+        return 0;
+    }
+}
+
+function saveHelloCount(value){
+    try{
+        globalThis.localStorage?.setItem(countKey,String(value));
+    }catch{
+        // The greeting still works when browser persistence is unavailable.
+    }
+}
+
 action?.addEventListener('click',()=>{
-    status.textContent=\`The \${appName} app is working.\`;
+    const count=loadHelloCount()+1;
+    saveHelloCount(count);
+    status.textContent=\`Hello from \${appName}! Greeting \${count}.\`;
 });
 `);
     if(native){
@@ -355,17 +462,22 @@ import test from '${SDK_NAME}/testing';
 const appRoot=new URL('../',import.meta.url);
 
 test('application shell uses the shared Arcane theme in order',async()=>{
-    const source=await readFile(new URL('index.html',appRoot),'utf8');
+    const [source,appSource]=await Promise.all([
+        readFile(new URL('index.html',appRoot),'utf8'),
+        readFile(new URL('modules/App.js',appRoot),'utf8')
+    ]);
     const theme=source.indexOf('./arcane/css/theme.css');
     const primitives=source.indexOf('./arcane/css/primitives.css');
     const appStyle=source.indexOf('./apps/${appId}/${appId}.css');
-    const bootstrap=source.indexOf('./arcane/modules/ThemeBootstrap.js');
+    const importMap=source.indexOf('${namedImports?'data-arcane-import-map':'./arcane/modules/ThemeBootstrap.js'}');
     const appModule=source.indexOf('./apps/${appId}/modules/App.js');
 
     assert.match(source,/<base href="\\.\\.\\/\\.\\.\\/">/);
     assert.match(source,/<meta name="arcane-app-id" content="${appId}">/);
     assert.ok(theme>=0&&primitives>theme&&appStyle>primitives);
-    assert.ok(bootstrap>appStyle&&appModule>bootstrap);
+    assert.ok(importMap>=0&&appModule>importMap);
+    assert.ok(appSource.includes("from '${themeSpecifier}'"));
+    assert.ok(appSource.includes("from '${appDataSpecifier}'"));
 });
 
 test('application package identity matches its directory',async()=>{

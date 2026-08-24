@@ -48,11 +48,25 @@ async function requestWithHost(instance,requestPath,host){
 
 async function installRuntime(workspaceRoot){
     const installedRoot=path.join(workspaceRoot,'node_modules','arcane-os');
-    await cp(
-        path.join(repositoryRoot,'runtime'),
-        path.join(installedRoot,'runtime'),
-        {recursive:true}
-    );
+    for(const directory of ['runtime','browser-runtime']){
+        await cp(
+            path.join(repositoryRoot,directory),
+            path.join(installedRoot,directory),
+            {recursive:true}
+        );
+    }
+    await mkdir(path.join(installedRoot,'src'),{recursive:true});
+    for(const relative of ['event-manager.mjs','dom-event-instrumentation.mjs']){
+        await cp(path.join(repositoryRoot,'src',relative),path.join(installedRoot,'src',relative));
+    }
+    for(const dependency of ['event-pubsub','strong-type']){
+        await cp(
+            path.join(repositoryRoot,'node_modules',dependency),
+            path.join(installedRoot,'node_modules',dependency),
+            {recursive:true}
+        );
+    }
+    await cp(path.join(repositoryRoot,'package.json'),path.join(installedRoot,'package.json'));
     for(const license of ['LICENSE','COMMERCIAL-LICENSE.md','NOTICE']){
         await cp(path.join(repositoryRoot,license),path.join(installedRoot,license));
     }
@@ -137,9 +151,13 @@ test('source server exposes only the selected app and SDK browser routes',async 
     assert.match(networkPolicy.headers.get('content-type'),/^application\/json/);
     assert.equal((await networkPolicy.json()).schemaVersion,1);
 
-    const strongType=await request(origin,'/node_modules/strong-type/index.js',{cookie});
+    const strongType=await request(origin,'/arcane/dependencies/strong-type/index.js',{cookie});
     assert.equal(strongType.status,200);
     assert.match(strongType.headers.get('content-type'),/^text\/javascript/);
+    assert.equal(
+        (await request(origin,'/node_modules/strong-type/index.js',{cookie})).status,
+        404
+    );
 
     for(const deniedPath of [
         '/package.json',
@@ -179,9 +197,17 @@ test('source server exposes only the selected app and SDK browser routes',async 
         path.join(workspaceRoot,'node_modules','arcane-os','runtime','arcane','css','theme.css'),
         'tampered runtime bytes\n'
     );
+    const unchangedWorkspaceRuntime=await request(origin,'/arcane/css/theme.css',{cookie});
+    assert.equal(unchangedWorkspaceRuntime.status,200);
+    assert.doesNotMatch(await unchangedWorkspaceRuntime.text(),/tampered runtime bytes/);
+
+    await writeFile(
+        path.join(workspaceRoot,'arcane','css','theme.css'),
+        'tampered workspace runtime bytes\n'
+    );
     const changedRuntime=await request(origin,'/arcane/css/theme.css',{cookie});
     assert.equal(changedRuntime.status,500);
-    assert.doesNotMatch(await changedRuntime.text(),/tampered runtime bytes/);
+    assert.doesNotMatch(await changedRuntime.text(),/tampered workspace runtime bytes/);
 });
 
 test('packaged server redirects to index and withholds its integrity receipt',async t=>{

@@ -9,10 +9,12 @@ import {
     RELEASE_MANIFEST_NAME
 } from './packager/core.mjs';
 import {
-    authenticateRuntimeReceipt,
-    readVerifiedRuntimeFile,
-    verifyRuntime
-} from './runtime.mjs';
+    authenticateWorkspaceRuntimeReceipt,
+    readVerifiedWorkspaceRuntimeFile,
+    verifyWorkspaceRuntime
+} from './workspace-runtime.mjs';
+import {verifyRuntime} from './runtime.mjs';
+import {verifySdkBrowserRuntime} from './sdk-browser-runtime.mjs';
 import {resolveWorkspace} from './workspace.mjs';
 import {createEventQueue} from './event-queue.mjs';
 
@@ -145,6 +147,31 @@ function identityMap(identities,prefix=''){
         if(relative)result.set(inventoryKey(relative),identity);
     }
     return result;
+}
+
+function routePrefixKey(prefix){
+    return prefix.map(segment=>segment.normalize('NFC').toLowerCase()).join('/');
+}
+
+function deterministicMappings(mappings){
+    const seen=new Map();
+    for(const mapping of mappings){
+        const key=routePrefixKey(mapping.prefix);
+        const prior=seen.get(key);
+        if(prior){
+            fail(
+                `Development server routes collide after case/NFC normalization: `
+                +`/${prior.prefix.join('/')} and /${mapping.prefix.join('/')}.`
+            );
+        }
+        seen.set(key,mapping);
+    }
+    return [...mappings].sort((left,right)=>{
+        if(left.prefix.length!==right.prefix.length)return right.prefix.length-left.prefix.length;
+        const leftKey=routePrefixKey(left.prefix);
+        const rightKey=routePrefixKey(right.prefix);
+        return leftKey<rightKey?-1:leftKey>rightKey?1:0;
+    });
 }
 
 function createFileWorkLimiter(){
@@ -318,7 +345,7 @@ function sharedPathAllowed(relative,route){
     });
 }
 
-async function sourceRoutes(workspaceRoot,appId,{runtimeReceipt,signal,onEvent}){
+async function sourceRoutes(workspaceRoot,appId,{workspaceRuntimeReceipt,signal}){
     const resolved=await resolveWorkspace({workspaceRoot,appId});
     if(resolved.config.workspaceMode==='integrated'){
         return {
@@ -340,16 +367,43 @@ async function sourceRoutes(workspaceRoot,appId,{runtimeReceipt,signal,onEvent})
             ]
         };
     }
-    const runtimeRoot=path.join(
-        resolved.workspaceRoot,
-        'node_modules',
-        'arcane-os',
-        'runtime'
-    );
-    const verified=runtimeReceipt??await verifyRuntime({runtimeRoot,signal,onEvent});
-    await authenticateRuntimeReceipt(verified,{runtimeRoot});
-    const arcaneIdentities=identityMap(verified.identities,'arcane');
-    const strongTypeIdentities=identityMap(verified.identities,'strong-type');
+    const runtimeRoot=path.join(resolved.workspaceRoot,'arcane');
+    let verified=workspaceRuntimeReceipt;
+    if(!verified){
+        const sdkRuntimeRoot=path.join(
+            resolved.workspaceRoot,
+            'node_modules',
+            'arcane-os',
+            'runtime'
+        );
+        const sdkRuntimeReceipt=await verifyRuntime({
+            runtimeRoot:sdkRuntimeRoot,
+            signal
+        });
+        const sdkBrowserRuntimeRoot=path.join(
+            resolved.workspaceRoot,
+            'node_modules',
+            'arcane-os',
+            'browser-runtime'
+        );
+        const sdkBrowserRuntimeReceipt=await verifySdkBrowserRuntime({
+            browserRuntimeRoot:sdkBrowserRuntimeRoot,
+            signal
+        });
+        verified=await verifyWorkspaceRuntime({
+            workspaceRoot:resolved.workspaceRoot,
+            runtimeRoot:sdkRuntimeRoot,
+            runtimeReceipt:sdkRuntimeReceipt,
+            browserRuntimeRoot:sdkBrowserRuntimeRoot,
+            sdkBrowserRuntimeReceipt,
+            signal
+        });
+    }
+    verified=await authenticateWorkspaceRuntimeReceipt(verified,{
+        workspaceRoot:resolved.workspaceRoot,
+        signal
+    });
+    const arcaneIdentities=identityMap(verified.identities);
     return {
         workspaceRoot:resolved.workspaceRoot,
         workspaceMode:'external',
@@ -363,25 +417,14 @@ async function sourceRoutes(workspaceRoot,appId,{runtimeReceipt,signal,onEvent})
             },
             {
                 prefix:['arcane'],
-                root:path.join(runtimeRoot,'arcane'),
+                root:runtimeRoot,
                 identities:arcaneIdentities,
-                read:relative=>readVerifiedRuntimeFile(verified,{
-                    runtimeRoot,
-                    relativePath:`arcane/${relative.join('/')}`,
+                read:relative=>readVerifiedWorkspaceRuntimeFile(verified,{
+                    workspaceRoot:resolved.workspaceRoot,
+                    relativePath:relative.join('/'),
                     signal
                 }),
                 allow:relative=>arcaneIdentities.has(inventoryKey(relative.join('/')))
-            },
-            {
-                prefix:['node_modules','strong-type'],
-                root:path.join(runtimeRoot,'strong-type'),
-                identities:strongTypeIdentities,
-                read:relative=>readVerifiedRuntimeFile(verified,{
-                    runtimeRoot,
-                    relativePath:`strong-type/${relative.join('/')}`,
-                    signal
-                }),
-                allow:relative=>strongTypeIdentities.has(inventoryKey(relative.join('/')))
             }
         ]
     };
@@ -461,7 +504,7 @@ async function startOwnedDevServer({
     host='127.0.0.1',
     port=0,
     signal,
-    runtimeReceipt,
+    workspaceRuntimeReceipt,
     releaseReceipt
 }={},events,releaseSignal){
     throwIfAborted(signal);
@@ -473,12 +516,13 @@ async function startOwnedDevServer({
     await events.send({type:'server.starting',mode,host,port,appId});
     const routeSet=mode==='source'
         ?await sourceRoutes(workspaceRoot,appId,{
-            runtimeReceipt,
+            workspaceRuntimeReceipt,
             signal,
             onEvent:event=>events.send(event)
         })
         :await packagedRoutes(releaseRoot,releaseReceipt,{signal});
-    for(const mapping of routeSet.mappings){
+    const mappings=deterministicMappings(routeSet.mappings);
+    for(const mapping of mappings){
         const info=await lstat(mapping.root);
         if(info.isSymbolicLink()||!info.isDirectory())fail(`Server route root must be a real directory: ${mapping.root}.`);
         mapping.root=await realpath(mapping.root);
@@ -533,7 +577,7 @@ async function startOwnedDevServer({
                 response.end();
                 return;
             }
-            const mapping=routeSet.mappings.find(route=>
+            const mapping=mappings.find(route=>
                 route.prefix.every((segment,index)=>segments[index]===segment)
             );
             if(!mapping){deny(response,404,'Not found.');return;}

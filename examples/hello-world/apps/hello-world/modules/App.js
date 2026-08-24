@@ -1,18 +1,11 @@
-import arcaneThemeReady from '../../../arcane/modules/ThemeBootstrap.js?v=1';
+import arcaneThemeReady from 'arcane/ThemeBootstrap';
 import {
     resolveApplicationId,
     resolveApplicationLocalStorageKey
-} from '../../../arcane/modules/AppDataScope.js?v=1';
-import DirectoryPicker from '../../../arcane/modules/DirectoryPicker.js?v=1';
+} from 'arcane/AppDataScope';
 
 const action=document.querySelector('#app-action');
-const nativeAction=document.querySelector('#native-action');
 const status=document.querySelector('#app-status');
-const environment=document.querySelector('#app-environment');
-
-const directoryPicker=new DirectoryPicker();
-
-let nativePickerReady=false;
 
 await arcaneThemeReady;
 
@@ -42,48 +35,4 @@ function sayHello(){
     status.textContent=`Hello from Arcane OS! Greeting ${count}.`;
 }
 
-async function describeEnvironment(){
-    const runtime=globalThis.Arcane?.runtime?.current?.();
-
-    if(runtime?.native!==true){
-        environment.textContent=
-            `Browser mode · ${appId} · Arcane theme and app-scoped storage`;
-        nativeAction.disabled=true;
-        return;
-    }
-
-    try{
-        const app=await globalThis.Arcane.app.current();
-        nativePickerReady=directoryPicker.available;
-        environment.textContent=
-            `Executable mode · ${app.displayName} ${app.version} · ${runtime.transport}`;
-        nativeAction.disabled=!nativePickerReady;
-    }catch(error){
-        environment.textContent=error?.message||'The Arcane native host is unavailable.';
-        nativeAction.disabled=true;
-    }
-}
-
-async function chooseDirectory(){
-    if(!nativePickerReady) return;
-
-    nativeAction.disabled=true;
-    status.textContent='Opening the native folder selector.';
-
-    try{
-        const result=await directoryPicker.select({
-            title:'Choose a folder for Arcane Hello World'
-        });
-        status.textContent=result.cancelled
-            ?'Folder selection canceled.'
-            :`Arcane selected ${result.path}`;
-    }catch(error){
-        status.textContent=error?.message||'The folder selector could not open.';
-    }finally{
-        nativeAction.disabled=!nativePickerReady;
-    }
-}
-
 action?.addEventListener('click',sayHello);
-nativeAction?.addEventListener('click',chooseDirectory);
-void describeEnvironment();

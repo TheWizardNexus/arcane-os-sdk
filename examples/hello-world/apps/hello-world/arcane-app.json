@@ -14,7 +14,6 @@
     "include": [
       "hello-world.css",
       "index.html",
-      "img/icon.png",
       "manifest.json",
       "modules"
     ],
@@ -24,15 +23,8 @@
     ]
   },
   "permissions": {
-    "capabilities": [
-      "filesystem.directory.select",
-      "preferences.read"
-    ],
-    "methods": [
-      "app.current",
-      "filesystem.directory.select",
-      "preferences.get"
-    ]
+    "capabilities": [],
+    "methods": []
   },
   "security": {
     "connectOrigins": [],
@@ -41,7 +33,7 @@
   },
   "native": {
     "type": "app",
-    "icon": "img/icon.png",
+    "icon": null,
     "order": 100,
     "bundledApps": []
   },
@@ -51,7 +43,6 @@
     "features": []
   },
   "targets": [
-    "browser",
-    "windows-x64"
+    "browser"
   ]
 }

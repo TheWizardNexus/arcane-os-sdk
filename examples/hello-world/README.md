@@ -1,162 +1,159 @@
 # Arcane Hello World
 
-This example is a small Arcane application written with HTML, CSS, and JavaScript.
-It says hello in a browser, remembers the greeting count for this app, and enables
-an operating-system folder picker when it runs inside the Windows executable.
+This maintained example is a browser-only Arcane application written with
+HTML, CSS, and JavaScript. It imports Arcane modules by stable names, remembers
+this app's greeting count, and uses the same authenticated runtime bytes in
+development and in its packaged release.
 
 ## Requirements
 
 - Node.js 22.23.2 or newer
 - npm
-- Windows x64 to build and run the executable
 
 ## Create the project
 
-    npx arcane-os new hello-world --path ./hello-world --display-name "Arcane Hello World" --target windows-x64 --git
-    Set-Location ./hello-world
-    npm install
+```sh
+npx arcane-os new hello-world --path ./hello-world --display-name "Arcane Hello World" --git
+cd hello-world
+npm install
+```
 
-The generated project pins arcane-os as a project-local development dependency.
-That dependency supplies the reproducible CLI and runtime used by the npm scripts.
+The generated project pins `arcane-os` as a project-local development
+dependency. That dependency supplies the reproducible CLI and authenticated
+runtime used by the npm scripts. Installing the CLI globally is optional.
 
-Installing arcane-os globally is optional:
+## Physical runtime and import map
 
-    npm install --global arcane-os
+The scaffold materializes a real `arcane/` tree beside `apps/`. It does not
+serve a virtual `node_modules` runtime. The checked-in Hello World fixture has
+the same shape:
 
-That makes the arcane command available in the shell. The project scripts still
-use the version installed by the project.
+```text
+hello-world/
+├── apps/hello-world/
+│   ├── modules/
+│   │   ├── App.js
+│   │   └── arcane.importmap.json
+│   ├── arcane-app.json
+│   ├── arcane-package.json
+│   ├── hello-world.css
+│   ├── index.html
+│   └── manifest.json
+├── arcane/
+│   ├── css/
+│   ├── dependencies/strong-type/
+│   ├── entities/
+│   ├── modules/
+│   └── sdk/
+│       ├── dependencies/event-pubsub/
+│       ├── dependencies/strong-type/
+│       └── event-manager.mjs
+├── arcane-packager.json
+├── arcane.lock.json
+└── package.json
+```
 
-## What the SDK adds
+`apps/hello-world/modules/arcane.importmap.json` is browser-standard JSON with
+one top-level `imports` object. The CLI keeps that artifact synchronized with a
+managed inline `<script type="importmap" data-arcane-import-map>` immediately
+after the document's sole `<base href="../../">`, before every active script or
+module preload in `index.html`. The committed fixture contains 163 authenticated
+runtime files and 85 import-map entries (84 named specifiers plus the URL-like
+runtime dependency remap). Representative entries are:
 
-- The arcane CLI creates, checks, serves, packages, and builds the application.
-- Arcane theme and primitive styles provide the card and button design.
-- AppDataScope creates a browser storage key owned by hello-world.
-- The executable injects the Arcane bridge, application identity, and native
-  DirectoryPicker.
+```json
+{
+  "imports": {
+    "arcane/AppDataScope": "./arcane/modules/AppDataScope.js",
+    "arcane/ThemeBootstrap": "./arcane/modules/ThemeBootstrap.js",
+    "arcane-os/event-manager": "./arcane/sdk/event-manager.mjs",
+    "event-pubsub": "./arcane/sdk/dependencies/event-pubsub/index.js",
+    "./node_modules/strong-type/index.js": "./arcane/dependencies/strong-type/index.js"
+  }
+}
+```
 
-## Project shape
+Regenerate the map explicitly whenever you want:
 
-The application owns files under apps/hello-world. npm installs the SDK runtime
-under node_modules; the example imports only the Arcane files shown here.
+```sh
+npm run import-map
+```
 
-    hello-world/
-    ├── apps/hello-world/
-    │   ├── img/icon.png
-    │   ├── modules/App.js
-    │   ├── arcane-app.json
-    │   ├── arcane-package.json
-    │   ├── hello-world.css
-    │   ├── index.html
-    │   └── manifest.json
-    ├── node_modules/arcane-os/runtime/arcane/
-    │   ├── css/
-    │   │   ├── primitives.css
-    │   │   └── theme.css
-    │   └── modules/
-    │       ├── AppDataScope.js
-    │       ├── DirectoryPicker.js
-    │       └── ThemeBootstrap.js
-    ├── arcane-packager.json
-    ├── arcane.lock.json
-    ├── package.json
-    └── package-lock.json
+Scaffold, development, package, and build also refresh the default map
+automatically. The generator scans Arcane's browser modules and every shipped
+dependency they import, removes stale entries, and fails without replacing the
+last valid map when an import cannot be resolved.
 
-During development those installed runtime files are available to the app at
-/arcane/. Packaging copies the runtime beside the application:
+The Arcane runtime's unchanged relative imports resolve to authenticated
+`strong-type@1.1.0` through the URL-like key. EventManager's shipped
+`event-pubsub@6.1.0` closure resolves its physical sibling
+`strong-type@2.0.0` beneath `arcane/sdk/dependencies/`; neither graph trusts or
+overwrites a consumer's top-level `node_modules` dependencies.
 
-    dist/hello-world/
-    ├── apps/hello-world/
-    │   ├── modules/App.js
-    │   ├── hello-world.css
-    │   ├── index.html
-    │   └── manifest.json
-    └── arcane/
-        ├── css/
-        │   ├── primitives.css
-        │   └── theme.css
-        └── modules/
-            ├── AppDataScope.js
-            ├── DirectoryPicker.js
-            └── ThemeBootstrap.js
+## How the application imports Arcane
 
-## How the application uses Arcane
+`index.html` loads Arcane's shared styles before the application stylesheet:
 
-index.html loads Arcane's shared styles before the application stylesheet:
+```html
+<link rel="stylesheet" href="./arcane/css/theme.css?v=1">
+<link rel="stylesheet" href="./arcane/css/primitives.css?v=1">
+<link rel="stylesheet" href="./apps/hello-world/hello-world.css?v=1">
+```
 
-    <link rel="stylesheet" href="./arcane/css/theme.css?v=1">
-    <link rel="stylesheet" href="./arcane/css/primitives.css?v=1">
-    <link rel="stylesheet" href="./apps/hello-world/hello-world.css?v=1">
+`App.js` uses query-free named imports. The browser import map resolves these
+names to the physical runtime:
 
-App.js imports the browser runtime helpers:
+```js
+import arcaneThemeReady from 'arcane/ThemeBootstrap';
+import {
+    resolveApplicationId,
+    resolveApplicationLocalStorageKey
+} from 'arcane/AppDataScope';
+```
 
-    import arcaneThemeReady from '../../../arcane/modules/ThemeBootstrap.js?v=1';
-    import {
-        resolveApplicationId,
-        resolveApplicationLocalStorageKey
-    } from '../../../arcane/modules/AppDataScope.js?v=1';
-    import DirectoryPicker from '../../../arcane/modules/DirectoryPicker.js?v=1';
+After the theme is ready, the application creates an app-scoped browser storage
+key and counts greetings:
 
-The browser path creates an app-scoped storage key and counts greetings:
+```js
+const appId=await resolveApplicationId();
+const countKey=resolveApplicationLocalStorageKey(
+    'hello-count',
+    {applicationId:appId}
+);
+```
 
-    const appId=await resolveApplicationId();
-    const countKey=resolveApplicationLocalStorageKey(
-        'hello-count',
-        {applicationId:appId}
-    );
+## Develop and test
 
-    function sayHello(){
-        const count=loadHelloCount()+1;
-        saveHelloCount(count);
-        status.textContent=`Hello from Arcane OS! Greeting ${count}.`;
-    }
+```sh
+npm run doctor
+npm run check
+npm run dev
+```
 
-The executable path detects the native host and uses Arcane's application and
-folder-picker APIs:
+Open the loopback URL printed by the CLI. The page demonstrates named Arcane
+imports, shared styling, application identity, and persistent browser storage.
+Press Ctrl+C to stop the development server.
 
-    const runtime=globalThis.Arcane?.runtime?.current?.();
+## Package, verify, bundle, and run
 
-    if(runtime?.native===true){
-        const app=await globalThis.Arcane.app.current();
-        const result=await directoryPicker.select({
-            title:'Choose a folder for Arcane Hello World'
-        });
-    }
+```sh
+npm run package
+npm run verify
+npm run bundle
+npm run run
+```
 
-The complete runnable files are in apps/hello-world/.
+`package` writes `dist/hello-world/`, including the same `arcane/**` bytes and
+the same import-map specifiers used in development. `verify` authenticates that
+directory. `bundle` creates
+`dist/hello-world-0.1.0.arcane-app.tar.gz`. `run` verifies and launches the
+packaged browser release on a loopback URL.
 
-## Run in the browser
+`npm run build` is an explicit browser build and writes the same packaged
+directory. It does not create a standalone native executable. Native targets
+are provider-supplied, require a separately declared target and compatible
+provider, and remain outside this maintained browser example; see the
+[platform target contract](../../docs/platform-targets.md).
 
-    npm run check
-    npm run dev
-
-Open the loopback URL printed by the CLI. The page displays two clear areas:
-
-- Works in the browser: Arcane styling, app identity, and a persistent greeting.
-- Executable feature: a disabled folder button with a message explaining that it
-  becomes available in the executable.
-
-Press Ctrl+C when you are ready to stop the development server.
-
-## Package the browser application
-
-    npm run package
-    npm exec -- arcane verify
-
-The packaged application is written to dist/hello-world/.
-
-## Build the Windows executable
-
-    npm run build
-
-The SDK compiles the host-native components and writes:
-
-    build/windows-x64/hello-world/ArcaneApp-hello-world.exe
-
-Keep the executable with the other files in its containing directory. To build,
-verify, and launch the application through the project script:
-
-    npm run run
-
-In executable mode the page shows the Arcane application name, version, and host
-transport. Choose a folder opens the operating-system folder selector and reports
-the selected path in the page.
+Every browser release also carries Arcane OS licensing material under
+`licenses/arcane-os/`. Review those terms before distribution.

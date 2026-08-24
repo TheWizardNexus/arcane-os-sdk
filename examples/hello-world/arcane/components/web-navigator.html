@@ -1,0 +1,239 @@
+<link rel="stylesheet" href="./arcane/css/theme.css?v=1">
+<link rel="stylesheet" href="./arcane/css/primitives.css?v=1">
+<style>
+:host{display:block;height:100%;min-height:30rem}
+.navigator{display:grid;grid-template-rows:auto 1fr auto;height:100%;min-height:30rem}
+.toolbar{align-items:center;border-bottom:1px solid var(--arcane-border);display:grid;gap:var(--arcane-space-2);grid-template-columns:auto minmax(0,1fr) auto;padding:var(--arcane-space-3)}
+.history,.actions{display:flex;gap:var(--arcane-space-1)}
+button{min-width:2.5rem}
+.address{display:flex;gap:var(--arcane-space-2)}
+.address input{min-width:0;width:100%}
+.viewport{display:grid;min-height:24rem}
+.viewport>iframe,.viewport>.blocked{grid-area:1/1;height:100%;min-height:24rem;width:100%}
+.viewport>iframe{background:var(--arcane-surface-raised);border:0}
+.blocked{align-content:center;background:var(--arcane-surface-raised);box-sizing:border-box;display:grid;gap:var(--arcane-space-3);justify-items:start;overflow:auto;padding:clamp(var(--arcane-space-5),7vw,var(--arcane-space-8))}
+.blocked[hidden]{display:none}
+.blocked__eyebrow{color:var(--arcane-danger);font-weight:700;letter-spacing:.08em;margin:0;text-transform:uppercase}
+.blocked h2,.blocked p{margin:0}
+.blocked code{max-width:100%;overflow-wrap:anywhere}
+.blocked dl{display:grid;gap:var(--arcane-space-2);margin:0}
+.blocked dl div{display:grid;gap:var(--arcane-space-1)}
+.blocked dt{color:var(--arcane-muted);font-size:.8rem;font-weight:700;text-transform:uppercase}
+.blocked dd{margin:0}
+.blocked__boundary{border-left:.25rem solid var(--arcane-danger);padding-left:var(--arcane-space-3)}
+.status{border-top:1px solid var(--arcane-border);color:var(--arcane-muted);font-size:.85rem;margin:0;padding:var(--arcane-space-2) var(--arcane-space-3)}
+@media(max-width:42rem){.toolbar{grid-template-columns:1fr}.history,.actions{justify-content:center}}
+</style>
+<section class="navigator arcane-card">
+    <div class="toolbar">
+        <div class="history">
+            <button id="back" class="arcane-button arcane-button--tertiary" type="button" aria-label="Back">←</button>
+            <button id="forward" class="arcane-button arcane-button--tertiary" type="button" aria-label="Forward">→</button>
+            <button id="home" class="arcane-button arcane-button--tertiary" type="button" aria-label="Home">⌂</button>
+        </div>
+        <form id="addressForm" class="address">
+            <label class="visually-hidden" for="address">Web address</label>
+            <input id="address" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://example.com">
+            <button class="arcane-button" type="submit">Go</button>
+        </form>
+        <div class="actions">
+            <button id="reload" class="arcane-button arcane-button--tertiary" type="button" aria-label="Reload">↻</button>
+            <button id="external" class="arcane-button arcane-button--secondary" type="button">Open externally</button>
+        </div>
+    </div>
+    <div class="viewport">
+        <iframe id="frame" title="Web content" referrerpolicy="strict-origin-when-cross-origin" sandbox="allow-forms allow-scripts"></iframe>
+        <section id="blocked" class="blocked" hidden tabindex="-1" aria-labelledby="blockedTitle">
+            <p class="blocked__eyebrow">Arcane global deny</p>
+            <h2 id="blockedTitle">Connection blocked</h2>
+            <p>Arcane stopped this outbound navigation before it sent a request.</p>
+            <code id="blockedTarget"></code>
+            <dl>
+                <div><dt>Reason</dt><dd id="blockedReason"></dd></div>
+                <div><dt>Source</dt><dd id="blockedSource"></dd></div>
+                <div><dt>Rule and decision</dt><dd id="blockedEvidence"></dd></div>
+            </dl>
+            <p class="blocked__boundary">Global deny rules override every app capability and cannot be bypassed here.</p>
+        </section>
+    </div>
+    <p id="status" class="status" role="status" aria-live="polite">Enter an address. Some sites block embedded viewing; use Open externally when needed.</p>
+</section>
+<script type="module">
+const host=this;
+const root=host.shadowRoot;
+const address=root.querySelector('#address');
+const frame=root.querySelector('#frame');
+const blocked=root.querySelector('#blocked');
+const status=root.querySelector('#status');
+const back=root.querySelector('#back');
+const forward=root.querySelector('#forward');
+let homeUrl='https://example.com/';
+let history=[];
+let position=-1;
+let navigationGuard=null;
+let navigationSequence=0;
+
+function normalize(value){
+    let text=String(value||'').trim();
+    if(!/^[a-z][a-z0-9+.-]*:/i.test(text))text=`https://${text}`;
+    const url=new URL(text);
+    if(!['http:','https:'].includes(url.protocol))throw new TypeError('Web addresses must use HTTP or HTTPS.');
+    return url.href;
+}
+
+function currentUrl(){return history[position]||'';}
+
+function unavailableDecision(url,error){
+    return {
+        blocked:true,
+        decisionId:'policy-unavailable',
+        decidedAt:new Date().toISOString(),
+        policyGeneration:null,
+        ruleId:'policy-unavailable',
+        ruleType:'policy',
+        target:url,
+        matchedValue:new URL(url).hostname,
+        reason:{
+            title:'Navigation paused because policy is unavailable',
+            description:'Arcane could not verify the global deny policy, so it did not send this request.'
+        },
+        source:{
+            label:'Arcane policy safety boundary',
+            reference:error?.code||null
+        }
+    };
+}
+
+async function evaluate(url,intent){
+    if(!navigationGuard){
+        const error=new Error('Arcane navigation guard is unavailable.');
+        error.code='ARCANE_NAVIGATION_GUARD_UNAVAILABLE';
+        return unavailableDecision(url,error);
+    }
+    try{
+        const decision=await navigationGuard(url,{intent});
+        if(!decision||typeof decision!=='object'||typeof decision.blocked!=='boolean'){
+            throw new TypeError('Navigation policy returned an invalid decision.');
+        }
+        return decision;
+    }catch(error){
+        return unavailableDecision(url,error);
+    }
+}
+
+function updateButtons(){
+    back.disabled=position<=0;
+    forward.disabled=position<0||position>=history.length-1;
+}
+
+function recordHistory(url,record){
+    if(!record)return;
+    history=history.slice(0,position+1);
+    history.push(url);
+    position=history.length-1;
+}
+
+function showBlocked(url,decision){
+    frame.hidden=true;
+    frame.removeAttribute('src');
+    blocked.hidden=false;
+    root.querySelector('#blockedTarget').textContent=url;
+    root.querySelector('#blockedReason').textContent=`${decision.reason?.title||'Blocked by policy'} — ${decision.reason?.description||'No additional reason was provided.'}`;
+    root.querySelector('#blockedSource').textContent=[decision.source?.label,decision.source?.reference].filter(Boolean).join(' · ')||'Arcane global policy';
+    root.querySelector('#blockedEvidence').textContent=[decision.ruleId&&`Rule ${decision.ruleId}`,decision.policyGeneration&&`Policy generation ${decision.policyGeneration}`,decision.decisionId&&`Decision ${decision.decisionId}`,decision.decidedAt].filter(Boolean).join(' · ');
+    status.textContent='Blocked by the Arcane global deny policy.';
+    blocked.focus();
+    host.dispatchEvent(new CustomEvent('web-navigation-blocked',{bubbles:true,composed:true,detail:{url,decision}}));
+}
+
+function showFrame(url){
+    blocked.hidden=true;
+    frame.hidden=false;
+    frame.src=url;
+    status.textContent='Loading…';
+    host.dispatchEvent(new CustomEvent('web-navigate',{bubbles:true,composed:true,detail:{url}}));
+}
+
+async function navigate(value,{record=true}={}){
+    const sequence=++navigationSequence;
+    try{
+        const url=normalize(value);
+        address.value=url;
+        status.textContent='Checking the global deny policy…';
+        const decision=await evaluate(url,'embedded');
+        if(sequence!==navigationSequence)return'';
+        recordHistory(url,record);
+        updateButtons();
+        if(decision.blocked){
+            showBlocked(url,decision);
+            return'';
+        }
+        showFrame(url);
+        return url;
+    }catch(error){
+        if(sequence===navigationSequence)status.textContent=error.message;
+        return'';
+    }
+}
+
+async function openExternal(){
+    const sequence=++navigationSequence;
+    try{
+        const url=normalize(currentUrl()||address.value||homeUrl);
+        status.textContent='Checking the global deny policy…';
+        const decision=await evaluate(url,'external');
+        if(sequence!==navigationSequence)return;
+        if(decision.blocked){
+            showBlocked(url,decision);
+            return;
+        }
+        status.textContent='Handing the allowed address to the system browser…';
+        host.dispatchEvent(new CustomEvent('web-open-external',{bubbles:true,composed:true,detail:{url}}));
+    }catch(error){
+        if(sequence===navigationSequence)status.textContent=error.message;
+    }
+}
+
+function ownNavigation(operation){
+    operation.catch(function reportUnexpectedNavigationFailure(error){
+        status.textContent=error.message;
+    });
+}
+
+function move(amount){
+    const next=position+amount;
+    if(next<0||next>=history.length)return;
+    position=next;
+    ownNavigation(navigate(history[position],{record:false}));
+}
+
+function configure(options){
+    if(options?.homeUrl)homeUrl=normalize(options.homeUrl);
+    navigationGuard=typeof options?.navigationGuard==='function'?options.navigationGuard:null;
+    if(options?.initialUrl)ownNavigation(navigate(options.initialUrl));
+    else updateButtons();
+    return host;
+}
+
+function handleAddressSubmit(event){event.preventDefault();ownNavigation(navigate(address.value));}
+function handleHomeClick(){ownNavigation(navigate(homeUrl));}
+function handleReloadClick(){const current=currentUrl();if(current)ownNavigation(navigate(current,{record:false}));}
+function handleExternalClick(){ownNavigation(openExternal());}
+function handleBackClick(){move(-1);}
+function handleForwardClick(){move(1);}
+function handleFrameLoad(){if(blocked.hidden)status.textContent='Loaded. If the page is blank, its site does not permit embedded viewing.';}
+
+host.configure=configure;
+host.navigate=navigate;
+host.currentUrl=currentUrl;
+root.querySelector('#addressForm').addEventListener('submit',handleAddressSubmit);
+root.querySelector('#home').addEventListener('click',handleHomeClick);
+root.querySelector('#reload').addEventListener('click',handleReloadClick);
+root.querySelector('#external').addEventListener('click',handleExternalClick);
+back.addEventListener('click',handleBackClick);
+forward.addEventListener('click',handleForwardClick);
+frame.addEventListener('load',handleFrameLoad);
+updateButtons();
+host.ready=true;
+host.dispatchEvent(new CustomEvent('web-navigator-ready',{bubbles:true,composed:true}));
+</script>

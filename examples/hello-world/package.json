@@ -7,11 +7,12 @@
     "dev": "arcane dev",
     "test": "arcane test",
     "check": "arcane check",
+    "import-map": "arcane import-map",
     "package": "arcane package",
-    "build": "arcane build --target windows-x64",
-    "run": "arcane run --target windows-x64",
-    "build:browser": "arcane build --target browser",
-    "run:browser": "arcane run --target browser"
+    "verify": "arcane verify",
+    "bundle": "arcane bundle",
+    "build": "arcane build --target browser",
+    "run": "arcane run --target browser"
   },
   "devDependencies": {
     "arcane-os": "0.1.0-dev.5"

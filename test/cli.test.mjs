@@ -28,11 +28,40 @@ test('CLI help and version succeed through the shipped executable',async()=>{
     assert.match(help.stdout,/external or integrated Arcane workspace/);
     assert.match(help.stdout,/arcane-os executables/);
     assert.match(help.stdout,/test --scope shared --test-file/);
+    assert.match(help.stdout,/import-map \[--workspace <directory>\] \[--app <id>\]/u);
     assert.match(help.stdout,/verify-bundle <file[.]arcane-app[.]tar[.]gz>/);
 
     const version=await runCli(['--version']);
     assert.equal(version.code,0);
     assert.equal(version.stdout.trim(),SDK_VERSION);
+});
+
+test('CLI import-map command follows workspace and app option grammar',async()=>{
+    const stdout=memoryStream();
+    const stderr=memoryStream();
+    const invocations=[];
+    const cwd=path.join('C:\\','sdk-cli-fixture');
+    const exitCode=await runCliInProcess([
+        'import-map',
+        '--workspace','named-apps',
+        '--app','hello-world',
+        '--output','ndjson'
+    ],{
+        cwd,
+        stdout:stdout.stream,
+        stderr:stderr.stream,
+        execute:async(command,options)=>{
+            invocations.push({command,options});
+            return {importMap:{artifact:'apps/hello-world/modules/arcane.importmap.json'}};
+        }
+    });
+    assert.equal(exitCode,0,stderr.read());
+    assert.equal(invocations.length,1);
+    assert.equal(invocations[0].command,'import-map');
+    assert.equal(invocations[0].options.workspaceRoot,path.resolve(cwd,'named-apps'));
+    assert.equal(invocations[0].options.appId,'hello-world');
+    assert.equal(invocations[0].options.scope,'app');
+    assert.equal(parseNdjson(stdout.read()).at(-1).type,'operation.completed');
 });
 
 test('CLI update checking is explicit, structured, and fails honestly',async t=>{

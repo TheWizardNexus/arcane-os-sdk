@@ -1,7 +1,11 @@
 import {lstat,mkdir,readFile,readdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
-import {loadRuntimeRelease} from './runtime.mjs';
+import {verifyRuntime} from './runtime.mjs';
+import {verifySdkBrowserRuntime} from './sdk-browser-runtime.mjs';
+import {materializeWorkspaceRuntime} from './workspace-runtime.mjs';
+import {generateImportMap} from './import-map.mjs';
+import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
 import {SDK_NAME,SDK_VERSION,workspaceTemplate} from './templates/workspace-template.mjs';
 import {inspectWorkspaceProfile} from './workspace.mjs';
 import {parseSemver} from './packager/core.mjs';
@@ -259,6 +263,29 @@ async function writeMissingFiles(workspaceRoot,files,{signal,onEvent}){
     return {createdFiles,skippedFiles};
 }
 
+async function assertExistingLockAdmission(workspaceRoot,files){
+    const expected=files.get('arcane.lock.json');
+    if(typeof expected!=='string')return;
+    const lockPath=path.join(workspaceRoot,'arcane.lock.json');
+    let info;
+    try{
+        info=await lstat(lockPath);
+    }catch(error){
+        if(error?.code==='ENOENT')return;
+        throw error;
+    }
+    if(info.isSymbolicLink()||!info.isFile()){
+        fail('Existing arcane.lock.json must be a real file.');
+    }
+    if(await readFile(lockPath,'utf8')!==expected){
+        fail(
+            'Existing arcane.lock.json does not match the authenticated SDK runtime '
+            +'admission. Remove or reconcile it before running arcane init; Arcane never '
+            +'overwrites a lock implicitly.'
+        );
+    }
+}
+
 async function runGitInit(workspaceRoot,signal,onEvent){
     throwIfAborted(signal);
     await emit(onEvent,{type:'scaffold.git.started',command:'git init -b main'});
@@ -313,17 +340,54 @@ export async function createWorkspace({
     const workspaceRoot=path.resolve(targetPath);
     await emit(onEvent,{type:'scaffold.started',mode:'create',workspaceRoot,appId,target});
     await assertCreateTarget(workspaceRoot);
-    const runtimeRelease=await loadRuntimeRelease();
+    const receipt=await withWorkspaceOperationLock({
+        workspaceRoot,
+        operation:'scaffold-create',
+        signal,
+        onEvent
+    },async workspaceOperationLease=>{
+    const runtimeReceipt=await verifyRuntime({signal,onEvent});
+    const sdkBrowserRuntimeReceipt=await verifySdkBrowserRuntime({signal,onEvent});
     const template=workspaceTemplate({
         appId,
         displayName,
-        runtimeRelease,
+        runtimeRelease:runtimeReceipt,
+        sdkBrowserRuntimeRelease:sdkBrowserRuntimeReceipt,
         target,
         appIcon:await scaffoldIcon(target)
     });
     const result=await writeMissingFiles(workspaceRoot,template.files,{signal,onEvent});
+    const workspaceRuntimeReceipt=await materializeWorkspaceRuntime({
+        workspaceRoot,
+        runtimeRoot:runtimeReceipt.canonicalLocation,
+        runtimeReceipt,
+        browserRuntimeRoot:sdkBrowserRuntimeReceipt.canonicalLocation,
+        sdkBrowserRuntimeReceipt,
+        signal,
+        onEvent
+    });
+    const importMap=await generateImportMap({
+        workspaceRoot,
+        appId,
+        appRoot:path.join(workspaceRoot,'apps',appId),
+        workspaceRuntimeReceipt,
+        workspaceOperationLease,
+        signal,
+        onEvent
+    });
     if(initializeGit)await runGitInit(workspaceRoot,signal,onEvent);
-    const receipt={workspaceRoot,appId,displayName:template.name,target,...result,gitInitialized:Boolean(initializeGit)};
+    const receipt={
+        workspaceRoot,
+        appId,
+        displayName:template.name,
+        target,
+        ...result,
+        workspaceRuntime:workspaceRuntimeReceipt,
+        importMap,
+        gitInitialized:Boolean(initializeGit)
+    };
+    return receipt;
+    });
     await emit(onEvent,{type:'scaffold.completed',...receipt});
     return receipt;
 }
@@ -342,13 +406,28 @@ export async function initWorkspace({
     const resolvedRoot=path.resolve(workspaceRoot);
     await emit(onEvent,{type:'scaffold.started',mode:'init',workspaceRoot:resolvedRoot,appId,target});
     await assertInitTarget(resolvedRoot);
+    const receipt=await withWorkspaceOperationLock({
+        workspaceRoot:resolvedRoot,
+        operation:'scaffold-init',
+        signal,
+        onEvent
+    },async workspaceOperationLease=>{
     const profile=await existingWorkspaceProfile(resolvedRoot);
     const workspaceMode=profile?.workspaceMode??'external';
+    const legacyIntegrated=workspaceMode==='integrated'
+        &&profile.config.browserRuntimeLayout==='integrated-legacy';
+    const runtimeReceipt=workspaceMode==='external'
+        ?await verifyRuntime({signal,onEvent})
+        :null;
+    const sdkBrowserRuntimeReceipt=workspaceMode==='external'
+        ?await verifySdkBrowserRuntime({signal,onEvent})
+        :null;
     const template=workspaceMode==='integrated'
         ?workspaceTemplate({
             appId,
             displayName,
             appOnly:true,
+            namedImports:!legacyIntegrated,
             minimumCoreVersion:await integratedCoreVersion(resolvedRoot),
             target,
             appIcon:await scaffoldIcon(target)
@@ -356,15 +435,49 @@ export async function initWorkspace({
         :workspaceTemplate({
             appId,
             displayName,
-            runtimeRelease:await loadRuntimeRelease(),
+            runtimeRelease:runtimeReceipt,
+            sdkBrowserRuntimeRelease:sdkBrowserRuntimeReceipt,
             target,
             appIcon:await scaffoldIcon(target)
         });
     const packagePlan=workspaceMode==='integrated'
         ?Object.freeze({exists:true,updated:false})
         :await prepareExistingPackage(resolvedRoot,template.files);
+    if(workspaceMode==='external'){
+        await assertExistingLockAdmission(resolvedRoot,template.files);
+    }
     const result=await writeMissingFiles(resolvedRoot,template.files,{signal,onEvent});
     const packageUpdated=await applyPackageMerge(resolvedRoot,packagePlan,{signal,onEvent});
+    const workspaceRuntimeReceipt=workspaceMode==='external'
+        ?await materializeWorkspaceRuntime({
+            workspaceRoot:resolvedRoot,
+            runtimeRoot:runtimeReceipt.canonicalLocation,
+            runtimeReceipt,
+            browserRuntimeRoot:sdkBrowserRuntimeReceipt.canonicalLocation,
+            sdkBrowserRuntimeReceipt,
+            signal,
+            onEvent
+        })
+        :null;
+    const importMap=legacyIntegrated
+        ?Object.freeze({
+            appId,
+            skipped:true,
+            compatibility:'integrated-legacy',
+            reason:'The canonical integrated Arcane OS root retains its physical two-route browser runtime.'
+        })
+        :await generateImportMap({
+            workspaceRoot:resolvedRoot,
+            appId,
+            appRoot:path.join(resolvedRoot,'apps',appId),
+            workspaceRuntimeReceipt,
+            workspaceOperationLease,
+            signal,
+            onEvent
+        });
+    if(legacyIntegrated){
+        await emit(onEvent,{type:'import-map.compatibility.skipped',...importMap});
+    }
     const receipt={
         workspaceRoot:resolvedRoot,
         workspaceMode,
@@ -373,8 +486,12 @@ export async function initWorkspace({
         target,
         ...result,
         packageUpdated,
+        workspaceRuntime:workspaceRuntimeReceipt,
+        importMap,
         gitInitialized:false
     };
+    return receipt;
+    });
     await emit(onEvent,{type:'scaffold.completed',...receipt});
     return receipt;
 }

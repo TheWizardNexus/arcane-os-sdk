@@ -1,6 +1,8 @@
 import path from 'node:path';
 import {access} from 'node:fs/promises';
 import {verifyRuntime} from './runtime.mjs';
+import {verifySdkBrowserRuntime} from './sdk-browser-runtime.mjs';
+import {verifyWorkspaceRuntime} from './workspace-runtime.mjs';
 import {validateWorkspace} from './workspace.mjs';
 import {runProcess} from './process.mjs';
 import {ARCANE_PROTOCOL,SDK_VERSION} from './constants.mjs';
@@ -248,9 +250,16 @@ export async function runDoctor({
     checks.push(await commandCheck('git','git',['--version'],{signal,onEvent,run}));
 
     try{
-        const receipt=await verifyRuntime({signal,onEvent});
+        const [receipt,browserReceipt]=await Promise.all([
+            verifyRuntime({signal,onEvent}),
+            verifySdkBrowserRuntime({signal,onEvent})
+        ]);
         checks.push(check('sdk-runtime','pass','The packaged Arcane runtime inventory is verified.',{
-            details:{sdkVersion:SDK_VERSION,contentSha256:receipt.contentSha256}
+            details:{
+                sdkVersion:SDK_VERSION,
+                contentSha256:receipt.contentSha256,
+                browserContentSha256:browserReceipt.contentSha256
+            }
         }));
     }catch(error){
         checks.push(check('sdk-runtime','fail',`The packaged Arcane runtime failed verification: ${error.message}`));
@@ -258,8 +267,9 @@ export async function runDoctor({
 
     const resolvedWorkspace=path.resolve(workspaceRoot??process.cwd());
     if(await exists(path.join(resolvedWorkspace,'arcane-packager.json'))){
+        let result=null;
         try{
-            const result=await validateWorkspace({
+            result=await validateWorkspace({
                 workspaceRoot:resolvedWorkspace,
                 appId,
                 signal,
@@ -271,11 +281,75 @@ export async function runDoctor({
         }catch(error){
             checks.push(check('workspace','fail',`The Arcane app workspace is invalid: ${error.message}`));
         }
+        if(result===null){
+            checks.push(check(
+                'workspace-runtime',
+                'skipped',
+                'The physical workspace runtime was not checked because workspace admission failed.',
+                {required:false,details:{workspaceRoot:resolvedWorkspace}}
+            ));
+        }else if(result.workspaceMode==='external'){
+            try{
+                const installedRoot=path.join(result.workspaceRoot,'node_modules','arcane-os');
+                const runtimeRoot=path.join(installedRoot,'runtime');
+                const browserRuntimeRoot=path.join(installedRoot,'browser-runtime');
+                const runtimeReceipt=await verifyRuntime({runtimeRoot,signal,onEvent});
+                const sdkBrowserRuntimeReceipt=await verifySdkBrowserRuntime({
+                    browserRuntimeRoot,
+                    signal,
+                    onEvent
+                });
+                const projected=await verifyWorkspaceRuntime({
+                    workspaceRoot:result.workspaceRoot,
+                    runtimeRoot,
+                    runtimeReceipt,
+                    browserRuntimeRoot,
+                    sdkBrowserRuntimeReceipt,
+                    signal,
+                    onEvent
+                });
+                checks.push(check(
+                    'workspace-runtime',
+                    'pass',
+                    'The composed physical Arcane and SDK browser runtime is verified.',
+                    {details:{
+                        contentSha256:projected.contentSha256,
+                        fileCount:projected.fileCount,
+                        runtimeManifestSha256:projected.sourceManifestSha256,
+                        runtimeContentSha256:projected.sourceContentSha256,
+                        browserManifestSha256:projected.sourceBrowserManifestSha256,
+                        browserContentSha256:projected.sourceBrowserContentSha256
+                    }}
+                ));
+            }catch(error){
+                checks.push(check(
+                    'workspace-runtime',
+                    'fail',
+                    `The composed physical workspace runtime is invalid: ${error.message}`
+                ));
+            }
+        }else if(result.workspaceMode==='integrated'){
+            const layout=result.config.browserRuntimeLayout;
+            checks.push(check(
+                'workspace-runtime',
+                'pass',
+                layout==='integrated-legacy'
+                    ?'The legacy integrated Arcane runtime routes are valid.'
+                    :'The integrated physical browser-runtime routes are valid.',
+                {details:{layout}}
+            ));
+        }
     }else{
         checks.push(check(
             'workspace',
             'skipped',
             'No arcane-packager.json was found at the selected workspace.',
+            {required:false,details:{workspaceRoot:resolvedWorkspace}}
+        ));
+        checks.push(check(
+            'workspace-runtime',
+            'skipped',
+            'No workspace runtime was selected for verification.',
             {required:false,details:{workspaceRoot:resolvedWorkspace}}
         ));
     }

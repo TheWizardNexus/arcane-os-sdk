@@ -9,6 +9,7 @@
     "schemaVersion",
     "sdk",
     "runtime",
+    "sdkBrowserRuntime",
     "protocols"
   ],
   "properties": {
@@ -49,6 +50,90 @@
         "upstreamCommit": {
           "type": "string",
           "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
+    "sdkBrowserRuntime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest",
+        "manifestSha256",
+        "contentSha256",
+        "builder",
+        "sdkVersion",
+        "source"
+      ],
+      "properties": {
+        "manifest": {
+          "const": "node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json"
+        },
+        "manifestSha256": {
+          "const": "9ffb51f7def3386a5a47a700cbaa52257728ca5d204621909b9744fd53393e1a"
+        },
+        "contentSha256": {
+          "const": "0caa302bc07d4a45f5290504ec62ddce98fdf5e3412f916c10aae3d51b1e5f7c"
+        },
+        "builder": {
+          "const": "arcane-sdk-browser-runtime-v1"
+        },
+        "sdkVersion": {
+          "const": "0.1.0-dev.5"
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authority",
+            "repository",
+            "protocol",
+            "browserEntry",
+            "dependencies"
+          ],
+          "properties": {
+            "authority": {
+              "const": "arcane-os-sdk"
+            },
+            "repository": {
+              "const": "https://github.com/TheWizardNexus/arcane-os-sdk.git"
+            },
+            "protocol": {
+              "const": "arcane-sdk-browser-runtime/1"
+            },
+            "browserEntry": {
+              "const": "arcane-os/event-manager"
+            },
+            "dependencies": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "version", "resolved", "integrity"],
+                  "properties": {
+                    "name": {"const": "event-pubsub"},
+                    "version": {"const": "6.1.0"},
+                    "resolved": {"const": "https://registry.npmjs.org/event-pubsub/-/event-pubsub-6.1.0.tgz"},
+                    "integrity": {"const": "sha512-FEMlhTxwqGM0hztTixG6FhVFXqp7Eq1ltk5mSreK6Mhy3xWWpLAzEUR6OMvMdNqT3jgSxA8JDhnhyAG3X4Xy7Q=="}
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "version", "resolved", "integrity"],
+                  "properties": {
+                    "name": {"const": "strong-type"},
+                    "version": {"const": "2.0.0"},
+                    "resolved": {"const": "https://registry.npmjs.org/strong-type/-/strong-type-2.0.0.tgz"},
+                    "integrity": {"const": "sha512-HHrY9qYC7yn+5mlewiI3k9RQM9gZqGQsqbomZcd10Ks0h4RlX01nnkWbCe4AsVPCI6KaFvpkWm1nHMD+Ykup6g=="}
+                  }
+                }
+              ],
+              "items": false
+            }
+          }
         }
       }
     },

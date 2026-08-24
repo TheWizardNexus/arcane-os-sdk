@@ -23,15 +23,9 @@ function sharedRoutes(mode){
     if(mode==='external'){
         return [
             {
-                source:'node_modules/arcane-os/runtime/arcane',
+                source:'arcane',
                 destination:'arcane',
-                include:['components','css','entities','img','modules','security'],
-                exclude:[]
-            },
-            {
-                source:'node_modules/arcane-os/runtime/strong-type',
-                destination:'node_modules/strong-type',
-                include:['index.js','licence','package.json'],
+                include:['components','css','dependencies','entities','img','modules','sdk','security'],
                 exclude:[]
             },
             {
@@ -46,13 +40,7 @@ function sharedRoutes(mode){
         {
             source:'arcane',
             destination:'arcane',
-            include:['components','css','entities','img','modules','security'],
-            exclude:[]
-        },
-        {
-            source:'node_modules/strong-type',
-            destination:'node_modules/strong-type',
-            include:['index.js','licence','package.json'],
+            include:['components','css','dependencies','entities','img','modules','sdk','security'],
             exclude:[]
         }
     ];

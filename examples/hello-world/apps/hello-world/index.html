@@ -4,6 +4,97 @@
     <meta charset="utf-8">
     <meta name="arcane-app-id" content="hello-world">
     <base href="../../">
+    <script type="importmap" data-arcane-import-map>
+{
+  "imports": {
+    "./node_modules/strong-type/index.js": "./arcane/dependencies/strong-type/index.js",
+    "arcane-os/event-manager": "./arcane/sdk/event-manager.mjs",
+    "arcane/AI": "./arcane/modules/AI.js",
+    "arcane/AIPreferenceRuntime": "./arcane/modules/AIPreferenceRuntime.js",
+    "arcane/AIPreferenceTuple": "./arcane/modules/AIPreferenceTuple.js",
+    "arcane/AIResponseLength": "./arcane/modules/AIResponseLength.js",
+    "arcane/AIResponseURLPolicy": "./arcane/modules/AIResponseURLPolicy.js",
+    "arcane/AnsiText": "./arcane/modules/AnsiText.js",
+    "arcane/ApiModelDatabase": "./arcane/modules/ApiModelDatabase.js",
+    "arcane/AppDataScope": "./arcane/modules/AppDataScope.js",
+    "arcane/AppearancePreferences": "./arcane/modules/AppearancePreferences.js",
+    "arcane/ArcaneCommunicationBridge": "./arcane/modules/ArcaneCommunicationBridge.js",
+    "arcane/ArcaneNavigationPolicy": "./arcane/modules/ArcaneNavigationPolicy.js",
+    "arcane/ArcaneNetworkPolicy": "./arcane/modules/ArcaneNetworkPolicy.js",
+    "arcane/AsyncBoundary": "./arcane/modules/AsyncBoundary.js",
+    "arcane/BrowserTestSuite": "./arcane/modules/BrowserTestSuite.js",
+    "arcane/CalculatorEngine": "./arcane/modules/CalculatorEngine.js",
+    "arcane/ChartLibrary": "./arcane/modules/ChartLibrary.js",
+    "arcane/ChatRecords": "./arcane/modules/ChatRecords.js",
+    "arcane/CommunicationAppController": "./arcane/modules/CommunicationAppController.js",
+    "arcane/CommunicationHub": "./arcane/modules/CommunicationHub.js",
+    "arcane/CommunicationPreferences": "./arcane/modules/CommunicationPreferences.js",
+    "arcane/CommunicationProviderRegistry": "./arcane/modules/CommunicationProviderRegistry.js",
+    "arcane/ComponentContracts": "./arcane/modules/ComponentContracts.js",
+    "arcane/ConfiguredAIChatSession": "./arcane/modules/ConfiguredAIChatSession.js",
+    "arcane/ConversationActionItems": "./arcane/modules/ConversationActionItems.js",
+    "arcane/ConversationClosingReport": "./arcane/modules/ConversationClosingReport.js",
+    "arcane/ConversationTimebox": "./arcane/modules/ConversationTimebox.js",
+    "arcane/CoreLocalModelCatalog": "./arcane/modules/CoreLocalModelCatalog.js",
+    "arcane/DBLS": "./arcane/modules/DBLS.js",
+    "arcane/DBOPFS": "./arcane/modules/DBOPFS.js",
+    "arcane/DataMaintenance": "./arcane/modules/DataMaintenance.js",
+    "arcane/DevelopmentWorkspace": "./arcane/modules/DevelopmentWorkspace.js",
+    "arcane/DirectoryPicker": "./arcane/modules/DirectoryPicker.js",
+    "arcane/DocumentNavigation": "./arcane/modules/DocumentNavigation.js",
+    "arcane/Errors": "./arcane/modules/Errors.js",
+    "arcane/GifEncoder": "./arcane/modules/GifEncoder.js",
+    "arcane/HTMLImport": "./arcane/modules/HTMLImport.js",
+    "arcane/InMemoryCommunicationProvider": "./arcane/modules/InMemoryCommunicationProvider.js",
+    "arcane/IsolatedModelQuestionRunner": "./arcane/modules/IsolatedModelQuestionRunner.js",
+    "arcane/LocalAIReadiness": "./arcane/modules/LocalAIReadiness.js",
+    "arcane/LocalAIReadinessController": "./arcane/modules/LocalAIReadinessController.js",
+    "arcane/MD": "./arcane/modules/MD.js",
+    "arcane/Mail": "./arcane/modules/Mail.js",
+    "arcane/MailTransport": "./arcane/modules/MailTransport.mjs",
+    "arcane/Marked.min": "./arcane/modules/Marked.min.js",
+    "arcane/MemoryRecords": "./arcane/modules/MemoryRecords.js",
+    "arcane/MessageAdvisory": "./arcane/modules/MessageAdvisory.js",
+    "arcane/ModelDefinition": "./arcane/modules/ModelDefinition.js",
+    "arcane/Ollama": "./arcane/modules/Ollama.js",
+    "arcane/OllamaModelIdentifier": "./arcane/modules/OllamaModelIdentifier.js",
+    "arcane/OllamaSettings": "./arcane/modules/OllamaSettings.js",
+    "arcane/OpenMeteoWeatherProvider": "./arcane/modules/OpenMeteoWeatherProvider.js",
+    "arcane/PreferenceStore": "./arcane/modules/PreferenceStore.js",
+    "arcane/Questionnaire": "./arcane/modules/Questionnaire.js",
+    "arcane/RecordLinkIndex": "./arcane/modules/RecordLinkIndex.js",
+    "arcane/RecordPassageIndex": "./arcane/modules/RecordPassageIndex.js",
+    "arcane/RecordReviewStore": "./arcane/modules/RecordReviewStore.js",
+    "arcane/RevocableProjectionLedger": "./arcane/modules/RevocableProjectionLedger.js",
+    "arcane/RiskSignalAnalyzer": "./arcane/modules/RiskSignalAnalyzer.js",
+    "arcane/ScamRiskPolicy": "./arcane/modules/ScamRiskPolicy.js",
+    "arcane/ScopedOPFSCache": "./arcane/modules/ScopedOPFSCache.js",
+    "arcane/ScreenCapture": "./arcane/modules/ScreenCapture.js",
+    "arcane/SpeechPlayback": "./arcane/modules/SpeechPlayback.js",
+    "arcane/StaticDocumentCatalog": "./arcane/modules/StaticDocumentCatalog.js",
+    "arcane/SystemAppearance": "./arcane/modules/SystemAppearance.js",
+    "arcane/SystemToolRegistry": "./arcane/modules/SystemToolRegistry.js",
+    "arcane/TerminalClient": "./arcane/modules/TerminalClient.js",
+    "arcane/TerminalCommandRegistry": "./arcane/modules/TerminalCommandRegistry.js",
+    "arcane/ThemeBootstrap": "./arcane/modules/ThemeBootstrap.js",
+    "arcane/ThemeManager": "./arcane/modules/ThemeManager.js",
+    "arcane/TimeGuard": "./arcane/modules/TimeGuard.js",
+    "arcane/ToolCallRouter": "./arcane/modules/ToolCallRouter.js",
+    "arcane/WaitForComponent": "./arcane/modules/WaitForComponent.js",
+    "arcane/YouTubeMedia": "./arcane/modules/YouTubeMedia.js",
+    "arcane/entities/ApiModelRecord": "./arcane/entities/ApiModelRecord.js",
+    "arcane/entities/Calculation": "./arcane/entities/Calculation.js",
+    "arcane/entities/CommunicationMessage": "./arcane/entities/CommunicationMessage.js",
+    "arcane/entities/CommunicationThread": "./arcane/entities/CommunicationThread.js",
+    "arcane/entities/Preference": "./arcane/entities/Preference.js",
+    "arcane/entities/TerminalSession": "./arcane/entities/TerminalSession.js",
+    "arcane/entities/Theme": "./arcane/entities/Theme.js",
+    "arcane/entities/User": "./arcane/entities/User.js",
+    "arcane/entities/Weather": "./arcane/entities/Weather.js",
+    "event-pubsub": "./arcane/sdk/dependencies/event-pubsub/index.js"
+  }
+}
+</script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="rgb(23, 34, 56)">
     <title>Arcane Hello World</title>
@@ -11,7 +102,6 @@
     <link rel="stylesheet" href="./arcane/css/theme.css?v=1">
     <link rel="stylesheet" href="./arcane/css/primitives.css?v=1">
     <link rel="stylesheet" href="./apps/hello-world/hello-world.css?v=1">
-    <script type="module" src="./arcane/modules/ThemeBootstrap.js?v=1"></script>
 </head>
 <body>
     <main class="app-shell">
@@ -24,24 +114,16 @@
             </header>
             <div class="arcane-card__body">
                 <div class="app-features">
-                    <section class="app-feature" aria-labelledby="browser-feature-title">
-                        <h2 id="browser-feature-title">Works in the browser</h2>
-                        <p>Arcane supplies the theme, button styles, and an app-scoped storage key.</p>
+                    <section class="app-feature" aria-labelledby="imports-feature-title">
+                        <h2 id="imports-feature-title">Named browser imports</h2>
+                        <p>Arcane supplies the theme, button styles, and app-scoped storage through stable JavaScript names.</p>
                         <p id="app-status" role="status" aria-live="polite">Ready to say hello.</p>
                         <button id="app-action" class="arcane-button" type="button">Say hello</button>
                     </section>
-                    <section class="app-feature" aria-labelledby="executable-feature-title">
-                        <h2 id="executable-feature-title">Executable feature</h2>
-                        <p id="app-environment" class="app-environment">Checking for the Arcane executable host.</p>
-                        <p>Arcane enables the native folder picker only inside the executable.</p>
-                        <div class="app-actions">
-                            <button
-                                id="native-action"
-                                class="arcane-button arcane-button--secondary"
-                                type="button"
-                                disabled
-                            >Choose a folder</button>
-                        </div>
+                    <section class="app-feature" aria-labelledby="parity-feature-title">
+                        <h2 id="parity-feature-title">Same files in dev and dist</h2>
+                        <p>The import map resolves the committed <code>arcane/</code> tree during development and the byte-identical packaged tree in <code>dist/hello-world/</code>.</p>
+                        <p class="app-environment">Regenerate it at any time with <code>npm run import-map</code>.</p>
                     </section>
                 </div>
             </div>

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {lstat,mkdir,readFile,rm,writeFile} from 'node:fs/promises';
+import {cp,lstat,mkdir,readFile,rm,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {
@@ -15,7 +15,7 @@ import {
     validateWorkspace,
     verifyApplication
 } from '../src/index.mjs';
-import {temporaryDirectory} from './helpers.mjs';
+import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
 
 async function writeJson(filePath,value){
     await mkdir(path.dirname(filePath),{recursive:true});
@@ -64,13 +64,7 @@ async function configureIntegratedWorkspace(workspaceRoot){
                 {
                     source:'arcane',
                     destination:'arcane',
-                    include:['components','css','entities','img','modules','security'],
-                    exclude:[]
-                },
-                {
-                    source:'node_modules/strong-type',
-                    destination:'node_modules/strong-type',
-                    include:['index.js','licence','package.json'],
+                    include:['components','css','dependencies','entities','img','modules','sdk','security'],
                     exclude:[]
                 }
             ]
@@ -101,22 +95,114 @@ async function configureIntegratedWorkspace(workspaceRoot){
     await writeFile(path.join(arcaneRoot,'img','integrated-fixture.txt'),'fixture\n');
     await writeFile(
         path.join(arcaneRoot,'modules','ThemeBootstrap.js'),
-        'document.documentElement.dataset.arcaneTheme="integrated";\n'
+        'document.documentElement.dataset.arcaneTheme="integrated"; export const integratedTheme=true;\n'
     );
 
-    const strongTypeRoot=path.join(workspaceRoot,'node_modules','strong-type');
-    await mkdir(strongTypeRoot,{recursive:true});
-    await writeFile(
-        path.join(strongTypeRoot,'index.js'),
-        'export const type=value=>value;\n'
-    );
-    await writeFile(path.join(strongTypeRoot,'licence'),'MIT\n');
-    await writeJson(path.join(strongTypeRoot,'package.json'),{
-        name:'strong-type',
-        version:'0.0.0-test',
+    const runtimeStrongType=JSON.parse(await readFile(
+        path.join(arcaneRoot,'dependencies','strong-type','package.json'),
+        'utf8'
+    ));
+    assert.equal(runtimeStrongType.name,'strong-type');
+    assert.equal(runtimeStrongType.version,'1.1.0');
+}
+
+async function configureLegacyIntegratedWorkspace(workspaceRoot){
+    await mkdir(workspaceRoot,{recursive:true});
+    await writeJson(path.join(workspaceRoot,'package.json'),{
+        name:'arcane-os',
+        private:true,
         type:'module'
     });
+    await writeJson(
+        path.join(workspaceRoot,'machine_bundles','arcane-os-machine-bundle','package.json'),
+        {name:'arcane-os-machine-bundle',version:'0.8.12'}
+    );
+    await writeJson(path.join(workspaceRoot,'arcane-packager.json'),{
+        schemaVersion:1,
+        appsRoot:'apps',
+        distRoot:'dist',
+        sharedPayloads:{
+            'browser-runtime':[
+                {
+                    source:'arcane',
+                    destination:'arcane',
+                    include:['components','css','entities','img','modules','security'],
+                    exclude:[]
+                },
+                {
+                    source:'node_modules/strong-type',
+                    destination:'node_modules/strong-type',
+                    include:['index.js','licence','package.json'],
+                    exclude:[]
+                }
+            ]
+        }
+    });
+    await cp(path.join(repositoryRoot,'runtime','arcane'),path.join(workspaceRoot,'arcane'),{
+        recursive:true
+    });
+    await cp(
+        path.join(repositoryRoot,'runtime','strong-type'),
+        path.join(workspaceRoot,'node_modules','strong-type'),
+        {recursive:true}
+    );
 }
+
+test('unchanged two-route integrated Arcane workspace keeps legacy dev and package behavior',async t=>{
+    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-integrated-legacy-'});
+    const appId='legacy-app';
+    await configureLegacyIntegratedWorkspace(workspaceRoot);
+    const initialized=await initializeApplication({
+        workspaceRoot,
+        appId,
+        displayName:'Legacy App'
+    });
+    assert.equal(initialized.workspaceMode,'integrated');
+    assert.equal(initialized.importMap.skipped,true);
+    assert.equal(initialized.importMap.compatibility,'integrated-legacy');
+    const appRoot=path.join(workspaceRoot,'apps',appId);
+    assert.match(
+        await readFile(path.join(appRoot,'modules','App.js'),'utf8'),
+        /from '[.][.][\/][.][.][\/][.][.][\/]arcane\/modules\/ThemeBootstrap[.]js'/u
+    );
+    await assert.rejects(
+        lstat(path.join(appRoot,'modules','arcane.importmap.json')),
+        error=>error?.code==='ENOENT'
+    );
+    const validation=await validateWorkspace({workspaceRoot,appId});
+    assert.equal(validation.config.browserRuntimeLayout,'integrated-legacy');
+
+    const development=await developApplication({workspaceRoot,appId,host:'127.0.0.1',port:0});
+    t.after(()=>development.close());
+    const cookie=await authorize(development);
+    assert.equal(
+        (await request(development,'/node_modules/strong-type/index.js',cookie)).status,
+        200
+    );
+    await development.close();
+    await development.lifecycle;
+
+    const packaged=await packageApplication({workspaceRoot,appId});
+    assert.equal(packaged.release.app,appId);
+    assert.equal(
+        await readFile(path.join(workspaceRoot,'dist',appId,'node_modules','strong-type','index.js'),'utf8'),
+        await readFile(path.join(workspaceRoot,'node_modules','strong-type','index.js'),'utf8')
+    );
+    const built=await buildApplication({workspaceRoot,appId,target:'browser'});
+    assert.equal(built.target,'browser');
+    assert.equal(built.release.app,appId);
+    const running=await runApplication({
+        workspaceRoot,
+        appId,
+        target:'browser',
+        host:'127.0.0.1',
+        port:0
+    });
+    assert.equal(running.target,'browser');
+    assert.equal(running.verified.verified,true);
+    await running.close();
+    await running.lifecycle;
+});
 
 test('integrated Arcane workspace supports the complete browser app workflow',async t=>{
     const parent=await temporaryDirectory(t,{prefix:'arcane-integrated-workspace-'});

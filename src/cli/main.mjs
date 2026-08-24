@@ -39,6 +39,7 @@ Usage:
   ${CLI_NAME} new <id> [--path <directory>] [--display-name <name>] [--target <target>] [--git]
   ${CLI_NAME} init [id] [--workspace <directory>] [--display-name <name>] [--target <target>]
   ${CLI_NAME} doctor [--workspace <directory>] [--arcane-root <directory>]
+  ${CLI_NAME} import-map [--workspace <directory>] [--app <id>]
   ${CLI_NAME} dev [--app <id>] [--host 127.0.0.1] [--port 8000]
   ${CLI_NAME} test [--app <id>] [--scope app]
   ${CLI_NAME} test --scope shared --test-file <repo-relative.test.mjs>
@@ -219,6 +220,10 @@ function operationOptions(command,parsed,cwd){
             arcaneRoot:values['arcane-root']?path.resolve(cwd,values['arcane-root']):undefined,
             requireLocalAI:flags.has('require-local-ai')
         };
+    }
+    if(command==='import-map'){
+        noExtraPositionals(command,positionals);
+        return common;
     }
     if(command==='dev'){
         noExtraPositionals(command,positionals);

@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import {lstat,readFile,readdir,realpath} from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -9,6 +10,11 @@ import {
     SDK_NAME as EXPECTED_SDK_NAME,
     SDK_VERSION as EXPECTED_SDK_VERSION
 } from './constants.mjs';
+import {inspectImportMapHtml} from './import-map.mjs';
+import {
+    SDK_BROWSER_RUNTIME_CONTENT_SHA256,
+    SDK_BROWSER_RUNTIME_MANIFEST_SHA256
+} from './sdk-browser-runtime.mjs';
 
 const APP_ID_PATTERN=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const SHA256_PATTERN=/^[a-f0-9]{64}$/;
@@ -71,14 +77,9 @@ function classifyRootConfig(config){
     if(!Array.isArray(routes))fail(`${ROOT_CONFIG_NAME} must define browser-runtime routes.`);
     const external=[
         {
-            source:'node_modules/arcane-os/runtime/arcane',
+            source:'arcane',
             destination:'arcane',
-            include:['components','css','entities','img','modules','security']
-        },
-        {
-            source:'node_modules/arcane-os/runtime/strong-type',
-            destination:'node_modules/strong-type',
-            include:['index.js','licence','package.json']
+            include:['components','css','dependencies','entities','img','modules','sdk','security']
         },
         {
             source:'node_modules/arcane-os',
@@ -87,6 +88,13 @@ function classifyRootConfig(config){
         }
     ];
     const integrated=[
+        {
+            source:'arcane',
+            destination:'arcane',
+            include:['components','css','dependencies','entities','img','modules','sdk','security']
+        }
+    ];
+    const integratedLegacy=[
         {
             source:'arcane',
             destination:'arcane',
@@ -106,14 +114,20 @@ function classifyRootConfig(config){
             &&Array.isArray(route.exclude)&&route.exclude.length===0;
     });
     let workspaceMode;
+    let browserRuntimeLayout;
     if(matches(external)){
         workspaceMode='external';
+        browserRuntimeLayout='physical-v1';
     }else if(matches(integrated)){
         workspaceMode='integrated';
+        browserRuntimeLayout='physical-v1';
+    }else if(matches(integratedLegacy)){
+        workspaceMode='integrated';
+        browserRuntimeLayout='integrated-legacy';
     }else{
         fail(`${ROOT_CONFIG_NAME} browser-runtime routes must match the external SDK or integrated Arcane workspace contract.`);
     }
-    return Object.freeze({...validated,workspaceMode});
+    return Object.freeze({...validated,workspaceMode,browserRuntimeLayout});
 }
 
 async function discoverAppsInRoot(root,config){
@@ -220,12 +234,57 @@ export async function resolveWorkspace({workspaceRoot=process.cwd(),appId}={}){
 }
 
 function validateLock(lock){
-    if(!isObject(lock)||lock.schemaVersion!==1||!isObject(lock.sdk)
+    const browser=lock?.sdkBrowserRuntime;
+    const browserSource=browser?.source;
+    const dependencies=browserSource?.dependencies;
+    const exactKeys=(value,keys)=>isObject(value)
+        &&Object.keys(value).sort().join('\0')===[...keys].sort().join('\0');
+    const expectedDependencies=[
+        {
+            name:'event-pubsub',
+            version:'6.1.0',
+            resolved:'https://registry.npmjs.org/event-pubsub/-/event-pubsub-6.1.0.tgz',
+            integrity:'sha512-FEMlhTxwqGM0hztTixG6FhVFXqp7Eq1ltk5mSreK6Mhy3xWWpLAzEUR6OMvMdNqT3jgSxA8JDhnhyAG3X4Xy7Q=='
+        },
+        {
+            name:'strong-type',
+            version:'2.0.0',
+            resolved:'https://registry.npmjs.org/strong-type/-/strong-type-2.0.0.tgz',
+            integrity:'sha512-HHrY9qYC7yn+5mlewiI3k9RQM9gZqGQsqbomZcd10Ks0h4RlX01nnkWbCe4AsVPCI6KaFvpkWm1nHMD+Ykup6g=='
+        }
+    ];
+    const dependenciesMatch=Array.isArray(dependencies)&&dependencies.length===2
+        &&dependencies.every((actual,index)=>{
+            const expected=expectedDependencies[index];
+            return exactKeys(actual,['name','version','resolved','integrity'])
+                &&actual.name===expected.name&&actual.version===expected.version
+                &&actual.resolved===expected.resolved&&actual.integrity===expected.integrity;
+        });
+    if(!exactKeys(lock,['schemaVersion','sdk','runtime','sdkBrowserRuntime','protocols'])
+        ||lock.schemaVersion!==1
+        ||!exactKeys(lock.sdk,['name','version'])
         ||lock.sdk.name!==EXPECTED_SDK_NAME||lock.sdk.version!==EXPECTED_SDK_VERSION
-        ||!isObject(lock.runtime)||!SHA256_PATTERN.test(lock.runtime.contentSha256)
+        ||!exactKeys(lock.runtime,['manifest','contentSha256','upstreamCommit'])
+        ||!SHA256_PATTERN.test(lock.runtime.contentSha256)
         ||!/^([a-f0-9]{40})$/.test(lock.runtime.upstreamCommit)
         ||lock.runtime.manifest!=='node_modules/arcane-os/runtime/ARCANE_RUNTIME_RELEASE.json'
-        ||!isObject(lock.protocols)||lock.protocols.arcane!=='arcane/1'
+        ||!exactKeys(browser,[
+            'manifest','manifestSha256','contentSha256','builder','sdkVersion','source'
+        ])
+        ||browser.manifest!=='node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json'
+        ||browser.manifestSha256!==SDK_BROWSER_RUNTIME_MANIFEST_SHA256
+        ||browser.contentSha256!==SDK_BROWSER_RUNTIME_CONTENT_SHA256
+        ||browser.builder!=='arcane-sdk-browser-runtime-v1'
+        ||browser.sdkVersion!==EXPECTED_SDK_VERSION
+        ||!exactKeys(browserSource,[
+            'authority','repository','protocol','browserEntry','dependencies'
+        ])||browserSource.authority!=='arcane-os-sdk'
+        ||browserSource.repository!=='https://github.com/TheWizardNexus/arcane-os-sdk.git'
+        ||browserSource.protocol!=='arcane-sdk-browser-runtime/1'
+        ||browserSource.browserEntry!=='arcane-os/event-manager'
+        ||!dependenciesMatch
+        ||!exactKeys(lock.protocols,['arcane','cliEvents','targetAdapter'])
+        ||lock.protocols.arcane!=='arcane/1'
         ||lock.protocols.cliEvents!=='arcane-cli-events/1'
         ||lock.protocols.targetAdapter!=='arcane-target-adapter/1'){
         fail('arcane.lock.json is incompatible with this SDK. Run arcane init only after reviewing missing files; existing locks are never overwritten.');
@@ -233,23 +292,71 @@ function validateLock(lock){
     return lock;
 }
 
-function assertHtmlContract(source,appId,{entry='index.html',strictStyles=true}={}){
+function sameBrowserRuntimeSource(actual,pinned){
+    const exactKeys=(value,keys)=>isObject(value)
+        &&Object.keys(value).sort().join('\0')===[...keys].sort().join('\0');
+    const keys=['authority','repository','protocol','browserEntry','dependencies'];
+    if(!exactKeys(actual,keys)||!exactKeys(pinned,keys)
+        ||actual.authority!==pinned.authority
+        ||actual.repository!==pinned.repository
+        ||actual.protocol!==pinned.protocol
+        ||actual.browserEntry!==pinned.browserEntry
+        ||!Array.isArray(actual.dependencies)||!Array.isArray(pinned.dependencies)
+        ||actual.dependencies.length!==pinned.dependencies.length){
+        return false;
+    }
+    const dependencyKeys=['name','version','resolved','integrity'];
+    return actual.dependencies.every((dependency,index)=>{
+        const expected=pinned.dependencies[index];
+        return exactKeys(dependency,dependencyKeys)&&exactKeys(expected,dependencyKeys)
+            &&dependency.name===expected.name&&dependency.version===expected.version
+            &&dependency.resolved===expected.resolved
+            &&dependency.integrity===expected.integrity;
+    });
+}
+
+function assertHtmlContract(source,appId,{
+    entry='index.html',
+    strictStyles=true,
+    allowMissingManagedImportMap=false
+}={}){
     const entryLabel=`apps/${appId}/${entry}`;
-    if(!new RegExp(`<meta\\s+name=["']arcane-app-id["']\\s+content=["']${appId}["']`).test(source)){
-        fail(`${entryLabel} must declare matching arcane-app-id metadata.`);
+    const htmlContract=inspectImportMapHtml(source);
+    const appIdMetadata=htmlContract.metas.filter(meta=>meta.name==='arcane-app-id');
+    if(appIdMetadata.length!==1||appIdMetadata[0].content!==appId){
+        fail(`${entryLabel} must declare exactly one active matching arcane-app-id metadata element.`);
     }
-    if(!/<base\s+href=["']\.\.\/\.\.\/["']/.test(source)){
-        fail(`${entryLabel} must declare <base href="../../">.`);
+    if(htmlContract.bases.length!==1||htmlContract.bases[0].href!=='../../'){
+        fail(`${entryLabel} must declare exactly one active <base href="../../">.`);
     }
-    const theme=source.indexOf('./arcane/css/theme.css');
-    const primitives=source.indexOf('./arcane/css/primitives.css');
-    const appStyleMatches=[...source.matchAll(new RegExp(`(?:\\./|/)apps/${appId.replaceAll('-','\\-')}/[^"']+\\.css(?:\\?[^"']*)?(?=["'])`, 'g'))];
-    const appStyle=appStyleMatches.length?Math.min(...appStyleMatches.map(match=>match.index)):-1;
-    const bootstrap=source.indexOf('./arcane/modules/ThemeBootstrap.js');
-    const appModuleMatches=[...source.matchAll(new RegExp(`(?:\\./|/)apps/${appId.replaceAll('-','\\-')}/[^"']+\\.(?:js|mjs)(?:\\?[^"']*)?(?=["'])`, 'g'))];
-    const appModule=appModuleMatches.length?Math.min(...appModuleMatches.map(match=>match.index)):-1;
+    const resourcePath=value=>value.split(/[?#]/u,1)[0];
+    const styles=htmlContract.links.filter(link=>link.rel
+        .split(/[\t\n\f\r ]+/u).includes('stylesheet'));
+    const positionOfStyle=expected=>styles.find(link=>resourcePath(link.href)===expected)?.start??-1;
+    const theme=positionOfStyle('./arcane/css/theme.css');
+    const primitives=positionOfStyle('./arcane/css/primitives.css');
+    const escapedAppId=appId.replace(/[.*+?^${}()|[\]\\]/gu,'\\$&');
+    const appStyle=styles.find(link=>new RegExp(
+        `^(?:\\./|/)apps/${escapedAppId}/[^/]+\\.css$`,
+        'u'
+    ).test(resourcePath(link.href)))?.start??-1;
+    const modules=htmlContract.scripts.filter(script=>script.type==='module'&&script.src);
+    const bootstrap=modules.find(script=>resourcePath(script.src)
+        ==='./arcane/modules/ThemeBootstrap.js')?.start??-1;
+    if(htmlContract.managedMaps.length>1){
+        fail(`${entryLabel} must contain at most one active managed Arcane import map.`);
+    }
+    const managedImportMap=htmlContract.managedMaps[0]?.start??-1;
+    const firstModule=htmlContract.firstModulePosition;
+    const appModule=modules.find(script=>new RegExp(
+        `^(?:\\./|/)apps/${escapedAppId}/.+\\.(?:js|mjs)$`,
+        'u'
+    ).test(resourcePath(script.src)))?.start??-1;
     if(theme<0){
         fail(`${entryLabel} must load the shared Arcane theme.css.`);
+    }
+    if(appModule<0){
+        fail(`${entryLabel} must load an active app-local module script.`);
     }
     if(strictStyles&&(primitives<=theme||appStyle<=primitives)){
         fail(`${entryLabel} must load theme.css, primitives.css, and app CSS in that order.`);
@@ -257,8 +364,21 @@ function assertHtmlContract(source,appId,{entry='index.html',strictStyles=true}=
     if(!strictStyles&&((primitives>=0&&primitives<=theme)||(appStyle>=0&&appStyle<=theme))){
         fail(`${entryLabel} must load shared and app CSS after theme.css.`);
     }
-    if(bootstrap<0||(appModule>=0&&appModule<=bootstrap)){
+    if(bootstrap>=0&&appModule>=0&&appModule<=bootstrap){
         fail(`${entryLabel} must load ThemeBootstrap.js before app-local module scripts.`);
+    }
+    if((managedImportMap>=0&&htmlContract.bases[0].end>managedImportMap)
+        ||(firstModule>=0&&htmlContract.bases[0].end>firstModule)){
+        fail(`${entryLabel} must place its base element before import maps and module loads.`);
+    }
+    if(bootstrap<0&&(
+        (managedImportMap<0&&!allowMissingManagedImportMap)
+        ||(managedImportMap>=0&&appModule>=0&&appModule<=managedImportMap)
+    )){
+        fail(
+            `${entryLabel} must install its managed Arcane import map before app-local `
+            +'module scripts when ThemeBootstrap.js is imported by name.'
+        );
     }
 }
 
@@ -267,6 +387,7 @@ export async function validateDiscoveredApplication({
     workspaceMode,
     workspaceConfig,
     app,
+    allowMissingManagedImportMap=false,
     signal,
     onEvent
 }={}){
@@ -328,7 +449,8 @@ export async function validateDiscoveredApplication({
     }
     assertHtmlContract(await readFile(entryPath,'utf8'),app.appId,{
         entry:manifest.entry,
-        strictStyles:workspaceMode==='external'
+        strictStyles:workspaceMode==='external',
+        allowMissingManagedImportMap
     });
     const receipt=Object.freeze({
         valid:true,
@@ -346,7 +468,13 @@ export async function validateDiscoveredApplication({
     return receipt;
 }
 
-export async function validateWorkspace({workspaceRoot=process.cwd(),appId,signal,onEvent}={}){
+export async function validateWorkspace({
+    workspaceRoot=process.cwd(),
+    appId,
+    allowMissingManagedImportMap=false,
+    signal,
+    onEvent
+}={}){
     throwIfAborted(signal);
     const resolved=await resolveWorkspace({workspaceRoot,appId});
     await emit(onEvent,{type:'workspace.validate.started',workspaceRoot:resolved.workspaceRoot,appId:resolved.appId});
@@ -409,12 +537,39 @@ export async function validateWorkspace({workspaceRoot=process.cwd(),appId,signa
                 ||installed.source?.commit!==lock.runtime.upstreamCommit){
                 fail('Installed SDK runtime does not match arcane.lock.json.');
             }
+            const browserManifestPath=path.join(
+                resolved.workspaceRoot,
+                'node_modules',
+                'arcane-os',
+                'browser-runtime',
+                'ARCANE_SDK_BROWSER_RELEASE.json'
+            );
+            const browserBytes=await readFile(browserManifestPath);
+            let installedBrowser;
+            try{installedBrowser=JSON.parse(browserBytes.toString('utf8'));}
+            catch(error){
+                fail(`Installed SDK browser runtime manifest is not valid JSON: ${error.message}`);
+            }
+            if(createHash('sha256').update(browserBytes).digest('hex')
+                    !==lock.sdkBrowserRuntime.manifestSha256
+                ||installedBrowser.contentSha256!==lock.sdkBrowserRuntime.contentSha256
+                ||installedBrowser.builder!==lock.sdkBrowserRuntime.builder
+                ||installedBrowser.sdkVersion!==lock.sdkBrowserRuntime.sdkVersion
+                ||!sameBrowserRuntimeSource(
+                    installedBrowser.source,
+                    lock.sdkBrowserRuntime.source
+                )){
+                fail('Installed SDK browser runtime does not match arcane.lock.json.');
+            }
         });
     }else{
         await add('workspace-runtime',async()=>{
+            const strongType=resolved.config.browserRuntimeLayout==='integrated-legacy'
+                ?path.join('node_modules','strong-type')
+                :path.join('arcane','dependencies','strong-type');
             for(const [relative,label] of [
                 ['arcane','Integrated Arcane runtime'],
-                [path.join('node_modules','strong-type'),'Integrated strong-type runtime']
+                [strongType,'Integrated strong-type runtime']
             ]){
                 const info=await lstat(path.join(resolved.workspaceRoot,relative));
                 if(info.isSymbolicLink()||!info.isDirectory()){
@@ -429,6 +584,7 @@ export async function validateWorkspace({workspaceRoot=process.cwd(),appId,signa
             workspaceMode,
             workspaceConfig:resolved.config,
             app:resolved.app,
+            allowMissingManagedImportMap,
             signal,
             onEvent
         });

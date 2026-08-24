@@ -163,6 +163,8 @@ const browserAdapter=Object.freeze({
         dryRun=false,
         signal,
         onEvent,
+        workspaceOperationLease,
+        runtimeVerificationState,
         validateSourceState
     }={}){
         await this.plan({workspaceRoot,appId,format,signing,signal});
@@ -173,17 +175,42 @@ const browserAdapter=Object.freeze({
             dryRun,
             signal,
             onEvent,
+            workspaceOperationLease,
+            runtimeVerificationState,
             validateSourceState
         });
         return {target:'browser',format,signing,release};
     },
-    async verify({workspaceRoot,appId,signal,onEvent}={}){
+    async verify({workspaceRoot,appId,runtimeVerificationState,signal,onEvent}={}){
         throwIfAborted(signal);
-        return {target:'browser',release:await verifyApp({workspaceRoot,appId,signal,onEvent})};
+        return {
+            target:'browser',
+            release:await verifyApp({
+                workspaceRoot,
+                appId,
+                runtimeVerificationState,
+                signal,
+                onEvent
+            })
+        };
     },
-    async run({workspaceRoot,appId,host='127.0.0.1',port=0,signal,onEvent}={}){
+    async run({
+        workspaceRoot,
+        appId,
+        runtimeVerificationState,
+        host='127.0.0.1',
+        port=0,
+        signal,
+        onEvent
+    }={}){
         throwIfAborted(signal);
-        const verified=await verifyApp({workspaceRoot,appId,signal,onEvent});
+        const verified=await verifyApp({
+            workspaceRoot,
+            appId,
+            runtimeVerificationState,
+            signal,
+            onEvent
+        });
         const server=await startDevServer({
             workspaceRoot,
             appId,

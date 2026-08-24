@@ -5,25 +5,17 @@
   "sharedPayloads": {
     "browser-runtime": [
       {
-        "source": "node_modules/arcane-os/runtime/arcane",
+        "source": "arcane",
         "destination": "arcane",
         "include": [
           "components",
           "css",
+          "dependencies",
           "entities",
           "img",
           "modules",
+          "sdk",
           "security"
-        ],
-        "exclude": []
-      },
-      {
-        "source": "node_modules/arcane-os/runtime/strong-type",
-        "destination": "node_modules/strong-type",
-        "include": [
-          "index.js",
-          "licence",
-          "package.json"
         ],
         "exclude": []
       },
@@ -40,4 +32,3 @@
     ]
   }
 }
-

@@ -16,11 +16,24 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
 import {isDeepStrictEqual} from 'node:util';
+import {withWorkspaceOperationLock} from '../workspace-operation-lock.mjs';
+import {generateImportMap} from '../import-map.mjs';
+import {authenticateRuntimeReceipt,verifyRuntime} from '../runtime.mjs';
+import {
+    authenticateSdkBrowserRuntimeReceipt,
+    verifySdkBrowserRuntime
+} from '../sdk-browser-runtime.mjs';
+import {
+    authenticateWorkspaceRuntimeReceipt,
+    verifyWorkspaceRuntime
+} from '../workspace-runtime.mjs';
 
 export const ROOT_CONFIG_NAME='arcane-packager.json';
 export const APP_CONFIG_NAME='arcane-package.json';
 export const RELEASE_MANIFEST_NAME='ARCANE_APP_RELEASE.json';
 export const PACKAGER_VERSION='arcane-app-packager-v1';
+
+const RUNTIME_AUTHORITIES_NAME='ARCANE_RUNTIME_AUTHORITIES.json';
 
 const RENAME_RETRY_CODES=new Set(['EACCES','EBUSY','EPERM']);
 const RENAME_RETRY_LIMIT=20;
@@ -135,6 +148,7 @@ const OLLAMA_MODEL_IDENTIFIER=
 const MODEL_DEFINITION_PATTERN=/^(?:Modelfile|[A-Za-z0-9][A-Za-z0-9._-]{0,118}\.Modelfile)$/;
 const MAX_LOCAL_AI_MODELS=64;
 const MAX_MODEL_DEFINITION_BYTES=512*1024;
+const SHA256_PATTERN=/^[a-f0-9]{64}$/u;
 
 function fail(message,code){
     const error=new Error(message);
@@ -1012,6 +1026,413 @@ async function assertValidatedDescriptorAuthority(validation,descriptorAuthority
     const contracts=await appDescriptorContracts();
     if(contracts.appDescriptorSha256(descriptor)!==descriptorAuthority.descriptorSha256){
         fail('Source validation returned a different canonical Arcane application descriptor.');
+    }
+}
+
+function packagedRuntimeAuthorities(receipt){
+    const arcane=receipt?.sources?.arcane;
+    const sdkBrowser=receipt?.sources?.sdkBrowser;
+    if(receipt?.kind!=='arcane-workspace-runtime-verification'
+        ||!Number.isSafeInteger(receipt.fileCount)||receipt.fileCount<1
+        ||!Number.isSafeInteger(receipt.totalBytes)||receipt.totalBytes<1
+        ||!SHA256_PATTERN.test(receipt.contentSha256??'')
+        ||!isPlainObject(arcane)||arcane.authority!=='arcane-os-upstream'
+        ||!SHA256_PATTERN.test(arcane.manifestSha256??'')
+        ||!SHA256_PATTERN.test(arcane.contentSha256??'')
+        ||!isPlainObject(arcane.source)
+        ||!isPlainObject(sdkBrowser)||sdkBrowser.authority!=='arcane-os-sdk'
+        ||!SHA256_PATTERN.test(sdkBrowser.manifestSha256??'')
+        ||!SHA256_PATTERN.test(sdkBrowser.contentSha256??'')
+        ||!isPlainObject(sdkBrowser.source)
+        ||!Array.isArray(sdkBrowser.source.dependencies)){
+        fail('The composed workspace runtime receipt is missing its source authorities.');
+    }
+    return immutableJsonCopy({
+        schemaVersion:1,
+        kind:'arcane-app-runtime-authorities',
+        sdkVersion:receipt.sdkVersion,
+        projection:{
+            fileCount:receipt.fileCount,
+            totalBytes:receipt.totalBytes,
+            contentSha256:receipt.contentSha256
+        },
+        sources:{
+            arcane:{
+                authority:arcane.authority,
+                manifestSha256:arcane.manifestSha256,
+                contentSha256:arcane.contentSha256,
+                source:arcane.source
+            },
+            sdkBrowser:{
+                authority:sdkBrowser.authority,
+                manifestSha256:sdkBrowser.manifestSha256,
+                contentSha256:sdkBrowser.contentSha256,
+                source:sdkBrowser.source
+            }
+        }
+    });
+}
+
+async function hasExternalRuntimeAdmission(context){
+    const lockPath=path.join(context.workspaceRoot,'arcane.lock.json');
+    try{
+        const info=await lstat(lockPath);
+        if(info.isSymbolicLink()||!info.isFile()){
+            fail('arcane.lock.json must be a real file before runtime provenance can be packaged.');
+        }
+        return true;
+    }catch(error){
+        if(error?.code==='ENOENT')return false;
+        throw error;
+    }
+}
+
+async function validateExternalRuntimeAdmission(context,{signal,onEvent}={}){
+    const {validateWorkspace}=await import('../workspace.mjs');
+    const validation=await validateWorkspace({
+        workspaceRoot:context.workspaceRoot,
+        appId:context.config.id,
+        signal,
+        onEvent
+    });
+    if(validation.workspaceMode!=='external'){
+        fail('A workspace with arcane.lock.json must use the external SDK runtime contract.');
+    }
+    return validation;
+}
+
+async function integratedWorkspaceCandidate(context){
+    const packagePath=path.join(context.workspaceRoot,'package.json');
+    let info;
+    try{
+        info=await lstat(packagePath);
+    }catch(error){
+        if(error?.code==='ENOENT')return false;
+        throw error;
+    }
+    if(info.isSymbolicLink()||!info.isFile()){
+        fail('workspace package.json must be a real file.');
+    }
+    const document=await readJsonDocument(packagePath,'workspace package.json');
+    return document.value?.name==='arcane-os'&&document.value?.type==='module';
+}
+
+function packageRuntimeLocations(context){
+    const installedRoot=path.join(context.workspaceRoot,'node_modules','arcane-os');
+    return Object.freeze({
+        runtimeRoot:path.join(installedRoot,'runtime'),
+        browserRuntimeRoot:path.join(installedRoot,'browser-runtime')
+    });
+}
+
+async function authenticatePackageRuntimeVerificationState(context,state,{signal}={}){
+    assertOnlyKeys(
+        state,
+        new Set(['runtimeReceipt','sdkBrowserRuntimeReceipt','workspaceRuntimeReceipt']),
+        'runtime verification state'
+    );
+    const descriptors=Object.getOwnPropertyDescriptors(state);
+    const required=['runtimeReceipt','sdkBrowserRuntimeReceipt','workspaceRuntimeReceipt'];
+    if(required.some(key=>!Object.hasOwn(descriptors,key)||!Object.hasOwn(descriptors[key],'value'))){
+        fail('The runtime verification state must use fixed receipt references, not accessors.');
+    }
+    const snapshot=Object.freeze({
+        runtimeReceipt:descriptors.runtimeReceipt.value,
+        sdkBrowserRuntimeReceipt:descriptors.sdkBrowserRuntimeReceipt.value,
+        workspaceRuntimeReceipt:descriptors.workspaceRuntimeReceipt.value
+    });
+    if(!snapshot.runtimeReceipt
+        ||!snapshot.sdkBrowserRuntimeReceipt
+        ||!snapshot.workspaceRuntimeReceipt){
+        fail('The runtime verification state must contain all three authenticated receipts.');
+    }
+    const {runtimeRoot,browserRuntimeRoot}=packageRuntimeLocations(context);
+    await authenticateRuntimeReceipt(snapshot.runtimeReceipt,{runtimeRoot,signal});
+    await authenticateSdkBrowserRuntimeReceipt(snapshot.sdkBrowserRuntimeReceipt,{
+        browserRuntimeRoot,
+        signal
+    });
+    await authenticateWorkspaceRuntimeReceipt(snapshot.workspaceRuntimeReceipt,{
+        workspaceRoot:context.workspaceRoot,
+        signal
+    });
+    const workspaceReceipt=snapshot.workspaceRuntimeReceipt;
+    const expectedArcaneSource={
+        authority:'arcane-os-upstream',
+        location:snapshot.runtimeReceipt.canonicalLocation,
+        manifestSha256:snapshot.runtimeReceipt.manifestSha256,
+        contentSha256:snapshot.runtimeReceipt.contentSha256,
+        source:snapshot.runtimeReceipt.source
+    };
+    const expectedBrowserSource={
+        authority:'arcane-os-sdk',
+        location:snapshot.sdkBrowserRuntimeReceipt.canonicalLocation,
+        manifestSha256:snapshot.sdkBrowserRuntimeReceipt.manifestSha256,
+        contentSha256:snapshot.sdkBrowserRuntimeReceipt.contentSha256,
+        source:snapshot.sdkBrowserRuntimeReceipt.source
+    };
+    if(workspaceReceipt.sourceRuntimeLocation!==snapshot.runtimeReceipt.canonicalLocation
+        ||workspaceReceipt.sourceManifestSha256!==snapshot.runtimeReceipt.manifestSha256
+        ||workspaceReceipt.sourceContentSha256!==snapshot.runtimeReceipt.contentSha256
+        ||workspaceReceipt.sourceBrowserRuntimeLocation
+            !==snapshot.sdkBrowserRuntimeReceipt.canonicalLocation
+        ||workspaceReceipt.sourceBrowserManifestSha256
+            !==snapshot.sdkBrowserRuntimeReceipt.manifestSha256
+        ||workspaceReceipt.sourceBrowserContentSha256
+            !==snapshot.sdkBrowserRuntimeReceipt.contentSha256
+        ||workspaceReceipt.sdkVersion!==snapshot.runtimeReceipt.sdkVersion
+        ||workspaceReceipt.sdkVersion!==snapshot.sdkBrowserRuntimeReceipt.sdkVersion
+        ||!isDeepStrictEqual(workspaceReceipt.sources?.arcane,expectedArcaneSource)
+        ||!isDeepStrictEqual(workspaceReceipt.sources?.sdkBrowser,expectedBrowserSource)){
+        fail('The workspace runtime receipt is not bound to the supplied source runtime receipts.');
+    }
+    return snapshot;
+}
+
+async function issuePackageRuntimeVerificationState(context,{signal,onEvent}={}){
+    const {runtimeRoot,browserRuntimeRoot}=packageRuntimeLocations(context);
+    const [runtimeReceipt,sdkBrowserRuntimeReceipt]=await Promise.all([
+        verifyRuntime({runtimeRoot,signal,onEvent}),
+        verifySdkBrowserRuntime({browserRuntimeRoot,signal,onEvent})
+    ]);
+    const workspaceRuntimeReceipt=await verifyWorkspaceRuntime({
+        workspaceRoot:context.workspaceRoot,
+        runtimeRoot,
+        runtimeReceipt,
+        browserRuntimeRoot,
+        sdkBrowserRuntimeReceipt,
+        signal,
+        onEvent
+    });
+    return Object.freeze({runtimeReceipt,sdkBrowserRuntimeReceipt,workspaceRuntimeReceipt});
+}
+
+async function refreshPackageImportMap(context,{
+    runtimeVerificationState,
+    workspaceOperationLease,
+    signal,
+    onEvent
+}={}){
+    const external=await hasExternalRuntimeAdmission(context);
+    if(!external&&!await integratedWorkspaceCandidate(context)){
+        if(runtimeVerificationState!==undefined){
+            fail('A runtime verification state cannot be supplied without an external runtime admission.');
+        }
+        return Object.freeze({importMapReceipt:null,runtimeVerificationState:null});
+    }
+    const {validateWorkspace}=await import('../workspace.mjs');
+    const validation=await validateWorkspace({
+        workspaceRoot:context.workspaceRoot,
+        appId:context.config.id,
+        allowMissingManagedImportMap:true,
+        signal,
+        onEvent
+    });
+    if(validation.workspaceMode!=='external'&&runtimeVerificationState!==undefined){
+        fail('A runtime verification state cannot be supplied to an integrated workspace.');
+    }
+    if(validation.workspaceMode==='integrated'
+        &&validation.config.browserRuntimeLayout==='integrated-legacy'){
+        return Object.freeze({
+            importMapReceipt:Object.freeze({skipped:true,workspaceMode:'integrated'}),
+            runtimeVerificationState:null
+        });
+    }
+
+    let workspaceRuntimeReceipt;
+    let authenticatedRuntimeState=null;
+    if(validation.workspaceMode==='external'){
+        authenticatedRuntimeState=runtimeVerificationState===undefined
+            ?await issuePackageRuntimeVerificationState(context,{signal,onEvent})
+            :await authenticatePackageRuntimeVerificationState(
+                context,
+                runtimeVerificationState,
+                {signal}
+            );
+        workspaceRuntimeReceipt=authenticatedRuntimeState.workspaceRuntimeReceipt;
+    }
+    const importMapReceipt=await generateImportMap({
+        workspaceRoot:context.workspaceRoot,
+        appId:context.config.id,
+        appRoot:context.appRoot,
+        entry:context.config.entry,
+        workspaceRuntimeReceipt,
+        workspaceOperationLease,
+        signal,
+        onEvent
+    });
+    return Object.freeze({importMapReceipt,runtimeVerificationState:authenticatedRuntimeState});
+}
+
+function authenticatedImportMapReceipt(receipt){
+    if(receipt==null||receipt.skipped===true)return receipt;
+    if(receipt.committed!==true||!Array.isArray(receipt.cleanupWarnings)){
+        fail(
+            'The generated import-map receipt is incomplete; the package release was not assembled.'
+        );
+    }
+    if(receipt.cleanupWarnings.length!==0){
+        fail(
+            'The generated import map committed with cleanup warnings; the package release '
+            +`was not assembled: ${receipt.cleanupWarnings.join('; ')}`,
+            'ARCANE_IMPORT_MAP_CLEANUP_FAILED'
+        );
+    }
+    return receipt;
+}
+
+function importMapReceiptFiles(context,receipt){
+    if(receipt==null||receipt.skipped===true)return Object.freeze([]);
+    if(!Array.isArray(receipt.files)||receipt.files.length!==2){
+        fail('The generated import-map receipt does not bind its committed artifact and entry files.');
+    }
+    const expected=Object.freeze([
+        Object.freeze({
+            role:'artifact',
+            path:`apps/${context.config.id}/modules/arcane.importmap.json`
+        }),
+        Object.freeze({
+            role:'entry',
+            path:`apps/${context.config.id}/${context.config.entry}`
+        })
+    ]);
+    const records=[];
+    for(const [index,record] of receipt.files.entries()){
+        assertOnlyKeys(
+            record,
+            new Set(['role','path','bytes','sha256']),
+            `import-map receipt files[${index}]`
+        );
+        const wanted=expected[index];
+        if(record.role!==wanted.role
+            ||normalizeRelativePath(record.path,`import-map receipt files[${index}].path`)
+                !==wanted.path
+            ||!Number.isSafeInteger(record.bytes)||record.bytes<1
+            ||!SHA256_PATTERN.test(record.sha256??'')){
+            fail(`The generated import-map receipt ${wanted.role} record is invalid.`);
+        }
+        records.push(Object.freeze({...record}));
+    }
+    return Object.freeze(records);
+}
+
+async function authenticateImportMapPair(context,receipt,{signal}={}){
+    const records=importMapReceiptFiles(context,receipt);
+    for(const record of records){
+        const filePath=resolveInside(
+            context.workspaceRoot,
+            record.path,
+            `import-map receipt ${record.role} path`
+        );
+        let verified;
+        try{
+            verified=await sha256WithIdentity(filePath,{
+                signal,
+                label:`import-map receipt ${record.role}`
+            });
+        }catch(error){
+            fail(
+                `The generated import-map ${record.role} is unavailable after commit: ${error.message}`
+            );
+        }
+        if(verified.identity.bytes!==record.bytes||verified.sha256!==record.sha256){
+            fail(`The generated import-map ${record.role} changed after it was committed.`);
+        }
+    }
+    return records;
+}
+
+async function authenticateCollectedImportMapPair(files,records,{signal}={}){
+    for(const record of records){
+        const collected=files.find(file=>file.destination===record.path);
+        if(!collected||collected.bytes!==record.bytes){
+            fail(`The package payload does not contain the committed import-map ${record.role}.`);
+        }
+        const verified=await sha256WithIdentity(collected.source,{
+            signal,
+            expectedIdentity:collected.identity,
+            label:`collected import-map ${record.role}`
+        });
+        if(verified.identity.bytes!==record.bytes||verified.sha256!==record.sha256){
+            fail(`The collected import-map ${record.role} does not match its committed receipt.`);
+        }
+    }
+}
+
+function authenticatePackagedImportMapPair(release,records){
+    for(const record of records){
+        const packaged=release.files.find(file=>file.path===record.path);
+        if(!packaged||packaged.bytes!==record.bytes||packaged.sha256!==record.sha256){
+            fail(`The packaged import-map ${record.role} does not match its committed receipt.`);
+        }
+    }
+}
+
+async function prepareRuntimeAuthorityState(context,{
+    validation,
+    runtimeVerificationState,
+    signal,
+    onEvent
+}={}){
+    if(!await hasExternalRuntimeAdmission(context)){
+        if(runtimeVerificationState!==undefined){
+            fail('A runtime verification state cannot be supplied to an integrated workspace.');
+        }
+        return null;
+    }
+    await validateExternalRuntimeAdmission(context,{signal,onEvent});
+
+    let verificationState=null;
+    let receipt=null;
+    if(runtimeVerificationState!==undefined){
+        verificationState=await authenticatePackageRuntimeVerificationState(
+            context,
+            runtimeVerificationState,
+            {signal}
+        );
+        receipt=verificationState.workspaceRuntimeReceipt;
+    }else if(validation?.kind==='arcane-workspace-runtime-verification'){
+        receipt=validation;
+        await authenticateWorkspaceRuntimeReceipt(receipt,{
+            workspaceRoot:context.workspaceRoot,
+            signal
+        });
+    }else{
+        verificationState=await issuePackageRuntimeVerificationState(context,{signal,onEvent});
+        receipt=verificationState.workspaceRuntimeReceipt;
+    }
+    return Object.freeze({
+        receipt,
+        document:packagedRuntimeAuthorities(receipt),
+        verificationState
+    });
+}
+
+async function authenticateRuntimeAuthorityState(context,state,{signal,onEvent}={}){
+    if(state===null){
+        if(await hasExternalRuntimeAdmission(context)){
+            fail('External runtime authority admission appeared during package verification.');
+        }
+        return;
+    }
+    if(!await hasExternalRuntimeAdmission(context)){
+        fail('External runtime authority admission disappeared during package verification.');
+    }
+    await validateExternalRuntimeAdmission(context,{signal,onEvent});
+    if(state.verificationState){
+        await authenticatePackageRuntimeVerificationState(
+            context,
+            state.verificationState,
+            {signal}
+        );
+    }else{
+        await authenticateWorkspaceRuntimeReceipt(state.receipt,{
+            workspaceRoot:context.workspaceRoot,
+            signal
+        });
+    }
+    if(!isDeepStrictEqual(packagedRuntimeAuthorities(state.receipt),state.document)){
+        fail('External runtime source authorities changed during package verification.');
     }
 }
 
@@ -1991,6 +2412,56 @@ async function writeReleaseManifest(root,context,version,{signal,onEvent}={}){
     };
 }
 
+async function writeRuntimeAuthorities(root,state){
+    if(state==null)return;
+    const authorityPath=path.join(root,RUNTIME_AUTHORITIES_NAME);
+    await writeFile(
+        authorityPath,
+        `${JSON.stringify(state.document,null,2)}\n`,
+        {encoding:'utf8',flag:'wx'}
+    );
+    const authority=await openStableRegularFile(authorityPath,RUNTIME_AUTHORITIES_NAME);
+    await authority.handle.close();
+}
+
+async function verifyRuntimeAuthorities(root,state){
+    const authorityPath=path.join(root,RUNTIME_AUTHORITIES_NAME);
+    if(state==null){
+        try{
+            await lstat(authorityPath);
+            fail(`${RUNTIME_AUTHORITIES_NAME} is not allowed without an external runtime authority.`);
+        }catch(error){
+            if(error?.code!=='ENOENT')throw error;
+        }
+        return;
+    }
+    const document=await readJsonDocument(authorityPath,RUNTIME_AUTHORITIES_NAME);
+    if(!isDeepStrictEqual(document.value,state.document)){
+        fail(`${RUNTIME_AUTHORITIES_NAME} does not match the admitted workspace runtime authorities.`);
+    }
+}
+
+function verifyRuntimeProjectionAuthority(release,state){
+    if(state==null)return;
+    const projection=release.files
+        .filter(file=>file.path.startsWith('arcane/'))
+        .map(file=>({
+            path:file.path.slice('arcane/'.length),
+            bytes:file.bytes,
+            sha256:file.sha256
+        }));
+    const totalBytes=projection.reduce((total,file)=>total+file.bytes,0);
+    const contentSha256=createHash('sha256')
+        .update(JSON.stringify(projection))
+        .digest('hex');
+    const expected=state.document.projection;
+    if(projection.length!==expected.fileCount
+        ||totalBytes!==expected.totalBytes
+        ||contentSha256!==expected.contentSha256){
+        fail('The packaged arcane runtime does not match its admitted runtime authorities.');
+    }
+}
+
 function expectedReleaseApp(context,version){
     const {config}=context;
     return {
@@ -2004,7 +2475,10 @@ function expectedReleaseApp(context,version){
     };
 }
 
-async function verifyFreshStaticRelease(root,context,version,releaseState,{signal}={}){
+async function verifyFreshStaticRelease(root,context,version,releaseState,{
+    runtimeAuthorityState,
+    signal
+}={}){
     throwIfAborted(signal);
     const {config}=context;
     const expectedApp=expectedReleaseApp(context,version);
@@ -2034,10 +2508,17 @@ async function verifyFreshStaticRelease(root,context,version,releaseState,{signa
         fail(`Package entry files for ${config.id} are invalid.`);
     }
 
+    await verifyRuntimeAuthorities(root,runtimeAuthorityState);
+    verifyRuntimeProjectionAuthority(release,runtimeAuthorityState);
+
     return releaseState;
 }
 
-async function verifyGenericRelease(root,context,version,{signal,onEvent}={}){
+async function verifyGenericRelease(root,context,version,{
+    runtimeAuthorityState,
+    signal,
+    onEvent
+}={}){
     const {config}=context;
     const manifestDocument=await readJsonDocument(
         path.join(root,RELEASE_MANIFEST_NAME),
@@ -2075,6 +2556,9 @@ async function verifyGenericRelease(root,context,version,{signal,onEvent}={}){
         ||!entryInfo.isFile()||entryInfo.isSymbolicLink()){
         fail(`Package entry files for ${config.id} are invalid.`);
     }
+
+    await verifyRuntimeAuthorities(root,runtimeAuthorityState);
+    verifyRuntimeProjectionAuthority(release,runtimeAuthorityState);
 
     return {
         release,
@@ -2118,7 +2602,11 @@ async function loadAdapter(context){
     return module;
 }
 
-async function verifyBuiltPackage(context,outputRoot,version,adapter,{signal,onEvent}={}){
+async function verifyBuiltPackage(context,outputRoot,version,adapter,{
+    runtimeAuthorityState,
+    signal,
+    onEvent
+}={}){
     throwIfAborted(signal);
     if(adapter){
         await adapter.verifyArcanePackage({
@@ -2132,7 +2620,11 @@ async function verifyBuiltPackage(context,outputRoot,version,adapter,{signal,onE
         });
     }
 
-    return verifyGenericRelease(outputRoot,context,version,{signal,onEvent});
+    return verifyGenericRelease(outputRoot,context,version,{
+        runtimeAuthorityState,
+        signal,
+        onEvent
+    });
 }
 
 async function writeAppVersion(context,version){
@@ -2376,6 +2868,8 @@ async function packageAppUnlocked({
     context:preparedContext,
     sharedPayloadSnapshot,
     authenticatedSharedPayloadState,
+    importMapReceipt,
+    runtimeVerificationState,
     signal,
     onEvent,
     validateSourceState
@@ -2392,10 +2886,16 @@ async function packageAppUnlocked({
     });
     const currentVersion=context.config.version;
     const version=resolveTargetVersion(currentVersion,{bump,exactVersion,preid});
+    const importMapFiles=dryRun
+        ?Object.freeze([])
+        :await authenticateImportMapPair(context,importMapReceipt,{signal});
     const files=await collectPackageFiles(context,{
         signal,
         sharedPayloadState:authenticatedSharedPayloadState
     });
+    if(!dryRun){
+        await authenticateCollectedImportMapPair(files,importMapFiles,{signal});
+    }
     const preview={
         app:appId,
         currentVersion,
@@ -2423,6 +2923,7 @@ async function packageAppUnlocked({
     let promoted=false;
     let operationSucceeded=false;
     let rollbackRestored=false;
+    let runtimeAuthorityState=null;
 
     try{
         await rm(staging,{recursive:true,force:true});
@@ -2468,16 +2969,42 @@ async function packageAppUnlocked({
         }
 
         throwIfAborted(signal);
+        let sourceValidation;
+        if(validateSourceState){
+            sourceValidation=await validateSourceState({signal});
+            await assertValidatedDescriptorAuthority(
+                sourceValidation,
+                context.descriptorAuthority
+            );
+        }
+        runtimeAuthorityState=await prepareRuntimeAuthorityState(context,{
+            validation:sourceValidation,
+            runtimeVerificationState,
+            signal,
+            onEvent
+        });
+        await writeRuntimeAuthorities(staging,runtimeAuthorityState);
         const releaseState=await writeReleaseManifest(staging,context,version,{signal,onEvent});
         const verifiedRelease=adapter
-            ?await verifyBuiltPackage(context,staging,version,adapter,{signal,onEvent})
-            :await verifyFreshStaticRelease(staging,context,version,releaseState,{signal});
+            ?await verifyBuiltPackage(context,staging,version,adapter,{
+                runtimeAuthorityState,
+                signal,
+                onEvent
+            })
+            :await verifyFreshStaticRelease(staging,context,version,releaseState,{
+                runtimeAuthorityState,
+                signal
+            });
 
         throwIfAborted(signal);
         if(validateSourceState){
             const validation=await validateSourceState({signal});
-            await assertValidatedDescriptorAuthority(validation,context.descriptorAuthority);
+            await assertValidatedDescriptorAuthority(
+                validation,
+                context.descriptorAuthority
+            );
         }
+        await authenticateRuntimeAuthorityState(context,runtimeAuthorityState,{signal,onEvent});
         await assertAppDescriptorAuthorityCurrent(context,{signal});
         if(sharedPayloadSnapshot!==undefined){
             await authenticateSharedPayloadSnapshotState(sharedPayloadSnapshot,{
@@ -2486,6 +3013,8 @@ async function packageAppUnlocked({
                 signal
             });
         }
+        await authenticateImportMapPair(context,importMapReceipt,{signal});
+        authenticatePackagedImportMapPair(verifiedRelease.release,importMapFiles);
         await assertArtifactState(staging,verifiedRelease.identities,{signal});
         throwIfAborted(signal);
 
@@ -2584,20 +3113,56 @@ export async function packageApp(options){
             signal:options?.signal
         });
     if(options?.dryRun){
+        if(options?.runtimeVerificationState!==undefined){
+            if(!await hasExternalRuntimeAdmission(context)){
+                fail('A runtime verification state cannot be supplied to an integrated workspace.');
+            }
+            await authenticatePackageRuntimeVerificationState(
+                context,
+                options.runtimeVerificationState,
+                {signal:options?.signal}
+            );
+        }
         return packageAppUnlocked({...options,context,authenticatedSharedPayloadState});
     }
-
-    await assertSafeDistBoundary(context.workspaceRoot,context.distRoot,{create:true});
-    const releaseLock=await acquirePackageLock(context.distRoot,options?.appId);
-
-    try{
-        return await packageAppUnlocked({...options,context,authenticatedSharedPayloadState});
-    }finally{
-        await releaseLock();
-    }
+    return withWorkspaceOperationLock({
+        workspaceRoot:context.workspaceRoot,
+        operation:'package',
+        workspaceOperationLease:options?.workspaceOperationLease,
+        signal:options?.signal,
+        onEvent:options?.onEvent
+    },async workspaceOperationLease=>{
+        await assertSafeDistBoundary(context.workspaceRoot,context.distRoot,{create:true});
+        const releaseLock=await acquirePackageLock(context.distRoot,options?.appId);
+        try{
+            const refreshed=await refreshPackageImportMap(context,{
+                runtimeVerificationState:options?.runtimeVerificationState,
+                workspaceOperationLease,
+                signal:options?.signal,
+                onEvent:options?.onEvent
+            });
+            const importMapReceipt=authenticatedImportMapReceipt(refreshed.importMapReceipt);
+            const packaged=await packageAppUnlocked({
+                ...options,
+                context,
+                authenticatedSharedPayloadState,
+                importMapReceipt,
+                runtimeVerificationState:refreshed.runtimeVerificationState??undefined
+            });
+            return {...packaged,importMapReceipt};
+        }finally{
+            await releaseLock();
+        }
+    });
 }
 
-export async function verifyApp({workspaceRoot,appId,signal,onEvent}){
+export async function verifyApp({
+    workspaceRoot,
+    appId,
+    runtimeVerificationState,
+    signal,
+    onEvent
+}){
     throwIfAborted(signal);
     const context=await getAppContext({
         workspaceRoot,
@@ -2605,14 +3170,20 @@ export async function verifyApp({workspaceRoot,appId,signal,onEvent}){
         bindDescriptorAuthority:true,
         signal
     });
+    const runtimeAuthorityState=await prepareRuntimeAuthorityState(context,{
+        runtimeVerificationState,
+        signal,
+        onEvent
+    });
     const adapter=await loadAdapter(context);
     const releaseState=await verifyBuiltPackage(
         context,
         context.outputRoot,
         context.config.version,
         adapter,
-        {signal,onEvent}
+        {runtimeAuthorityState,signal,onEvent}
     );
+    await authenticateRuntimeAuthorityState(context,runtimeAuthorityState,{signal,onEvent});
     const release=releaseState.release;
     const receipt=await issueAppReleaseReceipt(
         context.outputRoot,
@@ -2674,18 +3245,25 @@ export async function bumpVersion(options){
         return bumpVersionUnlocked(options);
     }
 
-    await getAppContext({
+    const context=await getAppContext({
         workspaceRoot:options?.workspaceRoot,
         appId:options?.appId
     });
-    const releaseLock=await acquireOperationLock(
-        options?.workspaceRoot,
-        options?.appId
-    );
-
-    try{
-        return await bumpVersionUnlocked(options);
-    }finally{
-        await releaseLock();
-    }
+    return withWorkspaceOperationLock({
+        workspaceRoot:context.workspaceRoot,
+        operation:'version-bump',
+        workspaceOperationLease:options?.workspaceOperationLease,
+        signal:options?.signal,
+        onEvent:options?.onEvent
+    },async()=>{
+        const releaseLock=await acquireOperationLock(
+            context.workspaceRoot,
+            options?.appId
+        );
+        try{
+            return await bumpVersionUnlocked({...options,workspaceRoot:context.workspaceRoot});
+        }finally{
+            await releaseLock();
+        }
+    });
 }

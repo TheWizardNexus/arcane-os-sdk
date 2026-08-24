@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
-import {cp,mkdir,readFile,writeFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {cp,mkdir,readFile,readdir,rm,unlink,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {createWorkspace} from '../src/scaffold.mjs';
+import {verifyRuntime} from '../src/runtime.mjs';
+import {verifySdkBrowserRuntime} from '../src/sdk-browser-runtime.mjs';
+import {verifyWorkspaceRuntime} from '../src/workspace-runtime.mjs';
 import {
     authenticateAppReleaseReceipt,
     normalizeRelativePath,
@@ -10,8 +14,18 @@ import {
     readVerifiedAppReleaseFile,
     verifyApp
 } from '../src/packager/core.mjs';
-import {packageApplication} from '../src/toolchain.mjs';
+import {
+    buildApplication,
+    bundleApplication,
+    createToolchain,
+    executeOperation,
+    packageApplication,
+    runApplication,
+    verifyApplication
+} from '../src/toolchain.mjs';
 import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
+
+const RUNTIME_AUTHORITIES_NAME='ARCANE_RUNTIME_AUTHORITIES.json';
 
 async function writeJson(filePath,value){
     await mkdir(path.dirname(filePath),{recursive:true});
@@ -26,15 +40,9 @@ async function createExternalFixture(root){
         sharedPayloads:{
             'browser-runtime':[
                 {
-                    source:'node_modules/arcane-os/runtime/arcane',
+                    source:'arcane',
                     destination:'arcane',
-                    include:['components','css','entities','img','modules','security'],
-                    exclude:[]
-                },
-                {
-                    source:'node_modules/arcane-os/runtime/strong-type',
-                    destination:'node_modules/strong-type',
-                    include:['index.js','licence','package.json'],
+                    include:['components','css','dependencies','entities','img','modules','sdk','security'],
                     exclude:[]
                 }
             ]
@@ -71,12 +79,12 @@ async function createExternalFixture(root){
     await writeFile(path.join(appRoot,'modules','z.js'),'export const latin=true;\n');
     await writeFile(path.join(appRoot,'modules','é.js'),'export const accented=true;\n');
 
-    const arcaneRoot=path.join(root,'node_modules','arcane-os','runtime','arcane');
-    for(const directory of ['components','css','entities','img','modules','security']){
+    const arcaneRoot=path.join(root,'arcane');
+    for(const directory of ['components','css','entities','img','modules','sdk','security']){
         await mkdir(path.join(arcaneRoot,directory),{recursive:true});
         await writeFile(path.join(arcaneRoot,directory,'fixture.txt'),`${directory}\n`);
     }
-    const strongTypeRoot=path.join(root,'node_modules','arcane-os','runtime','strong-type');
+    const strongTypeRoot=path.join(arcaneRoot,'dependencies','strong-type');
     await mkdir(strongTypeRoot,{recursive:true});
     await writeFile(path.join(strongTypeRoot,'index.js'),'export const type=value=>value;\n');
     await writeFile(path.join(strongTypeRoot,'licence'),'MIT\n');
@@ -114,19 +122,99 @@ async function snapshotRelease(workspaceRoot){
 
 async function installSdkRuntime(workspaceRoot){
     const installedRoot=path.join(workspaceRoot,'node_modules','arcane-os');
-    await cp(
-        path.join(repositoryRoot,'runtime'),
-        path.join(installedRoot,'runtime'),
-        {recursive:true}
-    );
-    await cp(path.join(repositoryRoot,'package.json'),path.join(installedRoot,'package.json'));
+    await mkdir(path.join(installedRoot,'src'),{recursive:true});
+    await Promise.all([
+        cp(
+            path.join(repositoryRoot,'runtime'),
+            path.join(installedRoot,'runtime'),
+            {recursive:true}
+        ),
+        cp(
+            path.join(repositoryRoot,'browser-runtime'),
+            path.join(installedRoot,'browser-runtime'),
+            {recursive:true}
+        ),
+        cp(
+            path.join(repositoryRoot,'node_modules','event-pubsub'),
+            path.join(installedRoot,'node_modules','event-pubsub'),
+            {recursive:true}
+        ),
+        cp(
+            path.join(repositoryRoot,'node_modules','strong-type'),
+            path.join(installedRoot,'node_modules','strong-type'),
+            {recursive:true}
+        ),
+        cp(
+            path.join(repositoryRoot,'src','event-manager.mjs'),
+            path.join(installedRoot,'src','event-manager.mjs')
+        ),
+        cp(
+            path.join(repositoryRoot,'src','dom-event-instrumentation.mjs'),
+            path.join(installedRoot,'src','dom-event-instrumentation.mjs')
+        ),
+        cp(path.join(repositoryRoot,'package.json'),path.join(installedRoot,'package.json'))
+    ]);
     for(const license of ['LICENSE','COMMERCIAL-LICENSE.md','NOTICE']){
         await cp(path.join(repositoryRoot,license),path.join(installedRoot,license));
     }
 }
 
+async function authenticatedWorkspace(t,{prefix,appId}){
+    const parent=await temporaryDirectory(t,{prefix});
+    const workspaceRoot=path.join(parent,'workspace');
+    await createWorkspace({targetPath:workspaceRoot,appId});
+    await installSdkRuntime(workspaceRoot);
+    return workspaceRoot;
+}
+
+async function issueRuntimeVerificationState(workspaceRoot){
+    const installedRoot=path.join(workspaceRoot,'node_modules','arcane-os');
+    const runtimeRoot=path.join(installedRoot,'runtime');
+    const browserRuntimeRoot=path.join(installedRoot,'browser-runtime');
+    const [runtimeReceipt,sdkBrowserRuntimeReceipt]=await Promise.all([
+        verifyRuntime({runtimeRoot}),
+        verifySdkBrowserRuntime({browserRuntimeRoot})
+    ]);
+    const workspaceRuntimeReceipt=await verifyWorkspaceRuntime({
+        workspaceRoot,
+        runtimeRoot,
+        runtimeReceipt,
+        browserRuntimeRoot,
+        sdkBrowserRuntimeReceipt
+    });
+    return Object.freeze({runtimeReceipt,sdkBrowserRuntimeReceipt,workspaceRuntimeReceipt});
+}
+
 function delay(milliseconds){
     return new Promise(resolve=>setTimeout(resolve,milliseconds));
+}
+
+function managedInlineMap(source){
+    const match=source.match(
+        /<script\b[^>]*\bdata-arcane-import-map\b[^>]*>([\s\S]*?)<\/script\s*>/iu
+    );
+    assert.ok(match,'managed Arcane import map must be present');
+    return JSON.parse(match[1]);
+}
+
+function replaceManagedInlineMap(source,value){
+    const pattern=/(<script\b[^>]*\bdata-arcane-import-map\b[^>]*>)[\s\S]*?(<\/script\s*>)/iu;
+    assert.match(source,pattern);
+    return source.replace(pattern,(_match,start,end)=>{
+        return `${start}\n${JSON.stringify(value,null,2)}\n    ${end}`;
+    });
+}
+
+async function rewriteReleaseInventory(releaseRoot,mutate){
+    const manifestPath=path.join(releaseRoot,'ARCANE_APP_RELEASE.json');
+    const release=JSON.parse(await readFile(manifestPath,'utf8'));
+    await mutate(release);
+    release.fileCount=release.files.length;
+    release.totalBytes=release.files.reduce((total,file)=>total+file.bytes,0);
+    release.contentSha256=createHash('sha256')
+        .update(JSON.stringify(release.files))
+        .digest('hex');
+    await writeFile(manifestPath,`${JSON.stringify(release,null,2)}\n`);
 }
 
 test('external workspace packages deterministically and detects release tampering',async t=>{
@@ -153,6 +241,8 @@ test('external workspace packages deterministically and detects release tamperin
         'NFC release paths must use defined UTF-8 byte order rather than locale collation'
     );
     assert.ok(releasePaths.includes('arcane/security/fixture.txt'));
+    assert.ok(releasePaths.includes('arcane/dependencies/strong-type/index.js'));
+    assert.equal(releasePaths.some(file=>file.startsWith('node_modules/strong-type/')),false);
     assert.ok(Object.isFrozen(first.receipt.files));
     assert.ok(Object.isFrozen(first.receipt.files[0]));
     assert.ok(Object.isFrozen(first.receipt.app));
@@ -224,6 +314,484 @@ test('external workspace packages deterministically and detects release tamperin
         verifyApp({workspaceRoot,appId:'fixture-app'}),
         /hash|integrity|inventory|bytes|release/i
     );
+});
+
+test('authenticated external package refreshes maps and preserves both runtime authorities',async t=>{
+    const appId='provenance-app';
+    const workspaceRoot=await authenticatedWorkspace(t,{
+        prefix:'arcane-runtime-provenance-package-',
+        appId
+    });
+    const appRoot=path.join(workspaceRoot,'apps',appId);
+    const mapPath=path.join(appRoot,'modules','arcane.importmap.json');
+    const entryPath=path.join(appRoot,'index.html');
+    const staleMap=`${JSON.stringify({imports:{}},null,2)}\n`;
+    await writeFile(mapPath,staleMap);
+    await writeFile(
+        entryPath,
+        replaceManagedInlineMap(await readFile(entryPath,'utf8'),{imports:{}})
+    );
+    const staleEntry=await readFile(entryPath,'utf8');
+
+    const preview=await packageApp({workspaceRoot,appId,dryRun:true});
+    assert.equal(preview.dryRun,true);
+    assert.equal(await readFile(mapPath,'utf8'),staleMap);
+    assert.equal(await readFile(entryPath,'utf8'),staleEntry);
+
+    const installedRoot=path.join(workspaceRoot,'node_modules','arcane-os');
+    const runtimeRoot=path.join(installedRoot,'runtime');
+    const browserRuntimeRoot=path.join(installedRoot,'browser-runtime');
+    const [runtimeReceipt,sdkBrowserRuntimeReceipt]=await Promise.all([
+        verifyRuntime({runtimeRoot}),
+        verifySdkBrowserRuntime({browserRuntimeRoot})
+    ]);
+    const workspaceRuntimeReceipt=await verifyWorkspaceRuntime({
+        workspaceRoot,
+        runtimeRoot,
+        runtimeReceipt,
+        browserRuntimeRoot,
+        sdkBrowserRuntimeReceipt
+    });
+    assert.equal((await packageApp({
+        workspaceRoot,
+        appId,
+        dryRun:true,
+        runtimeVerificationState:Object.freeze({
+            runtimeReceipt,
+            sdkBrowserRuntimeReceipt,
+            workspaceRuntimeReceipt
+        })
+    })).dryRun,true);
+    const alternateRuntimeParent=await temporaryDirectory(t,{
+        prefix:'arcane-mixed-runtime-receipt-'
+    });
+    const alternateRuntimeRoot=path.join(alternateRuntimeParent,'runtime');
+    await cp(runtimeRoot,alternateRuntimeRoot,{recursive:true});
+    const alternateRuntimeReceipt=await verifyRuntime({runtimeRoot:alternateRuntimeRoot});
+    const mixedWorkspaceRuntimeReceipt=await verifyWorkspaceRuntime({
+        workspaceRoot,
+        runtimeRoot:alternateRuntimeRoot,
+        runtimeReceipt:alternateRuntimeReceipt,
+        browserRuntimeRoot,
+        sdkBrowserRuntimeReceipt
+    });
+    await assert.rejects(
+        packageApp({
+            workspaceRoot,
+            appId,
+            runtimeVerificationState:Object.freeze({
+                runtimeReceipt,
+                sdkBrowserRuntimeReceipt,
+                workspaceRuntimeReceipt:mixedWorkspaceRuntimeReceipt
+            })
+        }),
+        /not bound to the supplied source runtime receipts/u
+    );
+    const accessorState={};
+    for(const [key,value] of Object.entries({
+        runtimeReceipt,
+        sdkBrowserRuntimeReceipt,
+        workspaceRuntimeReceipt
+    })){
+        Object.defineProperty(accessorState,key,{
+            enumerable:true,
+            get:()=>value
+        });
+    }
+    await assert.rejects(
+        packageApp({workspaceRoot,appId,runtimeVerificationState:accessorState}),
+        /fixed receipt references/u
+    );
+
+    const packageEvents=[];
+    const packaged=await packageApp({
+        workspaceRoot,
+        appId,
+        onEvent:event=>packageEvents.push(event)
+    });
+    assert.equal(packageEvents.filter(event=>event.type==='runtime.verify.started').length,1);
+    assert.equal(
+        packageEvents.filter(event=>event.type==='sdk-browser-runtime.verify.started').length,
+        1
+    );
+    assert.equal(
+        packageEvents.filter(event=>event.type==='workspace.runtime.verify.started').length,
+        1
+    );
+    assert.equal(packaged.importMapReceipt.committed,true);
+    assert.deepEqual(packaged.importMapReceipt.cleanupWarnings,[]);
+    assert.equal(Object.isFrozen(packaged.importMapReceipt.cleanupWarnings),true);
+    const releaseRoot=path.join(workspaceRoot,'dist',appId);
+    const sourceMapBytes=await readFile(mapPath);
+    const distMapBytes=await readFile(path.join(
+        releaseRoot,
+        'apps',
+        appId,
+        'modules',
+        'arcane.importmap.json'
+    ));
+    assert.deepEqual(distMapBytes,sourceMapBytes);
+    const sourceMap=JSON.parse(sourceMapBytes.toString('utf8'));
+    assert.equal(Object.keys(sourceMap.imports).length,85);
+    assert.equal(
+        sourceMap.imports['./node_modules/strong-type/index.js'],
+        './arcane/dependencies/strong-type/index.js'
+    );
+    assert.equal(sourceMap.imports['arcane-os/event-manager'],'./arcane/sdk/event-manager.mjs');
+    assert.equal(
+        sourceMap.imports['event-pubsub'],
+        './arcane/sdk/dependencies/event-pubsub/index.js'
+    );
+    const sourceEntryBytes=await readFile(entryPath);
+    const distEntryBytes=await readFile(path.join(releaseRoot,'apps',appId,'index.html'));
+    assert.deepEqual(distEntryBytes,sourceEntryBytes);
+    assert.deepEqual(managedInlineMap(sourceEntryBytes.toString('utf8')),sourceMap);
+    assert.deepEqual(managedInlineMap(distEntryBytes.toString('utf8')),sourceMap);
+
+    const authorityBytes=await readFile(path.join(releaseRoot,RUNTIME_AUTHORITIES_NAME));
+    const authorities=JSON.parse(authorityBytes.toString('utf8'));
+    assert.deepEqual(authorities,{
+        schemaVersion:1,
+        kind:'arcane-app-runtime-authorities',
+        sdkVersion:workspaceRuntimeReceipt.sdkVersion,
+        projection:{
+            fileCount:workspaceRuntimeReceipt.fileCount,
+            totalBytes:workspaceRuntimeReceipt.totalBytes,
+            contentSha256:workspaceRuntimeReceipt.contentSha256
+        },
+        sources:{
+            arcane:{
+                authority:workspaceRuntimeReceipt.sources.arcane.authority,
+                manifestSha256:workspaceRuntimeReceipt.sources.arcane.manifestSha256,
+                contentSha256:workspaceRuntimeReceipt.sources.arcane.contentSha256,
+                source:workspaceRuntimeReceipt.sources.arcane.source
+            },
+            sdkBrowser:{
+                authority:workspaceRuntimeReceipt.sources.sdkBrowser.authority,
+                manifestSha256:workspaceRuntimeReceipt.sources.sdkBrowser.manifestSha256,
+                contentSha256:workspaceRuntimeReceipt.sources.sdkBrowser.contentSha256,
+                source:workspaceRuntimeReceipt.sources.sdkBrowser.source
+            }
+        }
+    });
+    assert.deepEqual(
+        await readVerifiedAppReleaseFile(packaged.receipt,{
+            releaseRoot,
+            relativePath:RUNTIME_AUTHORITIES_NAME
+        }),
+        authorityBytes
+    );
+    const release=JSON.parse(await readFile(path.join(releaseRoot,'ARCANE_APP_RELEASE.json'),'utf8'));
+    assert.ok(release.files.some(file=>file.path===RUNTIME_AUTHORITIES_NAME));
+    const distProjection=release.files
+        .filter(file=>file.path.startsWith('arcane/'))
+        .map(file=>({path:file.path.slice('arcane/'.length),bytes:file.bytes,sha256:file.sha256}));
+    assert.equal(distProjection.length,workspaceRuntimeReceipt.fileCount);
+    assert.equal(
+        createHash('sha256').update(JSON.stringify(distProjection)).digest('hex'),
+        workspaceRuntimeReceipt.contentSha256
+    );
+    assert.equal((await verifyApp({workspaceRoot,appId})).verified,true);
+});
+
+test('browser toolchain operations verify each exact runtime state once',async t=>{
+    const appId='runtime-reuse-app';
+    const workspaceRoot=await authenticatedWorkspace(t,{
+        prefix:'arcane-browser-runtime-reuse-',
+        appId
+    });
+    const invoke=async operation=>{
+        const events=[];
+        const result=await operation(event=>events.push(event));
+        assert.equal(events.filter(event=>event.type==='runtime.verify.started').length,1);
+        assert.equal(
+            events.filter(event=>event.type==='sdk-browser-runtime.verify.started').length,
+            1
+        );
+        assert.equal(
+            events.filter(event=>event.type==='workspace.runtime.verify.started').length,
+            1
+        );
+        return {events,result};
+    };
+
+    const packaged=await invoke(onEvent=>packageApplication({workspaceRoot,appId,onEvent}));
+    assert.equal(packaged.events.filter(event=>event.type==='import-map.completed').length,1);
+    const built=await invoke(onEvent=>buildApplication({
+        workspaceRoot,
+        appId,
+        target:'browser',
+        onEvent
+    }));
+    assert.equal(built.events.filter(event=>event.type==='import-map.completed').length,1);
+    await invoke(onEvent=>verifyApplication({workspaceRoot,appId,onEvent}));
+    await invoke(onEvent=>bundleApplication({workspaceRoot,appId,onEvent}));
+    const running=await invoke(onEvent=>runApplication({
+        workspaceRoot,
+        appId,
+        target:'browser',
+        host:'127.0.0.1',
+        port:0,
+        onEvent
+    }));
+    await running.result.close();
+});
+
+test('public import-map operation is available through dispatch and the headless toolchain',async t=>{
+    const appId='public-import-map-app';
+    const workspaceRoot=await authenticatedWorkspace(t,{
+        prefix:'arcane-public-import-map-',
+        appId
+    });
+
+    const dispatched=await executeOperation('import-map',{workspaceRoot,appId});
+    assert.equal(dispatched.workspaceRoot,workspaceRoot);
+    assert.equal(dispatched.appId,appId);
+    assert.equal(dispatched.importMap.committed,true);
+
+    const toolchain=createToolchain({workspaceRoot,appId});
+    assert.equal(typeof toolchain.importMap,'function');
+    const headless=await toolchain.importMap();
+    assert.equal(headless.workspaceRoot,workspaceRoot);
+    assert.equal(headless.appId,appId);
+    assert.equal(headless.importMap.committed,true);
+});
+
+test('package release fails closed when import-map cleanup reports a warning',async t=>{
+    const appId='cleanup-warning';
+    const workspaceRoot=await authenticatedWorkspace(t,{
+        prefix:'arcane-import-map-cleanup-warning-',
+        appId
+    });
+    const appRoot=path.join(workspaceRoot,'apps',appId);
+    let tamperedBackup=false;
+
+    await assert.rejects(
+        packageApp({
+            workspaceRoot,
+            appId,
+            onEvent:async event=>{
+                if(tamperedBackup||event.type!=='import-map.commit.progress')return;
+                const entries=await readdir(appRoot);
+                const backup=entries.find(name=>name.includes('.arcane-backup-'));
+                assert.ok(backup,'entry backup must exist at the cleanup boundary');
+                const backupPath=path.join(appRoot,backup);
+                await rm(backupPath);
+                await writeFile(backupPath,'cleanup-warning injection\n');
+                tamperedBackup=true;
+            }
+        }),
+        error=>error?.code==='ARCANE_IMPORT_MAP_CLEANUP_FAILED'
+            &&/cleanup warnings|not assembled/iu.test(error.message)
+    );
+    assert.equal(tamperedBackup,true);
+    await assert.rejects(
+        readFile(path.join(workspaceRoot,'dist',appId,'ARCANE_APP_RELEASE.json')),
+        {code:'ENOENT'}
+    );
+});
+
+test('package rejects terminal import-map listener removal, truncation, and mismatch',async t=>{
+    const cases=[
+        {
+            name:'removed-artifact',
+            mutate:({mapPath})=>unlink(mapPath)
+        },
+        {
+            name:'truncated-entry',
+            mutate:({entryPath})=>writeFile(entryPath,'')
+        },
+        {
+            name:'mismatched-artifact',
+            mutate:({mapPath})=>writeFile(mapPath,'{"imports":{}}\n')
+        }
+    ];
+    for(const scenario of cases){
+        const appId=`listener-${scenario.name}`;
+        const workspaceRoot=await authenticatedWorkspace(t,{
+            prefix:`arcane-terminal-${scenario.name}-`,
+            appId
+        });
+        const appRoot=path.join(workspaceRoot,'apps',appId);
+        let mutated=false;
+
+        await assert.rejects(
+            packageApp({
+                workspaceRoot,
+                appId,
+                onEvent:async event=>{
+                    if(mutated||event.type!=='import-map.completed')return;
+                    await scenario.mutate({
+                        entryPath:path.join(appRoot,'index.html'),
+                        mapPath:path.join(appRoot,'modules','arcane.importmap.json')
+                    });
+                    mutated=true;
+                }
+            }),
+            /import-map (?:artifact|entry).*(?:changed|unavailable)|does not bind/iu
+        );
+        assert.equal(mutated,true);
+        await assert.rejects(
+            readFile(path.join(workspaceRoot,'dist',appId,'ARCANE_APP_RELEASE.json')),
+            {code:'ENOENT'}
+        );
+    }
+});
+
+test('release verification rejects removed or coherently rehashed runtime authority metadata',async t=>{
+    const appId='authority-tamper';
+    const workspaceRoot=await authenticatedWorkspace(t,{
+        prefix:'arcane-runtime-authority-tamper-',
+        appId
+    });
+    const releaseRoot=path.join(workspaceRoot,'dist',appId);
+    const authorityPath=path.join(releaseRoot,RUNTIME_AUTHORITIES_NAME);
+
+    await packageApp({workspaceRoot,appId});
+    await unlink(authorityPath);
+    await rewriteReleaseInventory(releaseRoot,release=>{
+        release.files=release.files.filter(file=>file.path!==RUNTIME_AUTHORITIES_NAME);
+    });
+    await assert.rejects(
+        verifyApp({workspaceRoot,appId}),
+        /ARCANE_RUNTIME_AUTHORITIES|runtime authorit|does not exist/iu
+    );
+
+    await packageApp({workspaceRoot,appId});
+    const tampered=JSON.parse(await readFile(authorityPath,'utf8'));
+    tampered.sources.sdkBrowser.source.dependencies[0].integrity='sha512-tampered';
+    const tamperedBytes=Buffer.from(`${JSON.stringify(tampered,null,2)}\n`);
+    await writeFile(authorityPath,tamperedBytes);
+    await rewriteReleaseInventory(releaseRoot,release=>{
+        const record=release.files.find(file=>file.path===RUNTIME_AUTHORITIES_NAME);
+        assert.ok(record);
+        record.bytes=tamperedBytes.length;
+        record.sha256=createHash('sha256').update(tamperedBytes).digest('hex');
+    });
+    await assert.rejects(
+        verifyApp({workspaceRoot,appId}),
+        /ARCANE_RUNTIME_AUTHORITIES|runtime authorit/iu
+    );
+
+    await packageApp({workspaceRoot,appId});
+    const arcanePath='arcane/modules/MD.js';
+    const tamperedArcaneBytes=Buffer.from('export default "tampered dist runtime";\n');
+    await writeFile(path.join(releaseRoot,...arcanePath.split('/')),tamperedArcaneBytes);
+    await rewriteReleaseInventory(releaseRoot,release=>{
+        const record=release.files.find(file=>file.path===arcanePath);
+        assert.ok(record);
+        record.bytes=tamperedArcaneBytes.length;
+        record.sha256=createHash('sha256').update(tamperedArcaneBytes).digest('hex');
+    });
+    await assert.rejects(
+        verifyApp({workspaceRoot,appId}),
+        /packaged arcane runtime|runtime authorit/iu
+    );
+});
+
+test('integrated physical packages reject external receipt tuples instead of ignoring them',async t=>{
+    const appId='integrated-physical-package';
+    const workspaceRoot=await authenticatedWorkspace(t,{
+        prefix:'arcane-integrated-physical-package-',
+        appId
+    });
+    const runtimeVerificationState=await issueRuntimeVerificationState(workspaceRoot);
+    await writeJson(path.join(workspaceRoot,'package.json'),{
+        name:'arcane-os',
+        private:true,
+        type:'module'
+    });
+    const rootConfigPath=path.join(workspaceRoot,'arcane-packager.json');
+    const rootConfig=JSON.parse(await readFile(rootConfigPath,'utf8'));
+    rootConfig.sharedPayloads['browser-runtime']=rootConfig.sharedPayloads['browser-runtime'].slice(0,1);
+    await writeJson(rootConfigPath,rootConfig);
+    await rm(path.join(workspaceRoot,'arcane.lock.json'));
+    await assert.rejects(
+        packageApp({workspaceRoot,appId,runtimeVerificationState}),
+        /runtime verification state cannot be supplied to an integrated workspace/u
+    );
+    await assert.rejects(
+        packageApp({workspaceRoot,appId,dryRun:true,runtimeVerificationState}),
+        /runtime verification state cannot be supplied to an integrated workspace/u
+    );
+    assert.equal(
+        (await packageApp({workspaceRoot,appId})).receipt.kind,
+        'arcane-app-release-verification'
+    );
+    await assert.rejects(
+        verifyApp({workspaceRoot,appId,runtimeVerificationState}),
+        /runtime verification state cannot be supplied to an integrated workspace/u
+    );
+    await assert.rejects(
+        runApplication({
+            workspaceRoot,
+            appId,
+            target:'browser',
+            runtimeVerificationState
+        }),
+        /runtime verification state cannot be supplied to an integrated workspace/u
+    );
+});
+
+test('integrated legacy packages retain their physical two-route contract without SDK authority metadata',async t=>{
+    const appId='legacy-package';
+    const workspaceRoot=await authenticatedWorkspace(t,{
+        prefix:'arcane-legacy-package-',
+        appId
+    });
+    const runtimeVerificationState=await issueRuntimeVerificationState(workspaceRoot);
+    await writeJson(path.join(workspaceRoot,'package.json'),{
+        name:'arcane-os',
+        private:true,
+        type:'module'
+    });
+    await writeJson(path.join(workspaceRoot,'arcane-packager.json'),{
+        schemaVersion:1,
+        appsRoot:'apps',
+        distRoot:'dist',
+        sharedPayloads:{
+            'browser-runtime':[
+                {
+                    source:'arcane',
+                    destination:'arcane',
+                    include:['components','css','entities','img','modules','security'],
+                    exclude:[]
+                },
+                {
+                    source:'node_modules/strong-type',
+                    destination:'node_modules/strong-type',
+                    include:['index.js','licence','package.json'],
+                    exclude:[]
+                }
+            ]
+        }
+    });
+    await rm(path.join(workspaceRoot,'arcane.lock.json'));
+    await cp(
+        path.join(workspaceRoot,'arcane','dependencies','strong-type'),
+        path.join(workspaceRoot,'node_modules','strong-type'),
+        {recursive:true}
+    );
+    await rm(path.join(workspaceRoot,'arcane','dependencies'),{recursive:true});
+    await rm(path.join(workspaceRoot,'arcane','sdk'),{recursive:true});
+
+    await assert.rejects(
+        packageApp({workspaceRoot,appId,runtimeVerificationState}),
+        /runtime verification state cannot be supplied to an integrated workspace/u
+    );
+
+    const packaged=await packageApp({workspaceRoot,appId});
+    const releaseRoot=path.join(workspaceRoot,'dist',appId);
+    await assert.rejects(readFile(path.join(releaseRoot,RUNTIME_AUTHORITIES_NAME)),{code:'ENOENT'});
+    assert.equal(
+        packaged.receipt.files.some(file=>file.path===RUNTIME_AUTHORITIES_NAME),
+        false
+    );
+    assert.ok(packaged.receipt.files.some(file=>{
+        return file.path==='node_modules/strong-type/index.js';
+    }));
+    assert.equal(packaged.receipt.files.some(file=>file.path.startsWith('arcane/sdk/')),false);
+    assert.equal((await verifyApp({workspaceRoot,appId})).verified,true);
 });
 
 test('release verification binds the exact authored security policy',async t=>{
@@ -399,7 +967,7 @@ test('toolchain package events serialize heartbeat and complete before settlemen
     assert.equal(packageEvents.at(-1),'package.completed');
 });
 
-test('toolchain event rejection cancels package work and remains handled',async t=>{
+test('toolchain event rejection before import-map commit cancels package work and remains handled',async t=>{
     const parent=await temporaryDirectory(t,{prefix:'arcane-toolchain-event-failure-'});
     const workspaceRoot=path.join(parent,'workspace');
     await createWorkspace({targetPath:workspaceRoot,appId:'rejected-events'});
@@ -417,7 +985,7 @@ test('toolchain event rejection cancels package work and remains handled',async 
             appId:'rejected-events',
             onEvent:async event=>{
                 delivered.push(event.type);
-                if(event.type==='package.copy.progress'){
+                if(event.type==='import-map.started'){
                     await delay(10);
                     throw callbackFailure;
                 }
@@ -430,6 +998,76 @@ test('toolchain event rejection cancels package work and remains handled',async 
     assert.equal(delivered.includes('package.completed'),false);
     await assert.rejects(
         readFile(path.join(workspaceRoot,'dist','rejected-events','ARCANE_APP_RELEASE.json')),
+        {code:'ENOENT'}
+    );
+});
+
+test('child import-map completion does not mark an uncommitted outer package',async t=>{
+    const parent=await temporaryDirectory(t,{prefix:'arcane-toolchain-child-map-event-'});
+    const workspaceRoot=path.join(parent,'workspace');
+    const appId='uncommitted-child-map';
+    await createWorkspace({targetPath:workspaceRoot,appId});
+    await installSdkRuntime(workspaceRoot);
+    const callbackFailure=new Error('Rejected child import-map completion.');
+
+    await assert.rejects(
+        packageApplication({
+            workspaceRoot,
+            appId,
+            onEvent:async event=>{
+                if(event.type==='import-map.completed')throw callbackFailure;
+            }
+        }),
+        error=>error===callbackFailure
+    );
+    await assert.rejects(
+        readFile(path.join(workspaceRoot,'dist',appId,'ARCANE_APP_RELEASE.json')),
+        {code:'ENOENT'}
+    );
+    assert.equal(
+        JSON.parse(await readFile(path.join(
+            workspaceRoot,'apps',appId,'modules','arcane.importmap.json'
+        ),'utf8')).imports['arcane-os/event-manager'],
+        './arcane/sdk/event-manager.mjs'
+    );
+    await assert.rejects(
+        readFile(path.join(workspaceRoot,'.arcane','workspace-operation.lock.json')),
+        {code:'ENOENT'}
+    );
+});
+
+test('toolchain preserves an authenticated package when lock-release delivery fails',async t=>{
+    const parent=await temporaryDirectory(t,{prefix:'arcane-toolchain-committed-release-'});
+    const workspaceRoot=path.join(parent,'workspace');
+    const appId='committed-release';
+    await createWorkspace({targetPath:workspaceRoot,appId});
+    await installSdkRuntime(workspaceRoot);
+    const callbackFailure=new Error('Rejected committed lock-release event.');
+
+    const result=await packageApplication({
+        workspaceRoot,
+        appId,
+        onEvent:async event=>{
+            if(event.type==='workspace.operation.released')throw callbackFailure;
+        }
+    });
+
+    assert.equal(result.release.eventDelivery.status,'degraded');
+    assert.equal(result.release.eventDelivery.errorCode,'ARCANE_EVENT_DELIVERY_FAILED');
+    assert.equal(result.release.eventDelivery.message,callbackFailure.message);
+    assert.equal(result.release.importMapReceipt.committed,true);
+    assert.deepEqual(result.release.importMapReceipt.cleanupWarnings,[]);
+    assert.equal(Object.isFrozen(result.release.importMapReceipt.cleanupWarnings),true);
+    assert.equal((await verifyApp({workspaceRoot,appId})).verified,true);
+    const sourceMap=await readFile(path.join(
+        workspaceRoot,'apps',appId,'modules','arcane.importmap.json'
+    ));
+    const packagedMap=await readFile(path.join(
+        workspaceRoot,'dist',appId,'apps',appId,'modules','arcane.importmap.json'
+    ));
+    assert.deepEqual(packagedMap,sourceMap);
+    await assert.rejects(
+        readFile(path.join(workspaceRoot,'.arcane','workspace-operation.lock.json')),
         {code:'ENOENT'}
     );
 });
