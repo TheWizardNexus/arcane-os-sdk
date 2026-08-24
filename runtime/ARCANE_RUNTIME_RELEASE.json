@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "builder": "arcane-sdk-runtime-v1",
-  "sdkVersion": "0.1.0-dev.5",
+  "sdkVersion": "0.1.0",
   "source": {
     "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
     "commit": "567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e",

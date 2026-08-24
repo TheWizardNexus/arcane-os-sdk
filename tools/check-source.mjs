@@ -79,9 +79,12 @@ function assertPackageMetadata(packageDocument){
     if(packageDocument.type!=='module'){
         fail('package.json type must be "module".');
     }
-    if(typeof packageDocument.version!=='string'
-        ||!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-dev(?:\.(0|[1-9][0-9]*))?$/.test(packageDocument.version)){
-        fail('Development package version must use the numeric MAJOR.MINOR.PATCH-dev[.NUMBER] policy.');
+    const stableVersion=typeof packageDocument.version==='string'
+        &&/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(packageDocument.version);
+    const developmentVersion=typeof packageDocument.version==='string'
+        &&/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-dev(?:\.(0|[1-9][0-9]*))?$/.test(packageDocument.version);
+    if(!stableVersion&&!developmentVersion){
+        fail('Package version must use numeric MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-dev[.NUMBER].');
     }
     if(packageDocument.license!=='AGPL-3.0-only'){
         fail('package.json license must be AGPL-3.0-only.');
@@ -93,10 +96,11 @@ function assertPackageMetadata(packageDocument){
     if(packageDocument.engines?.node!=='>=22.23.2'){
         fail('package.json must require Node.js >=22.23.2.');
     }
+    const expectedTag=developmentVersion?'dev':'latest';
     if(packageDocument.publishConfig?.access!=='public'
         ||packageDocument.publishConfig?.registry!=='https://registry.npmjs.org/'
-        ||packageDocument.publishConfig?.tag!=='dev'){
-        fail('package.json publishConfig must use the public npm registry and the dev tag.');
+        ||packageDocument.publishConfig?.tag!==expectedTag){
+        fail(`package.json publishConfig must use the public npm registry and the ${expectedTag} tag.`);
     }
 
     const requiredPublishedPaths=['bin/','src/','runtime/','schemas/'];
