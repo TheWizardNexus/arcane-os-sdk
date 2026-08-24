@@ -403,16 +403,29 @@ test('CI, reusable app release, and trusted publishing workflows retain narrow a
         assert.match(checkWorkflow,/push:\s*\n\s+branches:\s*\n\s+- main/u);
         assert.doesNotMatch(checkWorkflow,/\n\s+- dev\s*$/mu);
     });
-    await t.test('Check covers every supported Node and runner platform',()=>{
-        assert.match(checkWorkflow,/os:\s*[\s\S]*ubuntu-24\.04[\s\S]*windows-2025/u);
-        assert.match(checkWorkflow,/node:\s*[\s\S]*- 22[\s\S]*- 24/u);
+    await t.test('Check validates source once and smokes every supported package platform',()=>{
+        assert.match(checkWorkflow,/source_validation:[\s\S]*runs-on: ubuntu-24\.04/u);
+        assert.equal(checkWorkflow.match(/npm run check/gu)?.length,1);
+        assert.doesNotMatch(
+            checkWorkflow.slice(
+                checkWorkflow.indexOf('  source_validation:'),
+                checkWorkflow.indexOf('  pack_npm_release:')
+            ),
+            /matrix:/u
+        );
+        assert.match(checkWorkflow,/target: windows-x64[\s\S]*os: windows-2025/u);
+        assert.match(checkWorkflow,/target: linux-x64[\s\S]*os: ubuntu-24\.04/u);
         assert.match(checkWorkflow,/target: macos-arm64[\s\S]*os: macos-15[\s\S]*platform: darwin/u);
     });
     await t.test('Check installs and exercises one exact project-local npm artifact',()=>{
         assert.match(checkWorkflow,/actions\/upload-artifact@[0-9a-f]{40}/u);
         assert.match(checkWorkflow,/artifact-ids: \$\{\{ needs\.pack_npm_release\.outputs\['artifact-id'\] \}\}/u);
         assert.match(checkWorkflow,/ARCANE_SDK_NPM_RELEASE_METADATA/u);
-        assert.match(checkWorkflow,/bin\/arcane-test\.mjs test\/tarball\.test\.mjs/u);
+        assert.match(
+            checkWorkflow,
+            /bin\/arcane-test\.mjs test\/release-capability-smoke\.test\.mjs/u
+        );
+        assert.doesNotMatch(checkWorkflow,/bin\/arcane-test\.mjs test\/tarball\.test\.mjs/u);
         assert.doesNotMatch(checkWorkflow,/npm install --global/u);
     });
 
