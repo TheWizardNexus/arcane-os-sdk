@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2",
     "moduleSystem": "ESM"
   },
-  "memberCount": 151,
+  "memberCount": 158,
   "members": [
     {
       "id": "root:APP_BUNDLE_DESCRIPTOR_NAME",
@@ -1184,7 +1184,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Targets, native plans, and providers",
-      "summary": "Loads one fixed target provider from one explicit compatible Arcane OS checkout.",
+      "summary": "Loads the fixed provider for one target from an explicitly selected Arcane OS checkout and authenticates that provider generation for the current SDK process.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
       "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
@@ -2514,6 +2514,119 @@
       "availability": "Node and browser/bundler",
       "protocol": "arcane-event-stack/1",
       "normalization": "Rejects extra keys, invalid bounds, malformed nesting, unsafe values, and nonterminal overflow; returns a deeply frozen canonical document"
+    },
+    {
+      "id": "root:SDK_UPDATE_REGISTRY",
+      "name": "SDK_UPDATE_REGISTRY",
+      "displayName": "SDK_UPDATE_REGISTRY",
+      "kind": "constant",
+      "signature": "const SDK_UPDATE_REGISTRY",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Explicit SDK update checks",
+      "summary": "Approved default npm registry origin for the on-demand SDK update check.",
+      "availability": "Node; on-demand CLI or maintainer check only",
+      "protocol": "Credential-free HTTPS GET to an approved npm registry dist-tag endpoint",
+      "normalization": "Exact immutable HTTPS origin string"
+    },
+    {
+      "id": "root:SDK_UPDATE_TIMEOUT_MS",
+      "name": "SDK_UPDATE_TIMEOUT_MS",
+      "displayName": "SDK_UPDATE_TIMEOUT_MS",
+      "kind": "constant",
+      "signature": "const SDK_UPDATE_TIMEOUT_MS",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Explicit SDK update checks",
+      "summary": "Default per-request timeout for one explicit SDK registry check.",
+      "availability": "Node; on-demand CLI or maintainer check only",
+      "protocol": "Credential-free HTTPS GET to an approved npm registry dist-tag endpoint",
+      "normalization": "Exact immutable millisecond integer"
+    },
+    {
+      "id": "root:checkForSdkUpdate",
+      "name": "checkForSdkUpdate",
+      "displayName": "checkForSdkUpdate()",
+      "kind": "function",
+      "signature": "async checkForSdkUpdate({ packageName=SDK_NAME, currentVersion=SDK_VERSION, registry=SDK_UPDATE_REGISTRY, allowedRegistryHosts, timeoutMs=SDK_UPDATE_TIMEOUT_MS, fetchImpl=globalThis.fetch, signal, onEvent, clock=()=>new Date() }={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Explicit SDK update checks",
+      "summary": "Performs one bounded credential-free registry read and reports whether the selected npm dist-tag is newer than the installed SDK.",
+      "availability": "Node; on-demand CLI or maintainer check only",
+      "protocol": "Credential-free HTTPS GET to an approved npm registry dist-tag endpoint",
+      "normalization": "Frozen current, ahead, or update-available result; bounded registry data and normalized update-check failures"
+    },
+    {
+      "id": "root:checkSdkUpdate",
+      "name": "checkSdkUpdate",
+      "displayName": "checkSdkUpdate()",
+      "kind": "function",
+      "signature": "async checkSdkUpdate(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Explicit SDK update checks",
+      "summary": "Toolchain and CLI wrapper for exactly one checkForSdkUpdate invocation.",
+      "availability": "Node; on-demand CLI or maintainer check only",
+      "protocol": "Credential-free HTTPS GET to an approved npm registry dist-tag endpoint",
+      "normalization": "Preserves the direct check result, events, cancellation, and errors without scheduling another check"
+    },
+    {
+      "id": "root:compareSdkVersions",
+      "name": "compareSdkVersions",
+      "displayName": "compareSdkVersions()",
+      "kind": "function",
+      "signature": "compareSdkVersions(leftValue, rightValue)",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Explicit SDK update checks",
+      "summary": "Compares two strict semantic SDK versions without performing a registry request.",
+      "availability": "Node; on-demand CLI or maintainer check only",
+      "protocol": "In-process semantic-version comparison",
+      "normalization": "Returns -1, 0, or 1; build metadata does not affect precedence"
+    },
+    {
+      "id": "root:updateTagForVersion",
+      "name": "updateTagForVersion",
+      "displayName": "updateTagForVersion()",
+      "kind": "function",
+      "signature": "updateTagForVersion(value)",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Explicit SDK update checks",
+      "summary": "Selects npm dev for a prerelease SDK version and latest for a stable version.",
+      "availability": "Node; on-demand CLI or maintainer check only",
+      "protocol": "In-process npm dist-tag selection",
+      "normalization": "Exact dev or latest tag selected from strict semantic-version prerelease state"
+    },
+    {
+      "id": "root:validateUpdateRegistry",
+      "name": "validateUpdateRegistry",
+      "displayName": "validateUpdateRegistry()",
+      "kind": "function",
+      "signature": "validateUpdateRegistry(value, { allowedHosts=new Set(['registry.npmjs.org']) }={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Explicit SDK update checks",
+      "summary": "Validates one credential-free HTTPS registry root against an explicit hostname allowlist.",
+      "availability": "Node; on-demand CLI or maintainer check only",
+      "protocol": "Approved credential-free HTTPS registry origin",
+      "normalization": "Returns a normalized URL object only for an exact allowed root origin"
     }
   ]
 }

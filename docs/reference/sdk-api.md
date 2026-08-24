@@ -165,6 +165,13 @@ Protocol mechanics are intentionally kept in the [deep protocol guide](protocols
 | `verifyNativeArtifact()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `verifyRuntime()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `verifyTarget()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
+| `SDK_UPDATE_REGISTRY` | constant | `arcane-os` | Explicit SDK update checks | Node; on-demand CLI or maintainer check only |
+| `SDK_UPDATE_TIMEOUT_MS` | constant | `arcane-os` | Explicit SDK update checks | Node; on-demand CLI or maintainer check only |
+| `checkForSdkUpdate()` | function | `arcane-os` | Explicit SDK update checks | Node; on-demand CLI or maintainer check only |
+| `checkSdkUpdate()` | function | `arcane-os` | Explicit SDK update checks | Node; on-demand CLI or maintainer check only |
+| `compareSdkVersions()` | function | `arcane-os` | Explicit SDK update checks | Node; on-demand CLI or maintainer check only |
+| `updateTagForVersion()` | function | `arcane-os` | Explicit SDK update checks | Node; on-demand CLI or maintainer check only |
+| `validateUpdateRegistry()` | function | `arcane-os` | Explicit SDK update checks | Node; on-demand CLI or maintainer check only |
 | `ARCANE_EVENT_STACK_PROTOCOL` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `DEFAULT_DOM_EVENT_TYPES` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler; meaningful to browser DOM instrumentation |
 | `DOM_INTERACTION_EVENT` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Browser DOM or a DOM-compatible test host; constant imports in Node |
@@ -536,15 +543,34 @@ async function useauthenticateSharedPayloadSnapshot(...arguments_) {
 
 ### Overview
 
-Updates one selected app version with a validated semantic-version bump through the packager boundary.
+Updates the authored `arcane-package.json` version for one selected application.
+This is a development-time metadata operation. It never updates the Arcane SDK,
+the synchronized runtime, an installed application, or an Arcane OS host.
 
-### Signature and result
+### Signature, parameters, and result
 
 ```text
 async bumpVersion(options)
 ```
 
-Import it from `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os/packager`. `options.workspaceRoot` and `options.appId`
+select one configured app. Supply exactly one of `bump` (`"major"`, `"minor"`,
+`"patch"`, or `"prerelease"`) and `exactVersion`; `preid` customizes a
+prerelease bump and defaults to `"rc"`. `dryRun` defaults to `false`.
+
+The promise resolves to
+`{app, currentVersion, version, bump, dryRun}`. `bump` is `null` when an exact
+version was selected. A dry run validates and calculates the result without
+writing or acquiring the operation lock. A non-dry run acquires the selected
+app's packager lock under `dist/`, then atomically replaces only its
+`arcane-package.json` version through temporary and backup files.
+
+This function has no `signal`, `onEvent`, or receipt parameter: once started it
+has no public cancellation or progress-event contract. It rejects invalid or
+unchanged versions, conflicting `bump`/`exactVersion` inputs, an invalid
+workspace/app, an active or stale packager lock, and filesystem failures. The
+lock is released in `finally`; an unrecoverable replacement failure can leave
+the documented backup file for manual recovery.
 
 ### Availability and normalization
 
@@ -555,8 +581,17 @@ Import it from `arcane-os/packager`. The signature above states whether settleme
 ```javascript
 import {bumpVersion} from 'arcane-os/packager';
 
-async function usebumpVersion(...arguments_) {
-    return bumpVersion(...arguments_);
+async function previewNextPrerelease(workspaceRoot) {
+    const result = await bumpVersion({
+        workspaceRoot,
+        appId: 'example-app',
+        bump: 'prerelease',
+        preid: 'beta',
+        dryRun: true
+    });
+
+    console.log(`${result.currentVersion} -> ${result.version}`);
+    return result;
 }
 ```
 
@@ -1912,7 +1947,8 @@ async function useloadArcaneIntegratedProvider(...arguments_) {
 
 ### Overview
 
-Loads one fixed target provider from one explicit compatible Arcane OS checkout.
+Loads the fixed provider for one target from an explicitly selected Arcane OS
+checkout and authenticates that provider generation for the current SDK process.
 
 ### Signature and result
 
@@ -2593,6 +2629,11 @@ console.log(error.code, error.message);
 
 Frozen registry of stable SDK error-code strings.
 
+`ERROR_CODES.updateCheckFailed` is exactly
+`'ARCANE_UPDATE_CHECK_FAILED'`. It identifies a bounded update-check validation,
+registry, timeout, HTTP, or response failure; caller cancellation remains the
+separate `ERROR_CODES.cancelled` value.
+
 ### Value and import
 
 ```text
@@ -2610,7 +2651,7 @@ Import it from `arcane-os`. Treat arrays and records as immutable public values.
 ```javascript
 import {ERROR_CODES} from 'arcane-os';
 
-console.log(ERROR_CODES);
+console.log(ERROR_CODES.updateCheckFailed); // ARCANE_UPDATE_CHECK_FAILED
 ```
 
 ## errorRecord()
@@ -2643,15 +2684,25 @@ console.log(errorRecord(new Error('Example failure.')));
 
 ### Overview
 
-Throws a normalized `ArcaneError` with the supplied code and context.
+Synchronously throws an `ArcaneError` with the supplied code, message, and
+optional diagnostic context. It never returns a value or a promise.
 
-### Signature and result
+### Signature, parameters, and error
 
 ```text
 fail(code, message, options)
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. `code` is normally one of `ERROR_CODES`; a falsy
+code becomes `ARCANE_OPERATION_FAILED`. `message` is the public error message.
+`options` can contain `details`, `cause`, and `exitCode`. `details` is preserved
+for structured recovery, `cause` is attached through the standard `Error`
+cause, and an integer `exitCode` is preserved; otherwise the exit code is `1`.
+
+Calling `fail()` has no filesystem, event, cancellation, or receipt side
+effect. Catch the thrown `ArcaneError` synchronously, or let it reject the
+surrounding asynchronous operation naturally. Do not wrap it merely to make it
+look asynchronous.
 
 ### Availability and normalization
 
@@ -2660,10 +2711,16 @@ Import it from `arcane-os`. The signature above states whether settlement is syn
 ### Example
 
 ```javascript
-import {fail} from 'arcane-os';
+import {ERROR_CODES, fail} from 'arcane-os';
 
-async function usefail(...arguments_) {
-    return fail(...arguments_);
+function requireSelectedApp(appId) {
+    if (typeof appId !== 'string' || appId.length === 0) {
+        fail(ERROR_CODES.usage, 'Select one application.', {
+            details: {field: 'appId'}
+        });
+    }
+
+    return appId;
 }
 ```
 
@@ -2925,13 +2982,31 @@ async function userepositoryPull(...arguments_) {
 
 Pushes the selected attached branch through the repository's configured remote and credentials.
 
-### Signature and result
+### Signature, parameters, and result
 
 ```text
 async repositoryPush({ workspaceRoot=process.cwd(), signal, onEvent, run=runProcess }={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. `workspaceRoot` selects the Git worktree. `signal`
+cancels the owned Git process tree. The awaited `onEvent` callback receives the
+ordered `process.*` events for the three status probes and the push. `run` is an
+injectable process runner intended for deterministic tests; ordinary callers
+should keep the default.
+
+Before pushing, the SDK runs `git rev-parse --show-toplevel`,
+`git branch --show-current`, and `git status --short --branch` in order. It rejects a
+detached HEAD, then runs plain `git push`; the repository's current branch,
+configured upstream/remote, Git credentials, hooks, and server policy remain
+authoritative. Unlike `repositoryPull()`, this function does **not** require a
+clean worktree. It does not create a commit or select a remote/refspec for you.
+
+The promise resolves to
+`{action:'push', repositoryRoot, branch, output}`. `output` is trimmed stdout,
+or trimmed stderr when stdout is empty. A missing Git executable, failed status
+probe, rejected/nonzero push, cancellation, or event-callback failure rejects
+with the normalized process error. Cancellation stops the local process tree;
+it cannot prove that a remote accepted no objects before the interruption.
 
 ### Availability and normalization
 
@@ -2942,8 +3017,18 @@ Import it from `arcane-os`. The signature above states whether settlement is syn
 ```javascript
 import {repositoryPush} from 'arcane-os';
 
-async function userepositoryPush(...arguments_) {
-    return repositoryPush(...arguments_);
+// Call only after the user has chosen to publish the attached branch.
+async function pushAttachedBranch(workspaceRoot, signal) {
+    const result = await repositoryPush({
+        workspaceRoot,
+        signal,
+        onEvent(event) {
+            if (event.type === 'process.stderr') console.error(event.message);
+        }
+    });
+
+    console.log(`Pushed ${result.branch} from ${result.repositoryRoot}`);
+    return result;
 }
 ```
 
@@ -3121,13 +3206,38 @@ async function useselectApp(...arguments_) {
 
 Starts one bounded browser development server with exact runtime/app route mappings and an unguessable session capability.
 
-### Signature and result
+### Signature, modes, and result
 
 ```text
 async startDevServer(options={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. Source mode accepts
+`{workspaceRoot=process.cwd(), appId, mode='source', host='127.0.0.1', port=0,
+runtimeReceipt, signal, onEvent}` and serves one validated workspace application
+plus its verified SDK or integrated runtime. Packaged mode uses
+`{mode:'packaged', releaseRoot, releaseReceipt, host, port, signal, onEvent}` and
+serves only files admitted by that same-process release receipt. `host` must be
+numeric loopback `127.0.0.1` or `::1`; port `0` asks the operating system for an
+available port.
+
+The promise settles after the listener is ready and resolves to
+`{server, mode, workspaceRoot, appId, host, port, origin, cleanUrl, url, close,
+closed, lifecycle}`. `server` is the raw Node HTTP server. `url` contains the
+unguessable bootstrap capability that establishes an HttpOnly session
+cookie; do not log, persist, or disclose it. `cleanUrl` contains no capability
+but does not bootstrap a new browser session by itself. In packaged mode,
+`workspaceRoot` and `appId` are `null`.
+
+Starting the server opens a loopback listener and emits awaited,
+backpressured `server.starting` and `server.started` events. Request failures
+emit `server.request.failed`; shutdown emits `server.stopped` after owned
+requests and event delivery drain. Call `await result.close()` in a `finally`
+block, or abort `signal`; `close()` is idempotent and returns the
+same settlement represented by both `closed` and `lifecycle`. A listener error
+or event-callback failure closes the server and rejects its lifecycle. Invalid
+mode/host/port, workspace or receipt authentication failure, an occupied port,
+or an already-aborted signal rejects startup.
 
 ### Availability and normalization
 
@@ -3138,8 +3248,23 @@ Import it from `arcane-os`. The signature above states whether settlement is syn
 ```javascript
 import {startDevServer} from 'arcane-os';
 
-async function usestartDevServer(...arguments_) {
-    return startDevServer(...arguments_);
+async function inspectSourceServer(workspaceRoot, signal) {
+    const running = await startDevServer({
+        workspaceRoot,
+        appId: 'example-app',
+        mode: 'source',
+        host: '127.0.0.1',
+        port: 0,
+        signal
+    });
+
+    try {
+        // Hand running.url directly to the intended development browser.
+        console.log(`Serving on ${running.origin}`);
+        return {origin: running.origin, port: running.port};
+    } finally {
+        await running.close();
+    }
 }
 ```
 
@@ -3292,6 +3417,10 @@ async function usecreateApplication(...arguments_) {
 
 Returns a frozen convenience object that applies shared defaults to every headless application operation.
 
+The object includes `updateCheck(options)`, which merges defaults with the
+explicit call options and invokes `checkSdkUpdate()` once. Constructing the
+toolchain does not check, poll, schedule, download, install, or mutate anything.
+
 ### Signature and result
 
 ```text
@@ -3316,7 +3445,9 @@ const toolchain = createToolchain({
     }
 });
 
-console.log(Object.keys(toolchain));
+// Only this explicit call performs the single bounded registry request.
+const status = await toolchain.updateCheck();
+console.log(status.status);
 ```
 
 ## describeTargets()
@@ -3381,6 +3512,10 @@ async function usedevelopApplication(...arguments_) {
 
 Dispatches one named headless SDK operation with normalized acceptance, events, cancellation, and failure.
 
+The exact command `'update-check'` dispatches one `checkSdkUpdate(options)`
+call. Dispatch never installs a recurring task and never causes another command
+to check for updates implicitly.
+
 ### Signature and result
 
 ```text
@@ -3398,9 +3533,8 @@ Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states 
 ```javascript
 import {executeOperation} from 'arcane-os';
 
-async function useexecuteOperation(...arguments_) {
-    return executeOperation(...arguments_);
-}
+const result = await executeOperation('update-check');
+console.log(result.status, result.registryVersion);
 ```
 
 ## packageApplication()
@@ -3608,13 +3742,35 @@ async function useverifyBundleApplication(...arguments_) {
 
 Creates the ordered CLI reporter that normalizes accepted, progress, terminal, JSON, and NDJSON event delivery.
 
-### Signature and result
+### Signature, state, and output
 
 ```text
 createReporter({ command, output='human', stdout=process.stdout, stderr=process.stderr, operationId=randomUUID(), clock=()=>new Date() }={})
 ```
 
-Import it from `arcane-os` or `arcane-os/events`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/events`. This function returns
+synchronously. `output` must be `"human"`, `"json"`, or `"ndjson"`.
+`stdout` and `stderr` are writable streams; `operationId` and `clock` can be
+injected for deterministic tests.
+
+The returned object is
+`{operationId, output, accept, emit, forward, complete, reject, accepted,
+terminal}`. `accepted` and `terminal` are live getters. Call `accept(data)`
+before `emit(type, data, message)` or `forward(value, data)`. Acceptance happens
+once; later `accept()` calls return `null`. `complete(result)` and
+`reject(error)` are mutually terminal, and later progress or terminal calls
+return `null`. Each emitted event contains `arcane-cli-events/1`, the operation
+id, a strictly increasing sequence, an ISO timestamp, the command, type, status,
+and JSON-safe data. Circular members and unsupported JSON values are omitted;
+errors are reduced through `errorRecord()`.
+
+Human mode writes work events to stderr, readable results to stdout, and a
+completion line to stderr. JSON mode writes work events to stderr and exactly
+one final success/error envelope to stdout. NDJSON mode writes every event to
+stdout. Reporter methods write synchronously to the supplied streams; they do
+not provide backpressure promises, cancellation, or receipts. An unsupported
+mode, `emit()` before acceptance, an invalid clock result, or a stream write
+failure throws synchronously.
 
 ### Availability and normalization
 
@@ -3625,9 +3781,15 @@ Import it from `arcane-os` or `arcane-os/events`. The signature above states whe
 ```javascript
 import {createReporter} from 'arcane-os';
 
-async function usecreateReporter(...arguments_) {
-    return createReporter(...arguments_);
-}
+const reporter = createReporter({command: 'check', output: 'human'});
+
+reporter.accept({appId: 'example-app'});
+reporter.emit(
+    'workspace.validate.check',
+    {name: 'descriptor', ok: true},
+    'Validated the application descriptor.'
+);
+reporter.complete({ok: true});
 ```
 
 ## default()
@@ -3716,13 +3878,43 @@ console.log(registeredTestCount());
 
 Runs one shell-free child command with bounded output tails, ordered stream events, heartbeats, and process-tree cancellation.
 
-### Signature and result
+### Signature, parameters, and result
 
 ```text
 async runProcess(command, args=[], { cwd, env, signal, onEvent, heartbeatMs=5000, terminationGraceMs=DEFAULT_TERMINATION_GRACE_MS, allowNonzero=false, input }={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. `command` is executed directly with `shell:false`;
+`args` must be a fixed array of strings, so shell expansion, pipelines, and
+redirection never occur. `cwd` selects the child directory. `env` is shallowly
+merged over `process.env`. When supplied, `input` is written once and stdin is
+closed; otherwise stdin is closed immediately. On Microsoft NT, `npm` and `npx`
+are normalized to their Node CLI entrypoints.
+
+`onEvent` is awaited in order for `process.starting`, nonempty
+`process.stdout`/`process.stderr` lines, coalesced `process.heartbeat`, and the
+terminal process event. Stream delivery pauses the corresponding child stream
+while the callback owns that chunk. `heartbeatMs` defaults to 5 seconds; the
+timer applies a 1-second floor to ordinary numeric values.
+`terminationGraceMs` defaults to 1,500 ms and must
+be an integer from 100 through 30,000. `allowNonzero:false` rejects a nonzero
+exit; `true` returns it as data.
+
+The promise resolves to
+`{command, args, cwd, code, signal, stdout, stderr}`. Here `signal` is the
+child's terminating signal name or `null`, not the input `AbortSignal`. `args`
+is copied, `cwd` defaults to the current process directory, and each captured
+text stream keeps a bounded recent tail using a 4 MiB threshold. A missing executable rejects with
+`ARCANE_PREREQUISITE_MISSING`; invalid arguments, a disallowed nonzero exit,
+and spawn/runtime failures use the normalized SDK error boundary, with the
+nonzero result retained in error details.
+
+Aborting `signal` emits cancellation-requested state, terminates the owned
+process tree, escalates to a forced tree termination after the grace interval,
+drains event delivery, and rejects with `ARCANE_CANCELLED` and exit code 130.
+An `onEvent` failure also stops the tree and rejects with that callback failure.
+Cancellation proves only that the local process tree was stopped; it cannot
+reverse external effects already performed by the command.
 
 ### Availability and normalization
 
@@ -3733,9 +3925,14 @@ Import it from `arcane-os`. The signature above states whether settlement is syn
 ```javascript
 import {runProcess} from 'arcane-os';
 
-async function userunProcess(...arguments_) {
-    return runProcess(...arguments_);
-}
+const result = await runProcess(process.execPath, ['--version'], {
+    cwd: process.cwd(),
+    onEvent(event) {
+        if (event.type === 'process.stderr') console.error(event.message);
+    }
+});
+
+console.log(result.stdout.trim(), result.code);
 ```
 
 ## runRegisteredTests()
@@ -3744,13 +3941,35 @@ async function userunProcess(...arguments_) {
 
 Executes the current isolated realm's registered tests once and returns the normalized Vanilla Test report.
 
-### Signature and result
+### Signature, lifecycle, and result
 
 ```text
 async runRegisteredTests({signal, requireTests=true, onPhase}={})
 ```
 
-Import it from `arcane-os` or `arcane-os/testing`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/testing`. Register every top-level test
+with `test()` before this call. One module realm can run its registry only once;
+a second call rejects with `ReferenceError`. With `requireTests:true`, an empty
+registry becomes one failed report outcome. Set it to `false` only when an empty
+suite is intentional.
+
+Tests run sequentially. A test callback receives
+`{signal, after(callback), test(name, options?, callback)}` for cooperative
+cancellation, FIFO cleanup, and owned nested tests. Each test uses its declared
+timeout or `DEFAULT_TEST_TIMEOUT_MS`; test timeouts can abort the remainder of
+the run, cleanup and report phases have their own bounded timeouts, and cleanup
+is skipped after fatal timeout or cancellation because JavaScript promises
+cannot be preempted safely. The awaited `onPhase` callback receives started and
+completed records for test, cleanup, and report phases. A phase-callback failure
+is authoritative and can reject the run.
+
+The promise resolves to the frozen Vanilla Test snapshot
+`{passed, failed, total, failureCount, ok, report}`. `passed` and `failed` are
+frozen description arrays and `report` is the rendered text. Ordinary assertion
+failures produce `ok:false`; invalid API use, cancellation, a fatal timeout, or
+an authoritative phase/report failure rejects. Aborting `signal` propagates to
+the currently owned test and stops later tests, but test callbacks must observe
+their supplied signal to stop host work cooperatively.
 
 ### Availability and normalization
 
@@ -3759,11 +3978,20 @@ Import it from `arcane-os` or `arcane-os/testing`. The signature above states wh
 ### Example
 
 ```javascript
-import {runRegisteredTests} from 'arcane-os';
+import {runRegisteredTests, test} from 'arcane-os/testing';
 
-async function userunRegisteredTests(...arguments_) {
-    return runRegisteredTests(...arguments_);
-}
+test('normalizes an application id', () => {
+    const value = 'example-app'.trim();
+    if (value !== 'example-app') throw new Error('Unexpected id.');
+});
+
+const report = await runRegisteredTests({
+    onPhase(phase) {
+        if (phase.status === 'started') console.log(phase.name);
+    }
+});
+
+if (!report.ok) process.exitCode = 1;
 ```
 
 ## test()
@@ -3794,7 +4022,297 @@ test('adds two values', () => {
 });
 ```
 
-+# Central events, time travel, and DOM instrumentation
+# Explicit SDK update checks
+
+This is an on-demand Node.js control-plane and CLI maintainer surface. It never
+runs from renderer application code automatically. One call can make one
+bounded, credential-free HTTPS GET to an approved npm registry; there is no
+polling, recurrence, interval, background agent, download, install, dependency
+mutation, runtime replacement, or self-update. The only timer is the timeout
+owned and cleared by that one request.
+
+## SDK_UPDATE_REGISTRY
+
+### Overview
+
+Approved default npm registry root for an explicit SDK update check.
+
+### Value
+
+```text
+const SDK_UPDATE_REGISTRY = 'https://registry.npmjs.org/'
+```
+
+The request builder appends the fixed
+`-/package/arcane-os/dist-tags` endpoint only after validating the root.
+
+### Availability and normalization
+
+**Node; on-demand CLI or maintainer check only.** Exact immutable HTTPS origin
+string. Importing it performs no request and starts no timer.
+
+### Example
+
+```javascript
+import {SDK_UPDATE_REGISTRY, validateUpdateRegistry} from 'arcane-os';
+
+const registry = validateUpdateRegistry(SDK_UPDATE_REGISTRY);
+console.log(registry.origin);
+```
+
+## SDK_UPDATE_TIMEOUT_MS
+
+### Overview
+
+Default timeout for the single registry request owned by an explicit update check.
+
+### Value
+
+```text
+const SDK_UPDATE_TIMEOUT_MS = 2500
+```
+
+### Availability and normalization
+
+**Node; on-demand CLI or maintainer check only.** Exact immutable millisecond
+integer. Accepted per-call timeouts are safe integers from 100 through 10,000
+milliseconds.
+
+### Example
+
+```javascript
+import {SDK_UPDATE_TIMEOUT_MS} from 'arcane-os';
+
+console.log(`Update-check timeout: ${SDK_UPDATE_TIMEOUT_MS} ms`);
+```
+
+## checkForSdkUpdate()
+
+### Overview
+
+Performs exactly one bounded registry read and reports whether the npm dist-tag
+selected for the installed SDK is newer. It only checks metadata; it does not
+download, install, mutate, or schedule anything.
+
+### Signature and parameters
+
+```text
+async checkForSdkUpdate({
+    packageName=SDK_NAME,
+    currentVersion=SDK_VERSION,
+    registry=SDK_UPDATE_REGISTRY,
+    allowedRegistryHosts,
+    timeoutMs=SDK_UPDATE_TIMEOUT_MS,
+    fetchImpl=globalThis.fetch,
+    signal,
+    onEvent,
+    clock=()=>new Date()
+}={})
+```
+
+`packageName` must be exactly `arcane-os`. `currentVersion` must be strict
+semantic version text: prereleases select npm `dev`, while stable versions
+select `latest`. `registry` must pass `validateUpdateRegistry()`; the default
+hostname allowlist contains only `registry.npmjs.org`. `allowedRegistryHosts`,
+`fetchImpl`, and `clock` are explicit test or controlled-host injection points,
+not discovery mechanisms. `timeoutMs` is 100-10,000. `signal` provides caller
+cancellation, and each supplied `onEvent` callback is awaited.
+
+The request is one `GET` with `credentials:'omit'`, `redirect:'error'`,
+`cache:'no-store'`, and `referrerPolicy:'no-referrer'`. The response must retain
+the exact endpoint identity, return HTTP 200 and JSON media type, contain at
+most 32 KiB of valid UTF-8, and decode to 1-64 safe dist-tags whose values are
+strict semantic versions no longer than 128 characters.
+
+### Result, events, and errors
+
+The promise resolves to a frozen object:
+
+```text
+{
+    packageName,
+    currentVersion,
+    registryVersion,
+    tag,                 // 'dev' or 'latest'
+    status,              // 'update-available', 'current', or 'ahead'
+    updateAvailable,
+    registry,            // normalized origin
+    checkedAt            // clock().toISOString()
+}
+```
+
+After initial validation it emits awaited `update.check.started`. Success emits
+`update.check.completed`; a non-cancellation request or response failure emits
+`update.check.failed` with the normalized failure code.
+Registry, timeout, HTTP, redirect, content, JSON, dist-tag, version, or clock
+failures reject with `ARCANE_UPDATE_CHECK_FAILED`. Caller cancellation rejects
+with `ARCANE_CANCELLED`; it is distinct from the per-request timeout. Event
+callbacks are awaited, and a callback rejection can reject or replace the
+operation's normal settlement; it is never ignored. The owned timeout is cleared
+in `finally`.
+
+### Availability and normalization
+
+**Node; on-demand CLI or maintainer check only.** Registry data is reduced to
+one frozen status result. No provider payload becomes installation authority,
+and applications never invoke this function automatically.
+
+### Example
+
+```javascript
+import {checkForSdkUpdate} from 'arcane-os';
+
+// Defined for an explicit maintainer action; this function is not scheduled.
+async function checkInstalledSdkOnce(signal) {
+    const result = await checkForSdkUpdate({
+        signal,
+        onEvent(event) {
+            console.info(event.type, event.message);
+        }
+    });
+
+    console.log(result.status, result.registryVersion);
+    return result;
+}
+```
+
+## checkSdkUpdate()
+
+### Overview
+
+High-level toolchain/CLI wrapper for exactly one `checkForSdkUpdate()` call.
+
+### Signature and result
+
+```text
+async checkSdkUpdate(options={})
+```
+
+Import it from `arcane-os` or `arcane-os/toolchain`.
+
+It forwards the options unchanged and preserves the direct result, events,
+errors, cancellation, timeout, and security boundary. `executeOperation()`
+routes the exact command `'update-check'` here, and `createToolchain()` exposes
+it as `updateCheck(options)`. Neither route polls or schedules a later call.
+
+### Availability and normalization
+
+**Node; on-demand CLI or maintainer check only.** Same normalized contract as
+`checkForSdkUpdate()` with no additional request or mutation.
+
+### Example
+
+```javascript
+import {checkSdkUpdate} from 'arcane-os';
+
+async function runRequestedUpdateCheck(signal) {
+    const result = await checkSdkUpdate({signal});
+    return result.updateAvailable;
+}
+```
+
+## compareSdkVersions()
+
+### Overview
+
+Synchronously compares two strict semantic SDK versions without network access.
+
+### Signature and result
+
+```text
+compareSdkVersions(leftValue, rightValue)
+```
+
+Returns `-1` when the left version has lower precedence, `0` when precedence is
+equal, and `1` when it is higher. Major, minor, patch, then semantic prerelease
+identifiers are compared. A stable version outranks a prerelease at the same
+core version; build metadata does not affect precedence. Invalid input throws
+the packager's semantic-version validation error synchronously.
+
+### Availability and normalization
+
+**Node; on-demand CLI or maintainer check only.** Pure in-process comparison;
+no request, timer, event, mutation, or cancellation contract.
+
+### Example
+
+```javascript
+import {compareSdkVersions} from 'arcane-os';
+
+console.log(compareSdkVersions('0.1.0-dev.4', '0.1.0-dev.5')); // -1
+console.log(compareSdkVersions('1.0.0+local', '1.0.0+registry')); // 0
+```
+
+## updateTagForVersion()
+
+### Overview
+
+Selects the one npm dist-tag appropriate for an installed SDK version.
+
+### Signature and result
+
+```text
+updateTagForVersion(value)
+```
+
+Returns `'dev'` when the strict semantic version contains any prerelease
+identifier and `'latest'` otherwise. Invalid input synchronously throws
+`ARCANE_UPDATE_CHECK_FAILED` with the semantic-version error as its cause.
+
+### Availability and normalization
+
+**Node; on-demand CLI or maintainer check only.** Pure `dev`/`latest`
+normalization; no registry request or state change.
+
+### Example
+
+```javascript
+import {updateTagForVersion} from 'arcane-os';
+
+console.log(updateTagForVersion('0.1.0-dev.4')); // dev
+console.log(updateTagForVersion('1.0.0'));       // latest
+```
+
+## validateUpdateRegistry()
+
+### Overview
+
+Synchronously validates one credential-free HTTPS registry root against an
+explicit hostname allowlist.
+
+### Signature and result
+
+```text
+validateUpdateRegistry(value, {
+    allowedHosts=new Set(['registry.npmjs.org'])
+}={})
+```
+
+The URL must use HTTPS, have no username, password, query, or fragment, use the
+root path `/`, and use no explicit port other than 443. The lowercase hostname
+must be admitted by the supplied Set-like `allowedHosts`. It returns the
+normalized `URL` object. Validation performs no DNS lookup or request and does
+not claim trust in registry content.
+
+Invalid syntax, credentials, scheme, path, port, or hostname throws
+synchronously with `ARCANE_UPDATE_CHECK_FAILED`; the error can contain the
+parsed origin as diagnostic detail.
+
+### Availability and normalization
+
+**Node; on-demand CLI or maintainer check only.** Exact origin validation; no
+fallback, redirect acceptance, host discovery, polling, or mutation.
+
+### Example
+
+```javascript
+import {SDK_UPDATE_REGISTRY, validateUpdateRegistry} from 'arcane-os';
+
+const registry = validateUpdateRegistry(SDK_UPDATE_REGISTRY);
+console.log(registry.href); // https://registry.npmjs.org/
+```
+
+# Central events, time travel, and DOM instrumentation
 
 ## ARCANE_EVENT_STACK_PROTOCOL
 

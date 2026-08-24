@@ -117,6 +117,8 @@ new EventManager({
 `dom` may be a root directly or an options object containing `root`. Source and
 error stacks are omitted unless `captureStacks` is true. Redaction, depth, entry,
 string, and retention bounds are applied before records enter history.
+`maxSnapshotStringLength` defaults to 10,000 and must be a safe integer of at
+least 64; the other numeric retention limits must be positive safe integers.
 
 ### Properties
 
@@ -196,6 +198,11 @@ recording, and returns the manager.
 
 Stops and replaces the current DOM controller. The new controller starts
 immediately when recording is enabled. Returns the controller.
+
+Attaching at the exact retention limit causes the DOM-start event to trigger the
+normal terminal overflow path. In that case the returned controller is inactive,
+`timeTravelEnabled` is false, `overflowed` is true, and the final retained record
+is the overflow marker. No stopped lifecycle record is appended after it.
 
 #### `detachDOM()`
 
@@ -341,9 +348,17 @@ parseEventStack(source, {
 }={})
 ```
 
-All import limits must be positive safe integers. A valid overflowed stack may
-contain `maxEvents + 1` records only when its final record is the sole overflow
-marker.
+All import limits must be positive safe integers, except that
+`maxSnapshotStringLength` has the additional minimum of 64. A valid overflowed
+stack may contain `maxEvents + 1` records only when its final record is the sole
+overflow marker.
+
+The parser binds every imported record to its enclosing document: protocol and
+session must match, ids must equal `${sessionId}:${sequence}`, sequences and timing
+must be valid, status must agree with completion/error fields, and parent,
+depth, and causation data must form a valid earlier-record relationship. Unknown
+keys, missing keys, sparse arrays, forged identities, incomplete records, and
+nonterminal or forged overflow markers are rejected instead of repaired.
 
 ### Availability and normalization
 
@@ -678,6 +693,9 @@ The marker becomes record `maxEvents + 1`; recording is disabled, DOM observatio
 is stopped without adding another lifecycle record, and the triggering application
 event is still delivered live but is not recorded. The marker is written to
 history; it is not separately emitted to live subscribers at overflow time.
+Exactly `maxEvents` ordinary records plus this one terminal marker are retained.
+`enableTimeTravel()` rejects until `clearHistory()` removes the marker and resets
+the overflow state.
 
 ### Value
 
@@ -842,12 +860,36 @@ causation id when one is not supplied. A record initially appears as `dispatchin
 and is replaced with a completed or failed immutable record when synchronous
 delivery finishes.
 
-Snapshot normalization never evaluates accessor properties. It preserves cycles
-as `$ref`, applies tagged forms for non-finite numbers, bigint, symbols, functions,
-dates, regular expressions, errors, maps, sets, typed arrays, array buffers,
-truncation, unreadable values, and capture failures, and returns null-prototype
-objects. Tagged values are evidence, not executable values, and are not revived by
-playback.
+Snapshot normalization never evaluates accessor properties, including own
+properties that attempt to shadow the built-in behavior of dates, regular
+expressions, errors, maps, sets, typed arrays, data views, or functions. It
+preserves cycles as `$ref`, applies tagged forms for non-finite numbers, bigint,
+symbols, functions, dates, regular expressions, errors, maps, sets, typed arrays,
+array buffers, truncation, unreadable values, and capture failures, and returns
+null-prototype objects. BigInt decimal text is bounded by
+`maxSnapshotStringLength`, just like other generated strings.
+
+The minimum 64-character budget is sufficient for the SDK's generated tags and
+bookkeeping. When bounded property names collide, later names use an
+`$arcaneCollision:<index>` key; omitted object entries use `$arcaneTruncated`, and
+bounded collections use their corresponding truncation metadata. These special,
+collision, and truncation forms round-trip through `exportStack()` and
+`parseEventStack()` under the same limits. Tagged values are evidence, not
+executable values, and are not revived by playback.
+
+Safe capture is subordinate to live delivery. Snapshot accessors are represented
+as unreadable rather than invoked, and a proxy trap, invalid special value, or
+other snapshot failure becomes a bounded `snapshot-failed` value when possible.
+If diagnostic capture itself cannot construct a record, the live synchronous
+event is still delivered. A subscriber failure remains authoritative and is
+re-thrown after the SDK makes a best effort to finalize its failed record.
+
+With the defaults `redactSensitive:true` and `captureStacks:false`, source and
+error stacks are suppressed; credential-like keys and the private event fields
+`key`, `data`, and `detail` become `[REDACTED]`; and URL-like strings using
+`blob:`, `data:`, `file:`, `ftp:`, `ftps:`, `http:`, `https:`, `ws:`, or `wss:`
+become `[REDACTED URL]`. Redaction happens before history or export. Disabling it
+is an explicit diagnostic-risk decision, not a transport requirement.
 
 <details>
 <summary>Protocol and schema details</summary>
@@ -873,14 +915,14 @@ kernel/application snapshot.
 | Operation | Error | Recovery |
 | --- | --- | --- |
 | Constructor flags, clocks, or session id invalid | `TypeError` | Correct types; keep session id non-empty and at most 256 characters |
-| Constructor/import retention or snapshot limits invalid | `RangeError` | Use positive safe integers |
+| Constructor/import retention or snapshot limits invalid | `RangeError` | Use positive safe integers and keep `maxSnapshotStringLength` at least 64 |
 | Clock returns invalid timestamp or monotonic value | `TypeError` | Supply a valid UTC-compatible clock and finite non-negative monotonic clock |
 | Metadata is not an object; forwarded event is invalid | `TypeError` | Pass an object and a string event type |
 | Subscriber throws | Original error is rethrown | Treat synchronous handlers as part of the publisher's failure boundary |
 | History overflows | No exception in normal overflow; recording disables | Export, `clearHistory()`, then enable a new bounded session |
 | Re-enable before clearing overflow | `Error` | Clear history first |
 | Clear during dispatch/playback | `Error` | Wait for the active operation to finish |
-| Stack JSON/shape/order/causality invalid | `TypeError` | Reject the input; do not partially use it |
+| Stack JSON/shape/order/identity/timing/causality/overflow invalid | `TypeError` | Reject unknown, incomplete, or forged input; do not partially use it |
 | Import exceeds configured bounds | `RangeError` or invalid-stack `TypeError` | Raise explicit bounds only for a trusted operational need |
 | Stack range or playback mode/callback invalid | `TypeError` | Correct the options |
 | Export indentation, seek position, or playback speed invalid | `RangeError` | Use documented ranges |
@@ -890,23 +932,23 @@ kernel/application snapshot.
 
 ## Behavioral tests
 
-The executable contract belongs in:
+The executable contract is covered by:
 
 - `test/event-manager.test.mjs`: synchronous bus compatibility, causal recording,
-  redaction and immutable snapshots, strict export/import, cursor behavior,
-  review and event playback, cancellation, and central queue mirroring;
+  pollution-safe and accessor-safe snapshots, safe capture failures, redaction and
+  stack-suppression defaults, minimum-budget BigInt/collision/truncation round
+  trips, strict forged-import rejection, cursor behavior, review and event
+  playback, cancellation, bounded overflow, attach-at-limit cleanup, recovery,
+  and central queue mirroring;
 - `test/dom-event-instrumentation.test.mjs`: browser interaction/mutation capture,
   open-shadow observation, privacy defaults, lifecycle, and cleanup;
 - `test/contracts.test.mjs`: published schema and package-export stability;
 - `test/reference-completeness.test.mjs`: public export and MDN-reference coverage.
 
-The retention behavior must additionally assert the boundary itself: retain exactly
-`maxEvents` ordinary records, append one final overflow marker on the next
-recordable event, deliver that triggering event without recording it, stop DOM
-capture without a trailing lifecycle record, reject re-enabling before
-`clearHistory()`, and accept the bounded exported stack through
-`parseEventStack()`. This protects overflow semantics as behavior rather than only
-as documentation.
+The overflow tests assert the boundary itself: exactly `maxEvents` ordinary
+records, one final terminal marker, uninterrupted live delivery, inactive DOM
+capture without a trailing stopped marker, blocked re-enable until clear, and a
+strictly importable bounded export.
 
 Run the behavioral suite through the repository's normal gate:
 

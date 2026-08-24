@@ -42,11 +42,13 @@ This repository contains two related, explicitly versioned surfaces:
 
 The runtime receipt and Core reference remain distinct evidence even though
 they currently share one pinned upstream source identity. A browser module's
-bytes come from the generated runtime receipt. A native build pairs the
-application with one explicit compatible Arcane OS checkout and admits the
-selected Core by minimum version, protocol, feature, capability, and method
-requirements. A matching protocol name alone is not a compatibility or
-authority claim.
+bytes come from the generated runtime receipt. A native build selects one
+explicit Arcane OS checkout and Core. This SDK version accepts that selection
+only after its current native plan checks the exact declared protocol, version,
+features, capabilities, methods, provider contract, and identity-bound
+receipts. That current-build admission does not promise that a future SDK will
+accept this Core or that this SDK will accept a future Core. A matching protocol
+name or higher version alone is not compatibility or authority.
 
 See [Core reference provenance](core/README.md) for the imported inventory and
 the exact distinction between a documentation snapshot and shipped runtime
@@ -70,11 +72,14 @@ Public reference entries follow the established Arcane documentation model:
 
 ## Public runtime inventory
 
-The Node package exposes 151 semantic JavaScript records across 11 JavaScript
+The Node package exposes 158 semantic JavaScript records across 11 JavaScript
 entrypoints, plus eight JSON Schemas, its exact runtime manifest, and package
 metadata. The [machine-readable package inventory](inventory/package-api.json)
 and [SDK member reference](sdk-api.md) are checked bidirectionally against every
 declared JavaScript export.
+
+The seven update-check records are explicit on-demand checks; they do not poll,
+download, install, or self-update.
 
 The synchronized browser payload exposes:
 

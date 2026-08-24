@@ -11,8 +11,12 @@ ordinary browser has no Core local-model authority and is OpenAI-only.
 This section describes assets and maintainer commands in the pinned upstream
 [ARCANE-OS repository](https://github.com/TheWizardNexus/ARCANE-OS/tree/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e),
 not files or npm scripts supplied by `arcane-os`. SDK application developers
-use the browser module and an admitted external Core/service; they do not run
-these repository-maintenance commands from an app or SDK checkout.
+use the browser module and an external Core/service only after this SDK's
+current native plan admits the selected checkout and Core through its exact
+protocol, version, feature, capability, method, provider, and identity-bound
+receipt checks. That admission is current-build evidence, not a future SDK/Core
+compatibility promise. Developers do not run these repository-maintenance
+commands from an app or SDK checkout.
 
 Arcane OS includes `arcane/models/Arcane-3B.Modelfile`, `arcane/models/Arcane-8B.Modelfile`, `arcane/models/Arcane-12B.Modelfile`, `arcane/models/Arcane-20B.Modelfile`, and `arcane/models/Arcane-120B.Modelfile`. They create the durable `arcane:3b`, `arcane:8b`, `arcane:12b`, `arcane:20b`, and `arcane:120b` variants, while `arcane:latest` points to the user's effective choice through the machine-wide `ArcaneOllama` service. The 3B definition uses `granite4.1:3b-q4_K_M` with a memory-bounded 16,384-token context.
 
@@ -125,10 +129,10 @@ model. Browser runtime and generic metadata APIs do not consume or project this
 policy or declared mapping; the generated release-root record still physically
 contains it.
 
-The existing `Arcane.ai.chat()` remains supported. Applications populate local
-model controls from `Arcane.localAI.status()` and use admitted inference methods;
-raw `Arcane.ai.models()` and Ollama inventory methods are diagnostic surfaces for
-Settings, Terminal, and Shell only.
+The pinned runtime also exposes `Arcane.ai.chat()`. Applications populate local
+model controls from `Arcane.localAI.status()` and use admitted inference
+methods; raw `Arcane.ai.models()` and Ollama inventory methods are diagnostic
+surfaces for Settings, Terminal, and Shell only.
 
 ## Streaming
 

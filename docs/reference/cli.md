@@ -27,6 +27,7 @@ and exits nonzero on failure. Machine output is defined by
 | `arcane native-prepare` | Runs one standalone provider toolchain-integrity preparation diagnostic. |
 | `arcane build` | Packages, plans, builds, and retained-verifies one target artifact. |
 | `arcane run` | Verifies and serves an existing browser release, or packages, plans, builds, verifies, and launches one paired native artifact. |
+| `arcane update-check` | Performs one explicit, read-only npm dist-tag query for the installed SDK version. |
 | `arcane targets` | Lists target ids, declared status, formats, architectures, signing profiles, methods, and pairing reason. |
 | `arcane repo status\|pull\|push` | Runs one selected repository operation for the current app workspace. |
 
@@ -434,6 +435,74 @@ npm exec -- arcane run \
   --target linux-x64 \
   --arcane-root "../Arcane OS" \
   --output-root "../arcane-native-output"
+```
+
+## `arcane update-check`
+
+### Overview
+
+Performs one explicit, on-demand check of the installed Arcane SDK version
+against its matching npm distribution tag.
+
+```text
+arcane update-check
+```
+
+This is a maintainer/user query, not app runtime behavior. The command never
+polls, downloads a package, installs dependencies, changes files, mutates npm
+configuration, or self-updates. Arcane applications do not run it automatically.
+
+### Request boundary
+
+The command makes one bounded, credential-free HTTPS `GET` to the approved
+`registry.npmjs.org` origin for the `arcane-os` dist-tag document. It rejects
+redirects and changed request identity, omits credentials and referrer data,
+disables cache use, accepts only JSON, limits the response to 32 KiB, and uses a
+2.5-second timeout. The CLI does not expose registry, package, or timeout
+overrides.
+
+An installed prerelease version selects the npm `dev` tag. A stable installed
+version selects `latest`.
+
+### Result
+
+Success returns:
+
+```javascript
+{
+    packageName:'arcane-os',
+    currentVersion:'0.1.0-dev.4',
+    registryVersion:'0.1.0-dev.5',
+    tag:'dev',
+    status:'update-available', // or 'current' or 'ahead'
+    updateAvailable:true,
+    registry:'https://registry.npmjs.org',
+    checkedAt:'2026-08-24T04:00:00.000Z'
+}
+```
+
+`current` means the installed and registry versions match. `ahead` means the
+installed version is newer than the selected registry tag. `update-available`
+means the selected registry version is newer; the boolean is true only for that
+status. Reporting availability does not authorize or perform installation.
+
+### Events, errors, and cancellation
+
+The normal CLI envelope emits `operation.accepted`, then
+`update.check.started`. Success emits `update.check.completed` followed by the
+terminal `operation.completed` result. HTTP failure, timeout, changed origin,
+oversized/non-JSON/invalid UTF-8 content, malformed dist tags, or invalid semantic
+versions emit `update.check.failed` and terminate as `operation.failed` with
+`ARCANE_UPDATE_CHECK_FAILED` and exit status `1`.
+
+`SIGINT` or `SIGTERM` cancels the owned request. Cancellation terminates as
+`operation.cancelled` with exit status `130`; it does not masquerade as an update
+failure. Output framing follows the global human/JSON/NDJSON contract above.
+
+### Example
+
+```bash
+npm exec -- arcane update-check --output json
 ```
 
 ## `arcane targets`

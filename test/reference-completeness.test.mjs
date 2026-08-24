@@ -119,7 +119,7 @@ test('the public package API inventory matches every JavaScript export and MDN e
 
     await t.test('the inventory has stable unique records',()=>{
         assert.equal(inventory.sdkVersion,packageDocument.version);
-        assert.equal(inventory.memberCount,151);
+        assert.equal(inventory.memberCount,158);
         assert.equal(inventory.members.length,inventory.memberCount);
         assert.equal(new Set(inventory.members.map(member=>member.id)).size,inventory.memberCount);
         assert.equal(

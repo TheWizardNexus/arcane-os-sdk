@@ -184,10 +184,9 @@ endpoint selection, method admission, request/response limits, stream ids,
 chunk events, model-policy checks, native resource admission, and managed
 mutation workflows.
 
-Direct Ollama methods keep provider-native success envelopes so new bounded
-provider fields can remain usable. Arcane normalizes the outer promise/error and
-stream lifecycle. `chatText`, `generateText`, and `readiness` are helper-level
-normalizers.
+Direct Ollama methods preserve the bounded provider-native success envelope.
+Arcane normalizes the outer promise/error and stream lifecycle. `chatText`,
+`generateText`, and `readiness` are helper-level normalizers.
 
 ## Explicit cloud provider path
 
@@ -224,8 +223,11 @@ The common contract ends where platform truth must remain different:
   artifact kind, and some diagnostic/result fields remain platform-specific;
 - unsupported platforms fail or return a documented unsupported state; they do
   not run an unrelated browser implementation as a substitute;
-- a newer Core is compatible only when it provides the declared protocol,
-  features, capabilities, and methods, not simply because its version is higher.
+- this SDK version admits a selected checkout and Core only after the current
+  native plan's exact protocol, version, feature, capability, method, provider,
+  and identity-bound receipt checks all pass;
+- that current-build admission does not promise that a future SDK will accept
+  this Core or that this SDK will accept a future Core.
 
 ## Receipt and generation boundaries
 

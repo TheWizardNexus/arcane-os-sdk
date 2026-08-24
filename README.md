@@ -25,6 +25,24 @@ only the `dev` channel contract; query `npm view arcane-os@dev version` for
 current registry availability. Registry state is deliberately not baked into
 the immutable package documentation.
 
+That registry query is a maintainer action, not an application behavior. Apps
+never poll npm for SDK updates or replace their own SDK or synchronized runtime.
+The app repository's exact dependency and lockfile select the SDK; changing that
+selection is an explicit repository update followed by the normal validation
+and release gates.
+
+## Developer API reference
+
+Start with the [capability-first developer reference](docs/reference/README.md).
+It follows Arcane's MDN-style model and covers every public package export, CLI
+command, synchronized runtime module, entity, component, Arcane Core member,
+and Arcane Ollama method. Use the [availability and normalization matrix](docs/reference/availability-and-normalization.md)
+to distinguish Node, browser, native, cloud, and cross-host behavior; protocol
+mechanics are kept in the folded/deep-linked [protocol guide](docs/reference/protocols.md).
+The [behavioral-testing guide](docs/reference/behavioral-testing.md) explains the
+executable contract, while the [machine-readable inventories](docs/reference/inventory/)
+make completeness independently checkable.
+
 ## Central event instrumentation
 
 Use `arcane-os/event-manager` as the primary instrumentation surface for new
@@ -290,9 +308,10 @@ unsigned-local-test DEBs, and an Android development-signed APK. The
 `android-arm64` APK is architecture-neutral because it contains no native ABI;
 the target name identifies its supported physical/native ARM64 run profile.
 
-Every native build requires an explicit compatible Arcane OS checkout and a
-canonical app descriptor that declares the exact selected target. The SDK never
-searches for or silently selects a mutable toolchain root. Scaffold a separate
+Every native build requires an explicit Arcane OS checkout that passes this SDK
+version's admission checks and a canonical app descriptor that declares the
+exact selected target. The SDK never searches for or silently selects a mutable
+toolchain root. Scaffold a separate
 repository with the matching `--target`, or add and validate that target in the
 canonical descriptor before invoking its native command. From an external
 application repository, run one selected target:
@@ -334,8 +353,10 @@ build command prepares and reuses its own exact toolchain state once.
 The build authenticates the selected app release and descriptor, requires the
 Core to meet the highest minimum declared by the SDK runtime, selected app, and
 bundled dependencies, keep their declared Arcane protocol, and provide every
-required feature, capability, and method. A newer compatible Core is accepted.
-It copies release bytes through verified readers. Portable emits an app-scoped
+required feature, capability, and method. A Core reporting a higher version is
+accepted only when it passes those same current-SDK checks; this is not a promise
+that future SDK or Core releases will remain compatible. The build copies
+release bytes through verified readers. Portable emits an app-scoped
 Arcane Core payload under `build/portable/`; that directory is not executable
 and `arcane run --target portable` is intentionally unavailable. Windows emits
 an app-scoped executable bundle under `build/windows-x64/`. Linux emits an
@@ -395,23 +416,25 @@ extraction sequence is tracked in [docs/roadmap.md](docs/roadmap.md).
 New apps own `apps/<id>/arcane-app.json` schema 2. It contains publisher,
 permissions, security, native presentation, Core requirements, and target
 intent, and deterministically projects the exact schema-1
-`arcane-package.json` required by the current browser packager. Existing Arcane
-apps remain compatible through a read-only projection of the current native
-registry until each app adopts the authored descriptor. The schema-1 release
-manifest is intentionally unchanged during this migration.
+`arcane-package.json` required by the current browser packager. The pinned
+schema-1 apps recognized by this SDK are accepted through a read-only projection
+of the current native registry until each app adopts the authored descriptor.
+The schema-1 release manifest is intentionally unchanged during this migration;
+that current projection is not a general future-compatibility guarantee.
 
 ## ArcaneOllama
 
 Browser development never calls Ollama directly. `arcane doctor` performs a
 read-only managed-service assessment where the host supports one. Native apps
-will continue to use an app-scoped Arcane Core and `Arcane.localAI.status()`.
+use an app-scoped Arcane Core and `Arcane.localAI.status()` in this SDK version.
 Ollama is optional for packaging and non-AI applications.
 
 The loopback development server uses an unguessable session capability and a
 broad development-only content policy so the shared runtime can exercise remote
 providers, media, WebSockets, and embeds. It is not a production security
-boundary. Future native targets will enforce each app's declared origins through
-its approved Arcane descriptor. Served files are verified into bounded response
+boundary. Declared origins remain native policy input through the approved
+Arcane descriptor; enforcement for any additional target is roadmap scope, not
+a compatibility promise. Served files are verified into bounded response
 snapshots before headers; the current development limit is 64 MiB per file.
 
 ## Licensing

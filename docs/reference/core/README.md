@@ -30,13 +30,16 @@ The snapshot contains:
 | Ollama runtime/module overview | [Ollama module](ollama-module.md) |
 | Per-member guides | [`reference/arcane-api/`](reference/arcane-api/) |
 
-## Runtime pin and compatible Core
+## Runtime pin and current Core admission
 
 The SDK's browser runtime and this source reference use the same pinned Arcane
 OS commit. They remain different artifact classes: the SDK ships exact renderer
-bytes, while native builds can pair with a newer compatible Core when that Core
-still satisfies the declared protocol and every required feature, capability,
-and method.
+bytes. A native build does not infer compatibility from a higher Core version
+or a matching protocol name. This SDK version accepts a selected checkout and
+Core only when its current native plan's exact protocol, version, feature,
+capability, method, provider, and identity-bound receipt checks all pass. That
+is present-build admission evidence, not a promise that a future SDK will accept
+this Core or that this SDK will accept a future Core.
 
 Documentation provenance does not admit a Core. The SDK's native plan,
 provider, and receipt checks remain authoritative for a particular build.
