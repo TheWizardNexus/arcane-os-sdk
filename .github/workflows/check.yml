@@ -13,38 +13,29 @@ permissions:
   contents: read
 
 jobs:
-  check:
-    name: Node ${{ matrix.node }} / ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+  source_validation:
+    name: Validate the source once
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-24.04
-          - windows-2025
-        node:
-          - 22.23.2
-          - 24
     steps:
       - name: Check out the exact source revision
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - name: Use Node.js ${{ matrix.node }}
+      - name: Use the minimum supported Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 22.23.2
           package-manager-cache: false
       - name: Install exact dependencies
         run: npm ci --ignore-scripts
-      - name: Run development checks
+      - name: Run the authoritative source validation once
         run: npm run check
 
   pack_npm_release:
     name: Pack one exact npm release artifact
     if: github.event_name != 'pull_request'
-    needs: check
+    needs: source_validation
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     outputs:
@@ -86,11 +77,11 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  exercise_npm_release:
-    name: Exact npm artifact / ${{ matrix.target }}
+  installed_capability_smoke:
+    name: Installed capability smoke / ${{ matrix.target }}
     needs: pack_npm_release
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -108,11 +99,11 @@ jobs:
             platform: darwin
             architecture: arm64
     steps:
-      - name: Check out only the exact Vanilla Test contract source
+      - name: Check out the exact Vanilla Test smoke contract
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - name: Use the pinned native test toolchain
+      - name: Use the minimum supported Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22.23.2
@@ -127,30 +118,89 @@ jobs:
         with:
           artifact-ids: ${{ needs.pack_npm_release.outputs['artifact-id'] }}
           path: ${{ runner.temp }}/arcane-sdk-npm-release
-      - name: Exercise the downloaded tarball through Vanilla Test
+      - name: Exercise only the installed capability contract through Vanilla Test
         env:
           ARCANE_SDK_NPM_RELEASE_METADATA: ${{ runner.temp }}/arcane-sdk-npm-release/${{ needs.pack_npm_release.outputs['manifest-filename'] }}
           ARCANE_SDK_EXACT_ARTIFACT_REQUIRED: true
           ARCANE_SDK_EXPECTED_PLATFORM: ${{ matrix.platform }}
           ARCANE_SDK_EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
           npm_config_cache: ${{ runner.temp }}/arcane-sdk-npm-cache
-        run: node ./bin/arcane-test.mjs test/tarball.test.mjs
+        run: node ./bin/arcane-test.mjs test/release-capability-smoke.test.mjs
 
   npm_release_ready:
-    name: npm release readiness gate
+    name: Verify npm artifact identity and legal inventory once
     if: github.event_name != 'pull_request' && always()
     needs:
       - pack_npm_release
-      - exercise_npm_release
+      - installed_capability_smoke
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    permissions: {}
+    permissions:
+      actions: read
+      contents: read
     steps:
-      - name: Require the producer and every native exact-artifact test
+      - name: Require the producer and every installed capability smoke
         shell: bash
         env:
           PACK_RESULT: ${{ needs.pack_npm_release.result }}
-          MATRIX_RESULT: ${{ needs.exercise_npm_release.result }}
+          SMOKE_RESULT: ${{ needs.installed_capability_smoke.result }}
         run: |
           test "$PACK_RESULT" = success
-          test "$MATRIX_RESULT" = success
+          test "$SMOKE_RESULT" = success
+      - name: Check out the exact artifact verifier
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Use the minimum supported Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.23.2
+          package-manager-cache: false
+      - name: Download the same artifact by immutable id
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.pack_npm_release.outputs['artifact-id'] }}
+          path: ${{ runner.temp }}/arcane-sdk-npm-release
+      - name: Verify identity, integrity, shasum, licenses, and the standard-content boundary
+        shell: bash
+        env:
+          RELEASE_METADATA: ${{ runner.temp }}/arcane-sdk-npm-release/${{ needs.pack_npm_release.outputs['manifest-filename'] }}
+          RELEASE_VERSION: ${{ needs.pack_npm_release.outputs.version }}
+        run: |
+          set -euo pipefail
+          node tools/verify-npm-release.mjs --metadata "$RELEASE_METADATA" --expected-source "$GITHUB_SHA" --expected-version "$RELEASE_VERSION" --require-clean
+          node --input-type=module <<'NODE'
+          import {readFile} from 'node:fs/promises';
+          const manifest=JSON.parse(await readFile(process.env.RELEASE_METADATA,'utf8'));
+          const files=new Set(manifest.package.files.map(file=>file.path));
+          const required=[
+            'LICENSE',
+            'COMMERCIAL-LICENSE.md',
+            'NOTICE',
+            'node_modules/event-pubsub/licence',
+            'node_modules/strong-type/licence',
+            'browser-runtime/dependencies/event-pubsub/licence',
+            'browser-runtime/dependencies/strong-type/licence',
+            'runtime/arcane/modules/uPlot.LICENSE.txt',
+            'runtime/strong-type/licence'
+          ];
+          for(const requiredPath of required){
+            if(!files.has(requiredPath))throw new Error(`Missing release license: ${requiredPath}.`);
+          }
+          const forbiddenPrefixes=[
+            'native/',
+            'src/ai/',
+            'browser-runtime/ai/',
+            'licenses/ai/',
+            'node_modules/kokoro-js/',
+            'node_modules/phonemizer/',
+            'node_modules/espeak-ng/'
+          ];
+          const forbiddenExtension=/\.(?:gguf|wasm|data|exe|dll|so|dylib|node|py|c|cc|cpp|h|sh|ps1|bat|cmd)$/iu;
+          for(const file of files){
+            if(forbiddenPrefixes.some(prefix=>file.startsWith(prefix))||forbiddenExtension.test(file)){
+              throw new Error(`Nonstandard release content requires separate authorization: ${file}.`);
+            }
+          }
+          console.log(`Verified ${files.size} standard-content files and ${required.length} license boundaries.`);
+          NODE

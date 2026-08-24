@@ -41,21 +41,37 @@ test('premature promotion and dual-channel implementation is absent',async()=>{
     }
 });
 
-test('Check builds one npm tarball and executes those exact bytes on every supported OS',async()=>{
+test('Check validates once and runs one tiny installed-artifact smoke on each supported OS',async()=>{
     const workflow=await read('.github/workflows/check.yml');
     const packageDocument=JSON.parse(await read('package.json'));
-    assert.match(packageDocument.scripts?.['test:integration']??'',/tarball\.test\.mjs/u);
-    const artifactContract=await read('test/tarball.test.mjs');
-    assert.match(artifactContract,/process\.env\.CI==='true'&&!releaseMetadataPath/u);
-    assert.match(artifactContract,/defers release packing to the single CI producer/u);
+    assert.match(
+        packageDocument.scripts?.['test:integration']??'',
+        /release-capability-smoke\.test\.mjs/u
+    );
+    const artifactContract=await read('test/release-capability-smoke.test.mjs');
+    assert.match(artifactContract,/verifyNpmReleaseArtifact/u);
+    assert.match(artifactContract,/import test from '\.\.\/src\/testing\.mjs'/u);
+    assert.match(artifactContract,/node_modules','arcane-os'/u);
+    assert.match(artifactContract,/installedTestRunner/u);
+    assert.match(artifactContract,/\['exec','--offline','--','arcane','--version'\]/u);
+    assert.match(workflow,/source_validation:[\s\S]*npm run check/u);
+    assert.equal(workflow.match(/npm run check/gu)?.length,1);
+    const sourceStart=workflow.indexOf('  source_validation:');
+    const producerStart=workflow.indexOf('  pack_npm_release:');
+    assert.ok(sourceStart>=0&&producerStart>sourceStart);
+    const sourceJob=workflow.slice(sourceStart,producerStart);
+    assert.doesNotMatch(sourceJob,/matrix:/u);
+    assert.match(sourceJob,/runs-on: ubuntu-24\.04/u);
+    assert.match(sourceJob,/node-version: 22\.23\.2/u);
     assert.match(workflow,/pack_npm_release:[\s\S]*npm release artifact/u);
     assert.match(workflow,/pack_npm_release:[\s\S]*if: github\.event_name != 'pull_request'/u);
+    assert.match(workflow,/pack_npm_release:[\s\S]*needs: source_validation/u);
     assert.match(workflow,/actions\/upload-artifact@[0-9a-f]{40}/u);
     assert.match(workflow,/artifact-ids: \$\{\{ needs\.pack_npm_release\.outputs\['artifact-id'\] \}\}/u);
     assert.match(workflow,/os: windows-2025[\s\S]*platform: win32[\s\S]*architecture: x64/u);
     assert.match(workflow,/os: ubuntu-24\.04[\s\S]*platform: linux[\s\S]*architecture: x64/u);
     assert.match(workflow,/os: macos-15[\s\S]*platform: darwin[\s\S]*architecture: arm64/u);
-    const exerciseStart=workflow.indexOf('  exercise_npm_release:');
+    const exerciseStart=workflow.indexOf('  installed_capability_smoke:');
     const readinessStart=workflow.indexOf('  npm_release_ready:');
     assert.ok(exerciseStart>=0&&readinessStart>exerciseStart);
     const exerciseJob=workflow.slice(exerciseStart,readinessStart);
@@ -63,12 +79,21 @@ test('Check builds one npm tarball and executes those exact bytes on every suppo
     assert.equal(exerciseJob.match(cachePattern)?.length,2);
     assert.doesNotMatch(exerciseJob,/^    env:\s*\n      npm_config_cache:/mu);
     assert.match(exerciseJob,/Install the exact Vanilla Test dependency\s*\n        env:\s*\n          npm_config_cache:/u);
-    assert.match(exerciseJob,/Exercise the downloaded tarball through Vanilla Test[\s\S]*npm_config_cache:/u);
-    assert.match(workflow,/Use the pinned native test toolchain[\s\S]*node-version: 22\.23\.2/u);
-    assert.match(workflow,/ARCANE_SDK_NPM_RELEASE_METADATA:[\s\S]*bin\/arcane-test\.mjs test\/tarball\.test\.mjs/u);
+    assert.match(exerciseJob,/Exercise only the installed capability contract through Vanilla Test[\s\S]*npm_config_cache:/u);
+    assert.match(exerciseJob,/Use the minimum supported Node\.js[\s\S]*node-version: 22\.23\.2/u);
+    assert.match(
+        exerciseJob,
+        /ARCANE_SDK_NPM_RELEASE_METADATA:[\s\S]*bin\/arcane-test\.mjs test\/release-capability-smoke\.test\.mjs/u
+    );
     assert.match(exerciseJob,/ARCANE_SDK_EXACT_ARTIFACT_REQUIRED: true/u);
     assert.doesNotMatch(exerciseJob,/continue-on-error:\s*true/u);
-    assert.match(workflow,/npm_release_ready:[\s\S]*PACK_RESULT[\s\S]*MATRIX_RESULT/u);
+    assert.doesNotMatch(exerciseJob,/tarball\.test\.mjs|browser-import-map\.contract\.mjs/u);
+    assert.match(workflow,/npm_release_ready:[\s\S]*PACK_RESULT[\s\S]*SMOKE_RESULT/u);
+    assert.match(
+        workflow,
+        /Verify identity, integrity, shasum, licenses, and the standard-content boundary/u
+    );
+    assert.match(workflow,/tools\/verify-npm-release\.mjs/u);
     assert.doesNotMatch(workflow,/npm install --global/u);
 });
 

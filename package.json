@@ -48,7 +48,7 @@
     "test": "npm run test:unit && npm run test:functional && npm run test:integration && npm run test:regression",
     "test:unit": "node ./bin/arcane-test.mjs test/app-descriptor.test.mjs test/app-schema.test.mjs test/contracts.test.mjs test/doctor.test.mjs test/targets.test.mjs test/workspace-operation-lock.test.mjs",
     "test:functional": "node ./bin/arcane-test.mjs test/cli.test.mjs test/dev-server.test.mjs test/dom-event-instrumentation.test.mjs test/event-manager.test.mjs test/events.test.mjs test/import-map.test.mjs test/packaging.test.mjs test/reference-completeness.test.mjs test/runtime-api-behavior.test.mjs test/runtime-sync.test.mjs test/runtime.test.mjs test/scaffold.test.mjs test/site.test.mjs test/update-check.test.mjs",
-    "test:integration": "node ./bin/arcane-test.mjs test/integrated-shared.test.mjs test/integrated-workspace.test.mjs test/native-plan.test.mjs test/native-provider-loader.test.mjs test/npm-release.test.mjs test/release-bundle.test.mjs test/shared-payload-batch.test.mjs test/tarball.test.mjs",
+    "test:integration": "node ./bin/arcane-test.mjs test/integrated-shared.test.mjs test/integrated-workspace.test.mjs test/native-plan.test.mjs test/native-provider-loader.test.mjs test/npm-release.test.mjs test/release-bundle.test.mjs test/release-capability-smoke.test.mjs test/shared-payload-batch.test.mjs test/tarball.test.mjs",
     "test:regression": "node ./bin/arcane-test.mjs test/channel-workflows.test.mjs test/native-provider-generation.test.mjs test/testing.test.mjs test/test-sets.test.mjs",
     "check": "node tools/check-source.mjs && node tools/runtime-manifest.mjs --verify && node tools/sdk-browser-runtime-manifest.mjs --verify && npm test",
     "runtime:verify": "node tools/runtime-manifest.mjs --verify",
