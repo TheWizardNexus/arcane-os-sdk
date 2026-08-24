@@ -498,7 +498,9 @@ test('portable compatibility accepts newer compatible Core and rejects missing r
     });
 });
 
-test('paired CLI build packages one selected app and its exact dependency closure as verified readers',async t=>{
+// This aggregate now serializes two authenticated package/tamper cycles plus
+// lifecycle proofs; every nested case keeps the default 30-second watchdog.
+test('paired CLI build packages one selected app and its exact dependency closure as verified readers',{timeout:60_000},async t=>{
     const parent=await temporaryDirectory(t,{prefix:'arcane-portable-cli-'});
     const workspaceRoot=path.join(parent,'workspace');
     const toolchainRoot=path.join(parent,'arcane');

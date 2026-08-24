@@ -77,7 +77,19 @@ test('workspace lock metadata and explicit derived leases reject forgery and sib
         assert.equal(document.kind,'arcane-workspace-operation-lock');
         assert.equal(document.operation,'outer-test');
         assert.equal(document.owner.pid,process.pid);
-        assert.equal(document.scope,path.resolve(workspaceRoot));
+        assert.equal(document.scope,lease.workspaceRoot);
+        const [requestedCanonical,scopeCanonical]=await Promise.all([
+            realpath(workspaceRoot),
+            realpath(document.scope)
+        ]);
+        const [requestedIdentity,scopeIdentity]=await Promise.all([
+            lstat(requestedCanonical,{bigint:true}),
+            lstat(scopeCanonical,{bigint:true})
+        ]);
+        assert.equal(requestedIdentity.isDirectory(),true);
+        assert.equal(scopeIdentity.isDirectory(),true);
+        assert.equal(requestedIdentity.dev,scopeIdentity.dev);
+        assert.equal(requestedIdentity.ino,scopeIdentity.ino);
         assert.equal(document.ttlMilliseconds,6*60*60*1000);
         assert.equal(
             Date.parse(document.expiresAt)-Date.parse(document.acquiredAt),
