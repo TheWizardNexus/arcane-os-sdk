@@ -19,3 +19,12 @@ body {
     text-transform: uppercase;
 }
 
+.app-environment {
+    color: var(--muted-text-color, rgb(177, 190, 216));
+}
+
+.app-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}

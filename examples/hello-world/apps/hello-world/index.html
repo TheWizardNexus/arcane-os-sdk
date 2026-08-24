@@ -23,12 +23,20 @@
                 </div>
             </header>
             <div class="arcane-card__body">
+                <p id="app-environment" class="app-environment">Loading the Arcane web runtime.</p>
                 <p id="app-status" role="status" aria-live="polite">Ready to say hello.</p>
-                <button id="app-action" class="arcane-button" type="button">Say hello</button>
+                <div class="app-actions">
+                    <button id="app-action" class="arcane-button" type="button">Say hello</button>
+                    <button
+                        id="native-action"
+                        class="arcane-button arcane-button--secondary"
+                        type="button"
+                        disabled
+                    >Choose a folder (executable)</button>
+                </div>
             </div>
         </section>
     </main>
     <script type="module" src="./apps/hello-world/modules/App.js?v=1"></script>
 </body>
 </html>
-

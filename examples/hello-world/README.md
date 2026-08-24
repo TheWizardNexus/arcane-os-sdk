@@ -63,7 +63,9 @@ npm run run -- --arcane-root "..\Arcane OS"
 
 This Windows artifact is unsigned local-development output, not a production release.
 
-## Project shape
+## Project and runtime shape
+
+After `npm install`, the application source and the installed SDK runtime are separate. The developer owns `apps/`, the descriptors, and the npm files; npm generates `node_modules/` and the lockfile.
 
 ```text
 hello-world/
@@ -76,9 +78,58 @@ hello-world/
 │   ├── hello-world.css
 │   ├── index.html
 │   └── manifest.json
+├── node_modules/                         # npm-generated
+│   └── arcane-os/runtime/
+│       ├── ARCANE_RUNTIME_RELEASE.json   # every runtime path + hash
+│       ├── arcane/                       # SDK-supplied /arcane runtime
+│       │   ├── components/               # 39 files
+│       │   ├── css/                      # all 7 files
+│       │   │   ├── communications.css
+│       │   │   ├── dashboard-config.css
+│       │   │   ├── document-site.css
+│       │   │   ├── layout.css
+│       │   │   ├── primitives.css
+│       │   │   ├── theme.css
+│       │   │   └── utility-workspace.css
+│       │   ├── entities/                 # 15 files
+│       │   ├── img/                      # 10 files
+│       │   ├── modules/                  # 80 files
+│       │   │   ├── AppDataScope.js
+│       │   │   ├── DirectoryPicker.js
+│       │   │   ├── ThemeBootstrap.js
+│       │   │   └── … 77 more
+│       │   └── security/
+│       │       └── arcane-network-policy.json
+│       └── strong-type/
+│           ├── index.js
+│           ├── licence
+│           └── package.json
+├── package-lock.json                     # npm-generated in a real app
 ├── arcane-packager.json
 ├── arcane.lock.json
 └── package.json
 ```
 
-The page owns only its greeting and click behavior. The SDK supplies the shared theme, runtime, package validation, CLI, and native build orchestration.
+The SDK receipt currently inventories exactly 152 files under `arcane/`. During `npm run dev`, the owned server mounts `node_modules/arcane-os/runtime/arcane/` at `/arcane/`. The app does not copy or maintain that directory.
+
+`npm run package` materializes the same locked payload in the browser release:
+
+```text
+dist/hello-world/                         # generated
+├── ARCANE_APP_RELEASE.json
+├── index.html                            # generated redirect
+├── apps/hello-world/                     # five public app files
+├── arcane/
+│   ├── components/                       # 39 files
+│   ├── css/                              # 7 files, including theme.css and primitives.css
+│   ├── entities/                         # 15 files
+│   ├── img/                              # 10 files
+│   ├── modules/                          # 80 files, including the three used by App.js
+│   └── security/                         # arcane-network-policy.json
+├── node_modules/strong-type/             # 3 files
+└── licenses/arcane-os/                   # SDK license notices
+```
+
+HTML URLs such as `./arcane/css/theme.css` resolve from the release root because `index.html` declares `<base href="../../">`. Imports inside `apps/hello-world/modules/App.js` use `../../../arcane/modules/...` because they resolve from the module file itself.
+
+The example uses Arcane's browser-safe theme and app-data helpers to keep a scoped greeting count. In an executable, the theme's read-only preference grant loads the saved Arcane appearance, and `resolveApplicationId()` verifies that the page identity matches the application bound by the host. The injected `globalThis.Arcane` bridge then enables Arcane's capability-gated native folder selector. That bridge is executable infrastructure, not another checked-in file beneath `arcane/`.

@@ -23,8 +23,8 @@
 Set-Location .\hello-world
 npm install</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><div class="callout callout-warning"><strong>Current development checkout</strong><p><code>arcane-os</code> is not yet published. Today, run <code>npm run pack:local</code> in the SDK checkout and install the resulting <code>.tgz</code> through npm. The <a href="../../quick-start/">quick-start guide</a> shows that exact temporary path.</p></div></section>
 
-        <section id="shape"><p class="step-label">Step 02</p><h2>Know the project shape</h2><p>The app owns its source and descriptor. The npm package supplies shared runtime files during packaging; those files are not copied into app source.</p><div class="file-tree"><pre><code>hello-world/
-├── apps/hello-world/
+        <section id="shape"><p class="step-label">Step 02</p><h2>Know the project and runtime shapes</h2><p>After <code>npm install</code>, app-owned source and npm-installed SDK runtime sit beside one another. Developers do not author or copy <code>arcane/</code>; the SDK owns it and its <a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/runtime/ARCANE_RUNTIME_RELEASE.json" target="_blank" rel="noreferrer">runtime receipt <span aria-hidden="true">↗</span></a> inventories every path and hash.</p><div class="file-tree"><pre><code>hello-world/
+├── apps/hello-world/                    # app-owned source
 │   ├── img/icon.png
 │   ├── modules/App.js
 │   ├── test/app.test.mjs
@@ -33,18 +33,59 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
 │   ├── hello-world.css
 │   ├── index.html
 │   └── manifest.json
-├── arcane-packager.json
-├── arcane.lock.json
-└── package.json</code></pre></div></section>
+├── node_modules/                        # npm-generated
+│   └── arcane-os/runtime/
+│       ├── ARCANE_RUNTIME_RELEASE.json  # every runtime path + hash
+│       ├── arcane/                      # SDK-supplied /arcane runtime
+│       │   ├── components/              # 39 files
+│       │   ├── css/                     # all 7 files
+│       │   │   ├── communications.css
+│       │   │   ├── dashboard-config.css
+│       │   │   ├── document-site.css
+│       │   │   ├── layout.css
+│       │   │   ├── primitives.css
+│       │   │   ├── theme.css
+│       │   │   └── utility-workspace.css
+│       │   ├── entities/                # 15 files
+│       │   ├── img/                     # 10 files
+│       │   ├── modules/                 # 80 files
+│       │   │   ├── AppDataScope.js
+│       │   │   ├── DirectoryPicker.js
+│       │   │   ├── ThemeBootstrap.js
+│       │   │   └── … 77 more
+│       │   └── security/
+│       │       └── arcane-network-policy.json
+│       └── strong-type/
+│           ├── index.js
+│           ├── licence
+│           └── package.json
+├── package-lock.json                    # npm-generated in a real app
+├── arcane-packager.json                 # app-owned runtime route policy
+├── arcane.lock.json                     # app-owned runtime pin
+└── package.json                         # app-owned SDK pin and scripts</code></pre></div><p>The pinned runtime currently contains exactly 152 files under <code>arcane/</code>. During <code>npm run dev</code>, the owned server maps the installed directory to <code>/arcane/</code>. During <code>npm run package</code>, it becomes a physical release directory:</p><div class="file-tree"><pre><code>dist/hello-world/                         # generated browser release
+├── ARCANE_APP_RELEASE.json
+├── index.html                           # generated redirect
+├── apps/hello-world/                    # five public app files
+├── arcane/
+│   ├── components/                      # 39 files
+│   ├── css/                             # 7 files
+│   ├── entities/                        # 15 files
+│   ├── img/                             # 10 files
+│   ├── modules/                         # 80 files
+│   └── security/                        # arcane-network-policy.json
+├── node_modules/strong-type/            # 3 files
+└── licenses/arcane-os/                  # SDK license notices</code></pre></div></section>
 
-        <section id="source"><p class="step-label">Step 03</p><h2>Write the smallest visible app</h2><p>The document establishes the app identity and repository-root URL base, then loads the shared Arcane theme before the app stylesheet and module.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/index.html</span><button type="button" data-copy-button>Copy</button></div><pre><code>&lt;!doctype html&gt;
+        <section id="source"><p class="step-label">Step 03</p><h2>Write the smallest visible app</h2><p>The document establishes the app identity and release-root URL base, then loads the shared Arcane theme before the app stylesheet and module. The page offers an ordinary browser greeting and one button that only the injected executable host can enable.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/index.html</span><button type="button" data-copy-button>Copy</button></div><pre><code>&lt;!doctype html&gt;
 &lt;html lang="en"&gt;
 &lt;head&gt;
   &lt;meta charset="utf-8"&gt;
   &lt;meta name="arcane-app-id" content="hello-world"&gt;
   &lt;base href="../../"&gt;
   &lt;meta name="viewport" content="width=device-width, initial-scale=1"&gt;
+  &lt;meta name="theme-color" content="rgb(23, 34, 56)"&gt;
   &lt;title&gt;Arcane Hello World&lt;/title&gt;
+  &lt;link rel="manifest" href="./apps/hello-world/manifest.json"&gt;
   &lt;link rel="stylesheet" href="./arcane/css/theme.css?v=1"&gt;
   &lt;link rel="stylesheet" href="./arcane/css/primitives.css?v=1"&gt;
   &lt;link rel="stylesheet" href="./apps/hello-world/hello-world.css?v=1"&gt;
@@ -52,22 +93,116 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
 &lt;/head&gt;
 &lt;body&gt;
   &lt;main class="app-shell"&gt;
-    &lt;h1&gt;Hello, Arcane World!&lt;/h1&gt;
-    &lt;p id="app-status" role="status" aria-live="polite"&gt;Ready to say hello.&lt;/p&gt;
-    &lt;button id="app-action" class="arcane-button" type="button"&gt;Say hello&lt;/button&gt;
+    &lt;section class="arcane-card" aria-labelledby="app-title"&gt;
+      &lt;header class="arcane-card__header"&gt;
+        &lt;div&gt;
+          &lt;p class="eyebrow"&gt;Arcane application&lt;/p&gt;
+          &lt;h1 id="app-title"&gt;Hello, Arcane World!&lt;/h1&gt;
+        &lt;/div&gt;
+      &lt;/header&gt;
+      &lt;div class="arcane-card__body"&gt;
+        &lt;p id="app-environment" class="app-environment"&gt;Loading the Arcane web runtime.&lt;/p&gt;
+        &lt;p id="app-status" role="status" aria-live="polite"&gt;Ready to say hello.&lt;/p&gt;
+        &lt;div class="app-actions"&gt;
+          &lt;button id="app-action" class="arcane-button" type="button"&gt;Say hello&lt;/button&gt;
+          &lt;button id="native-action" class="arcane-button arcane-button--secondary" type="button" disabled&gt;Choose a folder (executable)&lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/section&gt;
   &lt;/main&gt;
   &lt;script type="module" src="./apps/hello-world/modules/App.js?v=1"&gt;&lt;/script&gt;
 &lt;/body&gt;
-&lt;/html&gt;</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><div class="code-block"><div class="code-bar"><span>apps/hello-world/modules/App.js</span><button type="button" data-copy-button>Copy</button></div><pre><code>const action=document.querySelector('#app-action');
-const status=document.querySelector('#app-status');
+&lt;/html&gt;</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><div class="code-block"><div class="code-bar"><span>apps/hello-world/modules/App.js</span><button type="button" data-copy-button>Copy</button></div><pre><code>import arcaneThemeReady from '../../../arcane/modules/ThemeBootstrap.js?v=1';
+import {
+    resolveApplicationId,
+    resolveApplicationLocalStorageKey
+} from '../../../arcane/modules/AppDataScope.js?v=1';
+import DirectoryPicker from '../../../arcane/modules/DirectoryPicker.js?v=1';
 
-function sayHello(){
-    status.textContent='Hello from Arcane OS!';
+const action=document.querySelector('#app-action');
+const nativeAction=document.querySelector('#native-action');
+const status=document.querySelector('#app-status');
+const environment=document.querySelector('#app-environment');
+
+const directoryPicker=new DirectoryPicker();
+
+let nativePickerReady=false;
+
+await arcaneThemeReady;
+
+const appId=await resolveApplicationId();
+const countKey=resolveApplicationLocalStorageKey('hello-count',{applicationId:appId});
+
+function loadHelloCount(){
+    try{
+        const value=Number(globalThis.localStorage?.getItem(countKey)??0);
+        return Number.isSafeInteger(value)&amp;&amp;value&gt;=0?value:0;
+    }catch{
+        return 0;
+    }
 }
 
-action?.addEventListener('click',sayHello);</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div></section>
+function saveHelloCount(value){
+    try{
+        globalThis.localStorage?.setItem(countKey,String(value));
+    }catch{
+        // The greeting still works when browser persistence is unavailable.
+    }
+}
 
-        <section id="descriptor"><p class="step-label">Step 04</p><h2>Declare what may be packaged and built</h2><p>The schema-2 descriptor is the app-owned identity and policy. It declares no capabilities because this greeting performs no privileged work.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/arcane-app.json · complete descriptor</span><button type="button" data-copy-button>Copy</button></div><pre><code>{
+function sayHello(){
+    const count=loadHelloCount()+1;
+    saveHelloCount(count);
+    status.textContent=`Hello from Arcane OS! Greeting ${count}.`;
+}
+
+async function describeEnvironment(){
+    const runtime=globalThis.Arcane?.runtime?.current?.();
+
+    if(runtime?.native!==true){
+        environment.textContent=
+            `Browser mode · ${appId} · Arcane theme and app-scoped storage`;
+        nativeAction.disabled=true;
+        return;
+    }
+
+    try{
+        const app=await globalThis.Arcane.app.current();
+        nativePickerReady=directoryPicker.available;
+        environment.textContent=
+            `Executable mode · ${app.displayName} ${app.version} · ${runtime.transport}`;
+        nativeAction.disabled=!nativePickerReady;
+    }catch(error){
+        environment.textContent=error?.message||'The Arcane native host is unavailable.';
+        nativeAction.disabled=true;
+    }
+}
+
+async function chooseDirectory(){
+    if(!nativePickerReady) return;
+
+    nativeAction.disabled=true;
+    status.textContent='Opening the native folder selector.';
+
+    try{
+        const result=await directoryPicker.select({
+            title:'Choose a folder for Arcane Hello World'
+        });
+        status.textContent=result.cancelled
+            ?'Folder selection canceled.'
+            :`Arcane selected ${result.path}`;
+    }catch(error){
+        status.textContent=error?.message||'The folder selector could not open.';
+    }finally{
+        nativeAction.disabled=!nativePickerReady;
+    }
+}
+
+action?.addEventListener('click',sayHello);
+nativeAction?.addEventListener('click',chooseDirectory);
+void describeEnvironment();</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><div class="callout callout-info"><strong>Why the paths differ</strong><p>HTML references such as <code>./arcane/css/theme.css</code> resolve against the declared release-root <code>&lt;base&gt;</code>. Static imports resolve from <code>apps/hello-world/modules/App.js</code>, so they climb three levels to <code>../../../arcane/modules/</code>. The executable's <code>globalThis.Arcane</code> bridge is injected by the host; it is not another file inside <code>arcane/</code>.</p></div></section>
+
+        <section id="descriptor"><p class="step-label">Step 04</p><h2>Declare what may be packaged and built</h2><p>The schema-2 descriptor is the app-owned identity and policy. Browser greeting and scoped storage need no native grant. The executable declares a read-only saved-theme preference, its host identity lookup, and the capability-gated operating-system folder selector.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/arcane-app.json · complete descriptor</span><button type="button" data-copy-button>Copy</button></div><pre><code>{
   "schemaVersion": 2,
   "id": "hello-world",
   "displayName": "Arcane Hello World",
@@ -84,7 +219,10 @@ action?.addEventListener('click',sayHello);</code></pre><span class="copy-status
     "exclude": [],
     "shared": ["browser-runtime"]
   },
-  "permissions": { "capabilities": [], "methods": [] },
+  "permissions": {
+    "capabilities": ["filesystem.directory.select", "preferences.read"],
+    "methods": ["app.current", "filesystem.directory.select", "preferences.get"]
+  },
   "security": {
     "connectOrigins": [],
     "frameOrigins": [],

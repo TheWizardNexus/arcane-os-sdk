@@ -5,6 +5,7 @@ import path from 'node:path';
 import {projectPackageManifest,validateAppDescriptor} from '../src/app-descriptor.mjs';
 import test from '../src/testing.mjs';
 import {repositoryRoot} from './helpers.mjs';
+import '../examples/hello-world/apps/hello-world/test/app.test.mjs';
 
 const siteRoot=path.join(repositoryRoot,'site');
 const exampleRoot=path.join(repositoryRoot,'examples','hello-world');
@@ -141,6 +142,13 @@ test('documentation describes the npm-local source-to-executable contract truthf
     assert.match(external,/npm run pack:local[\s\S]*npm install --save-dev --save-exact [^\n]*[.]tgz/u);
     assert.match(external,/packaged HTML, CSS, and JavaScript/u);
     assert.match(hello,/project-local <code>arcane-os<\/code> npm dependency/u);
+    assert.match(hello,/node_modules\/[\s\S]*arcane-os\/runtime\//u);
+    assert.match(hello,/dist\/hello-world\/[\s\S]*arcane\//u);
+    assert.match(hello,/exactly 152 files under <code>arcane\/<\/code>/u);
+    assert.match(hello,/AppDataScope[.]js/u);
+    assert.match(hello,/DirectoryPicker[.]js/u);
+    assert.match(hello,/globalThis[.]Arcane/u);
+    assert.match(hello,/filesystem[.]directory[.]select/u);
     assert.match(hello,/build\/windows-x64\/hello-world\/ArcaneApp-hello-world[.]exe/u);
     assert.match(hello,/Choose build or run/u);
     assert.match(hello,/unsigned local-development output, not a production release/u);
@@ -223,13 +231,14 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         assert.equal((await stat(path.join(exampleRoot,...relative.split('/')))).isFile(),true,relative);
     }
 
-    const [rootPackage,examplePackage,lock,runtimeRelease,authoredDescriptor,packageManifest]=await Promise.all([
+    const [rootPackage,examplePackage,lock,runtimeRelease,authoredDescriptor,packageManifest,packager]=await Promise.all([
         readJson(path.join(repositoryRoot,'package.json')),
         readJson(path.join(exampleRoot,'package.json')),
         readJson(path.join(exampleRoot,'arcane.lock.json')),
         readJson(path.join(repositoryRoot,'runtime','ARCANE_RUNTIME_RELEASE.json')),
         readJson(path.join(appRoot,'arcane-app.json')),
-        readJson(path.join(appRoot,'arcane-package.json'))
+        readJson(path.join(appRoot,'arcane-package.json')),
+        readJson(path.join(exampleRoot,'arcane-packager.json'))
     ]);
     await t.test('pins the current npm and runtime identities',()=>{
         assert.equal(examplePackage.devDependencies['arcane-os'],rootPackage.version);
@@ -238,10 +247,41 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         assert.equal(lock.runtime.upstreamCommit,runtimeRelease.source.commit);
         assert.equal(lock.protocols.arcane,runtimeRelease.source.protocol);
     });
+    await t.test('maps and inventories the documented Arcane runtime exactly',()=>{
+        const runtimePayload=packager.sharedPayloads['browser-runtime']
+            .find(payload=>payload.destination==='arcane');
+        assert.deepEqual(runtimePayload,{
+            source:'node_modules/arcane-os/runtime/arcane',
+            destination:'arcane',
+            include:['components','css','entities','img','modules','security'],
+            exclude:[]
+        });
+
+        const counts={};
+        const arcanePaths=runtimeRelease.files
+            .map(file=>file.path)
+            .filter(filePath=>filePath.startsWith('arcane/'));
+        for(const filePath of arcanePaths){
+            const directory=filePath.split('/')[1];
+            counts[directory]=(counts[directory]??0)+1;
+        }
+        assert.equal(arcanePaths.length,152);
+        assert.deepEqual(counts,{
+            components:39,
+            css:7,
+            entities:15,
+            img:10,
+            modules:80,
+            security:1
+        });
+    });
     await t.test('descriptor validates and projects exactly',()=>{
         const descriptor=validateAppDescriptor(authoredDescriptor,{appId:'hello-world'});
         assert.deepEqual(projectPackageManifest(descriptor),packageManifest);
-        assert.deepEqual(descriptor.permissions,{capabilities:[],methods:[]});
+        assert.deepEqual(descriptor.permissions,{
+            capabilities:['filesystem.directory.select','preferences.read'],
+            methods:['app.current','filesystem.directory.select','preferences.get']
+        });
         assert.deepEqual(descriptor.targets,['browser','windows-x64']);
     });
     await t.test('icon is the maintained native scaffold asset',async()=>{
@@ -264,10 +304,37 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         const bootstrap=html.indexOf('./arcane/modules/ThemeBootstrap.js');
         const appModule=html.indexOf('./apps/hello-world/modules/App.js');
         assert.ok(theme>=0&&primitives>theme&&appStyle>primitives&&bootstrap>appStyle&&appModule>bootstrap);
+        const runtimePaths=new Set(runtimeRelease.files.map(file=>file.path));
+        const htmlRuntimeReferences=[...html.matchAll(
+            /(?:href|src)="[.]\/(arcane\/[^"?]+)(?:[?][^"]*)?"/gu
+        )].map(match=>match[1]).sort();
+        const scriptRuntimeImports=[...script.matchAll(
+            /from\s+['"](?:[.]\.[/]?){3}(arcane\/[^'"?]+)(?:[?][^'"]*)?['"]/gu
+        )].map(match=>match[1]).sort();
+        assert.deepEqual(htmlRuntimeReferences,[
+            'arcane/css/primitives.css',
+            'arcane/css/theme.css',
+            'arcane/modules/ThemeBootstrap.js'
+        ]);
+        assert.deepEqual(scriptRuntimeImports,[
+            'arcane/modules/AppDataScope.js',
+            'arcane/modules/DirectoryPicker.js',
+            'arcane/modules/ThemeBootstrap.js'
+        ]);
+        for(const runtimePath of [...htmlRuntimeReferences,...scriptRuntimeImports]){
+            assert.equal(runtimePaths.has(runtimePath),true,runtimePath);
+        }
         assert.match(script,/function sayHello\(\)/u);
         assert.match(script,/Hello from Arcane OS!/u);
+        assert.match(script,/resolveApplicationId\(\)/u);
+        assert.match(script,/resolveApplicationLocalStorageKey\('hello-count',\{applicationId:appId\}\)/u);
+        assert.match(script,/globalThis[.]Arcane[?][.]runtime[?][.]current/u);
+        assert.match(script,/globalThis[.]Arcane[.]app[.]current\(\)/u);
+        assert.match(script,/directoryPicker[.]select\(/u);
         assert.match(readme,/project-local CLI/u);
         assert.match(readme,/intentionally omits `package-lock[.]json`/u);
+        assert.match(readme,/node_modules\/arcane-os\/runtime\//u);
+        assert.match(readme,/dist\/hello-world\/[\s\S]*arcane\//u);
         assert.match(readme,/build\/windows-x64\/hello-world\/ArcaneApp-hello-world[.]exe/u);
         assert.match(workflow,/npm ci --ignore-scripts/u);
     });

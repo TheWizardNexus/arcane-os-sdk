@@ -24,8 +24,15 @@
     ]
   },
   "permissions": {
-    "capabilities": [],
-    "methods": []
+    "capabilities": [
+      "filesystem.directory.select",
+      "preferences.read"
+    ],
+    "methods": [
+      "app.current",
+      "filesystem.directory.select",
+      "preferences.get"
+    ]
   },
   "security": {
     "connectOrigins": [],
@@ -48,4 +55,3 @@
     "windows-x64"
   ]
 }
-
