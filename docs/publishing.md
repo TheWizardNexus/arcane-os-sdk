@@ -1,42 +1,34 @@
-# Development publication
+# npm publication
 
-## Current branch stage
+## Canonical main and npm channels
 
-Until the first official SDK release, `main` is the single canonical working,
-integration, publication, and documentation branch. Pull requests and pushes
-target `main`, and the complete Node/platform matrix runs there. Do not use a
-separate development branch during this prerelease stage.
+`main` is the single canonical working and publication branch before and after
+the first release. Do not create a development branch. `-dev` versions select
+the npm `dev` dist-tag, while bare numeric stable versions select
+`latest`. These are registry channels, not Git branches.
 
-After the first official release, ordinary work will move to a long-lived
-`dev` branch while `main` remains the canonical released line. That transition
-must be made as one explicit release change that updates branch protections,
-checks, trusted publication rules, documentation channels, and contributor
-instructions together. The future branch name alone grants no authority.
+## Stable and development npm publication
 
-## Development npm publication
+The package version and `publishConfig.tag` must agree exactly: `-dev` uses
+`dev`, and a bare numeric stable version uses `latest`. npm is the canonical
+SDK distribution: application repositories add an exact `arcane-os` project
+dependency and invoke its local CLI with `npm exec -- arcane`. A separate
+global installer, standalone SDK executable, NuGet package, Homebrew formula,
+or OS package is not part of this release surface.
 
-The current development npm version is `0.1.0-dev.5` and `publishConfig.tag` is
-`dev`, so a development publication does not become the default `latest`
-release. Query `npm view arcane-os@dev version` for current registry
-availability; immutable package documentation does not assert mutable registry
-state. npm is the canonical SDK distribution: application repositories add an
-exact `arcane-os` project dependency and invoke its local CLI with
-`npm exec -- arcane`. A separate global installer, standalone SDK executable,
-NuGet package, Homebrew formula, or OS package is not part of this release
-surface. Vanilla Test's C# and Rust lifecycles do not turn this JavaScript SDK
-into a .NET or Rust package.
-
-`Check` first runs the development suite, then one unprivileged producer packs
-one `.tgz` under pinned Node and npm versions. The producer writes a canonical
+`Check` validates the source once, then one unprivileged producer packs one
+`.tgz` under pinned Node and npm versions. The producer writes a canonical
 manifest containing the source SHA, clean-checkout flag, package inventory,
 byte length, SHA-256, npm SHA-1 shasum, and SHA-512 integrity. Windows x64,
 Linux x64, and a real macOS arm64 runner use the declared Node `22.23.2` floor
 and each download that same Actions
 artifact by immutable artifact id. They never repack it. Each runner verifies
 the receipt, installs the tarball into a disposable project, exercises
-`npm exec --offline -- arcane`, and runs a test imported from
-`arcane-os/testing` through the installed package's `arcane-test.mjs`. A final
-readiness job fails unless the producer and the complete native matrix pass.
+`npm exec --offline -- arcane`, and runs one small capability contract through
+the installed package's `arcane-test.mjs`. A final readiness job verifies the
+same artifact's identity, integrity, shasum, license inventory, and content
+boundary once. Browser/process simulations, Pages, Examples, and presentation
+work are post-registry follow-through rather than npm publication gates.
 
 `publish-dev.yml` can run only when manually dispatched from `main` in
 `TheWizardNexus/arcane-os-sdk`. Dispatch requires an authorized npm content
@@ -49,14 +41,19 @@ promotion. Direct trusted publishing is not permitted for that class.
 
 For the standard path, the workflow authenticates a successful `Check` push
 run for that exact `main` SHA, downloads its immutable package artifact,
-reverifies the manifest and bytes, and publishes the downloaded `.tgz`. It
+reverifies the manifest and bytes, derives `dev` or `latest` from the strict
+version, and publishes the downloaded `.tgz`. It
 never invokes `npm pack` or `npm publish .` under publication authority. A
 repository-wide concurrency group prevents simultaneous publication jobs;
 GitHub may replace an older pending dispatch, and each surviving dispatch is
-safe to rerun. Preflight rejects byte mismatches, a backward `dev` move, or any
-dist-tag other than `dev`; an already-published matching version is an
-idempotent success. Post-publication
-verification tolerates npm's publish-time scanning for up to 15 minutes. If
+safe to rerun. Preflight rejects byte mismatches, tag rollback, malformed
+registry state, or any dist-tag other than `dev` and `latest`; an
+already-published matching version is an idempotent success. The historical
+first-version state where both tags identify `0.1.0-dev.5` is accepted only
+with its recorded integrity and shasum and only while no stable version exists.
+Post-publication verification preserves the other channel, checks integrity
+and shasum, and validates trusted-publisher provenance. It tolerates npm's
+publish-time scanning for up to 15 minutes. If
 scanning or manual review remains pending, the workflow reports that state and
 a rerun safely resumes verification without republishing immutable bytes.
 
@@ -73,7 +70,7 @@ integrity. Arcane separately requires the installed package to identify exactly
 as `arcane-os@0.1.0-dev.5` and verifies the locked runtime. A local directory
 `file:` install is intentionally unsupported because it may be linked.
 
-Before the first development publish, or while the registry package is absent:
+The first-version bootstrap established these permanent audit boundaries:
 
 1. Push the intended clean `main` commit and require the complete Check workflow,
    including the exact-artifact Windows/Linux/macOS matrix, to pass.
@@ -93,12 +90,10 @@ Before the first development publish, or while the registry package is absent:
    tarball. Do not rebuild or repack it for this bootstrap. After the package
    exists, standard releases may publish directly through OIDC, while dual-use
    releases must use `npm stage publish` and human 2FA promotion.
-5. Allow for npm publish-time scanning, then verify the registry's
-   `dist.integrity` equals the manifest, verify `dev` is
-   the only dist-tag, add a second appropriate owner, and configure npm trusted
-   publishing for the exact `publish-dev.yml` workflow and `npm` environment.
-   For a dual-use classification, grant stage-only trust instead of direct
-   publish authority.
+5. Verify the registry's `dist.integrity` and shasum. npm's required bootstrap
+   state has both `dev` and `latest` at the immutable `0.1.0-dev.5` bytes
+   until the first stable publish moves only `latest`. The sole trusted
+   publisher is the exact `publish-dev.yml` workflow and `npm` environment.
 6. Later standard development versions may use the workflow's direct OIDC
    authority. A dual-use version must be staged and promoted with human 2FA.
    Any missing policy decision, package bootstrap, environment, publisher
@@ -170,12 +165,12 @@ internal checksums alone do not grant authority.
 Stable versioning, the npm `latest` tag, and an official GitHub release remain a
 separate explicit release decision. Current `main` development does not
 silently convert a `-dev` package into an official release. A stable release
-must publish the same matrix-tested `.tgz` under `latest`; only after registry
+must publish the same source-validated and platform-smoked `.tgz` under
+`latest`; only after registry
 integrity matches may GitHub attach that `.tgz`, manifest, and checksum. Its Git
 tag and GitHub release title must both be the same bare numeric
-`MAJOR.MINOR.PATCH`. The first stable change must also activate the documented
-`dev`/`main` branch transition and protections; prerelease versions do not get a
-misleading numeric GitHub release.
+`MAJOR.MINOR.PATCH`. Prerelease versions do not get a misleading numeric
+GitHub release, and no release creates a Git branch for an npm dist-tag.
 
 ## Documentation publication
 
@@ -188,16 +183,14 @@ It does not rerun the SDK test suite or execute repository build code.
 
 The deployment job holds only the read, Pages, and OIDC permissions required by
 that single checked artifact. The `github-pages` environment remains the final
-deployment authority. A separate `/dev/` documentation channel is deferred to
-the same explicit post-release branch transition described above.
+deployment authority. Documentation channels are post-registry presentation
+work and do not change the canonical source branch.
 
 ## Work-amplification record
 
-The prerelease branch cardinality is one checked `main` SHA, one npm release
-candidate, one static site, and one Pages artifact. Four source-check jobs cover
-two supported Node lines on Windows and Linux. One producer creates the npm
-tarball once; three native consumers execute those exact bytes on Windows,
-Linux, and macOS; one readiness gate aggregates them. Development publication
-and Pages authenticate and reuse that successful exact-SHA evidence. Neither
-rebuilds the SDK package or reruns the suite, and Pages does not create a second
-site placement.
+The release graph is one checked `main` SHA and one npm release candidate. One
+source-validation job runs the suite once; one producer creates the tarball;
+three small installed-package consumers execute those exact bytes on Windows,
+Linux, and macOS; and one readiness job verifies identity and legal inventory.
+OIDC publication reuses that successful exact-SHA artifact without rebuilding.
+Pages and broader presentation work follow registry verification separately.

@@ -1,14 +1,12 @@
 # Arcane OS SDK repository instructions
 
-- Until the first official SDK release, work directly on the single canonical
-  `main` branch; do not create or use a development or feature branch.
-- After the first official release, ongoing work moves to the long-lived `dev`
-  branch and `main` remains the canonical released line. Activate that workflow
-  only as part of the official-release change, with matching checks,
-  publication rules, documentation channels, and branch protections.
-- Current continuous integration, development publication, and documentation
-  workflows authenticate `main`. Reuse exact-SHA evidence instead of rerunning
-  an unchanged check.
+- Work directly on the single canonical `main` branch before and after every
+  release; do not create or use a development or feature branch.
+- `dev` and `latest` are npm dist-tags selected from the strict package
+  version. They are never Git branches and do not change the canonical checkout.
+- Continuous integration and npm publication authenticate the exact `main`
+  SHA. Reuse its immutable artifact evidence instead of rerunning unchanged
+  checks or repacking release bytes.
 - Use plain JavaScript and web standards. Do not introduce TypeScript or TSX.
 - Keep the CLI and graphical clients on one shared headless toolchain contract.
 - Every potentially blocking CLI operation must acknowledge first, own its work, stream progress or heartbeat events, support safe cancellation, and surface a nonzero exit status on failure.
@@ -16,4 +14,6 @@
 - Reuse one immutable verification receipt for unchanged artifact bytes, policy, identity, location, and toolchain. Invalidate before mutation.
 - Applications must use the shared Arcane theme and `ThemeBootstrap.js`; reusable behavior belongs in the Arcane runtime, not an app-local copy.
 - Native adapters accept explicit inputs and must fail honestly when unavailable. Never substitute a browser package for a native executable.
-- Run `npm run check` before committing and pushing.
+- Run the narrow checks that own the changed contract before committing and
+  pushing. The hosted source-validation job runs `npm run check:release` once
+  per SHA; documentation and Pages checks follow registry publication.

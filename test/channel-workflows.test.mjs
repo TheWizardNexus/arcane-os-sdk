@@ -7,27 +7,28 @@ import {repositoryRoot} from './helpers.mjs';
 
 const read=relative=>readFile(path.join(repositoryRoot,...relative.split('/')),'utf8');
 
-test('prerelease repository instructions keep work on canonical main',async()=>{
+test('repository instructions keep every release line on canonical main',async()=>{
     const instructions=await read('AGENTS.md');
-    assert.match(instructions,/Until the first official SDK release[\s\S]*single canonical\s+`main` branch/u);
+    assert.match(instructions,/single canonical `main` branch before and after every\s+release/u);
     assert.match(instructions,/do not create or use a development or feature branch/u);
 });
 
-test('post-release instructions defer dev while keeping main canonical',async()=>{
+test('development and stable channels are npm tags rather than branches',async()=>{
     const instructions=await read('AGENTS.md');
-    assert.match(instructions,/After the first official release[\s\S]*long-lived `dev`/u);
-    assert.match(instructions,/`main` remains the canonical released line/u);
-    assert.match(instructions,/Activate that workflow\s+only as part of the official-release change/u);
+    assert.match(instructions,/`dev` and `latest` are npm dist-tags/u);
+    assert.match(instructions,/They are never Git branches/u);
+    assert.doesNotMatch(instructions,/long-lived `dev`/u);
 });
 
-test('publication guidance preserves the same staged branch transition',async()=>{
+test('publication guidance preserves canonical main and two strict npm channels',async()=>{
     const publishing=await read('docs/publishing.md');
-    assert.match(publishing,/Until the first official SDK release, `main` is the single canonical/u);
-    assert.match(publishing,/After the first official release, ordinary work will move to a long-lived\s+`dev` branch while `main` remains the canonical released line/u);
-    assert.match(publishing,/future branch name alone grants no authority/u);
+    assert.match(publishing,/`main` is the single canonical working and publication branch/u);
+    assert.match(publishing,/`-dev` versions select\s+the npm `dev` dist-tag/u);
+    assert.match(publishing,/numeric stable versions select\s+`latest`/u);
+    assert.doesNotMatch(publishing,/long-lived\s+`dev` branch/u);
 });
 
-test('premature promotion and dual-channel implementation is absent',async()=>{
+test('branch-promotion machinery remains absent',async()=>{
     const retired=[
         '.github/workflows/promote-main.yml',
         'tools/build-pages-channels.mjs'
@@ -54,8 +55,13 @@ test('Check validates once and runs one tiny installed-artifact smoke on each su
     assert.match(artifactContract,/node_modules','arcane-os'/u);
     assert.match(artifactContract,/installedTestRunner/u);
     assert.match(artifactContract,/\['exec','--offline','--','arcane','--version'\]/u);
-    assert.match(workflow,/source_validation:[\s\S]*npm run check/u);
-    assert.equal(workflow.match(/npm run check/gu)?.length,1);
+    assert.match(workflow,/source_validation:[\s\S]*npm run check:release/u);
+    assert.equal(workflow.match(/npm run check:release/gu)?.length,1);
+    assert.doesNotMatch(workflow,/npm run check(?:\s|$)/mu);
+    assert.doesNotMatch(
+        packageDocument.scripts?.['test:functional:release']??'',
+        /reference-completeness\.test\.mjs|site\.test\.mjs/u
+    );
     const sourceStart=workflow.indexOf('  source_validation:');
     const producerStart=workflow.indexOf('  pack_npm_release:');
     assert.ok(sourceStart>=0&&producerStart>sourceStart);
@@ -97,7 +103,7 @@ test('Check validates once and runs one tiny installed-artifact smoke on each su
     assert.doesNotMatch(workflow,/npm install --global/u);
 });
 
-test('development publication consumes the tested tarball without repacking',async()=>{
+test('channel-aware publication consumes the tested tarball without repacking',async()=>{
     const workflow=await read('.github/workflows/publish-dev.yml');
     assert.match(workflow,/actions\/download-artifact@[0-9a-f]{40}/u);
     assert.match(workflow,/artifact-ids: \$\{\{ steps\.readiness\.outputs\['artifact-id'\] \}\}/u);
@@ -108,7 +114,11 @@ test('development publication consumes the tested tarball without repacking',asy
     assert.match(workflow,/npm-registry-publication\.mjs preflight/u);
     assert.match(workflow,/npm-registry-publication\.mjs verify[\s\S]*--max-wait-ms 900000/u);
     assert.match(workflow,/npm publish "\$RELEASE_ROOT\/arcane-os-\$\{VERSION\}\.tgz"/u);
-    assert.match(workflow,/one-time npm package bootstrap/u);
+    assert.match(workflow,/--tag "\$CHANNEL" --provenance/u);
+    assert.match(workflow,/npm audit signatures[\s\S]*--include-attestations/u);
+    assert.match(workflow,/npm-registry-publication\.mjs provenance/u);
+    assert.equal(workflow.match(/id-token:\s*write/gu)?.length,1);
+    assert.doesNotMatch(workflow,/NODE_AUTH_TOKEN|npm dist-tag (?:add|rm)/u);
     assert.doesNotMatch(workflow,/npm publish (?:--[^\n ]+ )*\.(?:\s|$)/u);
     assert.doesNotMatch(workflow,/npm pack(?:\s|$)/u);
 });

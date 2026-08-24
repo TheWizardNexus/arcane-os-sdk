@@ -405,7 +405,8 @@ test('CI, reusable app release, and trusted publishing workflows retain narrow a
     });
     await t.test('Check validates source once and smokes every supported package platform',()=>{
         assert.match(checkWorkflow,/source_validation:[\s\S]*runs-on: ubuntu-24\.04/u);
-        assert.equal(checkWorkflow.match(/npm run check/gu)?.length,1);
+        assert.equal(checkWorkflow.match(/npm run check:release/gu)?.length,1);
+        assert.doesNotMatch(checkWorkflow,/npm run check(?:\s|$)/mu);
         assert.doesNotMatch(
             checkWorkflow.slice(
                 checkWorkflow.indexOf('  source_validation:'),
@@ -429,16 +430,16 @@ test('CI, reusable app release, and trusted publishing workflows retain narrow a
         assert.doesNotMatch(checkWorkflow,/npm install --global/u);
     });
 
-    await t.test('development publishing is manual and restricted to canonical main',()=>{
+    await t.test('npm publishing is manual and restricted to canonical main',()=>{
         assert.match(publishWorkflow,/workflow_dispatch:/u);
-        assert.match(publishWorkflow,/id-token:\s*write/u);
+        assert.equal(publishWorkflow.match(/id-token:\s*write/gu)?.length,1);
         assert.match(publishWorkflow,/if:[^\n]*github\.ref == 'refs\/heads\/main'/u);
         assert.match(publishWorkflow,/environment:\s*\n\s+name:\s*npm/u);
         assert.match(publishWorkflow,/test "\$GITHUB_REPOSITORY" = "TheWizardNexus\/arcane-os-sdk"/u);
         assert.match(publishWorkflow,/test "\$GITHUB_REF" = "refs\/heads\/main"/u);
         assert.match(publishWorkflow,/actions:\s*read/u);
     });
-    await t.test('development publishing reuses the exact successful main Check',()=>{
+    await t.test('npm publishing reuses the exact successful main Check',()=>{
         assert.match(publishWorkflow,/actions\/workflows\/check\.yml\/runs/u);
         assert.match(publishWorkflow,/-f branch=main/u);
         assert.match(publishWorkflow,/-f event=push/u);
@@ -452,7 +453,13 @@ test('CI, reusable app release, and trusted publishing workflows retain narrow a
         assert.match(publishWorkflow,/test "\$\(npm --version\)" = "11\.19\.0"/u);
         assert.match(publishWorkflow,/actions\/download-artifact@[0-9a-f]{40}/u);
         assert.match(publishWorkflow,/npm publish "\$RELEASE_ROOT\/arcane-os-\$\{VERSION\}\.tgz"/u);
-        assert.doesNotMatch(publishWorkflow,/npm install --global|npm pack(?:\s|$)/u);
+        assert.match(publishWorkflow,/--tag "\$CHANNEL" --provenance/u);
+        assert.match(publishWorkflow,/npm audit signatures[\s\S]*--include-attestations/u);
+        assert.match(publishWorkflow,/npm-registry-publication\.mjs provenance/u);
+        assert.doesNotMatch(
+            publishWorkflow,
+            /npm install --global|npm pack(?:\s|$)|NODE_AUTH_TOKEN|npm dist-tag (?:add|rm)/u
+        );
     });
     await t.test('app release is reusable, single-app, and exact-SDK bound',()=>{
         assert.match(appReleaseWorkflow,/workflow_call:/u);

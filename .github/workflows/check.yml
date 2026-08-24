@@ -29,8 +29,8 @@ jobs:
           package-manager-cache: false
       - name: Install exact dependencies
         run: npm ci --ignore-scripts
-      - name: Run the authoritative source validation once
-        run: npm run check
+      - name: Run the authoritative release-source validation once
+        run: npm run check:release
 
   pack_npm_release:
     name: Pack one exact npm release artifact

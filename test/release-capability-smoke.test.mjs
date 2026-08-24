@@ -49,7 +49,6 @@ test('the exact npm artifact exposes the supported installed capability contract
 
     const installed=await runNpm([
         'install',
-        '--offline',
         '--ignore-scripts',
         '--no-audit',
         '--no-fund',
