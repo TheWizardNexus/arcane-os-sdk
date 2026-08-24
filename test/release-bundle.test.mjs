@@ -27,7 +27,7 @@ import {
 } from '../src/release-bundle.mjs';
 import {temporaryDirectory} from './helpers.mjs';
 
-const GOLDEN_BUNDLE_SHA256='d869ae8a8f1e45db671586a467f221c8ca5685c295d5e5d7837a9ab04c818ac2';
+const GOLDEN_BUNDLE_SHA256='2132929602a9d3d16ff67086082ffa2df8424cf44496128e4501f3e18b9245e3';
 
 async function writeJson(filePath,value){
     await mkdir(path.dirname(filePath),{recursive:true});
@@ -224,7 +224,7 @@ function unsupportedSdkArchive(good){
     const tar=Buffer.from(gunzipSync(good));
     const first=tarSpans(tar).spans[0];
     const manifest=JSON.parse(tar.subarray(first.dataOffset,first.dataOffset+first.size).toString('utf8'));
-    manifest.sdk.version='0.1.0-dev.3';
+    manifest.sdk.version='9.9.9';
     const changed=Buffer.from(`${JSON.stringify(manifest,null,2)}\n`);
     assert.equal(changed.length,first.size);
     changed.copy(tar,first.dataOffset);
