@@ -1,0 +1,2519 @@
+{
+  "schemaVersion": 1,
+  "sdkVersion": "0.1.0-dev.4",
+  "environment": {
+    "runtime": "Node.js",
+    "minimumVersion": "22.23.2",
+    "moduleSystem": "ESM"
+  },
+  "memberCount": 151,
+  "members": [
+    {
+      "id": "root:APP_BUNDLE_DESCRIPTOR_NAME",
+      "name": "APP_BUNDLE_DESCRIPTOR_NAME",
+      "displayName": "APP_BUNDLE_DESCRIPTOR_NAME",
+      "kind": "constant",
+      "signature": "const APP_BUNDLE_DESCRIPTOR_NAME",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/release-bundle"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Canonical descriptor filename stored in an external application release bundle.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:APP_BUNDLE_EXTENSION",
+      "name": "APP_BUNDLE_EXTENSION",
+      "displayName": "APP_BUNDLE_EXTENSION",
+      "kind": "constant",
+      "signature": "const APP_BUNDLE_EXTENSION",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/release-bundle"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Required filename extension for deterministic external application release bundles.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:APP_BUNDLE_FORMAT",
+      "name": "APP_BUNDLE_FORMAT",
+      "displayName": "APP_BUNDLE_FORMAT",
+      "kind": "constant",
+      "signature": "const APP_BUNDLE_FORMAT",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/release-bundle"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Canonical archive encoding used by external application release bundles.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:APP_BUNDLE_KIND",
+      "name": "APP_BUNDLE_KIND",
+      "displayName": "APP_BUNDLE_KIND",
+      "kind": "constant",
+      "signature": "const APP_BUNDLE_KIND",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/release-bundle"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Stable manifest kind identifying an Arcane application release bundle.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:APP_BUNDLE_LIMITS",
+      "name": "APP_BUNDLE_LIMITS",
+      "displayName": "APP_BUNDLE_LIMITS",
+      "kind": "constant",
+      "signature": "const APP_BUNDLE_LIMITS",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/release-bundle"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Frozen compressed-size, expanded-size, entry-count, and path limits enforced by bundle creation and verification.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:APP_BUNDLE_MANIFEST_NAME",
+      "name": "APP_BUNDLE_MANIFEST_NAME",
+      "displayName": "APP_BUNDLE_MANIFEST_NAME",
+      "kind": "constant",
+      "signature": "const APP_BUNDLE_MANIFEST_NAME",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/release-bundle"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Canonical bundle-envelope manifest filename.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:APP_BUNDLE_RELEASE_PATH",
+      "name": "APP_BUNDLE_RELEASE_PATH",
+      "displayName": "APP_BUNDLE_RELEASE_PATH",
+      "kind": "constant",
+      "signature": "const APP_BUNDLE_RELEASE_PATH",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/release-bundle"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Canonical path of the packaged release manifest inside a bundle payload.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:APP_BUNDLE_SCHEMA_VERSION",
+      "name": "APP_BUNDLE_SCHEMA_VERSION",
+      "displayName": "APP_BUNDLE_SCHEMA_VERSION",
+      "kind": "constant",
+      "signature": "const APP_BUNDLE_SCHEMA_VERSION",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/release-bundle"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Current immutable bundle-envelope schema version.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:APP_BUNDLE_SUPPORTED_SDK_VERSIONS",
+      "name": "APP_BUNDLE_SUPPORTED_SDK_VERSIONS",
+      "displayName": "APP_BUNDLE_SUPPORTED_SDK_VERSIONS",
+      "kind": "constant",
+      "signature": "const APP_BUNDLE_SUPPORTED_SDK_VERSIONS",
+      "entrypoints": [
+        "arcane-os/release-bundle"
+      ],
+      "primaryImport": "arcane-os/release-bundle",
+      "group": "Packaging and release bundles",
+      "summary": "Exact SDK generations accepted by this bundle verifier.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:APP_CONFIG_NAME",
+      "name": "APP_CONFIG_NAME",
+      "displayName": "APP_CONFIG_NAME",
+      "kind": "constant",
+      "signature": "const APP_CONFIG_NAME",
+      "entrypoints": [
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os/packager",
+      "group": "Packaging and release bundles",
+      "summary": "Canonical schema-1 application package configuration filename used by the packager.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:APP_DESCRIPTOR_NAME",
+      "name": "APP_DESCRIPTOR_NAME",
+      "displayName": "APP_DESCRIPTOR_NAME",
+      "kind": "constant",
+      "signature": "const APP_DESCRIPTOR_NAME",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Runtime and app descriptors",
+      "summary": "Canonical schema-2 application descriptor filename.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:APP_DESCRIPTOR_SCHEMA_VERSION",
+      "name": "APP_DESCRIPTOR_SCHEMA_VERSION",
+      "displayName": "APP_DESCRIPTOR_SCHEMA_VERSION",
+      "kind": "constant",
+      "signature": "const APP_DESCRIPTOR_SCHEMA_VERSION",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Runtime and app descriptors",
+      "summary": "Current authored application descriptor schema version.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:appDescriptorSha256",
+      "name": "appDescriptorSha256",
+      "displayName": "appDescriptorSha256()",
+      "kind": "function",
+      "signature": "appDescriptorSha256(descriptor)",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Runtime and app descriptors",
+      "summary": "Returns the SHA-256 digest of the canonical validated schema-2 application descriptor.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:ARCANE_INTEGRATED_PROVIDER_RELATIVE_PATH",
+      "name": "ARCANE_INTEGRATED_PROVIDER_RELATIVE_PATH",
+      "displayName": "ARCANE_INTEGRATED_PROVIDER_RELATIVE_PATH",
+      "kind": "constant",
+      "signature": "const ARCANE_INTEGRATED_PROVIDER_RELATIVE_PATH",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/integrated-provider"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Frozen repository-relative path of Arcane OS's integrated shared-development provider.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:ARCANE_MACHINE_BUNDLE_VERSION",
+      "name": "ARCANE_MACHINE_BUNDLE_VERSION",
+      "displayName": "ARCANE_MACHINE_BUNDLE_VERSION",
+      "kind": "constant",
+      "signature": "const ARCANE_MACHINE_BUNDLE_VERSION",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Identity and protocol constants",
+      "summary": "Exact Arcane machine-bundle generation paired with this SDK runtime.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:ARCANE_NATIVE_PROVIDER_PATHS",
+      "name": "ARCANE_NATIVE_PROVIDER_PATHS",
+      "displayName": "ARCANE_NATIVE_PROVIDER_PATHS",
+      "kind": "constant",
+      "signature": "const ARCANE_NATIVE_PROVIDER_PATHS",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/native-provider"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Frozen target-to-provider path registry for native development providers.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:ARCANE_PORTABLE_PROVIDER_PATH",
+      "name": "ARCANE_PORTABLE_PROVIDER_PATH",
+      "displayName": "ARCANE_PORTABLE_PROVIDER_PATH",
+      "kind": "constant",
+      "signature": "const ARCANE_PORTABLE_PROVIDER_PATH",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/native-provider"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Compatibility alias for the portable provider path.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:ARCANE_PROTOCOL",
+      "name": "ARCANE_PROTOCOL",
+      "displayName": "ARCANE_PROTOCOL",
+      "kind": "constant",
+      "signature": "const ARCANE_PROTOCOL",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Identity and protocol constants",
+      "summary": "Application-facing Arcane bridge protocol required by this SDK.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:ARCANE_UPSTREAM_COMMIT",
+      "name": "ARCANE_UPSTREAM_COMMIT",
+      "displayName": "ARCANE_UPSTREAM_COMMIT",
+      "kind": "constant",
+      "signature": "const ARCANE_UPSTREAM_COMMIT",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Identity and protocol constants",
+      "summary": "Exact Arcane OS source commit from which the synchronized runtime was built.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:ARCANE_UPSTREAM_REPOSITORY",
+      "name": "ARCANE_UPSTREAM_REPOSITORY",
+      "displayName": "ARCANE_UPSTREAM_REPOSITORY",
+      "kind": "constant",
+      "signature": "const ARCANE_UPSTREAM_REPOSITORY",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Identity and protocol constants",
+      "summary": "Canonical upstream Arcane OS repository URL.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:ArcaneError",
+      "name": "ArcaneError",
+      "displayName": "ArcaneError",
+      "kind": "class",
+      "signature": "new ArcaneError(code, message, {details, cause, exitCode}={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Errors",
+      "summary": "Normalized SDK error class carrying a stable code, human message, optional resolution details, cause, and exit status.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "ArcaneError and JSON-safe error normalization"
+    },
+    {
+      "id": "root:assertIntegratedNativeToolchain",
+      "name": "assertIntegratedNativeToolchain",
+      "displayName": "assertIntegratedNativeToolchain()",
+      "kind": "function",
+      "signature": "assertIntegratedNativeToolchain({workspaceMode, workspaceRoot, toolchainRoot, target}={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Requires an integrated workspace and selected native toolchain root to resolve to the same canonical Arcane checkout.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:assertIntegratedPortableToolchain",
+      "name": "assertIntegratedPortableToolchain",
+      "displayName": "assertIntegratedPortableToolchain()",
+      "kind": "function",
+      "signature": "assertIntegratedPortableToolchain(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Portable-target compatibility wrapper for the integrated native checkout assertion.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:assertNativeApplicationToolchainCompatibility",
+      "name": "assertNativeApplicationToolchainCompatibility",
+      "displayName": "assertNativeApplicationToolchainCompatibility()",
+      "kind": "function",
+      "signature": "assertNativeApplicationToolchainCompatibility({prepared, toolchainReceipt}={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Checks a prepared native toolchain receipt against the selected application's declared Core requirements.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:assertNativeToolchainCompatibility",
+      "name": "assertNativeToolchainCompatibility",
+      "displayName": "assertNativeToolchainCompatibility()",
+      "kind": "function",
+      "signature": "assertNativeToolchainCompatibility({ appDescriptor, toolchainReceipt, minimumCoreVersion }={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/native"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Validates that a toolchain receipt provides the required Core version, protocol, features, capabilities, and methods.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:assertPortableToolchainCompatibility",
+      "name": "assertPortableToolchainCompatibility",
+      "displayName": "assertPortableToolchainCompatibility()",
+      "kind": "function",
+      "signature": "assertPortableToolchainCompatibility(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Portable-target compatibility wrapper for native application/toolchain admission.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:assessArcaneOllama",
+      "name": "assessArcaneOllama",
+      "displayName": "assessArcaneOllama()",
+      "kind": "function",
+      "signature": "async assessArcaneOllama({ signal, onEvent, platform=process.platform, run=runProcess, fileExists=exists }={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Performs a read-only Microsoft NT assessment of the managed ArcaneOllama service and reports unsupported hosts honestly.",
+      "availability": "Node; Microsoft NT managed-service assessment",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:authenticateAppReleaseAuthority",
+      "name": "authenticateAppReleaseAuthority",
+      "displayName": "authenticateAppReleaseAuthority()",
+      "kind": "function",
+      "signature": "async authenticateAppReleaseAuthority(receipt, { releaseRoot, expectedPackageConfig, expectedDescriptor, signal }={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Authenticates that a same-process app release receipt also carries authored descriptor authority for external delivery.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:authenticateAppReleaseReceipt",
+      "name": "authenticateAppReleaseReceipt",
+      "displayName": "authenticateAppReleaseReceipt()",
+      "kind": "function",
+      "signature": "async authenticateAppReleaseReceipt(receipt, options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Authenticates a same-process verified application release receipt against its exact current filesystem state.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:authenticateNativeBuildPlan",
+      "name": "authenticateNativeBuildPlan",
+      "displayName": "authenticateNativeBuildPlan()",
+      "kind": "function",
+      "signature": "async authenticateNativeBuildPlan(plan, { expectedNativeBuilder, expectedTarget, signal, onEvent }={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/native"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Authenticates an immutable same-process native build plan and its bound receipts before execution.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:authenticateRuntimeReceipt",
+      "name": "authenticateRuntimeReceipt",
+      "displayName": "authenticateRuntimeReceipt()",
+      "kind": "function",
+      "signature": "async authenticateRuntimeReceipt(receipt, { runtimeRoot=path.join(sdkRoot, 'runtime'), signal }={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Runtime and app descriptors",
+      "summary": "Authenticates a same-process runtime receipt against the exact runtime root and current file identities.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:authenticateSharedPayloadSnapshot",
+      "name": "authenticateSharedPayloadSnapshot",
+      "displayName": "authenticateSharedPayloadSnapshot()",
+      "kind": "function",
+      "signature": "async authenticateSharedPayloadSnapshot(receipt, options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Authenticates the same-process immutable shared-payload snapshot consumed by app packaging.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:buildApplication",
+      "name": "buildApplication",
+      "displayName": "buildApplication()",
+      "kind": "function",
+      "signature": "async buildApplication(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Headless toolchain operations",
+      "summary": "Builds and retained-verifies one explicitly selected native target through one paired provider.",
+      "availability": "Node; selected operation may produce browser or native output",
+      "protocol": "Shared headless operation API + arcane-cli-events/1",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:buildTarget",
+      "name": "buildTarget",
+      "displayName": "buildTarget()",
+      "kind": "function",
+      "signature": "async buildTarget(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/targets"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Invokes one target adapter build with explicit app, target, and artifact inputs.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:bumpVersion",
+      "name": "bumpVersion",
+      "displayName": "bumpVersion()",
+      "kind": "function",
+      "signature": "async bumpVersion(options)",
+      "entrypoints": [
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os/packager",
+      "group": "Packaging and release bundles",
+      "summary": "Updates one selected app version with a validated semantic-version bump through the packager boundary.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:bundleApplication",
+      "name": "bundleApplication",
+      "displayName": "bundleApplication()",
+      "kind": "function",
+      "signature": "async bundleApplication(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Headless toolchain operations",
+      "summary": "Creates one deterministic external application bundle from one authenticated packaged release.",
+      "availability": "Node; selected operation may produce browser or native output",
+      "protocol": "Shared headless operation API + arcane-cli-events/1",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:checkApplication",
+      "name": "checkApplication",
+      "displayName": "checkApplication()",
+      "kind": "function",
+      "signature": "async checkApplication(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Headless toolchain operations",
+      "summary": "Runs the selected application or integrated shared validation boundary.",
+      "availability": "Node; selected operation may produce browser or native output",
+      "protocol": "Shared headless operation API + arcane-cli-events/1",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:CLI_EVENT_PROTOCOL",
+      "name": "CLI_EVENT_PROTOCOL",
+      "displayName": "CLI_EVENT_PROTOCOL",
+      "kind": "constant",
+      "signature": "const CLI_EVENT_PROTOCOL",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Identity and protocol constants",
+      "summary": "Version identifier for normalized CLI JSON and NDJSON event envelopes.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:CLI_NAME",
+      "name": "CLI_NAME",
+      "displayName": "CLI_NAME",
+      "kind": "constant",
+      "signature": "const CLI_NAME",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Identity and protocol constants",
+      "summary": "Primary command name presented by the SDK.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:createApplication",
+      "name": "createApplication",
+      "displayName": "createApplication()",
+      "kind": "function",
+      "signature": "async createApplication(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Headless toolchain operations",
+      "summary": "Creates one new external application workspace through the shared headless toolchain.",
+      "availability": "Node; selected operation may produce browser or native output",
+      "protocol": "Shared headless operation API + arcane-cli-events/1",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:createAppReleaseBundle",
+      "name": "createAppReleaseBundle",
+      "displayName": "createAppReleaseBundle()",
+      "kind": "function",
+      "signature": "async createAppReleaseBundle({ receipt, releaseRoot, outputPath, overwrite=false, signal, onEvent }={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/release-bundle"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Writes one deterministic USTAR+gzip external application bundle from an authenticated authored release receipt.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:createCanonicalUstarHeader",
+      "name": "createCanonicalUstarHeader",
+      "displayName": "createCanonicalUstarHeader()",
+      "kind": "function",
+      "signature": "createCanonicalUstarHeader(entryPath, size)",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/release-bundle"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Builds the exact 512-byte canonical USTAR header for one validated bundle entry.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:createNativeBuildPlan",
+      "name": "createNativeBuildPlan",
+      "displayName": "createNativeBuildPlan()",
+      "kind": "function",
+      "signature": "async createNativeBuildPlan({ nativeBuilder, toolchainRoot, toolchainReceipt, appReleaseRoot, appReleaseReceipt, appDescriptor, dependencyReleases=[], providerGeneration, minimumCoreVersion, protectedRoots=[], outputRoot, targetRequest, signal, onEvent }={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/native"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Creates one immutable, authenticated, single-attempt native plan binding app, dependencies, toolchain, request, and output roots.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:createNativeTargetAdapter",
+      "name": "createNativeTargetAdapter",
+      "displayName": "createNativeTargetAdapter()",
+      "kind": "function",
+      "signature": "createNativeTargetAdapter({targetId, nativeBuilder}={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/targets"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Adapts one validated native builder to the common target-adapter contract.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:createReporter",
+      "name": "createReporter",
+      "displayName": "createReporter()",
+      "kind": "function",
+      "signature": "createReporter({ command, output='human', stdout=process.stdout, stderr=process.stderr, operationId=randomUUID(), clock=()=>new Date() }={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/events"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Events, processes, and testing",
+      "summary": "Creates the ordered CLI reporter that normalizes accepted, progress, terminal, JSON, and NDJSON event delivery.",
+      "availability": "Node",
+      "protocol": "arcane-cli-events/1",
+      "normalization": "SDK event/error/report normalization"
+    },
+    {
+      "id": "root:createToolchain",
+      "name": "createToolchain",
+      "displayName": "createToolchain()",
+      "kind": "function",
+      "signature": "createToolchain(defaults={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Headless toolchain operations",
+      "summary": "Returns a frozen convenience object that applies shared defaults to every headless application operation.",
+      "availability": "Node; selected operation may produce browser or native output",
+      "protocol": "Shared headless operation API + arcane-cli-events/1",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:createWorkspace",
+      "name": "createWorkspace",
+      "displayName": "createWorkspace()",
+      "kind": "function",
+      "signature": "async createWorkspace({ targetPath, appId, displayName, target='browser', initializeGit=false, signal, onEvent })",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Scaffolds one new external repository-shaped workspace and one selected application.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:default",
+      "name": "default",
+      "displayName": "default()",
+      "kind": "function",
+      "signature": "default(name, optionsOrCallback, maybeCallback)",
+      "entrypoints": [
+        "arcane-os/testing"
+      ],
+      "primaryImport": "arcane-os/testing",
+      "group": "Events, processes, and testing",
+      "summary": "Default-export alias of the public `test` registration function.",
+      "availability": "Node",
+      "protocol": "Node ESM / owned process or test lifecycle",
+      "normalization": "SDK event/error/report normalization"
+    },
+    {
+      "id": "root:DEFAULT_TEST_TIMEOUT_MS",
+      "name": "DEFAULT_TEST_TIMEOUT_MS",
+      "displayName": "DEFAULT_TEST_TIMEOUT_MS",
+      "kind": "constant",
+      "signature": "const DEFAULT_TEST_TIMEOUT_MS",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/testing"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Events, processes, and testing",
+      "summary": "Default timeout applied by the public isolated test API.",
+      "availability": "Node",
+      "protocol": "Node ESM / owned process or test lifecycle",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:describeTargets",
+      "name": "describeTargets",
+      "displayName": "describeTargets()",
+      "kind": "function",
+      "signature": "async describeTargets(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Headless toolchain operations",
+      "summary": "Returns the normalized target catalog through the headless operation lifecycle.",
+      "availability": "Node; selected operation may produce browser or native output",
+      "protocol": "Shared headless operation API + arcane-cli-events/1",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:developApplication",
+      "name": "developApplication",
+      "displayName": "developApplication()",
+      "kind": "function",
+      "signature": "async developApplication(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Headless toolchain operations",
+      "summary": "Starts one owned browser development server for the selected application.",
+      "availability": "Node; selected operation may produce browser or native output",
+      "protocol": "Shared headless operation API + arcane-cli-events/1",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:discoverPackagerApps",
+      "name": "discoverPackagerApps",
+      "displayName": "discoverPackagerApps()",
+      "kind": "function",
+      "signature": "async discoverPackagerApps({workspaceRoot:requestedWorkspaceRoot})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Root-entry alias for the packager-specific application discovery function.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:doctorApplication",
+      "name": "doctorApplication",
+      "displayName": "doctorApplication()",
+      "kind": "function",
+      "signature": "async doctorApplication(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Runs the read-only SDK/runtime/workspace and optional local-AI diagnostic operation.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:doctorNativeTarget",
+      "name": "doctorNativeTarget",
+      "displayName": "doctorNativeTarget()",
+      "kind": "function",
+      "signature": "async doctorNativeTarget(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Loads and diagnoses one explicit native provider and target without building an application.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:ERROR_CODES",
+      "name": "ERROR_CODES",
+      "displayName": "ERROR_CODES",
+      "kind": "constant",
+      "signature": "const ERROR_CODES",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Errors",
+      "summary": "Frozen registry of stable SDK error-code strings.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:errorRecord",
+      "name": "errorRecord",
+      "displayName": "errorRecord()",
+      "kind": "function",
+      "signature": "errorRecord(error)",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Errors",
+      "summary": "Projects an error into the JSON-safe normalized public error record.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "ArcaneError and JSON-safe error normalization"
+    },
+    {
+      "id": "root:executeNativeBuildPlan",
+      "name": "executeNativeBuildPlan",
+      "displayName": "executeNativeBuildPlan()",
+      "kind": "function",
+      "signature": "async executeNativeBuildPlan(plan, { expectedNativeBuilder, expectedTarget, signal, onEvent }={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/native"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Consumes one authenticated single-attempt native plan through its bound builder and event/cancellation lifecycle.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:executeOperation",
+      "name": "executeOperation",
+      "displayName": "executeOperation()",
+      "kind": "function",
+      "signature": "async executeOperation(command, options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Headless toolchain operations",
+      "summary": "Dispatches one named headless SDK operation with normalized acceptance, events, cancellation, and failure.",
+      "availability": "Node; selected operation may produce browser or native output",
+      "protocol": "Shared headless operation API + arcane-cli-events/1",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:fail",
+      "name": "fail",
+      "displayName": "fail()",
+      "kind": "function",
+      "signature": "fail(code, message, options)",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Errors",
+      "summary": "Throws a normalized `ArcaneError` with the supplied code and context.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "ArcaneError and JSON-safe error normalization"
+    },
+    {
+      "id": "root:getSdkRoot",
+      "name": "getSdkRoot",
+      "displayName": "getSdkRoot()",
+      "kind": "function",
+      "signature": "getSdkRoot()",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Runtime and app descriptors",
+      "summary": "Returns the absolute installed SDK package root.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:getTargetAdapter",
+      "name": "getTargetAdapter",
+      "displayName": "getTargetAdapter()",
+      "kind": "function",
+      "signature": "getTargetAdapter(targetId)",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/targets"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Returns the registered adapter for one exact target id or fails for an unknown target.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:incrementSemver",
+      "name": "incrementSemver",
+      "displayName": "incrementSemver()",
+      "kind": "function",
+      "signature": "incrementSemver(value, bump, preid)",
+      "entrypoints": [
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os/packager",
+      "group": "Packaging and release bundles",
+      "summary": "Returns a validated semantic version incremented by the requested bump and optional prerelease id.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:initializeApplication",
+      "name": "initializeApplication",
+      "displayName": "initializeApplication()",
+      "kind": "function",
+      "signature": "async initializeApplication(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Initializes missing Arcane files for one app in an existing external or integrated workspace.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:initWorkspace",
+      "name": "initWorkspace",
+      "displayName": "initWorkspace()",
+      "kind": "function",
+      "signature": "async initWorkspace({ workspaceRoot=process.cwd(), appId, displayName, target='browser', signal, onEvent })",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Adds one application scaffold to an existing workspace without overwriting incompatible files.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:inspectApp",
+      "name": "inspectApp",
+      "displayName": "inspectApp()",
+      "kind": "function",
+      "signature": "async inspectApp({workspaceRoot, appId})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Loads and validates one packager app configuration, shared mappings, descriptor, and release inputs.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:inspectWorkspaceProfile",
+      "name": "inspectWorkspaceProfile",
+      "displayName": "inspectWorkspaceProfile()",
+      "kind": "function",
+      "signature": "async inspectWorkspaceProfile(workspaceRoot=process.cwd())",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Classifies one canonical workspace as external or integrated and reports its fixed layout.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:INTEGRATED_TOOLCHAIN_PROTOCOL",
+      "name": "INTEGRATED_TOOLCHAIN_PROTOCOL",
+      "displayName": "INTEGRATED_TOOLCHAIN_PROTOCOL",
+      "kind": "constant",
+      "signature": "const INTEGRATED_TOOLCHAIN_PROTOCOL",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/integrated-provider"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Protocol required from the fixed integrated shared-development provider.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:listTargets",
+      "name": "listTargets",
+      "displayName": "listTargets()",
+      "kind": "function",
+      "signature": "listTargets()",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/targets"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Returns the frozen target descriptors without running an operation lifecycle.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:loadAppDescriptor",
+      "name": "loadAppDescriptor",
+      "displayName": "loadAppDescriptor()",
+      "kind": "function",
+      "signature": "async loadAppDescriptor({workspaceRoot, appRoot, appId, packageManifest})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Runtime and app descriptors",
+      "summary": "Loads an authored schema-2 descriptor or a bounded legacy projection with explicit provenance.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:loadArcaneIntegratedProvider",
+      "name": "loadArcaneIntegratedProvider",
+      "displayName": "loadArcaneIntegratedProvider()",
+      "kind": "function",
+      "signature": "loadArcaneIntegratedProvider({ arcaneRoot, signal, onEvent, run=runProcess }={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/integrated-provider"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Loads and authenticates the fixed Arcane-owned integrated development provider generation.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:loadArcaneNativeProvider",
+      "name": "loadArcaneNativeProvider",
+      "displayName": "loadArcaneNativeProvider()",
+      "kind": "function",
+      "signature": "loadArcaneNativeProvider({ arcaneRoot, target, inspect=lstat, canonicalize=realpath, readModule=readFile, importModule=specifier=>import(specifier), generationCache=providerGenerationCache, signal, onEvent }={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/native-provider"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Loads one fixed target provider from one explicit compatible Arcane OS checkout.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:loadArcanePortableProvider",
+      "name": "loadArcanePortableProvider",
+      "displayName": "loadArcanePortableProvider()",
+      "kind": "function",
+      "signature": "loadArcanePortableProvider(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/native-provider"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Compatibility wrapper that loads the portable native provider.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:loadRuntimeRelease",
+      "name": "loadRuntimeRelease",
+      "displayName": "loadRuntimeRelease()",
+      "kind": "function",
+      "signature": "async loadRuntimeRelease({runtimeRoot=path.join(sdkRoot, 'runtime')}={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Runtime and app descriptors",
+      "summary": "Reads and structurally validates the synchronized runtime release manifest.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:NATIVE_BUILD_PLAN_PROTOCOL",
+      "name": "NATIVE_BUILD_PLAN_PROTOCOL",
+      "displayName": "NATIVE_BUILD_PLAN_PROTOCOL",
+      "kind": "constant",
+      "signature": "const NATIVE_BUILD_PLAN_PROTOCOL",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/native"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Protocol identifier for immutable authenticated native build plans.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:NATIVE_BUILDER_PROTOCOL",
+      "name": "NATIVE_BUILDER_PROTOCOL",
+      "displayName": "NATIVE_BUILDER_PROTOCOL",
+      "kind": "constant",
+      "signature": "const NATIVE_BUILDER_PROTOCOL",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/native"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Protocol identifier required from injected native builders.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:normalizeError",
+      "name": "normalizeError",
+      "displayName": "normalizeError()",
+      "kind": "function",
+      "signature": "normalizeError(error, fallbackCode=ERROR_CODES.operationFailed)",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Errors",
+      "summary": "Converts an unknown thrown value into an `ArcaneError` while preserving an existing normalized error.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "ArcaneError and JSON-safe error normalization"
+    },
+    {
+      "id": "root:normalizeRelativePath",
+      "name": "normalizeRelativePath",
+      "displayName": "normalizeRelativePath()",
+      "kind": "function",
+      "signature": "normalizeRelativePath(value, label='path')",
+      "entrypoints": [
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os/packager",
+      "group": "Packaging and release bundles",
+      "summary": "Normalizes one portable repository-relative path and rejects traversal, aliases, links, and unsafe names.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:OUTPUT_MODES",
+      "name": "OUTPUT_MODES",
+      "displayName": "OUTPUT_MODES",
+      "kind": "constant",
+      "signature": "const OUTPUT_MODES",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Identity and protocol constants",
+      "summary": "Frozen supported CLI output modes: human, JSON, and NDJSON.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:packageApp",
+      "name": "packageApp",
+      "displayName": "packageApp()",
+      "kind": "function",
+      "signature": "async packageApp(options)",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Builds and authenticates one browser application release through the low-level packager API.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:packageApplication",
+      "name": "packageApplication",
+      "displayName": "packageApplication()",
+      "kind": "function",
+      "signature": "async packageApplication(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Headless toolchain operations",
+      "summary": "Runs the high-level package operation for one selected application.",
+      "availability": "Node; selected operation may produce browser or native output",
+      "protocol": "Shared headless operation API + arcane-cli-events/1",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:PACKAGER_VERSION",
+      "name": "PACKAGER_VERSION",
+      "displayName": "PACKAGER_VERSION",
+      "kind": "constant",
+      "signature": "const PACKAGER_VERSION",
+      "entrypoints": [
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os/packager",
+      "group": "Packaging and release bundles",
+      "summary": "Builder identity written into schema-1 application release manifests.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "packager:discoverApps",
+      "name": "discoverApps",
+      "displayName": "packager.discoverApps()",
+      "kind": "function",
+      "signature": "async discoverApps({workspaceRoot:requestedWorkspaceRoot})",
+      "entrypoints": [
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os/packager",
+      "group": "Packaging and release bundles",
+      "summary": "Discovers packager application configurations and release boundaries beneath one workspace root.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:parseSemver",
+      "name": "parseSemver",
+      "displayName": "parseSemver()",
+      "kind": "function",
+      "signature": "parseSemver(value)",
+      "entrypoints": [
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os/packager",
+      "group": "Packaging and release bundles",
+      "summary": "Parses one strict three-part semantic version with optional prerelease metadata.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:planApplication",
+      "name": "planApplication",
+      "displayName": "planApplication()",
+      "kind": "function",
+      "signature": "async planApplication(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Headless toolchain operations",
+      "summary": "Creates one authenticated native build plan without executing the provider build.",
+      "availability": "Node; selected operation may produce browser or native output",
+      "protocol": "Shared headless operation API + arcane-cli-events/1",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:prepareNativeTarget",
+      "name": "prepareNativeTarget",
+      "displayName": "prepareNativeTarget()",
+      "kind": "function",
+      "signature": "async prepareNativeTarget(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Runs one provider toolchain preparation and returns its authenticated process-owned receipt.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:prepareSharedPayloadSnapshot",
+      "name": "prepareSharedPayloadSnapshot",
+      "displayName": "prepareSharedPayloadSnapshot()",
+      "kind": "function",
+      "signature": "async prepareSharedPayloadSnapshot({ workspaceRoot:requestedWorkspaceRoot, sharedPayloadIds, signal, onEvent }={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Verifies and snapshots the shared runtime/dependency payload once for reuse by one packaging generation.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:projectNativeDescriptor",
+      "name": "projectNativeDescriptor",
+      "displayName": "projectNativeDescriptor()",
+      "kind": "function",
+      "signature": "projectNativeDescriptor(descriptor, {source}={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Runtime and app descriptors",
+      "summary": "Projects the canonical app descriptor into the native registry shape consumed by paired builders.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:projectPackageManifest",
+      "name": "projectPackageManifest",
+      "displayName": "projectPackageManifest()",
+      "kind": "function",
+      "signature": "projectPackageManifest(descriptor)",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Runtime and app descriptors",
+      "summary": "Projects a schema-2 descriptor into the compatible schema-1 application package contract.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:readVerifiedAppReleaseFile",
+      "name": "readVerifiedAppReleaseFile",
+      "displayName": "readVerifiedAppReleaseFile()",
+      "kind": "function",
+      "signature": "async readVerifiedAppReleaseFile(receipt, { releaseRoot, relativePath, signal }={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Reads one bounded file through an authenticated app-release receipt and rechecks its identity and digest.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:readVerifiedRuntimeFile",
+      "name": "readVerifiedRuntimeFile",
+      "displayName": "readVerifiedRuntimeFile()",
+      "kind": "function",
+      "signature": "async readVerifiedRuntimeFile(receipt, { runtimeRoot=path.join(sdkRoot, 'runtime'), relativePath, signal }={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Runtime and app descriptors",
+      "summary": "Reads one bounded runtime file through an authenticated runtime receipt and rechecks its identity and digest.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:registeredTestCount",
+      "name": "registeredTestCount",
+      "displayName": "registeredTestCount()",
+      "kind": "function",
+      "signature": "registeredTestCount()",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/testing"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Events, processes, and testing",
+      "summary": "Returns the number of tests registered in the current isolated test realm.",
+      "availability": "Node",
+      "protocol": "Node ESM / owned process or test lifecycle",
+      "normalization": "SDK event/error/report normalization"
+    },
+    {
+      "id": "root:RELEASE_MANIFEST_NAME",
+      "name": "RELEASE_MANIFEST_NAME",
+      "displayName": "RELEASE_MANIFEST_NAME",
+      "kind": "constant",
+      "signature": "const RELEASE_MANIFEST_NAME",
+      "entrypoints": [
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os/packager",
+      "group": "Packaging and release bundles",
+      "summary": "Canonical packaged application release manifest filename.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:repositoryApplication",
+      "name": "repositoryApplication",
+      "displayName": "repositoryApplication()",
+      "kind": "function",
+      "signature": "async repositoryApplication(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Headless toolchain operations",
+      "summary": "Dispatches one selected repository status, pull, or push operation through the headless lifecycle.",
+      "availability": "Node; selected operation may produce browser or native output",
+      "protocol": "Shared headless operation API + arcane-cli-events/1",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:repositoryPull",
+      "name": "repositoryPull",
+      "displayName": "repositoryPull()",
+      "kind": "function",
+      "signature": "async repositoryPull({ workspaceRoot=process.cwd(), signal, onEvent, run=runProcess }={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Runs one fast-forward-only pull after proving the selected repository worktree is clean.",
+      "availability": "Node; network-assisted Git",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:repositoryPush",
+      "name": "repositoryPush",
+      "displayName": "repositoryPush()",
+      "kind": "function",
+      "signature": "async repositoryPush({ workspaceRoot=process.cwd(), signal, onEvent, run=runProcess }={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Pushes the selected attached branch through the repository's configured remote and credentials.",
+      "availability": "Node; network-assisted Git",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:repositoryStatus",
+      "name": "repositoryStatus",
+      "displayName": "repositoryStatus()",
+      "kind": "function",
+      "signature": "async repositoryStatus({ workspaceRoot=process.cwd(), signal, onEvent, run=runProcess }={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Reads one repository's branch and short worktree status through an owned child process.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:resolveNativeBuildOutputRoot",
+      "name": "resolveNativeBuildOutputRoot",
+      "displayName": "resolveNativeBuildOutputRoot()",
+      "kind": "function",
+      "signature": "resolveNativeBuildOutputRoot({target, workspaceMode, workspaceRoot, outputRoot}={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Resolves and validates one native output root, including integrated-checkout non-overlap.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:resolvePortableBuildOutputRoot",
+      "name": "resolvePortableBuildOutputRoot",
+      "displayName": "resolvePortableBuildOutputRoot()",
+      "kind": "function",
+      "signature": "resolvePortableBuildOutputRoot(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Portable-target compatibility wrapper for native output-root resolution.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:resolveWorkspace",
+      "name": "resolveWorkspace",
+      "displayName": "resolveWorkspace()",
+      "kind": "function",
+      "signature": "async resolveWorkspace({workspaceRoot=process.cwd(), appId}={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Resolves one workspace profile and selected app into canonical SDK paths.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:ROOT_CONFIG_NAME",
+      "name": "ROOT_CONFIG_NAME",
+      "displayName": "ROOT_CONFIG_NAME",
+      "kind": "constant",
+      "signature": "const ROOT_CONFIG_NAME",
+      "entrypoints": [
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os/packager",
+      "group": "Packaging and release bundles",
+      "summary": "Canonical root packager configuration filename.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:discoverApps",
+      "name": "discoverApps",
+      "displayName": "discoverApps()",
+      "kind": "function",
+      "signature": "async discoverApps(workspaceRoot=process.cwd())",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Discovers application ids in one external or integrated workspace without selecting one.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:runApplication",
+      "name": "runApplication",
+      "displayName": "runApplication()",
+      "kind": "function",
+      "signature": "async runApplication(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Headless toolchain operations",
+      "summary": "Runs a browser app or performs the retained native build/verify/launch lifecycle for one target.",
+      "availability": "Node; selected operation may produce browser or native output",
+      "protocol": "Shared headless operation API + arcane-cli-events/1",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:runDoctor",
+      "name": "runDoctor",
+      "displayName": "runDoctor()",
+      "kind": "function",
+      "signature": "async runDoctor({ workspaceRoot, appId, arcaneRoot, requireLocalAI=false, signal, onEvent, platform=process.platform, run=runProcess }={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Runs the underlying read-only doctor checks and returns their normalized report.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:runProcess",
+      "name": "runProcess",
+      "displayName": "runProcess()",
+      "kind": "function",
+      "signature": "async runProcess(command, args=[], { cwd, env, signal, onEvent, heartbeatMs=5000, terminationGraceMs=DEFAULT_TERMINATION_GRACE_MS, allowNonzero=false, input }={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Events, processes, and testing",
+      "summary": "Runs one shell-free child command with bounded output tails, ordered stream events, heartbeats, and process-tree cancellation.",
+      "availability": "Node",
+      "protocol": "Node ESM / owned process or test lifecycle",
+      "normalization": "SDK event/error/report normalization"
+    },
+    {
+      "id": "root:runRegisteredTests",
+      "name": "runRegisteredTests",
+      "displayName": "runRegisteredTests()",
+      "kind": "function",
+      "signature": "async runRegisteredTests({signal, requireTests=true, onPhase}={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/testing"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Events, processes, and testing",
+      "summary": "Executes the current isolated realm's registered tests once and returns the normalized Vanilla Test report.",
+      "availability": "Node",
+      "protocol": "Node ESM / owned process or test lifecycle",
+      "normalization": "SDK event/error/report normalization"
+    },
+    {
+      "id": "root:runRepositoryAction",
+      "name": "runRepositoryAction",
+      "displayName": "runRepositoryAction()",
+      "kind": "function",
+      "signature": "async runRepositoryAction(action, options={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Selects and runs one repository action by name.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:runTarget",
+      "name": "runTarget",
+      "displayName": "runTarget()",
+      "kind": "function",
+      "signature": "async runTarget(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/targets"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Invokes one target adapter run method and fails honestly when the artifact kind is not runnable.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:RUNTIME_ROOT",
+      "name": "RUNTIME_ROOT",
+      "displayName": "RUNTIME_ROOT",
+      "kind": "constant",
+      "signature": "const RUNTIME_ROOT",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Identity and protocol constants",
+      "summary": "Absolute installed SDK runtime directory for the current process.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:SDK_NAME",
+      "name": "SDK_NAME",
+      "displayName": "SDK_NAME",
+      "kind": "constant",
+      "signature": "const SDK_NAME",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Identity and protocol constants",
+      "summary": "Published npm package name.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:SDK_ROOT",
+      "name": "SDK_ROOT",
+      "displayName": "SDK_ROOT",
+      "kind": "constant",
+      "signature": "const SDK_ROOT",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Identity and protocol constants",
+      "summary": "Absolute installed package root for the current process.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:SDK_VERSION",
+      "name": "SDK_VERSION",
+      "displayName": "SDK_VERSION",
+      "kind": "constant",
+      "signature": "const SDK_VERSION",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Identity and protocol constants",
+      "summary": "Exact SDK package version.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:selectApp",
+      "name": "selectApp",
+      "displayName": "selectApp()",
+      "kind": "function",
+      "signature": "async selectApp(workspaceRoot=process.cwd(), appId)",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Selects one exact app id, or requires an unambiguous single discovered application.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:startDevServer",
+      "name": "startDevServer",
+      "displayName": "startDevServer()",
+      "kind": "function",
+      "signature": "async startDevServer(options={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Starts one bounded browser development server with exact runtime/app route mappings and an unguessable session capability.",
+      "availability": "Node control plane; browser data plane",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:TARGET_ADAPTER_PROTOCOL",
+      "name": "TARGET_ADAPTER_PROTOCOL",
+      "displayName": "TARGET_ADAPTER_PROTOCOL",
+      "kind": "constant",
+      "signature": "const TARGET_ADAPTER_PROTOCOL",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Protocol required from target adapter descriptors and implementations.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:TARGET_IDS",
+      "name": "TARGET_IDS",
+      "displayName": "TARGET_IDS",
+      "kind": "constant",
+      "signature": "const TARGET_IDS",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Frozen list of currently exposed target identifiers.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Exact immutable SDK value"
+    },
+    {
+      "id": "root:test",
+      "name": "test",
+      "displayName": "test()",
+      "kind": "function",
+      "signature": "test(name, optionsOrCallback, maybeCallback)",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/testing"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Events, processes, and testing",
+      "summary": "Registers one public test, optional timeout, callback, nested cases, and FIFO cleanup in the isolated runner.",
+      "availability": "Node",
+      "protocol": "Node ESM / owned process or test lifecycle",
+      "normalization": "SDK event/error/report normalization"
+    },
+    {
+      "id": "root:testApplication",
+      "name": "testApplication",
+      "displayName": "testApplication()",
+      "kind": "function",
+      "signature": "async testApplication(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Headless toolchain operations",
+      "summary": "Runs the selected application's exact test boundary or one integrated shared test.",
+      "availability": "Node; selected operation may produce browser or native output",
+      "protocol": "Shared headless operation API + arcane-cli-events/1",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:throwIfAborted",
+      "name": "throwIfAborted",
+      "displayName": "throwIfAborted()",
+      "kind": "function",
+      "signature": "throwIfAborted(signal)",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Errors",
+      "summary": "Throws the signal reason or a normalized cancellation error when an AbortSignal is already aborted.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "ArcaneError and JSON-safe error normalization"
+    },
+    {
+      "id": "root:validateAppBundlePath",
+      "name": "validateAppBundlePath",
+      "displayName": "validateAppBundlePath()",
+      "kind": "function",
+      "signature": "validateAppBundlePath(value, label='bundle path')",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/release-bundle"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Validates and normalizes one portable path admitted inside an external app bundle.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:validateAppConfig",
+      "name": "validateAppConfig",
+      "displayName": "validateAppConfig()",
+      "kind": "function",
+      "signature": "validateAppConfig(value, appId, rootConfig, configPath=`apps/${appId}/${APP_CONFIG_NAME}`)",
+      "entrypoints": [
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os/packager",
+      "group": "Packaging and release bundles",
+      "summary": "Validates one schema-1 packager app configuration and its relationship to the root config.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:validateAppDescriptor",
+      "name": "validateAppDescriptor",
+      "displayName": "validateAppDescriptor()",
+      "kind": "function",
+      "signature": "validateAppDescriptor(value, {appId}={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Runtime and app descriptors",
+      "summary": "Strictly validates and freezes one schema-2 app descriptor, including runtime-only cross-field rules.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:validateNativeBuilder",
+      "name": "validateNativeBuilder",
+      "displayName": "validateNativeBuilder()",
+      "kind": "function",
+      "signature": "validateNativeBuilder(provider)",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/native"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Validates a native builder's protocol and required describe/doctor/prepare/build/verify/run methods.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:validateRootConfig",
+      "name": "validateRootConfig",
+      "displayName": "validateRootConfig()",
+      "kind": "function",
+      "signature": "validateRootConfig(value, configPath=ROOT_CONFIG_NAME)",
+      "entrypoints": [
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os/packager",
+      "group": "Packaging and release bundles",
+      "summary": "Validates one root packager mapping and its fixed shared-route boundaries.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:validateWorkspace",
+      "name": "validateWorkspace",
+      "displayName": "validateWorkspace()",
+      "kind": "function",
+      "signature": "async validateWorkspace({workspaceRoot=process.cwd(), appId, signal, onEvent}={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Runs canonical workspace, runtime, descriptor, and selected-app validation with progress events.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:verifyApp",
+      "name": "verifyApp",
+      "displayName": "verifyApp()",
+      "kind": "function",
+      "signature": "async verifyApp({workspaceRoot, appId, signal, onEvent})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/packager"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Authenticates one existing browser app release through the low-level packager API.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:verifyApplication",
+      "name": "verifyApplication",
+      "displayName": "verifyApplication()",
+      "kind": "function",
+      "signature": "async verifyApplication(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Headless toolchain operations",
+      "summary": "Runs the high-level verification operation for one selected browser release.",
+      "availability": "Node; selected operation may produce browser or native output",
+      "protocol": "Shared headless operation API + arcane-cli-events/1",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:verifyAppReleaseBundle",
+      "name": "verifyAppReleaseBundle",
+      "displayName": "verifyAppReleaseBundle()",
+      "kind": "function",
+      "signature": "async verifyAppReleaseBundle({bundlePath, signal, onEvent}={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/release-bundle"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Packaging and release bundles",
+      "summary": "Parses and authenticates one deterministic app bundle without extraction.",
+      "availability": "Node",
+      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+    },
+    {
+      "id": "root:verifyBundleApplication",
+      "name": "verifyBundleApplication",
+      "displayName": "verifyBundleApplication()",
+      "kind": "function",
+      "signature": "async verifyBundleApplication(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Headless toolchain operations",
+      "summary": "Runs the high-level external bundle verification operation.",
+      "availability": "Node; selected operation may produce browser or native output",
+      "protocol": "Shared headless operation API + arcane-cli-events/1",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:verifyNativeArtifact",
+      "name": "verifyNativeArtifact",
+      "displayName": "verifyNativeArtifact()",
+      "kind": "function",
+      "signature": "async verifyNativeArtifact(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Authenticates one target artifact through the exact prepared provider/toolchain receipt.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:verifyRuntime",
+      "name": "verifyRuntime",
+      "displayName": "verifyRuntime()",
+      "kind": "function",
+      "signature": "async verifyRuntime({ runtimeRoot=path.join(sdkRoot, 'runtime'), signal, onEvent }={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Runtime and app descriptors",
+      "summary": "Verifies every synchronized runtime file and returns a deeply frozen same-process receipt.",
+      "availability": "Node",
+      "protocol": "Node ESM",
+      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:verifyTarget",
+      "name": "verifyTarget",
+      "displayName": "verifyTarget()",
+      "kind": "function",
+      "signature": "async verifyTarget(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/targets"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Targets, native plans, and providers",
+      "summary": "Invokes one target adapter's artifact verification boundary.",
+      "availability": "Node; selected browser/native target or provider as documented",
+      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
+      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:ARCANE_EVENT_STACK_PROTOCOL",
+      "name": "ARCANE_EVENT_STACK_PROTOCOL",
+      "displayName": "ARCANE_EVENT_STACK_PROTOCOL",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_STACK_PROTOCOL",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Identifies strict serialized event-stack documents and records as arcane-event-stack/1.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-stack/1",
+      "normalization": "Exact protocol discriminator; no transport or host authority"
+    },
+    {
+      "id": "root:DEFAULT_DOM_EVENT_TYPES",
+      "name": "DEFAULT_DOM_EVENT_TYPES",
+      "displayName": "DEFAULT_DOM_EVENT_TYPES",
+      "kind": "constant",
+      "signature": "const DEFAULT_DOM_EVENT_TYPES",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Frozen default set of 48 capture-phase DOM interaction event names.",
+      "availability": "Node and browser/bundler; meaningful to browser DOM instrumentation",
+      "protocol": "Synchronous DOM observation projected into arcane-event-stack/1 records",
+      "normalization": "Exact frozen event-name list; host event objects are not retained"
+    },
+    {
+      "id": "root:DOM_INTERACTION_EVENT",
+      "name": "DOM_INTERACTION_EVENT",
+      "displayName": "DOM_INTERACTION_EVENT",
+      "kind": "constant",
+      "signature": "const DOM_INTERACTION_EVENT",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Event type emitted for a redacted, bounded DOM interaction diagnostic.",
+      "availability": "Browser DOM or a DOM-compatible test host; constant imports in Node",
+      "protocol": "In-process event-pubsub; optional arcane-event-stack/1 recording",
+      "normalization": "Normalized target, path, flags, and bounded details; sensitive content redacted"
+    },
+    {
+      "id": "root:DOM_MUTATION_EVENT",
+      "name": "DOM_MUTATION_EVENT",
+      "displayName": "DOM_MUTATION_EVENT",
+      "kind": "constant",
+      "signature": "const DOM_MUTATION_EVENT",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Event type emitted for a redacted, bounded DOM mutation diagnostic.",
+      "availability": "Browser DOM or a DOM-compatible test host; constant imports in Node",
+      "protocol": "MutationObserver projected through in-process events and optional arcane-event-stack/1 recording",
+      "normalization": "Normalized attribute, character-data, or child-list diagnostic; sensitive content redacted"
+    },
+    {
+      "id": "root:DOM_OBSERVATION_STARTED_EVENT",
+      "name": "DOM_OBSERVATION_STARTED_EVENT",
+      "displayName": "DOM_OBSERVATION_STARTED_EVENT",
+      "kind": "constant",
+      "signature": "const DOM_OBSERVATION_STARTED_EVENT",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Lifecycle event emitted after DOM instrumentation starts successfully.",
+      "availability": "Browser DOM or a DOM-compatible test host; constant imports in Node",
+      "protocol": "In-process event-pubsub; optional arcane-event-stack/1 recording",
+      "normalization": "Normalized root and capture-option diagnostic"
+    },
+    {
+      "id": "root:DOM_OBSERVATION_STOPPED_EVENT",
+      "name": "DOM_OBSERVATION_STOPPED_EVENT",
+      "displayName": "DOM_OBSERVATION_STOPPED_EVENT",
+      "kind": "constant",
+      "signature": "const DOM_OBSERVATION_STOPPED_EVENT",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Lifecycle event emitted when active DOM instrumentation stops normally.",
+      "availability": "Browser DOM or a DOM-compatible test host; constant imports in Node",
+      "protocol": "In-process event-pubsub; optional arcane-event-stack/1 recording",
+      "normalization": "Normalized root diagnostic; overflow shutdown intentionally suppresses this lifecycle record"
+    },
+    {
+      "id": "root:EventManager",
+      "name": "EventManager",
+      "displayName": "EventManager",
+      "kind": "class",
+      "signature": "new EventManager(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Runs synchronous pub/sub with optional bounded, immutable time-travel history and DOM instrumentation.",
+      "availability": "Node and browser/bundler; DOM capture requires a browser DOM or compatible host",
+      "protocol": "Synchronous event-pubsub plus optional arcane-event-stack/1 export/import",
+      "normalization": "Live listener arguments retain identity; recorded payloads and metadata are bounded, redacted, deeply frozen snapshots"
+    },
+    {
+      "id": "root:PLAYBACK_CANCELLED_EVENT",
+      "name": "PLAYBACK_CANCELLED_EVENT",
+      "displayName": "PLAYBACK_CANCELLED_EVENT",
+      "kind": "constant",
+      "signature": "const PLAYBACK_CANCELLED_EVENT",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Lifecycle event emitted when an AbortSignal cancels event-stack playback.",
+      "availability": "Node and browser/bundler",
+      "protocol": "In-process playback lifecycle over an arcane-event-stack/1 source",
+      "normalization": "Frozen summary with session, delivered count, cursor, completion flag, and redacted error snapshot"
+    },
+    {
+      "id": "root:PLAYBACK_COMPLETED_EVENT",
+      "name": "PLAYBACK_COMPLETED_EVENT",
+      "displayName": "PLAYBACK_COMPLETED_EVENT",
+      "kind": "constant",
+      "signature": "const PLAYBACK_COMPLETED_EVENT",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Lifecycle event emitted after selected event-stack records finish playback.",
+      "availability": "Node and browser/bundler",
+      "protocol": "In-process playback lifecycle over an arcane-event-stack/1 source",
+      "normalization": "Frozen summary with session, delivered count, cursor, and completed=true"
+    },
+    {
+      "id": "root:PLAYBACK_FAILED_EVENT",
+      "name": "PLAYBACK_FAILED_EVENT",
+      "displayName": "PLAYBACK_FAILED_EVENT",
+      "kind": "constant",
+      "signature": "const PLAYBACK_FAILED_EVENT",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Lifecycle event emitted when event-stack playback fails for a reason other than signal cancellation.",
+      "availability": "Node and browser/bundler",
+      "protocol": "In-process playback lifecycle over an arcane-event-stack/1 source",
+      "normalization": "Frozen summary with session, delivered count, cursor, completion flag, and redacted error snapshot"
+    },
+    {
+      "id": "root:PLAYBACK_RECORD_EVENT",
+      "name": "PLAYBACK_RECORD_EVENT",
+      "displayName": "PLAYBACK_RECORD_EVENT",
+      "kind": "constant",
+      "signature": "const PLAYBACK_RECORD_EVENT",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Review-mode event that presents one validated immutable record without re-emitting its original type.",
+      "availability": "Node and browser/bundler",
+      "protocol": "In-process review projection of arcane-event-stack/1",
+      "normalization": "Validated immutable event-stack record"
+    },
+    {
+      "id": "root:PLAYBACK_STARTED_EVENT",
+      "name": "PLAYBACK_STARTED_EVENT",
+      "displayName": "PLAYBACK_STARTED_EVENT",
+      "kind": "constant",
+      "signature": "const PLAYBACK_STARTED_EVENT",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Lifecycle event emitted before the selected playback range is delivered.",
+      "availability": "Node and browser/bundler",
+      "protocol": "In-process playback lifecycle over an arcane-event-stack/1 source",
+      "normalization": "Normalized session, range, count, speed, and mode summary"
+    },
+    {
+      "id": "root:TIME_TRAVEL_OVERFLOW_EVENT",
+      "name": "TIME_TRAVEL_OVERFLOW_EVENT",
+      "displayName": "TIME_TRAVEL_OVERFLOW_EVENT",
+      "kind": "constant",
+      "signature": "const TIME_TRAVEL_OVERFLOW_EVENT",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Terminal marker appended when bounded history reaches maxEvents and recording shuts down.",
+      "availability": "Node and browser/bundler",
+      "protocol": "Terminal arcane-event-stack/1 record type; the overflow marker is not dispatched on the live bus",
+      "normalization": "Fixed event-manager source/category with exact retention evidence; history may contain maxEvents plus this marker"
+    },
+    {
+      "id": "root:TIME_TRAVEL_SEEK_EVENT",
+      "name": "TIME_TRAVEL_SEEK_EVENT",
+      "displayName": "TIME_TRAVEL_SEEK_EVENT",
+      "kind": "constant",
+      "signature": "const TIME_TRAVEL_SEEK_EVENT",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Event emitted when the review cursor seeks to sequence zero or a retained sequence.",
+      "availability": "Node and browser/bundler",
+      "protocol": "In-process review cursor event; the retained stack remains unchanged",
+      "normalization": "Normalized sessionId, requested sequence, and immutable matching record or null"
+    },
+    {
+      "id": "root:arcaneEvents",
+      "name": "arcaneEvents",
+      "displayName": "arcaneEvents",
+      "kind": "singleton",
+      "signature": "const arcaneEvents",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Package-scoped EventManager singleton for applications that want one shared event bus.",
+      "availability": "Node and browser/bundler; DOM capture requires a compatible DOM",
+      "protocol": "Synchronous event-pubsub plus opt-in arcane-event-stack/1 recording",
+      "normalization": "Same module singleton through root and focused subpath; time travel starts disabled"
+    },
+    {
+      "id": "root:createDOMInstrumentation",
+      "name": "createDOMInstrumentation",
+      "displayName": "createDOMInstrumentation()",
+      "kind": "function",
+      "signature": "createDOMInstrumentation(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Creates a start/stop controller that projects DOM interactions and mutations into an EventManager.",
+      "availability": "Browser DOM or a DOM-compatible test host",
+      "protocol": "Capture-phase DOM events and MutationObserver projected to in-process EventManager events",
+      "normalization": "Produces bounded diagnostic descriptors, redacts sensitive values and URLs, and never reconstructs DOM state"
+    },
+    {
+      "id": "root:createEventManager",
+      "name": "createEventManager",
+      "displayName": "createEventManager()",
+      "kind": "function",
+      "signature": "createEventManager(options)",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Constructs and returns an independent EventManager instance.",
+      "availability": "Node and browser/bundler; DOM capture requires a compatible DOM",
+      "protocol": "Synchronous event-pubsub plus optional arcane-event-stack/1",
+      "normalization": "Equivalent constructor behavior without sharing the arcaneEvents singleton"
+    },
+    {
+      "id": "root:describeDOMTarget",
+      "name": "describeDOMTarget",
+      "displayName": "describeDOMTarget()",
+      "kind": "function",
+      "signature": "describeDOMTarget(target, root)",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Returns a frozen, content-free diagnostic descriptor for a DOM target.",
+      "availability": "Browser DOM or DOM-compatible objects; importable in Node",
+      "protocol": "Local DOM diagnostic helper",
+      "normalization": "Normalizes document, shadow root, text, element, global, and generic event targets without retaining nodes"
+    },
+    {
+      "id": "root:domSelector",
+      "name": "domSelector",
+      "displayName": "domSelector()",
+      "kind": "function",
+      "signature": "domSelector(target, root)",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Builds a diagnostic selector across light DOM and open shadow-root boundaries.",
+      "availability": "Browser DOM or DOM-compatible objects; importable in Node",
+      "protocol": "Local DOM diagnostic helper",
+      "normalization": "Returns a best-effort selector or null; triple-chevron separates open shadow boundaries"
+    },
+    {
+      "id": "root:parseEventStack",
+      "name": "parseEventStack",
+      "displayName": "parseEventStack()",
+      "kind": "function",
+      "signature": "parseEventStack(source, options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Strictly parses and validates an event-stack object or JSON string into a canonical frozen document.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-stack/1",
+      "normalization": "Rejects extra keys, invalid bounds, malformed nesting, unsafe values, and nonterminal overflow; returns a deeply frozen canonical document"
+    }
+  ]
+}

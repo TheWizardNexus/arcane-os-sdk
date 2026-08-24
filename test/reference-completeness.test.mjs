@@ -1,0 +1,497 @@
+import assert from 'node:assert/strict';
+import {readdir,readFile,stat} from 'node:fs/promises';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+
+import test from '../src/testing.mjs';
+import {repositoryRoot,runNode} from './helpers.mjs';
+
+const referenceRoot=path.join(repositoryRoot,'docs','reference');
+
+async function textFile(...segments){
+    return readFile(path.join(referenceRoot,...segments),'utf8');
+}
+
+async function jsonFile(...segments){
+    return JSON.parse(await textFile(...segments));
+}
+
+function escapeRegExp(value){
+    return value.replace(/[.*+?^${}()|[\]\\]/gu,'\\$&');
+}
+
+function sectionsByHeading(markdown){
+    const matches=[...markdown.matchAll(/^## (.+)\r?$/gmu)];
+    const sections=new Map();
+    for(let index=0;index<matches.length;index+=1){
+        const match=matches[index];
+        const end=matches[index+1]?.index??markdown.length;
+        const existing=sections.get(match[1])??[];
+        existing.push(markdown.slice(match.index,end));
+        sections.set(match[1],existing);
+    }
+    return sections;
+}
+
+function requireGuideSection(sections,name,requiredHeadings,{fence=true}={}){
+    const matches=sections.get(name)??[];
+    assert.equal(matches.length,1,`${name} must have exactly one H2 guide section.`);
+    const section=matches[0];
+    for(const heading of requiredHeadings){
+        assert.match(
+            section,
+            new RegExp(`^### ${escapeRegExp(heading)}\\r?$`,'mu'),
+            `${name} is missing ${heading}.`
+        );
+    }
+    if(fence)assert.match(section,/```(?:html|javascript|js|text)\b/u);
+    return section;
+}
+
+function packageEntrypointName(key){
+    return key==='.'?'arcane-os':`arcane-os/${key.slice(2)}`;
+}
+
+function sorted(values){
+    return [...values].sort();
+}
+
+async function markdownFiles(directory){
+    const files=[];
+    for(const entry of await readdir(directory,{withFileTypes:true})){
+        const entryPath=path.join(directory,entry.name);
+        if(entry.isDirectory())files.push(...await markdownFiles(entryPath));
+        else if(entry.isFile()&&entry.name.endsWith('.md'))files.push(entryPath);
+    }
+    return files;
+}
+
+async function filesUnder(directory){
+    const files=[];
+    for(const entry of await readdir(directory,{withFileTypes:true})){
+        const entryPath=path.join(directory,entry.name);
+        if(entry.isDirectory())files.push(...await filesUnder(entryPath));
+        else if(entry.isFile())files.push(entryPath);
+    }
+    return files;
+}
+
+function githubHeadingFragments(markdown){
+    const fragments=new Set();
+    const occurrences=new Map();
+    let fence=null;
+    for(const line of markdown.split(/\r?\n/u)){
+        const fenceMatch=line.match(/^\s*(`{3,}|~{3,})/u);
+        if(fenceMatch){
+            const marker=fenceMatch[1][0];
+            if(fence===marker)fence=null;
+            else if(fence===null)fence=marker;
+            continue;
+        }
+        if(fence!==null)continue;
+        const match=line.match(/^#{1,6}\s+(.+?)\s*#*\s*$/u);
+        if(!match)continue;
+        const base=match[1]
+            .replace(/<[^>]*>/gu,'')
+            .replace(/!?\[([^\]]+)\]\([^)]+\)/gu,'$1')
+            .replace(/[`*_~]/gu,'')
+            .toLowerCase()
+            .trim()
+            .replace(/[^\p{L}\p{M}\p{N}\p{Pc} -]/gu,'')
+            .replace(/\s+/gu,'-');
+        const occurrence=occurrences.get(base)??0;
+        occurrences.set(base,occurrence+1);
+        fragments.add(occurrence===0?base:`${base}-${String(occurrence)}`);
+    }
+    for(const match of markdown.matchAll(/\bid=["']([^"']+)["']/gu)){
+        fragments.add(match[1]);
+    }
+    return fragments;
+}
+
+test('the public package API inventory matches every JavaScript export and MDN entry',async t=>{
+    const [packageDocument,inventory,guide,eventGuide]=await Promise.all([
+        readFile(path.join(repositoryRoot,'package.json'),'utf8').then(JSON.parse),
+        jsonFile('inventory','package-api.json'),
+        textFile('sdk-api.md'),
+        textFile('event-manager.md')
+    ]);
+
+    await t.test('the inventory has stable unique records',()=>{
+        assert.equal(inventory.sdkVersion,packageDocument.version);
+        assert.equal(inventory.memberCount,151);
+        assert.equal(inventory.members.length,inventory.memberCount);
+        assert.equal(new Set(inventory.members.map(member=>member.id)).size,inventory.memberCount);
+        assert.equal(
+            new Set(inventory.members.map(member=>member.displayName)).size,
+            inventory.memberCount
+        );
+        for(const member of inventory.members){
+            for(const field of [
+                'id','name','displayName','kind','signature','primaryImport',
+                'group','summary','availability','protocol','normalization'
+            ]){
+                assert.equal(typeof member[field],'string',`${member.id}.${field}`);
+                assert.notEqual(member[field].trim(),'');
+            }
+            assert.ok(Array.isArray(member.entrypoints)&&member.entrypoints.length>0);
+        }
+    });
+
+    await t.test('every JavaScript export is documented in both directions',async()=>{
+        for(const [key,target] of Object.entries(packageDocument.exports)){
+            if(typeof target!=='string'||!target.endsWith('.mjs'))continue;
+            const entrypoint=packageEntrypointName(key);
+            const expected=sorted(new Set(
+                inventory.members
+                    .filter(member=>member.entrypoints.includes(entrypoint))
+                    .map(member=>member.name)
+            ));
+            const namespace=await import(pathToFileURL(
+                path.join(repositoryRoot,target)
+            ).href);
+            assert.deepEqual(
+                sorted(Object.keys(namespace)),
+                expected,
+                `${entrypoint} export drifted from the canonical inventory.`
+            );
+        }
+    });
+
+    await t.test('every inventory record owns one complete MDN-style guide section',()=>{
+        const sections=sectionsByHeading(guide);
+        for(const member of inventory.members){
+            requireGuideSection(sections,member.displayName,[
+                'Overview','Availability and normalization','Example'
+            ]);
+        }
+    });
+
+    await t.test('the focused EventManager guide owns every focused export',async()=>{
+        const sections=sectionsByHeading(eventGuide.replace(
+            /^## `([^`]+)`\r?$/gmu,
+            '## $1'
+        ));
+        for(const member of inventory.members.filter(item=>
+            item.entrypoints.includes('arcane-os/event-manager')
+        )){
+            requireGuideSection(sections,member.displayName,[
+                'Overview','Availability and normalization','Example'
+            ]);
+        }
+        assert.equal(
+            packageDocument.exports['./schemas/event-stack.json'],
+            './schemas/event-stack.schema.json'
+        );
+        const schema=JSON.parse(await readFile(
+            path.join(repositoryRoot,'schemas','event-stack.schema.json'),
+            'utf8'
+        ));
+        assert.equal(schema.properties.protocol.const,'arcane-event-stack/1');
+    });
+});
+
+test('the synchronized runtime catalogs match files, bindings, and component scripts',async t=>{
+    const [moduleInventory,entityInventory,componentInventory,moduleGuide,entityGuide,componentGuide]=
+        await Promise.all([
+            jsonFile('inventory','runtime-modules.json'),
+            jsonFile('inventory','runtime-entities.json'),
+            jsonFile('inventory','runtime-components.json'),
+            textFile('runtime-modules.md'),
+            textFile('runtime-entities.md'),
+            textFile('runtime-components.md')
+        ]);
+    const inspection=await runNode([
+        '--no-warnings',
+        '--experimental-vm-modules',
+        path.join(repositoryRoot,'tools','runtime-api-inventory.mjs')
+    ],{timeout:30_000});
+    assert.equal(inspection.code,0,inspection.stderr||inspection.stdout);
+    const live=JSON.parse(inspection.stdout);
+
+    await t.test('all module-directory artifacts and exact ESM bindings are cataloged',async()=>{
+        const actualPaths=sorted((await filesUnder(
+            path.join(repositoryRoot,'runtime','arcane','modules')
+        )).map(file=>path.relative(repositoryRoot,file).split(path.sep).join('/')));
+        assert.equal(moduleInventory.artifactCount,80);
+        assert.equal(moduleInventory.javascriptArtifactCount,78);
+        assert.equal(moduleInventory.esmExportCount,282);
+        assert.deepEqual(
+            sorted(moduleInventory.artifacts.map(artifact=>artifact.file)),
+            actualPaths
+        );
+        const liveByFile=new Map(live.modules.map(module=>[module.file,module.exports]));
+        for(const artifact of moduleInventory.artifacts){
+            if(!artifact.file.endsWith('.js')&&!artifact.file.endsWith('.mjs'))continue;
+            assert.deepEqual(
+                liveByFile.get(artifact.file),
+                sorted(artifact.exports),
+                `${artifact.file} bindings drifted from its reference record.`
+            );
+        }
+    });
+
+    await t.test('all entity modules and exact exports are cataloged',()=>{
+        assert.equal(entityInventory.moduleCount,15);
+        assert.equal(entityInventory.exportCount,35);
+        const liveByFile=new Map(live.entities.map(module=>[module.file,module.exports]));
+        assert.deepEqual(
+            sorted(live.entities.map(module=>module.file)),
+            sorted(entityInventory.modules.map(module=>module.file))
+        );
+        for(const module of entityInventory.modules){
+            assert.deepEqual(liveByFile.get(module.file),sorted(module.exports));
+        }
+    });
+
+    await t.test('all HTML components and their executable public surfaces are cataloged',async()=>{
+        assert.equal(componentInventory.componentCount,39);
+        assert.equal(live.components.length,39);
+        assert.equal(live.parsedComponentScriptCount,39);
+        assert.deepEqual(
+            sorted(live.components.map(component=>component.file)),
+            sorted(componentInventory.artifacts.map(component=>component.file))
+        );
+        for(const component of componentInventory.artifacts){
+            const source=await readFile(
+                path.join(repositoryRoot,component.file),
+                'utf8'
+            );
+            assert.ok(Array.isArray(component.methods));
+            assert.ok(Array.isArray(component.events));
+            assert.ok(Array.isArray(component.slots));
+            assert.ok(Array.isArray(component.dependencies));
+            assert.notEqual(component.availability.trim(),'');
+            assert.notEqual(component.normalization.trim(),'');
+
+            const documentedMethods=new Set(component.methods.flatMap(label=>
+                [...label.matchAll(/\b([A-Za-z_$][\w$]*)\(\)/gu)]
+                    .map(match=>match[1])
+            ));
+            for(const method of documentedMethods){
+                assert.match(
+                    source,
+                    new RegExp(`\\bhost\\.${escapeRegExp(method)}\\b`,'u'),
+                    `${component.file} no longer exposes ${method}.`
+                );
+            }
+            const directMethods=new Set();
+            for(const match of source.matchAll(
+                /\bhost\.([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*;/gu
+            )){
+                const [,publicName,localName]=match;
+                if(new RegExp(
+                    `(?:async\\s+)?function\\s+${escapeRegExp(localName)}\\b|(?:const|let|var)\\s+${escapeRegExp(localName)}\\s*=\\s*(?:async\\s*)?(?:\\([^)]*\\)|[A-Za-z_$][\\w$]*)\\s*=>`,
+                    'u'
+                ).test(source))directMethods.add(publicName);
+            }
+            for(const match of source.matchAll(
+                /\bhost\.([A-Za-z_$][\w$]*)\s*=\s*host\.\1\s*\|\|\s*(?:async\s+)?function\b/gu
+            )){
+                directMethods.add(match[1]);
+            }
+            for(const method of directMethods){
+                assert.ok(
+                    documentedMethods.has(method),
+                    `${component.file} exposes undocumented method ${method}().`
+                );
+            }
+
+            const actualEvents=new Set([...source.matchAll(
+                /new\s+CustomEvent\s*\(\s*['"]([^'"]+)['"]/gu
+            )].map(match=>match[1]));
+            for(const event of actualEvents){
+                assert.ok(
+                    component.events.includes(event),
+                    `${component.file} emits undocumented event ${event}.`
+                );
+            }
+            for(const event of component.events){
+                assert.match(
+                    source,
+                    new RegExp(`['"]${escapeRegExp(event)}['"]`,'u'),
+                    `${component.file} no longer references event ${event}.`
+                );
+            }
+
+            const documentedSlots=new Set(component.slots.flatMap(
+                slot=>slot.split('/')
+            ));
+            const actualSlots=new Set([...source.matchAll(
+                /<slot\b[^>]*\bname\s*=\s*['"]([^'"]+)['"]/giu
+            )].map(match=>match[1]));
+            for(const slot of actualSlots){
+                assert.ok(
+                    documentedSlots.has(slot),
+                    `${component.file} exposes undocumented slot ${slot}.`
+                );
+            }
+            for(const slot of documentedSlots){
+                assert.match(
+                    source,
+                    new RegExp(
+                        `\\b(?:name|slot)\\s*=\\s*['"]${escapeRegExp(slot)}['"]`,
+                        'u'
+                    ),
+                    `${component.file} no longer references slot ${slot}.`
+                );
+            }
+        }
+    });
+
+    await t.test('all synchronized JavaScript and inline component scripts parse',()=>{
+        assert.equal(live.parsedJavascriptCount,94);
+        assert.equal(live.support.length,1);
+        assert.deepEqual(live.support[0].exports,['Is','default']);
+    });
+
+    await t.test('every runtime artifact owns one capability-first guide entry',()=>{
+        const moduleSections=sectionsByHeading(moduleGuide);
+        for(const artifact of moduleInventory.artifacts){
+            requireGuideSection(moduleSections,artifact.name,[
+                'Overview','Public surface','Availability and normalization','Example'
+            ]);
+        }
+
+        const entitySections=sectionsByHeading(entityGuide);
+        for(const module of entityInventory.modules){
+            requireGuideSection(entitySections,path.basename(module.file),[
+                'Overview','Example'
+            ]);
+        }
+
+        const componentSections=sectionsByHeading(componentGuide);
+        for(const component of componentInventory.artifacts){
+            requireGuideSection(componentSections,component.name,[
+                'Overview','Public surface','Availability and normalization','Example'
+            ]);
+        }
+    });
+});
+
+test('the imported Core reference is exhaustive, focused, and mechanically readable',async t=>{
+    const [api,events,entities,guideNames]=await Promise.all([
+        textFile('core','arcane-api.md'),
+        textFile('core','arcane-events.md'),
+        textFile('core','arcane-entities.md'),
+        readdir(path.join(referenceRoot,'core','reference','arcane-api'))
+    ]);
+    const members=[...api.matchAll(
+        /^\| `(Arcane\.[^`(]+)` \| (?:Constructor|Namespace|Value) \|/gmu
+    )].map(match=>match[1]);
+    const methodRows=[...api.matchAll(
+        /^\| `(Arcane\.[^`]+\([^`]*\))` \|/gmu
+    )].map(match=>match[1].replace(/\([^)]*\)$/u,'()'));
+    const guideDocuments=await Promise.all(
+        guideNames.filter(name=>name.endsWith('.md')).map(async name=>({
+            name,
+            markdown:await textFile('core','reference','arcane-api',name)
+        }))
+    );
+    const guideSections=new Map();
+    for(const document of guideDocuments){
+        for(const [heading,sections] of sectionsByHeading(document.markdown)){
+            const current=guideSections.get(heading)??[];
+            current.push(...sections);
+            guideSections.set(heading,current);
+        }
+    }
+
+    await t.test('the Core namespace and method tables own exactly 141 public keys',()=>{
+        assert.equal(members.length,35);
+        assert.equal(methodRows.length,106);
+        const canonical=sorted([...members,...methodRows]);
+        assert.equal(new Set(canonical).size,141);
+        assert.deepEqual(sorted(guideSections.keys()),canonical);
+    });
+
+    await t.test('every Core public key has one substantive focused guide section',()=>{
+        for(const key of [...members,...methodRows]){
+            const section=requireGuideSection(guideSections,key,['Overview','Example']);
+            assert.ok(
+                (section.match(/^### /gmu)??[]).length>=3,
+                `${key} must have at least three explanatory sections.`
+            );
+            assert.match(section,/```(?:js|javascript)\b/u);
+        }
+    });
+
+    await t.test('events and shared entity exports retain exact canonical counts',()=>{
+        const eventNames=[...events.matchAll(/^\| `([^`]+)` \|/gmu)].map(match=>match[1]);
+        const entityExports=[...entities.matchAll(/^\| `([^`]+#[^`]+)` \|/gmu)]
+            .map(match=>match[1]);
+        assert.equal(eventNames.length,14);
+        assert.equal(new Set(eventNames).size,14);
+        assert.equal(entityExports.length,35);
+        assert.equal(new Set(entityExports).size,35);
+    });
+});
+
+test('every local Markdown reference link resolves inside the documentation tree',async()=>{
+    const files=await markdownFiles(referenceRoot);
+    const fragmentCache=new Map();
+    for(const file of files){
+        const markdown=await readFile(file,'utf8');
+        for(const match of markdown.matchAll(/!?\[[^\]]*\]\(([^)]+)\)/gu)){
+            const target=match[1].trim();
+            if(/^(?:https?:|mailto:)/iu.test(target))continue;
+            const hashIndex=target.indexOf('#');
+            const locator=(hashIndex<0?target:target.slice(0,hashIndex))
+                .split('?',1)[0];
+            const fragment=hashIndex<0?null:decodeURIComponent(
+                target.slice(hashIndex+1)
+            );
+            const resolved=locator
+                ?path.resolve(path.dirname(file),locator)
+                :file;
+            const details=await stat(resolved);
+            assert.ok(
+                details.isFile()||details.isDirectory(),
+                `${path.relative(repositoryRoot,file)} -> ${target}`
+            );
+            if(fragment&&details.isFile()&&path.extname(resolved)==='.md'){
+                let fragments=fragmentCache.get(resolved);
+                if(!fragments){
+                    fragments=githubHeadingFragments(
+                        await readFile(resolved,'utf8')
+                    );
+                    fragmentCache.set(resolved,fragments);
+                }
+                assert.ok(
+                    fragments.has(fragment),
+                    `${path.relative(repositoryRoot,file)} -> ${target}`
+                );
+            }
+        }
+    }
+});
+
+test('availability, normalization, protocols, and behavior remain first-class reference axes',async()=>{
+    const [index,availability,protocols,behavior,ollama]=await Promise.all([
+        textFile('README.md'),
+        textFile('availability-and-normalization.md'),
+        textFile('protocols.md'),
+        textFile('behavioral-testing.md'),
+        textFile('arcane-ollama.md')
+    ]);
+    for(const target of [
+        'sdk-api.md','event-manager.md','cli.md','runtime-modules.md','runtime-entities.md',
+        'runtime-components.md','core/arcane-api.md','arcane-ollama.md',
+        'availability-and-normalization.md','protocols.md','behavioral-testing.md'
+    ]){
+        assert.match(index,new RegExp(escapeRegExp(target),'u'));
+    }
+    for(const label of ['Node','Browser','Native','Cloud','Cross-host','Provider-native']){
+        assert.match(availability,new RegExp(`\\*\\*${escapeRegExp(label)}\\*\\*`,'u'));
+    }
+    for(const transport of [
+        'WebView2','WebKitGTK','Android WebView','development HTTP','standalone'
+    ]){
+        assert.match(protocols,new RegExp(escapeRegExp(transport),'iu'));
+    }
+    assert.match(availability,/No implicit protocol or provider fallback/u);
+    assert.match(ollama,/never connects directly to `localhost:11434`/u);
+    assert.match(ollama,/no automatic fallback/iu);
+    assert.match(behavior,/bidirectional/iu);
+    assert.match(behavior,/provider-native/iu);
+});

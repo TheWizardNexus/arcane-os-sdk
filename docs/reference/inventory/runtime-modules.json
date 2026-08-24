@@ -1,0 +1,1249 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "commit": "567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e",
+    "bundleVersion": "0.8.12",
+    "protocol": "arcane/1"
+  },
+  "artifactCount": 80,
+  "javascriptArtifactCount": 78,
+  "esmExportCount": 282,
+  "artifacts": [
+    {
+      "file": "runtime/arcane/modules/AI.js",
+      "name": "AI.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structured output, streaming, and queued audio playback.",
+      "availability": "Browser + native bridge + cloud",
+      "protocol": "OpenAI HTTPS, Arcane.ollama, Arcane.speech, Android WebView bridge",
+      "normalization": "High-level chat/speech behavior is normalized; provider diagnostics and media errors remain mixed.",
+      "surface": "default `AI`; `setAI()`, `streamRequest()`, `streamMessage()`, `fetchRequest()`, `fetch()`, `streamTTS()`, `finishTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`, `playAudio()`; installs `window.ai` and emits `ai-ready`."
+    },
+    {
+      "file": "runtime/arcane/modules/AIPreferenceRuntime.js",
+      "name": "AIPreferenceRuntime.js",
+      "kind": "esm",
+      "exports": [
+        "getAIPreferencesForRuntime",
+        "setAIPreferenceRuntimeOverride"
+      ],
+      "summary": "Applies and reads non-persistent per-user AI preference overrides.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Normalized six-slot preference state.",
+      "surface": "`setAIPreferenceRuntimeOverride()`, `getAIPreferencesForRuntime()`."
+    },
+    {
+      "file": "runtime/arcane/modules/AIPreferenceTuple.js",
+      "name": "AIPreferenceTuple.js",
+      "kind": "esm",
+      "exports": [
+        "AI_PREFERENCE_SLOT_KEYS",
+        "aiPreferenceTuplesEqual",
+        "normalizeAIPreferenceTuple"
+      ],
+      "summary": "Normalizes and compares the six provider/model preference slots.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Fully normalized frozen tuple.",
+      "surface": "`AI_PREFERENCE_SLOT_KEYS`, `normalizeAIPreferenceTuple()`, `aiPreferenceTuplesEqual()`."
+    },
+    {
+      "file": "runtime/arcane/modules/AIResponseLength.js",
+      "name": "AIResponseLength.js",
+      "kind": "esm",
+      "exports": [
+        "AI_RESPONSE_LENGTH_DEFAULT",
+        "AI_RESPONSE_LENGTH_OPTIONS",
+        "aiResponseLengthInstruction",
+        "applyAIResponseLength",
+        "normalizeAIResponseLength"
+      ],
+      "summary": "Normalizes concise/short/medium/long response preferences and applies the matching system instruction.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Fully normalized string/instruction contract.",
+      "surface": "Response-length constants plus `normalizeAIResponseLength()`, `aiResponseLengthInstruction()`, and `applyAIResponseLength()`."
+    },
+    {
+      "file": "runtime/arcane/modules/AIResponseURLPolicy.js",
+      "name": "AIResponseURLPolicy.js",
+      "kind": "esm",
+      "exports": [
+        "auditAIResponseLinks",
+        "decodeHTMLCharacterReferences",
+        "extractAIResponseLinks",
+        "normalizeAIResponseLink"
+      ],
+      "summary": "Extracts and audits links from AI Markdown, rendered HTML, CSS, srcset, bare URLs, and email text.",
+      "availability": "Cross-host",
+      "protocol": "In-process; bundled Marked parser",
+      "normalization": "Normalized frozen allowlist audit.",
+      "surface": "`auditAIResponseLinks()`, `extractAIResponseLinks()`, `normalizeAIResponseLink()`, `decodeHTMLCharacterReferences()`."
+    },
+    {
+      "file": "runtime/arcane/modules/AnsiText.js",
+      "name": "AnsiText.js",
+      "kind": "esm",
+      "exports": [
+        "parseAnsi",
+        "stripAnsi"
+      ],
+      "summary": "Parses terminal ANSI sequences into display spans or strips them to plain text.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Normalized text/span output.",
+      "surface": "`parseAnsi()`, `stripAnsi()`."
+    },
+    {
+      "file": "runtime/arcane/modules/ApiModelDatabase.js",
+      "name": "ApiModelDatabase.js",
+      "kind": "esm",
+      "exports": [
+        "appendParameters",
+        "default",
+        "publicEndpoint"
+      ],
+      "summary": "Fetches an injectable HTTP JSON model with parser, cache, redacted public endpoint records, and request lifecycle events.",
+      "availability": "Browser / native WebView / server with fetch",
+      "protocol": "HTTP(S) fetch",
+      "normalization": "Request records are normalized; fetch/provider failures remain mixed.",
+      "surface": "default `ApiModelDatabase`; `setEndpoint()`, `fetch()`, `cached()`; emits `api-model-request`, `api-model-success`, and `api-model-error`."
+    },
+    {
+      "file": "runtime/arcane/modules/AppDataScope.js",
+      "name": "AppDataScope.js",
+      "kind": "esm",
+      "exports": [
+        "APPLICATION_ID_MAX_LENGTH",
+        "APPLICATION_ID_PATTERN",
+        "APP_DATA_DIRECTORY",
+        "APP_LOCAL_STORAGE_PREFIX",
+        "canonicalApplicationId",
+        "declaredApplicationId",
+        "openApplicationDataDirectory",
+        "resolveApplicationId",
+        "resolveApplicationLocalStorageKey",
+        "resolveBrowserApplicationId"
+      ],
+      "summary": "Reconciles declared and native application identity and scopes OPFS/localStorage ownership fail-closed.",
+      "availability": "Browser / native WebView hybrid",
+      "protocol": "Arcane.app.current, DOM declaration, OPFS",
+      "normalization": "Strict normalized identifiers and coded mismatch failures.",
+      "surface": "Identity constants and `canonicalApplicationId()`, `resolveApplicationId()`, `resolveApplicationLocalStorageKey()`, `openApplicationDataDirectory()`."
+    },
+    {
+      "file": "runtime/arcane/modules/AppearancePreferences.js",
+      "name": "AppearancePreferences.js",
+      "kind": "esm",
+      "exports": [
+        "appearancePreferenceSchema",
+        "applyAppearancePreferences",
+        "createAppearancePreferenceStore",
+        "loadAndApplyAppearancePreferences"
+      ],
+      "summary": "Defines, stores, and applies color scheme, density, reduced motion, and large-text preferences.",
+      "availability": "Browser / native WebView hybrid",
+      "protocol": "PreferenceStore, DOM, optional Arcane preferences",
+      "normalization": "Normalized values; storage/host failures remain mixed.",
+      "surface": "`appearancePreferenceSchema`, `createAppearancePreferenceStore()`, `applyAppearancePreferences()`, `loadAndApplyAppearancePreferences()`."
+    },
+    {
+      "file": "runtime/arcane/modules/ArcaneCommunicationBridge.js",
+      "name": "ArcaneCommunicationBridge.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Maps provider HTTP threads/messages/connect/disconnect endpoints to normalized communication entities.",
+      "availability": "Browser / native WebView / server with fetch",
+      "protocol": "JSON HTTP(S), default loopback 127.0.0.1:8020",
+      "normalization": "Entity results are normalized; provider/transport failures remain mixed.",
+      "surface": "default `ArcaneCommunicationBridge`; `request()`, `listThreads()`, `getMessages()`, `send()`, `connect()`, `disconnect()`."
+    },
+    {
+      "file": "runtime/arcane/modules/ArcaneNavigationPolicy.js",
+      "name": "ArcaneNavigationPolicy.js",
+      "kind": "esm",
+      "exports": [
+        "createArcaneNavigationGuard"
+      ],
+      "summary": "Creates a fail-closed HTTP(S) navigation guard with domain and CIDR policy decisions.",
+      "availability": "Cross-host",
+      "protocol": "Arcane network-policy document",
+      "normalization": "Normalized frozen allow/block decision.",
+      "surface": "`createArcaneNavigationGuard()`."
+    },
+    {
+      "file": "runtime/arcane/modules/ArcaneNetworkPolicy.js",
+      "name": "ArcaneNetworkPolicy.js",
+      "kind": "esm",
+      "exports": [
+        "ARCANE_NETWORK_POLICY_SCHEMA_VERSION",
+        "ARCANE_NETWORK_POLICY_URL",
+        "canonicalNetworkHostname",
+        "emptyArcaneNetworkPolicy",
+        "findDeniedDomainRule",
+        "findDeniedNetworkRule",
+        "invalidateArcaneNetworkPolicyCache",
+        "loadArcaneNetworkPolicy",
+        "validateArcaneNetworkPolicy"
+      ],
+      "summary": "Validates the Arcane domain/network deny policy and matches domain, IPv4/IPv6 CIDR, protocol, and port rules.",
+      "availability": "Cross-host",
+      "protocol": "Same-origin policy fetch",
+      "normalization": "Strict coded normalization.",
+      "surface": "Policy constants plus validate/load/cache/match helpers."
+    },
+    {
+      "file": "runtime/arcane/modules/AsyncBoundary.js",
+      "name": "AsyncBoundary.js",
+      "kind": "esm",
+      "exports": [
+        "AsyncBoundaryAbortError",
+        "AsyncBoundaryTimeoutError",
+        "asyncBoundaryDefaults",
+        "default",
+        "runAsyncBoundary"
+      ],
+      "summary": "Runs one asynchronous operation with timeout, abort, result validation, and stable boundary errors.",
+      "availability": "Cross-host",
+      "protocol": "AbortController and timers",
+      "normalization": "Fully normalized timeout/abort errors.",
+      "surface": "`AsyncBoundaryTimeoutError`, `AsyncBoundaryAbortError`, defaults, `runAsyncBoundary()`, and default alias."
+    },
+    {
+      "file": "runtime/arcane/modules/BrowserTestSuite.js",
+      "name": "BrowserTestSuite.js",
+      "kind": "esm",
+      "exports": [
+        "assertionError",
+        "default",
+        "skipError"
+      ],
+      "summary": "Runs a fixed sequential browser test list with cooperative abort, per-test timeout, and lifecycle events.",
+      "availability": "Browser / standard Web APIs",
+      "protocol": "EventTarget and timers",
+      "normalization": "Normalized result and skip/assertion errors.",
+      "surface": "default `BrowserTestSuite`; `list()`, `run()`; emits suite/test start/result/complete events."
+    },
+    {
+      "file": "runtime/arcane/modules/CalculatorEngine.js",
+      "name": "CalculatorEngine.js",
+      "kind": "esm",
+      "exports": [
+        "default",
+        "evaluateExpression"
+      ],
+      "summary": "Evaluates bounded arithmetic, powers, constants, and common functions without `eval`.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Normalized `Calculation` result and parser errors.",
+      "surface": "default `CalculatorEngine`, `evaluateExpression()`; `calculate()` emits result/error events."
+    },
+    {
+      "file": "runtime/arcane/modules/CaseEvidenceIndexer.js",
+      "name": "CaseEvidenceIndexer.js",
+      "kind": "esm",
+      "exports": [
+        "indexPairedRecord",
+        "nearestPageMarker",
+        "parseStructuredRecordName",
+        "renderedPageBlocks",
+        "resolveEvidenceSourcePage",
+        "safeName",
+        "sha256",
+        "stem"
+      ],
+      "summary": "Pairs and indexes structured evidence records with rendered-page provenance and SHA-256 identity.",
+      "availability": "Node only",
+      "protocol": "node:fs/promises, node:path, node:crypto",
+      "normalization": "Normalized naming/page helpers; filesystem errors preserved.",
+      "surface": "Eight exported indexing, page, naming, stem, and digest helpers."
+    },
+    {
+      "file": "runtime/arcane/modules/ChartLibrary.js",
+      "name": "ChartLibrary.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Loads the bundled uPlot classic script once and returns its global constructor.",
+      "availability": "Browser / native WebView",
+      "protocol": "DOM script injection",
+      "normalization": "Load state/errors normalized; uPlot result is vendor-native.",
+      "surface": "default `loadChartLibrary()`."
+    },
+    {
+      "file": "runtime/arcane/modules/ChatRecords.js",
+      "name": "ChatRecords.js",
+      "kind": "esm",
+      "exports": [
+        "hasUserEntry"
+      ],
+      "summary": "Detects whether a chat record contains a meaningful user entry.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Boolean normalized result.",
+      "surface": "`hasUserEntry()`."
+    },
+    {
+      "file": "runtime/arcane/modules/CommunicationAppController.js",
+      "name": "CommunicationAppController.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Binds shared inbox, conversation, settings, theme, and provider workflows into one UI controller.",
+      "availability": "Browser / native WebView hybrid",
+      "protocol": "DOM plus communication providers",
+      "normalization": "Controller state normalized; provider/DOM failures mixed.",
+      "surface": "default controller with `start()`, `bind()`, `configure()`, `refresh()`, `select()`, `send()`, and settings actions."
+    },
+    {
+      "file": "runtime/arcane/modules/CommunicationHub.js",
+      "name": "CommunicationHub.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Fans out provider refresh/send operations and aggregates normalized threads/messages.",
+      "availability": "Cross-host with injected providers",
+      "protocol": "Injected provider contract",
+      "normalization": "Normalized aggregates; refresh contains per-provider failures.",
+      "surface": "default `CommunicationHub`; provider enablement, `refresh()`, `messages()`, and `send()`."
+    },
+    {
+      "file": "runtime/arcane/modules/CommunicationPreferences.js",
+      "name": "CommunicationPreferences.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Stores app-scoped, non-secret communication provider preferences.",
+      "availability": "Browser / native WebView hybrid",
+      "protocol": "Arcane.preferences or localStorage",
+      "normalization": "Normalized preference record; storage failures mixed.",
+      "surface": "default `CommunicationPreferences`; `load()`, `save()`."
+    },
+    {
+      "file": "runtime/arcane/modules/CommunicationProviderRegistry.js",
+      "name": "CommunicationProviderRegistry.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Registers and queries validated provider definitions, channels, and required methods.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Strict normalized registry.",
+      "surface": "default registry with `register()`, `get()`, `has()`, `list()`."
+    },
+    {
+      "file": "runtime/arcane/modules/ComponentContracts.js",
+      "name": "ComponentContracts.js",
+      "kind": "esm",
+      "exports": [
+        "CHART_LABELS",
+        "DASHBOARD_LABELS",
+        "MARKDOWN_FORMATS",
+        "MARKDOWN_LABELS",
+        "VOICE_LABELS",
+        "VOICE_MESSAGES",
+        "appendTranscription",
+        "applyMarkdownFormat",
+        "effectiveDashboardVisibility",
+        "normalizeChartOptions",
+        "normalizeChartRows",
+        "normalizeDashboardDefinitions",
+        "normalizeDashboardOptions",
+        "normalizeDashboardVisibility",
+        "normalizeMarkdownFormats",
+        "normalizeMarkdownOptions",
+        "normalizeVoiceOptions"
+      ],
+      "summary": "Owns normalized configuration/value contracts shared by chart, dashboard, Markdown, and voice components.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Fully normalized labels, rows, definitions, visibility, formats, editor and voice options.",
+      "surface": "Six constant sets and twelve normalization/formatting helpers."
+    },
+    {
+      "file": "runtime/arcane/modules/ConfiguredAIChatSession.js",
+      "name": "ConfiguredAIChatSession.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Owns bounded in-memory AI turns, context construction, response-length instruction, and atomic history commit.",
+      "availability": "Native bridge by default; cross-host with injected chat",
+      "protocol": "Arcane.ai.chat or injected provider",
+      "normalization": "Normalized session/result; provider rejection preserved.",
+      "surface": "default `ConfiguredAIChatSession`; `history()`, `clear()`, `send()`."
+    },
+    {
+      "file": "runtime/arcane/modules/ConversationActionItems.js",
+      "name": "ConversationActionItems.js",
+      "kind": "esm",
+      "exports": [
+        "CONVERSATION_ACTION_ITEM_BASES",
+        "CONVERSATION_ACTION_ITEM_PRESENTATION_COOLDOWN_MS",
+        "CONVERSATION_ACTION_ITEM_STATUSES",
+        "MAX_CONVERSATION_ACTION_ITEMS",
+        "MAX_CONVERSATION_ACTION_ITEM_CHARACTERS",
+        "MAX_CONVERSATION_REMEMBERED_ACTIONS",
+        "conversationActionItemsInstruction",
+        "createConversationActionItem",
+        "formatConversationActionItemCheckIn",
+        "markConversationActionItemsPresented",
+        "normalizeConversationActionItem",
+        "normalizeConversationActionItems",
+        "normalizeRememberedConversationActions",
+        "outstandingConversationActionItems",
+        "rememberConversationActionItems",
+        "removeConversationActionItem",
+        "selectConversationActionItemsForPresentation",
+        "updateConversationActionItem"
+      ],
+      "summary": "Normalizes, creates, updates, remembers, selects, and formats bounded conversation action items.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Fully normalized status/base/presentation contract.",
+      "surface": "Action-item constants and lifecycle/formatting helpers."
+    },
+    {
+      "file": "runtime/arcane/modules/ConversationClosingReport.js",
+      "name": "ConversationClosingReport.js",
+      "kind": "esm",
+      "exports": [
+        "CONVERSATION_CLOSING_REPORT_TOOL_NAME",
+        "classifyConversationClosingReportCalls",
+        "conversationClosingReportInstruction",
+        "createConversationClosingReportTool",
+        "formatConversationClosingReport",
+        "normalizeConversationClosingReport"
+      ],
+      "summary": "Defines the closing-report tool, instruction, result normalizer, call classifier, and formatter.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Fully normalized report contract.",
+      "surface": "Six constants/helpers for closing reports."
+    },
+    {
+      "file": "runtime/arcane/modules/ConversationTimebox.js",
+      "name": "ConversationTimebox.js",
+      "kind": "esm",
+      "exports": [
+        "CONVERSATION_TIMEBOX_LIMIT_MESSAGE",
+        "CONVERSATION_TIMEBOX_OPENING_INSTRUCTION",
+        "CONVERSATION_TIMEBOX_TOOL_NAME",
+        "ConversationSubmissionBarrier",
+        "appendConversationTimeboxOpeningInstruction",
+        "consumeConversationTimeboxCall",
+        "conversationTimeboxSubmissionKey",
+        "conversationTimeboxTool",
+        "createConversationTimeboxControlMessage",
+        "default",
+        "formatConversationElapsed",
+        "normalizeConversationTimeboxCommand",
+        "requireConversationTimeboxDelivery"
+      ],
+      "summary": "Owns conversation limits, control messages, submission barriers, elapsed formatting, and delivery proof.",
+      "availability": "Cross-host",
+      "protocol": "Clock/timers and callbacks",
+      "normalization": "Fully normalized state/command/delivery errors.",
+      "surface": "default `ConversationTimebox`, `ConversationSubmissionBarrier`, constants and control helpers."
+    },
+    {
+      "file": "runtime/arcane/modules/CoreLocalModelCatalog.js",
+      "name": "CoreLocalModelCatalog.js",
+      "kind": "esm",
+      "exports": [
+        "USER_MANAGED_LOOPBACK_PROVIDER_MODE",
+        "getCoreLocalModelCatalog",
+        "getCoreLocalModelCatalogWithAdmissionFailures",
+        "getCoreLocalSpeechAvailability",
+        "isUserManagedLoopbackLocalAIStatus"
+      ],
+      "summary": "Projects Core local-AI status into UI-safe admitted model and speech availability catalogs.",
+      "availability": "Cross-host",
+      "protocol": "In-process projection of Core status",
+      "normalization": "Fully normalized descriptors and stable admission labels.",
+      "surface": "Provider-mode constant and four catalog/availability helpers."
+    },
+    {
+      "file": "runtime/arcane/modules/DataMaintenance.js",
+      "name": "DataMaintenance.js",
+      "kind": "esm",
+      "exports": [
+        "clearEmptyChatsAndMemories",
+        "hasMemoryContent",
+        "hasUserEntry"
+      ],
+      "summary": "Deletes empty chats and associated/empty memory records inside the current app data scope.",
+      "availability": "Browser / native WebView",
+      "protocol": "Global DBOPFS",
+      "normalization": "Normalized counts; destructive storage failures preserved.",
+      "surface": "`clearEmptyChatsAndMemories()` plus content predicates."
+    },
+    {
+      "file": "runtime/arcane/modules/DBLS.js",
+      "name": "DBLS.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Provides app-scoped localStorage tables, batch reads/writes, filtering, deletion, and counts.",
+      "availability": "Browser / native WebView",
+      "protocol": "localStorage + AppDataScope",
+      "normalization": "Scoped keys and values normalized; storage failures mixed.",
+      "surface": "default `DBLS`; installs `window.dbls`, emits `dbls-ready`; CRUD/batch/key APIs."
+    },
+    {
+      "file": "runtime/arcane/modules/DBOPFS.js",
+      "name": "DBOPFS.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Provides app-scoped OPFS tables, worker I/O, backup/restore, compression, and CRUD/batch APIs.",
+      "availability": "Browser / native WebView",
+      "protocol": "OPFS, DBOPFSWorker, Compression Streams",
+      "normalization": "App scope normalized; DOM/storage errors preserved.",
+      "surface": "default `DBOPFS`; installs `window.dbopfs`, emits `dbopfs-ready`; table/file/backup APIs."
+    },
+    {
+      "file": "runtime/arcane/modules/DBOPFSWorker.js",
+      "name": "DBOPFSWorker.js",
+      "kind": "worker",
+      "exports": [],
+      "summary": "Serializes OPFS sync-handle read/write requests from a MessagePort.",
+      "availability": "Dedicated worker",
+      "protocol": "MessageChannel + OPFS sync access handle",
+      "normalization": "Responses normalize to `{success,fileData?}` or `{error:{name,message}}`.",
+      "surface": "No ESM exports; accepts `read` and `write` port requests."
+    },
+    {
+      "file": "runtime/arcane/modules/DevelopmentWorkspace.js",
+      "name": "DevelopmentWorkspace.js",
+      "kind": "esm",
+      "exports": [
+        "contextQuery",
+        "default",
+        "setupTaskId",
+        "workspaceRoot"
+      ],
+      "summary": "Provides bounded workspace inspection, context, setup task, and Node installer clients without arbitrary command execution.",
+      "availability": "Native bridge",
+      "protocol": "Arcane.development",
+      "normalization": "Inputs normalized; provider result/error preserved.",
+      "surface": "default `DevelopmentWorkspace` and input validators; `inspect()`, `context()`, `setup()`, `installNode()`."
+    },
+    {
+      "file": "runtime/arcane/modules/DirectoryPicker.js",
+      "name": "DirectoryPicker.js",
+      "kind": "esm",
+      "exports": [
+        "default",
+        "normalizeDirectoryPickerOptions",
+        "normalizeDirectorySelection"
+      ],
+      "summary": "Wraps the provider-owned native directory chooser and normalizes selected/cancelled/error results.",
+      "availability": "Native bridge",
+      "protocol": "Arcane.filesystem.selectDirectory",
+      "normalization": "Strict normalized selection and coded errors.",
+      "surface": "default `DirectoryPicker`, `normalizeDirectoryPickerOptions()`, `normalizeDirectorySelection()`."
+    },
+    {
+      "file": "runtime/arcane/modules/DocumentNavigation.js",
+      "name": "DocumentNavigation.js",
+      "kind": "esm",
+      "exports": [
+        "applyDocumentNavigationFilter",
+        "bindDocumentNavigation",
+        "clearDocumentNavigationFilter",
+        "initializeDocumentNavigation",
+        "revealCurrentDocumentNavigationItem"
+      ],
+      "summary": "Binds document navigation, filtering, history, current-item reveal, and load initialization.",
+      "availability": "Browser / native WebView",
+      "protocol": "DOM and history",
+      "normalization": "Normalized filter/navigation state; DOM effects preserved.",
+      "surface": "Five binding/filter/reveal helpers."
+    },
+    {
+      "file": "runtime/arcane/modules/Errors.js",
+      "name": "Errors.js",
+      "kind": "esm",
+      "exports": [
+        "default",
+        "fingerprintIncident",
+        "normalizeErrorEvent",
+        "normalizeRejectionEvent"
+      ],
+      "summary": "Normalizes global errors/rejections, fingerprints and deduplicates incidents, persists a ledger, and performs bounded delivery.",
+      "availability": "Browser / native WebView hybrid",
+      "protocol": "Window events, DBOPFS, Mail",
+      "normalization": "Incident records normalized; storage/mail failures isolated.",
+      "surface": "default `Errors`; event normalizers/fingerprint plus lifecycle, capture, delivery and teardown methods."
+    },
+    {
+      "file": "runtime/arcane/modules/GifEncoder.js",
+      "name": "GifEncoder.js",
+      "kind": "esm",
+      "exports": [
+        "default",
+        "indexPixels",
+        "lzw"
+      ],
+      "summary": "Encodes indexed frames into a bounded animated GIF using palette mapping and LZW.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Normalized byte output and bounds.",
+      "surface": "default `GifEncoder`, `indexPixels()`, `lzw()`."
+    },
+    {
+      "file": "runtime/arcane/modules/HTMLImport.js",
+      "name": "HTMLImport.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Defines the same-origin `<html-import>` loader with open shadow root, inline script execution, and readiness/error events.",
+      "availability": "Browser / native WebView",
+      "protocol": "Same-origin fetch + DOM",
+      "normalization": "Public error detail normalized; fetch/DOM failure preserved.",
+      "surface": "default `HTMLImport`; registers `html-import`; `connectedCallback()` and `ready`."
+    },
+    {
+      "file": "runtime/arcane/modules/InMemoryCommunicationProvider.js",
+      "name": "InMemoryCommunicationProvider.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Implements deterministic in-memory thread/message/send behavior for demos and tests.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Normalized communication entities.",
+      "surface": "default provider with `listThreads()`, `getMessages()`, `send()`."
+    },
+    {
+      "file": "runtime/arcane/modules/IsolatedModelQuestionRunner.js",
+      "name": "IsolatedModelQuestionRunner.js",
+      "kind": "esm",
+      "exports": [
+        "IsolatedModelQuestionRunner",
+        "countSentences",
+        "default"
+      ],
+      "summary": "Inspects one exact model and runs one isolated question with proof validation.",
+      "availability": "Native bridge or injected provider",
+      "protocol": "localAI isolated-model methods",
+      "normalization": "Strict normalized proof/coded errors.",
+      "surface": "default/named runner, `countSentences()`, `inspectModel()`, `runQuestion()`."
+    },
+    {
+      "file": "runtime/arcane/modules/LocalAIReadiness.js",
+      "name": "LocalAIReadiness.js",
+      "kind": "esm",
+      "exports": [
+        "LOCAL_AI_BROWSER_ENDPOINTS",
+        "checkLocalAIReadiness",
+        "deriveLocalAIRequirements",
+        "evaluateLocalSpeechHealth"
+      ],
+      "summary": "Derives selected AI requirements and returns a frozen readiness/recovery report across browser, desktop, and Android modes.",
+      "availability": "Browser/native hybrid",
+      "protocol": "Arcane.localAI, Arcane.speech, bounded browser speech health",
+      "normalization": "Fully normalized report and stable error codes; browsers never probe Ollama.",
+      "surface": "Endpoint constant plus requirements, speech-health, and readiness helpers."
+    },
+    {
+      "file": "runtime/arcane/modules/LocalAIReadinessController.js",
+      "name": "LocalAIReadinessController.js",
+      "kind": "esm",
+      "exports": [
+        "availabilityFromReport",
+        "createLocalAIReadinessController"
+      ],
+      "summary": "Coordinates local-AI status component checks, ensured recovery, availability projection, and teardown.",
+      "availability": "Browser/native hybrid",
+      "protocol": "LocalAIReadiness + component events",
+      "normalization": "Normalized controller state and change events.",
+      "surface": "`createLocalAIReadinessController()`, `availabilityFromReport()`."
+    },
+    {
+      "file": "runtime/arcane/modules/Mail.js",
+      "name": "Mail.js",
+      "kind": "esm",
+      "exports": [
+        "default",
+        "resolveMailConfig"
+      ],
+      "summary": "Builds bounded reports and prefers the native mail capability with an explicit HTTP transport fallback.",
+      "availability": "Browser/native hybrid + cloud",
+      "protocol": "Arcane.mail.send or MailTransport HTTP(S)",
+      "normalization": "Mail inputs/results normalized; transport failures mixed.",
+      "surface": "default `Mail`, `resolveMailConfig()`; installs `window.mail`; `send()`."
+    },
+    {
+      "file": "runtime/arcane/modules/MailTransport.mjs",
+      "name": "MailTransport.mjs",
+      "kind": "esm",
+      "exports": [
+        "DEFAULT_MAIL_REQUEST_TIMEOUT_MS",
+        "MAX_MAIL_RESPONSE_BYTES",
+        "normalizeMailEndpoint",
+        "sendMailReport"
+      ],
+      "summary": "Sends one bounded mail report to a normalized HTTP(S) endpoint with timeout and response-size limits.",
+      "availability": "Browser/server with fetch + cloud",
+      "protocol": "HTTP(S) fetch + AbortController",
+      "normalization": "Normalized endpoint/timeout/size errors; remote detail bounded.",
+      "surface": "Timeout/size constants, `normalizeMailEndpoint()`, `sendMailReport()`."
+    },
+    {
+      "file": "runtime/arcane/modules/Marked.min.js",
+      "name": "Marked.min.js",
+      "kind": "esm",
+      "exports": [
+        "Hooks",
+        "Lexer",
+        "Marked",
+        "Parser",
+        "Renderer",
+        "TextRenderer",
+        "Tokenizer",
+        "defaults",
+        "getDefaults",
+        "lexer",
+        "marked",
+        "options",
+        "parse",
+        "parseInline",
+        "parser",
+        "setOptions",
+        "use",
+        "walkTokens"
+      ],
+      "summary": "Vendored Marked 18.0.5 Markdown lexer, parser, renderer, extension, and walk-token API.",
+      "availability": "Cross-host vendor module",
+      "protocol": "In-process only",
+      "normalization": "Vendor-native Marked contract.",
+      "surface": "Twenty named/default-style Marked exports; see bundled license notice."
+    },
+    {
+      "file": "runtime/arcane/modules/MD.js",
+      "name": "MD.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Renders Markdown with Marked and exposes a DOM-sanitized projection.",
+      "availability": "Browser / native WebView",
+      "protocol": "Marked + DOM template sanitization",
+      "normalization": "Raw Marked behavior plus Arcane sanitization; parse errors vendor-native.",
+      "surface": "default `MD`; `raw`, `rendered`, `safeRendered`, `append()`."
+    },
+    {
+      "file": "runtime/arcane/modules/MemoryRecords.js",
+      "name": "MemoryRecords.js",
+      "kind": "esm",
+      "exports": [
+        "hasMemoryContent",
+        "normalizeMemoryContent"
+      ],
+      "summary": "Normalizes memory content and detects meaningful stored memory.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Fully normalized string/boolean results.",
+      "surface": "`normalizeMemoryContent()`, `hasMemoryContent()`."
+    },
+    {
+      "file": "runtime/arcane/modules/MessageAdvisory.js",
+      "name": "MessageAdvisory.js",
+      "kind": "esm",
+      "exports": [
+        "inspectMessageRecords",
+        "normalizeContentAdvisory",
+        "unavailableMessageInspection"
+      ],
+      "summary": "Normalizes message content advisories and contains per-message inspection failures.",
+      "availability": "Cross-host",
+      "protocol": "Injected inspector",
+      "normalization": "Normalized advisory records; inspector failures converted to unavailable results.",
+      "surface": "Three advisory/inspection helpers."
+    },
+    {
+      "file": "runtime/arcane/modules/ModelDefinition.js",
+      "name": "ModelDefinition.js",
+      "kind": "esm",
+      "exports": [
+        "loadModelDefinitionSystemPrompt",
+        "parseModelDefinition"
+      ],
+      "summary": "Parses the deterministic packaged Modelfile subset and extracts the SYSTEM prompt.",
+      "availability": "Cross-host",
+      "protocol": "Optional same-origin read-only fetch",
+      "normalization": "Strict normalized definition with coded syntax errors.",
+      "surface": "`parseModelDefinition()`, `loadModelDefinitionSystemPrompt()`."
+    },
+    {
+      "file": "runtime/arcane/modules/Ollama.js",
+      "name": "Ollama.js",
+      "kind": "esm",
+      "exports": [
+        "Ollama",
+        "default",
+        "ollama"
+      ],
+      "summary": "Provides the first-class Arcane Ollama client without direct access to localhost:11434.",
+      "availability": "Native bridge",
+      "protocol": "Arcane.ollama through Core",
+      "normalization": "Principal methods preserve provider-native envelopes; readiness/text/unload helpers normalize.",
+      "surface": "`Ollama`, singleton/default `ollama`; 24 methods; installs `globalThis.arcaneOllama`, emits `arcane-ollama-ready`."
+    },
+    {
+      "file": "runtime/arcane/modules/OllamaModelIdentifier.js",
+      "name": "OllamaModelIdentifier.js",
+      "kind": "esm",
+      "exports": [
+        "isOllamaModelIdentifier",
+        "normalizeOllamaModelIdentifier"
+      ],
+      "summary": "Validates and canonicalizes the syntax of Ollama model identifiers without granting model admission.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Fully normalized string/boolean result.",
+      "surface": "`normalizeOllamaModelIdentifier()`, `isOllamaModelIdentifier()`."
+    },
+    {
+      "file": "runtime/arcane/modules/OllamaSettings.js",
+      "name": "OllamaSettings.js",
+      "kind": "esm",
+      "exports": [
+        "arcaneBrainModelName",
+        "ollamaRuntimeSchema",
+        "ollamaServiceSchema"
+      ],
+      "summary": "Defines bounded runtime/service preference schemas and deterministic Arcane brain alias names.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Fully normalized settings/name contract.",
+      "surface": "`ollamaRuntimeSchema`, `ollamaServiceSchema`, `arcaneBrainModelName()`."
+    },
+    {
+      "file": "runtime/arcane/modules/OpenMeteoWeatherProvider.js",
+      "name": "OpenMeteoWeatherProvider.js",
+      "kind": "esm",
+      "exports": [
+        "OPEN_METEO_ENDPOINTS",
+        "default",
+        "mapForecast"
+      ],
+      "summary": "Searches and loads Open-Meteo data into frozen Arcane weather entities.",
+      "availability": "Browser / native WebView / server with fetch + cloud",
+      "protocol": "Open-Meteo HTTPS",
+      "normalization": "Provider data normalized to entities; transport errors mixed.",
+      "surface": "Endpoint constants, default provider, `mapForecast()`; search/load methods and lifecycle events."
+    },
+    {
+      "file": "runtime/arcane/modules/PreferenceStore.js",
+      "name": "PreferenceStore.js",
+      "kind": "esm",
+      "exports": [
+        "Preference",
+        "default",
+        "preferenceSchema"
+      ],
+      "summary": "Loads and updates schema-defined app preferences through native storage with a narrow browser fallback.",
+      "availability": "Browser/native hybrid",
+      "protocol": "Arcane.preferences or app-scoped localStorage",
+      "normalization": "Values normalized; only exact unsupported capability falls back.",
+      "surface": "default `PreferenceStore`, re-exported `Preference`/schema; load/set/reset APIs and events."
+    },
+    {
+      "file": "runtime/arcane/modules/QRCode.min.js",
+      "name": "QRCode.min.js",
+      "kind": "classic-script",
+      "exports": [],
+      "summary": "Vendored QRCode generator for DOM, canvas, SVG, and image output.",
+      "availability": "Browser vendor script",
+      "protocol": "Classic script global + DOM/canvas/SVG",
+      "normalization": "Vendor-native.",
+      "surface": "No ESM exports; global `QRCode`, `makeCode()`, `makeImage()`, `clear()`, `CorrectLevel`."
+    },
+    {
+      "file": "runtime/arcane/modules/Questionnaire.js",
+      "name": "Questionnaire.js",
+      "kind": "esm",
+      "exports": [
+        "DEFAULT_QUESTIONNAIRE_NOTIFICATION_TIME_MS",
+        "Questionnaire"
+      ],
+      "summary": "Evaluates whether a one-time questionnaire prompt is due without performing the prompt.",
+      "availability": "Cross-host",
+      "protocol": "In-process clock only",
+      "normalization": "Normalized fail-closed boolean.",
+      "surface": "Notification default and `Questionnaire` with timing/check methods."
+    },
+    {
+      "file": "runtime/arcane/modules/RecordLinkIndex.js",
+      "name": "RecordLinkIndex.js",
+      "kind": "esm",
+      "exports": [
+        "buildRecordLinkIndex",
+        "parseRecordLinks"
+      ],
+      "summary": "Parses record links and builds their normalized index.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Fully normalized.",
+      "surface": "`parseRecordLinks()`, `buildRecordLinkIndex()`."
+    },
+    {
+      "file": "runtime/arcane/modules/RecordPassageIndex.js",
+      "name": "RecordPassageIndex.js",
+      "kind": "esm",
+      "exports": [
+        "cleanExcerpt",
+        "extractDateMentions",
+        "findRulePassages",
+        "pageAtLine",
+        "pageMarkers",
+        "parseDateMention",
+        "textLines",
+        "validIsoDate"
+      ],
+      "summary": "Indexes text lines, page markers, dates, rules, and excerpts for record review.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Fully normalized.",
+      "surface": "Eight text/page/date/rule helper exports."
+    },
+    {
+      "file": "runtime/arcane/modules/RecordReviewStore.js",
+      "name": "RecordReviewStore.js",
+      "kind": "esm",
+      "exports": [
+        "default",
+        "normalizeRecordId",
+        "normalizeReview"
+      ],
+      "summary": "Stores normalized record-review decisions through native storage or app-scoped local fallback.",
+      "availability": "Browser/native hybrid",
+      "protocol": "Arcane.storage or localStorage",
+      "normalization": "Normalized ids/reviews/snapshots; storage failures mixed.",
+      "surface": "default store, record/review normalizers; `load()`, `get()`, `set()`, `snapshot()`, change event."
+    },
+    {
+      "file": "runtime/arcane/modules/RevocableProjectionLedger.js",
+      "name": "RevocableProjectionLedger.js",
+      "kind": "esm",
+      "exports": [
+        "DEFAULT_PROJECTION_LEDGER_CAPACITY",
+        "DEFAULT_PROJECTION_LEDGER_STORED_CHARACTERS",
+        "DEFAULT_PROJECTION_LEDGER_STORED_NODES",
+        "DEFAULT_PROJECTION_LEDGER_STORED_UTF8_BYTES",
+        "MAX_PROJECTION_LEDGER_CAPACITY",
+        "MAX_PROJECTION_LEDGER_STORED_CHARACTERS",
+        "MAX_PROJECTION_LEDGER_STORED_NODES",
+        "MAX_PROJECTION_LEDGER_STORED_UTF8_BYTES",
+        "PROJECTION_LEDGER_LIMITS",
+        "PROJECTION_LEDGER_REASON_CODES",
+        "PROJECTION_LEDGER_SCHEMA_VERSION",
+        "PROJECTION_LEDGER_STATUSES",
+        "ProjectionLedgerError",
+        "RevocableProjectionLedger",
+        "cloneProjectionLedgerValue",
+        "createProjectionLedgerFingerprint",
+        "createRevocableProjectionLedgerPortAdapter",
+        "default"
+      ],
+      "summary": "Implements an append-only bounded in-memory projection/revocation ledger safe for hostile descriptor inputs.",
+      "availability": "Cross-host",
+      "protocol": "In-process or explicit port adapter",
+      "normalization": "Strict normalization with stable `ProjectionLedgerError`.",
+      "surface": "Ledger classes, limits/status/reason constants, clone/fingerprint/port helpers, append/query/list APIs."
+    },
+    {
+      "file": "runtime/arcane/modules/RiskSignalAnalyzer.js",
+      "name": "RiskSignalAnalyzer.js",
+      "kind": "esm",
+      "exports": [
+        "DEFAULT_LEVELS",
+        "analyzeRiskSignals"
+      ],
+      "summary": "Matches configured risk signals and levels against bounded text.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Fully normalized.",
+      "surface": "`DEFAULT_LEVELS`, `analyzeRiskSignals()`."
+    },
+    {
+      "file": "runtime/arcane/modules/ScamRiskPolicy.js",
+      "name": "ScamRiskPolicy.js",
+      "kind": "esm",
+      "exports": [
+        "assessScamRisk",
+        "loadScamNetworkPolicy",
+        "scamRiskSignals",
+        "scamSafetyGuidance"
+      ],
+      "summary": "Combines deterministic scam signals with Arcane blocked-domain evidence and safety guidance.",
+      "availability": "Cross-host",
+      "protocol": "Arcane network policy fetch",
+      "normalization": "Fully normalized.",
+      "surface": "Signals plus load, assess, and guidance helpers."
+    },
+    {
+      "file": "runtime/arcane/modules/ScopedOPFSCache.js",
+      "name": "ScopedOPFSCache.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Provides a narrow exact-key JSON cache inside one app-owned OPFS namespace.",
+      "availability": "Browser / native WebView",
+      "protocol": "OPFS + AppDataScope",
+      "normalization": "Keys/limits/corruption handling normalized; storage errors mixed.",
+      "surface": "default `ScopedOPFSCache`; support check and get/set/delete APIs."
+    },
+    {
+      "file": "runtime/arcane/modules/ScreenCapture.js",
+      "name": "ScreenCapture.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Captures a display surface as image, video, or GIF with explicit lifecycle events.",
+      "availability": "Browser / native WebView",
+      "protocol": "getDisplayMedia, MediaRecorder, canvas, GifEncoder",
+      "normalization": "State/events normalized; permission and codec errors mixed.",
+      "surface": "default `ScreenCapture`; acquire/capture/start/stop/reset methods."
+    },
+    {
+      "file": "runtime/arcane/modules/SpeechPlayback.js",
+      "name": "SpeechPlayback.js",
+      "kind": "esm",
+      "exports": [
+        "MAX_SPEECH_CHARACTERS",
+        "MAX_SPEECH_CHUNKS",
+        "MAX_SPEECH_INPUT",
+        "PREFERRED_STREAM_SEGMENT",
+        "SPEECH_VOICE_ALIASES",
+        "SPEECH_VOICE_OPTIONS",
+        "SpeechPlayback",
+        "default",
+        "splitSpeechText"
+      ],
+      "summary": "Segments bounded text, queues latest-request speech synthesis, and controls lookahead HTML audio playback.",
+      "availability": "Browser + native bridge",
+      "protocol": "Arcane.speech.synthesize, Blob URLs, audio element",
+      "normalization": "State/limits normalized; provider/media failures mixed.",
+      "surface": "SpeechPlayback class/default, voice/limit constants, `splitSpeechText()`, playback lifecycle APIs."
+    },
+    {
+      "file": "runtime/arcane/modules/StaticDocumentCatalog.js",
+      "name": "StaticDocumentCatalog.js",
+      "kind": "esm",
+      "exports": [
+        "CATALOG_SCHEMA_VERSION",
+        "default",
+        "normalizeStaticDocumentCatalog",
+        "staticDocumentCacheKey"
+      ],
+      "summary": "Loads a positive static document inventory with byte/hash verification, cache, search, and bounded context.",
+      "availability": "Browser / native WebView / server with fetch",
+      "protocol": "HTTP(S), crypto.subtle, optional cache",
+      "normalization": "Strict catalog/content normalization; transport failures mixed.",
+      "surface": "default catalog, schema constant, catalog normalizer/cache-key; list/get/search/hydrate/context APIs."
+    },
+    {
+      "file": "runtime/arcane/modules/SystemAppearance.js",
+      "name": "SystemAppearance.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Reads or applies native appearance, returning an explicit unsupported browser state when no bridge exists.",
+      "availability": "Browser/native hybrid",
+      "protocol": "Arcane.appearance",
+      "normalization": "Absent bridge normalized; native result/error preserved.",
+      "surface": "default `SystemAppearance`; `available()`, `current()`, `apply()`."
+    },
+    {
+      "file": "runtime/arcane/modules/SystemPlatformPresentation.js",
+      "name": "SystemPlatformPresentation.js",
+      "kind": "classic-script",
+      "exports": [],
+      "summary": "Maps kernel names to presentation labels/classes without granting platform authority.",
+      "availability": "Browser / native WebView classic script",
+      "protocol": "DOM",
+      "normalization": "Fully normalized presentation only.",
+      "surface": "No ESM exports; global `ArcaneSystemPlatformPresentation` with `kernelType()`, `displayName()`, `apply()`."
+    },
+    {
+      "file": "runtime/arcane/modules/SystemToolRegistry.js",
+      "name": "SystemToolRegistry.js",
+      "kind": "esm",
+      "exports": [
+        "default",
+        "quoteArgument"
+      ],
+      "summary": "Registers validated command builders and constructs command strings without executing them.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Fully normalized definitions/quoting.",
+      "surface": "default registry, `quoteArgument()`, register/list/get/build APIs."
+    },
+    {
+      "file": "runtime/arcane/modules/TerminalClient.js",
+      "name": "TerminalClient.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Maps native terminal sessions and Arcane events into an EventTarget client.",
+      "availability": "Native bridge",
+      "protocol": "Arcane.terminal + Arcane.events",
+      "normalization": "Client events/state normalized; native result/error mixed.",
+      "surface": "default `TerminalClient`; start/write/resize/signal/close/receive/destroy APIs and terminal events."
+    },
+    {
+      "file": "runtime/arcane/modules/TerminalCommandRegistry.js",
+      "name": "TerminalCommandRegistry.js",
+      "kind": "esm",
+      "exports": [
+        "default",
+        "splitCommandLine"
+      ],
+      "summary": "Routes parsed command lines to injected handlers and provides definitions/completions.",
+      "availability": "Cross-host",
+      "protocol": "Injected handlers",
+      "normalization": "Parsing/routing normalized; handler result/error preserved.",
+      "surface": "default registry, `splitCommandLine()`, register/resolve/definitions/completions/execute APIs."
+    },
+    {
+      "file": "runtime/arcane/modules/ThemeBootstrap.js",
+      "name": "ThemeBootstrap.js",
+      "kind": "esm",
+      "exports": [
+        "arcaneThemeReady",
+        "bootstrapArcaneTheme",
+        "default"
+      ],
+      "summary": "Performs import-time Arcane theme loading and subscribes to native appearance changes.",
+      "availability": "Browser/native hybrid",
+      "protocol": "ThemeManager + Arcane.events",
+      "normalization": "Theme state normalized; storage/native errors mixed.",
+      "surface": "`bootstrapArcaneTheme()`, `arcaneThemeReady`, default ready promise."
+    },
+    {
+      "file": "runtime/arcane/modules/ThemeManager.js",
+      "name": "ThemeManager.js",
+      "kind": "esm",
+      "exports": [
+        "default",
+        "loadAndApplyTheme"
+      ],
+      "summary": "Loads, applies, previews, saves, resets, and synchronizes semantic Arcane themes.",
+      "availability": "Browser/native hybrid",
+      "protocol": "PreferenceStore, DOM, Arcane.appearance",
+      "normalization": "Theme values/events normalized; storage/native failures mixed.",
+      "surface": "default `ThemeManager`, `loadAndApplyTheme()`; scheme/custom/system APIs and `arcane-theme-change`."
+    },
+    {
+      "file": "runtime/arcane/modules/TimeGuard.js",
+      "name": "TimeGuard.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Persists and evaluates clock rollback and grace-period state.",
+      "availability": "Browser / native WebView",
+      "protocol": "User + DBOPFS",
+      "normalization": "Time decisions normalized; storage lifecycle mixed.",
+      "surface": "default `TimeGuard`; installs `window.timeguard`, emits `time-guard-ready`; clock methods."
+    },
+    {
+      "file": "runtime/arcane/modules/ToolCallRouter.js",
+      "name": "ToolCallRouter.js",
+      "kind": "esm",
+      "exports": [
+        "handleResponse",
+        "handleStreamedCalls",
+        "parseArguments"
+      ],
+      "summary": "Parses OpenAI-style tool calls and dispatches complete or streamed calls to injected handlers.",
+      "availability": "Cross-host",
+      "protocol": "Injected handlers",
+      "normalization": "Arguments/routing normalized; handler results returned or all-settled.",
+      "surface": "`parseArguments()`, `handleResponse()`, `handleStreamedCalls()`."
+    },
+    {
+      "file": "runtime/arcane/modules/uPlot.iife.min.js",
+      "name": "uPlot.iife.min.js",
+      "kind": "classic-script",
+      "exports": [],
+      "summary": "Vendored uPlot chart constructor and rendering runtime.",
+      "availability": "Browser vendor script",
+      "protocol": "Classic script + canvas/DOM",
+      "normalization": "Vendor-native.",
+      "surface": "No ESM exports; global `uPlot` with data/series/scale/cursor/hook/selection/destroy APIs."
+    },
+    {
+      "file": "runtime/arcane/modules/uPlot.LICENSE.txt",
+      "name": "uPlot.LICENSE.txt",
+      "kind": "license",
+      "exports": [],
+      "summary": "License companion for the bundled uPlot vendor runtime.",
+      "availability": "Documentation asset",
+      "protocol": "None",
+      "normalization": "Not executable.",
+      "surface": "MIT license text."
+    },
+    {
+      "file": "runtime/arcane/modules/uPlot.min.css",
+      "name": "uPlot.min.css",
+      "kind": "stylesheet",
+      "exports": [],
+      "summary": "Bundled uPlot presentation stylesheet.",
+      "availability": "Browser stylesheet",
+      "protocol": "CSS",
+      "normalization": "Presentation only.",
+      "surface": "Load with a stylesheet link before rendering uPlot charts."
+    },
+    {
+      "file": "runtime/arcane/modules/WaitForComponent.js",
+      "name": "WaitForComponent.js",
+      "kind": "esm",
+      "exports": [
+        "default"
+      ],
+      "summary": "Waits for a component property, method, or readiness event with optional error event and bounded timeout.",
+      "availability": "Cross-host EventTarget / browser component",
+      "protocol": "EventTarget + timers",
+      "normalization": "Normalized coded readiness, error, and timeout results.",
+      "surface": "default `waitForComponent()`."
+    },
+    {
+      "file": "runtime/arcane/modules/YouTubeMedia.js",
+      "name": "YouTubeMedia.js",
+      "kind": "esm",
+      "exports": [
+        "parseYouTubeMedia",
+        "youtubeEmbedUrl"
+      ],
+      "summary": "Validates YouTube video/playlist locators and constructs privacy-enhanced embed URLs.",
+      "availability": "Cross-host",
+      "protocol": "URL construction only",
+      "normalization": "Fully normalized.",
+      "surface": "`parseYouTubeMedia()`, `youtubeEmbedUrl()`."
+    }
+  ]
+}
