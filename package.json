@@ -53,7 +53,7 @@
     "test:integration": "node ./bin/arcane-test.mjs test/integrated-shared.test.mjs test/integrated-workspace.test.mjs test/native-plan.test.mjs test/native-provider-loader.test.mjs test/npm-release.test.mjs test/release-bundle.test.mjs test/release-capability-smoke.test.mjs test/shared-payload-batch.test.mjs test/tarball.test.mjs",
     "test:regression": "node ./bin/arcane-test.mjs test/channel-workflows.test.mjs test/native-provider-generation.test.mjs test/testing.test.mjs test/test-sets.test.mjs",
     "check": "node tools/check-source.mjs && node tools/runtime-manifest.mjs --verify && node tools/sdk-browser-runtime-manifest.mjs --verify && npm test",
-    "check:release": "node tools/check-source.mjs && node tools/runtime-manifest.mjs --verify && node tools/sdk-browser-runtime-manifest.mjs --verify && npm run test:release",
+    "check:release": "node tools/check-source.mjs && node tools/runtime-manifest.mjs --verify && node tools/sdk-browser-runtime-manifest.mjs --verify && node ./bin/arcane-test.mjs test/npm-release.test.mjs test/channel-workflows.test.mjs",
     "runtime:verify": "node tools/runtime-manifest.mjs --verify",
     "runtime:sync": "node tools/sync-runtime.mjs",
     "pack:local": "npm pack --ignore-scripts",

@@ -58,6 +58,16 @@ test('Check validates once and runs one tiny installed-artifact smoke on each su
     assert.match(workflow,/source_validation:[\s\S]*npm run check:release/u);
     assert.equal(workflow.match(/npm run check:release/gu)?.length,1);
     assert.doesNotMatch(workflow,/npm run check(?:\s|$)/mu);
+    assert.equal(
+        packageDocument.scripts?.['check:release'],
+        'node tools/check-source.mjs && node tools/runtime-manifest.mjs --verify && '
+        +'node tools/sdk-browser-runtime-manifest.mjs --verify && '
+        +'node ./bin/arcane-test.mjs test/npm-release.test.mjs test/channel-workflows.test.mjs'
+    );
+    assert.doesNotMatch(
+        packageDocument.scripts?.['check:release']??'',
+        /npm run test:|release-bundle|tarball|site|reference|integration|regression/u
+    );
     assert.doesNotMatch(
         packageDocument.scripts?.['test:functional:release']??'',
         /reference-completeness\.test\.mjs|site\.test\.mjs/u
