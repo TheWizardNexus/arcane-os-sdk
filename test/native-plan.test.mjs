@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {cp,lstat,mkdir,readFile,realpath,writeFile} from 'node:fs/promises';
+import {cp,lstat,mkdir,readFile,realpath,rm,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {
@@ -763,7 +763,7 @@ test('native plan execution admits one owner and rejects concurrent or sequentia
     });
 });
 
-test('an injected toolchain plans and builds one native target without changing the default registry',async t=>{
+test('an injected toolchain plans and builds one native target without changing the default registry',{timeout:60_000},async t=>{
     const parent=await temporaryDirectory(t,{prefix:'arcane-native-toolchain-'});
     const application=await prepareNativeRelease(parent);
     const toolchainRoot=path.join(parent,'toolchain');
@@ -997,4 +997,12 @@ test('an injected toolchain plans and builds one native target without changing 
             await assert.rejects(operation,error=>error?.code==='ARCANE_TARGET_DEFERRED');
         }
     });
+    await t.test(
+        'removes the expanded authenticated fixture inside an owned deadline',
+        {timeout:30_000},
+        async()=>{
+            await rm(parent,{recursive:true,force:true});
+            await assert.rejects(lstat(parent),error=>error?.code==='ENOENT');
+        }
+    );
 });
