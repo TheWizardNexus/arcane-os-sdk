@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="The modules under arcane/entities/ provide shared JavaScript records, value objects, validation helpers, and contract vocabularies for Arcane applications.…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-entities/"><link rel="icon" type="image/png" href="../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../styles.css"><link rel="stylesheet" href="../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane Shared Entities · Arcane OS SDK"><meta property="og:description" content="The modules under arcane/entities/ provide shared JavaScript records, value objects, validation helpers, and contract vocabularies for Arcane applications.…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-entities/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane Shared Entities · Arcane OS SDK"><meta name="twitter:description" content="The modules under arcane/entities/ provide shared JavaScript records, value objects, validation helpers, and contract vocabularies for Arcane applications.…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane Shared Entities | Arcane OS SDK</title><script src="../../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../">Overview</a><a href="../../../guides/">Guides</a><a href="../../../examples/">Examples</a><a href="../../../playground/">Playground</a><a href="../../../testing/">Testing</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="../../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Core</a><span aria-hidden="true">/</span><span aria-current="page">Arcane Shared Entities</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-shared-entities">Arcane Shared Entities</h1><p class="doc-lead">The modules under arcane/entities/ provide shared JavaScript records, value objects, validation helpers, and contract vocabularies for Arcane applications.…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../">Core map</a><a href="../arcane-api/">Arcane API</a><a href="../arcane-events/">Events</a><a href="../arcane-ai-contracts/">AI contracts</a><a href="./" aria-current="page">Entity exports</a><a href="../ollama-module/">Ollama module</a><a href="../reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/core/arcane-entities.md"><h2 id="purpose">Purpose</h2>
+<p>The modules under <code>arcane/entities/</code> provide shared JavaScript records, value
+objects, validation helpers, and contract vocabularies for Arcane applications.
+This reference is the canonical inventory of their public module exports. The
+export key is <code>&lt;module path&gt;#&lt;export name&gt;</code>; <code>default</code> denotes a module&#39;s default
+export. Import only the exports listed here, and do not depend on unexported
+implementation details.</p>
+<p>The <code>Kind</code> column describes the exported JavaScript value: <code>class</code>, <code>function</code>,
+or <code>constant</code>. Detailed, versioned rules for intent envelopes and TWiN policy
+decisions remain authoritative in the linked contract documents.</p>
+<h2 id="export-inventory">Export inventory</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Export key</th>
+<th>Kind</th>
+<th>Runtime symbol</th>
+<th>Public contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>arcane/entities/ApiModelRecord.js#default</code></td>
+<td>class</td>
+<td><code>ApiModelRecord</code></td>
+<td>Validates and freezes an HTTP(S) API response snapshot containing its endpoint, fetch time, metadata, and value.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/Calculation.js#default</code></td>
+<td>class</td>
+<td><code>Calculation</code></td>
+<td>Validates and freezes a bounded expression, finite numeric result, and creation time.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/Chat.js#default</code></td>
+<td>class</td>
+<td><code>ChatEntity</code></td>
+<td>Owns a browser chat session&#39;s messages, tool exchanges, memory extraction, and optional DBOPFS persistence in the <code>chats</code> table.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/CommunicationMessage.js#default</code></td>
+<td>class</td>
+<td><code>CommunicationMessage</code></td>
+<td>Normalizes and freezes one provider message, including addressing, channel, direction, delivery state, timestamp, and attachment metadata.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/CommunicationMessage.js#communicationChannels</code></td>
+<td>constant</td>
+<td><code>communicationChannels</code></td>
+<td>Shared <code>Set</code> of recognized message-channel identifiers: <code>email</code>, <code>sms</code>, <code>mms</code>, <code>rcs</code>, <code>whatsapp</code>, and <code>other</code>; consumers must not mutate it.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/CommunicationThread.js#default</code></td>
+<td>class</td>
+<td><code>CommunicationThread</code></td>
+<td>Normalizes and freezes a provider conversation snapshot with participants, unread state, and <code>CommunicationMessage</code> records.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/Document.js#default</code></td>
+<td>class</td>
+<td><code>DocumentEntity</code></td>
+<td>Specializes <code>FileEntity</code> with <code>documents</code> as its default DBOPFS table.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/File.js#default</code></td>
+<td>class</td>
+<td><code>FileEntity</code></td>
+<td>Addresses a DBOPFS file by table and name, saves supported file data, and opens files with MIME and format-aware parsing metadata.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/Image.js#default</code></td>
+<td>class</td>
+<td><code>ImageEntity</code></td>
+<td>Specializes <code>FileEntity</code> for the <code>images</code> table and exposes image validation, storage, data-URL, and blob-URL helpers.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/IntentEnvelope.js#IntentEnvelopeValidationError</code></td>
+<td>class</td>
+<td><code>IntentEnvelopeValidationError</code></td>
+<td>Privacy-safe validation error with stable <code>code</code> and structural <code>path</code> fields; see the <a href="https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/intent-envelope.md#errors" target="_blank" rel="noreferrer">intent-envelope contract</a>.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/IntentEnvelope.js#createIntentEnvelope</code></td>
+<td>function</td>
+<td><code>createIntentEnvelope</code></td>
+<td>Validates an intake payload separately from trusted identity, time, and provenance context, then returns an immutable v1 envelope; see the <a href="https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/intent-envelope.md#creation-authority-boundary" target="_blank" rel="noreferrer">creation authority boundary</a>.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/IntentEnvelope.js#rehydrateIntentEnvelope</code></td>
+<td>function</td>
+<td><code>rehydrateIntentEnvelope</code></td>
+<td>Validates and reconstructs a canonical v1 envelope object or JSON string without asserting authenticity or authority.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/IntentEnvelope.js#serializeIntentEnvelope</code></td>
+<td>function</td>
+<td><code>serializeIntentEnvelope</code></td>
+<td>Produces deterministic canonical JSON for a valid v1 intent envelope.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/IntentEnvelope.js#intentEnvelopeAuditProjection</code></td>
+<td>function</td>
+<td><code>intentEnvelopeAuditProjection</code></td>
+<td>Produces a frozen, bounded structural projection that excludes original expression and other documented content fields; see the <a href="https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/intent-envelope.md#public-api" target="_blank" rel="noreferrer">public API contract</a>.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/IntentEnvelope.js#intentEnvelopeContract</code></td>
+<td>constant</td>
+<td><code>intentEnvelopeContract</code></td>
+<td>Frozen v1 schema identifier, version, closed enum vocabularies, and size/count limits.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/Preference.js#default</code></td>
+<td>class</td>
+<td><code>Preference</code></td>
+<td>Validates and freezes one typed preference definition and normalizes candidate values against its type, bounds, and options.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/Preference.js#preferenceSchema</code></td>
+<td>function</td>
+<td><code>preferenceSchema</code></td>
+<td>Converts definitions to <code>Preference</code> instances, rejects duplicate keys, and returns a frozen schema array.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/TerminalSession.js#default</code></td>
+<td>class</td>
+<td><code>TerminalSession</code></td>
+<td>Validates terminal identity, shell, and lifecycle state and supports immutable-style patched copies through <code>with()</code>.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/TerminalSession.js#terminalShells</code></td>
+<td>constant</td>
+<td><code>terminalShells</code></td>
+<td>Frozen array of supported shell identifiers: <code>auto</code>, <code>powershell</code>, <code>cmd</code>, <code>bash</code>, and <code>sh</code>.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/Theme.js#arcaneLightThemeTokens</code></td>
+<td>constant</td>
+<td><code>arcaneLightThemeTokens</code></td>
+<td>Frozen map of the default light-scheme semantic color tokens.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/Theme.js#arcaneDarkThemeTokens</code></td>
+<td>constant</td>
+<td><code>arcaneDarkThemeTokens</code></td>
+<td>Frozen map of the default dark-scheme semantic color tokens.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/Theme.js#themeTokens</code></td>
+<td>constant</td>
+<td><code>themeTokens</code></td>
+<td>Frozen ordered definitions that map public theme-token keys to CSS custom properties, labels, and defaults.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/Theme.js#themeColorToHex</code></td>
+<td>function</td>
+<td><code>themeColorToHex</code></td>
+<td>Validates an RGB, RGBA, or six-digit hexadecimal color and returns its RGB channels as a normalized six-digit hexadecimal color.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/Theme.js#default</code></td>
+<td>class</td>
+<td><code>Theme</code></td>
+<td>Validates and freezes a named light or dark token set and can serialize, restore, apply, or clear that theme on a document root.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/TWiNPolicyDecision.js#TWiNPolicyDecisionValidationError</code></td>
+<td>class</td>
+<td><code>TWiNPolicyDecisionValidationError</code></td>
+<td>Privacy-safe policy-decision validation error with stable <code>code</code> and structural <code>path</code> fields; see the <a href="https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/twin-policy-decision.md#failure-and-recovery" target="_blank" rel="noreferrer">TWiN error contract</a>.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/TWiNPolicyDecision.js#createTWiNPolicyDecision</code></td>
+<td>function</td>
+<td><code>createTWiNPolicyDecision</code></td>
+<td>Validates an evaluator payload separately from trusted decision and policy provenance, then returns an immutable v1 decision; see the <a href="https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/twin-policy-decision.md#trusted-creation-boundary" target="_blank" rel="noreferrer">trusted creation boundary</a>.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/TWiNPolicyDecision.js#rehydrateTWiNPolicyDecision</code></td>
+<td>function</td>
+<td><code>rehydrateTWiNPolicyDecision</code></td>
+<td>Validates and reconstructs a canonical v1 policy-decision object or exact canonical JSON without asserting authenticity, freshness, or authority.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/TWiNPolicyDecision.js#serializeTWiNPolicyDecision</code></td>
+<td>function</td>
+<td><code>serializeTWiNPolicyDecision</code></td>
+<td>Produces deterministic canonical JSON for a valid v1 TWiN policy decision.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/TWiNPolicyDecision.js#twinPolicyDecisionAuditProjection</code></td>
+<td>function</td>
+<td><code>twinPolicyDecisionAuditProjection</code></td>
+<td>Produces a frozen structural audit projection that omits requirement targets and values; see <a href="https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/twin-policy-decision.md#privacy-and-audit-behavior" target="_blank" rel="noreferrer">privacy and audit behavior</a>.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/TWiNPolicyDecision.js#twinPolicyDecisionContract</code></td>
+<td>constant</td>
+<td><code>twinPolicyDecisionContract</code></td>
+<td>Frozen v1 schema identifier, version, layers, outcomes, core reason codes, and size/count limits.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/User.js#default</code></td>
+<td>class</td>
+<td><code>UserEntity</code></td>
+<td>Owns the browser user&#39;s validated settings and profile record, including DBOPFS load, refresh, serialized updates, and optional persistence.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/Weather.js#WeatherLocation</code></td>
+<td>class</td>
+<td><code>WeatherLocation</code></td>
+<td>Validates and freezes geographic identity, coordinates, and timezone metadata for a weather location.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/Weather.js#WeatherObservation</code></td>
+<td>class</td>
+<td><code>WeatherObservation</code></td>
+<td>Validates and freezes one timestamped current-weather observation and its units.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/Weather.js#WeatherDay</code></td>
+<td>class</td>
+<td><code>WeatherDay</code></td>
+<td>Validates and freezes one daily forecast with temperature, precipitation, and optional sunrise and sunset times.</td>
+</tr>
+<tr>
+<td><code>arcane/entities/Weather.js#WeatherSnapshot</code></td>
+<td>class</td>
+<td><code>WeatherSnapshot</code></td>
+<td>Validates and freezes a location, current observation, daily forecast list, source, and fetch time as one weather snapshot.</td>
+</tr>
+</tbody></table>
+</div>
+<h2 id="compatibility-boundary">Compatibility boundary</h2>
+<p>An exported entity validates and represents data; it does not grant a capability,
+authorization, native resource handle, provider credential, or policy approval.
+Consumers must preserve the separate Arcane capability and trust boundaries that
+govern persistence, networking, native execution, and protected data.</p>
+<p>Changing an export name, kind, meaning, enum, accepted shape, serialization, or
+validation invariant is a public-contract change. Update the implementation,
+this inventory, its focused tests, and any linked versioned contract together.</p>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/core/arcane-entities.md" target="_blank" rel="noreferrer"><code>docs/reference/core/arcane-entities.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#purpose">Purpose</a><a href="#export-inventory">Export inventory</a><a href="#compatibility-boundary">Compatibility boundary</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

@@ -72,6 +72,11 @@ jobs:
         shell: bash
         run: |
           test -f site/index.html
+          test -f site/reference/reference-manifest.json
+          test -f site/reference/sdk-api/index.html
+          test -f site/reference/event-manager/index.html
+          test -f site/reference/core/arcane-api/index.html
+          test -f site/reference/inventory/package-api.json
           if find site -type l -print -quit | grep -q .; then
             echo "The Pages artifact must not contain symbolic links." >&2
             exit 1

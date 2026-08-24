@@ -1,0 +1,934 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "commit": "567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e",
+    "bundleVersion": "0.8.12"
+  },
+  "componentCount": 39,
+  "loader": "/arcane/modules/HTMLImport.js",
+  "artifacts": [
+    {
+      "file": "runtime/arcane/components/app-bar.html",
+      "name": "app-bar.html",
+      "purpose": "Responsive application navigation, route state, status, and trailing actions.",
+      "methods": [
+        "setNavigation()",
+        "setActiveRoute()",
+        "setStatus()",
+        "refresh()"
+      ],
+      "events": [
+        "app-bar-ready"
+      ],
+      "slots": [
+        "brand-mark",
+        "product-name",
+        "navigation",
+        "status",
+        "trailing"
+      ],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "DOM-normalized"
+    },
+    {
+      "file": "runtime/arcane/components/assistant-panel.html",
+      "name": "assistant-panel.html",
+      "purpose": "Reusable assistant drawer, message area, composer, pending/streaming/empty/error state, and actions.",
+      "methods": [
+        "open()",
+        "close()",
+        "toggle()",
+        "send()",
+        "clear()",
+        "setState()",
+        "focusComposer()",
+        "scrollToEnd()"
+      ],
+      "events": [
+        "assistant-ready",
+        "assistant-send",
+        "assistant-clear"
+      ],
+      "slots": [
+        "title",
+        "subtitle",
+        "identity",
+        "messages/message",
+        "composer",
+        "actions",
+        "pending",
+        "streaming",
+        "empty",
+        "error",
+        "footer"
+      ],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "DOM-normalized; caller/provider results remain external"
+    },
+    {
+      "file": "runtime/arcane/components/calculator.html",
+      "name": "calculator.html",
+      "purpose": "Calculator keypad and result/error event surface backed by CalculatorEngine.",
+      "methods": [
+        "calculate()"
+      ],
+      "events": [
+        "calculator-ready",
+        "calculation-complete",
+        "calculation-error"
+      ],
+      "slots": [],
+      "dependencies": [
+        "CalculatorEngine.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Normalized Calculation/error events"
+    },
+    {
+      "file": "runtime/arcane/components/chart.html",
+      "name": "chart.html",
+      "purpose": "Accessible uPlot line, area, or point chart with normalized options and rows.",
+      "methods": [
+        "configure()",
+        "populate()",
+        "setData()",
+        "addData()",
+        "update()",
+        "destroy()"
+      ],
+      "events": [
+        "chart-ready",
+        "chart-remove"
+      ],
+      "slots": [],
+      "dependencies": [
+        "ChartLibrary.js",
+        "ComponentContracts.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Options/rows normalized; uPlot rendering is vendor-native"
+    },
+    {
+      "file": "runtime/arcane/components/chat.html",
+      "name": "chat.html",
+      "purpose": "Shared chat, file upload, streaming, speech, language, availability, and conversation-timebox surface.",
+      "methods": [
+        "streamMessage()",
+        "setMessageProgress()",
+        "setAIAvailability()",
+        "setInitialSpeechMuted()",
+        "setConversationComplete()",
+        "bindConversationTimebox()",
+        "submitMessage()",
+        "sendMessage()",
+        "languageChanged()"
+      ],
+      "events": [
+        "chat-ready",
+        "chat-send-message",
+        "chat-send-error",
+        "chat-file-uploaded",
+        "chat-language-changed",
+        "conversation-timebox-error"
+      ],
+      "slots": [],
+      "dependencies": [
+        "MD.js",
+        "File.js",
+        "ConversationTimebox.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "UI state normalized; AI/storage/media behavior mixed"
+    },
+    {
+      "file": "runtime/arcane/components/conversation-view.html",
+      "name": "conversation-view.html",
+      "purpose": "Provider-neutral conversation display, advisory actions, composer, busy state, and status.",
+      "methods": [
+        "setConversation()",
+        "setBusy()",
+        "setStatus()",
+        "clearComposer()"
+      ],
+      "events": [
+        "conversation-view-ready",
+        "communication-send",
+        "communication-advisory-action"
+      ],
+      "slots": [],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "DOM-normalized"
+    },
+    {
+      "file": "runtime/arcane/components/dashboard-config.html",
+      "name": "dashboard-config.html",
+      "purpose": "Selects which normalized chart definitions are visible on a dashboard.",
+      "methods": [
+        "configure()",
+        "setDefinitions()",
+        "setVisibility()",
+        "getChartOptions()",
+        "getEffectiveVisibility()",
+        "open()",
+        "close()"
+      ],
+      "events": [
+        "dashboard-config-ready",
+        "dashboard-config-opened",
+        "dashboard-config-closed",
+        "dashboard-config-change"
+      ],
+      "slots": [],
+      "dependencies": [
+        "ComponentContracts.js",
+        "WaitForComponent.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Fully normalized definitions and visibility"
+    },
+    {
+      "file": "runtime/arcane/components/data-maintenance.html",
+      "name": "data-maintenance.html",
+      "purpose": "Runs destructive cleanup of empty chats and memories inside the current app data scope.",
+      "methods": [
+        "open()"
+      ],
+      "events": [
+        "data-maintenance-ready",
+        "data-maintenance-complete"
+      ],
+      "slots": [],
+      "dependencies": [
+        "DataMaintenance.js",
+        "WaitForComponent.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Normalized counts; DBOPFS failures mixed"
+    },
+    {
+      "file": "runtime/arcane/components/data-view.html",
+      "name": "data-view.html",
+      "purpose": "Opens a generic modal-style data view around an injected provider.",
+      "methods": [
+        "beforeOpen()",
+        "open()"
+      ],
+      "events": [
+        "data-view-ready"
+      ],
+      "slots": [],
+      "dependencies": [
+        "WaitForComponent.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "DOM-native result"
+    },
+    {
+      "file": "runtime/arcane/components/directory-picker.html",
+      "name": "directory-picker.html",
+      "purpose": "Presents the provider-owned OS directory chooser with change/cancel/error states.",
+      "methods": [
+        "configure()",
+        "focus()",
+        "select()"
+      ],
+      "events": [
+        "directory-picker-ready",
+        "directory-picker-change",
+        "directory-picker-cancel",
+        "directory-picker-error"
+      ],
+      "slots": [],
+      "dependencies": [
+        "DirectoryPicker.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Strict normalized native selection/error"
+    },
+    {
+      "file": "runtime/arcane/components/document-inspector.html",
+      "name": "document-inspector.html",
+      "purpose": "Inspects PDF, text, or source documents and records review state.",
+      "methods": [
+        "loadDocument()",
+        "selectView()",
+        "markSaved()"
+      ],
+      "events": [
+        "document-inspector-ready",
+        "document-review-change"
+      ],
+      "slots": [],
+      "dependencies": [
+        "MD.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Document state normalized; browser document APIs mixed"
+    },
+    {
+      "file": "runtime/arcane/components/file-drop.html",
+      "name": "file-drop.html",
+      "purpose": "Acquires files by drag/drop or picker and presents busy, progress, error, and cleared state.",
+      "methods": [
+        "configure()",
+        "openPicker()",
+        "clear()",
+        "setBusy()",
+        "setError()",
+        "setProgress()"
+      ],
+      "events": [
+        "file-drop-ready",
+        "file-drop-selected",
+        "file-drop-progress",
+        "file-drop-state",
+        "file-drop-error"
+      ],
+      "slots": [],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "State normalized; browser File/drop errors mixed"
+    },
+    {
+      "file": "runtime/arcane/components/file-inspector.html",
+      "name": "file-inspector.html",
+      "purpose": "Displays file metadata, preview, busy/error state, and caller-defined actions.",
+      "methods": [
+        "configure()",
+        "show()",
+        "clear()",
+        "setActions()",
+        "setBusy()",
+        "setError()",
+        "setPreview()"
+      ],
+      "events": [
+        "file-inspector-ready",
+        "file-inspector-action",
+        "file-inspector-change",
+        "file-inspector-cleared",
+        "file-inspector-error"
+      ],
+      "slots": [
+        "title",
+        "preview",
+        "metadata",
+        "actions"
+      ],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "State normalized; preview/provider behavior mixed"
+    },
+    {
+      "file": "runtime/arcane/components/file-manager.html",
+      "name": "file-manager.html",
+      "purpose": "Browses, filters, selects, opens, and acts on app-scoped files.",
+      "methods": [
+        "setProvider()",
+        "loadAll()",
+        "setFilter()",
+        "select()",
+        "clearSelection()"
+      ],
+      "events": [
+        "file-manager-ready",
+        "file-manager-select",
+        "file-manager-open",
+        "file-manager-action"
+      ],
+      "slots": [],
+      "dependencies": [
+        "DBOPFS.js",
+        "File.js",
+        "WaitForComponent.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Selection/filter state normalized; storage/provider behavior mixed"
+    },
+    {
+      "file": "runtime/arcane/components/header.html",
+      "name": "header.html",
+      "purpose": "Legacy title bar with history, reload, online marker, presentation labels, and 988 link.",
+      "methods": [],
+      "events": [],
+      "slots": [],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Browser/platform-native behavior; no component-ready contract"
+    },
+    {
+      "file": "runtime/arcane/components/integration-settings.html",
+      "name": "integration-settings.html",
+      "purpose": "Edits non-secret communication service configuration and service actions.",
+      "methods": [
+        "configure()",
+        "getValues()",
+        "setStatus()"
+      ],
+      "events": [
+        "integration-settings-ready",
+        "integration-settings-save",
+        "integration-settings-close",
+        "integration-action"
+      ],
+      "slots": [],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Normalized non-secret values"
+    },
+    {
+      "file": "runtime/arcane/components/local-ai-status.html",
+      "name": "local-ai-status.html",
+      "purpose": "Presents local-AI standby, failure, recovery, guidance, retry, and dismissal states.",
+      "methods": [
+        "configure()",
+        "begin()",
+        "present(); hidden property"
+      ],
+      "events": [
+        "local-ai-status-ready",
+        "local-ai-status-dismissed",
+        "local-ai-retry"
+      ],
+      "slots": [],
+      "dependencies": [
+        "LocalAIReadiness.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Fully normalized LocalAIReadiness report"
+    },
+    {
+      "file": "runtime/arcane/components/markdown-document.html",
+      "name": "markdown-document.html",
+      "purpose": "Safely renders and navigates a Markdown document with focusable fragments.",
+      "methods": [
+        "configure()",
+        "load()",
+        "render()",
+        "clear()",
+        "fail()",
+        "focus()",
+        "focusFragment()"
+      ],
+      "events": [
+        "markdown-document-ready",
+        "markdown-document-state",
+        "markdown-document-navigate"
+      ],
+      "slots": [],
+      "dependencies": [
+        "MD.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "State/sanitized output normalized; Marked/DOM failures mixed"
+    },
+    {
+      "file": "runtime/arcane/components/markdown-editor.html",
+      "name": "markdown-editor.html",
+      "purpose": "Configurable Markdown authoring, toolbar, preview, title, and save surface.",
+      "methods": [
+        "configure()",
+        "focus()",
+        "clear()",
+        "saveEntry()"
+      ],
+      "events": [
+        "markdown-editor-ready",
+        "markdown-editor-change",
+        "markdown-editor-saved"
+      ],
+      "slots": [],
+      "dependencies": [
+        "MD.js",
+        "ComponentContracts.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Editor values normalized; injected save result mixed"
+    },
+    {
+      "file": "runtime/arcane/components/media-embed.html",
+      "name": "media-embed.html",
+      "purpose": "Loads a validated YouTube video or playlist embed and exposes external-platform action.",
+      "methods": [
+        "configure()",
+        "load()"
+      ],
+      "events": [
+        "media-embed-ready",
+        "media-load",
+        "media-error",
+        "media-open-platform"
+      ],
+      "slots": [],
+      "dependencies": [
+        "YouTubeMedia.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "URL/error normalized; iframe/platform behavior native"
+    },
+    {
+      "file": "runtime/arcane/components/modal.html",
+      "name": "modal.html",
+      "purpose": "Generic modal with population, open/close, actions, and sequential task execution.",
+      "methods": [
+        "populate()",
+        "open()",
+        "close()",
+        "runTasks()"
+      ],
+      "events": [
+        "modal-ready",
+        "modal-opened",
+        "modal-closed",
+        "modal-action"
+      ],
+      "slots": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Modal state normalized; injected task results mixed"
+    },
+    {
+      "file": "runtime/arcane/components/output-panel.html",
+      "name": "output-panel.html",
+      "purpose": "Presents status, output, body, coverage, actions, pending, error, and cleared states.",
+      "methods": [
+        "configure()",
+        "setOutput()",
+        "setBody()",
+        "setCoverage()",
+        "setActions()",
+        "setPending()",
+        "setStatus()",
+        "setError()",
+        "clear()"
+      ],
+      "events": [
+        "output-panel-ready",
+        "output-panel-state",
+        "output-panel-change",
+        "output-panel-action",
+        "output-panel-error",
+        "output-panel-cleared"
+      ],
+      "slots": [
+        "title",
+        "header-actions",
+        "body",
+        "coverage",
+        "actions"
+      ],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "DOM-normalized"
+    },
+    {
+      "file": "runtime/arcane/components/preferences-form.html",
+      "name": "preferences-form.html",
+      "purpose": "Builds a schema-driven preferences form with submit, reset, busy, and status behavior.",
+      "methods": [
+        "configure()",
+        "getValues()",
+        "setValues()",
+        "setBusy()",
+        "setStatus()"
+      ],
+      "events": [
+        "preferences-form-ready",
+        "preferences-change",
+        "preferences-submit",
+        "preferences-reset"
+      ],
+      "slots": [],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Normalized form values"
+    },
+    {
+      "file": "runtime/arcane/components/record-timeline.html",
+      "name": "record-timeline.html",
+      "purpose": "Displays chronological records/evidence and emits open actions.",
+      "methods": [
+        "setItems()",
+        "populate()"
+      ],
+      "events": [
+        "record-timeline-ready",
+        "record-timeline-open"
+      ],
+      "slots": [],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "DOM-normalized"
+    },
+    {
+      "file": "runtime/arcane/components/relationship-board.html",
+      "name": "relationship-board.html",
+      "purpose": "Displays normalized relationship nodes/edges in graph and list forms.",
+      "methods": [
+        "setGraph()",
+        "populate()"
+      ],
+      "events": [
+        "relationship-board-ready",
+        "relationship-node-open",
+        "relationship-edge-open"
+      ],
+      "slots": [],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "DOM-normalized"
+    },
+    {
+      "file": "runtime/arcane/components/screen-capture.html",
+      "name": "screen-capture.html",
+      "purpose": "Presents image, video, or GIF display-capture workflow.",
+      "methods": [
+        "capture()"
+      ],
+      "events": [
+        "screen-capture-ready",
+        "screen-capture-result"
+      ],
+      "slots": [],
+      "dependencies": [
+        "ScreenCapture.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "State/result normalized; media permission/codec failures mixed"
+    },
+    {
+      "file": "runtime/arcane/components/source-code-viewer.html",
+      "name": "source-code-viewer.html",
+      "purpose": "Renders line-addressable source code with load, error, focus, and state behavior.",
+      "methods": [
+        "configure()",
+        "load()",
+        "render()",
+        "clear()",
+        "fail()",
+        "focus()",
+        "focusLine()"
+      ],
+      "events": [
+        "source-code-viewer-ready",
+        "source-code-viewer-state"
+      ],
+      "slots": [],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Normalized source/state"
+    },
+    {
+      "file": "runtime/arcane/components/source-explanation.html",
+      "name": "source-explanation.html",
+      "purpose": "Presents an evidence finding, source selection, explanation, and save state.",
+      "methods": [
+        "showFinding()",
+        "populate()",
+        "selectSource()",
+        "markSaved()"
+      ],
+      "events": [
+        "source-explanation-ready",
+        "source-explanation-save",
+        "source-explanation-source-selected"
+      ],
+      "slots": [],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "DOM-normalized"
+    },
+    {
+      "file": "runtime/arcane/components/speech.html",
+      "name": "speech.html",
+      "purpose": "Coordinates speech controls, transcription completion, mute state, and microphone availability.",
+      "methods": [
+        "configure()",
+        "setAvailability()",
+        "setMuted(); availability",
+        "muted",
+        "initialMuted",
+        "componentReady properties"
+      ],
+      "events": [
+        "speech-ready",
+        "speech-transcription-complete",
+        "speech-microphone-unavailable"
+      ],
+      "slots": [],
+      "dependencies": [
+        "AI.js",
+        "DBLS.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "UI state normalized; AI/media behavior mixed"
+    },
+    {
+      "file": "runtime/arcane/components/summary-strip.html",
+      "name": "summary-strip.html",
+      "purpose": "Displays compact selectable KPI or summary items.",
+      "methods": [
+        "configure()",
+        "setItems()",
+        "updateItem()",
+        "clear()"
+      ],
+      "events": [
+        "summary-strip-ready",
+        "summary-strip-change",
+        "summary-strip-select"
+      ],
+      "slots": [],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "DOM-normalized"
+    },
+    {
+      "file": "runtime/arcane/components/table.html",
+      "name": "table.html",
+      "purpose": "Builds and updates a simple header/body table.",
+      "methods": [
+        "buildHeader()",
+        "buildTable()"
+      ],
+      "events": [
+        "table-ready",
+        "header-update",
+        "body-update"
+      ],
+      "slots": [],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "DOM-normalized"
+    },
+    {
+      "file": "runtime/arcane/components/task-progress.html",
+      "name": "task-progress.html",
+      "purpose": "Runs and displays a task list with started/change/complete/error state.",
+      "methods": [
+        "configure()",
+        "setTasks()",
+        "updateTask()",
+        "runTasks()",
+        "clear()"
+      ],
+      "events": [
+        "task-progress-ready",
+        "task-progress-started",
+        "task-progress-change",
+        "task-progress-complete",
+        "task-progress-error"
+      ],
+      "slots": [],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Task state normalized; injected task results mixed"
+    },
+    {
+      "file": "runtime/arcane/components/terminal-workspace.html",
+      "name": "terminal-workspace.html",
+      "purpose": "Presents multiple terminal sessions, output, active selection, theme, and terminal actions.",
+      "methods": [
+        "configure()",
+        "addSession()",
+        "removeSession()",
+        "activateSession()",
+        "append()",
+        "clear()",
+        "setState()",
+        "setTheme()",
+        "focus()"
+      ],
+      "events": [
+        "terminal-workspace-ready",
+        "terminal-submit",
+        "terminal-interrupt",
+        "terminal-clear",
+        "terminal-session-new",
+        "terminal-session-close",
+        "terminal-session-select",
+        "terminal-settings"
+      ],
+      "slots": [],
+      "dependencies": [
+        "AnsiText.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "UI/session state normalized; native command results supplied externally"
+    },
+    {
+      "file": "runtime/arcane/components/theme-editor.html",
+      "name": "theme-editor.html",
+      "purpose": "Edits, previews, saves, and resets semantic custom theme tokens.",
+      "methods": [
+        "configure()",
+        "getTheme()",
+        "setTheme()",
+        "setBusy()",
+        "setStatus()"
+      ],
+      "events": [
+        "theme-editor-ready",
+        "theme-preview",
+        "theme-save",
+        "theme-reset"
+      ],
+      "slots": [],
+      "dependencies": [
+        "Theme.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Fully normalized Theme values"
+    },
+    {
+      "file": "runtime/arcane/components/theme-switcher.html",
+      "name": "theme-switcher.html",
+      "purpose": "Selects and refreshes system, light, dark, or custom theme mode.",
+      "methods": [
+        "setMode()",
+        "refresh()"
+      ],
+      "events": [],
+      "slots": [],
+      "dependencies": [
+        "ThemeManager.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Preference/native appearance behavior mixed; no component-ready contract"
+    },
+    {
+      "file": "runtime/arcane/components/unified-inbox.html",
+      "name": "unified-inbox.html",
+      "purpose": "Displays provider-neutral communication threads with active/loading state.",
+      "methods": [
+        "configure()",
+        "setThreads()",
+        "setActive()",
+        "setLoading()"
+      ],
+      "events": [
+        "unified-inbox-ready",
+        "inbox-refresh",
+        "thread-select"
+      ],
+      "slots": [],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "DOM-normalized"
+    },
+    {
+      "file": "runtime/arcane/components/voice-transcription.html",
+      "name": "voice-transcription.html",
+      "purpose": "Records segmented microphone audio, transcribes, persists, and completes a combined transcript.",
+      "methods": [
+        "configure()",
+        "startRecording()",
+        "stopRecording()",
+        "save()",
+        "completeTranscription()/complete()",
+        "clear()",
+        "reset()",
+        "destroy()"
+      ],
+      "events": [
+        "voice-transcription-ready",
+        "voice-transcription-state",
+        "voice-transcription-segment",
+        "voice-transcription-change",
+        "voice-transcription-complete",
+        "speech-transcription-complete"
+      ],
+      "slots": [],
+      "dependencies": [
+        "MD.js",
+        "ComponentContracts.js",
+        "AI.js"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "State/text normalized; media/provider behavior mixed"
+    },
+    {
+      "file": "runtime/arcane/components/weather-widget.html",
+      "name": "weather-widget.html",
+      "purpose": "Displays normalized current and daily weather with refresh intent.",
+      "methods": [
+        "setWeather()",
+        "clear()"
+      ],
+      "events": [
+        "weather-widget-ready",
+        "weather-refresh"
+      ],
+      "slots": [],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Display normalized; provider supplied externally"
+    },
+    {
+      "file": "runtime/arcane/components/web-navigator.html",
+      "name": "web-navigator.html",
+      "purpose": "Guards embedded/external navigation and surfaces allow/block/open intents.",
+      "methods": [
+        "configure()",
+        "navigate()",
+        "currentUrl()"
+      ],
+      "events": [
+        "web-navigator-ready",
+        "web-navigate",
+        "web-navigation-blocked",
+        "web-open-external"
+      ],
+      "slots": [],
+      "dependencies": [],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
+      "normalization": "Navigation intent/decision normalized; browser navigation result platform-native"
+    }
+  ]
+}

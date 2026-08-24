@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="These authored notes explain the app-scoped persistence and user-controlled host surfaces behind the canonical inventory in docs/arcane-api.md. The methods…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/filesystem-storage-preferences-appearance/"><link rel="icon" type="image/png" href="../../../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../../../styles.css"><link rel="stylesheet" href="../../../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane API filesystem, storage, preferences, environment, and appearance guides · Arcane OS SDK"><meta property="og:description" content="These authored notes explain the app-scoped persistence and user-controlled host surfaces behind the canonical inventory in docs/arcane-api.md. The methods…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/filesystem-storage-preferences-appearance/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane API filesystem, storage, preferences, environment, and appearance guides · Arcane OS SDK"><meta name="twitter:description" content="These authored notes explain the app-scoped persistence and user-controlled host surfaces behind the canonical inventory in docs/arcane-api.md. The methods…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane API filesystem, storage, preferences, environment, and appearance guides | Arcane OS SDK</title><script src="../../../../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../../../">Overview</a><a href="../../../../../guides/">Guides</a><a href="../../../../../examples/">Examples</a><a href="../../../../../playground/">Playground</a><a href="../../../../../testing/">Testing</a><a href="../../../../" aria-current="page">Reference</a><a class="repo-link" href="../../../../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../../../">Docs</a><span aria-hidden="true">/</span><a href="../../../../">Reference</a><span aria-hidden="true">/</span><a href="../../../">Core</a><span aria-hidden="true">/</span><a href="../">Focused member guides</a><span aria-hidden="true">/</span><span aria-current="page">Arcane API filesystem, storage, preferences, environment, and appearance guides</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-api-filesystem-storage-preferences-environment-and-appearance-guides">Arcane API filesystem, storage, preferences, environment, and appearance guides</h1><p class="doc-lead">These authored notes explain the app-scoped persistence and user-controlled host surfaces behind the canonical inventory in docs/arcane-api.md. The methods…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../../../overview/">Overview</a><a href="../../../../sdk-api/">SDK JavaScript API</a><a href="../../../../cli/">CLI</a><a href="../../../../event-manager/">EventManager</a><a href="../../../../availability-and-normalization/">Availability</a><a href="../../../../protocols/">Protocols</a><a href="../../../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../../../../runtime-modules/">Modules</a><a href="../../../../runtime-entities/">Entities</a><a href="../../../../runtime-components/">Components</a><a href="../../../../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../../">Core map</a><a href="../../../arcane-api/">Arcane API</a><a href="../../../arcane-events/">Events</a><a href="../../../arcane-ai-contracts/">AI contracts</a><a href="../../../arcane-entities/">Entity exports</a><a href="../../../ollama-module/">Ollama module</a><a href="../">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/core/reference/arcane-api/filesystem-storage-preferences-appearance.md"><p>These authored notes explain the app-scoped persistence and user-controlled host
+surfaces behind the canonical inventory in <a href="../../../arcane-api/"><code>docs/arcane-api.md</code></a>.
+The methods remain capability-gated by the application descriptor; feature-detect
+the exact method before presenting a control.</p>
+<h2 id="arcanefilesystemselectdirectory">Arcane.filesystem.selectDirectory()</h2>
+<h3 id="overview">Overview</h3>
+<p>Opens the operating system&#39;s folder picker after a user action and returns one
+canonical existing directory. This is a selection capability, not general
+filesystem access: it does not enumerate drives, read the directory, create a
+folder, or grant permission to its contents.</p>
+<p>Use it when an application needs the user to choose a local workspace or export
+location. The application must still validate that the selected directory is
+appropriate for its own workflow.</p>
+<h3 id="options">Options</h3>
+<p>Pass an object containing only these optional fields:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>title</code></td>
+<td>Plain-text dialog title. Defaults to <code>Choose a folder</code>; maximum 200 characters; control characters are rejected.</td>
+</tr>
+<tr>
+<td><code>initialPath</code></td>
+<td>Existing absolute directory path. It is canonicalized before the picker opens and may not exceed 4,096 characters.</td>
+</tr>
+</tbody></table>
+</div>
+<p>The promise resolves to <code>{cancelled:true,path:null}</code> when the user cancels, or
+<code>{cancelled:false,path}</code> with the canonical absolute path. Cancellation is a
+normal result, not an error.</p>
+<h3 id="availability-and-errors">Availability and errors</h3>
+<p>Requires <code>filesystem.directory.select</code>. Core-backed Microsoft NT uses the native
+folder browser; Linux uses an installed Zenity or KDialog picker. Unsupported
+hosts reject with <code>FILESYSTEM_DIRECTORY_SELECTION_UNSUPPORTED</code>. Invalid options,
+an unavailable initial path, an invalid host response, or a selected directory
+that disappears are rejected explicitly.</p>
+<h3 id="example">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">async function chooseWorkspaceDirectory() {
+    const access = await Arcane.capabilities.list();
+    if (!access.methods.includes(&#39;filesystem.directory.select&#39;)) return null;
+
+    const selection = await Arcane.filesystem.selectDirectory({
+        title: &#39;Choose a development workspace&#39;
+    });
+    return selection.cancelled ? null : selection.path;
+}
+
+document.querySelector(&#39;#choose-workspace&#39;)?.addEventListener(
+    &#39;click&#39;,
+    async function handleWorkspaceSelection() {
+        const path = await chooseWorkspaceDirectory();
+        if (path) document.querySelector(&#39;#workspace-path&#39;).textContent = path;
+    }
+);
+</code></pre></div>
+<h2 id="arcanestoragelist">Arcane.storage.list()</h2>
+<h3 id="overview-1">Overview</h3>
+<p>Reports the keys and quota use for the current application&#39;s native storage.
+Storage is isolated by the application identity bound to the Core session; one
+application cannot use this namespace to inspect another application&#39;s records.</p>
+<h3 id="return-value">Return value</h3>
+<p>Requires <code>storage.read</code> and resolves to:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">{ keys: string[], usedBytes: number, maximumBytes: 1048576 }
+</code></pre></div>
+<p>Keys are sorted. <code>usedBytes</code> covers the complete persisted storage envelope, so
+it can be larger than the sum of the individual JSON values.</p>
+<h3 id="usage-and-failure-behavior">Usage and failure behavior</h3>
+<p>Use the keys to build an index, then call <code>get()</code> only for records the current
+view needs. An empty array is a valid new-app state. <code>METHOD_NOT_ALLOWED</code> means
+the current application lacks <code>storage.read</code>; do not fall back to another
+application&#39;s browser storage or retry until policy changes.</p>
+<h3 id="example-1">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">async function showStorageBudget() {
+    const inventory = await Arcane.storage.list();
+    console.log(`${inventory.usedBytes} of ${inventory.maximumBytes} bytes used`);
+    for (const key of inventory.keys) console.log(key);
+}
+
+await showStorageBudget();
+</code></pre></div>
+<h2 id="arcanestorageget">Arcane.storage.get()</h2>
+<h3 id="overview-2">Overview</h3>
+<p>Reads one JSON-compatible value from the current application&#39;s native storage.
+Use the explicit <code>found</code> flag to distinguish a missing key from a stored <code>null</code>.</p>
+<h3 id="key-and-return-value">Key and return value</h3>
+<p>The key must contain 1–128 letters, numbers, periods, underscores, colons, or
+hyphens and begin with a letter or number. The promise resolves to
+<code>{key,found,value}</code>; a missing key returns <code>found:false</code> and <code>value:null</code> rather
+than rejecting.</p>
+<p>Requires <code>storage.read</code>.</p>
+<h3 id="errors-and-recovery">Errors and recovery</h3>
+<p>Invalid keys reject with <code>INVALID_STORAGE_KEY</code>; correct the key rather than
+retrying. A capability rejection means this application cannot read native
+storage. Treat a host or transport failure as an unavailable read, not as a
+missing record, so the UI does not silently replace unknown data with defaults.</p>
+<h3 id="example-2">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">async function loadDraft() {
+    const result = await Arcane.storage.get(&#39;editor.draft.current&#39;);
+    return result.found ? result.value : { text: &#39;&#39;, updatedAt: null };
+}
+
+const draft = await loadDraft();
+console.log(draft.updatedAt);
+</code></pre></div>
+<h2 id="arcanestorageset">Arcane.storage.set()</h2>
+<h3 id="overview-3">Overview</h3>
+<p>Atomically creates or replaces one app-scoped storage value. Use storage for
+application data that is larger or more durable than a user preference, while
+remaining within the intentionally small native quota.</p>
+<h3 id="input-and-result">Input and result</h3>
+<p>The key follows the storage-key rules above. <code>value</code> is normalized through a
+JSON round-trip. Top-level <code>undefined</code>, functions, circular references, and
+values that cannot produce JSON reject. Inside objects, <code>undefined</code> and function
+properties are omitted; inside arrays, those slots become <code>null</code>. The receipt
+returns the normalized value, so do not use storage for data whose meaning
+depends on those values. One encoded value may use at most 131,072 bytes, and
+the complete app storage envelope may use at most 1,048,576 bytes.</p>
+<p>Requires <code>storage.write</code>. It resolves to
+<code>{key,value,bytes,totalBytes,maximumBytes}</code> only after the atomic write completes.
+Quota and validation failures leave the previous file unchanged.</p>
+<h3 id="example-3">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">async function saveDraft(text) {
+    return Arcane.storage.set(&#39;editor.draft.current&#39;, {
+        text: String(text),
+        updatedAt: new Date().toISOString()
+    });
+}
+
+const receipt = await saveDraft(&#39;Synthetic example text&#39;);
+console.log(`Saved ${receipt.bytes} bytes`);
+</code></pre></div>
+<h2 id="arcanestoragedelete">Arcane.storage.delete()</h2>
+<h3 id="overview-4">Overview</h3>
+<p>Deletes one key from the current application&#39;s native storage. Deleting a key
+that is already absent is safe and resolves with <code>deleted:false</code>.</p>
+<h3 id="return-value-and-errors">Return value and errors</h3>
+<p>Requires <code>storage.write</code> and resolves to
+<code>{key,deleted,totalBytes,maximumBytes}</code>. Invalid keys reject before the storage
+file is read. A successful <code>deleted:true</code> result means the updated storage
+envelope was written atomically.</p>
+<h3 id="side-effects-and-recovery">Side effects and recovery</h3>
+<p>Deletes are serialized with writes to the same app-owned document. If the
+renderer loses its connection around a delete, call <code>get()</code> after reconnecting
+to establish whether the key remains before offering another destructive
+action; a missing response is not proof that the mutation failed.</p>
+<h3 id="example-4">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">async function discardDraft() {
+    const result = await Arcane.storage.delete(&#39;editor.draft.current&#39;);
+    console.log(result.deleted ? &#39;Draft removed&#39; : &#39;No draft was stored&#39;);
+}
+
+document.querySelector(&#39;#discard-draft&#39;)?.addEventListener(
+    &#39;click&#39;,
+    discardDraft
+);
+</code></pre></div>
+<h2 id="arcanepreferenceslist">Arcane.preferences.list()</h2>
+<h3 id="overview-5">Overview</h3>
+<p>Reports the current application&#39;s preference keys and quota use. Preferences
+share the storage value and key validation rules but live in a separate
+app-scoped preferences document.</p>
+<h3 id="return-value-1">Return value</h3>
+<p>Requires <code>preferences.read</code> and resolves to
+<code>{keys,usedBytes,maximumBytes}</code>. Keys are sorted and <code>maximumBytes</code> is currently
+1,048,576 bytes for the complete preferences envelope.</p>
+<h3 id="usage-and-failure-behavior-1">Usage and failure behavior</h3>
+<p>Use this inventory to discover configured names, then read a needed preference
+with <code>get()</code>. Apply an application default only when that result says
+<code>found:false</code>. An empty list is valid. <code>METHOD_NOT_ALLOWED</code> means the application
+lacks <code>preferences.read</code>; do not switch to an unreviewed persistence path.</p>
+<h3 id="example-5">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">async function listPreferenceNames() {
+    const inventory = await Arcane.preferences.list();
+    return inventory.keys;
+}
+
+console.log(await listPreferenceNames());
+</code></pre></div>
+<h2 id="arcanepreferencesget">Arcane.preferences.get()</h2>
+<h3 id="overview-6">Overview</h3>
+<p>Reads one app-scoped preference. Use it for a user choice that the same
+application should restore later; use shared Arcane services for system-wide
+policy rather than copying a platform setting into app preferences.</p>
+<h3 id="result">Result</h3>
+<p>Requires <code>preferences.read</code>. The key uses the same 1–128 character contract as
+storage keys. The promise resolves to <code>{key,found,value}</code> and returns
+<code>found:false,value:null</code> for an absent preference.</p>
+<h3 id="errors-and-recovery-1">Errors and recovery</h3>
+<p>Invalid names reject with <code>INVALID_STORAGE_KEY</code> because preferences share the
+storage-key validator. A permission or host failure is not an absent preference:
+keep the setting unresolved or retain its current in-memory value instead of
+silently overwriting it with a default.</p>
+<h3 id="example-6">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">async function preferredDensity() {
+    const result = await Arcane.preferences.get(&#39;layout.density&#39;);
+    return result.found ? result.value : &#39;comfortable&#39;;
+}
+
+document.documentElement.dataset.density = await preferredDensity();
+</code></pre></div>
+<h2 id="arcanepreferencesset">Arcane.preferences.set()</h2>
+<h3 id="overview-7">Overview</h3>
+<p>Atomically creates or replaces one app-scoped preference. The complete value is
+validated before mutation, and the resolved receipt returns the JSON-normalized
+value that was actually persisted.</p>
+<h3 id="input-result-and-errors">Input, result, and errors</h3>
+<p>Requires <code>preferences.write</code>. Keys and values use the storage key, JSON, 128 KiB
+per-value, and 1 MiB total-envelope limits. The promise resolves to
+<code>{key,value,bytes,totalBytes,maximumBytes}</code>. Invalid JSON-compatible data or a
+quota overflow rejects without replacing the prior preference document.</p>
+<h3 id="example-7">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">async function saveDensity(density) {
+    if (![&#39;compact&#39;, &#39;comfortable&#39;].includes(density)) {
+        throw new TypeError(&#39;Unsupported density&#39;);
+    }
+    return Arcane.preferences.set(&#39;layout.density&#39;, density);
+}
+
+await saveDensity(&#39;compact&#39;);
+</code></pre></div>
+<h2 id="arcanepreferencessetmany">Arcane.preferences.setMany()</h2>
+<h3 id="overview-8">Overview</h3>
+<p>Validates and writes a related preference batch as one atomic mutation. Prefer
+this method when several settings describe one UI state and must never be
+observed half-updated.</p>
+<h3 id="entries-and-result">Entries and result</h3>
+<p>Pass a plain object containing 1–32 entries. Every key and value is normalized
+before any write begins. The entire request rejects when any member is invalid
+or the merged document exceeds the 1 MiB quota.</p>
+<p>Requires <code>preferences.write</code> and resolves to
+<code>{keys,count,bytes,totalBytes,maximumBytes}</code>. <code>keys</code> is sorted, <code>bytes</code> is the sum
+of the encoded values in this batch, and <code>totalBytes</code> covers the resulting full
+preferences envelope.</p>
+<h3 id="example-8">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">async function saveReadingPreferences() {
+    return Arcane.preferences.setMany({
+        &#39;reader.fontScale&#39;: 1.1,
+        &#39;reader.lineLength&#39;: &#39;medium&#39;,
+        &#39;reader.voice&#39;: &#39;onyx&#39;
+    });
+}
+
+const receipt = await saveReadingPreferences();
+console.log(`Updated ${receipt.count} preferences`);
+</code></pre></div>
+<h2 id="arcanepreferencesdelete">Arcane.preferences.delete()</h2>
+<h3 id="overview-9">Overview</h3>
+<p>Removes one app-scoped preference so the application can return to its default.
+An absent key is not an error.</p>
+<h3 id="return-value-2">Return value</h3>
+<p>Requires <code>preferences.write</code> and resolves to
+<code>{key,deleted,totalBytes,maximumBytes}</code>. The persisted document changes only
+when <code>deleted</code> is <code>true</code>.</p>
+<h3 id="side-effects-and-recovery-1">Side effects and recovery</h3>
+<p>Deletion is a serialized atomic preference mutation. If a transport failure
+makes the response ambiguous, call <code>get()</code> after reconnecting and branch on
+<code>found</code> before retrying. A missing key is already the desired default state and
+resolves with <code>deleted:false</code> rather than rejecting.</p>
+<h3 id="example-9">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">async function restoreDefaultDensity() {
+    const result = await Arcane.preferences.delete(&#39;layout.density&#39;);
+    return result.deleted;
+}
+
+document.querySelector(&#39;#restore-default-density&#39;)?.addEventListener(
+    &#39;click&#39;,
+    async function handleRestoreDefaultDensity() {
+        console.log(await restoreDefaultDensity());
+    }
+);
+</code></pre></div>
+<h2 id="arcaneenvironmentlist">Arcane.environment.list()</h2>
+<h3 id="overview-10">Overview</h3>
+<p>Lists the Arcane-managed environment profile without exposing protected values.
+Desktop hosts report the current user&#39;s Arcane-managed profile; Android reports
+the calling application&#39;s private profile. Ordinary entries contain their
+configured value; protected entries use the exact mask <code>•••••</code>.</p>
+<p>This is a Vault-only administrative surface, not a general application
+configuration mechanism. It requires <code>environment.read</code>, explicit app-id
+admission, and a Core or Android host.</p>
+<h3 id="return-value-3">Return value</h3>
+<p>The promise resolves to
+<code>{platform,pathSupported,maximumEntries,valueMaximumLength,persistence,entries}</code>.
+At most 256 case-insensitively unique entries are returned in sorted order.
+Desktop entries have <code>{name,value,configured:true,protected,scope:&#39;user&#39;}</code>;
+Android entries use <code>scope:&#39;app&#39;</code>. Android also reports <code>pathSupported:false</code>,
+because <code>PATH</code> is deliberately unavailable through this API there. Names use
+1–128 characters and ordinary values are bounded to 32,767 characters.</p>
+<h3 id="example-10">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">async function renderEnvironmentInventory() {
+    const result = await Arcane.environment.list();
+    for (const entry of result.entries) {
+        console.log(entry.name, {
+            protected: entry.protected,
+            configured: entry.configured,
+            scope: entry.scope
+        });
+    }
+}
+
+await renderEnvironmentInventory();
+</code></pre></div>
+<h2 id="arcaneenvironmentget">Arcane.environment.get()</h2>
+<h3 id="overview-11">Overview</h3>
+<p>Reads one configured environment entry, including the real value when the entry
+is protected. This deliberate plaintext-reveal operation is restricted to the
+Vault application with the separate <code>environment.protected.read</code> capability.
+On Android the entry belongs to the calling application&#39;s private profile, and
+requesting <code>PATH</code> rejects with <code>ENVIRONMENT_PATH_UNSUPPORTED</code>.</p>
+<p>Do not log, persist, transmit, or place the returned value in diagnostics. Keep
+it only for the immediate user-authorized workflow that required the reveal.</p>
+<h3 id="input-result-and-errors-1">Input, result, and errors</h3>
+<p>Names must begin with a letter or underscore and then contain only letters,
+numbers, underscores, periods, or hyphens, up to 128 characters. The promise
+resolves to <code>{entry}</code> using the entry shape described above. Missing entries
+reject with <code>ENVIRONMENT_ENTRY_NOT_FOUND</code>; invalid names reject before native
+dispatch.</p>
+<h3 id="example-11">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">async function revealEntryForCurrentInteraction(name) {
+    const { entry } = await Arcane.environment.get(name);
+    return entry.value;
+}
+
+const value = await revealEntryForCurrentInteraction(&#39;ARCANE_DEMO_VALUE&#39;);
+document.querySelector(&#39;#environment-value&#39;).textContent = value;
+</code></pre></div>
+<h2 id="arcaneenvironmentset">Arcane.environment.set()</h2>
+<h3 id="overview-12">Overview</h3>
+<p>Creates or replaces one Arcane-managed environment entry. It is an exclusive,
+high-risk mutation available only to Vault with <code>environment.write</code>. Desktop
+hosts persist a user-scoped entry for future processes; Android persists an
+app-scoped entry in private storage. Already-running processes do not
+retroactively receive a desktop change.</p>
+<h3 id="input-and-protection">Input and protection</h3>
+<p>Call <code>set(name, value, options?)</code>. Values must be strings without null
+characters and generally may not exceed 32,767 characters. On Linux, protected
+Secret Service payloads have an additional 8,191-byte encoded ceiling (about
+6,126 ASCII value bytes after metadata). <code>options.protected</code> must be a Boolean
+when supplied. The SDK defaults sensitive-looking names to protected storage,
+and Core refuses to save such names unprotected. On desktop, <code>PATH</code> must remain
+ordinary so future processes can use it; Android rejects any <code>PATH</code> mutation
+with <code>ENVIRONMENT_PATH_UNSUPPORTED</code>.</p>
+<p>The promise resolves to <code>{entry}</code>. Protected results contain the <code>•••••</code> mask,
+never an echo of the submitted secret.</p>
+<h3 id="mutation-uncertainty-and-recovery">Mutation uncertainty and recovery</h3>
+<p>Environment writes are serialized. <code>ENVIRONMENT_OPERATION_BUSY</code>,
+<code>ENVIRONMENT_RECOVERY_REQUIRED</code>, or <code>ENVIRONMENT_SERIALIZATION_RELEASE_FAILED</code>
+means the profile cannot safely accept another mutation yet. Linux can also
+report <code>ENVIRONMENT_PROTECTED_CLEANUP_FAILED</code> or
+<code>ENVIRONMENT_METADATA_COMMIT_UNCERTAIN</code>; Android can report
+<code>ANDROID_ENVIRONMENT_STORAGE_UNCERTAIN</code>. The renderer&#39;s normalized
+<code>Arcane.Error</code> currently exposes the public error code but not the native
+mutation-completion or cleanup-phase fields. Refresh the inventory after any of
+these uncertainty codes before deciding how to recover, and never blindly retry.</p>
+<h3 id="example-12">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">async function saveSyntheticProtectedValue() {
+    return Arcane.environment.set(
+        &#39;ARCANE_DEMO_TOKEN&#39;,
+        &#39;synthetic-development-value&#39;,
+        { protected: true }
+    );
+}
+
+document.querySelector(&#39;#confirm-environment-write&#39;)?.addEventListener(
+    &#39;click&#39;,
+    async function handleConfirmedEnvironmentWrite() {
+        const receipt = await saveSyntheticProtectedValue();
+        console.log(receipt.entry.name, receipt.entry.protected);
+    }
+);
+</code></pre></div>
+<h2 id="arcaneenvironmentremove">Arcane.environment.remove()</h2>
+<h3 id="overview-13">Overview</h3>
+<p>Deletes one Arcane-managed environment entry: user-scoped on desktop and
+app-scoped on Android. This exclusive Vault mutation is not reversible through
+the API, so require a clear user confirmation and do not treat deletion as a way
+to hide a value temporarily. Android rejects removal of <code>PATH</code> with
+<code>ENVIRONMENT_PATH_UNSUPPORTED</code>.</p>
+<h3 id="return-value-and-errors-1">Return value and errors</h3>
+<p>Requires <code>environment.write</code> and resolves to <code>{name,deleted:true}</code> only when the
+native host removed the exact case-insensitive name requested. A missing entry
+rejects with <code>ENVIRONMENT_ENTRY_NOT_FOUND</code>; response-identity mismatches fail
+closed instead of reporting success.</p>
+<h3 id="mutation-uncertainty-and-recovery-1">Mutation uncertainty and recovery</h3>
+<p>Removal uses the same serialized mutation boundary as <code>set()</code>. Treat
+<code>ENVIRONMENT_OPERATION_BUSY</code>, <code>ENVIRONMENT_RECOVERY_REQUIRED</code>,
+<code>ENVIRONMENT_SERIALIZATION_RELEASE_FAILED</code>, platform cleanup/commit uncertainty,
+and Android storage uncertainty as a recovery workflow—not permission to retry
+immediately. Only the public error code survives renderer normalization today.
+Refresh <code>list()</code> first and ask the user how to proceed if the resulting state
+cannot be established safely.</p>
+<h3 id="example-13">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">async function removeSyntheticEnvironmentEntry() {
+    return Arcane.environment.remove(&#39;ARCANE_DEMO_TOKEN&#39;);
+}
+
+document.querySelector(&#39;#remove-demo-entry&#39;)?.addEventListener(
+    &#39;click&#39;,
+    async function handleEnvironmentRemoval() {
+        const result = await removeSyntheticEnvironmentEntry();
+        console.log(`Removed ${result.name}`);
+    }
+);
+</code></pre></div>
+<h2 id="arcaneappearancecurrent">Arcane.appearance.current()</h2>
+<h3 id="overview-14">Overview</h3>
+<p>Reads the native user-appearance state visible to the current host. This is
+separate from an application&#39;s own CSS: Arcane applications should still load
+the shared theme and <code>ThemeBootstrap.js</code> so saved appearance choices are applied
+consistently.</p>
+<h3 id="return-value-and-platforms">Return value and platforms</h3>
+<p>Requires <code>appearance.read</code>. Microsoft NT returns
+<code>{supported:true,platform:&#39;windows&#39;,scheme,effectiveScheme,captionColor,textColor}</code>.
+<code>scheme</code> is <code>system</code>, <code>light</code>, or <code>dark</code>; <code>effectiveScheme</code> is <code>light</code> or <code>dark</code>.
+Linux currently reports an unsupported system appearance with null custom
+colors rather than claiming that native settings were changed.</p>
+<h3 id="example-14">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">async function reportNativeAppearance() {
+    const appearance = await Arcane.appearance.current();
+    console.log(appearance.supported, appearance.effectiveScheme);
+    return appearance;
+}
+
+await reportNativeAppearance();
+</code></pre></div>
+<h2 id="arcaneappearanceapply">Arcane.appearance.apply()</h2>
+<h3 id="overview-15">Overview</h3>
+<p>Applies the supported native appearance for the current user and returns the
+resulting state. On Microsoft NT it stores the Arcane choice, updates light/dark
+system values, and broadcasts an appearance change. Choosing <code>system</code> restores
+the captured baseline and removes Arcane custom caption colors.</p>
+<h3 id="appearance-contract">Appearance contract</h3>
+<p>Requires <code>appearance.write</code>. Pass only <code>scheme</code>, <code>captionColor</code>, and
+<code>textColor</code>. The scheme defaults to <code>system</code>. Custom colors apply only to
+<code>light</code> or <code>dark</code> and must use <code>rgb(r, g, b)</code> with channels from 0 through 255.
+Microsoft NT rejects unknown fields and malformed colors. Linux currently does
+not validate the supplied appearance object; it resolves to its
+<code>supported:false</code> status without claiming a native mutation. Always send the
+portable contract instead of using an unsupported host as a validator.</p>
+<p>Listen for <a href="../../../arcane-events/#event-inventory"><code>appearance.changed</code></a> when
+the surrounding UI needs to react to a host-originated appearance update.</p>
+<h3 id="example-15">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">async function applyDarkNativeAppearance() {
+    const result = await Arcane.appearance.apply({
+        scheme: &#39;dark&#39;,
+        captionColor: &#39;rgb(24, 27, 38)&#39;,
+        textColor: &#39;rgb(244, 246, 255)&#39;
+    });
+    console.log(result.effectiveScheme);
+}
+
+document.querySelector(&#39;#use-dark-appearance&#39;)?.addEventListener(
+    &#39;click&#39;,
+    async function handleDarkAppearanceRequest() {
+        await applyDarkNativeAppearance();
+    }
+);
+</code></pre></div>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/core/reference/arcane-api/filesystem-storage-preferences-appearance.md" target="_blank" rel="noreferrer"><code>docs/reference/core/reference/arcane-api/filesystem-storage-preferences-appearance.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#arcanefilesystemselectdirectory">Arcane.filesystem.selectDirectory()</a><a href="#arcanestoragelist">Arcane.storage.list()</a><a href="#arcanestorageget">Arcane.storage.get()</a><a href="#arcanestorageset">Arcane.storage.set()</a><a href="#arcanestoragedelete">Arcane.storage.delete()</a><a href="#arcanepreferenceslist">Arcane.preferences.list()</a><a href="#arcanepreferencesget">Arcane.preferences.get()</a><a href="#arcanepreferencesset">Arcane.preferences.set()</a><a href="#arcanepreferencessetmany">Arcane.preferences.setMany()</a><a href="#arcanepreferencesdelete">Arcane.preferences.delete()</a><a href="#arcaneenvironmentlist">Arcane.environment.list()</a><a href="#arcaneenvironmentget">Arcane.environment.get()</a><a href="#arcaneenvironmentset">Arcane.environment.set()</a><a href="#arcaneenvironmentremove">Arcane.environment.remove()</a><a href="#arcaneappearancecurrent">Arcane.appearance.current()</a><a href="#arcaneappearanceapply">Arcane.appearance.apply()</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../../../../architecture/">Architecture</a><a href="../../../../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="This directory derives the complete committed Arcane application API reference from the SDK runtime&#39;s exact upstream Arcane OS commit 567ad110bf57a1c2d4a3da…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane Core reference snapshot · Arcane OS SDK"><meta property="og:description" content="This directory derives the complete committed Arcane application API reference from the SDK runtime&#39;s exact upstream Arcane OS commit 567ad110bf57a1c2d4a3da…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane Core reference snapshot · Arcane OS SDK"><meta name="twitter:description" content="This directory derives the complete committed Arcane application API reference from the SDK runtime&#39;s exact upstream Arcane OS commit 567ad110bf57a1c2d4a3da…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane Core reference snapshot | Arcane OS SDK</title><script src="../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane Core reference snapshot</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-core-reference-snapshot">Arcane Core reference snapshot</h1><p class="doc-lead">This directory derives the complete committed Arcane application API reference from the SDK runtime&#39;s exact upstream Arcane OS commit 567ad110bf57a1c2d4a3da…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="./" aria-current="page">Core map</a><a href="arcane-api/">Arcane API</a><a href="arcane-events/">Events</a><a href="arcane-ai-contracts/">AI contracts</a><a href="arcane-entities/">Entity exports</a><a href="ollama-module/">Ollama module</a><a href="reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/core/README.md"><p>This directory derives the complete committed Arcane application API reference
+from the SDK runtime&#39;s exact upstream Arcane OS commit
+<code>567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e</code>. The imported reference defines
+protocol <code>arcane/1</code> at that source identity. Its canonical inventories and
+focused member contracts were verified unchanged at committed Arcane OS <code>main</code>
+commit <code>13f3ce0ae34f77a3495331c8b4c30b1bb105f8ed</code> during this import. SDK-local
+provenance, link, and package-boundary annotations are intentionally added here,
+so these Markdown files are not represented as byte-identical upstream blobs.</p>
+<p>The snapshot contains:</p>
+<ul>
+<li>35 namespaces, constructors, and values;</li>
+<li>106 application-facing methods;</li>
+<li>14 renderer-visible event names;</li>
+<li>35 public shared-entity exports;</li>
+<li>the complete provider-neutral AI and direct Ollama data contracts;</li>
+<li>141 MDN-style member guides with exact H2 keys, substantive contract detail,
+and safe JavaScript examples.</li>
+</ul>
+<h2 id="canonical-files">Canonical files</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Contract</th>
+<th>File</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Namespace and method inventory</td>
+<td><a href="arcane-api/">Arcane API reference</a></td>
+</tr>
+<tr>
+<td>Event names, delivery, hosts, triggers, and payloads</td>
+<td><a href="arcane-events/">Arcane events</a></td>
+</tr>
+<tr>
+<td>Public entity exports</td>
+<td><a href="arcane-entities/">Arcane entities</a></td>
+</tr>
+<tr>
+<td>AI requests, results, bounds, and provider boundaries</td>
+<td><a href="arcane-ai-contracts/">Arcane AI data contracts</a></td>
+</tr>
+<tr>
+<td>Ollama runtime/module overview</td>
+<td><a href="ollama-module/">Ollama module</a></td>
+</tr>
+<tr>
+<td>Per-member guides</td>
+<td><a href="reference/arcane-api/"><code>reference/arcane-api/</code></a></td>
+</tr>
+</tbody></table>
+</div>
+<h2 id="runtime-pin-and-current-core-admission">Runtime pin and current Core admission</h2>
+<p>The SDK&#39;s browser runtime and this source reference use the same pinned Arcane
+OS commit. They remain different artifact classes: the SDK ships exact renderer
+bytes. A native build does not infer compatibility from a higher Core version
+or a matching protocol name. This SDK version accepts a selected checkout and
+Core only when its current native plan&#39;s exact protocol, version, feature,
+capability, method, provider, and identity-bound receipt checks all pass. That
+is present-build admission evidence, not a promise that a future SDK will accept
+this Core or that this SDK will accept a future Core.</p>
+<p>Documentation provenance does not admit a Core. The SDK&#39;s native plan,
+provider, and receipt checks remain authoritative for a particular build.</p>
+<h2 id="reading-order">Reading order</h2>
+<p>Application developers should begin with the capability or method in
+<a href="arcane-api/">Arcane API reference</a> and use its linked guide. Engineers who
+need WebView2, WebKitGTK, Android WebView, development HTTP, Core RPC, event,
+or provider boundaries can continue into the SDK&#39;s
+<a href="../protocols/">protocol and host architecture guide</a>.</p>
+<h2 id="source-receipt-and-license-links">Source, receipt, and license links</h2>
+<ul>
+<li><a href="https://github.com/TheWizardNexus/ARCANE-OS/tree/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e" target="_blank" rel="noreferrer">Pinned upstream ARCANE-OS source</a></li>
+<li><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/runtime/ARCANE_RUNTIME_RELEASE.json" target="_blank" rel="noreferrer">SDK runtime release manifest</a></li>
+<li><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/tools/runtime-source.json" target="_blank" rel="noreferrer">SDK runtime source pin</a></li>
+<li><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">AGPL license</a></li>
+<li><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/COMMERCIAL-LICENSE.md" target="_blank" rel="noreferrer">Commercial-license notice</a></li>
+<li><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/NOTICE" target="_blank" rel="noreferrer">Third-party and distribution notice</a></li>
+</ul>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/core/README.md" target="_blank" rel="noreferrer"><code>docs/reference/core/README.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#canonical-files">Canonical files</a><a href="#runtime-pin-and-current-core-admission">Runtime pin and current Core admission</a><a href="#reading-order">Reading order</a><a href="#source-receipt-and-license-links">Source, receipt, and license links</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

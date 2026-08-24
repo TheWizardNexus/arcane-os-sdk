@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="These guides cover the synchronous renderer snapshot and the four event subscription and completion-observation methods. For individual event payloads, see…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/core-and-events/"><link rel="icon" type="image/png" href="../../../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../../../styles.css"><link rel="stylesheet" href="../../../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane API core and event guides · Arcane OS SDK"><meta property="og:description" content="These guides cover the synchronous renderer snapshot and the four event subscription and completion-observation methods. For individual event payloads, see…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/core-and-events/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane API core and event guides · Arcane OS SDK"><meta name="twitter:description" content="These guides cover the synchronous renderer snapshot and the four event subscription and completion-observation methods. For individual event payloads, see…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane API core and event guides | Arcane OS SDK</title><script src="../../../../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../../../">Overview</a><a href="../../../../../guides/">Guides</a><a href="../../../../../examples/">Examples</a><a href="../../../../../playground/">Playground</a><a href="../../../../../testing/">Testing</a><a href="../../../../" aria-current="page">Reference</a><a class="repo-link" href="../../../../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../../../">Docs</a><span aria-hidden="true">/</span><a href="../../../../">Reference</a><span aria-hidden="true">/</span><a href="../../../">Core</a><span aria-hidden="true">/</span><a href="../">Focused member guides</a><span aria-hidden="true">/</span><span aria-current="page">Arcane API core and event guides</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-api-core-and-event-guides">Arcane API core and event guides</h1><p class="doc-lead">These guides cover the synchronous renderer snapshot and the four event subscription and completion-observation methods. For individual event payloads, see…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../../../overview/">Overview</a><a href="../../../../sdk-api/">SDK JavaScript API</a><a href="../../../../cli/">CLI</a><a href="../../../../event-manager/">EventManager</a><a href="../../../../availability-and-normalization/">Availability</a><a href="../../../../protocols/">Protocols</a><a href="../../../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../../../../runtime-modules/">Modules</a><a href="../../../../runtime-entities/">Entities</a><a href="../../../../runtime-components/">Components</a><a href="../../../../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../../">Core map</a><a href="../../../arcane-api/">Arcane API</a><a href="../../../arcane-events/">Events</a><a href="../../../arcane-ai-contracts/">AI contracts</a><a href="../../../arcane-entities/">Entity exports</a><a href="../../../ollama-module/">Ollama module</a><a href="../">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/core/reference/arcane-api/core-and-events.md"><p>These guides cover the synchronous renderer snapshot and the four event
+subscription and completion-observation methods. For individual event payloads,
+see the <a href="../../../arcane-events/">Arcane event catalog</a>.</p>
+<h2 id="arcaneruntimecurrent">Arcane.runtime.current()</h2>
+<h3 id="overview">Overview</h3>
+<p><code>Arcane.runtime.current()</code> synchronously describes the Arcane transport surface
+detected for the current document. It performs no RPC and returns a frozen
+snapshot immediately.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const runtime = Arcane.runtime.current();
+</code></pre></div>
+<p>The result has this exact shape:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>connected</code></td>
+<td><code>boolean</code></td>
+<td><code>true</code> when this document initialized a callable Arcane messaging transport.</td>
+</tr>
+<tr>
+<td><code>transport</code></td>
+<td><code>string</code></td>
+<td>One of <code>webview2</code>, <code>webkitgtk</code>, <code>android-webview</code>, <code>development-http</code>, or <code>standalone</code>.</td>
+</tr>
+<tr>
+<td><code>native</code></td>
+<td><code>boolean</code></td>
+<td><code>true</code> for WebView2, WebKitGTK, and Android WebView hosts.</td>
+</tr>
+<tr>
+<td><code>managedLocalAI</code></td>
+<td><code>boolean</code></td>
+<td><code>true</code> only for the WebView2 and WebKitGTK desktop host classes that can mediate Arcane-managed local services.</td>
+</tr>
+</tbody></table>
+</div>
+<p><code>connected</code> is a transport fact, not a health, authority, or readiness claim. It
+does not mean Core answered a request, that the current application is admitted
+for a method, or that a dependency is installed. Likewise, <code>managedLocalAI</code>
+describes a host capability class; it does not report that Ollama, speech, or a
+model is installed or healthy.</p>
+<p>Use <code>Arcane.capabilities.list()</code> to inspect the bound application and admitted
+methods, and use the relevant namespace status method for dependency state.</p>
+<h3 id="runtime-snapshot">Runtime snapshot</h3>
+<p>The method returns a frozen object. It does not return a <code>Promise</code>, does not
+initialize a new request, and has no asynchronous rejection path.</p>
+<p>The transport values mean:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Environment</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>webview2</code></td>
+<td>Native Microsoft NT WebView2 host.</td>
+</tr>
+<tr>
+<td><code>webkitgtk</code></td>
+<td>Native Linux WebKitGTK host.</td>
+</tr>
+<tr>
+<td><code>android-webview</code></td>
+<td>Native Android WebView host.</td>
+</tr>
+<tr>
+<td><code>development-http</code></td>
+<td>Development HTTP bridge; not a native renderer host.</td>
+</tr>
+<tr>
+<td><code>standalone</code></td>
+<td>No callable Arcane host transport was selected.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="example">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const runtime = globalThis.Arcane?.runtime?.current?.();
+
+if (!runtime) {
+    throw new Error(&#39;The Arcane API is not loaded in this document.&#39;);
+}
+
+console.table(runtime);
+
+if (!runtime.connected) {
+    console.info(&#39;Open this application through an Arcane host to use native methods.&#39;);
+} else if (runtime.native) {
+    console.info(`Running through the native ${runtime.transport} transport.`);
+} else {
+    console.info(`Running through the ${runtime.transport} development transport.`);
+}
+</code></pre></div>
+<h2 id="arcaneeventson">Arcane.events.on()</h2>
+<h3 id="overview-1">Overview</h3>
+<p><code>Arcane.events.on(eventName, listener)</code> subscribes to every future matching
+event. It is synchronous and returns an unsubscribe function.</p>
+<p>For a named event, the listener receives the event&#39;s data payload directly:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const off = Arcane.events.on(&#39;terminal.output&#39;, function logTerminalOutput(data) {
+    console.log(data.sessionId, data.stream, data.data);
+});
+</code></pre></div>
+<p>The special event name <code>&quot;*&quot;</code> subscribes to all future events. Its listener
+receives <code>{ event, data }</code>, not the named event&#39;s data alone:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const off = Arcane.events.on(&#39;*&#39;, function logAnyArcaneEvent({event, data}) {
+    console.debug(event, data);
+});
+</code></pre></div>
+<p>Event names and payloads are defined in the
+<a href="../../../arcane-events/">Arcane event catalog</a>.</p>
+<h3 id="parameters-and-return-value">Parameters and return value</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>eventName</code></td>
+<td><code>string</code></td>
+<td>A documented event name, or <code>&quot;*&quot;</code> for live wildcard observation.</td>
+</tr>
+<tr>
+<td><code>listener</code></td>
+<td><code>function</code></td>
+<td>Called for each future matching event.</td>
+</tr>
+</tbody></table>
+</div>
+<p>The returned <code>unsubscribe()</code> function removes that listener. Retain it and call
+it during component or document teardown. Repeating the call is harmless.</p>
+<p>Passing a non-function <code>listener</code> throws a synchronous <code>TypeError</code>. An unknown
+event name does not itself throw; it simply has no delivery unless the host later
+emits that exact name.</p>
+<h3 id="delivery-and-failure-behavior">Delivery and failure behavior</h3>
+<p><code>on()</code> is future-only. It does not replay ordinary events or an already observed
+durable completion. Use <code>when()</code> when a late subscriber must observe
+<code>transport.ready</code> or <code>core.ready</code>.</p>
+<p>Listener exceptions are caught and logged. Delivery continues to the other
+listeners, and the exception is not sent back to the native event producer.
+Handle expected listener failures inside the callback when the application must
+surface them.</p>
+<h3 id="example-1">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const events = globalThis.Arcane?.events;
+
+if (!events?.on) {
+    throw new Error(&#39;Arcane events are unavailable.&#39;);
+}
+
+const offOutput = events.on(&#39;terminal.output&#39;, function writeTerminalOutput(payload) {
+    const write = payload.stream === &#39;stderr&#39; ? console.error : console.log;
+    write(`[${payload.sessionId}] ${payload.data}`);
+});
+
+const offAll = events.on(&#39;*&#39;, function logObservedArcaneEvent({event}) {
+    console.debug(&#39;Observed Arcane event&#39;, event);
+});
+
+function cleanup() {
+    offOutput();
+    offAll();
+}
+
+globalThis.addEventListener(&#39;pagehide&#39;, cleanup, {once: true});
+</code></pre></div>
+<h2 id="arcaneeventsonce">Arcane.events.once()</h2>
+<h3 id="overview-2">Overview</h3>
+<p><code>Arcane.events.once(eventName, listener)</code> subscribes to the next future matching
+event. The subscription removes itself before invoking the listener, so at most
+one future delivery reaches that callback. It returns an unsubscribe function
+that can cancel the subscription before the event occurs.</p>
+<p><code>once()</code> is future-only for every event, including <code>transport.ready</code> and
+<code>core.ready</code>. It never replays a completion that occurred before registration.
+Use <code>when()</code> for durable completion observation. Event names and payloads are in
+the <a href="../../../arcane-events/">Arcane event catalog</a>.</p>
+<h3 id="parameters-and-return-value-1">Parameters and return value</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>eventName</code></td>
+<td><code>string</code></td>
+<td>The exact future event to observe.</td>
+</tr>
+<tr>
+<td><code>listener</code></td>
+<td><code>function</code></td>
+<td>Called once with the named event&#39;s data payload.</td>
+</tr>
+</tbody></table>
+</div>
+<p>The result is an <code>unsubscribe()</code> function. Call it when the owner is disposed or
+when the application no longer needs to wait.</p>
+<p>The listener must be callable. Unlike <code>on()</code> and <code>when()</code>, the current <code>once()</code>
+surface does not synchronously validate the original listener. A non-function
+listener therefore fails inside guarded event delivery and is logged rather than
+producing a useful registration-time <code>TypeError</code>. Treat a non-function listener
+as invalid input and always pass a function.</p>
+<p>Listener exceptions are otherwise isolated in the same way as <code>on()</code> listener
+exceptions: they are logged and do not interrupt other event subscribers.</p>
+<h3 id="example-2">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const events = globalThis.Arcane?.events;
+
+if (!events?.once) {
+    throw new Error(&#39;Arcane events are unavailable.&#39;);
+}
+
+let timeout = null;
+const cancelExitWait = events.once(&#39;terminal.exit&#39;, function reportNextTerminalExit(payload) {
+    clearTimeout(timeout);
+    console.log(
+        `Session ${payload.sessionId} exited`,
+        payload.exitCode,
+        payload.signal
+    );
+});
+
+timeout = setTimeout(function cancelTimedOutExitWait() {
+    cancelExitWait();
+    console.warn(&#39;Stopped waiting for the next terminal exit.&#39;);
+}, 30_000);
+
+globalThis.addEventListener(&#39;pagehide&#39;, function cleanupExitWait() {
+    clearTimeout(timeout);
+    cancelExitWait();
+}, {once: true});
+</code></pre></div>
+<h2 id="arcaneeventswhen">Arcane.events.when()</h2>
+<h3 id="overview-3">Overview</h3>
+<p><code>Arcane.events.when(eventName, listener)</code> observes a designated durable
+completion. Exactly two event names are durable:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Hosts</th>
+<th>First payload</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>transport.ready</code></td>
+<td>Every initialized Arcane transport.</td>
+<td><code>{ protocol, transport }</code> identifies the selected wire protocol and transport.</td>
+</tr>
+<tr>
+<td><code>core.ready</code></td>
+<td>Core-backed Microsoft NT, Linux, and development HTTP hosts.</td>
+<td><code>{ pid, version, app, platform, elevated, simulation }</code> describes the ready Core process and its public host context.</td>
+</tr>
+</tbody></table>
+</div>
+<p>If the completion has not occurred, <code>when()</code> behaves as a one-time future
+subscription. If it already occurred, <code>when()</code> queues the stored first payload
+for asynchronous listener delivery. The callback never runs in the same call
+stack as a late <code>when()</code> registration.</p>
+<p>The first completion payload is snapshotted and recursively frozen before live
+callbacks run. Repeated events with the same durable name do not replace the
+stored value. Wildcard subscriptions can observe the original live completion,
+but they do not receive historical replays triggered by <code>when()</code>.</p>
+<p>See the <a href="../../../arcane-events/">Arcane event catalog</a> for both completion
+payloads and their limits.</p>
+<h3 id="parameters-and-return-value-2">Parameters and return value</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>eventName</code></td>
+<td><code>string</code></td>
+<td>The durable completion to observe: <code>transport.ready</code> or <code>core.ready</code>.</td>
+</tr>
+<tr>
+<td><code>listener</code></td>
+<td><code>function</code></td>
+<td>Called once with the immutable first completion payload.</td>
+</tr>
+</tbody></table>
+</div>
+<p>The return value is an unsubscribe function. For a queued late replay, calling
+it before the next microtask prevents callback delivery.</p>
+<p>Passing an event other than <code>transport.ready</code> or <code>core.ready</code> throws a
+synchronous <code>TypeError</code>. Passing a non-function listener for a valid durable
+event also throws a synchronous <code>TypeError</code>.</p>
+<p><code>transport.ready</code> alone does not prove host health, application authority,
+capability grants, publisher trust, or service readiness. Use the relevant API
+for each of those facts.</p>
+<h3 id="example-3">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const events = globalThis.Arcane?.events;
+
+if (!events?.when) {
+    throw new Error(&#39;Arcane completion events are unavailable.&#39;);
+}
+
+const offTransport = events.when(&#39;transport.ready&#39;, function reportTransportReady(payload) {
+    console.log(&#39;Transport selected&#39;, payload.protocol, payload.transport);
+});
+
+const offCore = events.when(&#39;core.ready&#39;, function reportCoreReady(payload) {
+    console.log(&#39;Core ready&#39;, payload.version, payload.app, payload.platform);
+});
+
+globalThis.addEventListener(&#39;pagehide&#39;, function cleanupReadinessSubscriptions() {
+    offTransport();
+    offCore();
+}, {once: true});
+</code></pre></div>
+<h2 id="arcaneeventscompleted">Arcane.events.completed()</h2>
+<h3 id="overview-4">Overview</h3>
+<p><code>Arcane.events.completed(eventName)</code> synchronously reports whether this document
+has already observed the first occurrence of a designated durable completion.
+It returns <code>true</code> only for an observed <code>transport.ready</code> or <code>core.ready</code> event.</p>
+<p>It returns <code>false</code> for a durable event that has not occurred, for an ordinary
+event, and for an unknown name. It does not throw for an unknown name and does
+not initiate transport or host work. Use <code>when()</code> to act when the completion is
+available instead of polling this method.</p>
+<p>The <a href="../../../arcane-events/">Arcane event catalog</a> distinguishes durable
+completions from future-only events.</p>
+<h3 id="parameters-and-return-value-3">Parameters and return value</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>eventName</code></td>
+<td><code>string</code></td>
+<td>The completion name to inspect.</td>
+</tr>
+</tbody></table>
+</div>
+<p>The return value is a synchronous <code>boolean</code>.</p>
+<h3 id="example-4">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const events = globalThis.Arcane?.events;
+
+if (!events?.completed || !events?.when) {
+    throw new Error(&#39;Arcane completion events are unavailable.&#39;);
+}
+
+if (events.completed(&#39;core.ready&#39;)) {
+    console.log(&#39;Core readiness was already observed in this document.&#39;);
+} else {
+    const stopWaiting = events.when(&#39;core.ready&#39;, function reportCoreReady(payload) {
+        console.log(&#39;Core became ready&#39;, payload.version);
+    });
+
+    globalThis.addEventListener(&#39;pagehide&#39;, stopWaiting, {once: true});
+}
+</code></pre></div>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/core/reference/arcane-api/core-and-events.md" target="_blank" rel="noreferrer"><code>docs/reference/core/reference/arcane-api/core-and-events.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#arcaneruntimecurrent">Arcane.runtime.current()</a><a href="#arcaneeventson">Arcane.events.on()</a><a href="#arcaneeventsonce">Arcane.events.once()</a><a href="#arcaneeventswhen">Arcane.events.when()</a><a href="#arcaneeventscompleted">Arcane.events.completed()</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../../../../architecture/">Architecture</a><a href="../../../../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

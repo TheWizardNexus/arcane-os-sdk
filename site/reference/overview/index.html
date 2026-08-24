@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="This reference answers developer questions in this order:">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/overview/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane OS SDK developer reference · Arcane OS SDK"><meta property="og:description" content="This reference answers developer questions in this order:"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/overview/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane OS SDK developer reference · Arcane OS SDK"><meta name="twitter:description" content="This reference answers developer questions in this order:"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane OS SDK developer reference | Arcane OS SDK</title><script src="../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK developer reference</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-developer-reference">Arcane OS SDK developer reference</h1><p class="doc-lead">This reference answers developer questions in this order:</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="./" aria-current="page">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama module</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/README.md"><p>This reference answers developer questions in this order:</p>
+<ol>
+<li><strong>What can the application or tool do?</strong></li>
+<li><strong>What should I import or call?</strong></li>
+<li><strong>What does a successful result look like?</strong></li>
+<li><strong>Where does it run?</strong></li>
+<li><strong>Only when needed: which transport, host, provider, or kernel boundary implements it?</strong></li>
+</ol>
+<p>The default path is capability-first. Transport and implementation detail is
+kept in the <a href="../protocols/">protocol and host architecture guide</a>, and every
+high-level page links to the relevant deep section instead of repeating it.</p>
+<h2 id="reference-map">Reference map</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Need</th>
+<th>Start here</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Use the Node.js package API</td>
+<td><a href="../sdk-api/">SDK JavaScript API</a></td>
+</tr>
+<tr>
+<td>Publish central events, capture bounded time-travel history, or observe the DOM</td>
+<td><a href="../event-manager/">EventManager and event-stack reference</a></td>
+</tr>
+<tr>
+<td>Use the <code>arcane</code> command</td>
+<td><a href="../cli/">CLI reference</a></td>
+</tr>
+<tr>
+<td>Choose browser, native, cloud, or cross-host behavior</td>
+<td><a href="../availability-and-normalization/">Availability and normalization</a></td>
+</tr>
+<tr>
+<td>Import a shipped renderer module</td>
+<td><a href="../runtime-modules/">Runtime module catalog</a></td>
+</tr>
+<tr>
+<td>Use a shared entity</td>
+<td><a href="../runtime-entities/">Runtime entity modules</a> and <a href="../core/arcane-entities/">exact export contracts</a></td>
+</tr>
+<tr>
+<td>Load a reusable HTML component</td>
+<td><a href="../runtime-components/">Runtime component catalog</a></td>
+</tr>
+<tr>
+<td>Call <code>globalThis.Arcane</code></td>
+<td><a href="../core/arcane-api/">Arcane Core API</a></td>
+</tr>
+<tr>
+<td>Subscribe to native events</td>
+<td><a href="../core/arcane-events/">Arcane event reference</a></td>
+</tr>
+<tr>
+<td>Use provider-neutral AI</td>
+<td><a href="../core/arcane-ai-contracts/">Arcane AI contracts</a></td>
+</tr>
+<tr>
+<td>Use Arcane Ollama</td>
+<td><a href="../arcane-ollama/">Arcane Ollama guide</a></td>
+</tr>
+<tr>
+<td>Understand transports and protocol switching</td>
+<td><a href="../protocols/">Protocol and host architecture</a></td>
+</tr>
+<tr>
+<td>Run contract and behavior tests</td>
+<td><a href="../behavioral-testing/">Behavioral testing</a></td>
+</tr>
+</tbody></table>
+</div>
+<h2 id="version-scope-and-provenance">Version scope and provenance</h2>
+<p>This repository contains two related, explicitly versioned surfaces:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Source identity</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SDK and CLI</td>
+<td><code>arcane-os</code> <code>0.1.0-dev.5</code></td>
+<td>The Node.js toolchain and package exports in this checkout.</td>
+</tr>
+<tr>
+<td>Browser runtime</td>
+<td>Arcane OS commit <code>567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e</code>, bundle <code>0.8.12</code>, protocol <code>arcane/1</code></td>
+<td>The exact 155-file runtime snapshot shipped under <code>runtime/</code>.</td>
+</tr>
+<tr>
+<td>Core reference snapshot</td>
+<td>Arcane OS commit <code>567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e</code>, protocol <code>arcane/1</code></td>
+<td>The application-facing Core contract derived into <code>docs/reference/core/</code>. Canonical inventory and focused-member content was verified unchanged at Arcane OS <code>main</code> commit <code>13f3ce0ae34f77a3495331c8b4c30b1bb105f8ed</code>; SDK-local provenance, link, and package-boundary annotations are added explicitly.</td>
+</tr>
+</tbody></table>
+</div>
+<p>The runtime receipt and Core reference remain distinct evidence even though
+they currently share one pinned upstream source identity. A browser module&#39;s
+bytes come from the generated runtime receipt. A native build selects one
+explicit Arcane OS checkout and Core. This SDK version accepts that selection
+only after its current native plan checks the exact declared protocol, version,
+features, capabilities, methods, provider contract, and identity-bound
+receipts. That current-build admission does not promise that a future SDK will
+accept this Core or that this SDK will accept a future Core. A matching protocol
+name or higher version alone is not compatibility or authority.</p>
+<p>See <a href="../core/">Core reference provenance</a> for the imported inventory and
+the exact distinction between a documentation snapshot and shipped runtime
+bytes.</p>
+<h2 id="mdn-style-page-contract">MDN-style page contract</h2>
+<p>Public reference entries follow the established Arcane documentation model:</p>
+<ul>
+<li>one canonical, mechanically readable inventory owns each public name;</li>
+<li>every public member or module has one guide entry headed by its exact name;</li>
+<li>each guide leads with an overview and the shortest safe working example;</li>
+<li>parameters, return values, errors, side effects, cancellation, and events are
+stated when they apply;</li>
+<li>availability is summarized near the call, while transport mechanics are
+folded into or deep-linked from the entry;</li>
+<li>normalized results are distinguished from provider- or platform-native
+envelopes;</li>
+<li>examples do not trigger destructive, privileged, expensive, or external
+actions merely by being copied.</li>
+</ul>
+<h2 id="public-runtime-inventory">Public runtime inventory</h2>
+<p>The Node package exposes 158 semantic JavaScript records across 11 JavaScript
+entrypoints, plus eight JSON Schemas, its exact runtime manifest, and package
+metadata. The <a href="../inventory/package-api.json">machine-readable package inventory</a>
+and <a href="../sdk-api/">SDK member reference</a> are checked bidirectionally against every
+declared JavaScript export.</p>
+<p>The seven update-check records are explicit on-demand checks; they do not poll,
+download, install, or self-update.</p>
+<p>The synchronized browser payload exposes:</p>
+<ul>
+<li>78 JavaScript module artifacts under <code>runtime/arcane/modules/</code>, including
+ESM modules, classic vendor globals, one worker protocol, and one Node-oriented
+mail transport;</li>
+<li>15 shared entity modules under <code>runtime/arcane/entities/</code>;</li>
+<li>39 reusable HTML-import components under <code>runtime/arcane/components/</code>;</li>
+<li>seven shared CSS artifacts, security policy, images, and the vendored
+<code>strong-type</code> dependency.</li>
+</ul>
+<p>The module and component catalogs enumerate every shipped artifact, including
+vendor support files that are not ESM imports. The runtime manifest remains the
+byte-level source of truth; the catalogs explain what those bytes let a
+developer do.</p>
+<h2 id="authority-and-feature-detection">Authority and feature detection</h2>
+<p>The presence of a JavaScript function is not permission to use it. Native
+applications should inspect <code>Arcane.capabilities.list()</code> where available and
+then call the relevant status method. Android callers with <code>system.read</code> obtain
+the nested capability snapshot through <code>Arcane.platform.status()</code>.</p>
+<p>Do not infer local-AI readiness from <code>Arcane.runtime.current().managedLocalAI</code>,
+infer authorization from a transport name, or treat an Ollama model inventory
+as package admission. Each method rechecks native policy at invocation time.</p>
+<h2 id="source-receipts-and-licensing">Source, receipts, and licensing</h2>
+<ul>
+<li><a href="https://github.com/TheWizardNexus/ARCANE-OS/tree/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e" target="_blank" rel="noreferrer">Pinned upstream ARCANE-OS source</a></li>
+<li><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/runtime/ARCANE_RUNTIME_RELEASE.json" target="_blank" rel="noreferrer">Exact runtime release manifest</a></li>
+<li><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/tools/runtime-source.json" target="_blank" rel="noreferrer">Reviewed runtime source pin</a></li>
+<li><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">AGPL license</a></li>
+<li><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/COMMERCIAL-LICENSE.md" target="_blank" rel="noreferrer">Commercial-license notice</a></li>
+<li><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/NOTICE" target="_blank" rel="noreferrer">Third-party and distribution notice</a></li>
+</ul>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/README.md" target="_blank" rel="noreferrer"><code>docs/reference/README.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#reference-map">Reference map</a><a href="#version-scope-and-provenance">Version scope and provenance</a><a href="#mdn-style-page-contract">MDN-style page contract</a><a href="#public-runtime-inventory">Public runtime inventory</a><a href="#authority-and-feature-detection">Authority and feature detection</a><a href="#source-receipts-and-licensing">Source, receipts, and licensing</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

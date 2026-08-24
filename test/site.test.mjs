@@ -4,13 +4,15 @@ import {readdir,readFile,stat} from 'node:fs/promises';
 import path from 'node:path';
 import {projectPackageManifest,validateAppDescriptor} from '../src/app-descriptor.mjs';
 import test from '../src/testing.mjs';
+import {verifyReferenceSite} from '../tools/build-reference-site.mjs';
 import {repositoryRoot} from './helpers.mjs';
 import '../examples/hello-world/apps/hello-world/test/app.test.mjs';
 
 const siteRoot=path.join(repositoryRoot,'site');
 const exampleRoot=path.join(repositoryRoot,'examples','hello-world');
 const canonicalRoot='https://thewizardnexus.github.io/arcane-os-sdk/';
-const pageRoutes=new Map([
+const htmlCache=new Map();
+const staticPageRoutes=new Map([
     ['index.html',''],
     ['quick-start/index.html','quick-start/'],
     ['guides/index.html','guides/'],
@@ -26,12 +28,36 @@ const pageRoutes=new Map([
     ['compatibility/index.html','compatibility/']
 ]);
 
+async function loadReferenceManifest(){
+    return readJson(path.join(siteRoot,'reference','reference-manifest.json'));
+}
+
+async function loadPageRoutes(){
+    const manifest=await loadReferenceManifest();
+    const routes=new Map(staticPageRoutes);
+    for(const page of manifest.pages){
+        assert.match(page.output,/^site\/reference\/.+\/index[.]html$/u);
+        assert.match(page.route,/^reference\/.+\/$/u);
+        routes.set(page.output.slice('site/'.length),page.route);
+    }
+    return routes;
+}
+
 function sitePath(fileName){
     return path.join(siteRoot,...fileName.split('/'));
 }
 
 async function readSiteFile(fileName,encoding='utf8'){
     return readFile(sitePath(fileName),encoding);
+}
+
+async function readHtmlFile(filePath){
+    let html=htmlCache.get(filePath);
+    if(html===undefined){
+        html=await readFile(filePath,'utf8');
+        htmlCache.set(filePath,html);
+    }
+    return html;
 }
 
 async function readJson(filePath){
@@ -83,7 +109,7 @@ async function assertLocalReference(sourceFile,reference){
     if(!rawFragment)return;
     assert.equal(path.extname(targetPath),'.html',`${sourceFile}: ${reference}`);
     const fragment=decodeURIComponent(rawFragment);
-    const targetHtml=await readFile(targetPath,'utf8');
+    const targetHtml=await readHtmlFile(targetPath);
     assert.match(targetHtml,new RegExp(`\\bid="${escapePattern(fragment)}"`,'u'),`${sourceFile}: ${reference}`);
 }
 
@@ -98,6 +124,7 @@ async function listHtmlFiles(directory=siteRoot,prefix=''){
 }
 
 test('Pages routes are semantic, canonical, and project-path safe',async t=>{
+    const pageRoutes=await loadPageRoutes();
     const actualPages=(await listHtmlFiles()).sort();
     assert.deepEqual(actualPages,[...pageRoutes.keys()].sort());
 
@@ -129,6 +156,102 @@ test('Pages routes are semantic, canonical, and project-path safe',async t=>{
             for(const reference of references)await assertLocalReference(fileName,reference);
         });
     }
+});
+
+test('the complete API reference is a first-party generated Pages corpus',async t=>{
+    await verifyReferenceSite();
+    const manifest=await loadReferenceManifest();
+    assert.equal(manifest.schema,'arcane-reference-site/1');
+    assert.deepEqual(manifest.versions,{
+        sdk:'0.1.0-dev.5',
+        runtime:'0.8.12',
+        protocol:'arcane/1'
+    });
+    assert.deepEqual(manifest.counts,{
+        markdownPages:24,
+        collectionPages:2,
+        htmlPages:26,
+        inventories:4
+    });
+    assert.equal(manifest.pages.filter(page=>page.kind==='markdown').length,24);
+    assert.equal(manifest.pages.filter(page=>page.kind==='collection').length,2);
+    assert.equal(new Set(manifest.pages.map(page=>page.source)).size,26);
+    assert.equal(new Set(manifest.pages.map(page=>page.output)).size,26);
+    assert.equal(new Set(manifest.pages.map(page=>page.route)).size,26);
+
+    await t.test('the landing and rendered documents keep detailed navigation on Pages',async()=>{
+        const landing=await readSiteFile('reference/index.html');
+        assert.doesNotMatch(
+            landing,
+            /href="https:\/\/github[.]com\/TheWizardNexus\/arcane-os-sdk\/(?:blob|tree)\/main\/docs\/reference/iu
+        );
+        for(const page of manifest.pages.filter(record=>record.kind==='markdown')){
+            const html=await readFile(path.join(repositoryRoot,...page.output.split('/')),'utf8');
+            assert.doesNotMatch(html,/href="(?!https?:)[^"]+[.]md(?:[?#][^"]*)?"/iu,page.output);
+            assert.doesNotMatch(html,/href="javascript:/iu,page.output);
+            assert.doesNotMatch(html,/<script(?![^>]*\bsrc=)[^>]*>/iu,page.output);
+            const sourceLinks=html.match(/<a\b[^>]*class="[^"]*reference-source-link[^"]*"[^>]*>/gu)??[];
+            assert.equal(sourceLinks.length,1,page.output);
+            assert.match(sourceLinks[0],/target="_blank"/u,page.output);
+            assert.match(sourceLinks[0],/rel="noreferrer"/u,page.output);
+            const ids=[...html.matchAll(/\bid="([^"]+)"/gu)].map(match=>match[1]);
+            assert.equal(new Set(ids).size,ids.length,`${page.output} contains duplicate element ids.`);
+            const source=await readFile(path.join(repositoryRoot,...page.source.split('/')),'utf8');
+            if(source.includes('```')){
+                assert.match(html,/class="[^"]*\bcode-block\b[^"]*"/u,page.output);
+                assert.match(html,/data-copy-button/u,page.output);
+                assert.match(html,/data-copy-status/u,page.output);
+            }
+        }
+    });
+
+    await t.test('published inventories are byte-identical to their canonical sources',async()=>{
+        for(const inventory of manifest.inventories){
+            const [source,published]=await Promise.all([
+                readFile(path.join(repositoryRoot,...inventory.source.split('/'))),
+                readFile(path.join(repositoryRoot,...inventory.output.split('/')))
+            ]);
+            assert.equal(published.equals(source),true,inventory.output);
+        }
+    });
+
+    await t.test('rendered API catalogs retain every inventoried public name',async()=>{
+        const [packageApi,runtimeModules,runtimeEntities,runtimeComponents,sdk,modules,entities,components]=await Promise.all([
+            readJson(path.join(repositoryRoot,'docs','reference','inventory','package-api.json')),
+            readJson(path.join(repositoryRoot,'docs','reference','inventory','runtime-modules.json')),
+            readJson(path.join(repositoryRoot,'docs','reference','inventory','runtime-entities.json')),
+            readJson(path.join(repositoryRoot,'docs','reference','inventory','runtime-components.json')),
+            readSiteFile('reference/sdk-api/index.html'),
+            readSiteFile('reference/runtime-modules/index.html'),
+            readSiteFile('reference/runtime-entities/index.html'),
+            readSiteFile('reference/runtime-components/index.html')
+        ]);
+        for(const member of packageApi.members){
+            assert.ok(sdk.includes(escapeHtmlSource(member.displayName)),member.displayName);
+        }
+        for(const artifact of runtimeModules.artifacts){
+            assert.ok(modules.includes(escapeHtmlSource(path.basename(artifact.file))),artifact.file);
+        }
+        for(const module of runtimeEntities.modules){
+            assert.ok(entities.includes(escapeHtmlSource(path.basename(module.file))),module.file);
+        }
+        for(const component of runtimeComponents.artifacts){
+            assert.ok(components.includes(escapeHtmlSource(component.name)),component.name);
+        }
+        assert.match(components,/<code>setNavigation\(\)<\/code><br><code>setActiveRoute\(\)<\/code>/u);
+        assert.doesNotMatch(components,/&lt;br\s*\/?&gt;/iu);
+    });
+
+    await t.test('folded protocol explanations remain available without executing source HTML',async()=>{
+        const [events,protocols]=await Promise.all([
+            readSiteFile('reference/event-manager/index.html'),
+            readSiteFile('reference/protocols/index.html')
+        ]);
+        assert.match(events,/<details>/u);
+        assert.match(events,/<summary>/u);
+        assert.match(protocols,/<details>/u);
+        assert.match(protocols,/<summary>/u);
+    });
 });
 
 test('documentation describes the consumer source-to-executable contract truthfully',async()=>{
@@ -411,15 +534,21 @@ test('Pages workflow deploys one authenticated main static artifact',async t=>{
         assert.match(workflow,/actions\/checkout@v7[\s\S]*ref: \$\{\{ steps[.]check[.]outputs[.]checked_sha \}\}/u);
         assert.match(workflow,/git rev-parse HEAD/u);
         assert.match(workflow,/actions\/configure-pages@v6/u);
+        assert.match(workflow,/test -f site\/reference\/reference-manifest[.]json/u);
+        assert.match(workflow,/test -f site\/reference\/sdk-api\/index[.]html/u);
+        assert.match(workflow,/test -f site\/reference\/event-manager\/index[.]html/u);
+        assert.match(workflow,/test -f site\/reference\/core\/arcane-api\/index[.]html/u);
+        assert.match(workflow,/test -f site\/reference\/inventory\/package-api[.]json/u);
         assert.match(workflow,/actions\/upload-pages-artifact@v5/u);
         assert.match(workflow,/path: [.][/]site/u);
         assert.match(workflow,/actions\/deploy-pages@v5/u);
     });
-    await t.test('publishes every canonical route outside the npm package',()=>{
+    await t.test('publishes every canonical route outside the npm package',async()=>{
         assert.equal(packageDocument.homepage,canonicalRoot);
         assert.equal(packageDocument.files.some(entry=>entry.startsWith('site')),false);
         assert.match(robots,/Sitemap: https:\/\/thewizardnexus[.]github[.]io\/arcane-os-sdk\/sitemap[.]xml/u);
         const locations=[...sitemap.matchAll(/<loc>([^<]+)<\/loc>/gu)].map(match=>match[1]).sort();
+        const pageRoutes=await loadPageRoutes();
         const expected=[...pageRoutes.values()].map(route=>`${canonicalRoot}${route}`).sort();
         assert.deepEqual(locations,expected);
     });

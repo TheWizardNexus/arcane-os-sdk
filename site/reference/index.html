@@ -11,32 +11,32 @@
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
-  <header class="site-header" data-site-header><a class="brand" href="../" aria-label="Arcane OS SDK documentation home"><img src="../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../">Overview</a><a href="../guides/">Guides</a><a href="../examples/">Examples</a><a href="../playground/">Playground</a><a href="../testing/">Testing</a><a href="./" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/README.md" target="_blank" rel="noreferrer">Full reference <span aria-hidden="true">↗</span></a></nav></header>
+  <header class="site-header" data-site-header><a class="brand" href="../" aria-label="Arcane OS SDK documentation home"><img src="../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../">Overview</a><a href="../guides/">Guides</a><a href="../examples/">Examples</a><a href="../playground/">Playground</a><a href="../testing/">Testing</a><a href="./" aria-current="page">Reference</a><a class="repo-link" href="overview/">Full reference</a></nav></header>
   <main id="main-content">
     <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../">Docs</a><span aria-hidden="true">/</span><span aria-current="page">Reference</span></nav><p class="eyebrow">Capability first · transport second</p><h1>Everything an Arcane developer can call.</h1><p class="doc-lead">Start with the job you need to do. Each reference entry identifies its import, result, native/browser/cloud availability, and normalization boundary. Wire protocols and host internals stay folded below the application contract.</p></header>
     <div class="docs-layout section-shell">
-      <aside class="docs-sidebar" aria-label="Reference navigation"><p>Reference</p><nav><a href="#capabilities">Choose a capability</a><a href="#surfaces">Complete surfaces</a><a href="#availability">Availability</a><a href="#cli">CLI</a><a href="#behavior">Behavior tests</a><a href="#protocols">Protocol details</a></nav></aside>
+      <aside class="docs-sidebar" aria-label="Reference navigation"><p>Reference</p><nav><a href="overview/">Reference map</a><a href="sdk-api/">SDK API</a><a href="event-manager/">EventManager</a><a href="runtime-modules/">Runtime modules</a><a href="runtime-entities/">Runtime entities</a><a href="runtime-components/">Runtime components</a><a href="core/">Arcane Core</a><a href="arcane-ollama/">Arcane Ollama</a><a href="availability-and-normalization/">Availability</a><a href="behavioral-testing/">Behavior tests</a><a href="protocols/">Protocol details</a></nav></aside>
       <article class="prose">
         <section id="capabilities">
           <h2>Choose a capability</h2>
           <div class="table-wrap" role="region" aria-label="Capability to API map" tabindex="0"><table><thead><tr><th scope="col">I need to…</th><th scope="col">Use</th><th scope="col">Where</th></tr></thead><tbody>
-            <tr><td>Scaffold, test, package, bundle, build, verify, or run an app</td><td><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/sdk-api.md" target="_blank" rel="noreferrer">Node SDK API</a> or <a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/cli.md" target="_blank" rel="noreferrer"><code>arcane</code> CLI</a></td><td>Node; explicit native provider for native targets</td></tr>
-            <tr><td>Publish central events, review bounded history, or observe DOM behavior</td><td><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/event-manager.md" target="_blank" rel="noreferrer"><code>EventManager</code> and <code>arcane-event-stack/1</code></a></td><td>Node and browser; DOM capture requires a compatible DOM</td></tr>
-            <tr><td>Build application behavior or UI</td><td><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/runtime-modules.md" target="_blank" rel="noreferrer">runtime modules</a>, <a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/runtime-entities.md" target="_blank" rel="noreferrer">entities</a>, and <a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/runtime-components.md" target="_blank" rel="noreferrer">components</a></td><td>Browser and native WebViews; module-specific dependencies apply</td></tr>
-            <tr><td>Read platform state or use native OS capabilities</td><td><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/core/arcane-api.md" target="_blank" rel="noreferrer"><code>globalThis.Arcane</code></a></td><td>Cross-host when the method is implemented and admitted</td></tr>
-            <tr><td>Use provider-neutral AI</td><td><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/core/arcane-ai-contracts.md" target="_blank" rel="noreferrer"><code>Arcane.ai</code> contracts</a></td><td>Native local AI or explicitly selected cloud provider</td></tr>
-            <tr><td>Use local Ollama without calling port 11434</td><td><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/arcane-ollama.md" target="_blank" rel="noreferrer">Arcane Ollama</a></td><td>Native Core; narrower Android chat projection</td></tr>
-            <tr><td>Observe host, operation, stream, terminal, or appearance events</td><td><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/core/arcane-events.md" target="_blank" rel="noreferrer"><code>Arcane.events</code></a></td><td>Event-specific host matrix</td></tr>
+            <tr><td>Scaffold, test, package, bundle, build, verify, or run an app</td><td><a href="sdk-api/">Node SDK API</a> or <a href="cli/"><code>arcane</code> CLI</a></td><td>Node; explicit native provider for native targets</td></tr>
+            <tr><td>Publish central events, review bounded history, or observe DOM behavior</td><td><a href="event-manager/"><code>EventManager</code> and <code>arcane-event-stack/1</code></a></td><td>Node and browser; DOM capture requires a compatible DOM</td></tr>
+            <tr><td>Build application behavior or UI</td><td><a href="runtime-modules/">runtime modules</a>, <a href="runtime-entities/">entities</a>, and <a href="runtime-components/">components</a></td><td>Browser and native WebViews; module-specific dependencies apply</td></tr>
+            <tr><td>Read platform state or use native OS capabilities</td><td><a href="core/arcane-api/"><code>globalThis.Arcane</code></a></td><td>Cross-host when the method is implemented and admitted</td></tr>
+            <tr><td>Use provider-neutral AI</td><td><a href="core/arcane-ai-contracts/"><code>Arcane.ai</code> contracts</a></td><td>Native local AI or explicitly selected cloud provider</td></tr>
+            <tr><td>Use local Ollama without calling port 11434</td><td><a href="arcane-ollama/">Arcane Ollama</a></td><td>Native Core; narrower Android chat projection</td></tr>
+            <tr><td>Observe host, operation, stream, terminal, or appearance events</td><td><a href="core/arcane-events/"><code>Arcane.events</code></a></td><td>Event-specific host matrix</td></tr>
           </tbody></table></div>
         </section>
 
         <section id="surfaces">
           <h2>Complete public surfaces</h2>
           <div class="definition-grid">
-            <article><h3>Node SDK</h3><p><strong>158</strong> semantic API records across 11 JavaScript package entrypoints, plus eight versioned schemas and manifest exports. Seven are explicit on-demand update checks; they do not poll, download, install, or self-update.</p><p><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/inventory/package-api.json" target="_blank" rel="noreferrer">Machine-readable inventory ↗</a></p></article>
-            <article><h3>Browser runtime</h3><p><strong>80</strong> module-directory artifacts, <strong>15</strong> entity modules with <strong>35</strong> exports, and <strong>39</strong> HTML components.</p><p><a href="https://github.com/TheWizardNexus/arcane-os-sdk/tree/main/docs/reference/inventory" target="_blank" rel="noreferrer">Runtime inventories ↗</a></p></article>
-            <article><h3>Arcane Core</h3><p><strong>35</strong> namespaces, constructors, and values; <strong>106</strong> application methods; and <strong>14</strong> renderer-visible events.</p><p><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/core/README.md" target="_blank" rel="noreferrer">Core reference map ↗</a></p></article>
-            <article><h3>Arcane Ollama</h3><p><strong>20</strong> exact bridge delegates plus four normalized helpers: readiness, generation text, chat text, and unload.</p><p><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/arcane-ollama.md" target="_blank" rel="noreferrer">Ollama guide ↗</a></p></article>
+            <article><h3>Node SDK</h3><p><strong>158</strong> semantic API records across 11 JavaScript package entrypoints, plus eight versioned schemas and manifest exports. Seven are explicit on-demand update checks; they do not poll, download, install, or self-update.</p><p><a href="inventory/package-api.json">Machine-readable inventory →</a></p></article>
+            <article><h3>Browser runtime</h3><p><strong>80</strong> module-directory artifacts, <strong>15</strong> entity modules with <strong>35</strong> exports, and <strong>39</strong> HTML components.</p><p><a href="inventory/">Runtime inventories →</a></p></article>
+            <article><h3>Arcane Core</h3><p><strong>35</strong> namespaces, constructors, and values; <strong>106</strong> application methods; and <strong>14</strong> renderer-visible events.</p><p><a href="core/">Core reference map →</a></p></article>
+            <article><h3>Arcane Ollama</h3><p><strong>20</strong> exact bridge delegates plus four normalized helpers: readiness, generation text, chat text, and unload.</p><p><a href="arcane-ollama/">Ollama guide →</a></p></article>
           </div>
           <p>Every SDK and Core key has one MDN-style focused entry with an overview, operating contract, availability or platform boundary, and safe example. Automated parity tests reject undocumented additions and stale entries.</p>
         </section>
@@ -52,7 +52,7 @@
             <tr><td><strong>Provider-native</strong></td><td>Arcane admits and bounds the call but preserves optional provider result fields.</td><td>Use the documented helper when a smaller normalized result is required.</td></tr>
           </tbody></table></div>
           <p>The current native matrix is Microsoft NT, Linux, and Android where listed. This SDK version exposes no macOS native target or Core-host contract; browser-only behavior on macOS does not become a native Arcane capability.</p>
-          <p><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/availability-and-normalization.md" target="_blank" rel="noreferrer">Read the complete availability and normalization guide ↗</a></p>
+          <p><a href="availability-and-normalization/">Read the complete availability and normalization guide →</a></p>
         </section>
 
         <section id="cli">
@@ -65,7 +65,7 @@
             <tr><td>Repository</td><td><code>repo status</code>, <code>repo pull</code>, <code>repo push</code></td></tr>
           </tbody></table></div>
           <p>Every command supports <code>--output human|json|ndjson</code>. Machine modes preserve ordered acceptance, progress, terminal result, cancellation, and nonzero failure behavior.</p>
-          <p><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/cli.md" target="_blank" rel="noreferrer">Open the option-by-option CLI reference ↗</a></p>
+          <p><a href="cli/">Open the option-by-option CLI reference →</a></p>
         </section>
 
         <section id="behavior">
@@ -74,7 +74,7 @@
           <pre><code>node ./bin/arcane-test.mjs test/reference-completeness.test.mjs
 node ./bin/arcane-test.mjs test/runtime-api-behavior.test.mjs
 npm run check</code></pre>
-          <p><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/behavioral-testing.md" target="_blank" rel="noreferrer">Read the host and protocol behavior matrix ↗</a></p>
+          <p><a href="behavioral-testing/">Read the host and protocol behavior matrix →</a></p>
         </section>
 
         <section id="protocols">
@@ -84,12 +84,12 @@ npm run check</code></pre>
           <details><summary>Core framing, events, cancellation, and kernel boundaries</summary><p>Desktop Core uses length-framed JSON RPC over host-private process channels. The development host projects calls through loopback HTTP and events through SSE. Windows and Linux hosts bind different native and kernel evidence beneath the common method policy; Android exposes a deliberately narrower generated projection. Cancellation is cooperative and method-specific, so renderer timeout does not imply rollback of a native mutation.</p></details>
           <details><summary>Central EventManager and time-travel stacks</summary><p><code>arcane-os/event-manager</code> is synchronous host-neutral JavaScript. Live listeners receive original arguments; optional history stores bounded, redacted, deeply frozen <code>arcane-event-stack/1</code> snapshots. That format is local diagnostic data, not Core <code>arcane/1</code> RPC. Review playback is safe by default; original-event replay is explicit and does not reproduce host or DOM side effects.</p></details>
           <details><summary>Arcane Ollama versus direct Ollama or cloud AI</summary><p>Applications do not call <code>127.0.0.1:11434</code>. Core binds app identity, capabilities, package-owned model policy, native admission, limits, streaming, and errors before using fixed loopback provider routes. Direct <code>Arcane.ollama</code> success envelopes remain provider-native. <code>Arcane.ai</code> is the provider-neutral path. OpenAI is explicit configuration, never an automatic fallback from local failure.</p></details>
-          <p><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/protocols.md" target="_blank" rel="noreferrer">Open the deep protocol and cross-kernel guide ↗</a></p>
+          <p><a href="protocols/">Open the deep protocol and cross-kernel guide →</a></p>
         </section>
       </article>
       <aside class="on-this-page" aria-label="On this page"><p>On this page</p><nav><a href="#capabilities">Capabilities</a><a href="#surfaces">Surfaces</a><a href="#availability">Availability</a><a href="#cli">CLI</a><a href="#behavior">Tests</a><a href="#protocols">Protocols</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../" aria-label="Arcane OS SDK documentation home"><img src="../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.1.0-dev.4, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../architecture/">Architecture</a><a href="../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../" aria-label="Arcane OS SDK documentation home"><img src="../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../architecture/">Architecture</a><a href="../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
 </body>
 </html>

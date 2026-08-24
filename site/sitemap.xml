@@ -13,6 +13,32 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/playground/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/testing/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/arcane-ollama/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/availability-and-normalization/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/behavioral-testing/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/cli/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-ai-contracts/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-api/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-entities/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-events/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/ollama-module/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/ai-and-ollama/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/applications-terminal-capabilities/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/core-and-events/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/filesystem-storage-preferences-appearance/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/namespaces/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/platform-installation-users-system/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/session-provisioning-diagnostics-development/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/event-manager/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/inventory/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/overview/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/protocols/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-components/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-entities/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/sdk-api/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/architecture/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/compatibility/</loc></url>
 </urlset>

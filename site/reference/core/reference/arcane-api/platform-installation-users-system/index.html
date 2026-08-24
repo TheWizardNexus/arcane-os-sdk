@@ -1,0 +1,1061 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="These methods report or change host-level state. Feature-detect the public member and use the capability and method inventory exposed by the current host be…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/platform-installation-users-system/"><link rel="icon" type="image/png" href="../../../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../../../styles.css"><link rel="stylesheet" href="../../../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane API platform, installation, users, and system guides · Arcane OS SDK"><meta property="og:description" content="These methods report or change host-level state. Feature-detect the public member and use the capability and method inventory exposed by the current host be…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/platform-installation-users-system/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane API platform, installation, users, and system guides · Arcane OS SDK"><meta name="twitter:description" content="These methods report or change host-level state. Feature-detect the public member and use the capability and method inventory exposed by the current host be…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane API platform, installation, users, and system guides | Arcane OS SDK</title><script src="../../../../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../../../">Overview</a><a href="../../../../../guides/">Guides</a><a href="../../../../../examples/">Examples</a><a href="../../../../../playground/">Playground</a><a href="../../../../../testing/">Testing</a><a href="../../../../" aria-current="page">Reference</a><a class="repo-link" href="../../../../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../../../">Docs</a><span aria-hidden="true">/</span><a href="../../../../">Reference</a><span aria-hidden="true">/</span><a href="../../../">Core</a><span aria-hidden="true">/</span><a href="../">Focused member guides</a><span aria-hidden="true">/</span><span aria-current="page">Arcane API platform, installation, users, and system guides</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-api-platform-installation-users-and-system-guides">Arcane API platform, installation, users, and system guides</h1><p class="doc-lead">These methods report or change host-level state. Feature-detect the public member and use the capability and method inventory exposed by the current host be…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../../../overview/">Overview</a><a href="../../../../sdk-api/">SDK JavaScript API</a><a href="../../../../cli/">CLI</a><a href="../../../../event-manager/">EventManager</a><a href="../../../../availability-and-normalization/">Availability</a><a href="../../../../protocols/">Protocols</a><a href="../../../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../../../../runtime-modules/">Modules</a><a href="../../../../runtime-entities/">Entities</a><a href="../../../../runtime-components/">Components</a><a href="../../../../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../../">Core map</a><a href="../../../arcane-api/">Arcane API</a><a href="../../../arcane-events/">Events</a><a href="../../../arcane-ai-contracts/">AI contracts</a><a href="../../../arcane-entities/">Entity exports</a><a href="../../../ollama-module/">Ollama module</a><a href="../">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/core/reference/arcane-api/platform-installation-users-system.md"><p>These methods report or change host-level state. Feature-detect the public
+member and use the capability and method inventory exposed by the current host
+before presenting a control. A grant never replaces a method&#39;s input,
+privilege, identity, freshness, or confirmation checks.</p>
+<p>Core operations that return an <code>operation</code> record also emit future-only
+<code>operation.started</code>, <code>operation.progress</code>, <code>operation.log</code>,
+<code>operation.completed</code>, or <code>operation.failed</code> events. Subscribe before calling
+the method, correlate by <code>operationId</code>, and release the returned unsubscribe
+function. An operation result can complete with warnings; inspect
+<code>warningCount</code> and the method-specific readiness fields.</p>
+<h2 id="arcaneplatformstatus">Arcane.platform.status()</h2>
+<h3 id="overview">Overview</h3>
+<p><code>Arcane.platform.status()</code> returns the host, execution-evidence, renderer,
+permission, application, and effective-capability snapshot for the bound
+session. It is a repeatable read with no side effect or event. It requires
+<code>system.read</code> and is available on Core and Android.</p>
+<h3 id="result-and-platform-differences">Result and platform differences</h3>
+<p>Core returns exactly <code>platform</code>, <code>rawPlatform</code>, <code>displayName</code>, <code>architecture</code>,
+<code>release</code>, <code>desktop</code>, <code>sessionType</code>, <code>simulated</code>, <code>adapter</code>, <code>version</code>,
+<code>protocol</code>, <code>application</code>, <code>renderer</code>, <code>permissions</code>, <code>capabilities</code>, and
+<code>execution</code>. Microsoft NT uses <code>platform: &quot;windows&quot;</code> and
+<code>rawPlatform: &quot;win32&quot;</code>; Linux uses <code>&quot;linux&quot;</code> for both. <code>hostname</code> is
+deliberately omitted.</p>
+<p><code>execution</code> is exactly
+<code>{hostPlatform, effectivePlatform, simulation, evidenceClass}</code>. Core uses
+<code>evidenceClass: &quot;real-host&quot;</code> or <code>&quot;simulation&quot;</code>. Android reports
+<code>platform/rawPlatform: &quot;android&quot;</code> and
+<code>execution: {hostPlatform:&quot;android&quot;, effectivePlatform:&quot;android&quot;, simulation:false, evidenceClass:&quot;application-host&quot;}</code>. Simulation and Android
+application-host evidence are not publisher, signing, or release-candidate
+attestations.</p>
+<p><code>renderer</code> contains <code>id</code>, <code>available</code>, and nullable <code>version</code>, with host-specific
+<code>adapter</code> or <code>executable</code> metadata. <code>permissions</code> has the shape documented by
+<code>Arcane.permissions.status()</code>. <code>capabilities</code> is exactly <code>{app, grants, methods}</code> and is the Android replacement for the Core-only direct
+<code>Arcane.capabilities.list()</code> method.</p>
+<h3 id="errors-and-recovery">Errors and recovery</h3>
+<p><code>METHOD_NOT_ALLOWED</code> or <code>ANDROID_CAPABILITY_DENIED</code> means <code>system.read</code> is not
+granted. <code>METHOD_CONTRACT_OUTPUT_INVALID</code> means the host status failed its
+closed shape or internal-consistency checks; repair the matching host and app
+package rather than inferring platform state from user-agent strings.</p>
+<h3 id="example">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const status = await Arcane.platform.status();
+
+console.log(status.displayName, status.architecture, status.release);
+console.log(status.execution.evidenceClass);
+console.log(&#39;Admitted methods&#39;, status.capabilities.methods);
+</code></pre></div>
+<h2 id="arcanepermissionsstatus">Arcane.permissions.status()</h2>
+<h3 id="overview-1">Overview</h3>
+<p><code>Arcane.permissions.status()</code> refreshes the Core host&#39;s permission/elevation
+observation. It requires <code>system.read</code>, is Core-only, changes no privilege, and
+emits no event. A true <code>canElevate</code> value describes the host mechanism; it does
+not mean this read prompted for or obtained elevation.</p>
+<h3 id="result">Result</h3>
+<p>The result is exactly <code>{elevated, level, canElevate, mechanism, detectedBy, probes}</code>. <code>elevated</code> and <code>canElevate</code> are booleans; <code>mechanism</code> may be <code>null</code>;
+<code>probes</code> contains bounded host-specific diagnostic records.</p>
+<p>Microsoft NT normally reports <code>level</code> as <code>&quot;standard&quot;</code>, <code>&quot;administrator&quot;</code>, or
+<code>&quot;system&quot;</code>, using UAC and an integrity-level probe. Linux reports <code>&quot;standard&quot;</code>
+or <code>&quot;root&quot;</code> from the effective uid and also records whether its kernel peer
+credential guard is available. Simulation returns explicitly simulated
+mechanisms and probes. Never use a simulation result as evidence of real
+administrator or root authority.</p>
+<h3 id="errors-and-recovery-1">Errors and recovery</h3>
+<p><code>METHOD_NOT_ALLOWED</code> means the application lacks <code>system.read</code>. A failed probe
+normally remains visible in <code>detectedBy</code> and <code>probes</code>; a rejected request or
+transport failure should be surfaced as unknown permission state, never treated
+as elevated.</p>
+<h3 id="example-1">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const permissions = await Arcane.permissions.status();
+
+if (!permissions.elevated) {
+    console.log(&#39;This host session is not elevated.&#39;, permissions.level);
+}
+</code></pre></div>
+<h2 id="arcaneversioncurrent">Arcane.version.current()</h2>
+<h3 id="overview-2">Overview</h3>
+<p><code>Arcane.version.current()</code> returns the active Arcane OS host/bundle version for
+this bridge session. It takes no parameters, needs no capability, and is
+available on Core and Android. It is a repeatable read with no event or side
+effect.</p>
+<h3 id="result-1">Result</h3>
+<p>The result is one canonical semantic-version string no longer than 64
+characters. It is the host release version, not an independently packaged
+application&#39;s version; use <code>Arcane.app.current().version</code> for the latter. A
+version string is not signer, integrity, update, or release-candidate evidence.</p>
+<h3 id="errors-and-recovery-2">Errors and recovery</h3>
+<p><code>METHOD_CONTRACT_OUTPUT_INVALID</code> indicates that the host returned a value other
+than its bound bundle version. Repair or update the host/package pair.
+<code>ARCANE_TRANSPORT_UNAVAILABLE</code> means the page is not hosted by Arcane.</p>
+<h3 id="example-2">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const hostVersion = await Arcane.version.current();
+const application = await Arcane.app.current();
+
+console.log(&#39;Host&#39;, hostVersion, &#39;Application&#39;, application.version);
+</code></pre></div>
+<h2 id="arcaneversioninstallation">Arcane.version.installation()</h2>
+<h3 id="overview-3">Overview</h3>
+<p><code>Arcane.version.installation()</code> calls the same <code>installation.status</code> RPC as
+<code>Arcane.installation.status()</code>. It does not return a version string and does not
+mutate or repair the installation. The alias requires <code>installation.read</code> on a
+Core host and emits no event.</p>
+<h3 id="result-and-availability">Result and availability</h3>
+<p>The exact installation-status object is documented under
+<code>Arcane.installation.status()</code>. Its <code>installedVersion</code> can be <code>null</code>, while
+<code>packageVersion</code> identifies the active Provisioner package. Use
+<code>disposition</code>, <code>action</code>, integrity, and identity fields together; comparing the
+two version strings alone is not an installation trust decision.</p>
+<h3 id="errors-and-recovery-3">Errors and recovery</h3>
+<p><code>METHOD_NOT_ALLOWED</code> means the application lacks <code>installation.read</code>.
+Installation identity or integrity errors must be shown with their supplied
+resolution. This alias is not projected on Android.</p>
+<h3 id="example-3">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const installation = await Arcane.version.installation();
+
+console.log(
+    installation.installedVersion,
+    installation.packageVersion,
+    installation.disposition
+);
+</code></pre></div>
+<h2 id="arcanemachinestatus">Arcane.machine.status()</h2>
+<h3 id="overview-4">Overview</h3>
+<p><code>Arcane.machine.status()</code> returns the Provisioner&#39;s combined machine-readiness
+view. It requires <code>provisioning.manage</code>, an application of type <code>provisioner</code>,
+and a Core host. It performs bounded status and verification reads but makes no
+machine change and emits no event.</p>
+<p>This result contains local account, filesystem-location, and installation
+details. Keep it inside the trusted Provisioner UI; do not send or persist the
+whole object as telemetry.</p>
+<h3 id="result-2">Result</h3>
+<p>The exact top-level fields are <code>version</code>, <code>protocol</code>, <code>application</code>, <code>os</code>,
+<code>nativeAdapter</code>, <code>identity</code>, <code>protectedUsername</code>, <code>protectedUsernames</code>,
+<code>usernamePolicy</code>, <code>installation</code>, <code>requirements</code>, <code>permissions</code>, <code>renderer</code>,
+<code>securityMode</code>, <code>publisherTrustSource</code>, <code>revocationStatus</code>,
+<code>installedSecurityMode</code>, <code>paths</code>, <code>simulation</code>, <code>execution</code>, and <code>bundleRoot</code>.</p>
+<p><code>installation</code>, <code>requirements</code>, <code>permissions</code>, and <code>execution</code> use the same
+shapes documented by their focused methods. <code>securityMode</code> and its evidence
+describe the active host release; <code>installedSecurityMode</code> describes the
+installed release or <code>&quot;not-installed&quot;</code>. Simulation remains labeled in both
+<code>simulation</code> and <code>execution</code>.</p>
+<h3 id="errors-and-recovery-4">Errors and recovery</h3>
+<p><code>METHOD_NOT_ALLOWED</code> means the caller is not the admitted Provisioner or lacks
+<code>provisioning.manage</code>. Status can also fail closed on invalid installation,
+account, or filesystem evidence. Preserve the error&#39;s diagnostic id and follow
+its repair guidance; do not remove failing fields and reinterpret the remainder
+as ready.</p>
+<h3 id="example-4">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const machine = await Arcane.machine.status();
+
+console.log(machine.os.displayName, machine.installation.disposition);
+console.log(&#39;Simulation&#39;, machine.execution.simulation);
+console.log(&#39;Required work&#39;, machine.requirements.filter(
+    function findBlockingRequirement(requirement) {
+        return requirement.blocking;
+    }
+));
+</code></pre></div>
+<h2 id="arcaneusercurrent">Arcane.user.current()</h2>
+<h3 id="overview-5">Overview</h3>
+<p><code>Arcane.user.current()</code> returns the privacy-minimized identity bound to the
+current host session. It requires <code>identity.read</code> and is available on Core and
+Android. It is a repeatable read with no event or side effect. It is not an
+authentication token and cannot select another user.</p>
+<h3 id="result-and-platform-differences-1">Result and platform differences</h3>
+<p>The exact result is <code>{identityKind, username, accountName, displayName, source}</code>. Microsoft NT and Linux return <code>identityKind: &quot;host-account&quot;</code>,
+nonempty <code>username</code>, <code>accountName</code>, and <code>displayName</code>, and <code>source</code> set to
+<code>&quot;windows&quot;</code> or <code>&quot;linux&quot;</code>.</p>
+<p>Android returns <code>identityKind: &quot;local-session&quot;</code>, <code>username: null</code>,
+<code>accountName: null</code>, a bounded display name, and <code>source: &quot;android&quot;</code>. Do not
+derive or synthesize an Android operating-system account identifier.</p>
+<h3 id="errors-and-recovery-5">Errors and recovery</h3>
+<p><code>METHOD_NOT_ALLOWED</code> or <code>ANDROID_CAPABILITY_DENIED</code> means <code>identity.read</code> is not
+granted. <code>METHOD_CONTRACT_OUTPUT_INVALID</code> means the identity violated the
+privacy-minimized contract; treat identity as unavailable and repair the host.</p>
+<h3 id="example-5">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const identity = await Arcane.user.current();
+const label = identity.identityKind === &#39;host-account&#39;
+    ? identity.displayName
+    : &#39;Local Android session&#39;;
+
+console.log(label, identity.source);
+</code></pre></div>
+<h2 id="arcanerequirementslist">Arcane.requirements.list()</h2>
+<h3 id="overview-6">Overview</h3>
+<p><code>Arcane.requirements.list()</code> returns all current Core installation requirement
+records. It requires <code>requirements.read</code>, takes no parameters, changes nothing,
+and emits no event. The result is a bare array, not a wrapper object.</p>
+<h3 id="result-3">Result</h3>
+<p>The array currently contains <code>ollama</code>, <code>renderer</code>, and <code>session-control</code>.
+Renderer and session-control records have exactly <code>id</code>, <code>name</code>,
+<code>minimumVersion</code>, <code>required</code>, <code>installable</code>, <code>description</code>, <code>ready</code>,
+<code>blocking</code>, <code>status</code>, <code>version</code>, <code>executable</code>, <code>message</code>, <code>platform</code>, and
+<code>adapter</code>.</p>
+<p>The Ollama record additionally has <code>requiredFor</code>, <code>requiredScope</code>, <code>detection</code>,
+and <code>globalInstall</code>. <code>detection</code> separates machine-wide and user-scoped
+observations; <code>globalInstall</code> is exactly <code>{available, status, action, requiresElevation, provider, reason}</code>. Ollama is optional for base Arcane OS,
+but required before local AI. Paths and process observations are local machine
+data and should not be logged wholesale.</p>
+<h3 id="errors-and-recovery-6">Errors and recovery</h3>
+<p><code>METHOD_NOT_ALLOWED</code> means the app lacks <code>requirements.read</code>. A record whose
+<code>ready</code> is false includes a human-facing <code>message</code>; only <code>blocking: true</code>
+blocks base installation. Refresh the list after the operator resolves a
+prerequisite rather than modifying the returned record.</p>
+<h3 id="example-6">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const requirements = await Arcane.requirements.list();
+
+for (const requirement of requirements) {
+    console.log(
+        requirement.name,
+        requirement.status,
+        requirement.blocking
+    );
+}
+</code></pre></div>
+<h2 id="arcanerequirementsensure">Arcane.requirements.ensure()</h2>
+<h3 id="overview-7">Overview</h3>
+<p><code>Arcane.requirements.ensure(requirementIds, options?)</code> checks and, only where an
+approved installer is available, attempts to prepare selected requirements. It
+requires <code>provisioning.manage</code>, the Provisioner application type, an elevated
+Core worker, and the exclusive machine-mutation boundary.</p>
+<p>Omitted, <code>null</code>, or empty <code>requirementIds</code> selects the required requirements
+(<code>renderer</code> and <code>session-control</code>), not every listed optional requirement. A
+nonempty array may contain each known id once and no more than the current
+three-item inventory. Always pass an array deliberately: the JavaScript wrapper
+normalizes a non-array first argument to the default selection.</p>
+<p><code>options</code> is either omitted or an exact plain object containing only
+<code>userProcessInterruption</code>, set to <code>&quot;deny&quot;</code> or <code>&quot;allow&quot;</code>; the default is
+<code>&quot;deny&quot;</code>. Use <code>&quot;allow&quot;</code> only after a separate, informed confirmation. The host
+still re-verifies exact process and port identity and will not terminate an
+unknown process.</p>
+<h3 id="result-side-effects-and-events">Result, side effects, and events</h3>
+<p>The exact result is <code>{requirements, operation, credentials}</code>. <code>requirements</code>
+contains fresh records only for the selected ids. <code>credentials</code> is an array and
+is normally empty. <code>operation</code> is the completed tracked-operation record with
+<code>id</code>, <code>type</code>, <code>status</code>, timestamps, <code>progress</code>, <code>currentStep</code>,
+<code>progressDetails</code>, <code>credentials</code>, <code>error</code>, and <code>warningCount</code>.</p>
+<p>The operation can perform disk, network, process, or installation work and
+emits the standard operation lifecycle events. Simulation changes only
+simulation state and is not real readiness evidence.</p>
+<h3 id="errors-and-recovery-7">Errors and recovery</h3>
+<p>Invalid ids or options use <code>INVALID_REQUIREMENTS_ENSURE_REQUEST</code>; invalid
+wrapper options throw <code>TypeError</code> before dispatch. Common host failures include
+<code>ADMIN_REQUIRED</code>, <code>OPERATION_BUSY</code>, <code>REQUIREMENT_NOT_INSTALLABLE</code>,
+<code>REQUIREMENT_VERIFY_FAILED</code>, and lease-release failures. Wait for a busy
+operation, keep interruption denied unless separately approved, and follow the
+specific requirement&#39;s recovery message.</p>
+<h3 id="example-7">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function ensureBlockingRequirementsAfterConfirmation(confirmChange) {
+    const requirements = await Arcane.requirements.list();
+    const selected = requirements.filter(
+        function selectBlockingRequirement(requirement) {
+            return requirement.required &amp;&amp; !requirement.ready;
+        }
+    ).map(function selectRequirementId(requirement) {
+        return requirement.id;
+    });
+
+    if (selected.length === 0 || !confirmChange(selected)) {
+        return null;
+    }
+
+    return Arcane.requirements.ensure(selected, {
+        userProcessInterruption: &#39;deny&#39;
+    });
+}
+</code></pre></div>
+<h2 id="arcaneinstallationstatus">Arcane.installation.status()</h2>
+<h3 id="overview-8">Overview</h3>
+<p><code>Arcane.installation.status()</code> reads the relationship between the active
+Provisioner package and the installed Arcane OS state. It requires
+<code>installation.read</code> on Core, makes no change, and emits no event. Status is
+evidence for deciding what to present; it does not authorize a later mutation.</p>
+<h3 id="result-4">Result</h3>
+<p>The exact fields are <code>present</code>, <code>installedVersion</code>, <code>packageVersion</code>, <code>blocked</code>,
+<code>blockedReason</code>, <code>repairRequired</code>, <code>repairReason</code>, <code>disposition</code>, <code>action</code>,
+<code>installRoot</code>, <code>stateRoot</code>, <code>manifest</code>, <code>installedPayloadMode</code>,
+<code>installedIntegrity</code>, <code>installedIdentity</code>, <code>identityRepairRequired</code>,
+<code>payloadRepairRequired</code>, <code>developmentTrustRepairRequired</code>,
+<code>developmentMachineTrust</code>, <code>candidatePayloadDiffers</code>, and <code>payload</code>.</p>
+<p><code>disposition</code> is <code>&quot;missing&quot;</code>, <code>&quot;downgrade-blocked&quot;</code>, <code>&quot;repair-required&quot;</code>,
+<code>&quot;update-available&quot;</code>, or <code>&quot;current&quot;</code>; <code>action</code> is <code>&quot;install&quot;</code>, <code>&quot;blocked&quot;</code>,
+<code>&quot;repair&quot;</code>, <code>&quot;update&quot;</code>, or <code>&quot;current&quot;</code>. <code>payload</code> is exactly <code>{mode, releaseReady, installable, description, missingRelease}</code>. The manifest and
+integrity/identity evidence are structured host records and may contain local
+paths; keep them inside the Provisioner boundary.</p>
+<h3 id="errors-and-recovery-8">Errors and recovery</h3>
+<p><code>METHOD_NOT_ALLOWED</code> means the caller lacks <code>installation.read</code>. A blocked,
+repair, or invalid-identity state is normally returned as data so the UI can
+present the exact next action. If the read itself rejects, preserve its
+diagnostic and repair guidance rather than using version comparison alone.</p>
+<h3 id="example-8">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const installation = await Arcane.installation.status();
+
+console.log(installation.disposition, installation.action);
+if (installation.blocked || installation.repairRequired) {
+    console.warn(installation.blockedReason || installation.repairReason);
+}
+</code></pre></div>
+<h2 id="arcaneinstallationensure">Arcane.installation.ensure()</h2>
+<h3 id="overview-9">Overview</h3>
+<p><code>Arcane.installation.ensure()</code> installs, updates, repairs, or verifies Arcane OS
+as required. It is a privileged, exclusive, non-idempotent Provisioner
+operation requiring <code>provisioning.manage</code> on Core. It can write protected
+files, register platform integration, and change machine configuration. Never
+start it without a visible status and separate user confirmation.</p>
+<p>The host rejects an installed Provisioner attempting to replace its own active
+installation; updates and repairs run from a verified external release. It
+blocks downgrades and re-verifies installation identity and postconditions.</p>
+<h3 id="result-side-effects-and-events-1">Result, side effects, and events</h3>
+<p>The exact result is <code>{manifest, installation, requirements, model, ready, warningCount, operation, credentials}</code>. <code>model</code> is exactly <code>{status, reason, requiredBefore, created}</code> and deliberately reports local-model setup as
+deferred from base installation. <code>ready: true</code> requires a present, current,
+nonblocked installation with accepted identity, integrity, and required
+requirements. A completed result can have <code>ready: false</code> and warnings when
+warn-first policy is active.</p>
+<p>The method emits the standard operation lifecycle events. Simulation mutates
+only deterministic development state and does not prove a real installation.</p>
+<h3 id="errors-and-recovery-9">Errors and recovery</h3>
+<p>Important failures include <code>ADMIN_REQUIRED</code>, <code>OPERATION_BUSY</code>,
+<code>EXTERNAL_PROVISIONER_REQUIRED</code>, <code>DOWNGRADE_BLOCKED</code>,
+<code>INSTALL_IDENTITY_INVALID</code>, payload or integrity failures, and installation
+lease/stage cleanup failures. Do not retry automatically after an ambiguous
+failure: preserve the diagnostic, inspect fresh <code>installation.status()</code>, and
+follow its recovery action.</p>
+<h3 id="example-9">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function ensureInstallationAfterConfirmation(confirmChange) {
+    const status = await Arcane.installation.status();
+    if (status.action === &#39;current&#39; || status.action === &#39;blocked&#39;) {
+        return status;
+    }
+    if (!confirmChange(status.action, status)) {
+        return null;
+    }
+    return Arcane.installation.ensure();
+}
+</code></pre></div>
+<h2 id="arcaneinstallationopenuninstaller">Arcane.installation.openUninstaller()</h2>
+<h3 id="overview-10">Overview</h3>
+<p><code>Arcane.installation.openUninstaller()</code> opens the globally installed Arcane OS
+uninstaller controller. It is available only to a Provisioner with
+<code>provisioning.manage</code> on a Microsoft NT Core host. The method does not uninstall
+anything itself: the controller separately performs UAC, read-only preflight,
+scope review, and typed confirmation.</p>
+<h3 id="result-and-side-effect">Result and side effect</h3>
+<p>The exact result is <code>{opened: true}</code>. It means Microsoft NT accepted creation
+of the installed uninstaller process, not that UAC was approved or an uninstall
+completed. The method emits no operation event. It will not run a checkout-local
+or caller-selected executable.</p>
+<h3 id="errors-and-recovery-10">Errors and recovery</h3>
+<p><code>UNINSTALLER_NOT_SUPPORTED</code> means the current platform is not Microsoft NT.
+<code>UNINSTALLER_UNAVAILABLE</code> and related integrity errors mean the global
+installation must be repaired. <code>UNINSTALLER_OPEN_FAILED</code> means process creation
+was not confirmed. Use the operating system&#39;s Installed apps interface when the
+verified controller cannot be opened.</p>
+<h3 id="example-10">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function openUninstallerAfterConfirmation(confirmOpen) {
+    if (!confirmOpen()) {
+        return null;
+    }
+    return Arcane.installation.openUninstaller();
+}
+</code></pre></div>
+<h2 id="arcaneuserslist">Arcane.users.list()</h2>
+<h3 id="overview-11">Overview</h3>
+<p><code>Arcane.users.list()</code> returns local accounts that use the exact Arcane shell or
+have a protected Arcane recovery record. It requires <code>users.manage</code>, an
+application of type <code>provisioner</code>, and a Core host. It is a read and emits no
+operation event. On Microsoft NT an elevated read can temporarily load and
+unload a signed-out profile to verify both protected shell bindings; it does not
+persistently change the account.</p>
+<h3 id="result-5">Result</h3>
+<p>The exact top-level result is <code>{users, policy, protectedUsernames}</code>. <code>policy</code> is
+exactly <code>{platform, minimumLength, maximumLength, description, example}</code>.
+<code>protectedUsernames</code> contains accounts the Provisioner must not convert.</p>
+<p>Every <code>users</code> record contains host account and shell observations plus the
+Arcane recovery fields <code>managedByArcane</code>, <code>createdByArcane</code>, <code>passwordStatus</code>,
+<code>provisionedAt</code>, <code>passwordChangedAt</code>, prior-shell values and presence flags,
+recorded binding/security metadata, <code>canRestoreShell</code>,
+<code>restoreRequiresElevatedVerification</code>, <code>shellMutationPhase</code>,
+<code>shellRecoveryPrepared</code>, <code>accountMutationPhase</code>, and <code>activationRequired</code>.</p>
+<p>Microsoft NT records include <code>username</code>, <code>sid</code>, <code>enabled</code>, <code>profile</code>, <code>shell</code>,
+both policy and legacy shell values/presence flags, <code>shellAssigned</code>,
+<code>shellBindingVersion</code>, <code>assignmentMode</code>, <code>verification</code>, and <code>source</code>. Linux
+records include <code>username</code>, optional <code>uid</code>, <code>enabled</code>, <code>profile</code>, <code>shell</code>,
+<code>shellAssigned</code>, <code>verification</code>, and <code>source</code>. Nullable or recorded-only values
+must remain unknown; do not coerce them to false.</p>
+<h3 id="errors-and-recovery-11">Errors and recovery</h3>
+<p><code>METHOD_NOT_ALLOWED</code> means this is not the admitted Provisioner. Host account,
+profile, registry, passwd, or recovery-record failures should be surfaced with
+their diagnostic. Refresh only after resolving the cause; do not drop a
+recorded-only entry, because it may represent an interrupted transaction that
+needs recovery.</p>
+<h3 id="example-11">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const result = await Arcane.users.list();
+
+for (const user of result.users) {
+    console.log(
+        user.username,
+        user.shellAssigned,
+        user.activationRequired,
+        user.verification
+    );
+}
+</code></pre></div>
+<h2 id="arcaneusersvalidate">Arcane.users.validate()</h2>
+<h3 id="overview-12">Overview</h3>
+<p><code>Arcane.users.validate(usernames)</code> validates one username or an array without
+creating or changing an account. The wrapper always sends an array. The method
+requires <code>users.manage</code>, the Provisioner application type, and Core; it is a
+read with no event.</p>
+<p>Microsoft NT permits 1–20 letters, numbers, periods, underscores, or hyphens,
+beginning with a letter or number and not ending in a period. Linux permits
+1–32 lower-case letters, numbers, underscores, or hyphens, beginning with a
+lower-case letter or underscore. Both reject reserved, privileged, and current
+protected accounts.</p>
+<h3 id="result-6">Result</h3>
+<p>The exact result is <code>{valid, users, errors, policy}</code>. <code>valid</code> is true only when
+at least one input is valid and there are no errors. Each successful item is
+exactly <code>{input, username, valid: true, exists}</code>. Each failed item includes
+<code>input</code>, <code>valid: false</code>, and the normalized Arcane error fields, including code,
+message, and recovery guidance. <code>policy</code> is the five-field platform username
+policy returned by <code>users.list()</code>.</p>
+<h3 id="errors-and-recovery-12">Errors and recovery</h3>
+<p>Individual invalid values are normally returned in <code>errors</code> as
+<code>INVALID_USERNAME</code> or <code>CURRENT_USER_PROTECTED</code>; the whole call need not reject.
+Use the returned policy and per-item resolution. Validate again immediately
+before a confirmed add because account existence can change after this read.</p>
+<h3 id="example-12">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const validation = await Arcane.users.validate([&#39;arcane-user&#39;]);
+
+if (!validation.valid) {
+    for (const error of validation.errors) {
+        console.warn(error.code, error.message, error.resolution);
+    }
+}
+</code></pre></div>
+<h2 id="arcaneusersadd">Arcane.users.add()</h2>
+<h3 id="overview-13">Overview</h3>
+<p><code>Arcane.users.add(usernames)</code> ensures the installation, then creates or
+configures one or more local standard accounts with the verified Arcane login
+shell. It requires <code>users.manage</code>, the Provisioner type, elevation, and the
+exclusive Core mutation boundary. The wrapper accepts one username or an array;
+the host validates every value and de-duplicates platform-equivalent names.</p>
+<p>This is a consequential, non-idempotent account mutation. Existing accounts
+keep their password while receiving a recoverable shell assignment. A newly
+created account is staged disabled, with an exact OS identity and prior-shell
+record, until its returned temporary credential has been delivered and
+<code>users.activate()</code> succeeds. The host attempts fail-closed rollback after an
+interruption; recorded partial state must be recovered, not guessed away.</p>
+<h3 id="result-credentials-and-events">Result, credentials, and events</h3>
+<p>The exact result is <code>{users, machineUsers, installation, operation, credentials}</code>. <code>users</code> contains per-request native results plus
+<code>passwordStatus</code> and <code>activationRequired</code>; <code>machineUsers</code> uses the record shape
+from <code>users.list()</code>. <code>installation</code> is a fresh installation-status object.</p>
+<p>For each new account, <code>credentials</code> contains exactly <code>{username, temporaryPassword, mustChangeAtNextSignIn: true, reason: &quot;new-account&quot;, activationRequired: true}</code>. Save and present the secret once through protected
+UI; never log, copy to telemetry, or persist it in ordinary app storage. The
+standard operation lifecycle events are emitted, and
+<code>operation.completed.credentials</code> is equally sensitive.</p>
+<h3 id="errors-and-recovery-13">Errors and recovery</h3>
+<p>Important failures include <code>ADMIN_REQUIRED</code>, <code>OPERATION_BUSY</code>, username and
+protected-account errors, <code>RELEASE_SECURITY_UNVERIFIED</code>,
+<code>PARTIAL_ACCOUNT_RECOVERY_REQUIRED</code>, shell backup/change failures, and
+platform user-provisioning failures. Do not repeat an ambiguous add. Refresh
+<code>users.list()</code>, preserve any credential already shown, and follow the recorded
+transaction recovery.</p>
+<h3 id="example-13">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function addUserAfterValidation(username, confirmAccountChange) {
+    const validation = await Arcane.users.validate([username]);
+    if (!validation.valid || !confirmAccountChange(validation.users[0])) {
+        return null;
+    }
+
+    const result = await Arcane.users.add([validation.users[0].username]);
+    // Present result.credentials through protected, non-logging UI.
+    return result;
+}
+</code></pre></div>
+<h2 id="arcaneusersactivate">Arcane.users.activate()</h2>
+<h3 id="overview-14">Overview</h3>
+<p><code>Arcane.users.activate(username)</code> enables only a newly created, disabled Arcane
+account whose durable staged identity is in <code>activation-pending</code>. It requires
+<code>users.manage</code>, the Provisioner type, elevation, and the exclusive Core
+mutation boundary. Call it only after the operator has safely received the
+temporary credential returned by <code>users.add()</code>.</p>
+<p>Activation re-verifies the exact SID or uid and Arcane shell assignment before
+enabling the account. It does not activate an existing account or a name-only
+match. The account must change its temporary password at next sign-in.</p>
+<h3 id="result-side-effects-and-events-2">Result, side effects, and events</h3>
+<p>The exact result is <code>{user, operation, credentials}</code>; <code>credentials</code> is empty.
+<code>user</code> contains the native <code>username</code>, stable <code>sid</code> or <code>uid</code>, <code>enabled: true</code>,
+<code>activated: true</code>, <code>activationRequired: false</code>, and
+<code>passwordStatus: &quot;temporary-issued&quot;</code>, with host-specific profile/shell or
+reconciliation fields where applicable. Standard operation events are emitted.</p>
+<h3 id="errors-and-recovery-14">Errors and recovery</h3>
+<p><code>STAGED_ACCOUNT_NOT_FOUND</code> means no exact disabled staged identity is eligible.
+<code>SHELL_CHANGED_EXTERNALLY</code>, <code>INVALID_STAGED_ACCOUNT</code>, or a changed SID/uid
+blocks activation. Platform failures leave or restore the account disabled
+where possible. Refresh the user inventory and follow the protected recovery
+record; never enable a same-named account manually based only on its name.</p>
+<h3 id="example-14">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function activateStagedUserAfterCredentialDelivery(
+    username,
+    confirmCredentialDelivered
+) {
+    if (!confirmCredentialDelivered(username)) {
+        return null;
+    }
+    return Arcane.users.activate(username);
+}
+</code></pre></div>
+<h2 id="arcaneusersresetpassword">Arcane.users.resetPassword()</h2>
+<h3 id="overview-15">Overview</h3>
+<p><code>Arcane.users.resetPassword(username)</code> prepares a new temporary password for an
+active, recorded Arcane user. Despite its name, this step does not change the
+operating-system password. It requires <code>users.manage</code>, the Provisioner type,
+and the exclusive Core operation boundary; the actual privileged change occurs
+only in <code>users.applyPassword()</code>.</p>
+<h3 id="result-and-credential-handling">Result and credential handling</h3>
+<p>The exact result is <code>{user, operation, credentials}</code>. <code>user</code> is exactly
+<code>{username, passwordReset: false, applyPasswordRequired: true, passwordStatus}</code>. <code>credentials</code> contains one exact object:
+<code>{username, temporaryPassword, mustChangeAtNextSignIn: true, reason: &quot;password-reset&quot;, applyPasswordRequired: true}</code>.</p>
+<p>The standard operation lifecycle events are emitted. Treat the credential in
+both the response and <code>operation.completed</code> event as sensitive, show it through
+protected UI, and do not log or durably store it.</p>
+<h3 id="errors-and-recovery-15">Errors and recovery</h3>
+<p><code>USER_NOT_FOUND</code> means the account is absent or not registered with Arcane.
+<code>STAGED_ACCOUNT_NOT_ACTIVE</code> requires completing the staged activation first.
+<code>NOT_ARCANE_USER</code> means the protected record does not show an active Arcane
+shell assignment. Since this method has not changed the OS password, a lost
+prepared credential can be discarded and prepared again.</p>
+<h3 id="example-15">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function preparePasswordResetAfterConfirmation(username, confirmReset) {
+    if (!confirmReset(username)) {
+        return null;
+    }
+    const prepared = await Arcane.users.resetPassword(username);
+    // Pass prepared.credentials[0] only to protected credential UI.
+    return prepared;
+}
+</code></pre></div>
+<h2 id="arcaneusersapplypassword">Arcane.users.applyPassword()</h2>
+<h3 id="overview-16">Overview</h3>
+<p><code>Arcane.users.applyPassword(username, temporaryPassword)</code> applies the exact
+temporary password produced by the current Provisioner workflow. It is a
+privileged, exclusive, non-idempotent Core mutation requiring <code>users.manage</code>
+and the Provisioner type. It changes the local operating-system password and
+forces a change at the next sign-in.</p>
+<p>Do not construct a password yourself. The accepted handoff has the generated
+<code>A!</code> prefix, 16 base64url characters, and <code>9z</code> suffix. Keep it in memory only
+long enough to show and apply it; never place it in a URL, log, diagnostic, or
+ordinary storage.</p>
+<h3 id="result-side-effects-and-events-3">Result, side effects, and events</h3>
+<p>The exact result is <code>{user, operation, credentials}</code> with an empty credentials
+array. <code>user</code> contains <code>username</code>, <code>passwordReset: true</code>,
+<code>mustChangeAtNextSignIn: true</code>, <code>applyPasswordRequired: false</code>, and
+<code>passwordStatus: &quot;temporary-issued&quot;</code>, plus <code>sid</code>/<code>uid</code> or <code>enabled</code> where the
+native host reports it. Standard operation events are emitted with redacted
+command diagnostics.</p>
+<h3 id="errors-and-recovery-16">Errors and recovery</h3>
+<p><code>INVALID_TEMPORARY_PASSWORD</code> rejects anything outside the exact generated
+handoff. <code>USER_NOT_FOUND</code> and <code>NOT_ARCANE_USER</code> block a changed or inactive
+account. Platform reset failures retain redacted diagnostics. After an
+ambiguous failure, do not generate a different secret immediately: refresh the
+account state and follow the error&#39;s reconciliation guidance, because the first
+password may already have been accepted.</p>
+<h3 id="example-16">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function applyPreparedPassword(prepared) {
+    const credential = prepared?.credentials?.[0];
+    if (!credential || credential.applyPasswordRequired !== true) {
+        throw new Error(&#39;A current prepared credential is required.&#39;);
+    }
+    return Arcane.users.applyPassword(
+        credential.username,
+        credential.temporaryPassword
+    );
+}
+</code></pre></div>
+<h2 id="arcaneusersverifyshell">Arcane.users.verifyShell()</h2>
+<h3 id="overview-17">Overview</h3>
+<p><code>Arcane.users.verifyShell(username)</code> performs an administrator-backed,
+read-only verification of the recorded account&#39;s exact Arcane shell binding.
+It requires <code>users.manage</code>, the Provisioner type, and privileged Core access,
+but it does not change the shell. Microsoft NT verifies both protected per-user
+bindings; Linux verifies the protected login-shell field.</p>
+<h3 id="result-and-events">Result and events</h3>
+<p>The exact result is <code>{user, operation, credentials}</code> with empty credentials.
+<code>user</code> is the current host-specific <code>users.list()</code> record plus
+<code>administratorVerified: true</code> and an <code>administratorVerifiedAt</code> timestamp.
+Inspect <code>user.shellAssigned</code>; administrative verification can successfully
+complete while reporting a mismatch. Standard operation events are emitted.</p>
+<h3 id="errors-and-recovery-17">Errors and recovery</h3>
+<p><code>NOT_ARCANE_USER</code> means no managed recovery record exists. <code>USER_NOT_FOUND</code>
+means the recorded account is gone. Profile, registry, passwd, SID, or uid
+verification errors require administrator review. Do not call
+<code>restoreShell()</code> merely because verification failed to run; restore only after
+reviewing a valid mismatch and the recorded baseline.</p>
+<h3 id="example-17">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const verification = await Arcane.users.verifyShell(&#39;arcane-user&#39;);
+
+if (!verification.user.shellAssigned) {
+    console.warn(&#39;The recorded Arcane shell binding does not match.&#39;);
+}
+</code></pre></div>
+<h2 id="arcaneusersrestoreshell">Arcane.users.restoreShell()</h2>
+<h3 id="overview-18">Overview</h3>
+<p><code>Arcane.users.restoreShell(username)</code> restores the exact prior shell values
+captured before Arcane assigned its login shell. It requires <code>users.manage</code>, the
+Provisioner type, elevation, and the exclusive Core mutation boundary. It does
+not delete the account or change its password, but it materially changes what
+starts at the user&#39;s next sign-in.</p>
+<p>Microsoft NT restores both prior policy and legacy shell bindings, including
+their recorded absence. Linux restores the recorded login shell after checking
+the exact uid and ensuring the prior executable still exists. The host refuses
+to overwrite a value changed outside the recorded transaction.</p>
+<h3 id="result-side-effects-and-events-4">Result, side effects, and events</h3>
+<p>The exact result is <code>{user, operation, credentials}</code> with empty credentials.
+<code>user</code> contains <code>username</code>, <code>restored: true</code>, the restored nullable <code>shell</code>,
+<code>shellAssigned: false</code>, and <code>verification</code>, plus Microsoft NT binding fields or
+Linux <code>profile</code> and <code>uid</code>. Recovery can also report <code>alreadyRestored: true</code>.
+Standard operation events are emitted.</p>
+<h3 id="errors-and-recovery-18">Errors and recovery</h3>
+<p><code>SHELL_BACKUP_NOT_FOUND</code> means there is no safe baseline. A staged account must
+be activated or recovered before restore. <code>SHELL_CHANGED_EXTERNALLY</code>, changed
+SID/uid errors, or <code>PREVIOUS_SHELL_MISSING</code> block mutation rather than guessing.
+Review the account and protected recovery record manually; do not substitute a
+default shell silently.</p>
+<h3 id="example-18">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function restoreShellAfterVerification(username, confirmRestore) {
+    const verification = await Arcane.users.verifyShell(username);
+    if (!confirmRestore(verification.user)) {
+        return null;
+    }
+    return Arcane.users.restoreShell(username);
+}
+</code></pre></div>
+<h2 id="arcanesystemlock">Arcane.system.lock()</h2>
+<h3 id="overview-19">Overview</h3>
+<p><code>Arcane.system.lock()</code> asks the operating system to lock the current desktop
+session. It requires <code>session.control</code>, an application of type <code>shell</code>, and a
+Core host. It is an exclusive, non-idempotent session-control request and does
+not merely hide or close Arcane.</p>
+<p>Microsoft NT dispatches the native workstation-lock command. Linux selects the
+first available supported controller from <code>loginctl</code>, GNOME Screensaver, or
+the XDG screensaver command. Simulation records only an explicitly simulated
+request.</p>
+<h3 id="result-and-side-effect-1">Result and side effect</h3>
+<p>On a real host the result is exactly <code>{requested: true, accepted: true, simulated: false, command, pid}</code>. In simulation it is exactly <code>{requested: true, accepted: true, simulated: true, command, args}</code>. Acceptance means the
+session controller process started; it is not a later proof that the desktop is
+visibly locked. No Arcane operation or completion event is emitted.</p>
+<h3 id="errors-and-recovery-19">Errors and recovery</h3>
+<p><code>SESSION_COMMAND_UNAVAILABLE</code> means no supported controller exists.
+<code>SESSION_COMMAND_DISPATCH_FAILED</code> or <code>SESSION_COMMAND_DISPATCH_TIMEOUT</code> means
+the host could not confirm process creation. <code>METHOD_NOT_ALLOWED</code> means the
+caller is not the admitted Shell or lacks <code>session.control</code>. Do not retry in a
+tight loop after an ambiguous timeout.</p>
+<h3 id="example-19">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function lockSessionAfterConfirmation(confirmLock) {
+    if (!confirmLock()) {
+        return null;
+    }
+    return Arcane.system.lock();
+}
+</code></pre></div>
+<h2 id="arcanesystemping">Arcane.system.ping()</h2>
+<h3 id="overview-20">Overview</h3>
+<p><code>Arcane.system.ping()</code> confirms that the bound Arcane bridge admitted and
+answered one request. It requires no capability and is available on Core and
+Android. It uses a 10-second client timeout, has no side effect, and emits no
+event.</p>
+<h3 id="result-and-limits">Result and limits</h3>
+<p>The exact result is <code>{ok: true}</code>. Success does not prove installation health,
+network reachability, renderer readiness, dependency readiness, elevation,
+publisher trust, signing, or release-candidate status. Use the focused status
+method for each of those questions.</p>
+<h3 id="errors-and-recovery-20">Errors and recovery</h3>
+<p><code>ARCANE_TRANSPORT_UNAVAILABLE</code> means no host is connected.
+<code>ARCANE_REQUEST_TIMEOUT</code> means the bridge did not complete before the client
+deadline. Android can reject duplicate or invalid bridge frames. Treat any
+failure as an unknown bridge state and reconnect; do not turn it into a broader
+health diagnosis without evidence.</p>
+<h3 id="example-20">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const reply = await Arcane.system.ping();
+console.log(&#39;Bridge replied&#39;, reply.ok);
+</code></pre></div>
+<h2 id="arcanesystemmetrics">Arcane.system.metrics()</h2>
+<h3 id="overview-21">Overview</h3>
+<p><code>Arcane.system.metrics()</code> reads a bounded machine resource snapshot. It
+requires <code>system.metrics.read</code> on a Core host, changes nothing, and emits no
+event. Metrics are local-machine data; retain only what the UI needs and do not
+use them as a stable device fingerprint.</p>
+<h3 id="result-7">Result</h3>
+<p>The exact result is <code>{architecture, logicalProcessors, loadAverage, memory, uptimeSeconds}</code>. <code>loadAverage</code> is the operating system&#39;s load-average array
+rounded to three decimals. <code>memory</code> is exactly <code>{totalBytes, freeBytes, usedBytes}</code>, with <code>usedBytes</code> computed as the nonnegative difference. Uptime is
+the whole number of seconds reported by the OS.</p>
+<p>This is an observation, not an admission decision. Local-model APIs apply their
+own hardware and memory policy; do not infer model eligibility from these
+values.</p>
+<h3 id="errors-and-recovery-21">Errors and recovery</h3>
+<p><code>METHOD_NOT_ALLOWED</code> means the application lacks <code>system.metrics.read</code>.
+Transport failure means the snapshot is unavailable; keep the last value
+visibly stale or clear it rather than reporting zero resources.</p>
+<h3 id="example-21">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const metrics = await Arcane.system.metrics();
+const freeGiB = metrics.memory.freeBytes / (1024 ** 3);
+
+console.log(metrics.logicalProcessors, `${freeGiB.toFixed(1)} GiB free`);
+</code></pre></div>
+<h2 id="arcanesystemfailurepolicy">Arcane.system.failurePolicy()</h2>
+<h3 id="overview-22">Overview</h3>
+<p><code>Arcane.system.failurePolicy()</code> reads the user-wide verification behavior used
+by tracked Core operations. It requires <code>preferences.read</code>, app id <code>settings</code>,
+and a Core host. It has no side effect or event.</p>
+<h3 id="result-and-behavior">Result and behavior</h3>
+<p>The exact result is <code>{failFast: boolean}</code>. The default is <code>false</code> (warn-first)
+when no saved policy exists. Warn-first lets specifically classified
+verification warnings complete visibly; it never authorizes unverified bytes or
+bypasses a hard identity, privilege, capability, or transaction boundary.
+<code>true</code> turns eligible warnings into operation failures.</p>
+<p>If Core cannot read a corrupt policy, it logs the problem internally and safely
+returns <code>{failFast: false}</code> for that process. Settings should present that value
+without claiming the saved file was healthy.</p>
+<h3 id="errors-and-recovery-22">Errors and recovery</h3>
+<p><code>METHOD_NOT_ALLOWED</code> means the caller is not Settings or lacks
+<code>preferences.read</code>. Transport failures leave the policy unknown. Use
+<code>saveFailurePolicy()</code> for an intentional change; do not mutate the returned
+object.</p>
+<h3 id="example-22">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const policy = await Arcane.system.failurePolicy();
+console.log(policy.failFast ? &#39;Fail fast&#39; : &#39;Warn first&#39;);
+</code></pre></div>
+<h2 id="arcanesystemsavefailurepolicy">Arcane.system.saveFailurePolicy()</h2>
+<h3 id="overview-23">Overview</h3>
+<p><code>Arcane.system.saveFailurePolicy(settings)</code> persists the user-wide verification
+behavior. It requires <code>preferences.write</code>, app id <code>settings</code>, and the exclusive
+Core mutation boundary. <code>settings</code> must be an exact object containing only the
+boolean <code>failFast</code> field; values are not coerced.</p>
+<p>The change affects subsequently created tracked operations. It does not change
+an already running operation and cannot weaken hard trust, authority,
+privilege, or integrity checks.</p>
+<h3 id="result-and-side-effect-2">Result and side effect</h3>
+<p>The exact result is <code>{failFast: boolean}</code> with the saved value. A real host
+durably replaces the protected user-wide policy record; simulation changes only
+simulation state. The method emits no standard operation event.</p>
+<h3 id="errors-and-recovery-23">Errors and recovery</h3>
+<p><code>INVALID_FAILURE_POLICY</code> rejects missing, nonboolean, or extra fields.
+<code>METHOD_NOT_ALLOWED</code> means the caller is not admitted Settings. <code>OPERATION_BUSY</code>
+means another exclusive mutation is active; wait, re-read the policy, and let
+the operator confirm the still-desired value.</p>
+<h3 id="example-23">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function saveFailurePolicyAfterConfirmation(failFast, confirmChange) {
+    if (!confirmChange(failFast)) {
+        return null;
+    }
+    return Arcane.system.saveFailurePolicy({failFast});
+}
+</code></pre></div>
+<h2 id="arcanenetworkstatus">Arcane.network.status()</h2>
+<h3 id="overview-24">Overview</h3>
+<p><code>Arcane.network.status()</code> reports whether the host sees at least one network
+interface with a non-loopback address. It requires <code>network.status.read</code> and is
+available on Core and Android. It performs no network request, changes nothing,
+and emits no event.</p>
+<h3 id="result-and-limits-1">Result and limits</h3>
+<p>The exact result is <code>{online, interfaceCount}</code>. <code>interfaceCount</code> is a safe
+integer from 0 through 64, and <code>online</code> is exactly
+<code>interfaceCount &gt; 0</code>. It does not prove Internet, DNS, route, captive-portal,
+mail-gateway, or application-service reachability.</p>
+<p>Use this result only as a coarse UI hint. A network operation still needs its
+own bounded timeout and surfaced error; do not suppress a retry solely because
+this snapshot says offline.</p>
+<h3 id="errors-and-recovery-24">Errors and recovery</h3>
+<p><code>METHOD_NOT_ALLOWED</code> or <code>ANDROID_CAPABILITY_DENIED</code> means the grant is absent.
+<code>NETWORK_STATUS_UNAVAILABLE</code> means Core observed more interfaces than its
+bounded contract accepts. <code>METHOD_CONTRACT_OUTPUT_INVALID</code> rejects a
+contradictory Android or Core result.</p>
+<h3 id="example-24">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const network = await Arcane.network.status();
+
+console.log(
+    network.online ? &#39;Interface present&#39; : &#39;No non-loopback interface&#39;,
+    network.interfaceCount
+);
+</code></pre></div>
+<h2 id="arcanefirewallstatus">Arcane.firewall.status()</h2>
+<h3 id="overview-25">Overview</h3>
+<p><code>Arcane.firewall.status()</code> returns the canonical global-deny policy identity,
+Arcane-owned native projection state, bounded audit count, coverage limits, and
+action readiness. It requires <code>firewall.read</code>, app id <code>firewall</code>, and a Core
+host. It is a repeatable read with no side effect or event.</p>
+<p>The current lifecycle implementation is development-only. Deterministic
+simulation can report <code>supported: true</code> but always reports
+<code>coverage.machineWide: false</code>. A non-simulated host reports lifecycle mutation
+unsupported until Core can authenticate its native-host caller. Never present
+simulation as live traffic enforcement.</p>
+<h3 id="result-8">Result</h3>
+<p>The exact top-level result is <code>{schemaVersion, platform, backend, simulation, supported, coverage, policy, state, projection, auditCount, supportedOperations, warnings}</code> with <code>schemaVersion: 1</code> and
+<code>supportedOperations</code> exactly <code>[&#39;install&#39;,&#39;enable&#39;,&#39;disable&#39;,&#39;rollback&#39;, &#39;recover&#39;]</code>.</p>
+<p><code>coverage</code> is exactly <code>{machineWide, ingress, egress, limitations}</code>. <code>policy</code>
+is exactly <code>{schemaVersion, generation, sha256, domainRuleCount, networkRuleCount}</code>. <code>state</code> is exactly <code>{generation, installed, enabled, installReady, enableReady, recoveryRequired, activePolicyGeneration, activePolicySha256, lastOperation, lastChangedAt}</code>. <code>projection</code> is exactly
+<code>{sha256, createdAt, expiresAt, addressCount, directRuleCount, domainRuleCount}</code>.</p>
+<p>Use <code>state.installReady</code> and <code>state.enableReady</code> as fail-closed UI gates, then
+bind any confirmed mutation to <code>policy.generation</code> and <code>state.generation</code>.
+Warnings include coverage, expiry, projection, and live-host limitations and
+must remain visible.</p>
+<h3 id="errors-and-recovery-25">Errors and recovery</h3>
+<p><code>METHOD_NOT_ALLOWED</code> means the current app is not Arcane Firewall or lacks
+<code>firewall.read</code>. Invalid policy/state or native inspection evidence is reflected
+as warnings and <code>recoveryRequired</code> where safe; a closed-contract failure uses
+<code>METHOD_CONTRACT_OUTPUT_INVALID</code>. Do not enable controls by recomputing
+readiness in the renderer.</p>
+<h3 id="example-25">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const status = await Arcane.firewall.status();
+
+console.log(status.platform, status.backend, status.simulation);
+console.log(&#39;Install ready&#39;, status.state.installReady);
+console.log(&#39;Enable ready&#39;, status.state.enableReady);
+for (const warning of status.warnings) {
+    console.warn(warning);
+}
+</code></pre></div>
+<h2 id="arcanefirewallaudit">Arcane.firewall.audit()</h2>
+<h3 id="overview-26">Overview</h3>
+<p><code>Arcane.firewall.audit(options?)</code> returns bounded Arcane Firewall lifecycle and
+owned-state metadata. It requires <code>firewall.read</code>, app id <code>firewall</code>, and Core.
+It does not return packet payloads, full per-packet attribution, credentials, or
+unbounded history and has no side effect or event.</p>
+<p><code>options</code> is optional. <code>limit</code> defaults to 100 and must be a safe integer from
+1 through 200; invalid values throw <code>TypeError</code> before dispatch.</p>
+<h3 id="result-9">Result</h3>
+<p>The exact result is <code>{records, total, truncated, coverage, warning}</code>.
+<code>warning</code> is a string or <code>null</code>. Records are newest first and each is exactly
+<code>{id, time, type, operation, stateGeneration, result, direction, ruleId, message}</code>. <code>type</code> is <code>&quot;lifecycle&quot;</code> or <code>&quot;blocked&quot;</code>; <code>operation</code> is one of
+<code>install</code>, <code>enable</code>, <code>disable</code>, <code>rollback</code>, <code>recover</code>, or <code>block</code>; <code>direction</code>
+and <code>ruleId</code> may be <code>null</code>.</p>
+<p><code>total</code> is the retained audit count, capped at 500. <code>truncated</code> says the chosen
+limit omitted retained records; it does not claim Arcane captured every network
+decision.</p>
+<h3 id="errors-and-recovery-26">Errors and recovery</h3>
+<p><code>METHOD_NOT_ALLOWED</code> means the Firewall read boundary is absent.
+<code>METHOD_CONTRACT_INPUT_INVALID</code> indicates a malformed native request; use the
+public wrapper and documented limit. A damaged state record can return an empty
+audit with its failure in <code>warning</code>, allowing the UI to offer Recovery without
+claiming that no history exists.</p>
+<h3 id="example-26">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const audit = await Arcane.firewall.audit({limit: 50});
+
+for (const record of audit.records) {
+    console.log(record.time, record.operation, record.result, record.message);
+}
+if (audit.warning) {
+    console.warn(audit.warning);
+}
+</code></pre></div>
+<h2 id="arcanefirewallinstall">Arcane.firewall.install()</h2>
+<h3 id="overview-27">Overview</h3>
+<p><code>Arcane.firewall.install(expectation)</code> resolves and stages the reviewed
+canonical deny-policy projection. It requires <code>firewall.manage</code>, app id
+<code>firewall</code>, elevated Core authority, the exclusive mutation boundary, and a
+separate user confirmation. It is non-idempotent and currently succeeds only in
+deterministic development simulation; live mutation fails explicitly.</p>
+<p><code>expectation</code> must be an exact plain object containing the current positive
+<code>expectedPolicyGeneration</code> and nonnegative <code>expectedStateGeneration</code> from one
+fresh <code>firewall.status()</code> result. Unknown, missing, stale, fractional, or
+negative values are rejected.</p>
+<p>Install may use bounded system DNS to project domain rules to addresses. One
+projection admits at most 4,096 domain rules. It stages Arcane-owned state with
+enforcement disabled; an enabled generation must be disabled first.</p>
+<h3 id="result-side-effects-and-events-5">Result, side effects, and events</h3>
+<p>Every firewall mutation resolves to exactly <code>{status, receipt, operation}</code>.
+<code>status</code> is the full fresh status object. <code>receipt</code> is exactly <code>{schemaVersion, operation, ownedNamespace, backend, policyGeneration, projectionSha256, completedAt, transactionId}</code>. <code>operation</code> is the completed standard operation
+record; its type is <code>&quot;firewall.install&quot;</code>, progress is 100, credentials is empty,
+and error is null. Standard operation events are emitted.</p>
+<h3 id="errors-and-recovery-27">Errors and recovery</h3>
+<p>Bad JavaScript input throws <code>TypeError</code>; stale snapshots use
+<code>FIREWALL_POLICY_GENERATION_STALE</code> or <code>FIREWALL_STATE_GENERATION_STALE</code>.
+<code>FIREWALL_HOST_AUTHENTICATION_UNAVAILABLE</code> identifies the current live-host
+boundary. Other important failures include <code>FIREWALL_MUTATION_BUSY</code>,
+<code>OPERATION_BUSY</code>, <code>FIREWALL_RECOVERY_REQUIRED</code>, <code>FIREWALL_DISABLE_REQUIRED</code>,
+bounded DNS/projection failures, and cancellation. Refresh status after any
+failure; do not reuse old generations.</p>
+<h3 id="example-27">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function installFirewallAfterConfirmation(confirmInstall) {
+    const status = await Arcane.firewall.status();
+    if (!status.simulation || !status.supported || !status.state.installReady) {
+        return null;
+    }
+    if (!confirmInstall(status)) {
+        return null;
+    }
+    return Arcane.firewall.install({
+        expectedPolicyGeneration: status.policy.generation,
+        expectedStateGeneration: status.state.generation
+    });
+}
+</code></pre></div>
+<h2 id="arcanefirewallenable">Arcane.firewall.enable()</h2>
+<h3 id="overview-28">Overview</h3>
+<p><code>Arcane.firewall.enable(expectation)</code> enables only the exact installed,
+unexpired projection for the current canonical policy. It requires
+<code>firewall.manage</code>, app id <code>firewall</code>, elevated Core authority, exclusive
+mutation, and separate confirmation. It does not resolve domains or silently
+replace a stale projection. Current success is simulation-only and never proves
+machine-wide enforcement.</p>
+<p>Pass the two exact current generations from a status whose
+<code>state.enableReady</code> is true. The host repeats all generation, recovery,
+prerequisite, policy hash, installation, and projection-expiry checks after
+dispatch.</p>
+<h3 id="result-side-effects-and-events-6">Result, side effects, and events</h3>
+<p>The exact result is <code>{status, receipt, operation}</code> with the receipt fields
+documented under <code>firewall.install()</code>. The receipt operation is <code>&quot;enable&quot;</code>, and
+the tracked operation type is <code>&quot;firewall.enable&quot;</code>. The returned status has a
+new state generation and reports the resulting simulated enabled state.
+Standard operation events are emitted.</p>
+<h3 id="errors-and-recovery-28">Errors and recovery</h3>
+<p>In addition to stale, busy, recovery, and live-host errors, enable can reject
+with <code>FIREWALL_NATIVE_PREREQUISITE_REQUIRED</code>, <code>FIREWALL_ALREADY_ENABLED</code>,
+<code>FIREWALL_INSTALL_REQUIRED</code>, or <code>FIREWALL_PROJECTION_EXPIRED</code>. Refresh status;
+an expired or mismatched projection requires a newly confirmed Install, not an
+automatic enable retry.</p>
+<h3 id="example-28">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function enableFirewallAfterConfirmation(confirmEnable) {
+    const status = await Arcane.firewall.status();
+    if (!status.simulation || !status.supported || !status.state.enableReady) {
+        return null;
+    }
+    if (!confirmEnable(status)) {
+        return null;
+    }
+    return Arcane.firewall.enable({
+        expectedPolicyGeneration: status.policy.generation,
+        expectedStateGeneration: status.state.generation
+    });
+}
+</code></pre></div>
+<h2 id="arcanefirewalldisable">Arcane.firewall.disable()</h2>
+<h3 id="overview-29">Overview</h3>
+<p><code>Arcane.firewall.disable(expectation)</code> disables only Arcane-owned firewall
+state. It requires <code>firewall.manage</code>, app id <code>firewall</code>, elevated Core
+authority, exclusive mutation, fresh generations, and separate confirmation.
+It does not disable or rewrite firewall rules owned by another product. Current
+success affects only deterministic simulation state.</p>
+<h3 id="result-side-effects-and-events-7">Result, side effects, and events</h3>
+<p>The exact result is <code>{status, receipt, operation}</code>. The receipt operation is
+<code>&quot;disable&quot;</code>, the tracked operation type is <code>&quot;firewall.disable&quot;</code>, and the fresh
+status reports <code>enabled: false</code> with an incremented state generation. Standard
+operation events are emitted. Request acceptance is not a live enforcement
+claim; check the returned labeled status.</p>
+<h3 id="errors-and-recovery-29">Errors and recovery</h3>
+<p><code>FIREWALL_NOT_INSTALLED</code> means there is no Arcane-owned installed generation to
+disable. Recovery-required, stale-generation, busy, and live-host-authentication
+errors fail without guessing ownership. Refresh status and confirm again; use
+Recovery only when the returned state explicitly requires reconciliation.</p>
+<h3 id="example-29">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function disableFirewallAfterConfirmation(confirmDisable) {
+    const status = await Arcane.firewall.status();
+    if (!status.simulation || !status.supported || !status.state.enabled) {
+        return null;
+    }
+    if (!confirmDisable(status)) {
+        return null;
+    }
+    return Arcane.firewall.disable({
+        expectedPolicyGeneration: status.policy.generation,
+        expectedStateGeneration: status.state.generation
+    });
+}
+</code></pre></div>
+<h2 id="arcanefirewallrollback">Arcane.firewall.rollback()</h2>
+<h3 id="overview-30">Overview</h3>
+<p><code>Arcane.firewall.rollback(expectation)</code> restores one retained Arcane-owned
+projection only when it belongs to the same canonical policy, remains
+unexpired, and preserves every deny in the current projection. It requires
+<code>firewall.manage</code>, app id <code>firewall</code>, elevated Core authority, exclusive
+mutation, fresh generations, and separate confirmation. Current success is
+simulation-only.</p>
+<p>Rollback never means “use any previous policy.” The host refuses a different
+policy generation/hash or a projection that would weaken current deny coverage.
+It reapplies the retained projection in the current installed/enabled mode.</p>
+<h3 id="result-side-effects-and-events-8">Result, side effects, and events</h3>
+<p>The exact result is <code>{status, receipt, operation}</code>. The tracked operation type
+is <code>&quot;firewall.rollback&quot;</code> and returned status records <code>lastOperation: &quot;rollback&quot;</code>. The native receipt&#39;s <code>operation</code> is <code>&quot;install&quot;</code> or <code>&quot;enable&quot;</code>
+because that is the concrete reapplication performed; there is intentionally no
+<code>&quot;rollback&quot;</code> receipt operation. Standard operation events are emitted.</p>
+<h3 id="errors-and-recovery-30">Errors and recovery</h3>
+<p>Rollback-specific failures are <code>FIREWALL_ROLLBACK_UNAVAILABLE</code>,
+<code>FIREWALL_ROLLBACK_POLICY_MISMATCH</code>,
+<code>FIREWALL_ROLLBACK_PROJECTION_EXPIRED</code>, <code>FIREWALL_CURRENT_POLICY_STALE</code>, and
+<code>FIREWALL_ROLLBACK_WOULD_WEAKEN_POLICY</code>. Keep the current state on rejection.
+Use a separately confirmed Disable, Install, and Enable sequence when the
+retained projection cannot be safely reused.</p>
+<h3 id="example-30">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function rollbackFirewallAfterConfirmation(confirmRollback) {
+    const status = await Arcane.firewall.status();
+    if (!status.simulation || !status.supported || status.state.recoveryRequired) {
+        return null;
+    }
+    if (!confirmRollback(status)) {
+        return null;
+    }
+    return Arcane.firewall.rollback({
+        expectedPolicyGeneration: status.policy.generation,
+        expectedStateGeneration: status.state.generation
+    });
+}
+</code></pre></div>
+<h2 id="arcanefirewallrecover">Arcane.firewall.recover()</h2>
+<h3 id="overview-31">Overview</h3>
+<p><code>Arcane.firewall.recover(expectation)</code> explicitly reconciles and removes only
+Arcane-owned firewall state when consistency or native inspection indicates
+recovery is required. It requires <code>firewall.manage</code>, app id <code>firewall</code>,
+elevated Core authority, exclusive mutation, fresh generations, and separate
+confirmation. Current success changes deterministic simulation state only.</p>
+<p>Recovery is not a general firewall reset. The backend is constrained to its
+Arcane-owned namespace; unrelated firewall state is outside the operation.</p>
+<h3 id="result-side-effects-and-events-9">Result, side effects, and events</h3>
+<p>The exact result is <code>{status, receipt, operation}</code>. The receipt operation is
+<code>&quot;recover&quot;</code>, the tracked operation type is <code>&quot;firewall.recover&quot;</code>, and successful
+status returns the Arcane state to its default noninstalled, disabled,
+non-recovery state at a new generation. Standard operation events are emitted.</p>
+<h3 id="errors-and-recovery-31">Errors and recovery</h3>
+<p>Stale generation, busy operation, privilege, and live-host-authentication
+failures still apply. Recovery may read a damaged consistency record, but it
+does not bypass policy identity or ownership. Preserve a failed transaction&#39;s
+diagnostic and avoid parallel retries; refresh status only after the exclusive
+operation has finished.</p>
+<h3 id="example-31">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function recoverFirewallAfterConfirmation(confirmRecovery) {
+    const status = await Arcane.firewall.status();
+    if (!status.simulation || !status.supported || !status.state.recoveryRequired) {
+        return null;
+    }
+    if (!confirmRecovery(status)) {
+        return null;
+    }
+    return Arcane.firewall.recover({
+        expectedPolicyGeneration: status.policy.generation,
+        expectedStateGeneration: status.state.generation
+    });
+}
+</code></pre></div>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/core/reference/arcane-api/platform-installation-users-system.md" target="_blank" rel="noreferrer"><code>docs/reference/core/reference/arcane-api/platform-installation-users-system.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#arcaneplatformstatus">Arcane.platform.status()</a><a href="#arcanepermissionsstatus">Arcane.permissions.status()</a><a href="#arcaneversioncurrent">Arcane.version.current()</a><a href="#arcaneversioninstallation">Arcane.version.installation()</a><a href="#arcanemachinestatus">Arcane.machine.status()</a><a href="#arcaneusercurrent">Arcane.user.current()</a><a href="#arcanerequirementslist">Arcane.requirements.list()</a><a href="#arcanerequirementsensure">Arcane.requirements.ensure()</a><a href="#arcaneinstallationstatus">Arcane.installation.status()</a><a href="#arcaneinstallationensure">Arcane.installation.ensure()</a><a href="#arcaneinstallationopenuninstaller">Arcane.installation.openUninstaller()</a><a href="#arcaneuserslist">Arcane.users.list()</a><a href="#arcaneusersvalidate">Arcane.users.validate()</a><a href="#arcaneusersadd">Arcane.users.add()</a><a href="#arcaneusersactivate">Arcane.users.activate()</a><a href="#arcaneusersresetpassword">Arcane.users.resetPassword()</a><a href="#arcaneusersapplypassword">Arcane.users.applyPassword()</a><a href="#arcaneusersverifyshell">Arcane.users.verifyShell()</a><a href="#arcaneusersrestoreshell">Arcane.users.restoreShell()</a><a href="#arcanesystemlock">Arcane.system.lock()</a><a href="#arcanesystemping">Arcane.system.ping()</a><a href="#arcanesystemmetrics">Arcane.system.metrics()</a><a href="#arcanesystemfailurepolicy">Arcane.system.failurePolicy()</a><a href="#arcanesystemsavefailurepolicy">Arcane.system.saveFailurePolicy()</a><a href="#arcanenetworkstatus">Arcane.network.status()</a><a href="#arcanefirewallstatus">Arcane.firewall.status()</a><a href="#arcanefirewallaudit">Arcane.firewall.audit()</a><a href="#arcanefirewallinstall">Arcane.firewall.install()</a><a href="#arcanefirewallenable">Arcane.firewall.enable()</a><a href="#arcanefirewalldisable">Arcane.firewall.disable()</a><a href="#arcanefirewallrollback">Arcane.firewall.rollback()</a><a href="#arcanefirewallrecover">Arcane.firewall.recover()</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../../../../architecture/">Architecture</a><a href="../../../../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

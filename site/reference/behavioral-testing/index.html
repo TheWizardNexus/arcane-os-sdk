@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="Reference completeness and runtime behavior are different gates. The SDK uses both.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/behavioral-testing/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Behavioral testing · Arcane OS SDK"><meta property="og:description" content="Reference completeness and runtime behavior are different gates. The SDK uses both."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/behavioral-testing/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Behavioral testing · Arcane OS SDK"><meta name="twitter:description" content="Reference completeness and runtime behavior are different gates. The SDK uses both."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Behavioral testing | Arcane OS SDK</title><script src="../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Behavioral testing</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="behavioral-testing">Behavioral testing</h1><p class="doc-lead">Reference completeness and runtime behavior are different gates. The SDK uses both.</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="./" aria-current="page">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama module</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/behavioral-testing.md"><p>Reference completeness and runtime behavior are different gates. The SDK uses
+both.</p>
+<p>Completeness is bidirectional: implementation additions require documentation,
+and documentation keys that no longer exist fail just as visibly.</p>
+<h2 id="fast-contract-path">Fast contract path</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm run test:unit
+npm run test:functional
+</code></pre></div>
+<p>Unit coverage verifies schemas, descriptors, target contracts, error behavior,
+and public reference inventories. Functional coverage exercises CLI parsing and
+output, the development server, runtime verification, packaging, scaffolding,
+events, and the generated documentation/site contract.</p>
+<h2 id="full-development-gate">Full development gate</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm run check
+</code></pre></div>
+<p>The full check validates source policy and the exact synchronized runtime
+manifest, then runs the non-overlapping unit, functional, integration, and
+regression sets. It remains development evidence; it is not native artifact or
+release acceptance.</p>
+<h2 id="behavioral-coverage-model">Behavioral coverage model</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Minimum behavior proved locally</th>
+<th>Heavier evidence boundary</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Package entrypoints</td>
+<td>Every declared JavaScript export imports; documented names match; constants and synchronous validators preserve their public contracts.</td>
+<td>None for import itself. Operations that invoke tools use the matching boundary below.</td>
+</tr>
+<tr>
+<td>EventManager and event stacks</td>
+<td>Live pub/sub ordering and payload identity, nested causation, immutable/redacted snapshots, strict import, bounded overflow, seek, all playback modes/lifecycle outcomes, cancellation, and DOM start/stop/privacy behavior.</td>
+<td>Real user journeys and browser layout belong in a browser harness; event-stack review never proves that external side effects can be replayed.</td>
+</tr>
+<tr>
+<td>CLI</td>
+<td>Commands parse, acknowledge, select one scope, produce normalized human/JSON/NDJSON output, propagate cancellation/failure, and reject invalid cardinality.</td>
+<td>Native build/run requires the selected real provider and host.</td>
+</tr>
+<tr>
+<td>Browser runtime modules</td>
+<td>Every shipped ESM module parses and its export inventory matches the catalog; pure helpers run focused success/error cases.</td>
+<td>DOM, OPFS, media, and Web Component journeys use a browser harness.</td>
+</tr>
+<tr>
+<td>Core bridge docs</td>
+<td>Canonical namespace/method/event/entity inventories match their one-per-member guides and required sections.</td>
+<td>Live Core conformance belongs in Arcane OS because Core implementation is not shipped as SDK source.</td>
+</tr>
+<tr>
+<td>Arcane Ollama wrapper</td>
+<td>Missing-host error, method forwarding, text/readiness normalization, unload request, and stream-option forwarding run against a deterministic fake <code>Arcane.ollama</code>.</td>
+<td>Real managed-service, model download/create, GPU/resource admission, and service restart require an admitted Arcane host.</td>
+</tr>
+<tr>
+<td>Native providers</td>
+<td>Plan/provider protocol, explicit target, receipt authentication, artifact reader, and unavailable-path honesty are tested with bounded fixtures.</td>
+<td>Exact Windows, Linux, or Android artifact verification and launch must run on that actual platform/architecture.</td>
+</tr>
+</tbody></table>
+</div>
+<h2 id="executable-examples">Executable examples</h2>
+<p>Examples should be safe to run repeatedly and should stop at the last boundary
+they can honestly prove. Documentation examples that would download a model,
+restart a service, create a user, install software, log out, delete a model, or
+launch an external resource define a function but do not invoke it.</p>
+<p>Behavior tests replace real authority with an explicit fake only for the public
+client contract. They must assert the exact request sent to the fake and the
+normalized result returned to the application. A fake provider never counts as
+native host, artifact, installation, or model-service evidence.</p>
+<h2 id="host-and-normalization-cases">Host and normalization cases</h2>
+<p>Cross-host APIs should cover at least these cases at their owning layer:</p>
+<ol>
+<li>standalone browser with no <code>Arcane</code> host;</li>
+<li>development HTTP transport with normalized request/error settlement;</li>
+<li>native transport with capability admitted;</li>
+<li>native transport with method or capability denied;</li>
+<li>platform-dependent <code>supported: false</code> result where documented;</li>
+<li>provider-native success envelope passed through unchanged;</li>
+<li>helper-normalized text/readiness result;</li>
+<li>stream chunk correlation and late/foreign chunk rejection;</li>
+<li>abort or timeout behavior, including whether host work can continue;</li>
+<li>explicit provider selection with no implicit local-to-cloud fallback.</li>
+</ol>
+<p>Central-event changes additionally cover the exact retention boundary:
+<code>maxEvents</code> ordinary records plus one terminal
+<code>TIME_TRAVEL_OVERFLOW_EVENT</code>, recording disabled, DOM observation stopped,
+continued unrecorded live delivery, rejection when re-enabling before
+<code>clearHistory()</code>, and strict acceptance of only a terminal overflow marker.
+DOM cases assert that private values, credentials, sensitive attributes, URLs,
+and markup remain redacted under every capture-option combination.</p>
+<h2 id="test-ownership">Test ownership</h2>
+<p>The SDK owns package, CLI, synchronized renderer, documentation, and injected
+provider-boundary behavior. Arcane OS owns live Core dispatch, native host
+bridges, capability policy, host service adapters, and real ArcaneOllama
+integration. A change that crosses both repositories needs focused tests at both
+owners; copying a Core test into this package would not make the SDK the Core
+implementation owner.</p>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/behavioral-testing.md" target="_blank" rel="noreferrer"><code>docs/reference/behavioral-testing.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#fast-contract-path">Fast contract path</a><a href="#full-development-gate">Full development gate</a><a href="#behavioral-coverage-model">Behavioral coverage model</a><a href="#executable-examples">Executable examples</a><a href="#host-and-normalization-cases">Host and normalization cases</a><a href="#test-ownership">Test ownership</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

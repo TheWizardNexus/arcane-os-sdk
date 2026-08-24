@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="Arcane Ollama lets an admitted application use local Ollama without knowing the service port, service account, model directory, host process, or native tran…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/arcane-ollama/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane Ollama · Arcane OS SDK"><meta property="og:description" content="Arcane Ollama lets an admitted application use local Ollama without knowing the service port, service account, model directory, host process, or native tran…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/arcane-ollama/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane Ollama · Arcane OS SDK"><meta name="twitter:description" content="Arcane Ollama lets an admitted application use local Ollama without knowing the service port, service account, model directory, host process, or native tran…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane Ollama | Arcane OS SDK</title><script src="../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane Ollama</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-ollama">Arcane Ollama</h1><p class="doc-lead">Arcane Ollama lets an admitted application use local Ollama without knowing the service port, service account, model directory, host process, or native tran…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="./" aria-current="page">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama module</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/arcane-ollama.md"><p>Arcane Ollama lets an admitted application use local Ollama without knowing the
+service port, service account, model directory, host process, or native
+transport. Application code imports one browser module and calls one API:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import ollama from &#39;/arcane/modules/Ollama.js&#39;;
+
+const reply = await ollama.chatText({
+    model: &#39;arcane:latest&#39;,
+    messages: [{role: &#39;user&#39;, content: &#39;Summarize this record.&#39;}]
+});
+
+console.log(reply);
+</code></pre></div>
+<p>The module never connects directly to <code>localhost:11434</code>. It delegates to the
+capability-gated <code>globalThis.Arcane.ollama</code> bridge. Core binds application
+identity, checks the exact method and package-owned model policy, admits native
+resources, and calls the managed ArcaneOllama service.</p>
+<p>This npm package exposes the synchronized browser client only. It does not
+bundle, install, start, or grant an Arcane Core or ArcaneOllama service. Every
+native call therefore requires a separately installed, compatible Arcane host,
+an app-scoped admitted Core session, the required capabilities, and a service
+that is ready under native policy. Import success alone proves none of those
+conditions.</p>
+<h2 id="what-developers-can-do">What developers can do</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Preferred call</th>
+<th>Result style</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Check whether the admitted service answers</td>
+<td><code>ollama.readiness()</code></td>
+<td>Arcane-normalized frozen readiness snapshot</td>
+</tr>
+<tr>
+<td>Generate text</td>
+<td><code>ollama.generateText(request)</code></td>
+<td>Arcane helper string</td>
+</tr>
+<tr>
+<td>Chat and return only assistant text</td>
+<td><code>ollama.chatText(request)</code></td>
+<td>Arcane helper string</td>
+</tr>
+<tr>
+<td>Use full generation/chat/tool/provider fields</td>
+<td><code>ollama.generate()</code> / <code>ollama.chat()</code></td>
+<td>Bounded Ollama provider-native envelope</td>
+</tr>
+<tr>
+<td>Create embeddings</td>
+<td><code>ollama.embed()</code></td>
+<td>Bounded Ollama provider-native envelope</td>
+</tr>
+<tr>
+<td>Read raw version/model/running/show inventory</td>
+<td><code>version()</code>, <code>models()</code>, <code>list()</code>, <code>running()</code>, <code>show()</code></td>
+<td>Provider-native diagnostic envelope</td>
+</tr>
+<tr>
+<td>Unload one model</td>
+<td><code>ollama.unload(model)</code></td>
+<td>Translates to generate with <code>prompt: &quot;&quot;</code> and <code>keep_alive: 0</code></td>
+</tr>
+<tr>
+<td>Read managed selection/runtime/service settings</td>
+<td><code>selection()</code>, <code>settings()</code>, <code>serviceSettings()</code></td>
+<td>Arcane-managed snapshot; some service fields are platform-dependent</td>
+</tr>
+<tr>
+<td>Change managed selection/runtime/service settings</td>
+<td><code>select()</code>, <code>saveSettings()</code>, <code>saveServiceSettings()</code></td>
+<td>Arcane-managed result plus operation receipt</td>
+</tr>
+<tr>
+<td>Run admitted raw model mutations</td>
+<td><code>pull()</code>, <code>push()</code>, <code>create()</code>, <code>copy()</code>, <code>delete()</code></td>
+<td>Policy-bound provider-native result; several calls are intentionally denied to ordinary apps</td>
+</tr>
+<tr>
+<td>Create an Arcane-managed brain alias</td>
+<td><code>createBrain()</code></td>
+<td>Arcane-managed model/default result plus operation receipt</td>
+</tr>
+</tbody></table>
+</div>
+<h2 id="fast-start">Fast start</h2>
+<h3 id="1-feature-detect-the-module">1. Feature-detect the module</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import ollama from &#39;/arcane/modules/Ollama.js&#39;;
+
+const readiness = await ollama.readiness();
+
+if (!readiness.ready) {
+    console.info(&#39;Local AI is unavailable:&#39;, readiness.errorCode);
+}
+</code></pre></div>
+<p><code>readiness()</code> catches a failed <code>version()</code> call and returns a frozen object:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">{ ready: boolean, version: string|null, errorCode: string|null }
+</code></pre></div>
+<p>It is a connectivity convenience, not model admission or inference readiness.
+Use <code>Arcane.localAI.status()</code> when the application needs the package-filtered
+runnable model catalog.</p>
+<h3 id="2-read-admitted-models">2. Read admitted models</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+
+if (!access.methods.includes(&#39;localAI.status&#39;)) {
+    throw new Error(&#39;This application is not admitted for local AI.&#39;);
+}
+
+const status = await globalThis.Arcane.localAI.status();
+console.table(status.models.ollama);
+</code></pre></div>
+<p>Populate product UI from this filtered catalog. <code>ollama.models()</code> is the raw
+diagnostic inventory for admitted Settings, Shell, or Terminal journeys; it is
+not the application&#39;s package-admitted model list.</p>
+<h3 id="3-stream-a-chat-response">3. Stream a chat response</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">let text = &#39;&#39;;
+
+const final = await ollama.chat({
+    model: &#39;arcane:latest&#39;,
+    messages: [{role: &#39;user&#39;, content: &#39;Explain the evidence.&#39;}]
+}, {
+    onChunk(chunk) {
+        text += chunk.message?.content ?? &#39;&#39;;
+    },
+    signal: AbortSignal.timeout(60_000)
+});
+
+console.log(text, final.done);
+</code></pre></div>
+<p>Arcane correlates chunks to the originating request. The final promise resolves
+with Ollama&#39;s final bounded chunk/envelope.</p>
+<h2 id="complete-module-api">Complete module API</h2>
+<p><code>/arcane/modules/Ollama.js</code> exports the <code>Ollama</code> class, a frozen <code>ollama</code>
+singleton, and that singleton as the default export. It also installs the
+non-writable <code>globalThis.arcaneOllama</code> convenience and emits
+<code>arcane-ollama-ready</code>. The pinned class defines exactly 24 public methods: the
+20 bridge delegates below and the four normalized helpers that follow.</p>
+<h3 id="raw-bridge-methods">Raw bridge methods</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Module method</th>
+<th>Delegation</th>
+<th>Capability/use</th>
+<th>Detailed Core guide</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>version()</code></td>
+<td><code>Arcane.ollama.version()</code></td>
+<td>Raw service version diagnostic.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamaversion">version</a></td>
+</tr>
+<tr>
+<td><code>models()</code></td>
+<td><code>Arcane.ollama.models()</code></td>
+<td>Raw installed-model diagnostic.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamamodels">models</a></td>
+</tr>
+<tr>
+<td><code>list()</code></td>
+<td>Calls <code>Arcane.ollama.models()</code></td>
+<td>Module alias for <code>models()</code>; it does not call the bridge&#39;s separate <code>list</code> alias.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamalist">list</a></td>
+</tr>
+<tr>
+<td><code>running()</code></td>
+<td><code>Arcane.ollama.running()</code></td>
+<td>Raw resident-model diagnostic.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamarunning">running</a></td>
+</tr>
+<tr>
+<td><code>show(model, options)</code></td>
+<td><code>Arcane.ollama.show(...)</code></td>
+<td>Raw bounded model metadata.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamashow">show</a></td>
+</tr>
+<tr>
+<td><code>generate(request, options)</code></td>
+<td><code>Arcane.ollama.generate(...)</code></td>
+<td>Admitted generation; optional chunk callback/signal/timeout.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamagenerate">generate</a></td>
+</tr>
+<tr>
+<td><code>chat(request, options)</code></td>
+<td><code>Arcane.ollama.chat(...)</code></td>
+<td>Admitted chat/tools; optional chunk callback/signal/timeout.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamachat">chat</a></td>
+</tr>
+<tr>
+<td><code>embed(request)</code></td>
+<td><code>Arcane.ollama.embed(...)</code></td>
+<td>Admitted embeddings.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamaembed">embed</a></td>
+</tr>
+<tr>
+<td><code>pull(model, options, streamOptions)</code></td>
+<td><code>Arcane.ollama.pull(...)</code></td>
+<td>Managed/policy-bound pull; denied to ordinary raw app flow.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamapull">pull</a></td>
+</tr>
+<tr>
+<td><code>push(model, options, streamOptions)</code></td>
+<td><code>Arcane.ollama.push(...)</code></td>
+<td>Raw push is policy-restricted/denied where documented.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamapush">push</a></td>
+</tr>
+<tr>
+<td><code>create(request, options)</code></td>
+<td><code>Arcane.ollama.create(...)</code></td>
+<td>Exact package-owned verified definition only.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamacreate">create</a></td>
+</tr>
+<tr>
+<td><code>copy(source, destination)</code></td>
+<td><code>Arcane.ollama.copy(...)</code></td>
+<td>Intentionally denied to applications; managed selection owns aliases.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamacopy">copy</a></td>
+</tr>
+<tr>
+<td><code>delete(model)</code></td>
+<td><code>Arcane.ollama.delete(...)</code></td>
+<td>Destructive exact package-owned verified model deletion.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamadelete">delete</a></td>
+</tr>
+<tr>
+<td><code>selection()</code></td>
+<td><code>Arcane.ollama.selection()</code></td>
+<td>Reads managed model preference/effective state.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamaselection">selection</a></td>
+</tr>
+<tr>
+<td><code>select(preference)</code></td>
+<td><code>Arcane.ollama.select(...)</code></td>
+<td>Runs managed size-selection/download/alias workflow.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamaselect">select</a></td>
+</tr>
+<tr>
+<td><code>settings()</code></td>
+<td><code>Arcane.ollama.settings()</code></td>
+<td>Reads managed runtime/provider settings.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamasettings">settings</a></td>
+</tr>
+<tr>
+<td><code>saveSettings(settings)</code></td>
+<td><code>Arcane.ollama.saveSettings(...)</code></td>
+<td>Saves runtime-owned default/load/context settings.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamasavesettings">saveSettings</a></td>
+</tr>
+<tr>
+<td><code>createBrain(definition)</code></td>
+<td><code>Arcane.ollama.createBrain(...)</code></td>
+<td>Creates a managed <code>arcane-&lt;slug&gt;:latest</code> alias.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamacreatebrain">createBrain</a></td>
+</tr>
+<tr>
+<td><code>serviceSettings()</code></td>
+<td><code>Arcane.ollama.serviceSettings()</code></td>
+<td>Reads host-level Ollama service configuration/support.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamaservicesettings">serviceSettings</a></td>
+</tr>
+<tr>
+<td><code>saveServiceSettings(settings)</code></td>
+<td><code>Arcane.ollama.saveServiceSettings(...)</code></td>
+<td>Applies privileged machine-wide service settings/restart.</td>
+<td><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneollamasaveservicesettings">saveServiceSettings</a></td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="normalized-helper-methods">Normalized helper methods</h3>
+<h2 id="ollamareadiness"><code>ollama.readiness()</code></h2>
+<h3 id="overview">Overview</h3>
+<p>Calls <code>version()</code> and converts success/failure into a frozen readiness snapshot.
+It never throws for service unavailability.</p>
+<h3 id="return-value">Return value</h3>
+<p><code>{ready:true, version, errorCode:null}</code> on success, or
+<code>{ready:false, version:null, errorCode}</code> on failure. A string version and an
+object <code>{version}</code> are both accepted.</p>
+<h3 id="example">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const {ready, version, errorCode} = await ollama.readiness();
+console.log(ready ? version : errorCode);
+</code></pre></div>
+<h2 id="ollamageneratetext"><code>ollama.generateText()</code></h2>
+<h3 id="overview-1">Overview</h3>
+<p>Calls <code>generate()</code> and coerces the final envelope&#39;s <code>response</code> field to a
+string with <code>String(response?.response || &#39;&#39;)</code>. Valid Ollama responses document
+<code>response</code> as a string. If an out-of-contract response supplies a truthy
+nonstring, the helper stringifies it; a missing, null, undefined, or other
+falsy nonstring value becomes an empty string.</p>
+<h3 id="example-1">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const text = await ollama.generateText({
+    model: &#39;arcane:latest&#39;,
+    prompt: &#39;Write one sentence.&#39;
+});
+</code></pre></div>
+<h2 id="ollamachattext"><code>ollama.chatText()</code></h2>
+<h3 id="overview-2">Overview</h3>
+<p>Calls <code>chat()</code> and coerces the final envelope&#39;s <code>message.content</code> field to a
+string with <code>String(response?.message?.content || &#39;&#39;)</code>. Valid Ollama responses
+document <code>message.content</code> as a string. If an out-of-contract response supplies
+a truthy nonstring, the helper stringifies it; a missing, null, undefined, or
+other falsy nonstring value becomes an empty string. Use <code>chat()</code> when tool
+calls, metrics, context, or optional provider fields matter.</p>
+<h3 id="example-2">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const text = await ollama.chatText({
+    model: &#39;arcane:latest&#39;,
+    messages: [{role: &#39;user&#39;, content: &#39;Hello&#39;}]
+});
+</code></pre></div>
+<h2 id="ollamaunload"><code>ollama.unload()</code></h2>
+<h3 id="overview-3">Overview</h3>
+<p>Translates <code>unload(model)</code> to:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">ollama.generate({model, prompt: &#39;&#39;, keep_alive: 0});
+</code></pre></div>
+<p>It returns the raw final generation envelope. It is a convenience request, not
+a proof that no other admitted client reloaded the model concurrently.</p>
+<h3 id="example-3">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function unloadAfterTheUserChooses(model) {
+    return ollama.unload(model);
+}
+</code></pre></div>
+<h2 id="availability-matrix">Availability matrix</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Host</th>
+<th>Inference</th>
+<th>Raw inventory</th>
+<th>Managed model/settings mutation</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Microsoft NT desktop Core</td>
+<td>Yes when <code>ai.inference</code> is admitted</td>
+<td>Settings/Shell/Terminal with <code>ai.models.read</code></td>
+<td>Admitted Settings/Shell journeys with management capabilities and privilege where required</td>
+<td>Full managed ArcaneOllama service path.</td>
+</tr>
+<tr>
+<td>Linux desktop Core</td>
+<td>Yes when admitted</td>
+<td>Admitted diagnostics</td>
+<td>Managed workflows where implemented; administrator-owned service settings can return manual/unsupported guidance</td>
+<td>Same application API, different host/service implementation.</td>
+</tr>
+<tr>
+<td>Android WebView</td>
+<td>Narrow admitted chat/inference projection for configured user-managed loopback</td>
+<td>No general desktop raw inventory</td>
+<td>No desktop model/service management</td>
+<td><code>managedLocalAI</code> remains false; listener reachability is not management authority.</td>
+</tr>
+<tr>
+<td>Development HTTP bridge</td>
+<td>Only when connected to an admitted Core-backed development host</td>
+<td>Host/method dependent</td>
+<td>Host/method dependent; never production authority</td>
+<td>Development transport, not a standalone-browser upgrade.</td>
+</tr>
+<tr>
+<td>Standalone browser</td>
+<td>No Arcane Ollama</td>
+<td>No</td>
+<td>No</td>
+<td><code>ARCANE_OLLAMA_UNAVAILABLE</code>.</td>
+</tr>
+<tr>
+<td>Cloud/OpenAI</td>
+<td>Not through <code>Arcane.ollama</code></td>
+<td>No</td>
+<td>No</td>
+<td>Use an explicitly selected <code>AI.js</code> cloud profile; no automatic fallback.</td>
+</tr>
+</tbody></table>
+</div>
+<h2 id="capabilities-and-policy">Capabilities and policy</h2>
+<ul>
+<li><code>ai.inference</code> admits package-filtered local generation, chat, and embeddings.</li>
+<li><code>ai.models.read</code> admits raw model diagnostics only to authorized system apps.</li>
+<li><code>ai.models.manage</code> admits policy-bound managed model lifecycle operations.</li>
+<li><code>ai.settings.manage</code> admits Settings-owned runtime/service configuration.</li>
+<li><code>ai.models.unverified.inference</code> is an explicit inference-only exception for
+already installed, hardware-admitted unverified models when the package says
+<code>verified_only:false</code>; it does not admit model mutation.</li>
+</ul>
+<p>The method allowlist is necessary but not sufficient. Exact package-owned model
+definitions, reserved aliases, native resources, platform support, installed
+state, and exclusive mutation policy remain authoritative.</p>
+<h2 id="raw-versus-normalized-behavior">Raw versus normalized behavior</h2>
+<p>The module intentionally has two levels:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Boundary</th>
+<th>Normalized by Arcane</th>
+<th>Intentionally preserved</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Missing bridge</td>
+<td>Throws coded <code>ARCANE_OLLAMA_UNAVAILABLE</code>.</td>
+<td>Nothing reaches a provider.</td>
+</tr>
+<tr>
+<td>Core call</td>
+<td>Promise settlement, capability/policy errors, request limits, diagnostics, stream ids/chunks.</td>
+<td>Bounded Ollama success fields and optional provider detail.</td>
+</tr>
+<tr>
+<td><code>readiness()</code></td>
+<td>Frozen Boolean/version/error-code snapshot.</td>
+<td>Provider error detail is reduced to <code>errorCode</code>.</td>
+</tr>
+<tr>
+<td><code>generateText()</code> / <code>chatText()</code></td>
+<td>Uses `String(value</td>
+<td></td>
+</tr>
+<tr>
+<td><code>unload()</code></td>
+<td>Stable translation to <code>keep_alive:0</code>.</td>
+<td>Final generation envelope remains provider-native.</td>
+</tr>
+</tbody></table>
+</div>
+<h2 id="streaming-cancellation-and-uncertain-mutation-state">Streaming, cancellation, and uncertain mutation state</h2>
+<p><code>generate</code>, <code>chat</code>, <code>pull</code>, <code>push</code>, and <code>create</code> accept stream controls through
+the bridge forms documented on their detailed pages. Core cooperatively cancels
+admitted inference methods where documented. For pull, push, create, selection,
+settings, or service mutation, abort/timeout/page teardown can stop renderer
+observation without proving host work rolled back.</p>
+<p>After an uncertain model mutation, refresh the relevant raw inventory,
+<code>selection()</code>, <code>settings()</code>, <code>serviceSettings()</code>, or <code>localAI.status()</code> before
+retrying. Do not stack a second mutation merely because the renderer timed out.</p>
+<h2 id="behavioral-testing">Behavioral testing</h2>
+<p>The SDK behavior suite uses an explicit fake <code>Arcane.ollama</code> to prove:</p>
+<ul>
+<li>every wrapper forwards the exact argument objects and provider-native result;</li>
+<li>stream options and signals are not rewritten;</li>
+<li>bridge absence throws <code>ARCANE_OLLAMA_UNAVAILABLE</code> before provider work;</li>
+<li><code>readiness()</code> returns frozen success/failure snapshots;</li>
+<li><code>generateText()</code> and <code>chatText()</code> use the pinned <code>String(value || &#39;&#39;)</code>
+behavior: truthy nonstrings stringify and falsy nonstrings become empty;</li>
+<li><code>unload()</code> sends exactly <code>{model, prompt: &quot;&quot;, keep_alive: 0}</code>.</li>
+</ul>
+<p>Those tests prove the shipped renderer module. Live Core dispatch, cancellation,
+ArcaneOllama health, real model pulls, GPU admission, service restart, and
+rollback remain Arcane OS host/integration evidence.</p>
+<p>Deep implementation path: <a href="../protocols/#arcane-ollama-protocol-path">Arcane Ollama protocol</a>.</p>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/arcane-ollama.md" target="_blank" rel="noreferrer"><code>docs/reference/arcane-ollama.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#what-developers-can-do">What developers can do</a><a href="#fast-start">Fast start</a><a href="#complete-module-api">Complete module API</a><a href="#ollamareadiness">ollama.readiness()</a><a href="#ollamageneratetext">ollama.generateText()</a><a href="#ollamachattext">ollama.chatText()</a><a href="#ollamaunload">ollama.unload()</a><a href="#availability-matrix">Availability matrix</a><a href="#capabilities-and-policy">Capabilities and policy</a><a href="#raw-versus-normalized-behavior">Raw versus normalized behavior</a><a href="#streaming-cancellation-and-uncertain-mutation-state">Streaming, cancellation, and uncertain mutation state</a><a href="#behavioral-testing">Behavioral testing</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

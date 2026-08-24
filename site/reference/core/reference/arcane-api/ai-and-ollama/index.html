@@ -1,0 +1,1385 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="These guides distinguish provider-neutral AI from direct Ollama access and from Arcane-managed lifecycle operations. Feature-detect the method, then use Arc…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/ai-and-ollama/"><link rel="icon" type="image/png" href="../../../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../../../styles.css"><link rel="stylesheet" href="../../../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane API AI and Ollama guides · Arcane OS SDK"><meta property="og:description" content="These guides distinguish provider-neutral AI from direct Ollama access and from Arcane-managed lifecycle operations. Feature-detect the method, then use Arc…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/ai-and-ollama/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane API AI and Ollama guides · Arcane OS SDK"><meta name="twitter:description" content="These guides distinguish provider-neutral AI from direct Ollama access and from Arcane-managed lifecycle operations. Feature-detect the method, then use Arc…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane API AI and Ollama guides | Arcane OS SDK</title><script src="../../../../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../../../">Overview</a><a href="../../../../../guides/">Guides</a><a href="../../../../../examples/">Examples</a><a href="../../../../../playground/">Playground</a><a href="../../../../../testing/">Testing</a><a href="../../../../" aria-current="page">Reference</a><a class="repo-link" href="../../../../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../../../">Docs</a><span aria-hidden="true">/</span><a href="../../../../">Reference</a><span aria-hidden="true">/</span><a href="../../../">Core</a><span aria-hidden="true">/</span><a href="../">Focused member guides</a><span aria-hidden="true">/</span><span aria-current="page">Arcane API AI and Ollama guides</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-api-ai-and-ollama-guides">Arcane API AI and Ollama guides</h1><p class="doc-lead">These guides distinguish provider-neutral AI from direct Ollama access and from Arcane-managed lifecycle operations. Feature-detect the method, then use Arc…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../../../overview/">Overview</a><a href="../../../../sdk-api/">SDK JavaScript API</a><a href="../../../../cli/">CLI</a><a href="../../../../event-manager/">EventManager</a><a href="../../../../availability-and-normalization/">Availability</a><a href="../../../../protocols/">Protocols</a><a href="../../../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../../../../runtime-modules/">Modules</a><a href="../../../../runtime-entities/">Entities</a><a href="../../../../runtime-components/">Components</a><a href="../../../../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../../">Core map</a><a href="../../../arcane-api/">Arcane API</a><a href="../../../arcane-events/">Events</a><a href="../../../arcane-ai-contracts/">AI contracts</a><a href="../../../arcane-entities/">Entity exports</a><a href="../../../ollama-module/">Ollama module</a><a href="../">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/core/reference/arcane-api/ai-and-ollama.md"><p>These guides distinguish provider-neutral AI from direct Ollama access and from
+Arcane-managed lifecycle operations. Feature-detect the method, then use
+<code>Arcane.capabilities.list()</code> when an application must explain why a method is
+unavailable. A method name in the shared JavaScript vocabulary is not itself a
+grant.</p>
+<p>Rejected calls use <code>Arcane.Error</code>. Branch on <code>code</code>, and present <code>message</code> and
+<code>resolution</code> to the user; do not parse human-readable messages as protocol
+values. Provider credentials, operation credentials, admission snapshots, and
+model inventory must not be logged or treated as reusable authorization.</p>
+<p>The complete request and result entities are defined in the
+<a href="../../../arcane-ai-contracts/">Arcane AI contracts</a>. Managed operations emit
+the standard <a href="../../../arcane-events/#event-inventory">Arcane operation events</a>.</p>
+<h2 id="arcaneaimodels">Arcane.ai.models()</h2>
+<h3 id="overview">Overview</h3>
+<p><code>Arcane.ai.models()</code> reads normalized installed-model diagnostics from the
+Arcane-managed Ollama service. Use it in diagnostic UI, not to populate an
+application model selector. Application inference choices must come from the
+admitted <code>Arcane.localAI.status().models.ollama</code> catalog.</p>
+<h3 id="parameters">Parameters</h3>
+<p>The method takes no arguments.</p>
+<h3 id="return-value">Return value</h3>
+<p>It resolves to <code>LocalAIInventory</code>: <code>{provider: &quot;arcane-ollama&quot;, models}</code>. The
+bounded <code>models</code> array has at most 512 records with <code>name</code>, <code>modifiedAt</code>,
+<code>sizeBytes</code>, <code>digest</code>, <code>family</code>, <code>parameterSize</code>, and <code>quantization</code> fields.</p>
+<h3 id="availability">Availability</h3>
+<p>This is a desktop Core diagnostic API. It requires <code>ai.models.read</code> and is
+admitted only to Settings, Shell, and Terminal. Browser previews and the
+current Android projection do not expose it.</p>
+<h3 id="errors-and-recovery">Errors and recovery</h3>
+<p>An unavailable or malformed local provider can reject with a local-Ollama
+request or <code>LOCAL_OLLAMA_INVALID_RESPONSE</code> error. Recheck service health before
+retrying. <code>METHOD_NOT_ALLOWED</code> requires the correct admitted diagnostic app;
+retrying from another app does not add authority.</p>
+<h3 id="streaming-cancellation-and-events">Streaming, cancellation, and events</h3>
+<p>This is one non-streaming inventory read. It emits no method event and exposes
+no per-call <code>AbortSignal</code>. The renderer&#39;s ordinary request timeout or page
+teardown can stop waiting without promising to cancel host work.</p>
+<h3 id="example">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const inventory = await globalThis.Arcane.ai.models();
+
+for (const model of inventory.models) {
+    console.info(model.name, model.parameterSize ?? &#39;unknown size&#39;);
+}
+</code></pre></div>
+<h2 id="arcaneaichat">Arcane.ai.chat()</h2>
+<h3 id="overview-1">Overview</h3>
+<p><code>Arcane.ai.chat(request)</code> sends one non-streaming chat request through the
+configured Ollama or OpenAI provider and normalizes the result. Prefer it when
+application code should remain provider-neutral. Bind a request to the profile
+you presented by sending <code>expectedProvider</code>; Arcane then rejects a concurrent
+provider change instead of silently switching providers.</p>
+<h3 id="parameters-1">Parameters</h3>
+<p><code>request</code> is a closed <code>AIChatRequest</code>. <code>messages</code> is required and contains 1-128
+exact <code>{role, content}</code> records. Roles are <code>system</code>, <code>user</code>, or <code>assistant</code>;
+each content string is nonempty and at most 131,072 characters, and combined
+content is at most 512 KiB. Portable optional fields are <code>expectedProvider</code> and
+<code>format</code> (<code>&quot;json&quot;</code>, <code>&quot;&quot;</code>, or <code>null</code>). <code>model</code>, <code>options</code>, <code>tools</code>,
+<code>keep_alive</code>, <code>think</code>, <code>logprobs</code>, and <code>top_logprobs</code> are Ollama-only controls.
+An omitted local model uses the saved default; OpenAI always uses the saved,
+account-validated model.</p>
+<h3 id="return-value-1">Return value</h3>
+<p>It resolves to normalized <code>AIChatResult</code>: <code>provider</code>, <code>model</code>, an assistant
+<code>message</code>, <code>done</code>, <code>doneReason</code>, <code>promptEvalCount</code>, and <code>evalCount</code>. Ollama can
+also supply bounded <code>message.thinking</code> and <code>message.toolCalls</code>. Response content
+and thinking are each retained up to 4 MiB.</p>
+<h3 id="availability-1">Availability</h3>
+<p>The current public method requires <code>ai.inference</code> on desktop Core. It can use
+the selected local Ollama service or protected OpenAI credential. The current
+Android projection exposes direct <code>Arcane.ollama.chat()</code>, not this
+provider-neutral method.</p>
+<h3 id="errors-and-recovery-1">Errors and recovery</h3>
+<p>Correct invalid request, message, model, format, or context errors before
+retrying. <code>AI_PROVIDER_CHANGED</code> means refresh <code>Arcane.ai.profile()</code> and let the
+user confirm the new provider. OpenAI can reject with
+<code>OPENAI_NOT_CONFIGURED</code>, <code>OPENAI_MODEL_REQUIRED</code>,
+<code>OPENAI_MODEL_UNAVAILABLE</code>, network, bounded-response, or invalid-response
+errors. Local model admission errors require a currently runnable admitted
+model or the managed lifecycle; Arcane never falls back to another provider.</p>
+<h3 id="streaming-cancellation-and-events-1">Streaming, cancellation, and events</h3>
+<p>This API resolves one normalized result and emits no chunk event. The wrapper
+uses a 130-second renderer timeout and does not expose a per-call signal.
+Desktop Core can cooperatively cancel the underlying method when it receives a
+host control frame, including page teardown, but timeout or teardown should
+still be treated as an unknown completion boundary rather than a retry token.</p>
+<h3 id="example-1">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const arcane = globalThis.Arcane;
+const profile = await arcane.ai.profile();
+const result = await arcane.ai.chat({
+    expectedProvider: profile.provider,
+    messages: [
+        {role: &#39;system&#39;, content: &#39;Answer briefly and accurately.&#39;},
+        {role: &#39;user&#39;, content: &#39;Explain the current model in one sentence.&#39;}
+    ]
+});
+
+console.info(result.message.content);
+</code></pre></div>
+<h2 id="arcaneaiprofile">Arcane.ai.profile()</h2>
+<h3 id="overview-2">Overview</h3>
+<p><code>Arcane.ai.profile()</code> returns the effective provider-neutral AI selection. Use
+it to label chat UI and to bind <code>Arcane.ai.chat()</code> with <code>expectedProvider</code>; it
+is not a settings mutation API.</p>
+<h3 id="parameters-2">Parameters</h3>
+<p>The method takes no arguments.</p>
+<h3 id="return-value-2">Return value</h3>
+<p>It resolves to <code>AIProfile</code> with <code>provider</code> (<code>&quot;ollama&quot;</code> or <code>&quot;openai&quot;</code>),
+<code>model</code>, <code>configured</code>, <code>local</code>, and <code>responseLength</code> (<code>&quot;low&quot;</code>, <code>&quot;medium&quot;</code>, or
+<code>&quot;high&quot;</code>). An OpenAI profile resolves only after Arcane proves a protected
+credential exists and the configured model is available to that account.</p>
+<h3 id="availability-2">Availability</h3>
+<p>This method requires <code>ai.inference</code> on desktop Core. The Ollama branch is local;
+the OpenAI branch performs a protected account-model network request. The
+current Android projection does not expose this method.</p>
+<h3 id="errors-and-recovery-2">Errors and recovery</h3>
+<p>For OpenAI, <code>OPENAI_NOT_CONFIGURED</code>, <code>OPENAI_MODEL_REQUIRED</code>, or
+<code>OPENAI_MODEL_UNAVAILABLE</code> requires Settings to repair the credential or model.
+Surface network and bounded-response failures as temporary provider failures;
+do not switch providers automatically.</p>
+<h3 id="streaming-cancellation-and-events-2">Streaming, cancellation, and events</h3>
+<p>This is a non-streaming snapshot and emits no method event. It has no per-call
+signal. A profile can become stale immediately, so bind consequential chat
+requests with <code>expectedProvider</code>.</p>
+<h3 id="example-2">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const profile = await globalThis.Arcane.ai.profile();
+const locationLabel = profile.local ? &#39;On this device&#39; : &#39;Remote provider&#39;;
+
+console.info(profile.model, locationLabel, profile.responseLength);
+</code></pre></div>
+<h2 id="arcaneaiprovidersettings">Arcane.ai.providerSettings()</h2>
+<h3 id="overview-3">Overview</h3>
+<p><code>Arcane.ai.providerSettings()</code> reads credential-free provider settings for the
+Settings application. Use it to initialize provider controls; use
+<code>Arcane.ai.profile()</code> in ordinary inference UI.</p>
+<h3 id="parameters-3">Parameters</h3>
+<p>The method takes no arguments.</p>
+<h3 id="return-value-3">Return value</h3>
+<p>It resolves to <code>{provider, openAIModel, openAIConfigured, responseLength}</code>.
+<code>openAIConfigured</code> reports only whether protected credential material exists.
+The credential is never returned, and this read does not live-validate the
+account or configured model.</p>
+<h3 id="availability-3">Availability</h3>
+<p>This is a desktop Core Settings-only API requiring <code>ai.settings.manage</code>.
+Browser previews, other apps, and the current Android projection cannot read
+it.</p>
+<h3 id="errors-and-recovery-3">Errors and recovery</h3>
+<p><code>METHOD_NOT_ALLOWED</code> requires the admitted Settings application and cannot be
+recovered by retry. Transport or protected-store failures should leave the
+existing UI state uncommitted and offer a later retry.</p>
+<h3 id="streaming-cancellation-and-events-3">Streaming, cancellation, and events</h3>
+<p>This is a non-streaming read with no method event or exposed signal. Treat its
+result as a snapshot, especially before a subsequent save.</p>
+<h3 id="example-3">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const settings = await globalThis.Arcane.ai.providerSettings();
+
+console.info({
+    provider: settings.provider,
+    model: settings.openAIModel,
+    credentialPresent: settings.openAIConfigured,
+    responseLength: settings.responseLength
+});
+</code></pre></div>
+<h2 id="arcaneaisaveprovidersettings">Arcane.ai.saveProviderSettings()</h2>
+<h3 id="overview-4">Overview</h3>
+<p><code>Arcane.ai.saveProviderSettings(settings)</code> applies a provider-settings patch.
+Use it only from Settings after explicit user intent. Arcane protects OpenAI
+credentials and attempts to roll back credential and settings changes together
+when a save fails.</p>
+<h3 id="parameters-4">Parameters</h3>
+<p>The patch can contain <code>provider</code>, <code>openAIModel</code>, <code>responseLength</code>, <code>token</code>, and
+<code>removeToken</code>; omitted keys preserve current values. <code>provider</code> is <code>&quot;ollama&quot;</code>
+or <code>&quot;openai&quot;</code>. <code>openAIModel</code> is 1-128 characters matching
+<code>[A-Za-z0-9][A-Za-z0-9._:-]{0,127}</code>. <code>responseLength</code> is <code>&quot;low&quot;</code>, <code>&quot;medium&quot;</code>,
+or <code>&quot;high&quot;</code>. A replacement <code>token</code> is trimmed, begins with <code>sk-</code>, and is
+20-512 characters. Only <code>removeToken: true</code> requests deletion, and a supplied
+token becomes the final credential. Arcane performs account-model validation
+when OpenAI is selected or a replacement token is supplied.</p>
+<h3 id="return-value-4">Return value</h3>
+<p>It resolves to the credential-free settings shape
+<code>{provider, openAIModel, openAIConfigured, responseLength}</code> after persistence.</p>
+<h3 id="availability-4">Availability</h3>
+<p>This is an exclusive desktop Core mutation requiring <code>ai.settings.manage</code> and
+the Settings app identity. OpenAI validation uses the network and protected
+credential store. It is not projected to Android.</p>
+<h3 id="errors-and-recovery-4">Errors and recovery</h3>
+<p>Correct <code>INVALID_AI_PROVIDER_SETTINGS</code>, provider, model, response-length, or
+token errors before retrying. OpenAI account/model errors require a valid
+credential and accessible model. On <code>CREDENTIAL_STORE_UNAVAILABLE</code>, leave the
+prior settings in place. <code>CREDENTIAL_ROLLBACK_FAILED</code> requires diagnostics and
+manual Settings review before another mutation. Never log a supplied token.</p>
+<h3 id="streaming-cancellation-and-events-4">Streaming, cancellation, and events</h3>
+<p>The method does not stream or emit operation events. The wrapper waits up to
+130 seconds and exposes no signal. Core does not cooperatively cancel this
+mutation, so closing the page or timing out can stop observation while the save
+continues; read <code>providerSettings()</code> before deciding whether to retry.</p>
+<h3 id="example-4">Example</h3>
+<p>This credential-free example selects local inference. Read a new OpenAI token
+from a protected user input at call time rather than embedding it in source.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">document.querySelector(&#39;#confirm-provider-settings&#39;)?.addEventListener(
+    &#39;click&#39;,
+    async function handleConfirmedProviderSettings() {
+        const saved = await globalThis.Arcane.ai.saveProviderSettings({
+            provider: &#39;ollama&#39;,
+            responseLength: &#39;medium&#39;
+        });
+        console.info(saved.provider, saved.responseLength);
+    }
+);
+</code></pre></div>
+<h2 id="arcaneaiprovidermodels">Arcane.ai.providerModels()</h2>
+<h3 id="overview-5">Overview</h3>
+<p><code>Arcane.ai.providerModels()</code> lists OpenAI model identifiers accessible to the
+stored credential. Use it to populate the Settings model control, not to list
+local Ollama models.</p>
+<h3 id="parameters-5">Parameters</h3>
+<p>The method takes no arguments.</p>
+<h3 id="return-value-5">Return value</h3>
+<p>It resolves to <code>{provider: &quot;openai&quot;, models}</code>, where <code>models</code> is a sorted array
+of bounded account-accessible identifiers.</p>
+<h3 id="availability-5">Availability</h3>
+<p>This is a desktop Core, Settings-only method requiring <code>ai.settings.manage</code>.
+It performs one protected OpenAI model-list network request and requires a
+stored credential even when Ollama is currently selected. Android does not
+project it.</p>
+<h3 id="errors-and-recovery-5">Errors and recovery</h3>
+<p><code>OPENAI_NOT_CONFIGURED</code> requires the user to save a credential. Provider
+unavailable, request-failed, response-too-large, or invalid-response errors are
+not evidence that a previously saved model should be deleted; keep the current
+choice and offer a later retry.</p>
+<h3 id="streaming-cancellation-and-events-5">Streaming, cancellation, and events</h3>
+<p>This is one non-streaming network read with no method event or per-call signal.
+The wrapper timeout is 130 seconds. Avoid issuing a request for every render or
+keystroke; refresh it as one owned Settings task.</p>
+<h3 id="example-5">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const catalog = await globalThis.Arcane.ai.providerModels();
+
+for (const modelId of catalog.models) {
+    console.info(modelId);
+}
+</code></pre></div>
+<h2 id="arcanelocalaistatus">Arcane.localAI.status()</h2>
+<h3 id="overview-6">Overview</h3>
+<p><code>Arcane.localAI.status()</code> discovers currently admitted local inference and
+speech choices. Use its <code>models</code> catalogs for application selectors and its
+provider-local status fields for recovery UI. The snapshot is evidence, not a
+grant; Core rechecks policy, identity, and resources at inference time.</p>
+<h3 id="parameters-6">Parameters</h3>
+<p>The method takes no arguments. Core accepts only the empty request generated by
+the wrapper. Concurrent callers in one Core process can share the active
+discovery, so reuse one application-owned refresh instead of polling from each
+component.</p>
+<h3 id="return-value-6">Return value</h3>
+<p>It resolves to schema-version 2 status with <code>runtime</code>, <code>policy</code>, <code>ollama</code>,
+<code>admission</code>, <code>speech</code>, and <code>models: {ollama, speech, transcription}</code>. Desktop
+Core reports native resource admission. Admitted Android returns
+<code>providerMode: &quot;user-managed-loopback&quot;</code> and a bounded package-policy catalog;
+its lifecycle remains user-managed and native desktop admission is not claimed.
+Provider discovery failures normally resolve as local <code>available</code>,
+<code>errorCode</code>, and empty-catalog state rather than rejecting the whole snapshot.</p>
+<h3 id="availability-6">Availability</h3>
+<p>The method requires <code>ai.inference</code>. Desktop Core admits it according to package
+policy. Android projects it only to explicitly admitted application identities,
+using fixed host-owned loopback providers. A browser preview has no local-AI
+authority.</p>
+<h3 id="errors-and-recovery-6">Errors and recovery</h3>
+<p>An invalid request or package-policy/capability mismatch can reject. Otherwise,
+branch on the returned service-local error codes. Refresh after a documented
+recovery action; do not interpret a transient unavailable service as permission
+to switch providers or mutate models.</p>
+<h3 id="streaming-cancellation-and-events-6">Streaming, cancellation, and events</h3>
+<p>Status is a non-streaming snapshot and emits no method event. The wrapper waits
+up to 15 seconds and exposes no signal. Core discovery is not cooperatively
+cancellable through this method; keep refreshes owned and avoid overlapping
+poll loops.</p>
+<h3 id="example-6">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const status = await globalThis.Arcane.localAI.status();
+const runnableModels = status.models.ollama.filter(
+    function selectRunnableLocalModel(model) {
+        return model.runnable === true;
+    }
+);
+
+console.info(status.runtime.kind, runnableModels.length);
+</code></pre></div>
+<h2 id="arcanelocalaiensureplatform">Arcane.localAI.ensurePlatform()</h2>
+<h3 id="overview-7">Overview</h3>
+<p><code>Arcane.localAI.ensurePlatform()</code> performs the Provisioner&#39;s exclusive
+post-install AI reconciliation. It verifies the current provider settings,
+ensures or repairs the selected verified local model when needed, applies
+resource admission, and optionally loads it. Do not use it as an ordinary app
+readiness probe; use <code>localAI.status()</code> instead.</p>
+<h3 id="parameters-7">Parameters</h3>
+<p>The method takes no arguments. It snapshots the current AI settings and retries
+its plan up to three times when they change concurrently.</p>
+<h3 id="return-value-7">Return value</h3>
+<p>Every result includes a completed <code>ArcaneOperation</code>. The OpenAI branch reports
+<code>local.available: false</code>, reason <code>&quot;openai-selected&quot;</code>, a configured <code>fallback</code>,
+and no local load. The local branch reports the selected model, alias, variant,
+final compatibility, bounded automatic-candidate failures, no fallback, and
+the managed load result.</p>
+<h3 id="availability-7">Availability</h3>
+<p>This is a desktop Core, Provisioner-type method requiring
+<code>provisioning.manage</code>. It is an exclusive mutation and is not in the Android
+projection.</p>
+<h3 id="errors-and-recovery-7">Errors and recovery</h3>
+<p>Provider configuration, verified-model, registry, native-admission,
+installation, and load failures preserve their stable Arcane codes and
+resolutions. <code>ARCANE_AI_PROFILE_CHANGED</code> means settings changed during three
+plans; refresh settings and let the user restart reconciliation. Arcane does
+not silently select OpenAI after local failure.</p>
+<h3 id="streaming-cancellation-and-events-7">Streaming, cancellation, and events</h3>
+<p>Subscribe before calling if the Provisioner shows progress. The operation emits
+<code>operation.started</code>, <code>operation.log</code>, <code>operation.progress</code>,
+<code>operation.completed</code>, or <code>operation.failed</code> data keyed by operation ID. The
+wrapper uses the long-operation timeout and exposes no signal; Core does not
+cooperatively cancel this workflow, so page teardown is not rollback.</p>
+<h3 id="example-7">Example</h3>
+<p>Run this only in the admitted Provisioner flow after installation succeeds.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">document.querySelector(&#39;#confirm-local-ai-reconciliation&#39;)?.addEventListener(
+    &#39;click&#39;,
+    async function handleConfirmedLocalAIReconciliation() {
+        const result = await globalThis.Arcane.localAI.ensurePlatform();
+        if (result.local.available) {
+            console.info(&#39;Local AI is ready:&#39;, result.local.model);
+        } else {
+            console.info(&#39;Configured provider:&#39;, result.fallback.provider);
+        }
+    }
+);
+</code></pre></div>
+<h2 id="arcanelocalairecover">Arcane.localAI.recover()</h2>
+<h3 id="overview-8">Overview</h3>
+<p><code>Arcane.localAI.recover(request)</code> starts and verifies existing approved
+Arcane-managed local services. It does not install, replace, stop, or silently
+reconfigure a service. Use it only from the admitted recovery journey after
+status identifies a recoverable service outage.</p>
+<h3 id="parameters-8">Parameters</h3>
+<p><code>request</code> is exactly <code>{services}</code>. <code>services</code> is a nonempty, duplicate-free
+subset of <code>&quot;ollama&quot;</code> and <code>&quot;speech&quot;</code>; the result uses canonical Ollama-then-
+speech order.</p>
+<h3 id="return-value-8">Return value</h3>
+<p>It resolves to <code>{ready: true, services, operation}</code>. Each service record is
+exactly <code>{id, serviceName, endpoint, state: &quot;running&quot;, ready: true, started}</code>
+and the completed operation is the privileged recovery receipt.</p>
+<h3 id="availability-8">Availability</h3>
+<p>This is a privileged, exclusive Core method for explicitly admitted recovery
+application identities with <code>ai.inference</code>. The managed recovery adapter is
+currently available on Microsoft NT. Linux reports recovery as unsupported,
+and Android owns its local services outside Arcane.</p>
+<h3 id="errors-and-recovery-8">Errors and recovery</h3>
+<p>Correct <code>LOCAL_AI_RECOVERY_INPUT_INVALID</code> before retrying. Unsupported platform,
+missing registration, service configuration, health, elevation, lease, or
+output-contract errors require the resolution on the <code>Arcane.Error</code>; do not
+substitute an installer or arbitrary service command from renderer code.</p>
+<h3 id="streaming-cancellation-and-events-8">Streaming, cancellation, and events</h3>
+<p>The workflow emits standard operation lifecycle and progress events. It is not
+streaming and exposes no signal. Core does not cooperatively cancel it, so a
+renderer timeout or page close can leave recovery running; refresh
+<code>localAI.status()</code> before any retry.</p>
+<h3 id="example-8">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">document.querySelector(&#39;#confirm-local-ai-recovery&#39;)?.addEventListener(
+    &#39;click&#39;,
+    async function handleConfirmedLocalAIRecovery() {
+        const result = await globalThis.Arcane.localAI.recover({
+            services: [&#39;speech&#39;]
+        });
+        console.info(result.services[0].ready);
+    }
+);
+</code></pre></div>
+<h2 id="arcanelocalaisetparallelrequests">Arcane.localAI.setParallelRequests()</h2>
+<h3 id="overview-9">Overview</h3>
+<p><code>Arcane.localAI.setParallelRequests(request)</code> calculates and applies the
+machine-wide Ollama parallel-request count for one exact app-owned verified
+model. It can restart Ollama, evict all resident models, and terminate in-flight
+local inference. Use it only in the sole registered application-owned
+administrative flow with clear impact disclosure.</p>
+<h3 id="parameters-9">Parameters</h3>
+<p><code>request</code> is exactly <code>{model, parallelRequests, contextTokens?}</code>. <code>model</code> is an
+app-owned verified identifier. <code>parallelRequests</code> is a nonnegative safe integer:
+<code>0</code> requests the maximum currently admitted; a positive request is a ceiling
+that Arcane can clamp down. <code>contextTokens</code> is a positive safe integer when
+present and otherwise uses the verified Modelfile value. Native model metadata,
+not an Arcane product ceiling, governs the maximum context.</p>
+<h3 id="return-value-9">Return value</h3>
+<p>The schema-version 1 receipt reports requested, previous, maximum allowed,
+allowed, and effective parallelism; context and native-context evidence;
+clamping, change, restart, health, and load state; evicted models; final
+admission; and a completed operation. Treat capacity evidence as a current
+snapshot, not a future performance promise.</p>
+<h3 id="availability-9">Availability</h3>
+<p>This is a privileged, exclusive desktop Core method for the sole registered
+owning application identity, requiring <code>ai.runtime.manage</code>. Microsoft NT applies
+the setting. Linux returns a 501 manual-systemd error, and Android does not
+expose the method.</p>
+<h3 id="errors-and-recovery-9">Errors and recovery</h3>
+<p>Input, app-owned-model, verified-policy, admission, capacity, unsupported,
+apply, health, load, and rollback errors are actionable by stable code. Arcane
+attempts to restore the prior count when loading fails after a change. After
+any uncertain completion, refresh status and service settings before another
+mutation.</p>
+<h3 id="streaming-cancellation-and-events-9">Streaming, cancellation, and events</h3>
+<p>The method emits standard operation events but no provider chunks. It has a
+long renderer timeout and no signal, and Core does not cooperatively cancel the
+workflow. A timeout or page close can occur while the service transaction
+continues.</p>
+<h3 id="example-9">Example</h3>
+<p>This no-change-oriented example requests the currently active count for a
+verified runnable model; it can still perform verification and loading.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">document.querySelector(&#39;#confirm-parallel-request-change&#39;)?.addEventListener(
+    &#39;click&#39;,
+    async function handleConfirmedParallelRequestChange() {
+        const arcane = globalThis.Arcane;
+        const status = await arcane.localAI.status();
+        const model = status.models.ollama.find(
+            function findVerifiedRunnableModel(candidate) {
+                return candidate.verified === true &amp;&amp; candidate.runnable === true;
+            }
+        );
+        if (!model) return;
+
+        const result = await arcane.localAI.setParallelRequests({
+            model: model.id,
+            parallelRequests: status.ollama.activeParallelRequests
+        });
+        console.info(result.effectiveParallelRequests);
+    }
+);
+</code></pre></div>
+<h2 id="arcanespeechstatus">Arcane.speech.status()</h2>
+<h3 id="overview-10">Overview</h3>
+<p><code>Arcane.speech.status()</code> directly checks the fixed local speech service. Use it
+when UI needs current synthesis and transcription readiness. Unlike
+<code>localAI.status()</code>, this direct call rejects when the host cannot reach and
+validate the speech health response.</p>
+<h3 id="parameters-10">Parameters</h3>
+<p>The method takes no arguments.</p>
+<h3 id="return-value-10">Return value</h3>
+<p>It resolves to <code>{ready, synthesisAvailable, transcriptionAvailable, status, ttsEngine, sttEngine}</code>. <code>ready</code> is true only when both roles are ready; use the
+role-specific booleans when UI needs only synthesis or transcription.</p>
+<h3 id="availability-10">Availability</h3>
+<p>The method requires <code>ai.inference</code> and a fixed host-owned local speech service.
+It is available on desktop Core and, through the current Android projection, to
+explicitly admitted application identities. Browser previews cannot reach it.</p>
+<h3 id="errors-and-recovery-10">Errors and recovery</h3>
+<p><code>LOCAL_SPEECH_UNAVAILABLE</code>, request-failed, invalid-response, or
+response-too-large errors mean the direct health contract was not proven.
+Offer the admitted managed recovery journey where available; do not probe or
+start arbitrary loopback services from renderer code.</p>
+<h3 id="streaming-cancellation-and-events-10">Streaming, cancellation, and events</h3>
+<p>This is a non-streaming health read with no method event. The wrapper timeout
+is 10 seconds and no per-call signal is exposed. Core does not cooperatively
+cancel this method; Android also does not expose speech cancellation.</p>
+<h3 id="example-10">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const status = await globalThis.Arcane.speech.status();
+
+console.info({
+    synthesis: status.synthesisAvailable,
+    transcription: status.transcriptionAvailable
+});
+</code></pre></div>
+<h2 id="arcanespeechsynthesize">Arcane.speech.synthesize()</h2>
+<h3 id="overview-11">Overview</h3>
+<p><code>Arcane.speech.synthesize(request)</code> converts bounded text to local speech. Use
+it only after checking synthesis readiness, and create an audio URL from the
+returned bytes without logging the base64 payload.</p>
+<h3 id="parameters-11">Parameters</h3>
+<p><code>request</code> uses the portable fields <code>input</code>, <code>model</code>, <code>voice</code>,
+<code>responseFormat</code>, and <code>speed</code>. <code>input</code> is required, trimmed, nonempty, and at
+most 4,000 characters. Defaults are <code>model: &quot;kokoro&quot;</code>, <code>voice: &quot;af_heart&quot;</code>,
+<code>responseFormat: &quot;opus&quot;</code>, and <code>speed: 1</code>. The voice matches
+<code>[a-z0-9][a-z0-9_-]{0,63}</code>, the format is <code>&quot;opus&quot;</code> or <code>&quot;wav&quot;</code>, and speed is
+0.5-2 inclusive. Send documented types; do not rely on host coercion of
+off-contract values.</p>
+<h3 id="return-value-11">Return value</h3>
+<p>It resolves to <code>{audioBase64, contentType}</code>. The canonical base64 represents
+1 byte through 6 MiB of audio, and <code>contentType</code> is <code>&quot;audio/ogg&quot;</code> or
+<code>&quot;audio/wav&quot;</code> matching the selected format.</p>
+<h3 id="availability-11">Availability</h3>
+<p>This method requires <code>ai.inference</code> and a ready fixed local speech provider.
+It is available on desktop Core and to explicitly admitted applications through
+the Android projection. Android bounds speech work to one active and one queued
+operation.</p>
+<h3 id="errors-and-recovery-11">Errors and recovery</h3>
+<p>Correct <code>INVALID_LOCAL_SPEECH_REQUEST</code> locally. Unavailable, request-failed,
+response-too-large, or invalid-response errors require a health refresh or
+managed recovery. On Android, <code>ANDROID_SPEECH_QUEUE_FULL</code> means wait for the
+owned active operation before retrying.</p>
+<h3 id="streaming-cancellation-and-events-11">Streaming, cancellation, and events</h3>
+<p>Synthesis returns one complete audio result and emits no method event. The
+wrapper timeout is 180 seconds, no signal is exposed, and timeout or page
+teardown does not promise cancellation of Core or Android speech work.</p>
+<h3 id="example-11">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const result = await globalThis.Arcane.speech.synthesize({
+    input: &#39;Your local speech service is ready.&#39;,
+    voice: &#39;af_heart&#39;,
+    responseFormat: &#39;opus&#39;,
+    speed: 1
+});
+
+console.info(result.contentType, result.audioBase64.length);
+</code></pre></div>
+<h2 id="arcanespeechtranscribe">Arcane.speech.transcribe()</h2>
+<h3 id="overview-12">Overview</h3>
+<p><code>Arcane.speech.transcribe(request)</code> sends bounded caller-supplied audio bytes,
+labeled as WebM, to the fixed local transcription service. Use it after local
+capture permission and recording have succeeded; the method itself does not
+capture audio or grant microphone permission.</p>
+<h3 id="parameters-12">Parameters</h3>
+<p><code>audioBase64</code> is required canonical base64: at most 8 MiB encoded and 1 byte
+through 6 MiB decoded. <code>mimeType</code> defaults to <code>&quot;audio/webm&quot;</code>; codec parameters
+may follow, but the base type must be WebM. <code>model</code> defaults to
+<code>&quot;whisper-small&quot;</code>. Core accepts the bounded Whisper-name pattern while the
+current Android provider requires exactly <code>&quot;whisper-small&quot;</code>. The host validates
+the label, encoding, and size; the fixed service decodes the media container.</p>
+<h3 id="return-value-12">Return value</h3>
+<p>It resolves to <code>{text}</code> with a trimmed transcript from a response bounded to
+64 KiB.</p>
+<h3 id="availability-12">Availability</h3>
+<p>This method requires <code>ai.inference</code> and ready local transcription. It is
+available on desktop Core and to explicitly admitted applications through the
+Android projection. Browser capture permission is separate from method
+admission.</p>
+<h3 id="errors-and-recovery-12">Errors and recovery</h3>
+<p>Correct invalid base64, size, MIME, or model errors before retrying.
+Unavailable, request-failed, response-too-large, and invalid-response errors
+require a status refresh or managed recovery. On Android, wait for owned speech
+work after <code>ANDROID_SPEECH_QUEUE_FULL</code>.</p>
+<h3 id="streaming-cancellation-and-events-12">Streaming, cancellation, and events</h3>
+<p>Transcription resolves one complete text result and emits no method event. The
+wrapper timeout is 180 seconds and no signal is exposed. Core and Android do
+not promise cancellation when the renderer stops waiting.</p>
+<h3 id="example-12">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function transcribeRecordedWebM(audioBase64) {
+    const result = await globalThis.Arcane.speech.transcribe({
+        audioBase64: audioBase64,
+        mimeType: &#39;audio/webm&#39;,
+        model: &#39;whisper-small&#39;
+    });
+    return result.text;
+}
+</code></pre></div>
+<h2 id="arcaneollamaversion">Arcane.ollama.version()</h2>
+<h3 id="overview-13">Overview</h3>
+<p><code>Arcane.ollama.version()</code> reads the fixed local Ollama provider&#39;s version
+envelope. Use it for diagnostics and compatibility display, not as model
+readiness or authorization evidence.</p>
+<h3 id="parameters-13">Parameters</h3>
+<p>The method takes no arguments.</p>
+<h3 id="return-value-13">Return value</h3>
+<p>It resolves to Ollama&#39;s provider-native version JSON. Arcane requires valid
+JSON and bounds the response to 12 MiB, but provider fields can vary with the
+installed Ollama version.</p>
+<h3 id="availability-13">Availability</h3>
+<p>This is a desktop Core diagnostic API requiring <code>ai.models.read</code>; it is
+admitted only to Settings, Shell, and Terminal. Core calls the fixed
+<code>127.0.0.1:11434</code> provider. The current Android projection and browser previews
+do not expose this method.</p>
+<h3 id="errors-and-recovery-13">Errors and recovery</h3>
+<p><code>LOCAL_OLLAMA_REQUEST_FAILED</code> covers an unavailable service, HTTP failure, or
+invalid provider response and marks retryable server failures where applicable.
+Refresh service status or use an admitted recovery workflow before retrying.
+<code>METHOD_NOT_ALLOWED</code> requires the correct diagnostic app.</p>
+<h3 id="streaming-cancellation-and-events-13">Streaming, cancellation, and events</h3>
+<p>This is a non-streaming read with no method event or exposed signal. The
+provider request has a five-second Core timeout; the renderer also owns its
+outer request timeout.</p>
+<h3 id="example-13">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const versionInfo = await globalThis.Arcane.ollama.version();
+
+console.info(versionInfo.version ?? &#39;Unknown Ollama version&#39;);
+</code></pre></div>
+<h2 id="arcaneollamamodels">Arcane.ollama.models()</h2>
+<h3 id="overview-14">Overview</h3>
+<p><code>Arcane.ollama.models()</code> reads Ollama&#39;s installed tags envelope. Use it for raw
+diagnostics. It is not the normalized <code>Arcane.ai.models()</code> inventory and must
+not populate an application selector; use admitted <code>localAI.status()</code> models
+for inference UI.</p>
+<h3 id="parameters-14">Parameters</h3>
+<p>The method takes no arguments.</p>
+<h3 id="return-value-14">Return value</h3>
+<p>It resolves to the bounded provider-native <code>/api/tags</code> envelope, usually with
+a <code>models</code> array. Nested fields follow the installed Ollama version rather than
+an Arcane-normalized entity contract.</p>
+<h3 id="availability-14">Availability</h3>
+<p>This desktop Core method requires <code>ai.models.read</code> and is limited to Settings,
+Shell, and Terminal. It is not projected to Android or browser previews.</p>
+<h3 id="errors-and-recovery-14">Errors and recovery</h3>
+<p>Local provider transport, HTTP, invalid-JSON, and bounded-response failures
+reject as Arcane errors. Recheck local service health and retry as one owned
+diagnostic refresh. Do not turn a raw provider record into an authorization or
+verified-model claim.</p>
+<h3 id="streaming-cancellation-and-events-14">Streaming, cancellation, and events</h3>
+<p>This is one non-streaming read with no method event or per-call signal. Core&#39;s
+provider timeout is ten seconds.</p>
+<h3 id="example-14">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const tags = await globalThis.Arcane.ollama.models();
+
+for (const model of tags.models ?? []) {
+    console.info(model.name ?? model.model ?? &#39;Unnamed model&#39;);
+}
+</code></pre></div>
+<h2 id="arcaneollamalist">Arcane.ollama.list()</h2>
+<h3 id="overview-15">Overview</h3>
+<p><code>Arcane.ollama.list()</code> is a JavaScript alias for
+<code>Arcane.ollama.models()</code>. It invokes the same <code>ollama.models</code> Core method and
+returns the same raw tags envelope. Prefer one spelling consistently within an
+application.</p>
+<h3 id="parameters-15">Parameters</h3>
+<p>The method takes no arguments.</p>
+<h3 id="return-value-15">Return value</h3>
+<p>It resolves to the bounded provider-native <code>/api/tags</code> envelope, not a bare
+model array.</p>
+<h3 id="availability-15">Availability</h3>
+<p>The alias has exactly the <code>ollama.models</code> boundary: desktop Core,
+<code>ai.models.read</code>, and Settings, Shell, or Terminal only. There is no distinct
+<code>ollama.list</code> capability-policy method and no Android projection.</p>
+<h3 id="errors-and-recovery-15">Errors and recovery</h3>
+<p>Handle the same local-provider and method-admission errors as
+<code>Arcane.ollama.models()</code>. A retry is useful only after service health or
+transport state can have changed.</p>
+<h3 id="streaming-cancellation-and-events-15">Streaming, cancellation, and events</h3>
+<p>This is a non-streaming read with no method event or signal. It does not create
+a second catalog or cache; it is just another wrapper name for the same call.</p>
+<h3 id="example-15">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const tags = await globalThis.Arcane.ollama.list();
+const installedCount = Array.isArray(tags.models) ? tags.models.length : 0;
+
+console.info(installedCount);
+</code></pre></div>
+<h2 id="arcaneollamarunning">Arcane.ollama.running()</h2>
+<h3 id="overview-16">Overview</h3>
+<p><code>Arcane.ollama.running()</code> reads Ollama&#39;s currently loaded-model envelope. Use
+it for diagnostics such as residency display. It is a momentary provider
+snapshot, not proof that capacity or admission will remain available.</p>
+<h3 id="parameters-16">Parameters</h3>
+<p>The method takes no arguments.</p>
+<h3 id="return-value-16">Return value</h3>
+<p>It resolves to the bounded provider-native <code>/api/ps</code> JSON, usually with a
+<code>models</code> array. Arcane does not normalize its nested provider fields.</p>
+<h3 id="availability-16">Availability</h3>
+<p>This is a desktop Core diagnostic read requiring <code>ai.models.read</code>, admitted
+only to Settings, Shell, and Terminal. Android and browser previews do not
+expose it.</p>
+<h3 id="errors-and-recovery-16">Errors and recovery</h3>
+<p>An unavailable provider, failed HTTP request, invalid JSON, or oversized
+response rejects. Refresh local service status before retrying. An empty
+provider array is a valid no-model-loaded state, not an error.</p>
+<h3 id="streaming-cancellation-and-events-16">Streaming, cancellation, and events</h3>
+<p>This method does not stream or emit events and has no signal. Core&#39;s provider
+timeout is ten seconds. Models can load or unload immediately after resolution.</p>
+<h3 id="example-16">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const running = await globalThis.Arcane.ollama.running();
+
+for (const model of running.models ?? []) {
+    console.info(model.name ?? model.model ?? &#39;Unnamed loaded model&#39;);
+}
+</code></pre></div>
+<h2 id="arcaneollamashow">Arcane.ollama.show()</h2>
+<h3 id="overview-17">Overview</h3>
+<p><code>Arcane.ollama.show(model, options?)</code> reads provider metadata for one installed
+model. Use it for bounded diagnostics and compatibility inspection; returned
+metadata is not verified package provenance or reusable admission evidence.</p>
+<h3 id="parameters-17">Parameters</h3>
+<p><code>model</code> is required and matches
+<code>[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}</code>. The optional object has only <code>verbose</code>;
+send a Boolean when requesting provider verbose metadata. The wrapper builds
+the top-level <code>model</code> field, and Core rejects unknown top-level fields.</p>
+<h3 id="return-value-17">Return value</h3>
+<p>It resolves to Ollama&#39;s bounded provider-native <code>/api/show</code> envelope. Nested
+metadata, parameters, template, and capability fields depend on the installed
+provider version.</p>
+<h3 id="availability-17">Availability</h3>
+<p>This desktop Core method requires <code>ai.models.read</code> and Settings, Shell, or
+Terminal identity. It is not projected to Android or browser previews.</p>
+<h3 id="errors-and-recovery-17">Errors and recovery</h3>
+<p><code>INVALID_AI_MODEL</code> requires a valid installed-model identifier.
+<code>INVALID_OLLAMA_REQUEST</code>, provider not-found, request, invalid-response, or
+bounded-response errors should be surfaced without upgrading raw metadata into
+a verified-model claim. Refresh inventory before retrying a not-found model.</p>
+<h3 id="streaming-cancellation-and-events-17">Streaming, cancellation, and events</h3>
+<p>This is a non-streaming read with no method event or signal. Core gives the
+provider request 30 seconds.</p>
+<h3 id="example-17">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const metadata = await globalThis.Arcane.ollama.show(&#39;gemma3:latest&#39;, {
+    verbose: false
+});
+
+console.info(metadata.details ?? metadata.model_info ?? {});
+</code></pre></div>
+<h2 id="arcaneollamagenerate">Arcane.ollama.generate()</h2>
+<h3 id="overview-18">Overview</h3>
+<p><code>Arcane.ollama.generate(request, streamOptions?)</code> calls Ollama&#39;s direct generate
+API after Core re-admits the exact model and requested context. Use it only
+when provider-native generation fields or chunks are required; use
+<code>Arcane.ai.chat()</code> for provider-neutral application chat.</p>
+<h3 id="parameters-18">Parameters</h3>
+<p><code>request</code> is a closed plain object, encoded to at most 8 MiB. Required <code>model</code>
+uses the Ollama name pattern. Supported provider fields are <code>prompt</code>, <code>suffix</code>,
+<code>images</code>, <code>format</code>, <code>options</code>, <code>system</code>, <code>template</code>, <code>context</code>, <code>raw</code>,
+<code>keep_alive</code>, <code>think</code>, <code>logprobs</code>, and <code>top_logprobs</code>. When supplied,
+<code>options.num_ctx</code> is a safe integer from 1,024 through 262,144.</p>
+<p><code>streamOptions</code> can be a named chunk callback or <code>{onChunk, signal, timeoutMs}</code>. Pass a genuine <code>AbortSignal</code> and a positive finite timeout; callers
+must not send the wrapper-owned <code>stream</code> or <code>streamId</code> fields.</p>
+<h3 id="return-value-18">Return value</h3>
+<p>Without chunk delivery, it resolves to Ollama&#39;s bounded provider-native
+generate envelope. With <code>onChunk</code>, the callback receives <code>(chunk, {operation: &quot;generate&quot;, streamId})</code> for each filtered stream record, and the
+promise resolves to the final provider chunk.</p>
+<h3 id="availability-18">Availability</h3>
+<p>This is a desktop Core method requiring <code>ai.inference</code>. Verified app models can
+be ensured or repaired before final admission. Unverified installed-model
+inference additionally requires <code>ai.models.unverified.inference</code> and remains
+inference-only. Applications with an isolated-model contract must use their
+application-owned isolated API. Android does not project direct generate.</p>
+<h3 id="errors-and-recovery-18">Errors and recovery</h3>
+<p>Correct invalid request, model, stream, serialization, size, and context errors
+locally. Model policy, verification, installation, isolated-operation, and
+resource-admission errors require a currently admitted model or the documented
+managed workflow. Provider failures reject as local-Ollama request errors;
+Arcane does not fall back to OpenAI.</p>
+<h3 id="streaming-cancellation-and-events-18">Streaming, cancellation, and events</h3>
+<p>Chunk delivery is backed by internal <code>ollama.chunk</code> events filtered to the
+wrapper-created stream ID; callers normally use <code>onChunk</code>, not a global event
+subscription. The default timeout is ten minutes. Aborting the supplied signal
+rejects the renderer promise, sends a cancel control, and desktop Core
+cooperatively destroys the active provider request. A chunk-callback exception
+is logged by the event dispatcher; own callback errors explicitly if they must
+fail application work.</p>
+<h3 id="example-18">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const arcane = globalThis.Arcane;
+const status = await arcane.localAI.status();
+const model = status.models.ollama.find(function findRunnableModel(candidate) {
+    return candidate.runnable === true;
+});
+
+if (!model) {
+    throw new Error(&#39;No admitted local model is currently runnable.&#39;);
+}
+
+const controller = new AbortController();
+
+function handleGenerateChunk(chunk, metadata) {
+    console.info(metadata.operation, chunk.done === true ? &#39;done&#39; : &#39;working&#39;);
+}
+
+const finalChunk = await arcane.ollama.generate({
+    model: model.id,
+    prompt: &#39;Write one short, credential-free greeting.&#39;
+}, {
+    onChunk: handleGenerateChunk,
+    signal: controller.signal,
+    timeoutMs: 120000
+});
+
+console.info(finalChunk.done === true);
+</code></pre></div>
+<h2 id="arcaneollamachat">Arcane.ollama.chat()</h2>
+<h3 id="overview-19">Overview</h3>
+<p><code>Arcane.ollama.chat(request, streamOptions?)</code> sends a provider-native Ollama
+chat after the host rechecks package policy, model identity, and current
+admission. Use it when Ollama-specific messages, tools, options, or streaming
+are intentional; use <code>Arcane.ai.chat()</code> for a normalized provider-neutral
+result.</p>
+<h3 id="parameters-19">Parameters</h3>
+<p>On desktop Core, <code>request</code> is a closed plain object of at most 8 MiB with
+required <code>model</code> and provider-native <code>messages</code>. Optional fields are <code>tools</code>,
+<code>format</code>, <code>options</code>, <code>keep_alive</code>, <code>think</code>, <code>logprobs</code>, and <code>top_logprobs</code>;
+<code>options.num_ctx</code>, when present, is 1,024-262,144. <code>streamOptions</code> can be a
+named callback or <code>{onChunk, signal, timeoutMs}</code> and is not forwarded to
+Ollama.</p>
+<p>Android admits a narrower generated contract for explicitly approved apps: 1-128
+bounded messages with <code>system</code>, <code>user</code>, <code>assistant</code>, or <code>tool</code> roles; bounded
+<code>format</code>, <code>think</code>, <code>tools</code>, and selected generation options; at most 512 KiB of
+combined message content and 768 KiB encoded request data. Do not send desktop-
+only <code>keep_alive</code> or log-probability fields when targeting Android.</p>
+<h3 id="return-value-19">Return value</h3>
+<p>It resolves to the final bounded provider-native chat envelope. With
+<code>onChunk</code>, each callback receives <code>(chunk, {operation: &quot;chat&quot;, streamId})</code> and
+the promise resolves to the final provider chunk. Direct provider fields are
+not normalized into <code>AIChatResult</code>.</p>
+<h3 id="availability-19">Availability</h3>
+<p>The method requires <code>ai.inference</code>. Desktop Core admits it according to package
+policy and native resource checks. Android projects the bounded user-managed-
+loopback form only to explicitly approved apps and repeats package-policy/provider
+inspection before dispatch. Plain browser previews have no Ollama authority.</p>
+<h3 id="errors-and-recovery-19">Errors and recovery</h3>
+<p>Correct invalid request, message, option, model, stream, size, or response
+errors locally. Policy, verified-model, installation, queue, isolated-operation,
+and capacity errors require a runnable admitted model; never bypass them by
+calling loopback directly. Android can additionally report queue, timeout,
+cancel, invalid-provider-response, or response-size errors. No branch silently
+changes provider.</p>
+<h3 id="streaming-cancellation-and-events-19">Streaming, cancellation, and events</h3>
+<p>The wrapper filters internal <code>ollama.chunk</code> events by its generated stream ID.
+The default renderer timeout is ten minutes. A supplied signal cancels the
+renderer request; desktop Core cooperatively destroys its provider request and
+Android cancels the owned chat task. Store application cleanup for any external
+controller or UI listener.</p>
+<h3 id="example-19">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const arcane = globalThis.Arcane;
+const status = await arcane.localAI.status();
+const model = status.models.ollama.find(function findRunnableChatModel(candidate) {
+    return candidate.runnable === true;
+});
+
+if (!model) {
+    throw new Error(&#39;No admitted local model is currently runnable.&#39;);
+}
+
+function handleChatChunk(chunk, metadata) {
+    console.info(metadata.operation, chunk.done === true ? &#39;done&#39; : &#39;working&#39;);
+}
+
+const result = await arcane.ollama.chat({
+    model: model.id,
+    messages: [{role: &#39;user&#39;, content: &#39;Reply with one short sentence.&#39;}]
+}, {
+    onChunk: handleChatChunk,
+    timeoutMs: 120000
+});
+
+console.info(result.message?.content ?? &#39;No text returned&#39;);
+</code></pre></div>
+<h2 id="arcaneollamaembed">Arcane.ollama.embed()</h2>
+<h3 id="overview-20">Overview</h3>
+<p><code>Arcane.ollama.embed(request)</code> creates provider-native local embeddings after
+Core re-admits the exact model and requested context. Use it only when an
+application intentionally owns the Ollama embedding contract and the returned
+vectors&#39; storage/privacy lifecycle.</p>
+<h3 id="parameters-20">Parameters</h3>
+<p><code>request</code> is a closed plain object of at most 8 MiB. Required <code>model</code> uses the
+Ollama name pattern. Supported provider fields are <code>input</code> (text or a batch),
+<code>truncate</code>, <code>dimensions</code>, <code>keep_alive</code>, and <code>options</code>; when present,
+<code>options.num_ctx</code> is 1,024-262,144. Nested provider-native values are forwarded
+for Ollama to validate.</p>
+<h3 id="return-value-20">Return value</h3>
+<p>It resolves to Ollama&#39;s bounded provider-native embed envelope, including the
+provider&#39;s vectors and metadata. Arcane does not normalize vector count or
+dimension into a separate stable entity.</p>
+<h3 id="availability-20">Availability</h3>
+<p>This is a desktop Core method requiring <code>ai.inference</code>. Verified models can use
+the managed ensure/repair path before admission. Unverified installed models
+also require <code>ai.models.unverified.inference</code>. Applications with an isolated
+model contract must use their application-owned API, and Android does not
+project direct embed.</p>
+<h3 id="errors-and-recovery-20">Errors and recovery</h3>
+<p>Correct invalid object, unknown field, model, serialization, request-size, or
+context errors before retrying. Model-policy, installation, isolation, and
+resource-admission errors require a currently admitted embedding model.
+Provider failures remain local-Ollama errors and never trigger remote fallback.</p>
+<h3 id="streaming-cancellation-and-events-20">Streaming, cancellation, and events</h3>
+<p>The public wrapper does not accept stream controls, a chunk callback, or an
+<code>AbortSignal</code>; it resolves one result and emits no method event. Its renderer
+timeout is ten minutes. Although the Core RPC boundary can cancel an embed
+request when a host control arrives, application code has no per-call signal in
+this API.</p>
+<h3 id="example-20">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function embedNonSensitiveText(verifiedEmbeddingModel, text) {
+    if (typeof text !== &#39;string&#39; || text.length === 0) {
+        throw new TypeError(&#39;Embedding input must be nonempty text.&#39;);
+    }
+    return globalThis.Arcane.ollama.embed({
+        model: verifiedEmbeddingModel,
+        input: text
+    });
+}
+</code></pre></div>
+<h2 id="arcaneollamapull">Arcane.ollama.pull()</h2>
+<h3 id="overview-21">Overview</h3>
+<p><code>Arcane.ollama.pull(model, options?, streamOptions?)</code> is intentionally denied to
+applications. A raw mutable-tag pull lacks integrity-bound pre-download
+evidence and native resource admission. Use an admitted managed selection or
+application-model workflow; do not retry the raw method or call Ollama&#39;s
+loopback endpoint directly.</p>
+<h3 id="parameters-21">Parameters</h3>
+<p>The wrapper accepts a model name, optional <code>{insecure}</code>, and optional stream
+controls. Model names use the 1-256 character Ollama pattern and <code>insecure</code>
+would be provider-native registry control. These arguments do not relax the
+Core policy denial.</p>
+<h3 id="return-value-21">Return value</h3>
+<p>For application callers the method returns <code>Promise&lt;never&gt;</code>: it rejects before
+issuing a provider pull and therefore has no success envelope.</p>
+<h3 id="availability-21">Availability</h3>
+<p>The vocabulary is present only at desktop Core&#39;s <code>ai.models.manage</code> boundary,
+but every admitted application call is denied. Verified-only policy returns
+<code>MANAGED_MODEL_WORKFLOW_REQUIRED</code>; unverified-model policy returns
+<code>UNVERIFIED_MODEL_MUTATION_FORBIDDEN</code>. Android and browser previews do not gain
+model-management authority.</p>
+<h3 id="errors-and-recovery-21">Errors and recovery</h3>
+<p>Both policy errors are terminal for this raw method. Choose a model through
+<code>Arcane.ollama.select()</code> or another package-bound managed workflow that performs
+registry evidence, integrity verification, and resource admission. Do not
+weaken transport security with <code>insecure</code> as a workaround.</p>
+<h3 id="streaming-cancellation-and-events-21">Streaming, cancellation, and events</h3>
+<p>Although the wrapper signature accepts stream controls, Core rejects before a
+provider request, so there are no chunks or operation events to cancel.</p>
+<h3 id="example-21">Example</h3>
+<p>This safe example demonstrates the required denial without starting a download.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">try {
+    await globalThis.Arcane.ollama.pull(&#39;gemma3:latest&#39;);
+    throw new Error(&#39;Raw Ollama pull unexpectedly succeeded.&#39;);
+} catch (error) {
+    const expectedCodes = [
+        &#39;MANAGED_MODEL_WORKFLOW_REQUIRED&#39;,
+        &#39;UNVERIFIED_MODEL_MUTATION_FORBIDDEN&#39;
+    ];
+    if (!expectedCodes.includes(error.code)) {
+        throw error;
+    }
+    console.info(&#39;Use the managed Arcane model workflow.&#39;);
+}
+</code></pre></div>
+<h2 id="arcaneollamapush">Arcane.ollama.push()</h2>
+<h3 id="overview-22">Overview</h3>
+<p><code>Arcane.ollama.push(model, options?, streamOptions?)</code> pushes an exact
+package-authorized verified model through the local Ollama provider. It can
+transfer model data to a configured registry. Use it only after explicit user
+authorization and provider/registry review; ordinary applications should not
+expose raw model publishing.</p>
+<h3 id="parameters-22">Parameters</h3>
+<p><code>model</code> is required and must be both a valid Ollama name and an app-owned
+verified definition. The optional provider object contains only Boolean
+<code>insecure</code>; keep it false unless an approved development registry explicitly
+requires otherwise. Stream controls can be a named callback or <code>{onChunk, signal, timeoutMs}</code> and are not forwarded as provider fields.</p>
+<h3 id="return-value-22">Return value</h3>
+<p>It resolves to the bounded provider-native push envelope. With a chunk callback,
+the callback receives <code>(chunk, {operation: &quot;push&quot;, streamId})</code>, and the promise
+resolves with the final provider chunk.</p>
+<h3 id="availability-22">Availability</h3>
+<p>This is an exclusive desktop Core mutation requiring <code>ai.models.manage</code> and an
+exact verified-only package model. Unverified-model mode is inference-only.
+Android and browser previews do not expose it.</p>
+<h3 id="errors-and-recovery-22">Errors and recovery</h3>
+<p>Invalid request/model errors require correction. Missing verified policy or an
+unknown app model is not retryable without a new package. Registry/provider
+failures can be retried only after confirming that a duplicate or partial
+remote publication is safe. Never place registry credentials in the request or
+logs.</p>
+<h3 id="streaming-cancellation-and-events-22">Streaming, cancellation, and events</h3>
+<p>Chunks use wrapper-filtered <code>ollama.chunk</code> events. The default renderer timeout
+is 50 minutes. A supplied signal stops renderer observation, but push is not in
+Core&#39;s cooperatively cancellable method set; the host/provider mutation can
+continue. Aborting is not rollback, and no <code>ArcaneOperation</code> receipt is added
+to the provider-native result.</p>
+<h3 id="example-22">Example</h3>
+<p>The helper is deliberately not invoked. Call it only after an admitted UI has
+obtained explicit publishing confirmation.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function pushVerifiedModelAfterConfirmation(model) {
+    function reportPushChunk(chunk) {
+        console.info(chunk.status ?? &#39;Push is running.&#39;);
+    }
+
+    return globalThis.Arcane.ollama.push(model, {insecure: false}, {
+        onChunk: reportPushChunk,
+        timeoutMs: 3000000
+    });
+}
+</code></pre></div>
+<h2 id="arcaneollamacreate">Arcane.ollama.create()</h2>
+<h3 id="overview-23">Overview</h3>
+<p><code>Arcane.ollama.create(request, streamOptions?)</code> exposes a tightly restricted
+verified model-definition create path. Core accepts creation only for an exact
+app-owned model and rechecks the base model and resource admission. Prefer the
+managed selection or <code>createBrain()</code> workflow unless the application package
+explicitly owns this definition.</p>
+<h3 id="parameters-23">Parameters</h3>
+<p>The closed request is at most 8 MiB and requires a valid <code>model</code>. The direct
+parser recognizes <code>from</code>, <code>files</code>, <code>adapters</code>, <code>template</code>, <code>license</code>, <code>system</code>,
+<code>parameters</code>, <code>messages</code>, and <code>quantize</code>. The managed verified boundary requires
+<code>from</code>, normalized <code>system</code>, and <code>parameters</code> to match the package definition
+exactly and forbids <code>files</code> and <code>adapters</code>. Do not add other provider-native
+controls unless the package contract expressly owns them. Reserved Arcane and
+rollback aliases are denied. Stream controls are a callback or <code>{onChunk, signal, timeoutMs}</code>.</p>
+<h3 id="return-value-23">Return value</h3>
+<p>It resolves to Ollama&#39;s bounded provider-native create envelope. With
+<code>onChunk</code>, callbacks receive <code>(chunk, {operation: &quot;create&quot;, streamId})</code>, and
+the promise resolves to the final chunk. This raw response does not include an
+<code>ArcaneOperation</code>.</p>
+<h3 id="availability-23">Availability</h3>
+<p>This is an exclusive desktop Core mutation requiring <code>ai.models.manage</code>,
+verified-only package policy, and an exact app-owned definition. Unverified
+mode, Android, browser previews, and reserved aliases cannot use it.</p>
+<h3 id="errors-and-recovery-23">Errors and recovery</h3>
+<p><code>MODEL_NOT_APP_VERIFIED</code>, <code>MODEL_DEFINITION_VERIFICATION_FAILED</code>, managed-
+workflow, resource-admission, and unverified-mutation errors require the
+package-owned workflow rather than edited renderer input. Provider failure can
+leave uncertain local creation state; refresh model inventory and verification
+before retrying.</p>
+<h3 id="streaming-cancellation-and-events-23">Streaming, cancellation, and events</h3>
+<p>Create chunks are filtered by the wrapper&#39;s stream ID. The default renderer
+timeout is 50 minutes. A supplied signal rejects renderer observation, but
+Core does not cooperatively cancel this raw create mutation; verify final local
+state after timeout or teardown.</p>
+<h3 id="example-23">Example</h3>
+<p>The helper is intentionally not invoked. Its definition must come from
+immutable package-owned policy, never user-edited JSON.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function createVerifiedDefinition(definition) {
+    function reportCreateChunk(chunk) {
+        console.info(chunk.status ?? &#39;Create is running.&#39;);
+    }
+
+    return globalThis.Arcane.ollama.create({
+        model: definition.name,
+        from: definition.from,
+        system: definition.system,
+        parameters: definition.parameters
+    }, {
+        onChunk: reportCreateChunk,
+        timeoutMs: 3000000
+    });
+}
+</code></pre></div>
+<h2 id="arcaneollamacopy">Arcane.ollama.copy()</h2>
+<h3 id="overview-24">Overview</h3>
+<p><code>Arcane.ollama.copy(source, destination)</code> is intentionally denied to every
+application. Raw alias copying is reserved to Arcane&#39;s integrity-gated managed
+selection workflow.</p>
+<h3 id="parameters-24">Parameters</h3>
+<p><code>source</code> and <code>destination</code> are required valid Ollama model names. Valid names do
+not make the operation admissible.</p>
+<h3 id="return-value-24">Return value</h3>
+<p>The application contract is <code>Promise&lt;never&gt;</code>: Core always rejects before a
+provider copy and produces no success result.</p>
+<h3 id="availability-24">Availability</h3>
+<p>The method sits behind the desktop Core <code>ai.models.manage</code> boundary but remains
+denied under both verified and unverified application policy. Android and
+browser previews do not expose it.</p>
+<h3 id="errors-and-recovery-24">Errors and recovery</h3>
+<p>Core returns <code>UNVERIFIED_MODEL_MUTATION_FORBIDDEN</code> with a resolution directing
+the caller to a managed model-selection workflow. Treat it as a policy result,
+not a transient provider failure.</p>
+<h3 id="streaming-cancellation-and-events-24">Streaming, cancellation, and events</h3>
+<p>The method does not reach the provider, stream chunks, accept a signal, or emit
+operation events.</p>
+<h3 id="example-24">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">try {
+    await globalThis.Arcane.ollama.copy(
+        &#39;gemma3:latest&#39;,
+        &#39;my-copy:latest&#39;
+    );
+    throw new Error(&#39;Raw Ollama copy unexpectedly succeeded.&#39;);
+} catch (error) {
+    if (error.code !== &#39;UNVERIFIED_MODEL_MUTATION_FORBIDDEN&#39;) {
+        throw error;
+    }
+    console.info(&#39;Use the managed Arcane selection workflow.&#39;);
+}
+</code></pre></div>
+<h2 id="arcaneollamadelete">Arcane.ollama.delete()</h2>
+<h3 id="overview-25">Overview</h3>
+<p><code>Arcane.ollama.delete(model)</code> deletes an exact package-owned verified model
+through Ollama. This destructive raw mutation can invalidate application state;
+prefer the owning managed lifecycle and require explicit user authorization.</p>
+<h3 id="parameters-25">Parameters</h3>
+<p><code>model</code> is a required Ollama name and must resolve to an exact app-owned
+verified definition. Reserved Arcane and rollback aliases are denied.</p>
+<h3 id="return-value-25">Return value</h3>
+<p>It resolves to Ollama&#39;s bounded provider-native delete response. The raw result
+does not contain a managed <code>ArcaneOperation</code> receipt.</p>
+<h3 id="availability-25">Availability</h3>
+<p>This is an exclusive desktop Core mutation requiring <code>ai.models.manage</code> and
+verified-only package policy. Unverified mode is inference-only. Android and
+browser previews do not expose delete.</p>
+<h3 id="errors-and-recovery-25">Errors and recovery</h3>
+<p>Invalid model, unverified-policy, missing app definition, and reserved-alias
+errors require the managed package workflow. Provider failure can leave the
+model&#39;s final state uncertain; refresh raw inventory and package verification
+before deciding whether a retry is safe.</p>
+<h3 id="streaming-cancellation-and-events-25">Streaming, cancellation, and events</h3>
+<p>Delete is non-streaming, emits no managed operation events, and exposes no
+signal. The renderer timeout is two minutes. Page teardown can stop observation
+without rolling back host work.</p>
+<h3 id="example-25">Example</h3>
+<p>The helper is not invoked. Call it only after the owning application has shown
+the exact verified model and obtained destructive-action confirmation.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function deleteVerifiedModelAfterConfirmation(model) {
+    return globalThis.Arcane.ollama.delete(model);
+}
+</code></pre></div>
+<h2 id="arcaneollamaselection">Arcane.ollama.selection()</h2>
+<h3 id="overview-26">Overview</h3>
+<p><code>Arcane.ollama.selection()</code> reads the current managed Arcane model preference
+and resolved runtime/provider state. Use it in Settings or Shell to explain the
+managed selection; use <code>localAI.status()</code> for an application&#39;s currently
+runnable model catalog.</p>
+<h3 id="parameters-26">Parameters</h3>
+<p>The method takes no arguments.</p>
+<h3 id="return-value-26">Return value</h3>
+<p>It resolves to <code>ArcaneModelSelection</code>: preference, recommended/effective/active
+variant, model and alias, default/boot settings, provider and OpenAI model,
+response length, credential-presence Boolean, bounded GPU diagnostics, and
+<code>recommendationPending</code>. The snapshot is diagnostic state, not admission for a
+later request.</p>
+<h3 id="availability-26">Availability</h3>
+<p>This desktop Core read requires <code>ai.models.read</code> and is admitted only to
+Settings and Shell. It is not projected to Android or browser previews.</p>
+<h3 id="errors-and-recovery-26">Errors and recovery</h3>
+<p>Method admission and transport errors require the correct app or host. If
+automatic recommendation is pending, display that state rather than treating
+the current model as a failed selection; refresh after the managed workflow
+completes.</p>
+<h3 id="streaming-cancellation-and-events-26">Streaming, cancellation, and events</h3>
+<p>This is a non-streaming snapshot with no method event or signal. A concurrent
+selection or settings mutation can make it stale immediately.</p>
+<h3 id="example-26">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const selection = await globalThis.Arcane.ollama.selection();
+
+console.info({
+    preference: selection.preference,
+    effectiveVariant: selection.effectiveVariant,
+    model: selection.model,
+    pending: selection.recommendationPending
+});
+</code></pre></div>
+<h2 id="arcaneollamaselect">Arcane.ollama.select()</h2>
+<h3 id="overview-27">Overview</h3>
+<p><code>Arcane.ollama.select(preference)</code> runs the managed model-selection workflow.
+It can download a verified base, create or replace a managed alias, perform
+native resource admission, and change persisted model state. Use it only from
+an admitted Settings or Shell choice with explicit user intent.</p>
+<h3 id="parameters-27">Parameters</h3>
+<p><code>preference</code> is one of <code>&quot;auto&quot;</code>, <code>&quot;3b&quot;</code>, <code>&quot;8b&quot;</code>, <code>&quot;12b&quot;</code>, <code>&quot;20b&quot;</code>, or
+<code>&quot;120b&quot;</code>. It is a managed size preference, not an arbitrary Ollama model name.
+The wrapper maps an omitted or empty value to <code>&quot;auto&quot;</code>.</p>
+<h3 id="return-value-27">Return value</h3>
+<p>It resolves to the selected model, alias, variant, preference, recommendation,
+base model, creation and alias-change effects, model-store and GPU evidence,
+final compatibility, automatic-candidate degradation/failures when relevant,
+rollback-snapshot state, and a completed <code>ArcaneOperation</code>.</p>
+<h3 id="availability-27">Availability</h3>
+<p>This is an exclusive desktop Core mutation requiring <code>ai.models.manage</code> and
+Settings or Shell identity. Package-bound verified definitions and current
+native capacity govern which preference can complete. Android does not expose
+the workflow.</p>
+<h3 id="errors-and-recovery-27">Errors and recovery</h3>
+<p><code>INVALID_ARCANE_MODEL_PREFERENCE</code> requires an enum value. Registry, integrity,
+definition, native-admission, storage, alias, load, and rollback errors preserve
+stable codes and resolutions. If <code>rollbackSnapshotRetained</code> is true on success,
+surface the recovery detail rather than deleting the retained alias from
+renderer code.</p>
+<h3 id="streaming-cancellation-and-events-27">Streaming, cancellation, and events</h3>
+<p>Selection emits standard operation lifecycle, log, and progress events. The
+wrapper uses a 50-minute timeout and exposes no signal; Core does not
+cooperatively cancel this managed workflow. A renderer timeout is not evidence
+that download or alias mutation stopped, so refresh <code>selection()</code> and status
+before retrying.</p>
+<h3 id="example-27">Example</h3>
+<p>The helper is deliberately not invoked; call it only after the user confirms
+the managed size choice and possible download.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function selectManagedModelAfterConfirmation(preference) {
+    const allowed = new Set([&#39;auto&#39;, &#39;3b&#39;, &#39;8b&#39;, &#39;12b&#39;, &#39;20b&#39;, &#39;120b&#39;]);
+    if (!allowed.has(preference)) {
+        throw new TypeError(&#39;Choose a documented Arcane model preference.&#39;);
+    }
+    return globalThis.Arcane.ollama.select(preference);
+}
+</code></pre></div>
+<h2 id="arcaneollamasettings">Arcane.ollama.settings()</h2>
+<h3 id="overview-28">Overview</h3>
+<p><code>Arcane.ollama.settings()</code> reads the complete managed AI runtime/provider
+settings snapshot for the Settings application. It returns the same
+<code>ArcaneModelSelection</code> shape as <code>selection()</code>, but has the stronger
+settings-management boundary.</p>
+<h3 id="parameters-28">Parameters</h3>
+<p>The method takes no arguments.</p>
+<h3 id="return-value-28">Return value</h3>
+<p>The snapshot contains model preference and aliases, default/boot settings,
+provider, OpenAI model, response length, protected-credential presence, GPU
+diagnostics, and recommendation state. Credentials are never returned.</p>
+<h3 id="availability-28">Availability</h3>
+<p>This is a desktop Core Settings-only API requiring <code>ai.settings.manage</code>.
+Android and browser previews do not expose it.</p>
+<h3 id="errors-and-recovery-28">Errors and recovery</h3>
+<p>Method-admission or transport errors require the correct Settings host. Treat
+the result as a single snapshot; do not merge stale provider fields into a
+later runtime-settings save.</p>
+<h3 id="streaming-cancellation-and-events-28">Streaming, cancellation, and events</h3>
+<p>This is a non-streaming read with no method event or signal. A concurrent
+settings or selection mutation can invalidate it immediately.</p>
+<h3 id="example-28">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const settings = await globalThis.Arcane.ollama.settings();
+
+console.info({
+    defaultModel: settings.defaultModel,
+    bootLoad: settings.bootLoad,
+    contextLength: settings.contextLength
+});
+</code></pre></div>
+<h2 id="arcaneollamasavesettings">Arcane.ollama.saveSettings()</h2>
+<h3 id="overview-29">Overview</h3>
+<p><code>Arcane.ollama.saveSettings(settings)</code> saves runtime-owned Ollama defaults. Use
+it for default model, managed startup load, residency, and context. Use
+<code>select()</code> for the size preference and <code>ai.saveProviderSettings()</code> for provider,
+OpenAI model, credential, and response length.</p>
+<h3 id="parameters-29">Parameters</h3>
+<p>Recognized fields are <code>defaultModel</code>, <code>bootLoad</code>, <code>bootKeepAlive</code>, and
+<code>contextLength</code>; omissions preserve current values. <code>defaultModel</code> uses the
+Ollama name pattern. <code>bootLoad</code> is Boolean. <code>bootKeepAlive</code> is <code>&quot;5m&quot;</code>, <code>&quot;30m&quot;</code>,
+<code>&quot;1h&quot;</code>, <code>&quot;24h&quot;</code>, or <code>&quot;-1&quot;</code>. <code>contextLength</code> is <code>0</code> for Automatic or
+1,024-262,144. Unknown keys, including stale provider/preference fields, are
+ignored so they cannot overwrite newer provider selection; do not send them.</p>
+<h3 id="return-value-29">Return value</h3>
+<p>It resolves to the complete updated <code>ArcaneModelSelection</code> settings snapshot
+plus a completed <code>operation</code>. It does not return selection-only mutation fields
+such as <code>created</code>, <code>baseModel</code>, or <code>aliasChanged</code>.</p>
+<h3 id="availability-29">Availability</h3>
+<p>This is an exclusive desktop Core Settings mutation requiring
+<code>ai.settings.manage</code>. When Ollama is selected, the default model must be
+installed. Enabling boot load performs resource admission and loads the model.
+Android does not expose this method.</p>
+<h3 id="errors-and-recovery-29">Errors and recovery</h3>
+<p>Correct invalid model, keep-alive, or context values locally. A missing default
+model, native-admission failure, load failure, or persistence error requires the
+stable resolution and a fresh settings read before retry. Unknown stale fields
+are intentionally ignored rather than validated.</p>
+<h3 id="streaming-cancellation-and-events-29">Streaming, cancellation, and events</h3>
+<p>The save emits standard operation events but no provider chunks. It uses the
+50-minute renderer timeout and has no signal. Core does not cooperatively cancel
+the mutation, so refresh <code>settings()</code> after an uncertain completion.</p>
+<h3 id="example-29">Example</h3>
+<p>The helper fetches current state and changes only runtime-owned fields. It is
+not invoked until an admitted Settings UI has confirmed the desired values.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function saveRuntimeSettingsAfterConfirmation(desired) {
+    return globalThis.Arcane.ollama.saveSettings({
+        defaultModel: desired.defaultModel,
+        bootLoad: desired.bootLoad,
+        bootKeepAlive: desired.bootKeepAlive,
+        contextLength: desired.contextLength
+    });
+}
+</code></pre></div>
+<h2 id="arcaneollamacreatebrain">Arcane.ollama.createBrain()</h2>
+<h3 id="overview-30">Overview</h3>
+<p><code>Arcane.ollama.createBrain(definition)</code> creates a managed
+<code>arcane-&lt;slug&gt;:latest</code> model from an approved base. It can pull or repair the
+base, create the alias, verify it, and optionally make it the default. Use it
+only from Settings after explaining download, storage, and default-model
+effects.</p>
+<h3 id="parameters-30">Parameters</h3>
+<p><code>baseModel</code> is required and uses the Ollama name pattern. <code>name</code> defaults to
+<code>&quot;my-brain&quot;</code> and is normalized to a lowercase 1-64 character slug using
+letters, digits, dots, underscores, and hyphens. <code>contextLength</code> defaults to <code>0</code>
+for inherited/automatic; send only <code>0</code> or an explicit 1,024-262,144 value.
+<code>makeDefault</code> defaults to false. Unknown keys are ignored and should not be
+sent.</p>
+<h3 id="return-value-30">Return value</h3>
+<p>It resolves to <code>{model, baseModel, defaultModel, operation}</code>. <code>model</code> is the
+created Arcane alias, <code>defaultModel</code> reports whether it became the default, and
+<code>operation</code> is the completed managed receipt.</p>
+<h3 id="availability-30">Availability</h3>
+<p>This is an exclusive desktop Core Settings mutation requiring
+<code>ai.models.manage</code>. The package-owned verified workflow, registry evidence,
+resource admission, and reserved-alias rules remain authoritative. Android
+does not expose it.</p>
+<h3 id="errors-and-recovery-30">Errors and recovery</h3>
+<p>Invalid base/name/context, model-policy, registry, integrity, storage,
+admission, provider-create, alias-verification, and persistence failures require
+the stable resolution. After uncertain completion, refresh inventory and
+settings before retrying; do not manually copy or delete managed aliases.</p>
+<h3 id="streaming-cancellation-and-events-30">Streaming, cancellation, and events</h3>
+<p>The workflow emits standard operation events but does not expose raw Ollama
+chunks. It has a 50-minute renderer timeout and no signal; Core does not
+cooperatively cancel it, so teardown is not rollback.</p>
+<h3 id="example-30">Example</h3>
+<p>This helper is not invoked until the Settings application confirms the exact
+base, name, context, and default-model effect.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function createBrainAfterConfirmation(baseModel, name) {
+    return globalThis.Arcane.ollama.createBrain({
+        baseModel: baseModel,
+        name: name,
+        contextLength: 0,
+        makeDefault: false
+    });
+}
+</code></pre></div>
+<h2 id="arcaneollamaservicesettings">Arcane.ollama.serviceSettings()</h2>
+<h3 id="overview-31">Overview</h3>
+<p><code>Arcane.ollama.serviceSettings()</code> reads host-owned Ollama service configuration.
+Use it to initialize the advanced Settings surface. Its object is intentionally
+platform-dependent; feature-detect support and fields instead of assuming one
+cross-platform exact shape.</p>
+<h3 id="parameters-31">Parameters</h3>
+<p>The method takes no arguments.</p>
+<h3 id="return-value-31">Return value</h3>
+<p>Microsoft NT reports effective settings and support state, including context,
+residency, loaded-model, parallelism, queue, flash-attention, K/V-cache, and
+no-cloud controls. Linux currently returns <code>supported: false</code> with a reason and
+bounded administrative defaults because systemd override management remains
+administrator-owned.</p>
+<h3 id="availability-31">Availability</h3>
+<p>This is a desktop Core Settings-only method requiring <code>ai.settings.manage</code>.
+The current Android projection and browser previews do not expose host service
+settings.</p>
+<h3 id="errors-and-recovery-31">Errors and recovery</h3>
+<p>Transport or native-adapter errors should leave controls read-only and present
+the returned resolution. <code>supported: false</code> is a valid platform state, not a
+reason to attempt renderer-side service-file edits.</p>
+<h3 id="streaming-cancellation-and-events-31">Streaming, cancellation, and events</h3>
+<p>This is a non-streaming read with no method event or signal. Treat the result
+as a snapshot; machine capacity or administrator configuration can change
+before a later save.</p>
+<h3 id="example-31">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const state = await globalThis.Arcane.ollama.serviceSettings();
+
+if (state.supported === false) {
+    console.info(state.reason ?? &#39;Service settings are managed externally.&#39;);
+} else {
+    console.info(state.numParallel, state.maxLoadedModels);
+}
+</code></pre></div>
+<h2 id="arcaneollamasaveservicesettings">Arcane.ollama.saveServiceSettings()</h2>
+<h3 id="overview-32">Overview</h3>
+<p><code>Arcane.ollama.saveServiceSettings(settings)</code> applies host-level Ollama service
+settings. It can restart the managed service, unload models, clamp requested
+parallel/load values to current capacity, and affect every local client. Use it
+only in advanced Settings with explicit machine-wide impact disclosure.</p>
+<h3 id="parameters-32">Parameters</h3>
+<p>Omitted fields receive defaults rather than preserving current values, so send
+the complete desired object. <code>contextLength</code> is 0-262,144; <code>keepAlive</code> is
+<code>&quot;-1&quot;</code>, <code>&quot;0&quot;</code>, or 1-9,999 plus <code>m</code> or <code>h</code>; <code>maxLoadedModels</code> is 0-16;
+<code>numParallel</code> is 1-16; <code>maxQueue</code> is 1-4,096; <code>flashAttention</code> and <code>noCloud</code> are
+Booleans; and <code>kvCacheType</code> is <code>&quot;f16&quot;</code>, <code>&quot;q8_0&quot;</code>, or <code>&quot;q4_0&quot;</code>. Defaults are
+0, <code>&quot;5m&quot;</code>, 1, 1, 512, false, <code>&quot;f16&quot;</code>, and true respectively. Unknown keys are
+ignored and should not be sent.</p>
+<h3 id="return-value-32">Return value</h3>
+<p>It resolves to the native platform result plus a completed <code>ArcaneOperation</code>.
+Microsoft NT reports requested and effective values, support/clamping detail,
+restart state, recommendation, and post-change health. Require
+<code>healthy === true</code> when that field is present.</p>
+<h3 id="availability-32">Availability</h3>
+<p>This is a privileged, exclusive desktop Core Settings method requiring
+<code>ai.settings.manage</code>. Microsoft NT currently applies the managed change. Linux
+rejects with <code>OLLAMA_SERVICE_SETTINGS_MANUAL</code> because the systemd override is
+administrator-managed. Android does not expose it.</p>
+<h3 id="errors-and-recovery-32">Errors and recovery</h3>
+<p>Correct invalid ranges and enums before calling. Unsupported/manual-platform,
+managed-service health, installation-lease, apply, restart, postcondition, and
+rollback errors require the stable resolution. After an uncertain completion,
+read <code>serviceSettings()</code> and local status before another mutation. Never edit
+service files or environment from renderer code.</p>
+<h3 id="streaming-cancellation-and-events-32">Streaming, cancellation, and events</h3>
+<p>The workflow emits standard operation lifecycle and progress events, not raw
+provider chunks. It uses a 50-minute renderer timeout and has no signal. Core
+does not cooperatively cancel it; timeout or page teardown can occur while the
+machine-wide transaction continues.</p>
+<h3 id="example-32">Example</h3>
+<p>The helper sends a complete desired state and is deliberately not invoked until
+the Settings application has obtained explicit restart confirmation.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function saveServiceSettingsAfterConfirmation(desired) {
+    return globalThis.Arcane.ollama.saveServiceSettings({
+        contextLength: desired.contextLength,
+        keepAlive: desired.keepAlive,
+        maxLoadedModels: desired.maxLoadedModels,
+        numParallel: desired.numParallel,
+        maxQueue: desired.maxQueue,
+        flashAttention: desired.flashAttention,
+        kvCacheType: desired.kvCacheType,
+        noCloud: desired.noCloud
+    });
+}
+</code></pre></div>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/core/reference/arcane-api/ai-and-ollama.md" target="_blank" rel="noreferrer"><code>docs/reference/core/reference/arcane-api/ai-and-ollama.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#arcaneaimodels">Arcane.ai.models()</a><a href="#arcaneaichat">Arcane.ai.chat()</a><a href="#arcaneaiprofile">Arcane.ai.profile()</a><a href="#arcaneaiprovidersettings">Arcane.ai.providerSettings()</a><a href="#arcaneaisaveprovidersettings">Arcane.ai.saveProviderSettings()</a><a href="#arcaneaiprovidermodels">Arcane.ai.providerModels()</a><a href="#arcanelocalaistatus">Arcane.localAI.status()</a><a href="#arcanelocalaiensureplatform">Arcane.localAI.ensurePlatform()</a><a href="#arcanelocalairecover">Arcane.localAI.recover()</a><a href="#arcanelocalaisetparallelrequests">Arcane.localAI.setParallelRequests()</a><a href="#arcanespeechstatus">Arcane.speech.status()</a><a href="#arcanespeechsynthesize">Arcane.speech.synthesize()</a><a href="#arcanespeechtranscribe">Arcane.speech.transcribe()</a><a href="#arcaneollamaversion">Arcane.ollama.version()</a><a href="#arcaneollamamodels">Arcane.ollama.models()</a><a href="#arcaneollamalist">Arcane.ollama.list()</a><a href="#arcaneollamarunning">Arcane.ollama.running()</a><a href="#arcaneollamashow">Arcane.ollama.show()</a><a href="#arcaneollamagenerate">Arcane.ollama.generate()</a><a href="#arcaneollamachat">Arcane.ollama.chat()</a><a href="#arcaneollamaembed">Arcane.ollama.embed()</a><a href="#arcaneollamapull">Arcane.ollama.pull()</a><a href="#arcaneollamapush">Arcane.ollama.push()</a><a href="#arcaneollamacreate">Arcane.ollama.create()</a><a href="#arcaneollamacopy">Arcane.ollama.copy()</a><a href="#arcaneollamadelete">Arcane.ollama.delete()</a><a href="#arcaneollamaselection">Arcane.ollama.selection()</a><a href="#arcaneollamaselect">Arcane.ollama.select()</a><a href="#arcaneollamasettings">Arcane.ollama.settings()</a><a href="#arcaneollamasavesettings">Arcane.ollama.saveSettings()</a><a href="#arcaneollamacreatebrain">Arcane.ollama.createBrain()</a><a href="#arcaneollamaservicesettings">Arcane.ollama.serviceSettings()</a><a href="#arcaneollamasaveservicesettings">Arcane.ollama.saveServiceSettings()</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../../../../architecture/">Architecture</a><a href="../../../../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

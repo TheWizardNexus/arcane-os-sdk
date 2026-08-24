@@ -1,0 +1,903 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="Arcane components are reusable HTML fragments loaded through the shared element. They are browser UI, so they run in an ordinary supported browser renderer…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-components/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane runtime component catalog · Arcane OS SDK"><meta property="og:description" content="Arcane components are reusable HTML fragments loaded through the shared element. They are browser UI, so they run in an ordinary supported browser renderer…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-components/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane runtime component catalog · Arcane OS SDK"><meta name="twitter:description" content="Arcane components are reusable HTML fragments loaded through the shared element. They are browser UI, so they run in an ordinary supported browser renderer…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane runtime component catalog | Arcane OS SDK</title><script src="../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane runtime component catalog</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-runtime-component-catalog">Arcane runtime component catalog</h1><p class="doc-lead">Arcane components are reusable HTML fragments loaded through the shared element. They are browser UI, so they run in an ordinary supported browser renderer…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="./" aria-current="page">Components</a><a href="../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama module</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/runtime-components.md"><p>Arcane components are reusable HTML fragments loaded through the shared <code>&lt;html-import&gt;</code> element. They are browser UI, so they run in an ordinary supported browser renderer and in native Arcane WebViews. They do not run in Node or as cloud services.</p>
+<p>A component file does not register its own custom element. The <code>&lt;html-import&gt;</code> host fetches the fragment from the same origin, attaches an open shadow root, runs its inline scripts with <code>this</code> bound to the host, and publishes <code>html-import-ready</code> or <code>html-import-error</code>. Component methods and properties are attached to that host.</p>
+<h2 id="basic-loading-pattern">Basic loading pattern</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;script type=&quot;module&quot;&gt;
+  import &#39;/arcane/modules/HTMLImport.js&#39;;
+&lt;/script&gt;
+
+&lt;html-import id=&quot;widget&quot; href=&quot;/arcane/components/weather-widget.html&quot;&gt;&lt;/html-import&gt;
+
+&lt;script type=&quot;module&quot;&gt;
+  const widget = document.querySelector(&#39;#widget&#39;);
+  widget.addEventListener(&#39;html-import-ready&#39;, () =&gt; {
+      console.log(&#39;Component methods are attached.&#39;, typeof widget.setWeather);
+  }, {once: true});
+&lt;/script&gt;
+</code></pre></div>
+<h2 id="canonical-inventory">Canonical inventory</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Capability</th>
+<th>Principal methods</th>
+<th>Events</th>
+<th>Normalization</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="#app-barhtml"><code>app-bar.html</code></a></td>
+<td>Responsive application navigation, route state, status, and trailing actions.</td>
+<td><code>setNavigation()</code><br><code>setActiveRoute()</code><br><code>setStatus()</code><br><code>refresh()</code></td>
+<td><code>app-bar-ready</code></td>
+<td>DOM-normalized</td>
+</tr>
+<tr>
+<td><a href="#assistant-panelhtml"><code>assistant-panel.html</code></a></td>
+<td>Reusable assistant drawer, message area, composer, pending/streaming/empty/error state, and actions.</td>
+<td><code>open()</code><br><code>close()</code><br><code>toggle()</code><br><code>send()</code><br><code>clear()</code><br><code>setState()</code><br><code>focusComposer()</code><br><code>scrollToEnd()</code></td>
+<td><code>assistant-ready</code><br><code>assistant-send</code><br><code>assistant-clear</code></td>
+<td>DOM-normalized; caller/provider results remain external</td>
+</tr>
+<tr>
+<td><a href="#calculatorhtml"><code>calculator.html</code></a></td>
+<td>Calculator keypad and result/error event surface backed by CalculatorEngine.</td>
+<td><code>calculate()</code></td>
+<td><code>calculator-ready</code><br><code>calculation-complete</code><br><code>calculation-error</code></td>
+<td>Normalized Calculation/error events</td>
+</tr>
+<tr>
+<td><a href="#charthtml"><code>chart.html</code></a></td>
+<td>Accessible uPlot line, area, or point chart with normalized options and rows.</td>
+<td><code>configure()</code><br><code>populate()</code><br><code>setData()</code><br><code>addData()</code><br><code>update()</code><br><code>destroy()</code></td>
+<td><code>chart-ready</code><br><code>chart-remove</code></td>
+<td>Options/rows normalized; uPlot rendering is vendor-native</td>
+</tr>
+<tr>
+<td><a href="#chathtml"><code>chat.html</code></a></td>
+<td>Shared chat, file upload, streaming, speech, language, availability, and conversation-timebox surface.</td>
+<td><code>streamMessage()</code><br><code>setMessageProgress()</code><br><code>setAIAvailability()</code><br><code>setInitialSpeechMuted()</code><br><code>setConversationComplete()</code><br><code>bindConversationTimebox()</code><br><code>submitMessage()</code><br><code>sendMessage()</code><br><code>languageChanged()</code></td>
+<td><code>chat-ready</code><br><code>chat-send-message</code><br><code>chat-send-error</code><br><code>chat-file-uploaded</code><br><code>chat-language-changed</code><br><code>conversation-timebox-error</code></td>
+<td>UI state normalized; AI/storage/media behavior mixed</td>
+</tr>
+<tr>
+<td><a href="#conversation-viewhtml"><code>conversation-view.html</code></a></td>
+<td>Provider-neutral conversation display, advisory actions, composer, busy state, and status.</td>
+<td><code>setConversation()</code><br><code>setBusy()</code><br><code>setStatus()</code><br><code>clearComposer()</code></td>
+<td><code>conversation-view-ready</code><br><code>communication-send</code><br><code>communication-advisory-action</code></td>
+<td>DOM-normalized</td>
+</tr>
+<tr>
+<td><a href="#dashboard-confightml"><code>dashboard-config.html</code></a></td>
+<td>Selects which normalized chart definitions are visible on a dashboard.</td>
+<td><code>configure()</code><br><code>setDefinitions()</code><br><code>setVisibility()</code><br><code>getChartOptions()</code><br><code>getEffectiveVisibility()</code><br><code>open()</code><br><code>close()</code></td>
+<td><code>dashboard-config-ready</code><br><code>dashboard-config-opened</code><br><code>dashboard-config-closed</code><br><code>dashboard-config-change</code></td>
+<td>Fully normalized definitions and visibility</td>
+</tr>
+<tr>
+<td><a href="#data-maintenancehtml"><code>data-maintenance.html</code></a></td>
+<td>Runs destructive cleanup of empty chats and memories inside the current app data scope.</td>
+<td><code>open()</code></td>
+<td><code>data-maintenance-ready</code><br><code>data-maintenance-complete</code></td>
+<td>Normalized counts; DBOPFS failures mixed</td>
+</tr>
+<tr>
+<td><a href="#data-viewhtml"><code>data-view.html</code></a></td>
+<td>Opens a generic modal-style data view around an injected provider.</td>
+<td><code>beforeOpen()</code><br><code>open()</code></td>
+<td><code>data-view-ready</code></td>
+<td>DOM-native result</td>
+</tr>
+<tr>
+<td><a href="#directory-pickerhtml"><code>directory-picker.html</code></a></td>
+<td>Presents the provider-owned OS directory chooser with change/cancel/error states.</td>
+<td><code>configure()</code><br><code>focus()</code><br><code>select()</code></td>
+<td><code>directory-picker-ready</code><br><code>directory-picker-change</code><br><code>directory-picker-cancel</code><br><code>directory-picker-error</code></td>
+<td>Strict normalized native selection/error</td>
+</tr>
+<tr>
+<td><a href="#document-inspectorhtml"><code>document-inspector.html</code></a></td>
+<td>Inspects PDF, text, or source documents and records review state.</td>
+<td><code>loadDocument()</code><br><code>selectView()</code><br><code>markSaved()</code></td>
+<td><code>document-inspector-ready</code><br><code>document-review-change</code></td>
+<td>Document state normalized; browser document APIs mixed</td>
+</tr>
+<tr>
+<td><a href="#file-drophtml"><code>file-drop.html</code></a></td>
+<td>Acquires files by drag/drop or picker and presents busy, progress, error, and cleared state.</td>
+<td><code>configure()</code><br><code>openPicker()</code><br><code>clear()</code><br><code>setBusy()</code><br><code>setError()</code><br><code>setProgress()</code></td>
+<td><code>file-drop-ready</code><br><code>file-drop-selected</code><br><code>file-drop-progress</code><br><code>file-drop-state</code><br><code>file-drop-error</code></td>
+<td>State normalized; browser File/drop errors mixed</td>
+</tr>
+<tr>
+<td><a href="#file-inspectorhtml"><code>file-inspector.html</code></a></td>
+<td>Displays file metadata, preview, busy/error state, and caller-defined actions.</td>
+<td><code>configure()</code><br><code>show()</code><br><code>clear()</code><br><code>setActions()</code><br><code>setBusy()</code><br><code>setError()</code><br><code>setPreview()</code></td>
+<td><code>file-inspector-ready</code><br><code>file-inspector-action</code><br><code>file-inspector-change</code><br><code>file-inspector-cleared</code><br><code>file-inspector-error</code></td>
+<td>State normalized; preview/provider behavior mixed</td>
+</tr>
+<tr>
+<td><a href="#file-managerhtml"><code>file-manager.html</code></a></td>
+<td>Browses, filters, selects, opens, and acts on app-scoped files.</td>
+<td><code>setProvider()</code><br><code>loadAll()</code><br><code>setFilter()</code><br><code>select()</code><br><code>clearSelection()</code></td>
+<td><code>file-manager-ready</code><br><code>file-manager-select</code><br><code>file-manager-open</code><br><code>file-manager-action</code></td>
+<td>Selection/filter state normalized; storage/provider behavior mixed</td>
+</tr>
+<tr>
+<td><a href="#headerhtml"><code>header.html</code></a></td>
+<td>Legacy title bar with history, reload, online marker, presentation labels, and 988 link.</td>
+<td>None</td>
+<td>No component-specific event</td>
+<td>Browser/platform-native behavior; no component-ready contract</td>
+</tr>
+<tr>
+<td><a href="#integration-settingshtml"><code>integration-settings.html</code></a></td>
+<td>Edits non-secret communication service configuration and service actions.</td>
+<td><code>configure()</code><br><code>getValues()</code><br><code>setStatus()</code></td>
+<td><code>integration-settings-ready</code><br><code>integration-settings-save</code><br><code>integration-settings-close</code><br><code>integration-action</code></td>
+<td>Normalized non-secret values</td>
+</tr>
+<tr>
+<td><a href="#local-ai-statushtml"><code>local-ai-status.html</code></a></td>
+<td>Presents local-AI standby, failure, recovery, guidance, retry, and dismissal states.</td>
+<td><code>configure()</code><br><code>begin()</code><br><code>present(); hidden property</code></td>
+<td><code>local-ai-status-ready</code><br><code>local-ai-status-dismissed</code><br><code>local-ai-retry</code></td>
+<td>Fully normalized LocalAIReadiness report</td>
+</tr>
+<tr>
+<td><a href="#markdown-documenthtml"><code>markdown-document.html</code></a></td>
+<td>Safely renders and navigates a Markdown document with focusable fragments.</td>
+<td><code>configure()</code><br><code>load()</code><br><code>render()</code><br><code>clear()</code><br><code>fail()</code><br><code>focus()</code><br><code>focusFragment()</code></td>
+<td><code>markdown-document-ready</code><br><code>markdown-document-state</code><br><code>markdown-document-navigate</code></td>
+<td>State/sanitized output normalized; Marked/DOM failures mixed</td>
+</tr>
+<tr>
+<td><a href="#markdown-editorhtml"><code>markdown-editor.html</code></a></td>
+<td>Configurable Markdown authoring, toolbar, preview, title, and save surface.</td>
+<td><code>configure()</code><br><code>focus()</code><br><code>clear()</code><br><code>saveEntry()</code></td>
+<td><code>markdown-editor-ready</code><br><code>markdown-editor-change</code><br><code>markdown-editor-saved</code></td>
+<td>Editor values normalized; injected save result mixed</td>
+</tr>
+<tr>
+<td><a href="#media-embedhtml"><code>media-embed.html</code></a></td>
+<td>Loads a validated YouTube video or playlist embed and exposes external-platform action.</td>
+<td><code>configure()</code><br><code>load()</code></td>
+<td><code>media-embed-ready</code><br><code>media-load</code><br><code>media-error</code><br><code>media-open-platform</code></td>
+<td>URL/error normalized; iframe/platform behavior native</td>
+</tr>
+<tr>
+<td><a href="#modalhtml"><code>modal.html</code></a></td>
+<td>Generic modal with population, open/close, actions, and sequential task execution.</td>
+<td><code>populate()</code><br><code>open()</code><br><code>close()</code><br><code>runTasks()</code></td>
+<td><code>modal-ready</code><br><code>modal-opened</code><br><code>modal-closed</code><br><code>modal-action</code></td>
+<td>Modal state normalized; injected task results mixed</td>
+</tr>
+<tr>
+<td><a href="#output-panelhtml"><code>output-panel.html</code></a></td>
+<td>Presents status, output, body, coverage, actions, pending, error, and cleared states.</td>
+<td><code>configure()</code><br><code>setOutput()</code><br><code>setBody()</code><br><code>setCoverage()</code><br><code>setActions()</code><br><code>setPending()</code><br><code>setStatus()</code><br><code>setError()</code><br><code>clear()</code></td>
+<td><code>output-panel-ready</code><br><code>output-panel-state</code><br><code>output-panel-change</code><br><code>output-panel-action</code><br><code>output-panel-error</code><br><code>output-panel-cleared</code></td>
+<td>DOM-normalized</td>
+</tr>
+<tr>
+<td><a href="#preferences-formhtml"><code>preferences-form.html</code></a></td>
+<td>Builds a schema-driven preferences form with submit, reset, busy, and status behavior.</td>
+<td><code>configure()</code><br><code>getValues()</code><br><code>setValues()</code><br><code>setBusy()</code><br><code>setStatus()</code></td>
+<td><code>preferences-form-ready</code><br><code>preferences-change</code><br><code>preferences-submit</code><br><code>preferences-reset</code></td>
+<td>Normalized form values</td>
+</tr>
+<tr>
+<td><a href="#record-timelinehtml"><code>record-timeline.html</code></a></td>
+<td>Displays chronological records/evidence and emits open actions.</td>
+<td><code>setItems()</code><br><code>populate()</code></td>
+<td><code>record-timeline-ready</code><br><code>record-timeline-open</code></td>
+<td>DOM-normalized</td>
+</tr>
+<tr>
+<td><a href="#relationship-boardhtml"><code>relationship-board.html</code></a></td>
+<td>Displays normalized relationship nodes/edges in graph and list forms.</td>
+<td><code>setGraph()</code><br><code>populate()</code></td>
+<td><code>relationship-board-ready</code><br><code>relationship-node-open</code><br><code>relationship-edge-open</code></td>
+<td>DOM-normalized</td>
+</tr>
+<tr>
+<td><a href="#screen-capturehtml"><code>screen-capture.html</code></a></td>
+<td>Presents image, video, or GIF display-capture workflow.</td>
+<td><code>capture()</code></td>
+<td><code>screen-capture-ready</code><br><code>screen-capture-result</code></td>
+<td>State/result normalized; media permission/codec failures mixed</td>
+</tr>
+<tr>
+<td><a href="#source-code-viewerhtml"><code>source-code-viewer.html</code></a></td>
+<td>Renders line-addressable source code with load, error, focus, and state behavior.</td>
+<td><code>configure()</code><br><code>load()</code><br><code>render()</code><br><code>clear()</code><br><code>fail()</code><br><code>focus()</code><br><code>focusLine()</code></td>
+<td><code>source-code-viewer-ready</code><br><code>source-code-viewer-state</code></td>
+<td>Normalized source/state</td>
+</tr>
+<tr>
+<td><a href="#source-explanationhtml"><code>source-explanation.html</code></a></td>
+<td>Presents an evidence finding, source selection, explanation, and save state.</td>
+<td><code>showFinding()</code><br><code>populate()</code><br><code>selectSource()</code><br><code>markSaved()</code></td>
+<td><code>source-explanation-ready</code><br><code>source-explanation-save</code><br><code>source-explanation-source-selected</code></td>
+<td>DOM-normalized</td>
+</tr>
+<tr>
+<td><a href="#speechhtml"><code>speech.html</code></a></td>
+<td>Coordinates speech controls, transcription completion, mute state, and microphone availability.</td>
+<td><code>configure()</code><br><code>setAvailability()</code><br><code>setMuted(); availability</code><br><code>muted</code><br><code>initialMuted</code><br><code>componentReady properties</code></td>
+<td><code>speech-ready</code><br><code>speech-transcription-complete</code><br><code>speech-microphone-unavailable</code></td>
+<td>UI state normalized; AI/media behavior mixed</td>
+</tr>
+<tr>
+<td><a href="#summary-striphtml"><code>summary-strip.html</code></a></td>
+<td>Displays compact selectable KPI or summary items.</td>
+<td><code>configure()</code><br><code>setItems()</code><br><code>updateItem()</code><br><code>clear()</code></td>
+<td><code>summary-strip-ready</code><br><code>summary-strip-change</code><br><code>summary-strip-select</code></td>
+<td>DOM-normalized</td>
+</tr>
+<tr>
+<td><a href="#tablehtml"><code>table.html</code></a></td>
+<td>Builds and updates a simple header/body table.</td>
+<td><code>buildHeader()</code><br><code>buildTable()</code></td>
+<td><code>table-ready</code><br><code>header-update</code><br><code>body-update</code></td>
+<td>DOM-normalized</td>
+</tr>
+<tr>
+<td><a href="#task-progresshtml"><code>task-progress.html</code></a></td>
+<td>Runs and displays a task list with started/change/complete/error state.</td>
+<td><code>configure()</code><br><code>setTasks()</code><br><code>updateTask()</code><br><code>runTasks()</code><br><code>clear()</code></td>
+<td><code>task-progress-ready</code><br><code>task-progress-started</code><br><code>task-progress-change</code><br><code>task-progress-complete</code><br><code>task-progress-error</code></td>
+<td>Task state normalized; injected task results mixed</td>
+</tr>
+<tr>
+<td><a href="#terminal-workspacehtml"><code>terminal-workspace.html</code></a></td>
+<td>Presents multiple terminal sessions, output, active selection, theme, and terminal actions.</td>
+<td><code>configure()</code><br><code>addSession()</code><br><code>removeSession()</code><br><code>activateSession()</code><br><code>append()</code><br><code>clear()</code><br><code>setState()</code><br><code>setTheme()</code><br><code>focus()</code></td>
+<td><code>terminal-workspace-ready</code><br><code>terminal-submit</code><br><code>terminal-interrupt</code><br><code>terminal-clear</code><br><code>terminal-session-new</code><br><code>terminal-session-close</code><br><code>terminal-session-select</code><br><code>terminal-settings</code></td>
+<td>UI/session state normalized; native command results supplied externally</td>
+</tr>
+<tr>
+<td><a href="#theme-editorhtml"><code>theme-editor.html</code></a></td>
+<td>Edits, previews, saves, and resets semantic custom theme tokens.</td>
+<td><code>configure()</code><br><code>getTheme()</code><br><code>setTheme()</code><br><code>setBusy()</code><br><code>setStatus()</code></td>
+<td><code>theme-editor-ready</code><br><code>theme-preview</code><br><code>theme-save</code><br><code>theme-reset</code></td>
+<td>Fully normalized Theme values</td>
+</tr>
+<tr>
+<td><a href="#theme-switcherhtml"><code>theme-switcher.html</code></a></td>
+<td>Selects and refreshes system, light, dark, or custom theme mode.</td>
+<td><code>setMode()</code><br><code>refresh()</code></td>
+<td>No component-specific event</td>
+<td>Preference/native appearance behavior mixed; no component-ready contract</td>
+</tr>
+<tr>
+<td><a href="#unified-inboxhtml"><code>unified-inbox.html</code></a></td>
+<td>Displays provider-neutral communication threads with active/loading state.</td>
+<td><code>configure()</code><br><code>setThreads()</code><br><code>setActive()</code><br><code>setLoading()</code></td>
+<td><code>unified-inbox-ready</code><br><code>inbox-refresh</code><br><code>thread-select</code></td>
+<td>DOM-normalized</td>
+</tr>
+<tr>
+<td><a href="#voice-transcriptionhtml"><code>voice-transcription.html</code></a></td>
+<td>Records segmented microphone audio, transcribes, persists, and completes a combined transcript.</td>
+<td><code>configure()</code><br><code>startRecording()</code><br><code>stopRecording()</code><br><code>save()</code><br><code>completeTranscription()/complete()</code><br><code>clear()</code><br><code>reset()</code><br><code>destroy()</code></td>
+<td><code>voice-transcription-ready</code><br><code>voice-transcription-state</code><br><code>voice-transcription-segment</code><br><code>voice-transcription-change</code><br><code>voice-transcription-complete</code><br><code>speech-transcription-complete</code></td>
+<td>State/text normalized; media/provider behavior mixed</td>
+</tr>
+<tr>
+<td><a href="#weather-widgethtml"><code>weather-widget.html</code></a></td>
+<td>Displays normalized current and daily weather with refresh intent.</td>
+<td><code>setWeather()</code><br><code>clear()</code></td>
+<td><code>weather-widget-ready</code><br><code>weather-refresh</code></td>
+<td>Display normalized; provider supplied externally</td>
+</tr>
+<tr>
+<td><a href="#web-navigatorhtml"><code>web-navigator.html</code></a></td>
+<td>Guards embedded/external navigation and surfaces allow/block/open intents.</td>
+<td><code>configure()</code><br><code>navigate()</code><br><code>currentUrl()</code></td>
+<td><code>web-navigator-ready</code><br><code>web-navigate</code><br><code>web-navigation-blocked</code><br><code>web-open-external</code></td>
+<td>Navigation intent/decision normalized; browser navigation result platform-native</td>
+</tr>
+</tbody></table>
+</div>
+<h2 id="app-barhtml">app-bar.html</h2>
+<h3 id="overview">Overview</h3>
+<p>Responsive application navigation, route state, status, and trailing actions.</p>
+<h3 id="public-surface">Public surface</h3>
+<p>Methods/properties: <code>setNavigation()</code>, <code>setActiveRoute()</code>, <code>setStatus()</code>, <code>refresh()</code>.</p>
+<p>Events: <code>app-bar-ready</code>.</p>
+<p>Slots: <code>brand-mark</code>, <code>product-name</code>, <code>navigation</code>, <code>status</code>, <code>trailing</code>.</p>
+<h3 id="availability-and-normalization">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;app-bar.html&quot;
+  href=&quot;/arcane/components/app-bar.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="assistant-panelhtml">assistant-panel.html</h2>
+<h3 id="overview-1">Overview</h3>
+<p>Reusable assistant drawer, message area, composer, pending/streaming/empty/error state, and actions.</p>
+<h3 id="public-surface-1">Public surface</h3>
+<p>Methods/properties: <code>open()</code>, <code>close()</code>, <code>toggle()</code>, <code>send()</code>, <code>clear()</code>, <code>setState()</code>, <code>focusComposer()</code>, <code>scrollToEnd()</code>.</p>
+<p>Events: <code>assistant-ready</code>, <code>assistant-send</code>, <code>assistant-clear</code>.</p>
+<p>Slots: <code>title</code>, <code>subtitle</code>, <code>identity</code>, <code>messages/message</code>, <code>composer</code>, <code>actions</code>, <code>pending</code>, <code>streaming</code>, <code>empty</code>, <code>error</code>, <code>footer</code>.</p>
+<h3 id="availability-and-normalization-1">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> DOM-normalized; caller/provider results remain external. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-1">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;assistant-panel.html&quot;
+  href=&quot;/arcane/components/assistant-panel.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="calculatorhtml">calculator.html</h2>
+<h3 id="overview-2">Overview</h3>
+<p>Calculator keypad and result/error event surface backed by CalculatorEngine.</p>
+<h3 id="public-surface-2">Public surface</h3>
+<p>Methods/properties: <code>calculate()</code>.</p>
+<p>Events: <code>calculator-ready</code>, <code>calculation-complete</code>, <code>calculation-error</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#calculatorenginejs"><code>CalculatorEngine.js</code></a>.</p>
+<h3 id="availability-and-normalization-2">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Normalized Calculation/error events. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-2">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;calculator.html&quot;
+  href=&quot;/arcane/components/calculator.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="charthtml">chart.html</h2>
+<h3 id="overview-3">Overview</h3>
+<p>Accessible uPlot line, area, or point chart with normalized options and rows.</p>
+<h3 id="public-surface-3">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>populate()</code>, <code>setData()</code>, <code>addData()</code>, <code>update()</code>, <code>destroy()</code>.</p>
+<p>Events: <code>chart-ready</code>, <code>chart-remove</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#chartlibraryjs"><code>ChartLibrary.js</code></a>, <a href="../runtime-modules/#componentcontractsjs"><code>ComponentContracts.js</code></a>.</p>
+<h3 id="availability-and-normalization-3">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Options/rows normalized; uPlot rendering is vendor-native. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-3">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;chart.html&quot;
+  href=&quot;/arcane/components/chart.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="chathtml">chat.html</h2>
+<h3 id="overview-4">Overview</h3>
+<p>Shared chat, file upload, streaming, speech, language, availability, and conversation-timebox surface.</p>
+<h3 id="public-surface-4">Public surface</h3>
+<p>Methods/properties: <code>streamMessage()</code>, <code>setMessageProgress()</code>, <code>setAIAvailability()</code>, <code>setInitialSpeechMuted()</code>, <code>setConversationComplete()</code>, <code>bindConversationTimebox()</code>, <code>submitMessage()</code>, <code>sendMessage()</code>, <code>languageChanged()</code>.</p>
+<p><code>sendMessage(text)</code> and <code>languageChanged(text)</code> are host-overridable async
+extension callbacks. The component installs warning-only defaults when the host
+does not supply them; applications may instead consume the corresponding
+<code>chat-send-message</code> and <code>chat-language-changed</code> events.</p>
+<p>Events: <code>chat-ready</code>, <code>chat-send-message</code>, <code>chat-send-error</code>, <code>chat-file-uploaded</code>, <code>chat-language-changed</code>, <code>conversation-timebox-error</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#mdjs"><code>MD.js</code></a>, <a href="../runtime-entities/#filejs"><code>File.js</code></a>, <a href="../runtime-modules/#conversationtimeboxjs"><code>ConversationTimebox.js</code></a>.</p>
+<h3 id="availability-and-normalization-4">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> UI state normalized; AI/storage/media behavior mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-4">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;chat.html&quot;
+  href=&quot;/arcane/components/chat.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="conversation-viewhtml">conversation-view.html</h2>
+<h3 id="overview-5">Overview</h3>
+<p>Provider-neutral conversation display, advisory actions, composer, busy state, and status.</p>
+<h3 id="public-surface-5">Public surface</h3>
+<p>Methods/properties: <code>setConversation()</code>, <code>setBusy()</code>, <code>setStatus()</code>, <code>clearComposer()</code>.</p>
+<p>Events: <code>conversation-view-ready</code>, <code>communication-send</code>, <code>communication-advisory-action</code>.</p>
+<h3 id="availability-and-normalization-5">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-5">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;conversation-view.html&quot;
+  href=&quot;/arcane/components/conversation-view.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="dashboard-confightml">dashboard-config.html</h2>
+<h3 id="overview-6">Overview</h3>
+<p>Selects which normalized chart definitions are visible on a dashboard.</p>
+<h3 id="public-surface-6">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>setDefinitions()</code>, <code>setVisibility()</code>, <code>getChartOptions()</code>, <code>getEffectiveVisibility()</code>, <code>open()</code>, <code>close()</code>.</p>
+<p>Events: <code>dashboard-config-ready</code>, <code>dashboard-config-opened</code>, <code>dashboard-config-closed</code>, <code>dashboard-config-change</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#componentcontractsjs"><code>ComponentContracts.js</code></a>, <a href="../runtime-modules/#waitforcomponentjs"><code>WaitForComponent.js</code></a>.</p>
+<h3 id="availability-and-normalization-6">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Fully normalized definitions and visibility. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-6">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;dashboard-config.html&quot;
+  href=&quot;/arcane/components/dashboard-config.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="data-maintenancehtml">data-maintenance.html</h2>
+<h3 id="overview-7">Overview</h3>
+<p>Runs destructive cleanup of empty chats and memories inside the current app data scope.</p>
+<h3 id="public-surface-7">Public surface</h3>
+<p>Methods/properties: <code>open()</code>.</p>
+<p>Events: <code>data-maintenance-ready</code>, <code>data-maintenance-complete</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#datamaintenancejs"><code>DataMaintenance.js</code></a>, <a href="../runtime-modules/#waitforcomponentjs"><code>WaitForComponent.js</code></a>.</p>
+<h3 id="availability-and-normalization-7">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Normalized counts; DBOPFS failures mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-7">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;data-maintenance.html&quot;
+  href=&quot;/arcane/components/data-maintenance.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="data-viewhtml">data-view.html</h2>
+<h3 id="overview-8">Overview</h3>
+<p>Opens a generic modal-style data view around an injected provider.</p>
+<h3 id="public-surface-8">Public surface</h3>
+<p>Methods/properties: <code>beforeOpen()</code>, <code>open()</code>.</p>
+<p>Events: <code>data-view-ready</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#waitforcomponentjs"><code>WaitForComponent.js</code></a>.</p>
+<h3 id="availability-and-normalization-8">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> DOM-native result. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-8">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;data-view.html&quot;
+  href=&quot;/arcane/components/data-view.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="directory-pickerhtml">directory-picker.html</h2>
+<h3 id="overview-9">Overview</h3>
+<p>Presents the provider-owned OS directory chooser with change/cancel/error states.</p>
+<h3 id="public-surface-9">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>focus()</code>, <code>select()</code>.</p>
+<p>Events: <code>directory-picker-ready</code>, <code>directory-picker-change</code>, <code>directory-picker-cancel</code>, <code>directory-picker-error</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#directorypickerjs"><code>DirectoryPicker.js</code></a>.</p>
+<h3 id="availability-and-normalization-9">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Strict normalized native selection/error. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-9">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;directory-picker.html&quot;
+  href=&quot;/arcane/components/directory-picker.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="document-inspectorhtml">document-inspector.html</h2>
+<h3 id="overview-10">Overview</h3>
+<p>Inspects PDF, text, or source documents and records review state.</p>
+<h3 id="public-surface-10">Public surface</h3>
+<p>Methods/properties: <code>loadDocument()</code>, <code>selectView()</code>, <code>markSaved()</code>.</p>
+<p>Events: <code>document-inspector-ready</code>, <code>document-review-change</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#mdjs"><code>MD.js</code></a>.</p>
+<h3 id="availability-and-normalization-10">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Document state normalized; browser document APIs mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-10">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;document-inspector.html&quot;
+  href=&quot;/arcane/components/document-inspector.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="file-drophtml">file-drop.html</h2>
+<h3 id="overview-11">Overview</h3>
+<p>Acquires files by drag/drop or picker and presents busy, progress, error, and cleared state.</p>
+<h3 id="public-surface-11">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>openPicker()</code>, <code>clear()</code>, <code>setBusy()</code>, <code>setError()</code>, <code>setProgress()</code>.</p>
+<p>Events: <code>file-drop-ready</code>, <code>file-drop-selected</code>, <code>file-drop-progress</code>, <code>file-drop-state</code>, <code>file-drop-error</code>.</p>
+<h3 id="availability-and-normalization-11">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> State normalized; browser File/drop errors mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-11">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;file-drop.html&quot;
+  href=&quot;/arcane/components/file-drop.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="file-inspectorhtml">file-inspector.html</h2>
+<h3 id="overview-12">Overview</h3>
+<p>Displays file metadata, preview, busy/error state, and caller-defined actions.</p>
+<h3 id="public-surface-12">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>show()</code>, <code>clear()</code>, <code>setActions()</code>, <code>setBusy()</code>, <code>setError()</code>, <code>setPreview()</code>.</p>
+<p>Events: <code>file-inspector-ready</code>, <code>file-inspector-action</code>, <code>file-inspector-change</code>, <code>file-inspector-cleared</code>, <code>file-inspector-error</code>.</p>
+<p>Slots: <code>title</code>, <code>preview</code>, <code>metadata</code>, <code>actions</code>.</p>
+<h3 id="availability-and-normalization-12">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> State normalized; preview/provider behavior mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-12">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;file-inspector.html&quot;
+  href=&quot;/arcane/components/file-inspector.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="file-managerhtml">file-manager.html</h2>
+<h3 id="overview-13">Overview</h3>
+<p>Browses, filters, selects, opens, and acts on app-scoped files.</p>
+<h3 id="public-surface-13">Public surface</h3>
+<p>Methods/properties: <code>setProvider()</code>, <code>loadAll()</code>, <code>setFilter()</code>, <code>select()</code>, <code>clearSelection()</code>.</p>
+<p>Events: <code>file-manager-ready</code>, <code>file-manager-select</code>, <code>file-manager-open</code>, <code>file-manager-action</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#dbopfsjs"><code>DBOPFS.js</code></a>, <a href="../runtime-entities/#filejs"><code>File.js</code></a>, <a href="../runtime-modules/#waitforcomponentjs"><code>WaitForComponent.js</code></a>.</p>
+<h3 id="availability-and-normalization-13">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Selection/filter state normalized; storage/provider behavior mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-13">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;file-manager.html&quot;
+  href=&quot;/arcane/components/file-manager.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="headerhtml">header.html</h2>
+<h3 id="overview-14">Overview</h3>
+<p>Legacy title bar with history, reload, online marker, presentation labels, and 988 link.</p>
+<h3 id="public-surface-14">Public surface</h3>
+<p>This fragment declares no public host method.</p>
+<p>This fragment declares no component-specific readiness or action event; use the loader&#39;s <code>html-import-ready</code> only to know that import execution completed.</p>
+<h3 id="availability-and-normalization-14">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Browser/platform-native behavior; no component-ready contract. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-14">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;header.html&quot;
+  href=&quot;/arcane/components/header.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="integration-settingshtml">integration-settings.html</h2>
+<h3 id="overview-15">Overview</h3>
+<p>Edits non-secret communication service configuration and service actions.</p>
+<h3 id="public-surface-15">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>getValues()</code>, <code>setStatus()</code>.</p>
+<p>Events: <code>integration-settings-ready</code>, <code>integration-settings-save</code>, <code>integration-settings-close</code>, <code>integration-action</code>.</p>
+<h3 id="availability-and-normalization-15">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Normalized non-secret values. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-15">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;integration-settings.html&quot;
+  href=&quot;/arcane/components/integration-settings.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="local-ai-statushtml">local-ai-status.html</h2>
+<h3 id="overview-16">Overview</h3>
+<p>Presents local-AI standby, failure, recovery, guidance, retry, and dismissal states.</p>
+<h3 id="public-surface-16">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>begin()</code>, <code>present(); hidden property</code>.</p>
+<p>Events: <code>local-ai-status-ready</code>, <code>local-ai-status-dismissed</code>, <code>local-ai-retry</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#localaireadinessjs"><code>LocalAIReadiness.js</code></a>.</p>
+<h3 id="availability-and-normalization-16">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Fully normalized LocalAIReadiness report. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-16">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;local-ai-status.html&quot;
+  href=&quot;/arcane/components/local-ai-status.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="markdown-documenthtml">markdown-document.html</h2>
+<h3 id="overview-17">Overview</h3>
+<p>Safely renders and navigates a Markdown document with focusable fragments.</p>
+<h3 id="public-surface-17">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>load()</code>, <code>render()</code>, <code>clear()</code>, <code>fail()</code>, <code>focus()</code>, <code>focusFragment()</code>.</p>
+<p>Events: <code>markdown-document-ready</code>, <code>markdown-document-state</code>, <code>markdown-document-navigate</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#mdjs"><code>MD.js</code></a>.</p>
+<h3 id="availability-and-normalization-17">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> State/sanitized output normalized; Marked/DOM failures mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-17">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;markdown-document.html&quot;
+  href=&quot;/arcane/components/markdown-document.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="markdown-editorhtml">markdown-editor.html</h2>
+<h3 id="overview-18">Overview</h3>
+<p>Configurable Markdown authoring, toolbar, preview, title, and save surface.</p>
+<h3 id="public-surface-18">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>focus()</code>, <code>clear()</code>, <code>saveEntry()</code>.</p>
+<p>Events: <code>markdown-editor-ready</code>, <code>markdown-editor-change</code>, <code>markdown-editor-saved</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#mdjs"><code>MD.js</code></a>, <a href="../runtime-modules/#componentcontractsjs"><code>ComponentContracts.js</code></a>.</p>
+<h3 id="availability-and-normalization-18">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Editor values normalized; injected save result mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-18">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;markdown-editor.html&quot;
+  href=&quot;/arcane/components/markdown-editor.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="media-embedhtml">media-embed.html</h2>
+<h3 id="overview-19">Overview</h3>
+<p>Loads a validated YouTube video or playlist embed and exposes external-platform action.</p>
+<h3 id="public-surface-19">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>load()</code>.</p>
+<p>Events: <code>media-embed-ready</code>, <code>media-load</code>, <code>media-error</code>, <code>media-open-platform</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#youtubemediajs"><code>YouTubeMedia.js</code></a>.</p>
+<h3 id="availability-and-normalization-19">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> URL/error normalized; iframe/platform behavior native. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-19">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;media-embed.html&quot;
+  href=&quot;/arcane/components/media-embed.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="modalhtml">modal.html</h2>
+<h3 id="overview-20">Overview</h3>
+<p>Generic modal with population, open/close, actions, and sequential task execution.</p>
+<h3 id="public-surface-20">Public surface</h3>
+<p>Methods/properties: <code>populate()</code>, <code>open()</code>, <code>close()</code>, <code>runTasks()</code>.</p>
+<p>Events: <code>modal-ready</code>, <code>modal-opened</code>, <code>modal-closed</code>, <code>modal-action</code>.</p>
+<p>Slots: <code>header</code>, <code>body</code>, <code>footer</code>.</p>
+<h3 id="availability-and-normalization-20">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Modal state normalized; injected task results mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-20">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;modal.html&quot;
+  href=&quot;/arcane/components/modal.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="output-panelhtml">output-panel.html</h2>
+<h3 id="overview-21">Overview</h3>
+<p>Presents status, output, body, coverage, actions, pending, error, and cleared states.</p>
+<h3 id="public-surface-21">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>setOutput()</code>, <code>setBody()</code>, <code>setCoverage()</code>, <code>setActions()</code>, <code>setPending()</code>, <code>setStatus()</code>, <code>setError()</code>, <code>clear()</code>.</p>
+<p>Events: <code>output-panel-ready</code>, <code>output-panel-state</code>, <code>output-panel-change</code>, <code>output-panel-action</code>, <code>output-panel-error</code>, <code>output-panel-cleared</code>.</p>
+<p>Slots: <code>title</code>, <code>header-actions</code>, <code>body</code>, <code>coverage</code>, <code>actions</code>.</p>
+<h3 id="availability-and-normalization-21">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-21">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;output-panel.html&quot;
+  href=&quot;/arcane/components/output-panel.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="preferences-formhtml">preferences-form.html</h2>
+<h3 id="overview-22">Overview</h3>
+<p>Builds a schema-driven preferences form with submit, reset, busy, and status behavior.</p>
+<h3 id="public-surface-22">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>getValues()</code>, <code>setValues()</code>, <code>setBusy()</code>, <code>setStatus()</code>.</p>
+<p>Events: <code>preferences-form-ready</code>, <code>preferences-change</code>, <code>preferences-submit</code>, <code>preferences-reset</code>.</p>
+<h3 id="availability-and-normalization-22">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Normalized form values. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-22">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;preferences-form.html&quot;
+  href=&quot;/arcane/components/preferences-form.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="record-timelinehtml">record-timeline.html</h2>
+<h3 id="overview-23">Overview</h3>
+<p>Displays chronological records/evidence and emits open actions.</p>
+<h3 id="public-surface-23">Public surface</h3>
+<p>Methods/properties: <code>setItems()</code>, <code>populate()</code>.</p>
+<p>Events: <code>record-timeline-ready</code>, <code>record-timeline-open</code>.</p>
+<h3 id="availability-and-normalization-23">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-23">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;record-timeline.html&quot;
+  href=&quot;/arcane/components/record-timeline.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="relationship-boardhtml">relationship-board.html</h2>
+<h3 id="overview-24">Overview</h3>
+<p>Displays normalized relationship nodes/edges in graph and list forms.</p>
+<h3 id="public-surface-24">Public surface</h3>
+<p>Methods/properties: <code>setGraph()</code>, <code>populate()</code>.</p>
+<p>Events: <code>relationship-board-ready</code>, <code>relationship-node-open</code>, <code>relationship-edge-open</code>.</p>
+<h3 id="availability-and-normalization-24">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-24">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;relationship-board.html&quot;
+  href=&quot;/arcane/components/relationship-board.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="screen-capturehtml">screen-capture.html</h2>
+<h3 id="overview-25">Overview</h3>
+<p>Presents image, video, or GIF display-capture workflow.</p>
+<h3 id="public-surface-25">Public surface</h3>
+<p>Methods/properties: <code>capture()</code>.</p>
+<p>Events: <code>screen-capture-ready</code>, <code>screen-capture-result</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#screencapturejs"><code>ScreenCapture.js</code></a>.</p>
+<h3 id="availability-and-normalization-25">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> State/result normalized; media permission/codec failures mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-25">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;screen-capture.html&quot;
+  href=&quot;/arcane/components/screen-capture.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="source-code-viewerhtml">source-code-viewer.html</h2>
+<h3 id="overview-26">Overview</h3>
+<p>Renders line-addressable source code with load, error, focus, and state behavior.</p>
+<h3 id="public-surface-26">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>load()</code>, <code>render()</code>, <code>clear()</code>, <code>fail()</code>, <code>focus()</code>, <code>focusLine()</code>.</p>
+<p>Events: <code>source-code-viewer-ready</code>, <code>source-code-viewer-state</code>.</p>
+<h3 id="availability-and-normalization-26">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Normalized source/state. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-26">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;source-code-viewer.html&quot;
+  href=&quot;/arcane/components/source-code-viewer.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="source-explanationhtml">source-explanation.html</h2>
+<h3 id="overview-27">Overview</h3>
+<p>Presents an evidence finding, source selection, explanation, and save state.</p>
+<h3 id="public-surface-27">Public surface</h3>
+<p>Methods/properties: <code>showFinding()</code>, <code>populate()</code>, <code>selectSource()</code>, <code>markSaved()</code>.</p>
+<p>Events: <code>source-explanation-ready</code>, <code>source-explanation-save</code>, <code>source-explanation-source-selected</code>.</p>
+<h3 id="availability-and-normalization-27">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-27">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;source-explanation.html&quot;
+  href=&quot;/arcane/components/source-explanation.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="speechhtml">speech.html</h2>
+<h3 id="overview-28">Overview</h3>
+<p>Coordinates speech controls, transcription completion, mute state, and microphone availability.</p>
+<h3 id="public-surface-28">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>setAvailability()</code>, <code>setMuted(); availability</code>, <code>muted</code>, <code>initialMuted</code>, <code>componentReady properties</code>.</p>
+<p>Events: <code>speech-ready</code>, <code>speech-transcription-complete</code>, <code>speech-microphone-unavailable</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#aijs"><code>AI.js</code></a>, <a href="../runtime-modules/#dblsjs"><code>DBLS.js</code></a>.</p>
+<h3 id="availability-and-normalization-28">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> UI state normalized; AI/media behavior mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-28">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;speech.html&quot;
+  href=&quot;/arcane/components/speech.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="summary-striphtml">summary-strip.html</h2>
+<h3 id="overview-29">Overview</h3>
+<p>Displays compact selectable KPI or summary items.</p>
+<h3 id="public-surface-29">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>setItems()</code>, <code>updateItem()</code>, <code>clear()</code>.</p>
+<p>Events: <code>summary-strip-ready</code>, <code>summary-strip-change</code>, <code>summary-strip-select</code>.</p>
+<h3 id="availability-and-normalization-29">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-29">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;summary-strip.html&quot;
+  href=&quot;/arcane/components/summary-strip.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="tablehtml">table.html</h2>
+<h3 id="overview-30">Overview</h3>
+<p>Builds and updates a simple header/body table.</p>
+<h3 id="public-surface-30">Public surface</h3>
+<p>Methods/properties: <code>buildHeader()</code>, <code>buildTable()</code>.</p>
+<p>Events: <code>table-ready</code>, <code>header-update</code>, <code>body-update</code>.</p>
+<h3 id="availability-and-normalization-30">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-30">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;table.html&quot;
+  href=&quot;/arcane/components/table.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="task-progresshtml">task-progress.html</h2>
+<h3 id="overview-31">Overview</h3>
+<p>Runs and displays a task list with started/change/complete/error state.</p>
+<h3 id="public-surface-31">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>setTasks()</code>, <code>updateTask()</code>, <code>runTasks()</code>, <code>clear()</code>.</p>
+<p>Events: <code>task-progress-ready</code>, <code>task-progress-started</code>, <code>task-progress-change</code>, <code>task-progress-complete</code>, <code>task-progress-error</code>.</p>
+<h3 id="availability-and-normalization-31">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Task state normalized; injected task results mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-31">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;task-progress.html&quot;
+  href=&quot;/arcane/components/task-progress.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="terminal-workspacehtml">terminal-workspace.html</h2>
+<h3 id="overview-32">Overview</h3>
+<p>Presents multiple terminal sessions, output, active selection, theme, and terminal actions.</p>
+<h3 id="public-surface-32">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>addSession()</code>, <code>removeSession()</code>, <code>activateSession()</code>, <code>append()</code>, <code>clear()</code>, <code>setState()</code>, <code>setTheme()</code>, <code>focus()</code>.</p>
+<p>Events: <code>terminal-workspace-ready</code>, <code>terminal-submit</code>, <code>terminal-interrupt</code>, <code>terminal-clear</code>, <code>terminal-session-new</code>, <code>terminal-session-close</code>, <code>terminal-session-select</code>, <code>terminal-settings</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#ansitextjs"><code>AnsiText.js</code></a>.</p>
+<h3 id="availability-and-normalization-32">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> UI/session state normalized; native command results supplied externally. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-32">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;terminal-workspace.html&quot;
+  href=&quot;/arcane/components/terminal-workspace.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="theme-editorhtml">theme-editor.html</h2>
+<h3 id="overview-33">Overview</h3>
+<p>Edits, previews, saves, and resets semantic custom theme tokens.</p>
+<h3 id="public-surface-33">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>getTheme()</code>, <code>setTheme()</code>, <code>setBusy()</code>, <code>setStatus()</code>.</p>
+<p>Events: <code>theme-editor-ready</code>, <code>theme-preview</code>, <code>theme-save</code>, <code>theme-reset</code>.</p>
+<p>Shared dependencies: <a href="../runtime-entities/#themejs"><code>Theme.js</code></a>.</p>
+<h3 id="availability-and-normalization-33">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Fully normalized Theme values. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-33">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;theme-editor.html&quot;
+  href=&quot;/arcane/components/theme-editor.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="theme-switcherhtml">theme-switcher.html</h2>
+<h3 id="overview-34">Overview</h3>
+<p>Selects and refreshes system, light, dark, or custom theme mode.</p>
+<h3 id="public-surface-34">Public surface</h3>
+<p>Methods/properties: <code>setMode()</code>, <code>refresh()</code>.</p>
+<p>This fragment declares no component-specific readiness or action event; use the loader&#39;s <code>html-import-ready</code> only to know that import execution completed.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#thememanagerjs"><code>ThemeManager.js</code></a>.</p>
+<h3 id="availability-and-normalization-34">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Preference/native appearance behavior mixed; no component-ready contract. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-34">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;theme-switcher.html&quot;
+  href=&quot;/arcane/components/theme-switcher.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="unified-inboxhtml">unified-inbox.html</h2>
+<h3 id="overview-35">Overview</h3>
+<p>Displays provider-neutral communication threads with active/loading state.</p>
+<h3 id="public-surface-35">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>setThreads()</code>, <code>setActive()</code>, <code>setLoading()</code>.</p>
+<p>Events: <code>unified-inbox-ready</code>, <code>inbox-refresh</code>, <code>thread-select</code>.</p>
+<h3 id="availability-and-normalization-35">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-35">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;unified-inbox.html&quot;
+  href=&quot;/arcane/components/unified-inbox.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="voice-transcriptionhtml">voice-transcription.html</h2>
+<h3 id="overview-36">Overview</h3>
+<p>Records segmented microphone audio, transcribes, persists, and completes a combined transcript.</p>
+<h3 id="public-surface-36">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>startRecording()</code>, <code>stopRecording()</code>, <code>save()</code>, <code>completeTranscription()/complete()</code>, <code>clear()</code>, <code>reset()</code>, <code>destroy()</code>.</p>
+<p>Events: <code>voice-transcription-ready</code>, <code>voice-transcription-state</code>, <code>voice-transcription-segment</code>, <code>voice-transcription-change</code>, <code>voice-transcription-complete</code>, <code>speech-transcription-complete</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#mdjs"><code>MD.js</code></a>, <a href="../runtime-modules/#componentcontractsjs"><code>ComponentContracts.js</code></a>, <a href="../runtime-modules/#aijs"><code>AI.js</code></a>.</p>
+<h3 id="availability-and-normalization-36">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> State/text normalized; media/provider behavior mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-36">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;voice-transcription.html&quot;
+  href=&quot;/arcane/components/voice-transcription.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="weather-widgethtml">weather-widget.html</h2>
+<h3 id="overview-37">Overview</h3>
+<p>Displays normalized current and daily weather with refresh intent.</p>
+<h3 id="public-surface-37">Public surface</h3>
+<p>Methods/properties: <code>setWeather()</code>, <code>clear()</code>.</p>
+<p>Events: <code>weather-widget-ready</code>, <code>weather-refresh</code>.</p>
+<h3 id="availability-and-normalization-37">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Display normalized; provider supplied externally. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-37">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;weather-widget.html&quot;
+  href=&quot;/arcane/components/weather-widget.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="web-navigatorhtml">web-navigator.html</h2>
+<h3 id="overview-38">Overview</h3>
+<p>Guards embedded/external navigation and surfaces allow/block/open intents.</p>
+<h3 id="public-surface-38">Public surface</h3>
+<p>Methods/properties: <code>configure()</code>, <code>navigate()</code>, <code>currentUrl()</code>.</p>
+<p>Events: <code>web-navigator-ready</code>, <code>web-navigate</code>, <code>web-navigation-blocked</code>, <code>web-open-external</code>.</p>
+<h3 id="availability-and-normalization-38">Availability and normalization</h3>
+<p><strong>Browser and supported native WebViews.</strong> Navigation intent/decision normalized; browser navigation result platform-native. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-38">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;web-navigator.html&quot;
+  href=&quot;/arcane/components/web-navigator.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<h2 id="readiness-caveats">Readiness caveats</h2>
+<p><code>header.html</code> and <code>theme-switcher.html</code> do not currently publish a component-specific ready event/property. Consumers can observe <code>html-import-ready</code> for completed fragment execution and then feature-detect their methods. Other fragments publish the exact ready event listed above.</p>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/runtime-components.md" target="_blank" rel="noreferrer"><code>docs/reference/runtime-components.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#basic-loading-pattern">Basic loading pattern</a><a href="#canonical-inventory">Canonical inventory</a><a href="#app-barhtml">app-bar.html</a><a href="#assistant-panelhtml">assistant-panel.html</a><a href="#calculatorhtml">calculator.html</a><a href="#charthtml">chart.html</a><a href="#chathtml">chat.html</a><a href="#conversation-viewhtml">conversation-view.html</a><a href="#dashboard-confightml">dashboard-config.html</a><a href="#data-maintenancehtml">data-maintenance.html</a><a href="#data-viewhtml">data-view.html</a><a href="#directory-pickerhtml">directory-picker.html</a><a href="#document-inspectorhtml">document-inspector.html</a><a href="#file-drophtml">file-drop.html</a><a href="#file-inspectorhtml">file-inspector.html</a><a href="#file-managerhtml">file-manager.html</a><a href="#headerhtml">header.html</a><a href="#integration-settingshtml">integration-settings.html</a><a href="#local-ai-statushtml">local-ai-status.html</a><a href="#markdown-documenthtml">markdown-document.html</a><a href="#markdown-editorhtml">markdown-editor.html</a><a href="#media-embedhtml">media-embed.html</a><a href="#modalhtml">modal.html</a><a href="#output-panelhtml">output-panel.html</a><a href="#preferences-formhtml">preferences-form.html</a><a href="#record-timelinehtml">record-timeline.html</a><a href="#relationship-boardhtml">relationship-board.html</a><a href="#screen-capturehtml">screen-capture.html</a><a href="#source-code-viewerhtml">source-code-viewer.html</a><a href="#source-explanationhtml">source-explanation.html</a><a href="#speechhtml">speech.html</a><a href="#summary-striphtml">summary-strip.html</a><a href="#tablehtml">table.html</a><a href="#task-progresshtml">task-progress.html</a><a href="#terminal-workspacehtml">terminal-workspace.html</a><a href="#theme-editorhtml">theme-editor.html</a><a href="#theme-switcherhtml">theme-switcher.html</a><a href="#unified-inboxhtml">unified-inbox.html</a><a href="#voice-transcriptionhtml">voice-transcription.html</a><a href="#weather-widgethtml">weather-widget.html</a></nav><p class="toc-more">2 additional sections remain searchable in the page.</p></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

@@ -1,0 +1,2896 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="This reference defines the request and result objects used by Arcane&#39;s provider-neutral AI, local AI, speech, isolated-inference, and direct Ollama APIs. St…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-ai-contracts/"><link rel="icon" type="image/png" href="../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../styles.css"><link rel="stylesheet" href="../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane AI Data Contracts · Arcane OS SDK"><meta property="og:description" content="This reference defines the request and result objects used by Arcane&#39;s provider-neutral AI, local AI, speech, isolated-inference, and direct Ollama APIs. St…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-ai-contracts/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane AI Data Contracts · Arcane OS SDK"><meta name="twitter:description" content="This reference defines the request and result objects used by Arcane&#39;s provider-neutral AI, local AI, speech, isolated-inference, and direct Ollama APIs. St…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane AI Data Contracts | Arcane OS SDK</title><script src="../../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../">Overview</a><a href="../../../guides/">Guides</a><a href="../../../examples/">Examples</a><a href="../../../playground/">Playground</a><a href="../../../testing/">Testing</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="../../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Core</a><span aria-hidden="true">/</span><span aria-current="page">Arcane AI Data Contracts</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-ai-data-contracts">Arcane AI Data Contracts</h1><p class="doc-lead">This reference defines the request and result objects used by Arcane&#39;s provider-neutral AI, local AI, speech, isolated-inference, and direct Ollama APIs. St…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../">Core map</a><a href="../arcane-api/">Arcane API</a><a href="../arcane-events/">Events</a><a href="./" aria-current="page">AI contracts</a><a href="../arcane-entities/">Entity exports</a><a href="../ollama-module/">Ollama module</a><a href="../reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/core/arcane-ai-contracts.md"><p>This reference defines the request and result objects used by Arcane&#39;s
+provider-neutral AI, local AI, speech, isolated-inference, and direct Ollama
+APIs. Start with the method index in the <a href="../arcane-api/">Arcane API Reference</a>.</p>
+<p>The type names below are documentation notation for plain JavaScript values.
+They are not TypeScript declarations.</p>
+<h2 id="contract-conventions">Contract conventions</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Input style</th>
+<th>Unknown keys</th>
+<th>Object rules</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Exact record</td>
+<td>Rejected</td>
+<td>A plain object with exactly the documented own data properties. Every field is required unless marked optional. Arrays, accessors, symbol keys, and non-plain objects are rejected.</td>
+</tr>
+<tr>
+<td>Closed object</td>
+<td>Rejected at the documented level</td>
+<td>A plain object containing only the documented top-level keys. Provider-native nested values may have additional provider-defined structure.</td>
+</tr>
+<tr>
+<td>Settings object</td>
+<td>Currently ignored</td>
+<td>A plain object whose documented keys are read. Callers should still send only documented keys.</td>
+</tr>
+</tbody></table>
+</div>
+<p><code>Required</code> means the caller must supply the field. <code>Conditional</code> means the field
+is required only under the condition in its constraints. A safe integer passes
+<code>Number.isSafeInteger</code>. Byte limits use UTF-8 unless a row says characters,
+encoded text, or decoded bytes.</p>
+<p>Authorization and host admission occur before method-specific validation. An
+unauthorized caller can therefore receive a capability or host error before an
+input error. Rejections use <code>Arcane.Error</code>; never parse its human-readable
+message as a protocol value.</p>
+<p>These rows define the portable caller contract. Some provider-settings and
+speech validators currently coerce or ignore particular off-contract values
+differently on desktop Core and Android. Callers must send the documented types
+and keys and must not depend on permissive host behavior or uniform rejection of
+invalid input. The provider-neutral AI, local-AI, speech, and direct Ollama
+methods in this document currently use method-local validators rather than
+canonical entries in <code>method-contracts.json</code>; catalog metadata must not invent
+semantic attributes that the registry does not define.</p>
+<h2 id="provider-neutral-ai">Provider-neutral AI</h2>
+<h3 id="ai-chat-request">AI chat request</h3>
+<p><code>Arcane.ai.chat(request)</code> accepts a closed <code>AIChatRequest</code>.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>messages</code></td>
+<td><a href="#ai-chat-message"><code>AIChatMessage[]</code></a></td>
+<td align="right">Yes</td>
+<td>1-128 records; combined content at most 512 KiB</td>
+<td>Conversation sent to the configured provider.</td>
+</tr>
+<tr>
+<td><code>expectedProvider</code></td>
+<td><code>&quot;ollama&quot; | &quot;openai&quot;</code></td>
+<td align="right">No</td>
+<td>Omitted means no caller-side provider binding</td>
+<td>Rejects with <code>AI_PROVIDER_CHANGED</code> when the configured provider changed before dispatch.</td>
+</tr>
+<tr>
+<td><code>format</code></td>
+<td><code>&quot;json&quot; | &quot;&quot; | null</code></td>
+<td align="right">No</td>
+<td>Omit, <code>null</code>, or <code>&quot;&quot;</code> for text</td>
+<td>Portable output-format control.</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>string</code></td>
+<td align="right">No</td>
+<td>Local model pattern <code>[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}</code></td>
+<td>Local Ollama override. The OpenAI path always uses the configured, account-validated model.</td>
+</tr>
+<tr>
+<td><code>options</code></td>
+<td>JSON object</td>
+<td align="right">No</td>
+<td>Ollama only</td>
+<td>Provider-native generation options.</td>
+</tr>
+<tr>
+<td><code>tools</code></td>
+<td>JSON array</td>
+<td align="right">No</td>
+<td>Ollama only</td>
+<td>Provider-native tool definitions.</td>
+</tr>
+<tr>
+<td><code>keep_alive</code></td>
+<td>JSON value</td>
+<td align="right">No</td>
+<td>Ollama only</td>
+<td>Provider-native model-residency control.</td>
+</tr>
+<tr>
+<td><code>think</code></td>
+<td>JSON value</td>
+<td align="right">No</td>
+<td>Ollama only</td>
+<td>Provider-native reasoning control.</td>
+</tr>
+<tr>
+<td><code>logprobs</code></td>
+<td>JSON value</td>
+<td align="right">No</td>
+<td>Ollama only</td>
+<td>Provider-native log-probability control.</td>
+</tr>
+<tr>
+<td><code>top_logprobs</code></td>
+<td>JSON value</td>
+<td align="right">No</td>
+<td>Ollama only</td>
+<td>Provider-native log-probability count.</td>
+</tr>
+</tbody></table>
+</div>
+<p>For a provider-portable request, send only <code>messages</code>, optional
+<code>expectedProvider</code>, and optional <code>format</code>.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const profile = await Arcane.ai.profile();
+
+const result = await Arcane.ai.chat({
+  expectedProvider: profile.provider,
+  messages: [
+    { role: &quot;system&quot;, content: &quot;Answer briefly and accurately.&quot; },
+    { role: &quot;user&quot;, content: &quot;What models are available?&quot; }
+  ]
+});
+</code></pre></div>
+<h3 id="ai-chat-message">AI chat message</h3>
+<p>Every <code>AIChatMessage</code> is an exact record.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>role</code></td>
+<td><code>&quot;system&quot; | &quot;user&quot; | &quot;assistant&quot;</code></td>
+<td align="right">Yes</td>
+<td>Exact lowercase value</td>
+<td>Message author role.</td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Nonempty; at most 131,072 characters</td>
+<td>Message text.</td>
+</tr>
+</tbody></table>
+</div>
+<p>No other message fields are accepted.</p>
+<h3 id="ai-chat-result">AI chat result</h3>
+<p><code>AIChatResult</code> is normalized across configured Ollama and OpenAI chat.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>provider</code></td>
+<td><code>&quot;arcane-ollama&quot; | &quot;openai&quot;</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Provider that completed the request.</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Bounded provider model identifier</td>
+<td>Model used for the response.</td>
+</tr>
+<tr>
+<td><code>message.role</code></td>
+<td><code>&quot;assistant&quot;</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Normalized response role.</td>
+</tr>
+<tr>
+<td><code>message.content</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>At most 4 MiB retained</td>
+<td>Assistant response text.</td>
+</tr>
+<tr>
+<td><code>message.thinking</code></td>
+<td><code>string</code></td>
+<td align="right">No</td>
+<td>Ollama only; at most 4 MiB retained</td>
+<td>Provider reasoning text when present.</td>
+</tr>
+<tr>
+<td><code>message.toolCalls</code></td>
+<td><code>array</code></td>
+<td align="right">No</td>
+<td>Ollama provider-native records</td>
+<td>Tool calls when present.</td>
+</tr>
+<tr>
+<td><code>done</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>OpenAI returns <code>true</code></td>
+<td>Completion flag.</td>
+</tr>
+<tr>
+<td><code>doneReason</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>At most 128 characters</td>
+<td>Completion reason.</td>
+</tr>
+<tr>
+<td><code>promptEvalCount</code></td>
+<td><code>integer | null</code></td>
+<td align="right">Yes</td>
+<td>Nonnegative when present</td>
+<td>Prompt token/evaluation count.</td>
+</tr>
+<tr>
+<td><code>evalCount</code></td>
+<td><code>integer | null</code></td>
+<td align="right">Yes</td>
+<td>Nonnegative when present</td>
+<td>Completion token/evaluation count.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="ai-profile">AI profile</h3>
+<p><code>Arcane.ai.profile()</code> returns <code>AIProfile</code>.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>provider</code></td>
+<td><code>&quot;ollama&quot; | &quot;openai&quot;</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Selected provider.</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Effective configured model</td>
+<td>Model used by provider-neutral chat.</td>
+</tr>
+<tr>
+<td><code>configured</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Required provider configuration is present.</td>
+</tr>
+<tr>
+<td><code>local</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td><code>true</code> only for Ollama</td>
+<td>Whether inference remains local.</td>
+</tr>
+<tr>
+<td><code>responseLength</code></td>
+<td><code>&quot;low&quot; | &quot;medium&quot; | &quot;high&quot;</code></td>
+<td align="right">Yes</td>
+<td>Legacy invalid/missing state resolves to <code>&quot;medium&quot;</code></td>
+<td>Conversational response target, not a provider token limit.</td>
+</tr>
+</tbody></table>
+</div>
+<p>An OpenAI profile is returned only after Arcane proves a protected credential
+exists and the configured model is available to that account.</p>
+<h3 id="ai-provider-settings-input">AI provider settings input</h3>
+<p><code>Arcane.ai.saveProviderSettings(settings)</code> reads the documented fields from an
+<code>AIProviderSettingsInput</code> patch. Omitted keys preserve the current value. Send
+only these keys and the documented value types; do not rely on a host ignoring
+unknown fields or coercing <code>removeToken</code>.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>provider</code></td>
+<td><code>&quot;ollama&quot; | &quot;openai&quot;</code></td>
+<td align="right">No</td>
+<td>Current provider</td>
+<td>Provider to select.</td>
+</tr>
+<tr>
+<td><code>openAIModel</code></td>
+<td><code>string</code></td>
+<td align="right">Conditional</td>
+<td>Pattern <code>[A-Za-z0-9][A-Za-z0-9._:-]{0,127}</code>; required for OpenAI</td>
+<td>Account-accessible OpenAI model.</td>
+</tr>
+<tr>
+<td><code>responseLength</code></td>
+<td><code>&quot;low&quot; | &quot;medium&quot; | &quot;high&quot;</code></td>
+<td align="right">No</td>
+<td>Current value</td>
+<td>Conversational response target.</td>
+</tr>
+<tr>
+<td><code>token</code></td>
+<td><code>string</code></td>
+<td align="right">No</td>
+<td>Trimmed, starts with <code>sk-</code>, 20-512 characters</td>
+<td>Replacement OpenAI credential. It is protected and never returned.</td>
+</tr>
+<tr>
+<td><code>removeToken</code></td>
+<td><code>boolean</code></td>
+<td align="right">No</td>
+<td>Only <code>true</code> requests deletion</td>
+<td>Removes the stored credential. A supplied <code>token</code> becomes the final credential.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Arcane verifies the selected OpenAI model when OpenAI is selected and validates
+a supplied replacement credential before persistence. Ollama-selected settings
+may retain a dormant OpenAI model; Arcane revalidates it before a later switch
+to OpenAI. Credential and settings mutations are rolled back together when
+possible if the save fails.</p>
+<h3 id="ai-provider-settings-result">AI provider settings result</h3>
+<p><code>Arcane.ai.providerSettings()</code> and a successful save return
+<code>AIProviderSettingsResult</code>.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>provider</code></td>
+<td><code>&quot;ollama&quot; | &quot;openai&quot;</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Selected provider.</td>
+</tr>
+<tr>
+<td><code>openAIModel</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>May be empty when OpenAI is not selected</td>
+<td>Saved OpenAI model.</td>
+</tr>
+<tr>
+<td><code>openAIConfigured</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>A protected credential exists.</td>
+</tr>
+<tr>
+<td><code>responseLength</code></td>
+<td><code>&quot;low&quot; | &quot;medium&quot; | &quot;high&quot;</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Saved response target.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Credentials are never included.</p>
+<h3 id="local-ai-inventory">Local AI inventory</h3>
+<p><code>Arcane.ai.models()</code> returns <code>LocalAIInventory</code>, not a bare array. This is raw
+diagnostic inventory, not the admitted application selector catalog.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>provider</code></td>
+<td><code>&quot;arcane-ollama&quot;</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Catalog source.</td>
+</tr>
+<tr>
+<td><code>models</code></td>
+<td><code>OllamaInventoryModel[]</code></td>
+<td align="right">Yes</td>
+<td>At most 512 records</td>
+<td>Normalized installed inventory.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Each <code>OllamaInventoryModel</code> contains:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Local model-name pattern</td>
+<td>Installed model identifier.</td>
+</tr>
+<tr>
+<td><code>modifiedAt</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>At most 64 characters</td>
+<td>Provider timestamp when available.</td>
+</tr>
+<tr>
+<td><code>sizeBytes</code></td>
+<td><code>integer | null</code></td>
+<td align="right">Yes</td>
+<td>Nonnegative safe integer</td>
+<td>Installed size when valid.</td>
+</tr>
+<tr>
+<td><code>digest</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>Lowercase 64-character hexadecimal digest</td>
+<td>Model digest when valid.</td>
+</tr>
+<tr>
+<td><code>family</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>At most 128 characters</td>
+<td>Provider-reported family.</td>
+</tr>
+<tr>
+<td><code>parameterSize</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>At most 64 characters</td>
+<td>Provider parameter-size label.</td>
+</tr>
+<tr>
+<td><code>quantization</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>At most 64 characters</td>
+<td>Provider quantization label.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="ai-provider-model-catalog">AI provider model catalog</h3>
+<p><code>Arcane.ai.providerModels()</code> returns <code>AIProviderModelCatalog</code> after querying the
+protected OpenAI credential&#39;s account.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>provider</code></td>
+<td><code>&quot;openai&quot;</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Catalog source.</td>
+</tr>
+<tr>
+<td><code>models</code></td>
+<td><code>string[]</code></td>
+<td align="right">Yes</td>
+<td>Each value matches the OpenAI model pattern</td>
+<td>Sorted account-accessible identifiers.</td>
+</tr>
+</tbody></table>
+</div>
+<p>This method can perform a network request. It does not return Ollama models.</p>
+<h2 id="local-ai-discovery-and-lifecycle">Local AI discovery and lifecycle</h2>
+<h3 id="local-ai-status-v2">Local AI status v2</h3>
+<p><code>Arcane.localAI.status()</code> takes no arguments and returns <code>LocalAIStatusV2</code>.
+Concurrent callers in one Core process can share the same active discovery.
+An admitted development Android provider uses the same schema version with the
+exact <code>user-managed-loopback</code> discriminator described below.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>schemaVersion</code></td>
+<td><code>2</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>Status schema.</td>
+</tr>
+<tr>
+<td><code>providerMode</code></td>
+<td><code>&quot;user-managed-loopback&quot;</code></td>
+<td align="right">Android only</td>
+<td>Omitted by desktop Core</td>
+<td>Identifies the narrow Android provider without changing <code>Arcane.runtime.current().managedLocalAI</code>, which remains false.</td>
+</tr>
+<tr>
+<td><code>runtime</code></td>
+<td>object</td>
+<td align="right">Yes</td>
+<td>Desktop Core or bounded Android provider identity</td>
+<td>Runtime authority and whether desktop native resource admission is active.</td>
+</tr>
+<tr>
+<td><code>policy</code></td>
+<td>object</td>
+<td align="right">Yes</td>
+<td>See below</td>
+<td>Package-bound model policy.</td>
+</tr>
+<tr>
+<td><code>ollama</code></td>
+<td>object</td>
+<td align="right">Yes</td>
+<td>See below</td>
+<td>Ollama discovery state.</td>
+</tr>
+<tr>
+<td><code>admission</code></td>
+<td>object</td>
+<td align="right">Yes</td>
+<td>See below</td>
+<td>Native-admission summary.</td>
+</tr>
+<tr>
+<td><code>speech</code></td>
+<td>object</td>
+<td align="right">Yes</td>
+<td>See below</td>
+<td>Independent speech readiness.</td>
+</tr>
+<tr>
+<td><code>models</code></td>
+<td>object</td>
+<td align="right">Yes</td>
+<td><code>{ollama, speech, transcription}</code> arrays</td>
+<td>Admitted catalogs.</td>
+</tr>
+</tbody></table>
+</div>
+<p><code>policy</code> fields:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>verified_only</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>Package policy</td>
+<td>Whether only declared verified models are considered.</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td><code>&quot;package-bound-application-policy&quot;</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>Policy source.</td>
+</tr>
+<tr>
+<td><code>unverifiedInferenceAuthorized</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>Requires explicit package authority</td>
+<td>Whether installed unverified models may be considered for inference.</td>
+</tr>
+</tbody></table>
+</div>
+<p><code>ollama</code> fields:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>available</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Core obtained a valid bounded catalog.</td>
+</tr>
+<tr>
+<td><code>modelCapabilitiesVerified</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Capability discovery completed.</td>
+</tr>
+<tr>
+<td><code>nativeAdmissionEnforced</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td><code>true</code> for desktop Core; <code>false</code> for Android user-managed loopback</td>
+<td>Whether desktop native resource admission is enforced. Android still applies its generated package-policy and provider-inspection boundary.</td>
+</tr>
+<tr>
+<td><code>activeParallelRequests</code></td>
+<td><code>integer</code></td>
+<td align="right">Desktop Core</td>
+<td>Positive safe integer</td>
+<td>Current machine-wide managed Ollama parallel request count used for active-fit evidence.</td>
+</tr>
+<tr>
+<td><code>errorCode</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>Normalized code</td>
+<td>Discovery failure code.</td>
+</tr>
+</tbody></table>
+</div>
+<p><code>admission</code> fields:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>policyVersion</code></td>
+<td><code>integer</code></td>
+<td align="right">Yes</td>
+<td>Currently <code>1</code></td>
+<td>Resource-policy version.</td>
+</tr>
+<tr>
+<td><code>enforcedBy</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Bounded host-owned identifier</td>
+<td>Admission authority; renderers must not interpret it as reusable authorization.</td>
+</tr>
+<tr>
+<td><code>evaluatedModels</code></td>
+<td><code>integer</code></td>
+<td align="right">Yes</td>
+<td>Nonnegative</td>
+<td>Candidate count evaluated.</td>
+</tr>
+<tr>
+<td><code>admittedModels</code></td>
+<td><code>integer</code></td>
+<td align="right">Yes</td>
+<td>0 through <code>evaluatedModels</code></td>
+<td>Candidate count admitted at one parallel request. A model can still have <code>runnable:false</code> when the active machine-wide parallel count exceeds its current model-specific ceiling.</td>
+</tr>
+<tr>
+<td><code>rejected</code></td>
+<td><code>array</code></td>
+<td align="right">Yes</td>
+<td><code>{id, compatibility}</code> records</td>
+<td>Rejected candidates and admission evidence.</td>
+</tr>
+</tbody></table>
+</div>
+<p><code>speech</code> fields:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>available</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Synthesis or transcription is available.</td>
+</tr>
+<tr>
+<td><code>reachable</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Core validated the health endpoint.</td>
+</tr>
+<tr>
+<td><code>synthesisAvailable</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Kokoro readiness.</td>
+</tr>
+<tr>
+<td><code>transcriptionAvailable</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Whisper readiness.</td>
+</tr>
+<tr>
+<td><code>synthesisErrorCode</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Synthesis failure/readiness code.</td>
+</tr>
+<tr>
+<td><code>transcriptionErrorCode</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Transcription failure/readiness code.</td>
+</tr>
+<tr>
+<td><code>errorCode</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Overall speech failure code.</td>
+</tr>
+</tbody></table>
+</div>
+<p><code>models.ollama</code> contains <a href="#local-ai-model"><code>LocalAIModel</code></a> records.
+<code>models.speech</code> and <code>models.transcription</code> contain
+<a href="#local-ai-service-model"><code>LocalAIServiceModel</code></a> records. An unavailable service
+resolves as service-local status data where possible; it never silently changes
+providers.</p>
+<p>For <code>providerMode:&quot;user-managed-loopback&quot;</code>, the Android host calls only the
+fixed <code>127.0.0.1:11434</code> Ollama service and fixed host-owned loopback speech
+service. It returns only installed package-policy models that passed its bounded
+provider inspection, repeats model admission before <code>ollama.chat</code>, and merges
+the independently bounded Kokoro and Whisper role health and catalogs. The host
+does not expose recovery or model mutation. The renderer never calls either
+loopback API directly.</p>
+<p>Android Linux Terminal, Ollama, and every model lifecycle action remain user-owned. Plain
+loopback Ollama has no caller authentication; other local applications or
+processes may call it, race the host&#39;s checks, contend for resources, or deny
+service. This is unsigned development behavior, not release support, managed
+service ownership, or an isolated-inference guarantee. Android exposes no
+application-owned isolated-question or repository extension unless generated
+package and method policy explicitly admit it.</p>
+<h3 id="local-ai-model">Local AI model</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code>, <code>name</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Equal model identifiers</td>
+<td>Snapshot selection identifier and Ollama name.</td>
+</tr>
+<tr>
+<td><code>provider</code></td>
+<td><code>&quot;ollama&quot;</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>Provider.</td>
+</tr>
+<tr>
+<td><code>roles</code></td>
+<td><code>array</code></td>
+<td align="right">Yes</td>
+<td>Currently empty</td>
+<td>Reserved role catalog.</td>
+</tr>
+<tr>
+<td><code>managed</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Declared by package policy.</td>
+</tr>
+<tr>
+<td><code>installed</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Runnable alias or authorized model is installed.</td>
+</tr>
+<tr>
+<td><code>admitted</code></td>
+<td><code>true</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>Current serial-fit admission. This is not proof that the active parallel setting fits.</td>
+</tr>
+<tr>
+<td><code>runnable</code>, <code>creatable</code>, <code>pullable</code>, <code>verified</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Managed lifecycle state. <code>runnable:false</code> can mean the active parallel setting exceeds the model&#39;s current ceiling.</td>
+</tr>
+<tr>
+<td><code>capabilitiesVerified</code>, <code>available</code></td>
+<td><code>true</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>Capability and availability proof.</td>
+</tr>
+<tr>
+<td><code>modifiedAt</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Installed timestamp.</td>
+</tr>
+<tr>
+<td><code>sizeBytes</code></td>
+<td><code>integer | null</code></td>
+<td align="right">Yes</td>
+<td>Nonnegative safe integer</td>
+<td>Model size.</td>
+</tr>
+<tr>
+<td><code>digest</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>64-character hexadecimal value</td>
+<td>Installed digest.</td>
+</tr>
+<tr>
+<td><code>family</code>, <code>parameterSize</code>, <code>quantization</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>Bounded diagnostic strings</td>
+<td>Provider metadata.</td>
+</tr>
+<tr>
+<td><code>compatibility</code></td>
+<td><a href="#model-resource-admission"><code>ModelResourceAdmission</code></a></td>
+<td align="right">Yes</td>
+<td><code>admitted:true</code></td>
+<td>Native resource and definition evidence.</td>
+</tr>
+</tbody></table>
+</div>
+<p>This record is snapshot evidence, not reusable authorization. Core re-admits the
+exact model and requested context before inference.</p>
+<h3 id="local-ai-service-model">Local AI service model</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td><code>&quot;kokoro&quot; | &quot;whisper-small&quot;</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Model identifier.</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>&quot;Kokoro&quot; | &quot;Whisper Small&quot;</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Display name.</td>
+</tr>
+<tr>
+<td><code>provider</code></td>
+<td><code>&quot;speech&quot;</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>Service provider.</td>
+</tr>
+<tr>
+<td><code>roles</code></td>
+<td><code>[&quot;tts&quot;] | [&quot;stt&quot;]</code></td>
+<td align="right">Yes</td>
+<td>One role</td>
+<td>Supported operation.</td>
+</tr>
+<tr>
+<td><code>available</code></td>
+<td><code>true</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>Availability in this snapshot.</td>
+</tr>
+<tr>
+<td><code>engine</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Health-validated identifier</td>
+<td>Native engine.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="model-resource-admission">Model resource admission</h3>
+<p><code>ModelResourceAdmission</code> is a union. Early failures can omit diagnostic fields;
+callers must not assume every field exists.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>policyVersion</code></td>
+<td><code>integer</code></td>
+<td align="right">Yes</td>
+<td>Currently <code>1</code></td>
+<td>Resource-policy version.</td>
+</tr>
+<tr>
+<td><code>admitted</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Current fit decision.</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>&quot;compatible&quot; | &quot;incompatible&quot; | &quot;evidence-unavailable&quot;</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Admission classification.</td>
+</tr>
+<tr>
+<td><code>code</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td><code>null</code> on success</td>
+<td>Stable result code.</td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>At most 512 characters</td>
+<td>Human-readable result.</td>
+</tr>
+<tr>
+<td><code>resolution</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>At most 512 characters</td>
+<td>Suggested remediation.</td>
+</tr>
+<tr>
+<td><code>operation</code></td>
+<td><code>&quot;inference&quot; | &quot;create&quot; | &quot;pull&quot;</code></td>
+<td align="right">No</td>
+<td>Evidence-dependent</td>
+<td>Evaluated operation.</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>string</code></td>
+<td align="right">No</td>
+<td>At most 256 characters</td>
+<td>Evaluated model.</td>
+</tr>
+<tr>
+<td><code>modelBytes</code>, <code>downloadBytes</code>, <code>contextTokens</code>, <code>nativeContextTokens</code>, <code>kvCacheBytes</code></td>
+<td><code>integer | null</code></td>
+<td align="right">No</td>
+<td>Positive when present</td>
+<td>Model, transfer, requested/native context, and K/V-cache evidence.</td>
+</tr>
+<tr>
+<td><code>parallelism</code></td>
+<td><code>integer</code></td>
+<td align="right">No</td>
+<td>Positive safe integer</td>
+<td>Parallel request count evaluated by this admission record.</td>
+</tr>
+<tr>
+<td><code>activeParallelRequests</code></td>
+<td><code>integer</code></td>
+<td align="right">No</td>
+<td>Positive safe integer</td>
+<td>Current machine-wide managed Ollama setting observed for the snapshot.</td>
+</tr>
+<tr>
+<td><code>maxAllowedParallelRequests</code></td>
+<td><code>integer | null</code></td>
+<td align="right">No</td>
+<td><code>null</code>, 0, or a positive safe integer</td>
+<td>Largest count admitted by the same immutable model/resource snapshot. It is solved directly from the model&#39;s K/V-cache equation and available working-set bytes, without a product ceiling. <code>null</code> means evidence was unavailable; <code>0</code> means even one request was proven memory-incompatible.</td>
+</tr>
+<tr>
+<td><code>activeParallelRequestsAllowed</code></td>
+<td><code>boolean | null</code></td>
+<td align="right">No</td>
+<td>-</td>
+<td>Whether the active count is within <code>maxAllowedParallelRequests</code>; <code>null</code> preserves unknown evidence.</td>
+</tr>
+<tr>
+<td><code>runtimeHeadroomBytes</code>, <code>requiredWorkingSetBytes</code></td>
+<td><code>integer</code></td>
+<td align="right">No</td>
+<td>Positive</td>
+<td>Derived working-set requirements.</td>
+</tr>
+<tr>
+<td><code>requiredAdditionalBytes</code>, <code>availableWorkingSetBytes</code></td>
+<td><code>integer</code></td>
+<td align="right">No</td>
+<td>Nonnegative</td>
+<td>Additional requirement and available capacity.</td>
+</tr>
+<tr>
+<td><code>loadedModelBytes</code>, <code>targetResidentBytes</code></td>
+<td><code>integer</code></td>
+<td align="right">No</td>
+<td>Nonnegative</td>
+<td>Current residency evidence.</td>
+</tr>
+<tr>
+<td><code>checks</code></td>
+<td><a href="#model-resource-checks"><code>ModelResourceCheck[]</code></a></td>
+<td align="right">No</td>
+<td>-</td>
+<td>Individual capacity checks.</td>
+</tr>
+<tr>
+<td><code>definitionVerified</code>, <code>baseModelInstalled</code>, <code>creationRequired</code>, <code>pullRequired</code></td>
+<td><code>boolean</code></td>
+<td align="right">No</td>
+<td>Managed workflows</td>
+<td>Managed lifecycle evidence.</td>
+</tr>
+<tr>
+<td><code>registryEvidence</code></td>
+<td>object</td>
+<td align="right">No</td>
+<td>Opaque diagnostic shape</td>
+<td>Preflight detail; never an authorization token.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Other bounded diagnostics may appear on failures. Branch on <code>admitted</code>,
+<code>status</code>, and <code>code</code>; treat additional evidence as display-only.</p>
+<h3 id="model-resource-checks">Model resource checks</h3>
+<p>A working-set <code>ModelResourceCheck</code> contains:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td><code>&quot;working-set&quot;</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>Check identifier.</td>
+</tr>
+<tr>
+<td><code>ok</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Pass/fail result.</td>
+</tr>
+<tr>
+<td><code>requiredBytes</code>, <code>totalRequiredBytes</code>, <code>availableBytes</code></td>
+<td><code>integer</code></td>
+<td align="right">Yes</td>
+<td>Nonnegative</td>
+<td>Required additional, required total, and available bytes.</td>
+</tr>
+<tr>
+<td><code>systemFreeBytes</code>, <code>systemReserveBytes</code>, <code>usableSystemBytes</code></td>
+<td><code>integer</code></td>
+<td align="right">Yes</td>
+<td>Nonnegative</td>
+<td>System-memory evidence.</td>
+</tr>
+<tr>
+<td><code>usableGpuBytes</code>, <code>loadedModelBytes</code>, <code>targetResidentBytes</code></td>
+<td><code>integer</code></td>
+<td align="right">Yes</td>
+<td>Nonnegative</td>
+<td>Accelerator and residency evidence.</td>
+</tr>
+</tbody></table>
+</div>
+<p>A pull may add a <code>&quot;model-store&quot;</code> check with <code>ok</code>, <code>requiredBytes</code>,
+<code>availableBytes</code>, <code>storageFreeBytes</code>, and <code>storageReserveBytes</code>.</p>
+<p>Admission proves only current fit. It does not prove safety, output quality,
+license, provenance, supplier identity, future capacity, or stability under
+later concurrent workloads.</p>
+<h3 id="local-ai-platform-result">Local AI platform result</h3>
+<p><code>Arcane.localAI.ensurePlatform()</code> takes no arguments. It is a Provisioner-only,
+exclusive post-install reconciliation. It retries when settings change during
+the operation and rejects with <code>ARCANE_AI_PROFILE_CHANGED</code> after three stale
+plans instead of overwriting newer settings.</p>
+<p><code>LocalAIPlatformResult</code> always contains an <a href="#arcane-operation"><code>ArcaneOperation</code></a>
+and one of these branches.</p>
+<p>OpenAI-selected branch:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>local</code></td>
+<td>object</td>
+<td align="right">Yes</td>
+<td><code>{available:false, reason:&quot;openai-selected&quot;}</code></td>
+<td>Local reconciliation was intentionally skipped.</td>
+</tr>
+<tr>
+<td><code>fallback.provider</code></td>
+<td><code>&quot;openai&quot;</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>Explicit selected provider.</td>
+</tr>
+<tr>
+<td><code>fallback.model</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Protected-credential account-validated model</td>
+<td>Selected OpenAI model.</td>
+</tr>
+<tr>
+<td><code>fallback.configured</code></td>
+<td><code>true</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>Required credential and model are valid.</td>
+</tr>
+<tr>
+<td><code>loaded</code></td>
+<td>object</td>
+<td align="right">Yes</td>
+<td><code>{loaded:false, provider:&quot;openai&quot;, model}</code></td>
+<td>No local model was loaded.</td>
+</tr>
+<tr>
+<td><code>operation</code></td>
+<td><a href="#arcane-operation"><code>ArcaneOperation</code></a></td>
+<td align="right">Yes</td>
+<td>Completed</td>
+<td>Exclusive operation receipt.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Local branch:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>local.available</code></td>
+<td><code>true</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>Local AI is available.</td>
+</tr>
+<tr>
+<td><code>local.model</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Managed selected model</td>
+<td>Ready model definition.</td>
+</tr>
+<tr>
+<td><code>local.alias</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Managed alias</td>
+<td>Selected runtime alias.</td>
+</tr>
+<tr>
+<td><code>local.variant</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Arcane model variant</td>
+<td>Selected size.</td>
+</tr>
+<tr>
+<td><code>local.compatibility</code></td>
+<td><a href="#model-resource-admission"><code>ModelResourceAdmission</code></a></td>
+<td align="right">Yes</td>
+<td><code>admitted:true</code></td>
+<td>Final native admission.</td>
+</tr>
+<tr>
+<td><code>local.recommendationDegraded</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Automatic selection used a smaller candidate after capacity rejection.</td>
+</tr>
+<tr>
+<td><code>local.candidateFailures</code></td>
+<td><code>array</code></td>
+<td align="right">Yes</td>
+<td>Empty unless an earlier automatic candidate failed</td>
+<td>Bounded prior failures.</td>
+</tr>
+<tr>
+<td><code>fallback</code></td>
+<td><code>null</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Arcane did not silently change providers.</td>
+</tr>
+<tr>
+<td><code>loaded</code></td>
+<td>object</td>
+<td align="right">Yes</td>
+<td>See below</td>
+<td>Managed boot-load result.</td>
+</tr>
+<tr>
+<td><code>operation</code></td>
+<td><a href="#arcane-operation"><code>ArcaneOperation</code></a></td>
+<td align="right">Yes</td>
+<td>Completed</td>
+<td>Exclusive operation receipt.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Each candidate failure is <code>{variant, kind, code, message, resolution}</code>. <code>kind</code>
+is <code>&quot;capacity&quot;</code>, <code>&quot;evidence-unavailable&quot;</code>, or <code>&quot;fatal&quot;</code>; only a capacity
+failure allows Automatic mode to try the next smaller candidate.</p>
+<p><code>loaded</code> is a union. Both branches contain <code>loaded</code>, <code>provider</code>, and <code>model</code>.
+The successful local branch also contains <code>keepAlive</code> and <code>contextLength</code>, where
+<code>contextLength:null</code> means Automatic.</p>
+<h3 id="local-ai-recovery-request">Local AI recovery request</h3>
+<p><code>Arcane.localAI.recover(request)</code> accepts an exact <code>LocalAIRecoveryRequest</code>.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>services</code></td>
+<td><code>string[]</code></td>
+<td align="right">Yes</td>
+<td>Nonempty, duplicate-free subset of <code>&quot;ollama&quot;</code> and <code>&quot;speech&quot;</code></td>
+<td>Existing Arcane-managed services to start and verify.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="local-ai-recovery-result">Local AI recovery result</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ready</code></td>
+<td><code>true</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>All requested services are ready.</td>
+</tr>
+<tr>
+<td><code>services</code></td>
+<td><code>array</code></td>
+<td align="right">Yes</td>
+<td>Canonical Ollama-then-speech order</td>
+<td>Per-service results.</td>
+</tr>
+<tr>
+<td><code>operation</code></td>
+<td><a href="#arcane-operation"><code>ArcaneOperation</code></a></td>
+<td align="right">Yes</td>
+<td>Completed</td>
+<td>Privileged exclusive operation.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Every service result is exact:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td><code>&quot;ollama&quot; | &quot;speech&quot;</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Service identifier.</td>
+</tr>
+<tr>
+<td><code>serviceName</code></td>
+<td><code>&quot;ArcaneOllama&quot; | &quot;ArcaneLocalSpeech&quot;</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Operating-system service name.</td>
+</tr>
+<tr>
+<td><code>endpoint</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Fixed <code>127.0.0.1</code> health/version endpoint</td>
+<td>Verified loopback endpoint.</td>
+</tr>
+<tr>
+<td><code>state</code></td>
+<td><code>&quot;running&quot;</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>Verified state.</td>
+</tr>
+<tr>
+<td><code>ready</code></td>
+<td><code>true</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>Readiness proof.</td>
+</tr>
+<tr>
+<td><code>started</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>This request issued the start.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Recovery starts an existing approved registration. It does not install,
+replace, stop, or silently reconfigure a service.</p>
+<h3 id="local-ai-parallel-request-configuration">Local AI parallel request configuration</h3>
+<p><code>Arcane.localAI.setParallelRequests(request)</code> accepts an exact
+<code>LocalAIParallelRequestsRequest</code>:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>model</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Exact app-owned verified model identifier</td>
+<td>Model whose declared definition and native metadata govern the calculation and subsequent load.</td>
+</tr>
+<tr>
+<td><code>parallelRequests</code></td>
+<td><code>integer</code></td>
+<td align="right">Yes</td>
+<td>Nonnegative safe integer</td>
+<td><code>0</code> requests the maximum currently allowed; a positive value is a requested ceiling and is clamped down when necessary.</td>
+</tr>
+<tr>
+<td><code>contextTokens</code></td>
+<td><code>integer</code></td>
+<td align="right">No</td>
+<td>Positive safe integer; defaults to verified Modelfile <code>num_ctx</code></td>
+<td>Exact per-request context evaluated and used to load the model. The model&#39;s native metadata, rather than an Arcane product range, supplies the maximum.</td>
+</tr>
+</tbody></table>
+</div>
+<p>A successful <code>LocalAIParallelRequestsResult</code> contains:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>schemaVersion</code></td>
+<td><code>1</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>Result schema.</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Exact verified alias</td>
+<td>Model ensured and loaded.</td>
+</tr>
+<tr>
+<td><code>contextTokens</code>, <code>nativeContextTokens</code></td>
+<td><code>integer | null</code></td>
+<td align="right">Yes</td>
+<td>Positive safe integers when present</td>
+<td>Requested context and model-native limit when metadata provides one.</td>
+</tr>
+<tr>
+<td><code>requestedParallelRequests</code></td>
+<td><code>integer</code></td>
+<td align="right">Yes</td>
+<td>Nonnegative safe integer</td>
+<td>Caller input.</td>
+</tr>
+<tr>
+<td><code>requestMode</code></td>
+<td><code>&quot;maximum-allowed&quot; | &quot;requested-ceiling&quot;</code></td>
+<td align="right">Yes</td>
+<td>Derived from input</td>
+<td>Interpretation of the request.</td>
+</tr>
+<tr>
+<td><code>previousParallelRequests</code></td>
+<td><code>integer</code></td>
+<td align="right">Yes</td>
+<td>Positive safe integer</td>
+<td>Proven setting before the operation.</td>
+</tr>
+<tr>
+<td><code>maxAllowedParallelRequests</code></td>
+<td><code>integer</code></td>
+<td align="right">Yes</td>
+<td>Positive safe integer</td>
+<td>Largest count admitted by the resource state used for the effective decision. A changed path uses a fresh stopped-service snapshot.</td>
+</tr>
+<tr>
+<td><code>allowedParallelRequests</code>, <code>effectiveParallelRequests</code></td>
+<td><code>integer</code></td>
+<td align="right">Yes</td>
+<td>Positive safe integers; equal</td>
+<td>Clamped target and proven effective count used for the load.</td>
+</tr>
+<tr>
+<td><code>requestedAllowed</code>, <code>clamped</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Whether a positive request fit without reduction and whether reduction occurred. Auto (<code>0</code>) is allowed and is not called clamped.</td>
+</tr>
+<tr>
+<td><code>changed</code>, <code>restarted</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Whether the final service setting changed and whether the managed service actually restarted. A resource change observed after stopping can make <code>restarted:true</code> and <code>changed:false</code>; the receipt reports both facts independently.</td>
+</tr>
+<tr>
+<td><code>healthy</code>, <code>loaded</code></td>
+<td><code>true</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>Post-operation service and model readiness.</td>
+</tr>
+<tr>
+<td><code>loadedModel</code></td>
+<td>object</td>
+<td align="right">Yes</td>
+<td><code>{name,contextLength}</code></td>
+<td>Bounded <code>/api/ps</code> confirmation; provider-reported <code>contextLength</code> may represent runner allocation.</td>
+</tr>
+<tr>
+<td><code>serviceScope</code></td>
+<td><code>&quot;machine&quot;</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>The Ollama setting is global even though Arcane selected it from one model&#39;s evidence.</td>
+</tr>
+<tr>
+<td><code>unloadedModels</code></td>
+<td><code>string[]</code></td>
+<td align="right">Yes</td>
+<td>Bounded pre-restart identifiers</td>
+<td>Resident models evicted by the restart; empty on a no-op.</td>
+</tr>
+<tr>
+<td><code>definitionVerified</code></td>
+<td><code>true</code></td>
+<td align="right">Yes</td>
+<td>Literal</td>
+<td>Exact alias was verified after any required create/repair.</td>
+</tr>
+<tr>
+<td><code>modelSource</code></td>
+<td><code>&quot;verified-alias&quot; | &quot;installed-base&quot; | &quot;registry-preflight&quot;</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Evidence source used for the pre-change capacity calculation.</td>
+</tr>
+<tr>
+<td><code>admission</code></td>
+<td><a href="#model-resource-admission"><code>ModelResourceAdmission</code></a></td>
+<td align="right">Yes</td>
+<td><code>admitted:true</code></td>
+<td>Fresh active-setting admission after ensure/repair and before load.</td>
+</tr>
+<tr>
+<td><code>operation</code></td>
+<td><a href="#arcane-operation"><code>ArcaneOperation</code></a></td>
+<td align="right">Yes</td>
+<td>Completed</td>
+<td>Privileged exclusive operation receipt.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Core snapshots one exact model/resource state and solves the maximum directly
+from the model metadata&#39;s K/V-cache byte ratio and the snapshot&#39;s available
+working-set bytes. There is no candidate-count search and no Arcane product
+ceiling. The largest exact integer representable by the JavaScript/JSON API is a
+transport constraint, not a model-capacity claim. The result is a current
+memory/resource admission with explicit reserves, not a performance optimum or
+a promise of future availability. If the tentative target already equals the
+current setting, Core does not stop Ollama. Otherwise the guarded transaction
+stops and proves the service, takes one fresh stopped-service resource snapshot,
+re-solves the effective count, changes only <code>OLLAMA_NUM_PARALLEL</code> when that final
+count differs, and starts/proves the service. This unloads every resident Ollama
+model and can terminate in-flight local inference.
+It then ensures or repairs the exact alias, loads it with the requested context
+and indefinite residency, and returns only after <code>/api/ps</code> confirms the model.
+If loading fails after a setting change, Core attempts to restore the prior count.
+The operation does not drain unrelated Core processes or direct loopback clients.
+Automatic mutation is currently implemented only by the managed Microsoft NT
+adapter. Linux validates the request but returns a <code>501</code> manual-systemd error;
+Android&#39;s user-managed loopback mode does not invoke this desktop Core method.</p>
+<h3 id="arcane-operation">Arcane operation</h3>
+<p>Successful mutating AI methods include <code>ArcaneOperation</code>.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>UUID</td>
+<td>Operation identifier.</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Method-specific</td>
+<td>Operation type.</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Successful returned operations are <code>&quot;completed&quot;</code></td>
+<td>State.</td>
+</tr>
+<tr>
+<td><code>startedAt</code></td>
+<td>ISO timestamp <code>string</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Start time.</td>
+</tr>
+<tr>
+<td><code>completedAt</code></td>
+<td>ISO timestamp <code>string | null</code></td>
+<td align="right">Yes</td>
+<td>Present on completion</td>
+<td>Completion time.</td>
+</tr>
+<tr>
+<td><code>progress</code></td>
+<td><code>number</code></td>
+<td align="right">Yes</td>
+<td>0-100; success is 100</td>
+<td>Latest progress.</td>
+</tr>
+<tr>
+<td><code>currentStep</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Latest visible step.</td>
+</tr>
+<tr>
+<td><code>progressDetails</code></td>
+<td><code>object | null</code></td>
+<td align="right">Yes</td>
+<td>Operation-specific</td>
+<td>Structured progress.</td>
+</tr>
+<tr>
+<td><code>credentials</code></td>
+<td><code>array</code></td>
+<td align="right">Yes</td>
+<td>Normally empty for AI lifecycle work</td>
+<td>Host-issued credential artifacts, if any; do not log or persist them.</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td><code>object | null</code></td>
+<td align="right">Yes</td>
+<td><code>null</code> on success</td>
+<td>Normalized operation error.</td>
+</tr>
+</tbody></table>
+</div>
+<h2 id="speech">Speech</h2>
+<h3 id="speech-status">Speech status</h3>
+<p><code>Arcane.speech.status()</code> takes no arguments and returns <code>SpeechStatus</code>.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ready</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td><code>true</code> only when TTS and STT are ready</td>
+<td>Aggregate readiness.</td>
+</tr>
+<tr>
+<td><code>synthesisAvailable</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>Core/native-host field</td>
+<td>Independent Kokoro readiness.</td>
+</tr>
+<tr>
+<td><code>transcriptionAvailable</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>Core/native-host field</td>
+<td>Independent Whisper readiness.</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Bounded health identifier</td>
+<td>Native service state.</td>
+</tr>
+<tr>
+<td><code>ttsEngine</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Health-validated</td>
+<td>Text-to-speech engine.</td>
+</tr>
+<tr>
+<td><code>sttEngine</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Health-validated</td>
+<td>Speech-to-text engine.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Unlike <code>localAI.status()</code>, this direct call rejects when Core cannot reach and
+validate the speech health response.</p>
+<h3 id="speech-synthesis-request">Speech synthesis request</h3>
+<p><code>Arcane.speech.synthesize(request)</code> accepts the portable
+<code>SpeechSynthesisRequest</code> fields below. Supply the documented primitive types and
+lowercase values; do not rely on host-specific coercion or empty-string
+defaulting.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>input</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Trimmed, nonempty, at most 4,000 characters</td>
+<td>Text to synthesize.</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>&quot;kokoro&quot;</code></td>
+<td align="right">No</td>
+<td>Default <code>&quot;kokoro&quot;</code>; only supported value</td>
+<td>Synthesis model.</td>
+</tr>
+<tr>
+<td><code>voice</code></td>
+<td><code>string</code></td>
+<td align="right">No</td>
+<td>Default <code>&quot;af_heart&quot;</code>; <code>[a-z0-9][a-z0-9_-]{0,63}</code></td>
+<td>Kokoro voice.</td>
+</tr>
+<tr>
+<td><code>responseFormat</code></td>
+<td><code>&quot;opus&quot; | &quot;wav&quot;</code></td>
+<td align="right">No</td>
+<td>Default <code>&quot;opus&quot;</code></td>
+<td>Audio format.</td>
+</tr>
+<tr>
+<td><code>speed</code></td>
+<td><code>number</code></td>
+<td align="right">No</td>
+<td>Default <code>1</code>; 0.5-2 inclusive</td>
+<td>Speaking speed.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="speech-synthesis-result">Speech synthesis result</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>audioBase64</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Base64 for 1 byte through 6 MiB of audio</td>
+<td>Encoded audio.</td>
+</tr>
+<tr>
+<td><code>contentType</code></td>
+<td><code>&quot;audio/ogg&quot; | &quot;audio/wav&quot;</code></td>
+<td align="right">Yes</td>
+<td>Matches the result encoding</td>
+<td>Media type.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="speech-transcription-request">Speech transcription request</h3>
+<p><code>Arcane.speech.transcribe(request)</code> accepts an exact
+<code>SpeechTranscriptionRequest</code>.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>audioBase64</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Canonical base64; encoded at most 8 MiB; decoded 1 byte through 6 MiB</td>
+<td>Media bytes labeled as WebM. The bridge validates encoding and bounds, while the fixed speech service parses the container.</td>
+</tr>
+<tr>
+<td><code>mimeType</code></td>
+<td><code>string</code></td>
+<td align="right">No</td>
+<td>Default <code>&quot;audio/webm&quot;</code>; base type must be <code>audio/webm</code></td>
+<td>Media type; codec parameters may follow.</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>string</code></td>
+<td align="right">No</td>
+<td>Default <code>&quot;whisper-small&quot;</code>; <code>whisper(?:[._-][a-z0-9]+)*</code></td>
+<td>Whisper identifier. The fixed service rejects unsupported variants.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="speech-transcription-result">Speech transcription result</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>text</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Trimmed; response limited to 64 KiB</td>
+<td>Transcript.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Application-owned inference extensions define their request, callback, proof,
+and isolation schemas with the owning package. They are included in the same
+developer-reference completeness check but do not become generic Arcane AI
+contracts merely because Core transports them.</p>
+<h2 id="direct-ollama-api">Direct Ollama API</h2>
+<p>Direct Ollama calls are local Core APIs, not provider-neutral contracts. Their
+request objects are closed top-level plain objects. Core rejects unknown
+top-level fields, non-JSON-compatible values, and encoded requests larger than
+8 MiB. Nested provider-native objects are forwarded for Ollama to validate.</p>
+<h3 id="ollama-model-name">Ollama model name</h3>
+<p>Every required <code>OllamaModelName</code> matches:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}
+</code></pre></div>
+<h3 id="ollama-show-options">Ollama show options</h3>
+<p><code>Arcane.ollama.show(model, options)</code> accepts <code>OllamaShowOptions</code>:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>verbose</code></td>
+<td><code>boolean</code></td>
+<td align="right">No</td>
+<td>Provider default</td>
+<td>Requests verbose metadata.</td>
+</tr>
+</tbody></table>
+</div>
+<p>The wrapper supplies the validated <code>model</code> field.</p>
+<h3 id="ollama-generate-request">Ollama generate request</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>model</code></td>
+<td><a href="#ollama-model-name"><code>OllamaModelName</code></a></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Model to run.</td>
+</tr>
+<tr>
+<td><code>prompt</code></td>
+<td><code>string</code></td>
+<td align="right">Provider</td>
+<td>-</td>
+<td>Generation prompt.</td>
+</tr>
+<tr>
+<td><code>suffix</code></td>
+<td><code>string</code></td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Text after the generated insertion.</td>
+</tr>
+<tr>
+<td><code>images</code></td>
+<td><code>array</code></td>
+<td align="right">No</td>
+<td>Provider-native base64 values</td>
+<td>Multimodal input.</td>
+</tr>
+<tr>
+<td><code>format</code></td>
+<td>JSON value</td>
+<td align="right">No</td>
+<td>Text, JSON, or schema format</td>
+<td>Output format.</td>
+</tr>
+<tr>
+<td><code>options</code></td>
+<td>object</td>
+<td align="right">No</td>
+<td>Provider-native; <code>num_ctx</code> is 1,024-262,144 when supplied</td>
+<td>Runtime options.</td>
+</tr>
+<tr>
+<td><code>system</code>, <code>template</code></td>
+<td><code>string</code></td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Prompt controls.</td>
+</tr>
+<tr>
+<td><code>context</code></td>
+<td><code>array</code></td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Legacy context tokens.</td>
+</tr>
+<tr>
+<td><code>raw</code></td>
+<td><code>boolean</code></td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Raw prompt mode.</td>
+</tr>
+<tr>
+<td><code>keep_alive</code></td>
+<td><code>string | number</code></td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Residency.</td>
+</tr>
+<tr>
+<td><code>think</code>, <code>logprobs</code>, <code>top_logprobs</code></td>
+<td>JSON value</td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Reasoning/log-probability controls.</td>
+</tr>
+</tbody></table>
+</div>
+<p>See <a href="https://docs.ollama.com/api/generate" target="_blank" rel="noreferrer">Ollama&#39;s generate API</a>.</p>
+<h3 id="ollama-chat-request">Ollama chat request</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>model</code></td>
+<td><a href="#ollama-model-name"><code>OllamaModelName</code></a></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Model to run.</td>
+</tr>
+<tr>
+<td><code>messages</code></td>
+<td><code>array</code></td>
+<td align="right">Provider</td>
+<td>Provider-native records</td>
+<td>Conversation.</td>
+</tr>
+<tr>
+<td><code>tools</code></td>
+<td><code>array</code></td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Tool definitions.</td>
+</tr>
+<tr>
+<td><code>format</code></td>
+<td>JSON value</td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Output format or schema.</td>
+</tr>
+<tr>
+<td><code>options</code></td>
+<td>object</td>
+<td align="right">No</td>
+<td>Provider-native; <code>num_ctx</code> is 1,024-262,144 when supplied</td>
+<td>Runtime options.</td>
+</tr>
+<tr>
+<td><code>keep_alive</code></td>
+<td><code>string | number</code></td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Residency.</td>
+</tr>
+<tr>
+<td><code>think</code>, <code>logprobs</code>, <code>top_logprobs</code></td>
+<td>JSON value</td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Reasoning/log-probability controls.</td>
+</tr>
+</tbody></table>
+</div>
+<p>See <a href="https://docs.ollama.com/api/chat" target="_blank" rel="noreferrer">Ollama&#39;s chat API</a>.</p>
+<h3 id="ollama-embed-request">Ollama embed request</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>model</code></td>
+<td><a href="#ollama-model-name"><code>OllamaModelName</code></a></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Embedding model.</td>
+</tr>
+<tr>
+<td><code>input</code></td>
+<td><code>string | array</code></td>
+<td align="right">Provider</td>
+<td>Provider-native</td>
+<td>Text or batch to embed.</td>
+</tr>
+<tr>
+<td><code>truncate</code></td>
+<td><code>boolean</code></td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Allow truncation.</td>
+</tr>
+<tr>
+<td><code>dimensions</code></td>
+<td><code>integer</code></td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Embedding dimensions.</td>
+</tr>
+<tr>
+<td><code>keep_alive</code></td>
+<td><code>string | number</code></td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Residency.</td>
+</tr>
+<tr>
+<td><code>options</code></td>
+<td>object</td>
+<td align="right">No</td>
+<td>Provider-native; <code>num_ctx</code> is 1,024-262,144 when supplied</td>
+<td>Runtime options.</td>
+</tr>
+</tbody></table>
+</div>
+<p>See <a href="https://docs.ollama.com/api/embed" target="_blank" rel="noreferrer">Ollama&#39;s embed API</a>.</p>
+<h3 id="ollama-pull-options">Ollama pull options</h3>
+<p><code>Arcane.ollama.pull(model, options, streamOptions)</code> accepts:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>insecure</code></td>
+<td><code>boolean</code></td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Insecure-registry control.</td>
+</tr>
+</tbody></table>
+</div>
+<p>The raw application call always rejects; see
+<a href="#raw-ollama-management-restrictions">Raw Ollama management restrictions</a>.</p>
+<h3 id="ollama-push-options">Ollama push options</h3>
+<p><code>Arcane.ollama.push(model, options, streamOptions)</code> accepts:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>insecure</code></td>
+<td><code>boolean</code></td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Insecure-registry control.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Push is allowed only for a model authorized by verified package policy.</p>
+<h3 id="ollama-create-request">Ollama create request</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>model</code></td>
+<td><a href="#ollama-model-name"><code>OllamaModelName</code></a></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Alias to create.</td>
+</tr>
+<tr>
+<td><code>from</code></td>
+<td><a href="#ollama-model-name"><code>OllamaModelName</code></a></td>
+<td align="right">Conditional</td>
+<td>Required by Arcane&#39;s managed verified workflow</td>
+<td>Base model.</td>
+</tr>
+<tr>
+<td><code>files</code>, <code>adapters</code></td>
+<td>object</td>
+<td align="right">No</td>
+<td>Provider-native; forbidden by Arcane&#39;s managed path</td>
+<td>File/adapter mappings.</td>
+</tr>
+<tr>
+<td><code>template</code>, <code>system</code></td>
+<td><code>string</code></td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Stored prompt configuration.</td>
+</tr>
+<tr>
+<td><code>license</code></td>
+<td><code>string | array</code></td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>License text.</td>
+</tr>
+<tr>
+<td><code>parameters</code></td>
+<td>object</td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Model parameters.</td>
+</tr>
+<tr>
+<td><code>messages</code></td>
+<td><code>array</code></td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Stored messages.</td>
+</tr>
+<tr>
+<td><code>quantize</code></td>
+<td><code>string</code></td>
+<td align="right">No</td>
+<td>Provider-native</td>
+<td>Quantization request.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Arcane permits creation only when alias, base, SYSTEM text, and parameters
+exactly match the package-owned verified definition. Reserved Arcane and
+rollback aliases reject. See <a href="https://docs.ollama.com/api/create" target="_blank" rel="noreferrer">Ollama&#39;s create API</a>.</p>
+<h3 id="ollama-stream-controls">Ollama stream controls</h3>
+<p>Generate, chat, pull, push, and create accept <code>OllamaStreamControls</code> in the
+document; these controls are not sent as provider request fields.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>onChunk</code></td>
+<td><a href="#ollama-chunk-callback"><code>OllamaChunkCallback</code></a></td>
+<td align="right">No</td>
+<td>-</td>
+<td>Receives provider-native chunks.</td>
+</tr>
+<tr>
+<td><code>signal</code></td>
+<td><code>AbortSignal</code></td>
+<td align="right">No</td>
+<td>Genuine signal object</td>
+<td>Stops renderer observation and sends a best-effort host cancellation control. Whether host work stops depends on the method.</td>
+</tr>
+<tr>
+<td><code>timeoutMs</code></td>
+<td><code>number</code></td>
+<td align="right">No</td>
+<td>Callers must supply a positive finite number; method default otherwise</td>
+<td>Renderer request timeout. The current wrapper coerces this value, so do not depend on acceptance of another type.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Callers must not send internal <code>stream</code> or <code>streamId</code>; the wrapper creates them.</p>
+<h3 id="ollama-chunk-callback">Ollama chunk callback</h3>
+<p>An <code>OllamaChunkCallback</code> is called as <code>onChunk(chunk, metadata)</code>. <code>chunk</code> is a
+provider-native JSON object. <code>metadata</code> is <code>{operation, streamId}</code>. A callback
+may be passed directly in place of <code>OllamaStreamControls</code>.</p>
+<h3 id="ollama-provider-responses">Ollama provider responses</h3>
+<p>Direct Ollama methods return bounded provider-native envelopes. Arcane does not
+normalize their nested fields into the provider-neutral entities above. Core
+requires valid JSON, caps a response at 12 MiB, parses newline-delimited stream
+data, and resolves a stream with its final provider chunk.</p>
+<p>Fields can change with the installed Ollama version. Use the official
+<a href="https://docs.ollama.com/api/introduction" target="_blank" rel="noreferrer">Ollama API reference</a> for the
+provider response entities.</p>
+<ul>
+<li><code>version()</code> returns the version envelope.</li>
+<li><code>models()</code> and <code>list()</code> return the tags envelope, not <code>model[]</code>.</li>
+<li><code>running()</code> returns the running-model envelope, not <code>model[]</code>.</li>
+<li><code>show</code>, <code>generate</code>, <code>chat</code>, <code>embed</code>, <code>push</code>, <code>create</code>, and <code>delete</code> return
+their corresponding provider-native envelope.</li>
+</ul>
+<h3 id="raw-ollama-management-restrictions">Raw Ollama management restrictions</h3>
+<p><code>Arcane.ollama.pull()</code> and <code>Arcane.ollama.copy()</code> always reject and therefore
+return <code>Promise&lt;never&gt;</code> to an application. A raw pull lacks integrity-bound
+pre-download evidence; the managed lifecycle owns registry/GGUF preflight and
+native admission. Raw alias copy is reserved to the managed selection workflow.</p>
+<p><code>push</code>, <code>create</code>, and <code>delete</code> require verified package policy and reject
+reserved aliases. Unverified-model mode is inference-only and never pulls,
+creates, copies, pushes, deletes, or repairs a model.</p>
+<h2 id="ollama-selection-and-settings">Ollama selection and settings</h2>
+<h3 id="arcane-model-preference">Arcane model preference</h3>
+<p><code>Arcane.ollama.select(preference)</code> accepts <code>ArcaneModelPreference</code>:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&quot;auto&quot;</code></td>
+<td>Try the bounded automatic candidate sequence.</td>
+</tr>
+<tr>
+<td><code>&quot;3b&quot;</code>, <code>&quot;8b&quot;</code>, <code>&quot;12b&quot;</code>, <code>&quot;20b&quot;</code>, <code>&quot;120b&quot;</code></td>
+<td>Explicit managed Arcane model size.</td>
+</tr>
+</tbody></table>
+</div>
+<p>The value is a preference enum, not an arbitrary model name.</p>
+<h3 id="arcane-model-selection">Arcane model selection</h3>
+<p><code>Arcane.ollama.selection()</code> and <code>settings()</code> return <code>ArcaneModelSelection</code>.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>preference</code></td>
+<td><a href="#arcane-model-preference"><code>ArcaneModelPreference</code></a></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Saved preference.</td>
+</tr>
+<tr>
+<td><code>recommendedVariant</code>, <code>effectiveVariant</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Managed variants</td>
+<td>Recommended and resolved sizes.</td>
+</tr>
+<tr>
+<td><code>model</code>, <code>alias</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Variant model and stable managed alias.</td>
+</tr>
+<tr>
+<td><code>activeVariant</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>Managed variant</td>
+<td>Persisted active state.</td>
+</tr>
+<tr>
+<td><code>defaultModel</code></td>
+<td><a href="#ollama-model-name"><code>OllamaModelName</code></a></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Default inference model.</td>
+</tr>
+<tr>
+<td><code>bootLoad</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Load during managed startup.</td>
+</tr>
+<tr>
+<td><code>bootKeepAlive</code></td>
+<td><code>&quot;5m&quot; | &quot;30m&quot; | &quot;1h&quot; | &quot;24h&quot; | &quot;-1&quot;</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Boot residency.</td>
+</tr>
+<tr>
+<td><code>contextLength</code></td>
+<td><code>integer</code></td>
+<td align="right">Yes</td>
+<td><code>0</code> or 1,024-262,144; <code>0</code> is Automatic</td>
+<td>Saved context.</td>
+</tr>
+<tr>
+<td><code>provider</code></td>
+<td><code>&quot;ollama&quot; | &quot;openai&quot;</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Saved provider.</td>
+</tr>
+<tr>
+<td><code>openAIModel</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Saved OpenAI model.</td>
+</tr>
+<tr>
+<td><code>responseLength</code></td>
+<td><code>&quot;low&quot; | &quot;medium&quot; | &quot;high&quot;</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Response target.</td>
+</tr>
+<tr>
+<td><code>openAIConfigured</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Protected credential exists.</td>
+</tr>
+<tr>
+<td><code>gpu</code></td>
+<td>object</td>
+<td align="right">Yes</td>
+<td>Bounded diagnostic snapshot</td>
+<td>Accelerator evidence.</td>
+</tr>
+<tr>
+<td><code>recommendationPending</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Automatic selection awaits persisted admission.</td>
+</tr>
+</tbody></table>
+</div>
+<p><code>gpu</code> contains <code>devices</code> (at most 16 <code>{name, memoryBytes}</code> records),
+<code>totalMemoryBytes</code>, <code>largestMemoryBytes</code>, <code>memoryReliable</code>, and <code>source</code>.</p>
+<h3 id="arcane-model-selection-result">Arcane model selection result</h3>
+<p>A successful <code>select()</code> returns <code>ArcaneModelSelectionResult</code> plus
+<a href="#arcane-operation"><code>ArcaneOperation</code></a>.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>model</code>, <code>alias</code>, <code>variant</code>, <code>preference</code>, <code>recommendedVariant</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>Managed values</td>
+<td>Selected model identity.</td>
+</tr>
+<tr>
+<td><code>created</code>, <code>aliasChanged</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Mutation effects.</td>
+</tr>
+<tr>
+<td><code>baseModel</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Verified base.</td>
+</tr>
+<tr>
+<td><code>modelsRoot</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>Host path</td>
+<td>Model store.</td>
+</tr>
+<tr>
+<td><code>gpu</code>, <code>evidence</code></td>
+<td>object</td>
+<td align="right">Yes</td>
+<td>Bounded diagnostics</td>
+<td>Native and definition evidence.</td>
+</tr>
+<tr>
+<td><code>compatibility</code></td>
+<td><a href="#model-resource-admission"><code>ModelResourceAdmission</code></a></td>
+<td align="right">Yes</td>
+<td><code>admitted:true</code></td>
+<td>Final admission.</td>
+</tr>
+<tr>
+<td><code>recommendationDegraded</code></td>
+<td><code>boolean</code></td>
+<td align="right">No</td>
+<td>Automatic only</td>
+<td>Smaller capacity candidate selected.</td>
+</tr>
+<tr>
+<td><code>candidateFailures</code></td>
+<td><code>array</code></td>
+<td align="right">No</td>
+<td>Automatic only</td>
+<td>Earlier bounded failures.</td>
+</tr>
+<tr>
+<td><code>rollbackSnapshotRetained</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>A recovery snapshot remains because cleanup could not be proven.</td>
+</tr>
+<tr>
+<td><code>recoveryAlias</code></td>
+<td><code>string | null</code></td>
+<td align="right">Yes</td>
+<td>Reserved alias when retained</td>
+<td>Alias an administrator can use for recovery.</td>
+</tr>
+<tr>
+<td><code>operation</code></td>
+<td><a href="#arcane-operation"><code>ArcaneOperation</code></a></td>
+<td align="right">Yes</td>
+<td>Completed</td>
+<td>Selection operation.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="arcane-ai-settings-input">Arcane AI settings input</h3>
+<p><code>Arcane.ollama.saveSettings(settings)</code> reads only runtime-owned fields. Unknown
+keys, including stale provider/model preference fields from an old screen, are
+ignored so they cannot overwrite newer provider selection.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>defaultModel</code></td>
+<td><a href="#ollama-model-name"><code>OllamaModelName</code></a></td>
+<td align="right">No</td>
+<td>Current value</td>
+<td>Default runtime model.</td>
+</tr>
+<tr>
+<td><code>bootLoad</code></td>
+<td><code>boolean</code></td>
+<td align="right">No</td>
+<td>Current value</td>
+<td>Load at managed startup.</td>
+</tr>
+<tr>
+<td><code>bootKeepAlive</code></td>
+<td><code>&quot;5m&quot; | &quot;30m&quot; | &quot;1h&quot; | &quot;24h&quot; | &quot;-1&quot;</code></td>
+<td align="right">No</td>
+<td>Current value</td>
+<td>Boot residency.</td>
+</tr>
+<tr>
+<td><code>contextLength</code></td>
+<td><code>integer</code></td>
+<td align="right">No</td>
+<td><code>0</code> or 1,024-262,144</td>
+<td>Runtime context; <code>0</code> is Automatic.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Use <code>select()</code> for the managed size preference and
+<code>saveProviderSettings()</code> for provider, OpenAI model, credential, and response
+length.</p>
+<h3 id="arcane-ai-settings-result">Arcane AI settings result</h3>
+<p>A successful settings save returns <code>ArcaneAISettingsResult</code>: the complete
+<a href="#arcane-model-selection"><code>ArcaneModelSelection</code></a> snapshot after the mutation,
+plus <code>operation</code> as an <a href="#arcane-operation"><code>ArcaneOperation</code></a>. It does not return
+the selection-only mutation fields such as <code>created</code>, <code>baseModel</code>, or
+<code>aliasChanged</code>.</p>
+<h3 id="arcane-brain-definition">Arcane brain definition</h3>
+<p><code>Arcane.ollama.createBrain(definition)</code> reads <code>ArcaneBrainDefinition</code>; unknown
+keys are currently ignored and should not be sent.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>baseModel</code></td>
+<td><a href="#ollama-model-name"><code>OllamaModelName</code></a></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Base model.</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td align="right">No</td>
+<td>Default <code>&quot;my-brain&quot;</code>; normalized to a 1-64 character slug</td>
+<td>Brain name.</td>
+</tr>
+<tr>
+<td><code>contextLength</code></td>
+<td><code>integer</code></td>
+<td align="right">No</td>
+<td><code>0</code> for inherited/automatic; use 1,024-262,144 explicitly</td>
+<td>Requested context.</td>
+</tr>
+<tr>
+<td><code>makeDefault</code></td>
+<td><code>boolean</code></td>
+<td align="right">No</td>
+<td>Default <code>false</code></td>
+<td>Make the created model the default.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="arcane-brain-result">Arcane brain result</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>model</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td><code>arcane-&lt;slug&gt;:latest</code></td>
+<td>Created model.</td>
+</tr>
+<tr>
+<td><code>baseModel</code></td>
+<td><code>string</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Base model.</td>
+</tr>
+<tr>
+<td><code>defaultModel</code></td>
+<td><code>boolean</code></td>
+<td align="right">Yes</td>
+<td>-</td>
+<td>Became the default.</td>
+</tr>
+<tr>
+<td><code>operation</code></td>
+<td><a href="#arcane-operation"><code>ArcaneOperation</code></a></td>
+<td align="right">Yes</td>
+<td>Completed</td>
+<td>Creation operation.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="ollama-service-settings-state">Ollama service settings state</h3>
+<p><code>Arcane.ollama.serviceSettings()</code> returns a platform-dependent native state.
+Microsoft NT reports effective settings and support state. Callers must
+feature-detect platform-specific fields rather than assume one cross-platform
+exact object.</p>
+<h3 id="ollama-service-settings-input">Ollama service settings input</h3>
+<p><code>Arcane.ollama.saveServiceSettings(settings)</code> applies defaults to omitted fields;
+send the complete desired <code>OllamaServiceSettingsInput</code>. Unknown keys are
+currently ignored and should not be sent.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th align="right">Required</th>
+<th>Constraints / default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>contextLength</code></td>
+<td><code>integer</code></td>
+<td align="right">No</td>
+<td>Default <code>0</code>; 0-262,144</td>
+<td>Service context.</td>
+</tr>
+<tr>
+<td><code>keepAlive</code></td>
+<td><code>string</code></td>
+<td align="right">No</td>
+<td>Default <code>&quot;5m&quot;</code>; <code>&quot;-1&quot;</code>, <code>&quot;0&quot;</code>, or 1-9,999 plus <code>m</code>/<code>h</code></td>
+<td>Residency.</td>
+</tr>
+<tr>
+<td><code>maxLoadedModels</code></td>
+<td><code>integer</code></td>
+<td align="right">No</td>
+<td>Default <code>1</code>; 0-16</td>
+<td>Loaded-model limit.</td>
+</tr>
+<tr>
+<td><code>numParallel</code></td>
+<td><code>integer</code></td>
+<td align="right">No</td>
+<td>Default <code>1</code>; 1-16</td>
+<td>Parallel requests.</td>
+</tr>
+<tr>
+<td><code>maxQueue</code></td>
+<td><code>integer</code></td>
+<td align="right">No</td>
+<td>Default <code>512</code>; 1-4,096</td>
+<td>Queue limit.</td>
+</tr>
+<tr>
+<td><code>flashAttention</code></td>
+<td><code>boolean</code></td>
+<td align="right">No</td>
+<td>Default <code>false</code></td>
+<td>Flash attention.</td>
+</tr>
+<tr>
+<td><code>kvCacheType</code></td>
+<td><code>&quot;f16&quot; | &quot;q8_0&quot; | &quot;q4_0&quot;</code></td>
+<td align="right">No</td>
+<td>Default <code>&quot;f16&quot;</code></td>
+<td>K/V-cache format.</td>
+</tr>
+<tr>
+<td><code>noCloud</code></td>
+<td><code>boolean</code></td>
+<td align="right">No</td>
+<td>Default <code>true</code></td>
+<td>Prevent Ollama cloud behavior.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="ollama-service-settings-result">Ollama service settings result</h3>
+<p>A successful save returns the platform result plus
+<a href="#arcane-operation"><code>ArcaneOperation</code></a>. Microsoft NT currently reports requested
+and effective settings, support/clamping detail, restart state, and post-change
+health. Require <code>healthy === true</code> where that field exists.</p>
+<h2 id="errors-and-capability-boundaries">Errors and capability boundaries</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method group</th>
+<th>Required authority</th>
+<th>Additional restriction</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Provider-neutral chat/profile and local status</td>
+<td><code>ai.inference</code></td>
+<td>Configured provider; local status is served by desktop Core or an explicitly admitted Android <code>user-managed-loopback</code> host, distinguished by <code>providerMode</code> and runtime fields.</td>
+</tr>
+<tr>
+<td>Raw local inventory</td>
+<td><code>ai.models.read</code></td>
+<td>Settings, Shell, and Terminal diagnostics.</td>
+</tr>
+<tr>
+<td>Provider settings/OpenAI model catalog</td>
+<td><code>ai.settings.manage</code></td>
+<td>Settings only.</td>
+</tr>
+<tr>
+<td><code>localAI.ensurePlatform()</code></td>
+<td><code>provisioning.manage</code></td>
+<td>Provisioner type; exclusive.</td>
+</tr>
+<tr>
+<td><code>localAI.recover()</code></td>
+<td><code>ai.inference</code></td>
+<td>Approved recovery apps; privileged and exclusive.</td>
+</tr>
+<tr>
+<td><code>localAI.setParallelRequests()</code></td>
+<td><code>ai.runtime.manage</code></td>
+<td>Sole registered grantee; desktop Core only; privileged and exclusive.</td>
+</tr>
+<tr>
+<td>Speech</td>
+<td><code>ai.inference</code></td>
+<td>Requires local speech host.</td>
+</tr>
+<tr>
+<td>Raw Ollama reads</td>
+<td><code>ai.models.read</code></td>
+<td>Diagnostic apps only.</td>
+</tr>
+<tr>
+<td>Raw Ollama inference</td>
+<td><code>ai.inference</code></td>
+<td>Exact model is re-admitted.</td>
+</tr>
+<tr>
+<td>Ollama mutations</td>
+<td><code>ai.models.manage</code></td>
+<td>Verified package policy; raw pull/copy reject.</td>
+</tr>
+<tr>
+<td>Runtime/provider/service settings</td>
+<td><code>ai.settings.manage</code></td>
+<td>Settings restrictions; service mutation is privileged/exclusive.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Additional invariants:</p>
+<ul>
+<li>Raw inventory must not populate an application model selector. Use the
+admitted <code>Arcane.localAI.status().models.ollama</code> catalog.</li>
+<li>Browser runtimes gain no local Ollama authority from the shared API
+vocabulary. Android exposes only its explicitly admitted projection (currently
+<code>ollama.chat()</code> for approved applications), not desktop lifecycle or model
+mutation authority.</li>
+<li>Unverified installed-model inference additionally requires
+<code>ai.models.unverified.inference</code> and remains inference-only.</li>
+<li>Arcane never silently changes from Ollama to OpenAI after local discovery or
+admission failure.</li>
+<li>Provider credentials are never returned to renderers.</li>
+<li>Status, admission, progress, registry evidence, and model records are
+observations, not grants or reusable authorization.</li>
+<li>Core rechecks current package policy, model identity, and resources at the
+operation boundary.</li>
+</ul>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/core/arcane-ai-contracts.md" target="_blank" rel="noreferrer"><code>docs/reference/core/arcane-ai-contracts.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#contract-conventions">Contract conventions</a><a href="#provider-neutral-ai">Provider-neutral AI</a><a href="#local-ai-discovery-and-lifecycle">Local AI discovery and lifecycle</a><a href="#speech">Speech</a><a href="#direct-ollama-api">Direct Ollama API</a><a href="#ollama-selection-and-settings">Ollama selection and settings</a><a href="#errors-and-capability-boundaries">Errors and capability boundaries</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

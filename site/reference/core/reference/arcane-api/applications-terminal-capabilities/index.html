@@ -1,0 +1,1182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="The terminal methods are available only to the application whose bound id is terminal, with the terminal.execute grant, through an admitted Core or Android…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/applications-terminal-capabilities/"><link rel="icon" type="image/png" href="../../../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../../../styles.css"><link rel="stylesheet" href="../../../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane API applications, terminal, and capabilities guides · Arcane OS SDK"><meta property="og:description" content="The terminal methods are available only to the application whose bound id is terminal, with the terminal.execute grant, through an admitted Core or Android…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/applications-terminal-capabilities/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane API applications, terminal, and capabilities guides · Arcane OS SDK"><meta name="twitter:description" content="The terminal methods are available only to the application whose bound id is terminal, with the terminal.execute grant, through an admitted Core or Android…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane API applications, terminal, and capabilities guides | Arcane OS SDK</title><script src="../../../../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../../../">Overview</a><a href="../../../../../guides/">Guides</a><a href="../../../../../examples/">Examples</a><a href="../../../../../playground/">Playground</a><a href="../../../../../testing/">Testing</a><a href="../../../../" aria-current="page">Reference</a><a class="repo-link" href="../../../../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../../../">Docs</a><span aria-hidden="true">/</span><a href="../../../../">Reference</a><span aria-hidden="true">/</span><a href="../../../">Core</a><span aria-hidden="true">/</span><a href="../">Focused member guides</a><span aria-hidden="true">/</span><span aria-current="page">Arcane API applications, terminal, and capabilities guides</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-api-applications-terminal-and-capabilities-guides">Arcane API applications, terminal, and capabilities guides</h1><p class="doc-lead">The terminal methods are available only to the application whose bound id is terminal, with the terminal.execute grant, through an admitted Core or Android…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../../../overview/">Overview</a><a href="../../../../sdk-api/">SDK JavaScript API</a><a href="../../../../cli/">CLI</a><a href="../../../../event-manager/">EventManager</a><a href="../../../../availability-and-normalization/">Availability</a><a href="../../../../protocols/">Protocols</a><a href="../../../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../../../../runtime-modules/">Modules</a><a href="../../../../runtime-entities/">Entities</a><a href="../../../../runtime-components/">Components</a><a href="../../../../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../../">Core map</a><a href="../../../arcane-api/">Arcane API</a><a href="../../../arcane-events/">Events</a><a href="../../../arcane-ai-contracts/">AI contracts</a><a href="../../../arcane-entities/">Entity exports</a><a href="../../../ollama-module/">Ollama module</a><a href="../">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/core/reference/arcane-api/applications-terminal-capabilities.md"><p>The terminal methods are available only to the application whose bound id is
+<code>terminal</code>, with the <code>terminal.execute</code> grant, through an admitted Core or
+Android host. Other applications do not receive this process-control authority
+by default.</p>
+<p>Before presenting terminal UI, feature-detect <code>Arcane.terminal</code>, then confirm
+the application, grant, and exact method admission with
+<code>Arcane.capabilities.list()</code>:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const terminal = globalThis.Arcane?.terminal;
+const access = await globalThis.Arcane?.capabilities?.list?.();
+
+const terminalAvailable = Boolean(
+    terminal?.start
+    &amp;&amp; access?.app?.id === &#39;terminal&#39;
+    &amp;&amp; access.grants.includes(&#39;terminal.execute&#39;)
+    &amp;&amp; access.methods.includes(&#39;terminal.start&#39;)
+);
+</code></pre></div>
+<p>Rejected calls use <code>Arcane.Error</code>. Its <code>code</code>, <code>message</code>, and <code>resolution</code>
+properties are the stable application-facing recovery fields.</p>
+<h2 id="arcaneappcurrent">Arcane.app.current()</h2>
+<h3 id="overview">Overview</h3>
+<p><code>Arcane.app.current()</code> identifies the application to which the native bridge
+session is bound. The host, not renderer input, selects this identity. Use it
+for display and correlation; app-scoped storage and authority are already bound
+by the host and cannot be changed by passing another id.</p>
+<p>The method takes no parameters, is a repeatable read, requires no capability,
+and is admitted on Core and Android hosts. It has no side effect and emits no
+event.</p>
+<h3 id="result">Result</h3>
+<p>The exact result has these eight properties:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>Canonical lower-case application id, at most 64 characters.</td>
+</tr>
+<tr>
+<td><code>displayName</code></td>
+<td>Host-bound display name.</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td><code>&quot;app&quot;</code>, <code>&quot;shell&quot;</code>, or <code>&quot;provisioner&quot;</code>.</td>
+</tr>
+<tr>
+<td><code>entry</code></td>
+<td>Safe relative entry path, or <code>null</code>.</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td>The bound application&#39;s semantic version. Shell and Provisioner use the OS bundle version; packaged apps own their version.</td>
+</tr>
+<tr>
+<td><code>securityMode</code></td>
+<td><code>&quot;publisher-verified&quot;</code>, <code>&quot;unsigned-local-test&quot;</code>, or <code>&quot;unverified&quot;</code>.</td>
+</tr>
+<tr>
+<td><code>publisherTrustSource</code></td>
+<td>Publisher evidence for a publisher-verified host, otherwise <code>null</code>.</td>
+</tr>
+<tr>
+<td><code>revocationStatus</code></td>
+<td>Revocation evidence for a publisher-verified host, otherwise <code>null</code>.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Android returns the immutable Shell or application-APK descriptor with
+<code>securityMode: &quot;unverified&quot;</code> and both publisher evidence fields set to <code>null</code>.
+That describes the current Android distribution; it is not a publisher-trust
+claim.</p>
+<h3 id="errors-and-recovery">Errors and recovery</h3>
+<p><code>ARCANE_TRANSPORT_UNAVAILABLE</code> means the page is not running through an Arcane
+host. <code>METHOD_CONTRACT_OUTPUT_INVALID</code> means the host supplied an invalid
+identity; stop and repair or reinstall the matching host/package rather than
+guessing an application id.</p>
+<h3 id="example">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const currentApp = await Arcane.app.current();
+
+console.log(currentApp.displayName, currentApp.version);
+console.log(currentApp.id, currentApp.type, currentApp.securityMode);
+</code></pre></div>
+<h2 id="arcaneapplicationslist">Arcane.applications.list()</h2>
+<h3 id="overview-1">Overview</h3>
+<p><code>Arcane.applications.list()</code> reads the installed, launchable application
+catalog. It is available only to the bound <code>shell</code> or <code>terminal</code> application
+with the <code>applications.read</code> grant on Core or Android. It performs a verified
+catalog read and emits no event.</p>
+<p>The result is a catalog wrapper, not a bare array. At most 256 unique
+applications are returned, ordered by ascending <code>order</code>, then by display name
+and id on Core. Android validates its generated order before returning it.</p>
+<h3 id="result-1">Result</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const catalog = {
+    verified: true,
+    securityMode: &#39;unsigned-local-test&#39;,
+    publisherTrustSource: null,
+    revocationStatus: null,
+    applications: [
+        {
+            id: &#39;files&#39;,
+            displayName: &#39;Files&#39;,
+            description: &#39;Browse app-owned files.&#39;,
+            iconUrl: &#39;/apps/files/icon.png&#39;,
+            version: &#39;1.0.0&#39;,
+            order: 10,
+            verified: true
+        }
+    ]
+};
+</code></pre></div>
+<p>Each record has exactly <code>id</code>, <code>displayName</code>, <code>description</code>, <code>iconUrl</code>,
+<code>version</code>, <code>order</code>, and <code>verified</code>. Nullable metadata is returned as <code>null</code>.
+Every record&#39;s <code>verified</code> value equals the wrapper value. Publisher-verified
+Core catalogs include bounded trust source and revocation evidence;
+unsigned-development catalogs use <code>null</code> evidence. A non-debug Android package
+can report <code>verified: false</code>, <code>securityMode: &quot;unverified&quot;</code>, and null evidence;
+do not turn that development fact into a trust claim.</p>
+<h3 id="errors-and-recovery-1">Errors and recovery</h3>
+<p><code>METHOD_NOT_ALLOWED</code> or <code>ANDROID_CAPABILITY_DENIED</code> means the app identity or
+grant is not admitted. Catalog or package failures use
+<code>APPLICATION_ADAPTER_UNAVAILABLE</code>, <code>APPLICATION_CATALOG_UNAVAILABLE</code>,
+<code>APPLICATION_CATALOG_UNVERIFIED</code>, or <code>APPLICATION_CATALOG_INVALID</code>. Treat those
+as installation-integrity failures and offer repair; do not display or launch a
+partially accepted catalog.</p>
+<h3 id="example-1">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const catalog = await Arcane.applications.list();
+
+if (!catalog.verified) {
+    console.warn(&#39;The host did not verify this development catalog.&#39;);
+}
+
+for (const application of catalog.applications) {
+    console.log(application.id, application.displayName, application.version);
+}
+</code></pre></div>
+<h2 id="arcaneapplicationslaunch">Arcane.applications.launch()</h2>
+<h3 id="overview-2">Overview</h3>
+<p><code>Arcane.applications.launch(id)</code> asks the host to dispatch one installed
+application from the catalog returned by <code>applications.list()</code>. It is a
+non-idempotent application-dispatch operation. The method is available only to
+the bound <code>shell</code> or <code>terminal</code> application with <code>applications.launch</code> on Core
+or Android.</p>
+<p>Pass the unchanged canonical id from the current catalog. It must be a
+lower-case hyphenated application id no longer than 64 characters; reserved
+host identities such as Shell and Provisioner are not application launch
+targets. Android additionally requires the generated APK to be installed and
+launchable.</p>
+<h3 id="result-and-lifecycle">Result and lifecycle</h3>
+<p>The exact result is <code>{ id, accepted: true }</code>. <code>accepted</code> means the host accepted
+the dispatch request. It does not prove that the target rendered successfully,
+became ready, or remained open. There is no portable public launch-completion
+event, so do not wait for one or retry automatically after an ambiguous
+transport failure.</p>
+<h3 id="errors-and-recovery-2">Errors and recovery</h3>
+<p>Use the current catalog again after <code>APPLICATION_NOT_FOUND</code>. Wait for an active
+installation or application shutdown after <code>APPLICATION_INSTALL_BUSY</code> or
+<code>APPLICATIONS_BUSY</code>. <code>INVALID_APPLICATION_ID</code> and
+<code>INVALID_APPLICATION_REQUEST</code> indicate caller input. Adapter or dispatch
+failures use <code>APPLICATION_ADAPTER_UNAVAILABLE</code>,
+<code>APPLICATION_LAUNCH_FAILED</code>, or <code>APPLICATION_LAUNCH_REJECTED</code>; repair the host
+if a catalog-listed application repeatedly fails.</p>
+<h3 id="example-2">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">document.querySelector(&#39;#launch-files&#39;)?.addEventListener(
+    &#39;click&#39;,
+    async function handleApplicationLaunch() {
+        const catalog = await Arcane.applications.list();
+        const filesApp = catalog.applications.find(function findFilesApp(application) {
+            return application.id === &#39;files&#39;;
+        });
+        if (!filesApp) return;
+
+        const launch = await Arcane.applications.launch(filesApp.id);
+        console.log(&#39;Dispatch accepted&#39;, launch.id, launch.accepted);
+    }
+);
+</code></pre></div>
+<h2 id="arcaneexternalopen">Arcane.external.open()</h2>
+<h3 id="overview-3">Overview</h3>
+<p><code>Arcane.external.open(uri)</code> hands one validated <code>mailto:</code> URI to the operating
+system&#39;s registered handler. It requires the <code>external.open</code> grant and an
+admitted Core or Android host. The call is non-idempotent, emits no Arcane
+event, and simulation rejects it instead of pretending to open another app.</p>
+<p>The URI may be at most 4096 printable ASCII characters. It must have no leading
+or trailing whitespace, raw spaces, fragment, backslash, malformed percent
+escape, or raw or percent-encoded control character. Only <code>mailto:</code> is
+accepted; percent-encode query values with <code>encodeURIComponent()</code>.</p>
+<h3 id="result-and-side-effect">Result and side effect</h3>
+<p>The exact result is <code>{ opened: true, uri }</code>, with the scheme canonicalized to
+lower-case <code>mailto:</code>. <code>opened: true</code> means only that the host accepted the
+operating-system handoff. It does not prove that a composer appeared or that a
+message was sent. On Microsoft NT the host uses the system URI handler; Linux
+requires <code>xdg-open</code>; Android launches an admitted intent handler.</p>
+<h3 id="errors-and-recovery-3">Errors and recovery</h3>
+<p><code>EXTERNAL_SCHEME_NOT_ALLOWED</code> means the URI is not <code>mailto:</code>.
+<code>EXTERNAL_OPEN_INVALID</code> identifies malformed input. <code>EXTERNAL_OPEN_SIMULATED</code>
+and <code>EXTERNAL_OPEN_UNSUPPORTED</code> require a real host with a configured handler.
+<code>EXTERNAL_OPEN_FAILED</code> means the OS did not accept the handoff. Do not retry
+blindly after a timeout because the first handoff may already have occurred.</p>
+<h3 id="example-3">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">document.querySelector(&#39;#open-support-email&#39;)?.addEventListener(
+    &#39;click&#39;,
+    async function handleSupportEmailRequest() {
+        const subject = encodeURIComponent(&#39;Arcane support request&#39;);
+        const uri = `mailto:support@example.com?subject=${subject}`;
+        const result = await Arcane.external.open(uri);
+        console.log(&#39;Operating-system handoff accepted&#39;, result.opened);
+    }
+);
+</code></pre></div>
+<h2 id="arcanemailsend">Arcane.mail.send()</h2>
+<h3 id="overview-4">Overview</h3>
+<p><code>Arcane.mail.send({report, reportKey})</code> sends one bounded report to the fixed
+local Arcane mail gateway. It is admitted only to explicitly approved reporting
+applications with <code>mail.send</code> on Microsoft NT or Linux Core. Android does not
+project it, and simulation fails explicitly. Core performs no automatic retry.</p>
+<p><code>reportKey</code> is the caller&#39;s idempotency key: 8–128 characters from letters,
+numbers, period, underscore, colon, and hyphen. Reuse the same key only when
+retrying the same logical report after an uncertain local-gateway outcome.</p>
+<h3 id="input">Input</h3>
+<p><code>report</code> is an exact object with required <code>type</code>, <code>subject</code>, and <code>to</code>, plus
+optional <code>text</code> and <code>html</code>; unknown fields are rejected. <code>type</code> is
+<code>&quot;crisis_detected&quot;</code>, <code>&quot;error&quot;</code>, or <code>&quot;report&quot;</code>. The trimmed subject is 1–160
+characters without controls. <code>to</code> contains at most 50 email-shaped addresses,
+each at most 254 characters; it may be empty only for an <code>error</code> report. At
+least one of <code>text</code> or <code>html</code> must contain non-whitespace content. The serialized
+report may not exceed 786,432 UTF-8 bytes.</p>
+<h3 id="result-2">Result</h3>
+<p>The exact result is
+<code>{requestId, status, statusCode, sent, partial, uncertain}</code>. The combinations
+are fixed:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th><code>status</code></th>
+<th><code>statusCode</code></th>
+<th>Flags</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>accepted</code></td>
+<td><code>202</code></td>
+<td><code>sent: true</code>, <code>partial: false</code>, <code>uncertain: false</code></td>
+</tr>
+<tr>
+<td><code>partially_accepted</code></td>
+<td><code>207</code></td>
+<td><code>sent: false</code>, <code>partial: true</code>, <code>uncertain: false</code></td>
+</tr>
+<tr>
+<td><code>delivery_uncertain</code></td>
+<td><code>207</code></td>
+<td><code>sent: false</code>, <code>partial: false</code>, <code>uncertain: true</code></td>
+</tr>
+</tbody></table>
+</div>
+<p>These are gateway acceptance states, not proof that every downstream recipient
+received a message. The method has a 450-second bridge timeout around a
+440-second absolute gateway deadline and emits no dedicated mail event.</p>
+<h3 id="errors-and-recovery-4">Errors and recovery</h3>
+<p>Malformed input is <code>METHOD_CONTRACT_INPUT_INVALID</code>. Simulation uses
+<code>MAIL_SEND_SIMULATION_UNAVAILABLE</code>. Gateway connection, redirect, oversized or
+invalid response, rejection, and timeout failures use the corresponding
+<code>MAIL_GATEWAY_*</code>, <code>MAIL_SEND_REJECTED</code>, or <code>MAIL_SEND_TIMEOUT</code> code. Follow the
+error&#39;s <code>resolution</code>; when a retry is appropriate, keep the same report and
+<code>reportKey</code> so the gateway can deduplicate it. Never log report bodies or keys
+that correlate sensitive reports.</p>
+<h3 id="example-4">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">document.querySelector(&#39;#confirm-report-send&#39;)?.addEventListener(
+    &#39;click&#39;,
+    async function handleConfirmedReportSend() {
+        const request = {
+            reportKey: `report:${crypto.randomUUID()}`,
+            report: {
+                type: &#39;report&#39;,
+                subject: &#39;Synthetic development report&#39;,
+                to: [&#39;developer@example.com&#39;],
+                text: &#39;This is synthetic test content.&#39;
+            }
+        };
+        const result = await Arcane.mail.send(request);
+        console.log(result.requestId, result.status, result.statusCode);
+    }
+);
+</code></pre></div>
+<h2 id="arcanecapabilitieslist">Arcane.capabilities.list()</h2>
+<h3 id="overview-5">Overview</h3>
+<p><code>Arcane.capabilities.list()</code> returns the effective authority of the current
+Core-bound application session. It takes no parameters, requires no capability,
+has no side effect, and emits no event. Use it to disable unavailable controls;
+it does not grant authority or make a later mutation safe without its own
+preconditions.</p>
+<p>The direct method is Core-only in the current projection. Android callers with
+<code>system.read</code> obtain the same nested capability snapshot from
+<code>Arcane.platform.status().capabilities</code>; a direct Android
+<code>capabilities.list</code> request is unsupported.</p>
+<h3 id="result-3">Result</h3>
+<p>The exact result is <code>{ app, grants, methods }</code>. <code>app</code> is the same eight-field
+descriptor returned by <code>Arcane.app.current()</code>. <code>grants</code> is the sorted list of
+capability strings bound to the app. <code>methods</code> is the sorted list of exact RPC
+method names admitted after capability, app-type, and app-id policy checks.</p>
+<p>RPC names can differ from public JavaScript member names: for example,
+<code>Arcane.applications.list()</code> is admitted as <code>&quot;apps.list&quot;</code>. Test the matching RPC
+name and feature-detect the JavaScript member before enabling a control.</p>
+<h3 id="errors-and-recovery-5">Errors and recovery</h3>
+<p><code>ARCANE_TRANSPORT_UNAVAILABLE</code> means there is no host. An Android call rejects
+with <code>ANDROID_CAPABILITY_UNSUPPORTED</code>; use the platform-status snapshot there.
+An unexpected or missing method in a Core result indicates a policy/package
+mismatch—refresh the app after repair rather than treating a grant string alone
+as permission.</p>
+<h3 id="example-5">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await Arcane.capabilities.list();
+const canLaunch = Boolean(
+    Arcane.applications?.launch
+    &amp;&amp; access.grants.includes(&#39;applications.launch&#39;)
+    &amp;&amp; access.methods.includes(&#39;apps.launch&#39;)
+);
+
+console.log(access.app.id, canLaunch);
+</code></pre></div>
+<h2 id="arcaneterminalstart">Arcane.terminal.start()</h2>
+<h3 id="overview-6">Overview</h3>
+<p><code>Arcane.terminal.start(options?)</code> starts one native terminal session owned by
+the bound Arcane Terminal application. It is a high-risk, non-idempotent process
+start. The host admits no more than eight concurrent sessions.</p>
+<p>The method is available only when <code>terminal.start</code> is projected, the application
+id is <code>terminal</code>, the <code>terminal.execute</code> grant is present, and <code>terminal.start</code>
+appears in the admitted method list. A browser preview cannot start an operating
+system process.</p>
+<p>Subscribe to terminal events before calling <code>start()</code>. The host begins
+forwarding process streams as part of startup, so an early output event may
+arrive before application code receives the resolved session object. Buffer
+events by <code>sessionId</code> until the start result identifies the desired session.</p>
+<h3 id="options">Options</h3>
+<p>The optional <code>options</code> object has four normalized fields:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>shell</code></td>
+<td><code>string</code></td>
+<td><code>&quot;auto&quot;</code></td>
+<td>One of <code>auto</code>, <code>powershell</code>, <code>cmd</code>, <code>bash</code>, or <code>sh</code>, subject to host availability; at most 16 characters.</td>
+</tr>
+<tr>
+<td><code>cwd</code></td>
+<td><code>string</code></td>
+<td><code>&quot;&quot;</code></td>
+<td>Existing accessible working directory, or the host default when empty; at most 4096 characters and subject to the host sandbox.</td>
+</tr>
+<tr>
+<td><code>columns</code></td>
+<td>safe integer</td>
+<td><code>120</code></td>
+<td>From 20 through 500.</td>
+</tr>
+<tr>
+<td><code>rows</code></td>
+<td>safe integer</td>
+<td><code>32</code></td>
+<td>From 5 through 200.</td>
+</tr>
+</tbody></table>
+</div>
+<p>The JavaScript wrapper sends only these four fields and converts the supplied
+values to their documented string or number forms. Values outside the checked
+bounds are rejected; do not rely on host clamping.</p>
+<h3 id="resolved-session">Resolved session</h3>
+<p>The method resolves to:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const session = {
+    id: &#39;term-example&#39;,
+    shell: &#39;powershell&#39;,
+    cwd: &#39;&lt;resolved working directory&gt;&#39;,
+    title: &#39;PowerShell&#39;,
+    columns: 120,
+    rows: 32,
+    createdAt: &#39;2026-08-15T12:00:00.000Z&#39;
+};
+</code></pre></div>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td><code>string</code></td>
+<td>Opaque session identifier matching the Arcane session-id contract and no longer than 128 characters.</td>
+</tr>
+<tr>
+<td><code>shell</code></td>
+<td><code>string</code></td>
+<td>Resolved shell selected by the host.</td>
+</tr>
+<tr>
+<td><code>cwd</code></td>
+<td><code>string</code></td>
+<td>Resolved working directory.</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td><code>string</code></td>
+<td>Host-provided display title, at most 80 characters.</td>
+</tr>
+<tr>
+<td><code>columns</code></td>
+<td><code>number</code></td>
+<td>Accepted column count.</td>
+</tr>
+<tr>
+<td><code>rows</code></td>
+<td><code>number</code></td>
+<td>Accepted row count.</td>
+</tr>
+<tr>
+<td><code>createdAt</code></td>
+<td><code>string</code></td>
+<td>Host creation timestamp.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="events">Events</h3>
+<p>After startup, observe these future-only events:</p>
+<ul>
+<li><code>terminal.output</code> carries <code>{ sessionId, stream, data }</code> for stdout and stderr
+chunks. Chunks are not lines and may contain terminal control sequences.</li>
+<li><code>terminal.exit</code> carries <code>{ sessionId, exitCode, signal }</code> after the process
+exits and the host retires the session.</li>
+<li><code>terminal.error</code> carries <code>{ sessionId, message }</code> for asynchronous host stream
+failures. The Android provider also uses it when a session exceeds its output
+limit.</li>
+</ul>
+<p>Store every returned unsubscribe function and call it during teardown. The
+<a href="../../../arcane-events/">Arcane event catalog</a> defines the complete event
+payloads.</p>
+<h3 id="platform-differences">Platform differences</h3>
+<p>On Microsoft NT Core hosts, <code>auto</code> resolves to PowerShell. <code>powershell</code>, <code>cmd</code>,
+and an installed <code>bash</code> are selectable; <code>sh</code> is unavailable. On Linux Core
+hosts, <code>auto</code> resolves to Bash, <code>sh</code> selects <code>/bin/sh</code>, <code>powershell</code> requires an
+installed <code>pwsh</code>, and <code>cmd</code> is unavailable.</p>
+<p>On Android, only <code>auto</code> and <code>sh</code> are accepted and both resolve to the
+application-sandbox <code>/system/bin/sh</code>. The working directory must stay inside the
+application&#39;s private files area. Android runs the process as the ordinary
+Arcane Terminal app identity and stops a session after one MiB of emitted
+output.</p>
+<h3 id="errors-and-recovery-6">Errors and recovery</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning and recovery</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>METHOD_NOT_ALLOWED</code></td>
+<td>The bound application or grant is wrong. Open the admitted Arcane Terminal application; do not retry from another app.</td>
+</tr>
+<tr>
+<td><code>ARCANE_TRANSPORT_UNAVAILABLE</code></td>
+<td>Open Arcane Terminal through an installed or development Arcane host.</td>
+</tr>
+<tr>
+<td><code>METHOD_CONTRACT_INPUT_INVALID</code> or <code>TERMINAL_REQUEST_INVALID</code></td>
+<td>Use only the documented fields, value types, and bounds.</td>
+</tr>
+<tr>
+<td><code>TERMINAL_SESSION_LIMIT</code></td>
+<td>Close an existing session before retrying.</td>
+</tr>
+<tr>
+<td><code>TERMINAL_SHELL_INVALID</code></td>
+<td>Use one of the five documented shell names.</td>
+</tr>
+<tr>
+<td><code>TERMINAL_SHELL_UNAVAILABLE</code></td>
+<td>Select a shell supported and installed on the active platform.</td>
+</tr>
+<tr>
+<td><code>TERMINAL_CWD_INVALID</code></td>
+<td>Choose an existing accessible directory allowed by the current host sandbox.</td>
+</tr>
+<tr>
+<td><code>TERMINAL_START_FAILED</code></td>
+<td>Verify that the resolved shell executable is installed and can start, then retry.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="example-6">Example</h3>
+<p>This complete example subscribes before startup, buffers early output, uses the
+session methods, requests closure, observes process exit, and releases every
+listener.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const arcane = globalThis.Arcane;
+const terminal = arcane?.terminal;
+const events = arcane?.events;
+
+if (!terminal?.start || !events?.on || !arcane?.capabilities?.list) {
+    throw new Error(&#39;Open Arcane Terminal through an admitted Arcane host.&#39;);
+}
+
+const access = await arcane.capabilities.list();
+const requiredMethods = [
+    &#39;terminal.start&#39;,
+    &#39;terminal.list&#39;,
+    &#39;terminal.write&#39;,
+    &#39;terminal.resize&#39;,
+    &#39;terminal.close&#39;
+];
+
+if (
+    access.app?.id !== &#39;terminal&#39;
+    || !access.grants.includes(&#39;terminal.execute&#39;)
+    || !requiredMethods.every(function isRequiredTerminalMethodAdmitted(method) {
+        return access.methods.includes(method);
+    })
+) {
+    throw new Error(&#39;This application is not admitted for terminal execution.&#39;);
+}
+
+const bufferedOutput = new Map();
+const observedExits = new Map();
+const exitWaiters = new Map();
+const maxBufferedChunksPerSession = 128;
+let session = null;
+let activeSessionId = null;
+
+function render({stream, data}) {
+    const write = stream === &#39;stderr&#39; ? console.error : console.log;
+    write(data);
+}
+
+const offOutput = events.on(&#39;terminal.output&#39;, function handleTerminalOutput(payload) {
+    if (payload.sessionId === activeSessionId) {
+        render(payload);
+        return;
+    }
+    const pending = bufferedOutput.get(payload.sessionId) ?? [];
+    pending.push(payload);
+    // Bound pre-identification buffering; surface truncation in a real UI.
+    if (pending.length &gt; maxBufferedChunksPerSession) {
+        pending.shift();
+    }
+    bufferedOutput.set(payload.sessionId, pending);
+});
+
+const offExit = events.on(&#39;terminal.exit&#39;, function handleTerminalExit(payload) {
+    observedExits.set(payload.sessionId, payload);
+    const waiter = exitWaiters.get(payload.sessionId);
+    if (waiter) {
+        clearTimeout(waiter.timer);
+        exitWaiters.delete(payload.sessionId);
+        waiter.resolve(payload);
+    }
+});
+
+const offError = events.on(&#39;terminal.error&#39;, function handleTerminalError(payload) {
+    console.error(`Terminal ${payload.sessionId}: ${payload.message}`);
+});
+
+function waitForExit(sessionId, timeoutMs = 5000) {
+    if (observedExits.has(sessionId)) {
+        return Promise.resolve(observedExits.get(sessionId));
+    }
+    return new Promise(function createExitWait(resolve, reject) {
+        const timer = setTimeout(function rejectTimedOutExitWait() {
+            exitWaiters.delete(sessionId);
+            reject(new Error(`Timed out waiting for ${sessionId} to exit.`));
+        }, timeoutMs);
+        exitWaiters.set(sessionId, {resolve, timer});
+    });
+}
+
+try {
+    session = await terminal.start({
+        shell: &#39;auto&#39;,
+        cwd: &#39;&#39;,
+        columns: 120,
+        rows: 32
+    });
+    activeSessionId = session.id;
+
+    for (const payload of bufferedOutput.get(session.id) ?? []) {
+        render(payload);
+    }
+    bufferedOutput.delete(session.id);
+
+    await terminal.resize(session.id, 100, 30);
+
+    const {sessions} = await terminal.list();
+    console.log(&#39;Owned sessions&#39;, sessions);
+
+    const lineEnding = [&#39;powershell&#39;, &#39;cmd&#39;].includes(session.shell)
+        ? &#39;\r\n&#39;
+        : &#39;\n&#39;;
+    const writeResult = await terminal.write(
+        session.id,
+        `echo Arcane terminal ready${lineEnding}`
+    );
+    console.log(&#39;Accepted input bytes&#39;, writeResult.bytes);
+
+    const exitPromise = waitForExit(session.id);
+    const closeResult = await terminal.close(session.id);
+    console.log(&#39;Close request accepted&#39;, closeResult.accepted);
+
+    const exit = await exitPromise;
+    console.log(&#39;Process exit&#39;, exit.exitCode, exit.signal);
+} catch (error) {
+    if (error instanceof arcane.Error) {
+        console.error(error.code, error.message, error.resolution);
+    } else {
+        throw error;
+    }
+} finally {
+    if (session &amp;&amp; !observedExits.has(session.id)) {
+        await terminal.close(session.id).catch(function ignoreTerminalCloseFailure() {});
+    }
+    offOutput();
+    offExit();
+    offError();
+    for (const waiter of exitWaiters.values()) {
+        clearTimeout(waiter.timer);
+    }
+    exitWaiters.clear();
+}
+</code></pre></div>
+<h2 id="arcaneterminallist">Arcane.terminal.list()</h2>
+<h3 id="overview-7">Overview</h3>
+<p><code>Arcane.terminal.list()</code> returns the current terminal sessions owned by the
+bound application. It is a repeatable read, takes no parameters, and does not
+list sessions owned by another application or user boundary.</p>
+<p>The resolved value is a wrapper object, not the session array itself:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const {sessions} = await Arcane.terminal.list();
+</code></pre></div>
+<p>At most eight entries are returned. A host may remove an exited or closed
+session promptly, so use terminal events for lifecycle observation rather than
+using repeated list calls as a substitute for event delivery.</p>
+<h3 id="session-inventory">Session inventory</h3>
+<p>The exact resolved shape is:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const result = {
+    sessions: [
+        {
+            id: &#39;term-example&#39;,
+            shell: &#39;powershell&#39;,
+            cwd: &#39;&lt;resolved working directory&gt;&#39;,
+            columns: 120,
+            rows: 32,
+            createdAt: &#39;2026-08-15T12:00:00.000Z&#39;,
+            state: &#39;running&#39;
+        }
+    ]
+};
+</code></pre></div>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td><code>string</code></td>
+<td>Opaque app-owned session id.</td>
+</tr>
+<tr>
+<td><code>shell</code></td>
+<td><code>string</code></td>
+<td>Resolved shell name.</td>
+</tr>
+<tr>
+<td><code>cwd</code></td>
+<td><code>string</code></td>
+<td>Resolved working directory.</td>
+</tr>
+<tr>
+<td><code>columns</code></td>
+<td><code>number</code></td>
+<td>Current bounded column count.</td>
+</tr>
+<tr>
+<td><code>rows</code></td>
+<td><code>number</code></td>
+<td>Current bounded row count.</td>
+</tr>
+<tr>
+<td><code>createdAt</code></td>
+<td><code>string</code></td>
+<td>Host creation timestamp.</td>
+</tr>
+<tr>
+<td><code>state</code></td>
+<td><code>string</code></td>
+<td>Current host-reported state while the session remains in the inventory: <code>starting</code>, <code>running</code>, <code>exited</code>, or <code>closed</code>.</td>
+</tr>
+</tbody></table>
+</div>
+<p><code>list()</code> deliberately does not return the <code>title</code> property included in the
+<code>start()</code> result.</p>
+<h3 id="errors-and-recovery-7">Errors and recovery</h3>
+<p><code>METHOD_NOT_ALLOWED</code> means the application is not admitted for
+<code>terminal.execute</code>. <code>ARCANE_TRANSPORT_UNAVAILABLE</code> means no callable host is
+connected. A host result that violates the exact wrapper or session shape is
+rejected as <code>METHOD_CONTRACT_OUTPUT_INVALID</code>; treat that as a host/package
+integrity failure rather than trying to reinterpret the result.</p>
+<h3 id="example-7">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const terminal = globalThis.Arcane?.terminal;
+
+if (!terminal?.list) {
+    throw new Error(&#39;Terminal session inventory is unavailable.&#39;);
+}
+
+try {
+    const {sessions} = await terminal.list();
+
+    for (const session of sessions) {
+        console.log(
+            session.id,
+            session.shell,
+            session.state,
+            `${session.columns}x${session.rows}`,
+            session.cwd
+        );
+    }
+} catch (error) {
+    if (error instanceof Arcane.Error) {
+        console.error(error.code, error.message, error.resolution);
+    } else {
+        throw error;
+    }
+}
+</code></pre></div>
+<h2 id="arcaneterminalwrite">Arcane.terminal.write()</h2>
+<h3 id="overview-8">Overview</h3>
+<p><code>Arcane.terminal.write(sessionId, data)</code> writes one nonempty UTF-8 input chunk
+to a running app-owned session. The method is non-idempotent: after an ambiguous
+timeout or transport failure, do not retry blindly because the first input may
+already have reached the process.</p>
+<p>The method does not append a line ending. Use <code>&quot;\r\n&quot;</code> for PowerShell or
+Command Prompt and <code>&quot;\n&quot;</code> for POSIX shells when the target shell should submit
+a command. It also does not return process output or command completion;
+subscribe to <code>terminal.output</code> and <code>terminal.exit</code> before writing.</p>
+<p>Output events contain stream chunks, not lines. Preserve per-session arrival
+order and expect a chunk to contain partial text, multiple lines, or terminal
+control sequences.</p>
+<h3 id="input-1">Input</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sessionId</code></td>
+<td><code>string</code></td>
+<td>Opaque id returned by <code>start()</code> or <code>list()</code>, from 1 through 128 characters and matching the Arcane session-id pattern.</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td><code>string</code></td>
+<td>Nonempty UTF-8 input from 1 through 65,536 bytes.</td>
+</tr>
+</tbody></table>
+</div>
+<p>The JavaScript wrapper converts <code>sessionId</code> and <code>data</code> to strings. An empty value
+is still invalid, and the limit is measured in UTF-8 bytes rather than JavaScript
+characters.</p>
+<h3 id="acceptance-result">Acceptance result</h3>
+<p>The method resolves to:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const result = {
+    sessionId: &#39;term-example&#39;,
+    accepted: true,
+    bytes: 21
+};
+</code></pre></div>
+<p><code>bytes</code> is the accepted UTF-8 byte count, from 1 through 65,536. <code>accepted</code>
+means the host accepted the input for the session; it does not mean the shell
+finished a command.</p>
+<h3 id="errors-and-recovery-8">Errors and recovery</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning and recovery</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>METHOD_CONTRACT_INPUT_INVALID</code> or <code>TERMINAL_DATA_INVALID</code></td>
+<td>Send a nonempty chunk no larger than 64 KiB. Split larger input deliberately.</td>
+</tr>
+<tr>
+<td><code>TERMINAL_SESSION_INVALID</code></td>
+<td>Use an unchanged id returned by the API.</td>
+</tr>
+<tr>
+<td><code>TERMINAL_SESSION_NOT_FOUND</code></td>
+<td>The session has exited or was closed. Refresh with <code>list()</code> or start another session.</td>
+</tr>
+<tr>
+<td><code>TERMINAL_INPUT_CLOSED</code></td>
+<td>The process no longer accepts stdin. Start a new session instead of retrying.</td>
+</tr>
+<tr>
+<td><code>METHOD_NOT_ALLOWED</code></td>
+<td>The current application lacks terminal admission.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="example-8">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const terminal = globalThis.Arcane?.terminal;
+const events = globalThis.Arcane?.events;
+
+if (!terminal?.write || !terminal?.list || !events?.on) {
+    throw new Error(&#39;Native terminal input is unavailable.&#39;);
+}
+
+const {sessions} = await terminal.list();
+const session = sessions[0];
+
+if (!session) {
+    throw new Error(&#39;Start a terminal session before writing input.&#39;);
+}
+
+const offOutput = events.on(&#39;terminal.output&#39;, function handleTerminalOutput(payload) {
+    if (payload.sessionId === session.id) {
+        console.log(payload.stream, payload.data);
+    }
+});
+
+try {
+    const lineEnding = [&#39;powershell&#39;, &#39;cmd&#39;].includes(session.shell)
+        ? &#39;\r\n&#39;
+        : &#39;\n&#39;;
+    const result = await terminal.write(
+        session.id,
+        `echo Input was accepted${lineEnding}`
+    );
+    console.log(`Accepted ${result.bytes} UTF-8 bytes.`);
+} catch (error) {
+    if (error instanceof Arcane.Error) {
+        console.error(error.code, error.message, error.resolution);
+    } else {
+        throw error;
+    }
+} finally {
+    offOutput();
+}
+</code></pre></div>
+<h2 id="arcaneterminalresize">Arcane.terminal.resize()</h2>
+<h3 id="overview-9">Overview</h3>
+<p><code>Arcane.terminal.resize(sessionId, columns, rows)</code> updates the bounded dimensions
+recorded for a running app-owned session. The current host contract reports this
+as an emulated resize. It updates Arcane&#39;s terminal-session dimensions but does
+not promise a native pseudoterminal resize or emit a resize event.</p>
+<h3 id="dimensions">Dimensions</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sessionId</code></td>
+<td><code>string</code></td>
+<td>Opaque id returned by <code>start()</code> or <code>list()</code>, no longer than 128 characters.</td>
+</tr>
+<tr>
+<td><code>columns</code></td>
+<td>safe integer</td>
+<td>From 20 through 500.</td>
+</tr>
+<tr>
+<td><code>rows</code></td>
+<td>safe integer</td>
+<td>From 5 through 200.</td>
+</tr>
+</tbody></table>
+</div>
+<p>The wrapper converts both dimensions with <code>Number()</code>. Fractions, non-finite
+values, and out-of-range values do not satisfy the checked method contract.</p>
+<h3 id="acceptance-result-1">Acceptance result</h3>
+<p>The method resolves to this exact object:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const result = {
+    sessionId: &#39;term-example&#39;,
+    columns: 100,
+    rows: 30,
+    accepted: true,
+    emulated: true
+};
+</code></pre></div>
+<p>The returned dimensions are the accepted values. <code>emulated: true</code> distinguishes
+this session metadata update from a guarantee that the operating system resized
+a native pseudoterminal.</p>
+<h3 id="errors-and-recovery-9">Errors and recovery</h3>
+<p>Invalid dimensions are rejected as <code>METHOD_CONTRACT_INPUT_INVALID</code>. An invalid
+or retired id produces <code>TERMINAL_SESSION_INVALID</code> or
+<code>TERMINAL_SESSION_NOT_FOUND</code>. Use <code>list()</code> to refresh current app-owned sessions;
+do not reuse an id after exit.</p>
+<h3 id="example-9">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const terminal = globalThis.Arcane?.terminal;
+
+if (!terminal?.resize || !terminal?.list) {
+    throw new Error(&#39;Terminal resize is unavailable.&#39;);
+}
+
+const {sessions} = await terminal.list();
+const session = sessions[0];
+
+if (!session) {
+    throw new Error(&#39;Start a terminal session before resizing it.&#39;);
+}
+
+try {
+    const result = await terminal.resize(session.id, 100, 30);
+    console.log(
+        `Recorded ${result.columns}x${result.rows}`,
+        `emulated=${result.emulated}`
+    );
+} catch (error) {
+    if (error instanceof Arcane.Error) {
+        console.error(error.code, error.message, error.resolution);
+    } else {
+        throw error;
+    }
+}
+</code></pre></div>
+<h2 id="arcaneterminalsignal">Arcane.terminal.signal()</h2>
+<h3 id="overview-10">Overview</h3>
+<p><code>Arcane.terminal.signal(sessionId, signal = &quot;interrupt&quot;)</code> sends one supported
+control request to a running app-owned session. It is non-idempotent process
+control. Subscribe to <code>terminal.exit</code> before signaling when the application
+needs to observe whether the process exits.</p>
+<h3 id="signal-request">Signal request</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sessionId</code></td>
+<td><code>string</code></td>
+<td>None</td>
+<td>Opaque id returned by <code>start()</code> or <code>list()</code>, no longer than 128 characters.</td>
+</tr>
+<tr>
+<td><code>signal</code></td>
+<td><code>string</code></td>
+<td><code>&quot;interrupt&quot;</code></td>
+<td>Either <code>interrupt</code> or <code>terminate</code>; no other signal name is supported.</td>
+</tr>
+</tbody></table>
+</div>
+<p>On desktop Core hosts, <code>interrupt</code> maps to the host&#39;s <code>SIGINT</code> process-control
+request and <code>terminate</code> maps to <code>SIGTERM</code>. Android applies the supported request
+through its sandbox process-destruction boundary; applications must not depend
+on Unix signal details there.</p>
+<h3 id="acceptance-result-2">Acceptance result</h3>
+<p>The method resolves to:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const result = {
+    sessionId: &#39;term-example&#39;,
+    signal: &#39;interrupt&#39;,
+    accepted: true
+};
+</code></pre></div>
+<p><code>accepted</code> is a boolean and may be <code>false</code>. A true value means the host accepted
+the control request, not that the process exited or used a particular exit code.
+Observe <code>terminal.exit</code> for the final outcome.</p>
+<h3 id="errors-and-recovery-10">Errors and recovery</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning and recovery</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>METHOD_CONTRACT_INPUT_INVALID</code> or <code>TERMINAL_SIGNAL_INVALID</code></td>
+<td>Use only <code>interrupt</code> or <code>terminate</code>.</td>
+</tr>
+<tr>
+<td><code>TERMINAL_SESSION_INVALID</code></td>
+<td>Use an unchanged API-returned session id.</td>
+</tr>
+<tr>
+<td><code>TERMINAL_SESSION_NOT_FOUND</code></td>
+<td>The process is no longer running; refresh with <code>list()</code> or start another session.</td>
+</tr>
+<tr>
+<td><code>METHOD_NOT_ALLOWED</code></td>
+<td>The current application lacks <code>terminal.execute</code> admission.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Do not retry a signal automatically after an ambiguous transport failure; the
+first request may already have affected the process.</p>
+<h3 id="example-10">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const terminal = globalThis.Arcane?.terminal;
+const events = globalThis.Arcane?.events;
+
+if (!terminal?.signal || !terminal?.list || !events?.on) {
+    throw new Error(&#39;Terminal process control is unavailable.&#39;);
+}
+
+const {sessions} = await terminal.list();
+const session = sessions[0];
+
+if (!session) {
+    throw new Error(&#39;Start a terminal session before signaling it.&#39;);
+}
+
+let offExit = function ignoreExitUnsubscribe() {};
+
+const exited = new Promise(function waitForTerminalExit(resolve) {
+    offExit = events.on(&#39;terminal.exit&#39;, function handleTerminalExit(payload) {
+        if (payload.sessionId === session.id) {
+            offExit();
+            resolve(payload);
+        }
+    });
+});
+
+try {
+    const result = await terminal.signal(session.id, &#39;interrupt&#39;);
+    console.log(&#39;Interrupt request accepted&#39;, result.accepted);
+
+    if (result.accepted) {
+        const exit = await Promise.race([
+            exited,
+            new Promise(function waitForExitTimeout(resolve) {
+                setTimeout(function resolveExitTimeout() {
+                    resolve(null);
+                }, 2000);
+            })
+        ]);
+        console.log(exit ? &#39;Session exited&#39; : &#39;Session remains available&#39;);
+    }
+} catch (error) {
+    if (error instanceof Arcane.Error) {
+        console.error(error.code, error.message, error.resolution);
+    } else {
+        throw error;
+    }
+} finally {
+    offExit();
+}
+</code></pre></div>
+<h2 id="arcaneterminalclose">Arcane.terminal.close()</h2>
+<h3 id="overview-11">Overview</h3>
+<p><code>Arcane.terminal.close(sessionId)</code> asks the host to close one app-owned terminal
+session. It is non-idempotent process control. The host may close input and then
+terminate the process according to its platform policy.</p>
+<p>The resolved result acknowledges the close request; it is not the process exit
+record. Subscribe to <code>terminal.exit</code> before calling <code>close()</code> and use that event
+as the final lifecycle observation. Calling <code>close()</code> again after the host
+retires the session can reject with <code>TERMINAL_SESSION_NOT_FOUND</code>.</p>
+<h3 id="session-identifier">Session identifier</h3>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sessionId</code></td>
+<td><code>string</code></td>
+<td>Opaque id returned by <code>start()</code> or <code>list()</code>, from 1 through 128 characters and matching the session-id contract.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="acceptance-result-3">Acceptance result</h3>
+<p>The method resolves to:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const result = {
+    sessionId: &#39;term-example&#39;,
+    accepted: true
+};
+</code></pre></div>
+<p><code>accepted: true</code> means that the host accepted the close request. It does not
+mean the process has exited, that an exit code is already available, or that all
+earlier output chunks have been rendered.</p>
+<h3 id="errors-and-recovery-11">Errors and recovery</h3>
+<p><code>TERMINAL_SESSION_INVALID</code> means the identifier does not satisfy the public
+session-id contract. <code>TERMINAL_SESSION_NOT_FOUND</code> means the session has already
+exited or been retired. Treat the latter as stale local state and refresh the
+owned inventory instead of repeatedly closing the same id.</p>
+<p><code>METHOD_NOT_ALLOWED</code> and <code>ARCANE_TRANSPORT_UNAVAILABLE</code> indicate an availability
+or host problem, not a session problem. Reopen the admitted Arcane Terminal host
+rather than retrying the close call in a browser preview.</p>
+<h3 id="example-11">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const terminal = globalThis.Arcane?.terminal;
+const events = globalThis.Arcane?.events;
+
+if (!terminal?.close || !terminal?.list || !events?.on) {
+    throw new Error(&#39;Terminal session closure is unavailable.&#39;);
+}
+
+const {sessions} = await terminal.list();
+const session = sessions[0];
+
+if (!session) {
+    throw new Error(&#39;Start a terminal session before closing it.&#39;);
+}
+
+let offExit = function ignoreExitUnsubscribe() {};
+
+const exited = new Promise(function waitForTerminalExit(resolve) {
+    offExit = events.on(&#39;terminal.exit&#39;, function handleTerminalExit(payload) {
+        if (payload.sessionId === session.id) {
+            offExit();
+            resolve(payload);
+        }
+    });
+});
+
+try {
+    const result = await terminal.close(session.id);
+    console.log(&#39;Close request accepted&#39;, result.accepted);
+
+    const exit = await Promise.race([
+        exited,
+        new Promise(function waitForExitTimeout(_resolve, reject) {
+            setTimeout(function rejectExitTimeout() {
+                reject(new Error(&#39;Timed out waiting for terminal.exit.&#39;));
+            }, 5000);
+        })
+    ]);
+    console.log(&#39;Process exited&#39;, exit.exitCode, exit.signal);
+} catch (error) {
+    if (error instanceof Arcane.Error) {
+        console.error(error.code, error.message, error.resolution);
+    } else {
+        console.error(error);
+    }
+} finally {
+    offExit();
+}
+</code></pre></div>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/core/reference/arcane-api/applications-terminal-capabilities.md" target="_blank" rel="noreferrer"><code>docs/reference/core/reference/arcane-api/applications-terminal-capabilities.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#arcaneappcurrent">Arcane.app.current()</a><a href="#arcaneapplicationslist">Arcane.applications.list()</a><a href="#arcaneapplicationslaunch">Arcane.applications.launch()</a><a href="#arcaneexternalopen">Arcane.external.open()</a><a href="#arcanemailsend">Arcane.mail.send()</a><a href="#arcanecapabilitieslist">Arcane.capabilities.list()</a><a href="#arcaneterminalstart">Arcane.terminal.start()</a><a href="#arcaneterminallist">Arcane.terminal.list()</a><a href="#arcaneterminalwrite">Arcane.terminal.write()</a><a href="#arcaneterminalresize">Arcane.terminal.resize()</a><a href="#arcaneterminalsignal">Arcane.terminal.signal()</a><a href="#arcaneterminalclose">Arcane.terminal.close()</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../../../../architecture/">Architecture</a><a href="../../../../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

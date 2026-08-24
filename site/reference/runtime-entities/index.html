@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="The synchronized runtime ships 15 entity modules with 35 public ESM bindings. This page explains each module&#39;s capability and host assumptions. The exact co…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-entities/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane runtime entity modules · Arcane OS SDK"><meta property="og:description" content="The synchronized runtime ships 15 entity modules with 35 public ESM bindings. This page explains each module&#39;s capability and host assumptions. The exact co…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-entities/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane runtime entity modules · Arcane OS SDK"><meta name="twitter:description" content="The synchronized runtime ships 15 entity modules with 35 public ESM bindings. This page explains each module&#39;s capability and host assumptions. The exact co…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane runtime entity modules | Arcane OS SDK</title><script src="../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane runtime entity modules</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-runtime-entity-modules">Arcane runtime entity modules</h1><p class="doc-lead">The synchronized runtime ships 15 entity modules with 35 public ESM bindings. This page explains each module&#39;s capability and host assumptions. The exact co…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../runtime-modules/">Modules</a><a href="./" aria-current="page">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama module</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/runtime-entities.md"><p>The synchronized runtime ships 15 entity modules with 35 public ESM bindings.
+This page explains each module&#39;s capability and host assumptions. The exact
+constructor/function/value contracts are canonical in the
+<a href="../core/arcane-entities/">Arcane shared entity inventory</a>.</p>
+<p>Entity creation and serialization are usually cross-host. Methods that touch
+DOM, DBOPFS, local storage, AI, or object URLs require the corresponding browser
+or native-WebView dependency.</p>
+<h2 id="canonical-inventory">Canonical inventory</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Exports</th>
+<th>Capability</th>
+<th>Availability / normalization</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ApiModelRecord.js</code></td>
+<td><code>default</code></td>
+<td>Frozen HTTP(S) model response snapshot.</td>
+<td>Cross-host; normalized.</td>
+</tr>
+<tr>
+<td><code>Calculation.js</code></td>
+<td><code>default</code></td>
+<td>Frozen bounded expression and finite result.</td>
+<td>Cross-host; normalized.</td>
+</tr>
+<tr>
+<td><code>Chat.js</code></td>
+<td><code>default</code></td>
+<td>Conversation messages, tool exchanges, memories, and optional persistence.</td>
+<td>Browser/native WebView; AI/DBOPFS behavior mixed.</td>
+</tr>
+<tr>
+<td><code>CommunicationMessage.js</code></td>
+<td><code>default</code>, <code>communicationChannels</code></td>
+<td>Frozen provider-neutral message.</td>
+<td>Cross-host; normalized.</td>
+</tr>
+<tr>
+<td><code>CommunicationThread.js</code></td>
+<td><code>default</code></td>
+<td>Frozen provider-neutral thread containing normalized messages.</td>
+<td>Cross-host; normalized.</td>
+</tr>
+<tr>
+<td><code>Document.js</code></td>
+<td><code>default</code></td>
+<td>File entity specialization for the <code>documents</code> table.</td>
+<td>Browser/native WebView; DBOPFS behavior mixed.</td>
+</tr>
+<tr>
+<td><code>File.js</code></td>
+<td><code>default</code></td>
+<td>MIME-aware file open/save and DBOPFS persistence.</td>
+<td>Browser/native WebView; mixed storage/rendering errors.</td>
+</tr>
+<tr>
+<td><code>Image.js</code></td>
+<td><code>default</code></td>
+<td>Image validation, upload, persistence, data URL, Blob URL, and revocation.</td>
+<td>Browser/native WebView; mixed File/Blob/DBOPFS errors.</td>
+</tr>
+<tr>
+<td><code>IntentEnvelope.js</code></td>
+<td>six named exports</td>
+<td>Immutable canonical intent record, serialization, rehydration, and privacy-safe audit projection.</td>
+<td>Cross-host; strict normalized coded errors.</td>
+</tr>
+<tr>
+<td><code>Preference.js</code></td>
+<td><code>default</code>, <code>preferenceSchema</code></td>
+<td>Boolean, number, select, and text preference definitions.</td>
+<td>Cross-host; normalized.</td>
+</tr>
+<tr>
+<td><code>TerminalSession.js</code></td>
+<td><code>default</code>, <code>terminalShells</code></td>
+<td>Frozen terminal session identity, shell, and state.</td>
+<td>Cross-host; normalized.</td>
+</tr>
+<tr>
+<td><code>Theme.js</code></td>
+<td>five exports</td>
+<td>Semantic theme tokens, conversion, serialization, and DOM application.</td>
+<td>Values cross-host; apply/clear need DOM; normalized/mixed.</td>
+</tr>
+<tr>
+<td><code>TWiNPolicyDecision.js</code></td>
+<td>six named exports</td>
+<td>Immutable canonical policy decision, rehydration, serialization, and redacted audit projection.</td>
+<td>Cross-host; strict normalized coded errors.</td>
+</tr>
+<tr>
+<td><code>User.js</code></td>
+<td><code>default</code></td>
+<td>User preferences/profile state with DBLS/DBOPFS lifecycle.</td>
+<td>Browser/native WebView; storage behavior mixed.</td>
+</tr>
+<tr>
+<td><code>Weather.js</code></td>
+<td>four classes</td>
+<td>Frozen location, observation, day, and snapshot weather entities.</td>
+<td>Cross-host; normalized.</td>
+</tr>
+</tbody></table>
+</div>
+<h2 id="apimodelrecordjs">ApiModelRecord.js</h2>
+<h3 id="overview">Overview</h3>
+<p><code>ApiModelRecord</code> freezes an endpoint, fetch time, metadata, and parsed value so
+provider reads can be cached or emitted without leaking mutable response state.</p>
+<h3 id="example">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import ApiModelRecord from &#39;/arcane/entities/ApiModelRecord.js&#39;;
+
+const record = new ApiModelRecord({
+    endpoint: &#39;https://example.invalid/model&#39;,
+    fetchedAt: new Date().toISOString(),
+    metadata: {},
+    value: {ready: true}
+});
+</code></pre></div>
+<h2 id="calculationjs">Calculation.js</h2>
+<h3 id="overview-1">Overview</h3>
+<p><code>Calculation</code> owns a bounded expression, finite result, creation time, and
+<code>toJSON()</code> projection. Use <code>CalculatorEngine</code> to produce validated instances.</p>
+<h3 id="example-1">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import Calculation from &#39;/arcane/entities/Calculation.js&#39;;
+
+console.log(new Calculation({expression: &#39;2 + 2&#39;, result: 4}).toJSON());
+</code></pre></div>
+<h2 id="chatjs">Chat.js</h2>
+<h3 id="overview-2">Overview</h3>
+<p><code>ChatEntity</code> owns message history, saved state, tool exchanges, memory lookup,
+and optional app-scoped DBOPFS persistence. It installs no independent native
+authority; AI and storage dependencies must be available to the host.</p>
+<h3 id="example-2">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import Chat from &#39;/arcane/entities/Chat.js&#39;;
+
+const chat = new Chat();
+chat.addUserMessage(&#39;Hello.&#39;);
+</code></pre></div>
+<h2 id="communicationmessagejs">CommunicationMessage.js</h2>
+<h3 id="overview-3">Overview</h3>
+<p>Normalizes one provider message and exports the supported channel values:
+email, SMS, MMS, RCS, WhatsApp, and other.</p>
+<h3 id="example-3">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import CommunicationMessage from &#39;/arcane/entities/CommunicationMessage.js&#39;;
+
+const message = new CommunicationMessage({
+    id: &#39;message-1&#39;,
+    channel: &#39;email&#39;,
+    body: &#39;Hello&#39;
+});
+</code></pre></div>
+<h2 id="communicationthreadjs">CommunicationThread.js</h2>
+<h3 id="overview-4">Overview</h3>
+<p>Normalizes one conversation thread and its <code>CommunicationMessage</code> records into
+a frozen provider-neutral object.</p>
+<h3 id="example-4">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import CommunicationThread from &#39;/arcane/entities/CommunicationThread.js&#39;;
+
+const thread = new CommunicationThread({id: &#39;thread-1&#39;, messages: []});
+</code></pre></div>
+<h2 id="documentjs">Document.js</h2>
+<h3 id="overview-5">Overview</h3>
+<p><code>DocumentEntity</code> specializes <code>FileEntity</code> for the app-scoped <code>documents</code> table.
+Its persistence methods require the same DBOPFS lifecycle and ownership proof as
+the base file entity.</p>
+<h3 id="example-5">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import DocumentEntity from &#39;/arcane/entities/Document.js&#39;;
+
+const document = new DocumentEntity();
+console.log(document.tableName);
+</code></pre></div>
+<h2 id="filejs">File.js</h2>
+<h3 id="overview-6">Overview</h3>
+<p><code>FileEntity</code> loads and saves supported file formats through app-scoped DBOPFS
+and uses the shared Markdown renderer where appropriate.</p>
+<h3 id="example-6">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import FileEntity from &#39;/arcane/entities/File.js&#39;;
+
+const file = new FileEntity();
+console.log(file.fileName);
+</code></pre></div>
+<h2 id="imagejs">Image.js</h2>
+<h3 id="overview-7">Overview</h3>
+<p><code>ImageEntity</code> extends <code>FileEntity</code> with image validation, upload, base64 data
+URLs, Blob URLs, and explicit Blob URL revocation.</p>
+<h3 id="example-7">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import ImageEntity from &#39;/arcane/entities/Image.js&#39;;
+
+console.log(typeof ImageEntity.prototype.revokeBlobURL);
+</code></pre></div>
+<h2 id="intentenvelopejs">IntentEnvelope.js</h2>
+<h3 id="overview-8">Overview</h3>
+<p>Creates immutable canonical v1 intent records while keeping trusted provenance
+separate from hostile payload input. Serialization, rehydration, and the audit
+projection are bounded and deterministic.</p>
+<h3 id="example-8">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {
+    createIntentEnvelope,
+    serializeIntentEnvelope
+} from &#39;/arcane/entities/IntentEnvelope.js&#39;;
+
+const intent = createIntentEnvelope(
+    {originalExpression: &#39;Summarize the record.&#39;, normalizedGoal: &#39;summarize&#39;},
+    {source: &#39;example&#39;}
+);
+
+console.log(serializeIntentEnvelope(intent));
+</code></pre></div>
+<h2 id="preferencejs">Preference.js</h2>
+<h3 id="overview-9">Overview</h3>
+<p>Defines preference types, option normalization, value validation, JSON
+projection, and schema normalization for shared stores and forms.</p>
+<h3 id="example-9">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import Preference from &#39;/arcane/entities/Preference.js&#39;;
+
+const preference = new Preference({
+    key: &#39;density&#39;,
+    type: &#39;select&#39;,
+    defaultValue: &#39;comfortable&#39;,
+    options: [&#39;comfortable&#39;, &#39;compact&#39;]
+});
+</code></pre></div>
+<h2 id="terminalsessionjs">TerminalSession.js</h2>
+<h3 id="overview-10">Overview</h3>
+<p>Normalizes terminal session id, shell, state, updates, and JSON projection. The
+entity does not start a process; <code>TerminalClient</code> owns the native bridge call.</p>
+<h3 id="example-10">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import TerminalSession from &#39;/arcane/entities/TerminalSession.js&#39;;
+
+console.log(TerminalSession.shell(&#39;auto&#39;));
+</code></pre></div>
+<h2 id="themejs">Theme.js</h2>
+<h3 id="overview-11">Overview</h3>
+<p>Owns the shared light/dark semantic token sets, color conversion, JSON
+projection, DOM application, and clearing. Token work is cross-host; <code>apply()</code>
+and <code>clear()</code> require a document root.</p>
+<h3 id="example-11">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import Theme, {arcaneDarkThemeTokens} from &#39;/arcane/entities/Theme.js&#39;;
+
+const theme = new Theme({name: &#39;example&#39;, tokens: arcaneDarkThemeTokens});
+console.log(theme.toJSON());
+</code></pre></div>
+<h2 id="twinpolicydecisionjs">TWiNPolicyDecision.js</h2>
+<h3 id="overview-12">Overview</h3>
+<p>Creates immutable canonical v1 policy decisions with trusted provenance,
+bounded serialization, rehydration, and a target/value-redacted audit view.</p>
+<h3 id="example-12">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {
+    createTWiNPolicyDecision,
+    twinPolicyDecisionAuditProjection
+} from &#39;/arcane/entities/TWiNPolicyDecision.js&#39;;
+
+const decision = createTWiNPolicyDecision(
+    {layer: &#39;application&#39;, policy: &#39;example&#39;, outcome: &#39;allow&#39;},
+    {source: &#39;example&#39;}
+);
+
+console.log(twinPolicyDecisionAuditProjection(decision));
+</code></pre></div>
+<h2 id="userjs">User.js</h2>
+<h3 id="overview-13">Overview</h3>
+<p>Owns persisted user preference/profile fields, explicit-preference updates,
+fresh reads, saves, and JSON projection. It installs <code>window.user</code> after its
+DBLS/DBOPFS lifecycle and emits <code>user-entity-loaded</code>.</p>
+<h3 id="example-13">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import UserEntity from &#39;/arcane/entities/User.js&#39;;
+
+console.log(typeof UserEntity.prototype.toJSON);
+</code></pre></div>
+<h2 id="weatherjs">Weather.js</h2>
+<h3 id="overview-14">Overview</h3>
+<p>Exports four frozen normalized records: <code>WeatherLocation</code>,
+<code>WeatherObservation</code>, <code>WeatherDay</code>, and <code>WeatherSnapshot</code>.</p>
+<h3 id="example-14">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {WeatherLocation} from &#39;/arcane/entities/Weather.js&#39;;
+
+const location = new WeatherLocation({name: &#39;Houston&#39;});
+console.log(location.toJSON());
+</code></pre></div>
+<h2 id="availability-and-protocol-details">Availability and protocol details</h2>
+<p>Entity modules are delivered by browser ESM at <code>/arcane/entities/</code>. They do not
+cross Core by being imported. Individual persistence, AI, DOM, or native calls
+cross the dependency named by that entity. See
+<a href="../availability-and-normalization/">availability and normalization</a> and the
+<a href="../protocols/">deep protocol guide</a>.</p>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/runtime-entities.md" target="_blank" rel="noreferrer"><code>docs/reference/runtime-entities.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#canonical-inventory">Canonical inventory</a><a href="#apimodelrecordjs">ApiModelRecord.js</a><a href="#calculationjs">Calculation.js</a><a href="#chatjs">Chat.js</a><a href="#communicationmessagejs">CommunicationMessage.js</a><a href="#communicationthreadjs">CommunicationThread.js</a><a href="#documentjs">Document.js</a><a href="#filejs">File.js</a><a href="#imagejs">Image.js</a><a href="#intentenvelopejs">IntentEnvelope.js</a><a href="#preferencejs">Preference.js</a><a href="#terminalsessionjs">TerminalSession.js</a><a href="#themejs">Theme.js</a><a href="#twinpolicydecisionjs">TWiNPolicyDecision.js</a><a href="#userjs">User.js</a><a href="#weatherjs">Weather.js</a><a href="#availability-and-protocol-details">Availability and protocol details</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

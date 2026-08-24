@@ -1,0 +1,265 @@
+{
+  "schema": "arcane-reference-site/1",
+  "generatedBy": "tools/build-reference-site.mjs",
+  "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
+  "versions": {
+    "sdk": "0.1.0-dev.5",
+    "runtime": "0.8.12",
+    "protocol": "arcane/1"
+  },
+  "counts": {
+    "markdownPages": 24,
+    "collectionPages": 2,
+    "htmlPages": 26,
+    "inventories": 4
+  },
+  "pages": [
+    {
+      "source": "docs/reference/arcane-ollama.md",
+      "output": "site/reference/arcane-ollama/index.html",
+      "route": "reference/arcane-ollama/",
+      "sourceSha256": "bdd73f6ba8ea13e77a37b83c72fd0f10b1d8c4e3d7b6c480dd6011fbc6d9a390",
+      "outputSha256": "ad2953db412864c863d0c13ef62a22a18087f5b03a26553e925eab5248c35f55",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/availability-and-normalization.md",
+      "output": "site/reference/availability-and-normalization/index.html",
+      "route": "reference/availability-and-normalization/",
+      "sourceSha256": "6bf72017b69d78ce57356d04c599cf49891b6dbddfaeed74d2175d37df7535a8",
+      "outputSha256": "e4c01cfc5eef92eb8939bc7eee4e9f50291a3518f680dfe15decbd080fe5a2b6",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/behavioral-testing.md",
+      "output": "site/reference/behavioral-testing/index.html",
+      "route": "reference/behavioral-testing/",
+      "sourceSha256": "906c311a8489d8cdfa62ef2492ac5765066c06ff9a37c7f682f34b7171f8259f",
+      "outputSha256": "3404d3d1e2f10b97af5e5a615bd4c47b635f4ece64493711717369461f07530b",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/cli.md",
+      "output": "site/reference/cli/index.html",
+      "route": "reference/cli/",
+      "sourceSha256": "14cd7729f7f96e4f84e711a2785e5e527a15ce6d06502e8422fe4dded8f8b050",
+      "outputSha256": "9894c4eab6a8e80b00aa01a62245edb21df273eb3078fba473e60771096c1763",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core/README.md",
+      "output": "site/reference/core/index.html",
+      "route": "reference/core/",
+      "sourceSha256": "3b3b94328d12cb36e78b10928a23ffc254e52117866903e154ac3e38401b7322",
+      "outputSha256": "9a583bcef34f47d791878f797bbe43eae92abff3e18174cbcea4e7a6c24c27ce",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core/arcane-ai-contracts.md",
+      "output": "site/reference/core/arcane-ai-contracts/index.html",
+      "route": "reference/core/arcane-ai-contracts/",
+      "sourceSha256": "a423da0f0f934057ec64e683500daa0431525cbca05a39ba679a348daf41bcf5",
+      "outputSha256": "5b20c178d3522c9ee05d70fc174e5f37a62b50e40a620c18d4ec968dfe5a802f",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core/arcane-api.md",
+      "output": "site/reference/core/arcane-api/index.html",
+      "route": "reference/core/arcane-api/",
+      "sourceSha256": "3e1c5bfdf4b033758713614e54a40465f8766a8821a250e7353182603cc461c5",
+      "outputSha256": "416ab031253ef37420ddd133865ae8f0361ea3b577c91bdf8cf5523724c67e66",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core/arcane-entities.md",
+      "output": "site/reference/core/arcane-entities/index.html",
+      "route": "reference/core/arcane-entities/",
+      "sourceSha256": "815e9b122c501ee44d47ad49b568b10963ed6aec989b946a53ea340397cd0e3a",
+      "outputSha256": "8d311dd4687a02b1bac55b89f611d42c8d5b81a767dd61d1fc9b505ecade9ab4",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core/arcane-events.md",
+      "output": "site/reference/core/arcane-events/index.html",
+      "route": "reference/core/arcane-events/",
+      "sourceSha256": "a3dc4d04eea5b1b572d8d48bc88ed8fdf6aa85c25c6d417c373fc21ddb566c68",
+      "outputSha256": "bfa21d8606a96331d19702bc9b324340fc8c1c3553c18705ec9462ee1d654221",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core/ollama-module.md",
+      "output": "site/reference/core/ollama-module/index.html",
+      "route": "reference/core/ollama-module/",
+      "sourceSha256": "b43fc03cba88210437868a8d377e71ef3b224262bbc6a00fd695beb6dd71a0ad",
+      "outputSha256": "fd18e0f0894264676c6cd348aa8137dbd9aa66c15a718bb3530f3510e63316a7",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core/reference/arcane-api/",
+      "output": "site/reference/core/reference/arcane-api/index.html",
+      "route": "reference/core/reference/arcane-api/",
+      "sourceSha256": "f4223aa8e51656047010de37dfa6d882a0bb04679ac1513f2f65568cd3030a55",
+      "outputSha256": "d32fbf857c9322ec5423e4537798c53a4917360bb503d9d7c039fc1ebc26bc01",
+      "kind": "collection"
+    },
+    {
+      "source": "docs/reference/core/reference/arcane-api/ai-and-ollama.md",
+      "output": "site/reference/core/reference/arcane-api/ai-and-ollama/index.html",
+      "route": "reference/core/reference/arcane-api/ai-and-ollama/",
+      "sourceSha256": "77ff9c7b278ffc7940895049cf46c33845238d62bffed7a743becf4a2c2e011d",
+      "outputSha256": "07c5f9d580dbf69edf925b5e42daa439dbf0cd44ba3c3e44528ffd87045bee2c",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core/reference/arcane-api/applications-terminal-capabilities.md",
+      "output": "site/reference/core/reference/arcane-api/applications-terminal-capabilities/index.html",
+      "route": "reference/core/reference/arcane-api/applications-terminal-capabilities/",
+      "sourceSha256": "dae32bbbd3be2a98c680f919a0d299af9494fa86c3e87e77f4f2a04fbc284188",
+      "outputSha256": "91c3b0c44e24797a9c98a1cdf2e0183cf7174cea992b57fd287a963f2f3168d1",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core/reference/arcane-api/core-and-events.md",
+      "output": "site/reference/core/reference/arcane-api/core-and-events/index.html",
+      "route": "reference/core/reference/arcane-api/core-and-events/",
+      "sourceSha256": "b0b73d0c3a0fdb7a0326129f1898961525b72c6627e81d6720d20a7555060063",
+      "outputSha256": "c84cd368e7cb9e6a7f51a5db32a72bc9a14236807d8459c099dff1d81243c21c",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core/reference/arcane-api/filesystem-storage-preferences-appearance.md",
+      "output": "site/reference/core/reference/arcane-api/filesystem-storage-preferences-appearance/index.html",
+      "route": "reference/core/reference/arcane-api/filesystem-storage-preferences-appearance/",
+      "sourceSha256": "57c4f2baeb953507924a7785869b1289af171acaa326c635d9e912b28d856275",
+      "outputSha256": "2a445c31452103392b037d9b208a2ef70c0df3add3236ffe8dbbbf815e43fb54",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core/reference/arcane-api/namespaces.md",
+      "output": "site/reference/core/reference/arcane-api/namespaces/index.html",
+      "route": "reference/core/reference/arcane-api/namespaces/",
+      "sourceSha256": "1bb882f5957ec16f1a64b0bb3f3e47ea6f951301147d05d3ff05aca622b307fa",
+      "outputSha256": "8eaf31ff0582005d4204b4ba1f56fd1ef29c66b384aa78739c8ca04a9cdfe01a",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core/reference/arcane-api/platform-installation-users-system.md",
+      "output": "site/reference/core/reference/arcane-api/platform-installation-users-system/index.html",
+      "route": "reference/core/reference/arcane-api/platform-installation-users-system/",
+      "sourceSha256": "495aaa76aed1f98ce6ed182adbe0ff3b9e79ddf285fad37ca24ba7df82e61b7b",
+      "outputSha256": "df2d6b7c99563fe87bfedd6699c5992f2045e7a182e3411273c4b204d0758563",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core/reference/arcane-api/session-provisioning-diagnostics-development.md",
+      "output": "site/reference/core/reference/arcane-api/session-provisioning-diagnostics-development/index.html",
+      "route": "reference/core/reference/arcane-api/session-provisioning-diagnostics-development/",
+      "sourceSha256": "b34552f86504f7ce7aa1618065209a004ecb236e4de7eba0290af32be7511901",
+      "outputSha256": "a5243274aab3833d727f1087899d9275e069623a3f7b599844341cc7a1d3a114",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/event-manager.md",
+      "output": "site/reference/event-manager/index.html",
+      "route": "reference/event-manager/",
+      "sourceSha256": "22ef15ebe3dc67b20f89bfd5d3f787a3f854aa4278ac28a008a2f8fc60aa44bb",
+      "outputSha256": "57cc17fe347193d05ab52779f449d52d80e066c845acac26bba17c42252ac931",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/inventory/",
+      "output": "site/reference/inventory/index.html",
+      "route": "reference/inventory/",
+      "sourceSha256": "948d2c9b976ede9fb90d144229f4411ebcc13d8249071a5332936538b3b2adc9",
+      "outputSha256": "0f6e5d70aba8a7820772dfbba119fcfa9d9cc7e476e1732b42d2aa2847e86b5b",
+      "kind": "collection"
+    },
+    {
+      "source": "docs/reference/README.md",
+      "output": "site/reference/overview/index.html",
+      "route": "reference/overview/",
+      "sourceSha256": "403bc9b2d5cf757ce707f988787fc77f083ae81652959130f012e5c32c0cf42c",
+      "outputSha256": "1aa2a54e942fba20203c8dcb6d7c3c61c62ac4c2599e7d61fd3f803ae1f1b162",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/protocols.md",
+      "output": "site/reference/protocols/index.html",
+      "route": "reference/protocols/",
+      "sourceSha256": "3b55c614e1adb3a4a6c31fab151f6ba79ef8f282566aa48d74c777003d88c158",
+      "outputSha256": "96e6d124fa00af6f37911aa1f1d366c2e40b418ece3d42e43435ca563adf4d7c",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/runtime-components.md",
+      "output": "site/reference/runtime-components/index.html",
+      "route": "reference/runtime-components/",
+      "sourceSha256": "1935387d9f744ffb606a674c02fe8e23d6f7e0f1b39bac4c5b1c9da2c948d349",
+      "outputSha256": "c67e89de0b4cc38c732a45da12c608a86e3714eaf5f4e080735ffed9d6f8d437",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/runtime-entities.md",
+      "output": "site/reference/runtime-entities/index.html",
+      "route": "reference/runtime-entities/",
+      "sourceSha256": "59c2d3299f9e3e06313fed29d712742395527bd4ecd3c35345098fbbf1d4c34d",
+      "outputSha256": "a82925396ef1ebb1c19285d5a61f88f434d8ab7ed707881e3667b2f6db062b8b",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/runtime-modules.md",
+      "output": "site/reference/runtime-modules/index.html",
+      "route": "reference/runtime-modules/",
+      "sourceSha256": "a94f31ade738a72fe8331b20db60127b9162236b2cc2eceb91afd04d6bca125a",
+      "outputSha256": "3fcaa06fc0cb4de88b1ed03dc4a89faa77268f2975f54bd82377245fc362882d",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/sdk-api.md",
+      "output": "site/reference/sdk-api/index.html",
+      "route": "reference/sdk-api/",
+      "sourceSha256": "052e5683941db0522ffb71a65672d56ba6296deeea7366c7c7f9eab759bd2b33",
+      "outputSha256": "4d1c13ea316e123d295118d21dd70ccb17d0479bfbffad0fe803a9993618ed4a",
+      "kind": "markdown"
+    }
+  ],
+  "inventories": [
+    {
+      "source": "docs/reference/inventory/package-api.json",
+      "output": "site/reference/inventory/package-api.json",
+      "route": "reference/inventory/package-api.json",
+      "sourceSha256": "285f1a736aa92bcff14e9b5205d57bcc5ab79e01d6646a0f4e2198776087781f",
+      "outputSha256": "285f1a736aa92bcff14e9b5205d57bcc5ab79e01d6646a0f4e2198776087781f"
+    },
+    {
+      "source": "docs/reference/inventory/runtime-components.json",
+      "output": "site/reference/inventory/runtime-components.json",
+      "route": "reference/inventory/runtime-components.json",
+      "sourceSha256": "426fa4f413dff211ff18fd7fc7a207a63bad646458b7cbeb5797e230bfbf3612",
+      "outputSha256": "426fa4f413dff211ff18fd7fc7a207a63bad646458b7cbeb5797e230bfbf3612"
+    },
+    {
+      "source": "docs/reference/inventory/runtime-entities.json",
+      "output": "site/reference/inventory/runtime-entities.json",
+      "route": "reference/inventory/runtime-entities.json",
+      "sourceSha256": "90dec46085e7e740f0c1c1085f93a9d6564c1043d4b2c9fa4e25a7a3eb64f6d3",
+      "outputSha256": "90dec46085e7e740f0c1c1085f93a9d6564c1043d4b2c9fa4e25a7a3eb64f6d3"
+    },
+    {
+      "source": "docs/reference/inventory/runtime-modules.json",
+      "output": "site/reference/inventory/runtime-modules.json",
+      "route": "reference/inventory/runtime-modules.json",
+      "sourceSha256": "6e0e0ab9743939478f478a93497b2693702bf88bd460d917a4e22740b335d5aa",
+      "outputSha256": "6e0e0ab9743939478f478a93497b2693702bf88bd460d917a4e22740b335d5aa"
+    }
+  ],
+  "assets": [
+    {
+      "source": "tools/build-reference-site.mjs#reference-css",
+      "output": "site/reference/reference.css",
+      "route": "reference/reference.css",
+      "sourceSha256": "fc5866d87b0111c1dfab31db71f1e45ea11840a3ab970d038cd061667245b134",
+      "outputSha256": "fc5866d87b0111c1dfab31db71f1e45ea11840a3ab970d038cd061667245b134"
+    }
+  ]
+}

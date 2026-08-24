@@ -1,0 +1,1323 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="window.Arcane is the immutable application-facing API provided by the Arcane native host bridge. Arcane applications use the same contract when hosted by We…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-api/"><link rel="icon" type="image/png" href="../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../styles.css"><link rel="stylesheet" href="../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane API Reference · Arcane OS SDK"><meta property="og:description" content="window.Arcane is the immutable application-facing API provided by the Arcane native host bridge. Arcane applications use the same contract when hosted by We…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-api/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane API Reference · Arcane OS SDK"><meta name="twitter:description" content="window.Arcane is the immutable application-facing API provided by the Arcane native host bridge. Arcane applications use the same contract when hosted by We…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane API Reference | Arcane OS SDK</title><script src="../../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../">Overview</a><a href="../../../guides/">Guides</a><a href="../../../examples/">Examples</a><a href="../../../playground/">Playground</a><a href="../../../testing/">Testing</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="../../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Core</a><span aria-hidden="true">/</span><span aria-current="page">Arcane API Reference</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-api-reference">Arcane API Reference</h1><p class="doc-lead">window.Arcane is the immutable application-facing API provided by the Arcane native host bridge. Arcane applications use the same contract when hosted by We…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../">Core map</a><a href="./" aria-current="page">Arcane API</a><a href="../arcane-events/">Events</a><a href="../arcane-ai-contracts/">AI contracts</a><a href="../arcane-entities/">Entity exports</a><a href="../ollama-module/">Ollama module</a><a href="../reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/core/arcane-api.md"><p><code>window.Arcane</code> is the immutable application-facing API provided by the Arcane native host bridge. Arcane applications use the same contract when hosted by WebView2 on Microsoft NT, WebKitGTK on Linux, the Android WebView launcher bridge, or the development HTTP bridge. This is not a browser-only API: calls cross into the native Arcane runtime or platform service, and the available native operation is governed by the application&#39;s declared capabilities and host policy. This document owns the product-neutral operating-system surface; application-owned extension namespaces and methods are documented with their owning packages and participate in the same completeness check.</p>
+<p>The Android bridge is an experimental foundation. Its source controller binds one WebView to one immutable packaged entry at the exact reserved HTTPS origin and denies non-packaged navigation and resources. A generated Android application registry derives the OS bundle version plus Shell identity, entry, and grant intersection from the canonical bundle manifest and method policy registry; each application APK independently derives its app identity and version from <code>apps/&lt;id&gt;/arcane-package.json</code>. One immutable host session has no caller-supplied identity, entry, version, or grant inputs. It requires the installed package version to match the expected Shell or app identity, while <code>version.current()</code> remains the OS bundle version for every session. The controller consumes that same session entry. AndroidX WebKit injects the bridge only at that origin, and the bridge admits messages only from the main frame after checking source origin, method admission, grant where required, and replay state. The controller can be installed only once and exposes a UI-thread teardown result that distinguishes removal of native bridge authority from full WebView destruction; failed destruction remains retryable, and authority-revoked controllers cannot load or install again. This teardown does not erase the shared WebView profile, cookies, DOM storage, cache, or service-worker data. The canonical Shell receives capability-free, bound-session <code>system.ping</code>, <code>version.current</code>, and <code>app.current</code> plus <code>platform.status</code> and <code>network.status</code>. Ping returns only <code>{ok:true}</code> and does not claim health, readiness, privilege, or trust. Version and application identity are provider-free reads of the immutable session; Android application trust remains <code>unverified</code> with no publisher or revocation claim. Android network status preserves the Core meaning of <code>{ online, interfaceCount }</code> by counting interfaces with non-loopback addresses, returns no interface identity or address, bounds malformed provider results, and requires no Android permission. The reviewed mailto-only <code>external.open</code> host implementation remains unavailable to the Shell because its canonical manifest does not grant that capability. Beyond the generated bootstrap and application-specific providers, methods and URI schemes fail closed. An admitted development application host may additionally expose the package-policy-filtered local-AI, chat, and speech methods through <code>ai.inference</code>; applications without that exact admission receive none of them. Generated source authority and package-version equality are not APK-signer or runtime-session authentication. This does not establish a complete Android launcher, authenticated package/session policy, signed application catalog, persistent-profile retention/deletion policy, scoped-storage resource grant, process recovery, update, or release contract.</p>
+<p>The current debug-local-test Android distribution supersedes the earlier source-only status above: Kotlin compilation and API 35 instrumentation now pass for a HOME-eligible Shell plus 17 separately installed application APKs. Each app binds one verified packaged entry, Android identity, UID, storage scope, declared grants, and registry-derived network policy. <code>Arcane.applications.launch(id)</code> resolves only an installed generated package. Arcane Terminal alone receives the Android terminal provider, which runs bounded <code>/system/bin/sh</code> sessions under its ordinary app UID and private default working directory. This remains unsigned local evidence, not signer authentication, production release approval, update/recovery acceptance, or accessibility conformance.</p>
+<p>Every operation returns a <code>Promise</code> unless the return column says otherwise. Rejected operations use <code>Arcane.Error</code>, which exposes <code>code</code>, <code>message</code>, <code>resolution</code>, <code>diagnosticId</code>, and technical diagnostic fields when available.</p>
+<p>Parameter objects shown as optional may be omitted. Actual availability is also controlled by the application&#39;s declared capabilities and native policy.</p>
+<p>Android host installation reports whether cleanup remains required and includes the teardown result after a partial setup failure. A launcher must retain that controller and retry close rather than treating every failed installation as clean.</p>
+<h2 id="namespace-constructor-and-value-inventory">Namespace, constructor, and value inventory</h2>
+<p>This inventory covers every enumerable, non-method member exposed directly or through a namespace on <code>window.Arcane</code>. Method rows in the later sections are checked separately against the live bridge. Adding, removing, or renaming a public namespace, constructor, value, or method requires the matching reference update in the same change.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Member</th>
+<th>Kind</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Arcane.protocol</code></td>
+<td>Value</td>
+<td>Exact native bridge protocol identifier, currently <code>&quot;arcane/1&quot;</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.Error</code></td>
+<td>Constructor</td>
+<td>Normalized native/API error constructor with <code>code</code>, <code>message</code>, <code>resolution</code>, <code>diagnosticId</code>, and available technical diagnostic fields.</td>
+</tr>
+<tr>
+<td><code>Arcane.runtime</code></td>
+<td>Namespace</td>
+<td>Local renderer and detected-host surface information.</td>
+</tr>
+<tr>
+<td><code>Arcane.events</code></td>
+<td>Namespace</td>
+<td>Native event subscriptions and durable completion observation; see the <a href="../arcane-events/#event-inventory">event inventory</a> for names, delivery, hosts, triggers, and payloads.</td>
+</tr>
+<tr>
+<td><code>Arcane.ai</code></td>
+<td>Namespace</td>
+<td>Provider-neutral AI profile, model, chat, and provider-setting operations.</td>
+</tr>
+<tr>
+<td><code>Arcane.environment</code></td>
+<td>Namespace</td>
+<td>App-authorized native environment-profile operations.</td>
+</tr>
+<tr>
+<td><code>Arcane.mail</code></td>
+<td>Namespace</td>
+<td>Capability-gated native mail composition and delivery.</td>
+</tr>
+<tr>
+<td><code>Arcane.speech</code></td>
+<td>Namespace</td>
+<td>Native speech readiness, synthesis, and transcription.</td>
+</tr>
+<tr>
+<td><code>Arcane.localAI</code></td>
+<td>Namespace</td>
+<td>Native-host local-AI readiness, reconciliation, recovery, and isolated inference.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama</code></td>
+<td>Namespace</td>
+<td>Admitted native Ollama inference, inventory, policy, and model-management operations.</td>
+</tr>
+<tr>
+<td><code>Arcane.app</code></td>
+<td>Namespace</td>
+<td>Identity of the application bound to the current host session.</td>
+</tr>
+<tr>
+<td><code>Arcane.applications</code></td>
+<td>Namespace</td>
+<td>Installed-application inventory and launch operations.</td>
+</tr>
+<tr>
+<td><code>Arcane.external</code></td>
+<td>Namespace</td>
+<td>Policy-restricted requests to open external resources.</td>
+</tr>
+<tr>
+<td><code>Arcane.repository</code></td>
+<td>Namespace</td>
+<td>Application repository-service namespaces.</td>
+</tr>
+<tr>
+<td><code>Arcane.terminal</code></td>
+<td>Namespace</td>
+<td>Bounded native terminal-session lifecycle and input operations.</td>
+</tr>
+<tr>
+<td><code>Arcane.capabilities</code></td>
+<td>Namespace</td>
+<td>Capability inventory visible to the bound application.</td>
+</tr>
+<tr>
+<td><code>Arcane.platform</code></td>
+<td>Namespace</td>
+<td>Host platform and execution-evidence status.</td>
+</tr>
+<tr>
+<td><code>Arcane.permissions</code></td>
+<td>Namespace</td>
+<td>Effective permission and capability status.</td>
+</tr>
+<tr>
+<td><code>Arcane.version</code></td>
+<td>Namespace</td>
+<td>Arcane bundle version and installation status aliases.</td>
+</tr>
+<tr>
+<td><code>Arcane.machine</code></td>
+<td>Namespace</td>
+<td>Machine status available to the bound application.</td>
+</tr>
+<tr>
+<td><code>Arcane.user</code></td>
+<td>Namespace</td>
+<td>Current Arcane user identity.</td>
+</tr>
+<tr>
+<td><code>Arcane.requirements</code></td>
+<td>Namespace</td>
+<td>Requirement inventory and authorized installation operations.</td>
+</tr>
+<tr>
+<td><code>Arcane.installation</code></td>
+<td>Namespace</td>
+<td>Installation status, installation, and native uninstaller access.</td>
+</tr>
+<tr>
+<td><code>Arcane.users</code></td>
+<td>Namespace</td>
+<td>Arcane user administration and shell configuration.</td>
+</tr>
+<tr>
+<td><code>Arcane.system</code></td>
+<td>Namespace</td>
+<td>Bounded operating-system actions, metrics, health-independent ping, and failure policy.</td>
+</tr>
+<tr>
+<td><code>Arcane.network</code></td>
+<td>Namespace</td>
+<td>Privacy-bounded native network status.</td>
+</tr>
+<tr>
+<td><code>Arcane.firewall</code></td>
+<td>Namespace</td>
+<td>Firewall-only review, bounded audit, and explicitly confirmed development lifecycle simulation for the global deny policy.</td>
+</tr>
+<tr>
+<td><code>Arcane.filesystem</code></td>
+<td>Namespace</td>
+<td>Native filesystem selection operations.</td>
+</tr>
+<tr>
+<td><code>Arcane.storage</code></td>
+<td>Namespace</td>
+<td>App-scoped native key/value storage.</td>
+</tr>
+<tr>
+<td><code>Arcane.preferences</code></td>
+<td>Namespace</td>
+<td>App-scoped preference reads and atomic writes.</td>
+</tr>
+<tr>
+<td><code>Arcane.appearance</code></td>
+<td>Namespace</td>
+<td>Native appearance state and application.</td>
+</tr>
+<tr>
+<td><code>Arcane.session</code></td>
+<td>Namespace</td>
+<td>Current Arcane session lifecycle.</td>
+</tr>
+<tr>
+<td><code>Arcane.provisioning</code></td>
+<td>Namespace</td>
+<td>Provisioning-plan operations.</td>
+</tr>
+<tr>
+<td><code>Arcane.diagnostics</code></td>
+<td>Namespace</td>
+<td>Bounded diagnostic summary and record retrieval.</td>
+</tr>
+<tr>
+<td><code>Arcane.development</code></td>
+<td>Namespace</td>
+<td>Development-only inspection, context, setup, and tool installation.</td>
+</tr>
+</tbody></table>
+</div>
+<h2 id="core-and-events">Core and events</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Parameters</th>
+<th>Return</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Arcane.runtime.current()</code></td>
+<td>None</td>
+<td>Frozen <code>{connected, transport, native, managedLocalAI}</code></td>
+<td>Synchronously describes this document&#39;s detected Arcane host surface without sending an RPC.</td>
+</tr>
+<tr>
+<td><code>Arcane.events.on(eventName, listener)</code></td>
+<td><code>eventName</code>: event-name string or <code>&quot;*&quot;</code>; <code>listener</code>: callback</td>
+<td><code>() =&gt; void</code> unsubscribe function</td>
+<td>Subscribes to future deliveries from the <a href="../arcane-events/#event-inventory">event inventory</a>. A named listener receives the event data; the wildcard listener receives <code>{event, data}</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.events.once(eventName, listener)</code></td>
+<td><code>eventName</code>: event-name string; <code>listener</code>: callback</td>
+<td><code>() =&gt; void</code> unsubscribe function</td>
+<td>Subscribes to the next matching delivery and removes the listener before invoking it. It does not replay an event that already occurred.</td>
+</tr>
+<tr>
+<td><code>Arcane.events.when(eventName, listener)</code></td>
+<td><code>eventName</code>: <code>&quot;transport.ready&quot;</code> or <code>&quot;core.ready&quot;</code>; <code>listener</code>: callback</td>
+<td><code>() =&gt; void</code> unsubscribe function</td>
+<td>Subscribes to a durable lifecycle completion. A late subscriber receives the first frozen completion payload asynchronously.</td>
+</tr>
+<tr>
+<td><code>Arcane.events.completed(eventName)</code></td>
+<td><code>eventName</code>: <code>&quot;transport.ready&quot;</code> or <code>&quot;core.ready&quot;</code></td>
+<td><code>boolean</code></td>
+<td>Synchronously reports whether this document has stored the designated durable completion.</td>
+</tr>
+</tbody></table>
+</div>
+<p><code>transport.ready</code> and <code>core.ready</code> are the initial durable completions. Their
+first JSON payload is snapshotted and frozen before live callbacks run; repeated
+completions do not replace it. Ordinary events and <code>once()</code> remain future-only,
+so progress, stream, and appearance updates are never replayed as stale state.
+<code>transport.ready</code> means that this document selected a callable Arcane messaging
+surface. It does not prove host health, application authority, capability grants,
+publisher trust, or release readiness.</p>
+<p><code>Arcane.runtime.current()</code> is a local renderer snapshot, not a health,
+authorization, or trust claim. <code>connected</code> means this document initialized its
+selected messaging transport; it does not mean Core answered, a capability is
+granted, or a dependency is ready. <code>native</code> is true for WebView2, WebKitGTK, and
+Android WebView hosts. <code>managedLocalAI</code> is true only for the WebView2 and
+WebKitGTK desktop host classes that can mediate Arcane-managed local services;
+it does not report whether Ollama, speech, or any model is installed or healthy.
+Android continues to report <code>managedLocalAI:false</code>; that value must not be
+changed merely because an admitted host can proxy a user-managed Ollama
+listener. The development HTTP bridge and an ordinary standalone browser both report
+<code>native:false</code> and <code>managedLocalAI:false</code>; their transport values are
+<code>development-http</code> and <code>standalone</code>, respectively. The native transport values
+are <code>webview2</code>, <code>webkitgtk</code>, and <code>android-webview</code>. Without an app-scoped Core or
+the exact Android status response described below, an application is
+OpenAI-only. No renderer probes, lists, or calls an Ollama HTTP endpoint
+directly.</p>
+<h2 id="artificial-intelligence-and-ollama">Artificial intelligence and Ollama</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Parameters</th>
+<th>Return</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Arcane.ai.models()</code></td>
+<td>None</td>
+<td><a href="../arcane-ai-contracts/#local-ai-inventory"><code>Promise&lt;LocalAIInventory&gt;</code></a></td>
+<td>Lists raw local model inventory for Settings, Terminal, and Shell diagnostics. Application model selectors use the admitted <code>Arcane.localAI.status().models.ollama</code> catalog instead.</td>
+</tr>
+<tr>
+<td><code>Arcane.ai.chat(request)</code></td>
+<td><code>request</code>: <a href="../arcane-ai-contracts/#ai-chat-request"><code>AIChatRequest</code></a></td>
+<td><a href="../arcane-ai-contracts/#ai-chat-result"><code>Promise&lt;AIChatResult&gt;</code></a></td>
+<td>Sends a chat request through the configured provider.</td>
+</tr>
+<tr>
+<td><code>Arcane.ai.profile()</code></td>
+<td>None</td>
+<td><a href="../arcane-ai-contracts/#ai-profile"><code>Promise&lt;AIProfile&gt;</code></a></td>
+<td>Gets the effective AI profile, including its canonical conversational response-length target.</td>
+</tr>
+<tr>
+<td><code>Arcane.ai.providerSettings()</code></td>
+<td>None</td>
+<td><a href="../arcane-ai-contracts/#ai-provider-settings-result"><code>Promise&lt;AIProviderSettingsResult&gt;</code></a></td>
+<td>Gets provider selection, credential status, and the conversational response-length target.</td>
+</tr>
+<tr>
+<td><code>Arcane.ai.saveProviderSettings(settings)</code></td>
+<td><code>settings</code>: <a href="../arcane-ai-contracts/#ai-provider-settings-input"><code>AIProviderSettingsInput</code></a></td>
+<td><a href="../arcane-ai-contracts/#ai-provider-settings-result"><code>Promise&lt;AIProviderSettingsResult&gt;</code></a></td>
+<td>Saves provider settings; validates the selected model when OpenAI is selected and validates a supplied replacement credential before persistence. Ollama-selected settings may retain a dormant OpenAI model for later revalidation.</td>
+</tr>
+<tr>
+<td><code>Arcane.ai.providerModels()</code></td>
+<td>None</td>
+<td><a href="../arcane-ai-contracts/#ai-provider-model-catalog"><code>Promise&lt;AIProviderModelCatalog&gt;</code></a></td>
+<td>Queries models available to the configured OpenAI account.</td>
+</tr>
+<tr>
+<td><code>Arcane.localAI.status()</code></td>
+<td>None</td>
+<td><a href="../arcane-ai-contracts/#local-ai-status-v2"><code>Promise&lt;LocalAIStatusV2&gt;</code></a></td>
+<td>Returns the native host&#39;s authoritative package-policy-filtered catalog and readiness. Desktop Core includes native resource and speech admission. An admitted Android application host may instead return <code>providerMode:&quot;user-managed-loopback&quot;</code>; that status has no managed lifecycle, but it merges bounded native Kokoro/Whisper role health and catalog evidence while Android speech operations use the separate <code>Arcane.speech</code> bridge. Requires <code>ai.inference</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.localAI.ensurePlatform()</code></td>
+<td>None</td>
+<td><a href="../arcane-ai-contracts/#local-ai-platform-result"><code>Promise&lt;LocalAIPlatformResult&gt;</code></a></td>
+<td>Runs the Provisioner-only post-install AI reconciliation as one exclusive operation: returns an explicitly selected, configured OpenAI state without touching Ollama, or hardware-admits, ensures, and loads the managed local model according to boot settings. Requires <code>provisioning.manage</code> and the <code>provisioner</code> app type.</td>
+</tr>
+<tr>
+<td><code>Arcane.localAI.recover(request)</code></td>
+<td><code>request</code>: <a href="../arcane-ai-contracts/#local-ai-recovery-request"><code>LocalAIRecoveryRequest</code></a></td>
+<td><a href="../arcane-ai-contracts/#local-ai-recovery-result"><code>Promise&lt;LocalAIRecoveryResult&gt;</code></a></td>
+<td>Requests one privileged, exclusive, start-existing-service-only recovery of selected Arcane-managed local services. Requires <code>ai.inference</code> and explicit application admission.</td>
+</tr>
+<tr>
+<td><code>Arcane.localAI.setParallelRequests(request)</code></td>
+<td><code>request</code>: <a href="../arcane-ai-contracts/#local-ai-parallel-request-configuration"><code>LocalAIParallelRequestsRequest</code></a></td>
+<td><a href="../arcane-ai-contracts/#local-ai-parallel-request-configuration"><code>Promise&lt;LocalAIParallelRequestsResult&gt;</code></a></td>
+<td>Solves one app-owned verified model/context&#39;s maximum directly from native model and memory/resource evidence without a product ceiling, clamps a positive request to that result (<code>0</code> requests the maximum), and changes the machine-wide managed Ollama setting only when needed. A tentative change uses one fresh stopped-service snapshot before the final value is written, then Core ensures, loads, and confirms the exact model. A restart unloads resident models. Automatic mutation currently requires the dedicated <code>ai.runtime.manage</code> capability on Microsoft NT desktop Core and operating-system authorization; Linux returns administrator-managed systemd guidance, and Android user-managed loopback sessions do not invoke it.</td>
+</tr>
+<tr>
+<td><code>Arcane.speech.status()</code></td>
+<td>None</td>
+<td><a href="../arcane-ai-contracts/#speech-status"><code>Promise&lt;SpeechStatus&gt;</code></a></td>
+<td>Reads bounded, independent Kokoro and Whisper readiness through Core or an admitted Android native host. Requires <code>ai.inference</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.speech.synthesize(request)</code></td>
+<td><code>request</code>: <a href="../arcane-ai-contracts/#speech-synthesis-request"><code>SpeechSynthesisRequest</code></a></td>
+<td><a href="../arcane-ai-contracts/#speech-synthesis-result"><code>Promise&lt;SpeechSynthesisResult&gt;</code></a></td>
+<td>Synthesizes bounded local speech through the native host and fixed loopback runtime. Requires <code>ai.inference</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.speech.transcribe(request)</code></td>
+<td><code>request</code>: <a href="../arcane-ai-contracts/#speech-transcription-request"><code>SpeechTranscriptionRequest</code></a></td>
+<td><a href="../arcane-ai-contracts/#speech-transcription-result"><code>Promise&lt;SpeechTranscriptionResult&gt;</code></a></td>
+<td>Sends bounded canonical base64 bytes labeled <code>audio/webm</code> to local Whisper through the native host. The bridge validates encoding, label, and bounds; the fixed service parses the media container. Requires <code>ai.inference</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.version()</code></td>
+<td>None</td>
+<td><a href="../arcane-ai-contracts/#ollama-provider-responses"><code>Promise&lt;OllamaVersionResponse&gt;</code></a></td>
+<td>Gets the managed Ollama version for Settings, Terminal, and Shell diagnostics.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.models()</code></td>
+<td>None</td>
+<td><a href="../arcane-ai-contracts/#ollama-provider-responses"><code>Promise&lt;OllamaModelsResponse&gt;</code></a></td>
+<td>Lists the raw provider inventory envelope; it is not the application admission catalog.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.list()</code></td>
+<td>None</td>
+<td><a href="../arcane-ai-contracts/#ollama-provider-responses"><code>Promise&lt;OllamaModelsResponse&gt;</code></a></td>
+<td>Alias of the raw <code>models()</code> inventory.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.running()</code></td>
+<td>None</td>
+<td><a href="../arcane-ai-contracts/#ollama-provider-responses"><code>Promise&lt;OllamaRunningModelsResponse&gt;</code></a></td>
+<td>Lists the provider running-model envelope.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.show(model, options?)</code></td>
+<td><code>model</code>: <a href="../arcane-ai-contracts/#ollama-model-name"><code>OllamaModelName</code></a>; <code>options?</code>: <a href="../arcane-ai-contracts/#ollama-show-options"><code>OllamaShowOptions</code></a></td>
+<td><a href="../arcane-ai-contracts/#ollama-provider-responses"><code>Promise&lt;OllamaShowResponse&gt;</code></a></td>
+<td>Gets model metadata and configuration.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.generate(request, options?)</code></td>
+<td><code>request</code>: <a href="../arcane-ai-contracts/#ollama-generate-request"><code>OllamaGenerateRequest</code></a>; <code>options?</code>: <a href="../arcane-ai-contracts/#ollama-stream-controls"><code>OllamaStreamControls</code></a> or <a href="../arcane-ai-contracts/#ollama-chunk-callback"><code>OllamaChunkCallback</code></a></td>
+<td><a href="../arcane-ai-contracts/#ollama-provider-responses"><code>Promise&lt;OllamaGenerateResponse&gt;</code></a></td>
+<td>Generates text after Core re-admits the exact requested model; optionally streams chunks.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.chat(request, options?)</code></td>
+<td><code>request</code>: <a href="../arcane-ai-contracts/#ollama-chat-request"><code>OllamaChatRequest</code></a>; <code>options?</code>: <a href="../arcane-ai-contracts/#ollama-stream-controls"><code>OllamaStreamControls</code></a> or <a href="../arcane-ai-contracts/#ollama-chunk-callback"><code>OllamaChunkCallback</code></a></td>
+<td><a href="../arcane-ai-contracts/#ollama-provider-responses"><code>Promise&lt;OllamaChatResponse&gt;</code></a></td>
+<td>Runs native Ollama chat after the host re-admits the exact requested model, optionally streamed. An admitted Android host proxies only this inference operation to its user-managed fixed loopback service and exposes no model mutation or lifecycle operation.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.embed(request)</code></td>
+<td><code>request</code>: <a href="../arcane-ai-contracts/#ollama-embed-request"><code>OllamaEmbedRequest</code></a></td>
+<td><a href="../arcane-ai-contracts/#ollama-provider-responses"><code>Promise&lt;OllamaEmbedResponse&gt;</code></a></td>
+<td>Creates embeddings after Core re-admits the exact requested model.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.pull(model, options?, streamOptions?)</code></td>
+<td><code>model</code>: <a href="../arcane-ai-contracts/#ollama-model-name"><code>OllamaModelName</code></a>; <code>options?</code>: <a href="../arcane-ai-contracts/#ollama-pull-options"><code>OllamaPullOptions</code></a>; <code>streamOptions?</code>: <a href="../arcane-ai-contracts/#ollama-stream-controls"><code>OllamaStreamControls</code></a> or <a href="../arcane-ai-contracts/#ollama-chunk-callback"><code>OllamaChunkCallback</code></a></td>
+<td><a href="../arcane-ai-contracts/#raw-ollama-management-restrictions"><code>Promise&lt;never&gt;</code></a></td>
+<td>Direct application pull fails closed; Arcane&#39;s managed workflow owns integrity-bound preflight and admission.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.push(model, options?, streamOptions?)</code></td>
+<td><code>model</code>: <a href="../arcane-ai-contracts/#ollama-model-name"><code>OllamaModelName</code></a>; <code>options?</code>: <a href="../arcane-ai-contracts/#ollama-push-options"><code>OllamaPushOptions</code></a>; <code>streamOptions?</code>: <a href="../arcane-ai-contracts/#ollama-stream-controls"><code>OllamaStreamControls</code></a> or <a href="../arcane-ai-contracts/#ollama-chunk-callback"><code>OllamaChunkCallback</code></a></td>
+<td><a href="../arcane-ai-contracts/#ollama-provider-responses"><code>Promise&lt;OllamaPushResponse&gt;</code></a></td>
+<td>Pushes only a model authorized by verified application policy.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.create(request, options?)</code></td>
+<td><code>request</code>: <a href="../arcane-ai-contracts/#ollama-create-request"><code>OllamaCreateRequest</code></a>; <code>options?</code>: <a href="../arcane-ai-contracts/#ollama-stream-controls"><code>OllamaStreamControls</code></a> or <a href="../arcane-ai-contracts/#ollama-chunk-callback"><code>OllamaChunkCallback</code></a></td>
+<td><a href="../arcane-ai-contracts/#ollama-provider-responses"><code>Promise&lt;OllamaCreateResponse&gt;</code></a></td>
+<td>Creates a package-owned verified alias only after <code>from</code>, normalized <code>system</code>, and <code>parameters</code> match policy and <code>files</code>/<code>adapters</code> are absent; other admitted fields remain provider-native.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.copy(source, destination)</code></td>
+<td><code>source</code>: <a href="../arcane-ai-contracts/#ollama-model-name"><code>OllamaModelName</code></a>; <code>destination</code>: <a href="../arcane-ai-contracts/#ollama-model-name"><code>OllamaModelName</code></a></td>
+<td><a href="../arcane-ai-contracts/#raw-ollama-management-restrictions"><code>Promise&lt;never&gt;</code></a></td>
+<td>Raw application alias copy is denied; managed selection owns alias mutation.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.delete(model)</code></td>
+<td><code>model</code>: <a href="../arcane-ai-contracts/#ollama-model-name"><code>OllamaModelName</code></a></td>
+<td><a href="../arcane-ai-contracts/#ollama-provider-responses"><code>Promise&lt;OllamaDeleteResponse&gt;</code></a></td>
+<td>Deletes only a model authorized by verified application policy.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.selection()</code></td>
+<td>None</td>
+<td><a href="../arcane-ai-contracts/#arcane-model-selection"><code>Promise&lt;ArcaneModelSelection&gt;</code></a></td>
+<td>Gets Arcane&#39;s managed model preference and state.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.select(preference)</code></td>
+<td><code>preference</code>: <a href="../arcane-ai-contracts/#arcane-model-preference"><code>ArcaneModelPreference</code></a></td>
+<td><a href="../arcane-ai-contracts/#arcane-model-selection-result"><code>Promise&lt;ArcaneModelSelectionResult&gt;</code></a></td>
+<td>Selects a managed size preference and reconciles the model.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.settings()</code></td>
+<td>None</td>
+<td><a href="../arcane-ai-contracts/#arcane-model-selection"><code>Promise&lt;ArcaneModelSelection&gt;</code></a></td>
+<td>Gets Ollama runtime settings.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.saveSettings(settings)</code></td>
+<td><code>settings</code>: <a href="../arcane-ai-contracts/#arcane-ai-settings-input"><code>ArcaneAISettingsInput</code></a></td>
+<td><a href="../arcane-ai-contracts/#arcane-ai-settings-result"><code>Promise&lt;ArcaneAISettingsResult&gt;</code></a></td>
+<td>Saves only runtime-owned default-model, boot-load, keep-alive, and context settings.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.createBrain(definition)</code></td>
+<td><code>definition</code>: <a href="../arcane-ai-contracts/#arcane-brain-definition"><code>ArcaneBrainDefinition</code></a></td>
+<td><a href="../arcane-ai-contracts/#arcane-brain-result"><code>Promise&lt;ArcaneBrainResult&gt;</code></a></td>
+<td>Creates an Arcane brain model.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.serviceSettings()</code></td>
+<td>None</td>
+<td><a href="../arcane-ai-contracts/#ollama-service-settings-state"><code>Promise&lt;OllamaServiceSettingsState&gt;</code></a></td>
+<td>Gets managed Ollama service settings.</td>
+</tr>
+<tr>
+<td><code>Arcane.ollama.saveServiceSettings(settings)</code></td>
+<td><code>settings</code>: <a href="../arcane-ai-contracts/#ollama-service-settings-input"><code>OllamaServiceSettingsInput</code></a></td>
+<td><a href="../arcane-ai-contracts/#ollama-service-settings-result"><code>Promise&lt;OllamaServiceSettingsResult&gt;</code></a></td>
+<td>Saves managed service settings.</td>
+</tr>
+</tbody></table>
+</div>
+<p>The native AI profile always returns <code>responseLength</code> as <code>&quot;low&quot;</code>, <code>&quot;medium&quot;</code>,
+or <code>&quot;high&quot;</code>; missing or invalid legacy persisted values safely resolve to
+<code>&quot;medium&quot;</code>. New saves reject any other value. Conversational applications may
+use this target to augment their system prompt, but specific user requests and
+required application, structured-output, tool, safety, evidence, warning, or
+next-step content take precedence.</p>
+<p><code>Arcane.localAI.status()</code> is a native-host, non-mutating discovery and
+admission API. An abridged representative desktop Core schema-v2 result is:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>json</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-json">{
+  &quot;schemaVersion&quot;: 2,
+  &quot;runtime&quot;: {
+    &quot;kind&quot;: &quot;arcane-core&quot;,
+    &quot;nativeModelAdmission&quot;: true
+  },
+  &quot;policy&quot;: {
+    &quot;verified_only&quot;: true,
+    &quot;source&quot;: &quot;package-bound-application-policy&quot;,
+    &quot;unverifiedInferenceAuthorized&quot;: false
+  },
+  &quot;ollama&quot;: {
+    &quot;available&quot;: true,
+    &quot;modelCapabilitiesVerified&quot;: true,
+    &quot;nativeAdmissionEnforced&quot;: true,
+    &quot;errorCode&quot;: null
+  },
+  &quot;admission&quot;: {
+    &quot;policyVersion&quot;: 1,
+    &quot;enforcedBy&quot;: &quot;arcane-core&quot;,
+    &quot;evaluatedModels&quot;: 1,
+    &quot;admittedModels&quot;: 1,
+    &quot;rejected&quot;: []
+  },
+  &quot;speech&quot;: {
+    &quot;available&quot;: true,
+    &quot;reachable&quot;: true,
+    &quot;synthesisAvailable&quot;: true,
+    &quot;transcriptionAvailable&quot;: true,
+    &quot;synthesisErrorCode&quot;: null,
+    &quot;transcriptionErrorCode&quot;: null,
+    &quot;errorCode&quot;: null
+  },
+  &quot;models&quot;: {
+    &quot;ollama&quot;: [
+      {
+        &quot;id&quot;: &quot;EXAMPLE:8b&quot;,
+        &quot;name&quot;: &quot;EXAMPLE:8b&quot;,
+        &quot;provider&quot;: &quot;ollama&quot;,
+        &quot;roles&quot;: [],
+        &quot;managed&quot;: true,
+        &quot;installed&quot;: true,
+        &quot;admitted&quot;: true,
+        &quot;runnable&quot;: true,
+        &quot;creatable&quot;: false,
+        &quot;pullable&quot;: false,
+        &quot;verified&quot;: true,
+        &quot;capabilitiesVerified&quot;: true,
+        &quot;available&quot;: true,
+        &quot;modifiedAt&quot;: null,
+        &quot;sizeBytes&quot;: 1,
+        &quot;digest&quot;: null,
+        &quot;family&quot;: null,
+        &quot;parameterSize&quot;: null,
+        &quot;quantization&quot;: null,
+        &quot;compatibility&quot;: {
+          &quot;policyVersion&quot;: 1,
+          &quot;admitted&quot;: true,
+          &quot;status&quot;: &quot;compatible&quot;,
+          &quot;code&quot;: null,
+          &quot;message&quot;: &quot;EXAMPLE:8b fits the current native resource budget.&quot;,
+          &quot;resolution&quot;: null
+        }
+      }
+    ],
+    &quot;speech&quot;: [
+      {
+        &quot;id&quot;: &quot;kokoro&quot;,
+        &quot;name&quot;: &quot;Kokoro&quot;,
+        &quot;provider&quot;: &quot;speech&quot;,
+        &quot;roles&quot;: [&quot;tts&quot;],
+        &quot;available&quot;: true,
+        &quot;engine&quot;: &quot;kokoro&quot;
+      }
+    ],
+    &quot;transcription&quot;: [
+      {
+        &quot;id&quot;: &quot;whisper-small&quot;,
+        &quot;name&quot;: &quot;Whisper Small&quot;,
+        &quot;provider&quot;: &quot;speech&quot;,
+        &quot;roles&quot;: [&quot;stt&quot;],
+        &quot;available&quot;: true,
+        &quot;engine&quot;: &quot;whisper.cpp&quot;
+      }
+    ]
+  }
+}
+</code></pre></div>
+<p>The development Android variant keeps the same schema version and adds the
+exact top-level discriminator <code>providerMode:&quot;user-managed-loopback&quot;</code>. Its
+runtime kind is <code>android-user-managed-loopback</code>, <code>managedLocalAI</code> remains
+false, and <code>models.ollama</code> contains only installed package-policy models that
+passed the host&#39;s bounded provider inspection. The same status operation starts
+a concurrent bounded native speech probe and merges its actual role health and
+Kokoro/Whisper catalog into the standard speech fields without making speech
+failure hide an available Ollama catalog. The separately capability-gated
+<code>Arcane.speech</code> methods proxy the fixed host-owned loopback speech service for
+an admitted application host. Readiness calls <code>Arcane.speech.status()</code> through that bridge, while
+profile discovery consumes the merged status catalog; neither path fetches a
+loopback endpoint from the renderer. Inference uses <code>Arcane.ollama.chat</code>. No renderer makes a direct
+loopback request, and no recovery, pull, create, delete, start, stop, or repair
+method is admitted.</p>
+<p>Android Linux Terminal, Ollama, and model lifecycle remain user-owned. A plain loopback Ollama
+listener has no caller authentication, so other local applications or
+processes can call or race it. This is unsigned development behavior, not
+release support, a managed-service claim, or an isolated-inference guarantee.
+Android exposes no application-owned isolated-question or repository extension
+unless the generated package and method policy explicitly admit it.</p>
+<p>An admitted model&#39;s <code>compatibility</code> also carries the evaluated operation and
+model, actual installed model bytes, context tokens, K/V-cache estimate,
+runtime headroom, total and additional working-set requirements, available
+working-set bytes, loaded and target-resident bytes, and the individual memory
+and, for a pull, model-store checks. A rejected entry is returned as
+<code>{id, compatibility}</code> under <code>admission.rejected</code>; its compatibility record has
+<code>admitted:false</code>, <code>status:&quot;incompatible&quot;</code> or
+<code>status:&quot;evidence-unavailable&quot;</code>, a stable code, bounded message and resolution,
+and the evidence that was available. Rejected models do not appear in
+<code>models.ollama</code>.</p>
+<p>Core starts the bounded Ollama catalog, running-model inventory, and speech
+health work together and coalesces concurrent status callers. It inspects model
+metadata with bounded concurrency before admitting a candidate. A failed
+service resolves as service-local status data and does not erase the other
+service&#39;s result. <code>ollama.available</code> means the fixed catalog endpoint returned
+a valid bounded inventory; it does not mean any model passed policy or resource
+admission. Speech synthesis and transcription remain independent, and the
+fixed <code>kokoro</code> and <code>whisper-small</code> identities appear only when their respective
+health dependencies are ready.</p>
+<h3 id="package-policy-and-authoritative-model-discovery">Package policy and authoritative model discovery</h3>
+<p>The policy is authored only as
+<code>apps/&lt;id&gt;/arcane-package.json.localAIModelPolicy</code>, carried by the verified
+<code>ARCANE_APP_RELEASE.json</code> native admission record, and projected by the native
+packager only into the compiled Core <code>APP_DESCRIPTOR.aiModelPolicy</code>. It is not
+returned by <code>Arcane.app.current()</code>, <code>Arcane.capabilities.list()</code>, a browser
+manifest, a document catalog, or another browser-facing API. Renderer code does
+not consume or reconstruct it.</p>
+<p>For <code>verified_only:true</code>, Core considers only app-declared managed candidates.
+It verifies an installed alias against the exact packaged app-owned Modelfile
+before native resource admission. A missing alias can appear as <code>creatable</code>
+only when its already-installed base passes admission, or as <code>pullable</code> only
+when registry preflight supplies the integrity-bound byte and metadata evidence
+needed for pull admission. Before inference Core completes that managed
+lifecycle and re-verifies the resulting alias. The current automatic path fails
+closed when actual base bytes are unavailable before download.</p>
+<p>For <code>verified_only:false</code>, the native descriptor must also grant
+<code>ai.models.unverified.inference</code>. Core may additionally consider any
+already-installed model, using a bounded default context when the request does
+not supply one, but still admits only models whose actual bytes and metadata fit
+the current native resource evidence. Unverified access is inference-only:
+Core never pulls, creates, repairs, copies, pushes, or deletes an unverified
+model. Policy/capability disagreement fails closed during native packaging and
+again in Core.</p>
+<p>Admission derives from actual installed model bytes and model metadata,
+requested context and K/V-cache type, configured parallelism, free system and
+GPU memory with safety reserves, currently loaded models and target residency,
+and model-store free space for pulls. It does not use renderer-reported hardware
+or a GPU-name allowlist. Missing size, context, model metadata, K/V-cache inputs,
+native memory evidence, or required storage evidence rejects the model.</p>
+<p>For a missing managed base, Core preflights only a canonical Ollama library
+registry name. It bounds manifest/configuration responses, layer counts, byte
+sizes, redirects, content encoding, deadlines, cache entries, and successively
+ranged GGUF prefixes (at most 256 KiB). It SHA-256-verifies the configuration and
+its binding to the declared model layers, then extracts only the model dimensions
+needed for K/V estimation. The ranged bytes are explicitly not a full layer
+digest. After admission, Ollama must finish the full-digest-verified pull and
+Core must observe the installed base before alias creation, exact-definition
+verification, or inference. Any unavailable or inconsistent evidence fails
+closed.</p>
+<p>Applications call the method after rendering their initial UI and populate
+local-model controls from <code>models.ollama</code> in the returned order. They must not
+apply a second alias, parameter-count, family, memory, or GPU filter: Core&#39;s
+catalog is authoritative for that app and session. The method itself does not
+change a profile, choose a remote fallback, start or repair a service, pull a
+base, create an alias, or perform inference.</p>
+<p>Desktop Core admits the status catalog at one parallel request and separately
+reports <code>activeParallelRequests</code>, <code>maxAllowedParallelRequests</code>, and
+<code>activeParallelRequestsAllowed</code>. Thus a policy-valid model can remain visible
+with <code>runnable:false</code> when the current machine-wide count is too high. An
+authorized model-selection UI can also show Core&#39;s bounded
+<code>admission.rejected</code> records as disabled choices so a model is not mistaken for
+uninstalled merely because it cannot currently fit. Those records remain
+observations; only the dedicated privileged
+<code>setParallelRequests()</code> operation can change the count and load a model.</p>
+<p>The admitted catalog is part of local inference authorization, so the method
+requires <code>ai.inference</code>. Raw inventory methods require <code>ai.models.read</code> and are
+restricted to Settings, Terminal, and Shell. The admitted status API is
+unavailable to Android and to an ordinary browser without an app-scoped Core.
+Browser applications are OpenAI-only and must not probe or call Ollama directly.
+A native standalone package has its own app-scoped Core and can use the status
+method when its descriptor grants inference.</p>
+<p><code>Arcane.localAI.recover()</code> accepts only the own <code>services</code> field; an empty
+array, duplicate or unknown identifier, additional field, or unsupported
+System Platform fails before an exclusive mutation or elevation request. Core
+canonicalizes a two-service request to <code>ollama</code> then <code>speech</code>. On Microsoft NT,
+the fixed service identities are <code>ArcaneOllama</code> at
+<code>C:\Program Files\Ollama\ArcaneOllamaService.exe</code> and <code>ArcaneLocalSpeech</code> at
+<code>C:\Program Files\Arcane OS\bin\ArcaneLocalSpeechService.exe</code>. Before the first
+state change, the adapter proves every requested registration&#39;s exact command,
+<code>LocalService</code> account, automatic own-process start configuration, unrestricted
+service SID, empty dependencies, the exact service-specific environment, and
+regular fixed host. It then runs only <code>sc.exe start</code> for a verified stopped
+fixed service and rechecks the registration and fixed health proof. The method
+never installs, creates, reconfigures, stops, deletes, or changes an ACL. A
+successful service result is returned in canonical order; <code>started</code> is <code>true</code>
+only when that recovery request issued the start.</p>
+<p>The Microsoft NT development builder places the manifest-bound
+<code>ArcaneLocalSpeechService.exe</code> host and local speech runtime in the release.
+Installation or repair, not this application method, validates the activated
+files, registers <code>ArcaneLocalSpeech</code> at the fixed path as an automatic
+own-process <code>LocalService</code> with an unrestricted service SID and no dependencies
+or service environment, starts it, and requires its bounded probe. A request
+against a pre-change or damaged installation still fails closed with
+<code>LOCAL_AI_SERVICE_NOT_INSTALLED</code> and verified-repair guidance. Recovery never
+adopts an independently launched speech executable. This is development
+behavior; production signing and clean-machine promotion evidence remain
+deferred.</p>
+<p>Application-owned extension methods, schemas, repository bindings, and
+isolation policy are documented with the package that owns them. Arcane Core
+does not expose a generic Git API or infer application authority from this
+product-neutral reference.</p>
+<h2 id="applications-terminal-and-capabilities">Applications, terminal, and capabilities</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Parameters</th>
+<th>Return</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Arcane.app.current()</code></td>
+<td>None</td>
+<td><code>Promise&lt;app record&gt;</code></td>
+<td>Gets the exact bound application descriptor. Its <code>version</code> is owned by that app&#39;s <code>arcane-package.json</code>; built-in Shell and Provisioner use the OS bundle version. Android returns the immutable Shell or application-APK identity with <code>unverified</code> publisher status.</td>
+</tr>
+<tr>
+<td><code>Arcane.applications.list()</code></td>
+<td>None</td>
+<td><code>Promise&lt;{verified, securityMode, publisherTrustSource, revocationStatus, applications}&gt;</code></td>
+<td>Returns the verified installed-application catalog wrapper visible to Shell or Terminal; it is not a bare array. The RPC authority name is <code>apps.list</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.applications.launch(id)</code></td>
+<td>Canonical application ID from the current catalog</td>
+<td><code>Promise&lt;{id, accepted:true}&gt;</code></td>
+<td>Asks the host to dispatch a registered application. Acceptance does not prove that the target rendered, became ready, or remained open. The RPC authority name is <code>apps.launch</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.external.open(uri)</code></td>
+<td>Exact printable-ASCII URI without whitespace, fragments, backslashes, malformed escapes, or encoded controls; currently <code>mailto:</code> only</td>
+<td><code>Promise&lt;{opened, uri}&gt;</code></td>
+<td>Hands a validated URI to the operating system&#39;s registered default application. <code>opened: true</code> means only that the OS accepted the handoff, not that a composer opened or a message was sent. Simulation fails explicitly instead of claiming a handoff. Requires <code>external.open</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.mail.send({report, reportKey})</code></td>
+<td>Exact report with <code>type</code>, <code>subject</code>, <code>to</code>, and <code>text</code> and/or <code>html</code>; <code>reportKey</code> matches <code>[A-Za-z0-9._:-]{8,128}</code>; report JSON no larger than 786,432 bytes</td>
+<td><code>Promise&lt;{requestId,status,statusCode,sent,partial,uncertain}&gt;</code></td>
+<td>Validates and forwards one bounded request to the fixed loopback Arcane mail gateway without Core retry. The shared Mail module preflights the same native size bound. Availability requires explicit <code>mail.send</code> application admission on Microsoft NT/Linux Core hosts; Android does not project this method, and simulation fails explicitly.</td>
+</tr>
+<tr>
+<td><code>Arcane.terminal.start(options?)</code></td>
+<td><code>options?</code>: <code>{shell=&quot;auto&quot;, cwd=&quot;&quot;, columns=120, rows=32}</code>; shell is <code>auto</code>, <code>powershell</code>, <code>cmd</code>, <code>bash</code>, or <code>sh</code>; columns 20–500; rows 5–200</td>
+<td><code>Promise&lt;{id,shell,cwd,title,columns,rows,createdAt}&gt;</code></td>
+<td>Starts one of at most eight app-owned native terminal sessions. Requires <code>terminal.execute</code>, app id <code>terminal</code>, and a Core or Android host.</td>
+</tr>
+<tr>
+<td><code>Arcane.terminal.list()</code></td>
+<td>None</td>
+<td><code>Promise&lt;{sessions: Array&lt;{id,shell,cwd,columns,rows,createdAt,state}&gt;}&gt;</code></td>
+<td>Lists the current app-owned sessions; it returns a wrapper object, not a bare array. Requires <code>terminal.execute</code>, app id <code>terminal</code>, and a Core or Android host.</td>
+</tr>
+<tr>
+<td><code>Arcane.terminal.write(sessionId, data)</code></td>
+<td><code>sessionId</code>: 1–128-character session identifier; <code>data</code>: 1–65,536 UTF-8 bytes</td>
+<td><code>Promise&lt;{sessionId,accepted:true,bytes}&gt;</code></td>
+<td>Writes one input chunk. Output is delivered separately through <code>terminal.output</code>, so subscribe before starting a session and correlate chunks by <code>sessionId</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.terminal.resize(sessionId, columns, rows)</code></td>
+<td><code>sessionId</code>; <code>columns</code>: 20–500; <code>rows</code>: 5–200</td>
+<td><code>Promise&lt;{sessionId,columns,rows,accepted:true,emulated:true}&gt;</code></td>
+<td>Updates the session dimensions. The current hosts record an emulated resize rather than claiming a native pseudo-terminal resize.</td>
+</tr>
+<tr>
+<td><code>Arcane.terminal.signal(sessionId, signal=&quot;interrupt&quot;)</code></td>
+<td><code>sessionId</code>; <code>signal</code>: <code>&quot;interrupt&quot;</code> or <code>&quot;terminate&quot;</code></td>
+<td><code>Promise&lt;{sessionId,signal,accepted}&gt;</code></td>
+<td>Requests a supported control signal. <code>accepted</code> reports process-controller acceptance, not process exit; observe <code>terminal.exit</code> for completion.</td>
+</tr>
+<tr>
+<td><code>Arcane.terminal.close(sessionId)</code></td>
+<td><code>sessionId</code>: 1–128-character session identifier</td>
+<td><code>Promise&lt;{sessionId,accepted:true}&gt;</code></td>
+<td>Closes input and requests session termination. The resolved value acknowledges the request; observe <code>terminal.exit</code> for actual process completion.</td>
+</tr>
+<tr>
+<td><code>Arcane.capabilities.list()</code></td>
+<td>None</td>
+<td><code>Promise&lt;{app, grants, methods}&gt;</code></td>
+<td>Returns the current Core-bound application descriptor, grants, and exact allowed RPC names. Android callers use <code>Arcane.platform.status().capabilities</code>; the direct method is not projected there.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Terminal output and lifecycle changes are event-driven. The canonical <a href="../arcane-events/#event-inventory">Arcane event inventory</a> defines <code>terminal.output</code>, <code>terminal.exit</code>, and the Android <code>terminal.error</code> payload. The shared <code>TerminalClient</code> adapter correlates those deliveries with owned sessions and re-emits DOM events for reusable UI code.</p>
+<h2 id="platform-installation-users-and-system">Platform, installation, users, and system</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Parameters</th>
+<th>Return</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Arcane.platform.status()</code></td>
+<td>None</td>
+<td><code>Promise&lt;status&gt;</code></td>
+<td>Gets native platform status.</td>
+</tr>
+<tr>
+<td><code>Arcane.permissions.status()</code></td>
+<td>None</td>
+<td><code>Promise&lt;status&gt;</code></td>
+<td>Gets permission/elevation status.</td>
+</tr>
+<tr>
+<td><code>Arcane.version.current()</code></td>
+<td>None</td>
+<td><code>Promise&lt;string&gt;</code></td>
+<td>Gets the Arcane OS bundle/host version bound to this session. It does not become an application&#39;s independently owned version and is not signer, update, or RC attestation.</td>
+</tr>
+<tr>
+<td><code>Arcane.version.installation()</code></td>
+<td>None</td>
+<td><code>Promise&lt;installation status&gt;</code></td>
+<td>Alias-like access to installation status.</td>
+</tr>
+<tr>
+<td><code>Arcane.machine.status()</code></td>
+<td>None</td>
+<td><code>Promise&lt;status&gt;</code></td>
+<td>Gets machine readiness/status.</td>
+</tr>
+<tr>
+<td><code>Arcane.user.current()</code></td>
+<td>None</td>
+<td><code>Promise&lt;{identityKind, username, accountName, displayName, source}&gt;</code></td>
+<td>Gets the privacy-minimized bound identity. Microsoft NT/Linux return a <code>host-account</code>; Android returns an anonymous <code>local-session</code> with null account identifiers. Requires <code>identity.read</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.requirements.list()</code></td>
+<td>None</td>
+<td><code>Promise&lt;requirement[]&gt;</code></td>
+<td>Lists installation requirements.</td>
+</tr>
+<tr>
+<td><code>Arcane.requirements.ensure(requirementIds, options?)</code></td>
+<td>Array of requirement IDs; omitted, <code>null</code>, or empty selects required requirements only; <code>options.userProcessInterruption</code> is exactly <code>deny</code> or <code>allow</code> and defaults to <code>deny</code></td>
+<td><code>Promise&lt;{requirements, operation, credentials}&gt;</code></td>
+<td>Ensures the selected requirements are installed/configured. The guarded Provisioner-open Ollama reconciliation always uses <code>deny</code>; only the separately confirmed close-and-retry action uses <code>allow</code>, and the native handoff still re-proves exact process and port identity before any interruption.</td>
+</tr>
+<tr>
+<td><code>Arcane.installation.status()</code></td>
+<td>None</td>
+<td><code>Promise&lt;status&gt;</code></td>
+<td>Gets installation state.</td>
+</tr>
+<tr>
+<td><code>Arcane.installation.ensure()</code></td>
+<td>None</td>
+<td><code>Promise&lt;result&gt;</code></td>
+<td>Ensures the Arcane installation reaches its required state.</td>
+</tr>
+<tr>
+<td><code>Arcane.installation.openUninstaller()</code></td>
+<td>None</td>
+<td><code>Promise&lt;{opened:true}&gt;</code></td>
+<td>Microsoft NT Provisioner only. Opens the globally installed <code>C:\Program Files\Arcane OS\bin\ArcaneUninstaller.exe</code>; it never uninstalls through checkout-local code. <code>opened</code> means Windows accepted creation of the installed uninstaller process. The controller separately owns UAC, read-only preflight, scope review, and typed confirmation.</td>
+</tr>
+<tr>
+<td><code>Arcane.users.list()</code></td>
+<td>None</td>
+<td><code>Promise&lt;{users, policy, protectedUsernames}&gt;</code></td>
+<td>Lists supported local users plus the platform username policy and accounts the Provisioner must not convert.</td>
+</tr>
+<tr>
+<td><code>Arcane.users.validate(usernames)</code></td>
+<td>Username or array</td>
+<td><code>Promise&lt;{valid, users, errors, policy}&gt;</code></td>
+<td>Validates candidate usernames without changing an account.</td>
+</tr>
+<tr>
+<td><code>Arcane.users.add(usernames)</code></td>
+<td>Username or array</td>
+<td><code>Promise&lt;{users, operation, credentials}&gt;</code></td>
+<td>Creates/configures local Arcane users and returns sensitive temporary credentials for protected presentation.</td>
+</tr>
+<tr>
+<td><code>Arcane.users.activate(username)</code></td>
+<td>Username</td>
+<td><code>Promise&lt;{user, operation, credentials}&gt;</code></td>
+<td>Activates a staged configured user.</td>
+</tr>
+<tr>
+<td><code>Arcane.users.resetPassword(username)</code></td>
+<td>Username</td>
+<td><code>Promise&lt;{user, operation, credentials}&gt;</code></td>
+<td>Prepares a temporary credential but does not change the operating-system password; apply it with <code>users.applyPassword()</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.users.applyPassword(username, temporaryPassword)</code></td>
+<td>Username; exact temporary password from the current workflow</td>
+<td><code>Promise&lt;{user, operation, credentials}&gt;</code></td>
+<td>Performs the privileged native password mutation and forces change at next sign-in.</td>
+</tr>
+<tr>
+<td><code>Arcane.users.verifyShell(username)</code></td>
+<td>Username</td>
+<td><code>Promise&lt;{user, operation, credentials}&gt;</code></td>
+<td>Verifies the user&#39;s Arcane shell configuration.</td>
+</tr>
+<tr>
+<td><code>Arcane.users.restoreShell(username)</code></td>
+<td>Username</td>
+<td><code>Promise&lt;{user, operation, credentials}&gt;</code></td>
+<td>Restores the recorded supported shell configuration.</td>
+</tr>
+<tr>
+<td><code>Arcane.system.lock()</code></td>
+<td>None</td>
+<td><code>Promise&lt;result&gt;</code></td>
+<td>Locks the operating-system session.</td>
+</tr>
+<tr>
+<td><code>Arcane.system.ping()</code></td>
+<td>None</td>
+<td><code>Promise&lt;{ok:true}&gt;</code></td>
+<td>Confirms only that the bound host bridge admitted and answered the request. It does not claim dependency readiness, system health, privilege, signer trust, or release-candidate status.</td>
+</tr>
+<tr>
+<td><code>Arcane.system.metrics()</code></td>
+<td>None</td>
+<td><code>Promise&lt;metrics&gt;</code></td>
+<td>Gets allowed machine metrics.</td>
+</tr>
+<tr>
+<td><code>Arcane.system.failurePolicy()</code></td>
+<td>None</td>
+<td><code>Promise&lt;{failFast:boolean}&gt;</code></td>
+<td>Gets the user-wide verification behavior. <code>failFast</code> defaults to <code>false</code>; application-owned repository readers may use it to choose validated-subset warnings or immediate rejection. Settings only.</td>
+</tr>
+<tr>
+<td><code>Arcane.system.saveFailurePolicy(settings)</code></td>
+<td><code>{failFast:boolean}</code></td>
+<td><code>Promise&lt;{failFast:boolean}&gt;</code></td>
+<td>Saves warn-first (<code>false</code>) or fail-fast (<code>true</code>) behavior. The preference does not expose quarantined documents or relax repository-write validation. Settings only.</td>
+</tr>
+<tr>
+<td><code>Arcane.network.status()</code></td>
+<td>None</td>
+<td><code>Promise&lt;{online, interfaceCount}&gt;</code></td>
+<td>Counts interfaces with at least one non-loopback address. <code>online</code> does not claim Internet, DNS, captive-portal, route, or service reachability.</td>
+</tr>
+<tr>
+<td><code>Arcane.firewall.status()</code></td>
+<td>None</td>
+<td><code>Promise&lt;FirewallStatus&gt;</code></td>
+<td>Firewall-app-only status for the canonical policy, Arcane-owned platform plan/state, projection, audit count, limitations, supported lifecycle operations, and fail-closed <code>installReady</code>/<code>enableReady</code> evidence. Current non-simulation status is unsupported; simulation is labeled and never claims machine-wide coverage. Requires <code>firewall.read</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.firewall.audit(options?)</code></td>
+<td>Optional <code>{limit}</code> integer from 1 through 200</td>
+<td><code>Promise&lt;FirewallAudit&gt;</code></td>
+<td>Returns bounded lifecycle and owned-state metadata, not packet payloads or complete per-packet attribution. Requires <code>firewall.read</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.firewall.install(expectation)</code></td>
+<td><code>{expectedPolicyGeneration, expectedStateGeneration}</code></td>
+<td><code>Promise&lt;FirewallOperationResult&gt;</code></td>
+<td>After separate user confirmation, stages the reviewed global-deny projection in deterministic development simulation. Domain projection may use bounded system DNS and admits at most 4,096 domain rules; status disables Install before confirmation when the canonical policy exceeds that native ceiling. Live mutation is unavailable. Requires <code>firewall.manage</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.firewall.enable(expectation)</code></td>
+<td><code>{expectedPolicyGeneration, expectedStateGeneration}</code></td>
+<td><code>Promise&lt;FirewallOperationResult&gt;</code></td>
+<td>After confirmation, enables only the exact installed, unexpired projection in simulation; it does not resolve or silently replace policy. Requires <code>firewall.manage</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.firewall.disable(expectation)</code></td>
+<td><code>{expectedPolicyGeneration, expectedStateGeneration}</code></td>
+<td><code>Promise&lt;FirewallOperationResult&gt;</code></td>
+<td>After confirmation, disables only Arcane-owned simulation state. Requires <code>firewall.manage</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.firewall.rollback(expectation)</code></td>
+<td><code>{expectedPolicyGeneration, expectedStateGeneration}</code></td>
+<td><code>Promise&lt;FirewallOperationResult&gt;</code></td>
+<td>After confirmation, restores only an unexpired retained projection for the current canonical policy when it preserves every current deny. Requires <code>firewall.manage</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.firewall.recover(expectation)</code></td>
+<td><code>{expectedPolicyGeneration, expectedStateGeneration}</code></td>
+<td><code>Promise&lt;FirewallOperationResult&gt;</code></td>
+<td>After confirmation, reconciles only Arcane-owned simulation state; divergence blocks other lifecycle actions. Requires <code>firewall.manage</code>.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Core-backed <code>platform.status</code> and <code>machine.status</code> records include <code>execution.hostPlatform</code>, <code>execution.effectivePlatform</code>, <code>execution.simulation</code>, and <code>execution.evidenceClass</code>. The Android bridge returns the same execution fields with <code>application-host</code> evidence. A simulated effective platform is test evidence only; no simulation or source-only Android assertion is real-host, publisher, signing, or release-candidate evidence.</p>
+<p>The native desktop contract retains the technical compatibility values <code>platform: &quot;windows&quot;</code> and <code>rawPlatform: &quot;win32&quot;</code>; user-facing interfaces present that family as <strong>Microsoft NT</strong>. <code>arcane/modules/SystemPlatformPresentation.js</code> maps the verified status to <code>Microsoft NT</code> or <code>Linux</code> and applies <code>arcane-kernel-nt</code> or <code>arcane-kernel-linux</code>, plus <code>data-arcane-kernel</code>, to the document root. Those DOM values exist only for presentation and CSS. They must never grant a capability, establish release trust, select a native adapter, or substitute for <code>Arcane.permissions.status()</code> and host-verified execution evidence.</p>
+<p>The canonical authority registry in <code>machine_bundles/arcane-os-machine-bundle/src/api/method-policies.json</code> defines the current RPC surface. The canonical semantic definitions for the shared or contract-bound methods live in <code>machine_bundles/arcane-os-machine-bundle/src/api/method-contracts.json</code>. They are deliberately separate from method authority policy: semantic effect metadata cannot grant a capability, admit an application or host, or imply privilege. Core executes the closed input/output validators at its request and response boundaries. Android consumes separately generated semantic constants for its admitted cross-host subset and validates or constructs the corresponding results; Core alone consumes the fixed-loopback mail contract. The exact unsigned-debug Android distribution now has Kotlin build parity and API 35 Launcher, Browser, and Terminal instrumentation evidence. The registry remains a partial vertical slice: privacy-safe audit and confirmation infrastructure, definitions for the remaining Core-only methods, production signing, real-device conformance, and candidate review are still required.</p>
+<h2 id="filesystem-storage-preferences-and-appearance">Filesystem, storage, preferences, and appearance</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Parameters</th>
+<th>Return</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Arcane.filesystem.selectDirectory(options?)</code></td>
+<td><code>options?</code>: <code>{title?, initialPath?}</code>; title up to 200 plain-text characters; initial path must be an existing absolute directory</td>
+<td><code>Promise&lt;{cancelled:boolean, path:string|null}&gt;</code></td>
+<td>Opens the native directory picker after a user action. It returns one canonical existing directory or explicit cancellation; it does not enumerate or grant access to directory contents. Requires <code>filesystem.directory.select</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.storage.list()</code></td>
+<td>None</td>
+<td><code>Promise&lt;{keys:string[], usedBytes:number, maximumBytes:1048576}&gt;</code></td>
+<td>Lists sorted keys and quota use for the current application&#39;s isolated native storage. Requires <code>storage.read</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.storage.get(key)</code></td>
+<td><code>key</code>: 1–128-character app-storage key</td>
+<td><code>Promise&lt;{key, found:boolean, value}&gt;</code></td>
+<td>Reads one app-scoped JSON value. A missing key resolves with <code>found:false,value:null</code>. Requires <code>storage.read</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.storage.set(key, value)</code></td>
+<td><code>key</code>; JSON-compatible <code>value</code> up to 131,072 encoded bytes</td>
+<td><code>Promise&lt;{key, value, bytes, totalBytes, maximumBytes}&gt;</code></td>
+<td>Atomically writes one app-scoped value under the 1 MiB total quota. Requires <code>storage.write</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.storage.delete(key)</code></td>
+<td><code>key</code>: 1–128-character app-storage key</td>
+<td><code>Promise&lt;{key, deleted:boolean, totalBytes, maximumBytes}&gt;</code></td>
+<td>Deletes one app-scoped value; an absent key resolves with <code>deleted:false</code>. Requires <code>storage.write</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.preferences.list()</code></td>
+<td>None</td>
+<td><code>Promise&lt;{keys:string[], usedBytes:number, maximumBytes:1048576}&gt;</code></td>
+<td>Lists sorted keys and quota use for the current application&#39;s isolated preferences. Requires <code>preferences.read</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.preferences.get(key)</code></td>
+<td><code>key</code>: 1–128-character preference key</td>
+<td><code>Promise&lt;{key, found:boolean, value}&gt;</code></td>
+<td>Reads one preference. A missing key resolves with <code>found:false,value:null</code>. Requires <code>preferences.read</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.preferences.set(key, value)</code></td>
+<td><code>key</code>; JSON-compatible <code>value</code> up to 131,072 encoded bytes</td>
+<td><code>Promise&lt;{key, value, bytes, totalBytes, maximumBytes}&gt;</code></td>
+<td>Atomically writes one preference under the 1 MiB total quota. Requires <code>preferences.write</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.preferences.setMany(entries)</code></td>
+<td>Plain object containing one to 32 preference key/value entries</td>
+<td><code>Promise&lt;{keys, count, bytes, totalBytes, maximumBytes}&gt;</code></td>
+<td>Validates the complete bounded batch and writes it atomically; no preference changes when any entry is invalid. Requires <code>preferences.write</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.preferences.delete(key)</code></td>
+<td><code>key</code>: 1–128-character preference key</td>
+<td><code>Promise&lt;{key, deleted:boolean, totalBytes, maximumBytes}&gt;</code></td>
+<td>Deletes one preference; an absent key resolves with <code>deleted:false</code>. Requires <code>preferences.write</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.environment.list()</code></td>
+<td>None</td>
+<td><code>Promise&lt;{platform, pathSupported, maximumEntries, valueMaximumLength, persistence, entries}&gt;</code></td>
+<td>Lists the native Arcane environment profile. Ordinary values are returned; protected values are exactly <code>•••••</code>. Requires <code>environment.read</code> and explicit application admission.</td>
+</tr>
+<tr>
+<td><code>Arcane.environment.get(name)</code></td>
+<td><code>name</code>: environment-variable name</td>
+<td><code>Promise&lt;{entry}&gt;</code></td>
+<td>Gets one configured entry. This is the deliberate plaintext-reveal operation: a protected entry&#39;s real value crosses the native bridge to the authorized renderer. Requires the separate <code>environment.protected.read</code> capability.</td>
+</tr>
+<tr>
+<td><code>Arcane.environment.set(name, value, options?)</code></td>
+<td><code>name</code>: environment-variable name; <code>value</code>: string up to 32,767 characters generally, but a Linux protected value is limited by the 8,191-byte encoded Secret Service payload (about 6,126 ASCII value bytes); <code>options.protected?</code>: Boolean</td>
+<td><code>Promise&lt;{entry}&gt;</code></td>
+<td>Creates or replaces a desktop user-scoped or Android app-scoped entry. Android rejects <code>PATH</code>; the SDK defaults sensitive-looking names to protected storage, and the returned protected value remains <code>•••••</code>. Requires <code>environment.write</code> and explicit application admission.</td>
+</tr>
+<tr>
+<td><code>Arcane.environment.remove(name)</code></td>
+<td><code>name</code>: environment-variable name</td>
+<td><code>Promise&lt;{name, deleted:true}&gt;</code></td>
+<td>Deletes one configured entry. Requires <code>environment.write</code> and explicit application admission.</td>
+</tr>
+<tr>
+<td><code>Arcane.appearance.current()</code></td>
+<td>None</td>
+<td><code>Promise&lt;{supported, platform, scheme, effectiveScheme, captionColor, textColor}&gt;</code></td>
+<td>Gets the current native appearance state. Requires <code>appearance.read</code>; Linux currently reports <code>supported:false</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.appearance.apply(appearance)</code></td>
+<td><code>{scheme?:&quot;system&quot;|&quot;light&quot;|&quot;dark&quot;, captionColor?, textColor?}</code> with custom colors in <code>rgb(r, g, b)</code> form</td>
+<td><code>Promise&lt;{supported, platform, scheme, effectiveScheme, captionColor, textColor}&gt;</code></td>
+<td>Applies supported current-user native appearance values and returns the resulting state. Requires <code>appearance.write</code>; Linux currently reports unsupported without claiming a mutation.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="environment-profile-contract">Environment profile contract</h3>
+<p>The public SDK is positional and constructs closed RPC parameter objects:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const inventory = await Arcane.environment.list();
+const saved = await Arcane.environment.set(
+  &#39;EXAMPLE_API_KEY&#39;,
+  &#39;synthetic-development-value&#39;,
+  { protected: true }
+);
+const revealed = await Arcane.environment.get(&#39;EXAMPLE_API_KEY&#39;);
+const removed = await Arcane.environment.remove(&#39;EXAMPLE_API_KEY&#39;);
+</code></pre></div>
+<p>The corresponding native requests are exactly <code>{}</code>, <code>{name}</code>,
+<code>{name,value,protected}</code>, and <code>{name}</code>. Unknown or missing fields are rejected.
+<code>protected</code> is a Boolean in the native set request. If the SDK caller omits the
+options object, the SDK derives that Boolean from the sensitive-name policy;
+callers should pass <code>{protected:true}</code> or <code>{protected:false}</code> when their data
+classification is already known.</p>
+<p>An environment entry has this exact application-facing shape:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">{
+  name: &#39;EXAMPLE_API_KEY&#39;,
+  scope: &#39;user&#39;,
+  protected: true,
+  configured: true,
+  value: &#39;•••••&#39;
+}
+</code></pre></div>
+<p><code>list()</code> returns
+<code>{platform,pathSupported,maximumEntries,valueMaximumLength,persistence,entries}</code>.
+<code>get()</code> and <code>set()</code> return <code>{entry}</code>. <code>remove()</code> returns
+<code>{name,deleted:true}</code>. <code>configured</code> is always <code>true</code> for a returned entry; a
+missing <code>get()</code> or <code>remove()</code> rejects with <code>ENVIRONMENT_ENTRY_NOT_FOUND</code>.
+Empty-string values are valid and are not deletion.</p>
+<p><code>list()</code> returns an ordinary entry&#39;s actual value, but replaces every protected
+value with exactly five U+2022 bullet characters (<code>•••••</code>). <code>set()</code> applies the
+same mask to its protected result. Only an explicit <code>get(name)</code> returns a
+protected value in plaintext. That reveal is intentional and is why
+<code>environment.get</code> has the separate <code>environment.protected.read</code> capability.
+The value then exists in the authorized renderer and process memory; the mask is a
+display and data-minimization control, not encryption or authorization.</p>
+<p>Names must match <code>^[A-Za-z_][A-Za-z0-9_.-]{0,127}$</code>; values are strings of no
+more than 32,767 characters and cannot contain a null character. A profile has
+at most 256 entries. The current profiles use case-insensitive identity for
+replacement and preserve the most recently supplied display spelling. Names
+whose uppercase separator-delimited tokens include <code>KEY</code>, <code>KEYS</code>, <code>TOKEN</code>,
+<code>TOKENS</code>, <code>SECRET</code>, <code>SECRETS</code>, <code>PASSWORD</code>, <code>PASSWORDS</code>, <code>PASS</code>, <code>PASSWD</code>, <code>PWD</code>,
+<code>CREDENTIAL</code>, <code>CREDENTIALS</code>, <code>AUTH</code>, or <code>BEARER</code> are treated as sensitive. The conservative heuristic also recognizes
+separated or compact API-key, access-key/access-token, auth-key/auth-token,
+private-key, and client-secret variants, including <code>APIKEY</code>, <code>ACCESSKEY</code>,
+<code>ACCESSTOKEN</code>, <code>AUTHKEY</code>, <code>AUTHTOKEN</code>, <code>PRIVATEKEY</code>, and <code>CLIENTSECRET</code> forms.
+Matching names must be protected; <code>protected:false</code> is rejected for them.
+<code>PATH</code> is executable-discovery configuration and must remain ordinary;
+<code>environment.set</code> rejects <code>{protected:true}</code> for that exact name.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Entry scope</th>
+<th align="right"><code>pathSupported</code></th>
+<th>Ordinary storage</th>
+<th>Protected storage</th>
+<th><code>persistence</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Microsoft NT (<code>windows</code>)</td>
+<td><code>user</code></td>
+<td align="right"><code>true</code></td>
+<td>Current user&#39;s <code>HKCU\Environment</code> values with exact string-kind verification and compensating rollback</td>
+<td>Current-user DPAPI-protected Arcane record; inventory strips protected plaintext inside the helper</td>
+<td><code>windows-current-user-environment</code></td>
+</tr>
+<tr>
+<td>Linux</td>
+<td><code>user</code></td>
+<td align="right"><code>true</code></td>
+<td>Arcane-managed current-user profile</td>
+<td>Freedesktop Secret Service through <code>secret-tool</code>; no plaintext fallback</td>
+<td><code>arcane-managed-current-user-environment</code></td>
+</tr>
+<tr>
+<td>Android</td>
+<td><code>app</code></td>
+<td align="right"><code>false</code></td>
+<td>Host-package private app storage</td>
+<td>AES-GCM ciphertext whose key is held by Android Keystore</td>
+<td><code>android-app-encrypted-environment</code></td>
+</tr>
+</tbody></table>
+</div>
+<p>Desktop Core serializes all four environment operations through one bounded
+32-request process-local queue and one current-user cross-process lease, so an
+inventory or reveal in another app-scoped Core cannot race a mutation. Core
+releases and verifies the lease before returning success. A live owner returns
+<code>ENVIRONMENT_OPERATION_BUSY</code>; a dead or invalid owner is preserved and returns
+<code>ENVIRONMENT_RECOVERY_REQUIRED</code> rather than being reclaimed across an uncertain
+two-store transition. <code>set()</code> and <code>remove()</code> also retain the global
+exclusive-mutation boundary. Native set results must match the requested name,
+protection decision, and exact ordinary value or protected five-bullet mask
+before Core returns them.
+Microsoft NT rejects a protected-record/plaintext-registry shadow. Linux binds
+new protected values to a random Secret Service generation in a namespace that
+does not overlap legacy entries, fsyncs the metadata file and directory before
+cleaning the prior generation, and keeps legacy lookup compatibility.
+Failure to verify candidate, prior-generation, or deletion cleanup rejects with
+<code>ENVIRONMENT_PROTECTED_CLEANUP_FAILED</code>. Linux post-rename durability ambiguity
+rejects with <code>ENVIRONMENT_METADATA_COMMIT_UNCERTAIN</code>. Native code retains
+bounded cleanup and mutation-uncertainty detail internally, but the renderer&#39;s
+normalized <code>Arcane.Error</code> currently exposes the public error code rather than
+those internal fields. Treat either code as uncertain, refresh inventory, and
+do not blindly retry. Android returns
+<code>ANDROID_ENVIRONMENT_STORAGE_UNCERTAIN</code> if its synchronous profile commit cannot
+prove persistence.</p>
+<p>The Linux <code>secret-tool</code> path accepts at most 8,191 bytes for Arcane&#39;s complete
+prefixed Base64 payload (6,126 ASCII value bytes; fewer for multibyte UTF-8).
+Larger Linux protected values reject with
+<code>ENVIRONMENT_PROTECTED_VALUE_TOO_LARGE</code>; ordinary values and other platforms
+retain the general contract bound. A nonzero Secret Service lookup is treated
+as storage unavailable because the CLI does not distinguish absence from an
+unavailable or locked service reliably.</p>
+<p>On Microsoft NT, an ordinary <code>PATH</code> is the current user&#39;s registry value; a
+successful mutation broadcasts the platform environment-change notification,
+but already-running processes do not thereby receive a rewritten environment.
+On Linux, <code>PATH</code> belongs to the Arcane-managed user profile rather than silently
+rewriting a shell startup file. Android does not expose a mutable operating-
+system user PATH: <code>PATH</code> get, set, and remove requests are rejected and the list
+metadata reports <code>pathSupported:false</code>.</p>
+<p>The method policies admit these operations only to explicitly authorized
+application IDs on Core and Android hosts. <code>list()</code> requires
+<code>environment.read</code>; <code>get()</code> requires <code>environment.protected.read</code>; and <code>set()</code>
+plus <code>remove()</code> require <code>environment.write</code> and run as exclusive mutations.
+Desktop reads and writes also share the bounded serialized environment queue.
+The owning application reference records the concrete admission and UI boundary.</p>
+<p>Native storage and preferences resolve below
+<code>&lt;state-root&gt;/Arcane OS/apps/&lt;application-id&gt;/</code> as <code>storage.json</code> and
+<code>preferences.json</code>. The host-bound canonical app ID selects the folder; callers
+cannot provide a different identity. Browser OPFS follows
+<code>apps/&lt;application-id&gt;/...</code>, DBLS fallback keys use
+<code>arcane.apps.&lt;application-id&gt;:</code>, and native browser profiles are also app-owned.
+Unowned legacy global data is preserved but not guessed into an app. The complete
+layout and same-origin browser limitation are maintained in the repository-only
+<a href="https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/application-data-isolation.md" target="_blank" rel="noreferrer">Application data isolation</a>; see the public <a href="https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/apps/docs/guides/repository-access.md#private-developer-material" target="_blank" rel="noreferrer">repository-access boundary</a>.</p>
+<h2 id="session-provisioning-diagnostics-and-development">Session, provisioning, diagnostics, and development</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Parameters</th>
+<th>Return</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Arcane.session.logout()</code></td>
+<td>None</td>
+<td><code>Promise&lt;{requested:true, accepted:true, simulated:true, command, args}|{requested:true, accepted:true, simulated:false, command, pid}&gt;</code></td>
+<td>Requests logout of the current host operating-system session. This is not an Arcane-only application exit, and acceptance does not prove logout completed. Shell-only; requires <code>session.control</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.provisioning.plan(usernames)</code></td>
+<td>Username or array</td>
+<td><code>Promise&lt;{ok, version, installation, requirements, users, usernamePolicy, elevated, simulation, blocked, steps}&gt;</code></td>
+<td>Creates a current read-only provisioning plan without applying it. Provisioner-only; requires <code>provisioning.manage</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.diagnostics.recentErrors()</code></td>
+<td>None</td>
+<td><code>Promise&lt;diagnostic[]&gt;</code></td>
+<td>Lists up to 60 recent in-memory structured Core errors, newest first. Requires <code>diagnostics.read</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.diagnostics.get(diagnosticId)</code></td>
+<td>Opaque diagnostic ID from a recent error</td>
+<td><code>Promise&lt;diagnostic&gt;</code></td>
+<td>Gets one current in-memory diagnostic record or rejects after it is evicted. Requires <code>diagnostics.read</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.development.inspect(root)</code></td>
+<td>Existing absolute canonical Arcane checkout root</td>
+<td><code>Promise&lt;{root, runtimeVersion, repository, git, tools, signing, readiness}&gt;</code></td>
+<td>Read-only inspection of an approved development workspace. Developer-only; requires <code>development.read</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.development.context(root, query)</code></td>
+<td>Approved checkout root; 1–4,096-character query</td>
+<td><code>Promise&lt;{root, query, files, totals}&gt;</code></td>
+<td>Gets redacted context from at most ten tracked safe text files, bounded to 6,144 characters per file and 49,152 characters overall. Developer-only; requires <code>development.read</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.development.setup(root, taskId)</code></td>
+<td>Checkout root; <code>root-dependencies</code>, <code>machine-dependencies</code>, <code>git-hooks</code>, or <code>windows-signing</code></td>
+<td><code>Promise&lt;{root, taskId, completed:true, exitCode, operation}&gt;</code></td>
+<td>Runs one inspected allowlisted development setup task with operation progress. Developer-only; requires <code>development.manage</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.development.installNode()</code></td>
+<td>None</td>
+<td><code>Promise&lt;{installed, simulated, node, operation}&gt;</code></td>
+<td>Installs and verifies the supported Node.js 22+ development runtime on Microsoft NT. Developer-only privileged mutation; requires <code>development.manage</code>.</td>
+</tr>
+</tbody></table>
+</div>
+<h2 id="maintenance-rule">Maintenance rule</h2>
+<p>The source of truth for the application-facing native bridge API is <code>machine_bundles/arcane-os-machine-bundle/src/frontend/shared/arcane-api.js</code>. Follow the repository-only <a href="https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/developer-reference-sop.md" target="_blank" rel="noreferrer">Developer Reference Maintenance SOP</a> (see <a href="https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/apps/docs/guides/repository-access.md#private-developer-material" target="_blank" rel="noreferrer">Repository and download access</a>): every added, removed, renamed, or changed <code>Arcane</code> member must update the exact inventory or method table, including parameters, return, and description, in the same change. Renderer-visible event changes must also update the <a href="../arcane-events/#event-inventory">Arcane event inventory</a>. Long-form member guides enrich these canonical rows; they do not replace or duplicate the checked inventory.</p>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/core/arcane-api.md" target="_blank" rel="noreferrer"><code>docs/reference/core/arcane-api.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#namespace-constructor-and-value-inventory">Namespace, constructor, and value inventory</a><a href="#core-and-events">Core and events</a><a href="#artificial-intelligence-and-ollama">Artificial intelligence and Ollama</a><a href="#applications-terminal-and-capabilities">Applications, terminal, and capabilities</a><a href="#platform-installation-users-and-system">Platform, installation, users, and system</a><a href="#filesystem-storage-preferences-and-appearance">Filesystem, storage, preferences, and appearance</a><a href="#session-provisioning-diagnostics-and-development">Session, provisioning, diagnostics, and development</a><a href="#maintenance-rule">Maintenance rule</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

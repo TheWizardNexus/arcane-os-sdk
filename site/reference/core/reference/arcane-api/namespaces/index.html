@@ -1,0 +1,1009 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="These namespace guides explain how related Arcane API members work together. The individual method guides provide the exact parameters, resolved values, err…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/namespaces/"><link rel="icon" type="image/png" href="../../../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../../../styles.css"><link rel="stylesheet" href="../../../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane API namespace guides · Arcane OS SDK"><meta property="og:description" content="These namespace guides explain how related Arcane API members work together. The individual method guides provide the exact parameters, resolved values, err…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/namespaces/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane API namespace guides · Arcane OS SDK"><meta name="twitter:description" content="These namespace guides explain how related Arcane API members work together. The individual method guides provide the exact parameters, resolved values, err…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane API namespace guides | Arcane OS SDK</title><script src="../../../../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../../../">Overview</a><a href="../../../../../guides/">Guides</a><a href="../../../../../examples/">Examples</a><a href="../../../../../playground/">Playground</a><a href="../../../../../testing/">Testing</a><a href="../../../../" aria-current="page">Reference</a><a class="repo-link" href="../../../../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../../../">Docs</a><span aria-hidden="true">/</span><a href="../../../../">Reference</a><span aria-hidden="true">/</span><a href="../../../">Core</a><span aria-hidden="true">/</span><a href="../">Focused member guides</a><span aria-hidden="true">/</span><span aria-current="page">Arcane API namespace guides</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-api-namespace-guides">Arcane API namespace guides</h1><p class="doc-lead">These namespace guides explain how related Arcane API members work together. The individual method guides provide the exact parameters, resolved values, err…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../../../overview/">Overview</a><a href="../../../../sdk-api/">SDK JavaScript API</a><a href="../../../../cli/">CLI</a><a href="../../../../event-manager/">EventManager</a><a href="../../../../availability-and-normalization/">Availability</a><a href="../../../../protocols/">Protocols</a><a href="../../../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../../../../runtime-modules/">Modules</a><a href="../../../../runtime-entities/">Entities</a><a href="../../../../runtime-components/">Components</a><a href="../../../../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../../">Core map</a><a href="../../../arcane-api/">Arcane API</a><a href="../../../arcane-events/">Events</a><a href="../../../arcane-ai-contracts/">AI contracts</a><a href="../../../arcane-entities/">Entity exports</a><a href="../../../ollama-module/">Ollama module</a><a href="../">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/core/reference/arcane-api/namespaces.md"><p>These namespace guides explain how related Arcane API members work together.
+The individual method guides provide the exact parameters, resolved values,
+errors, and focused examples for each call.</p>
+<h2 id="arcaneevents">Arcane.events</h2>
+<h3 id="overview">Overview</h3>
+<p><code>Arcane.events</code> is the application-facing event hub for messages delivered by
+the bound Arcane host. It provides four synchronous subscription and observation
+methods:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Member</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Arcane.events.on(eventName, listener)</code></td>
+<td>Observe every future matching event until unsubscribed.</td>
+</tr>
+<tr>
+<td><code>Arcane.events.once(eventName, listener)</code></td>
+<td>Observe the next future matching event, then unsubscribe automatically.</td>
+</tr>
+<tr>
+<td><code>Arcane.events.when(eventName, listener)</code></td>
+<td>Observe a designated durable completion, including an asynchronous replay when it already occurred.</td>
+</tr>
+<tr>
+<td><code>Arcane.events.completed(eventName)</code></td>
+<td>Check whether a designated durable completion has already been observed.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Use a named subscription when the application knows the event it needs. A named
+listener receives that event&#39;s data payload directly. A wildcard subscription
+uses the event name <code>&quot;*&quot;</code> and receives an envelope shaped as
+<code>{ event, data }</code>. Wildcard delivery is useful for bounded diagnostics, but it
+should not replace named subscriptions in application logic. Some event
+payloads can contain credentials or other sensitive values, so do not log
+wildcard <code>data</code> indiscriminately.</p>
+<p>See the <a href="../../../arcane-events/">Arcane event catalog</a> for event names, triggers,
+payloads, and host-specific availability.</p>
+<h3 id="delivery-and-replay-model">Delivery and replay model</h3>
+<p>Ordinary events are live and future-only. They are not retained for a late
+subscriber. This includes progress, terminal streams, terminal exits, and
+appearance changes. <code>on()</code> and <code>once()</code> never replay an earlier ordinary event.</p>
+<p>Only <code>transport.ready</code> and <code>core.ready</code> are designated durable completions. The
+first payload for each completion is snapshotted and frozen before listeners
+run. Later occurrences do not replace it. <code>when()</code> delivers a future first
+completion like a one-time subscription, or queues the stored first payload for
+asynchronous delivery when the completion already occurred.</p>
+<p><code>transport.ready</code> means that the document selected a callable Arcane transport.
+It does not prove that Core is healthy, that a method is admitted, or that a
+capability is granted. <code>core.ready</code> reports the host&#39;s readiness event; use the
+method-specific capability and status APIs for authorization and service state.</p>
+<h3 id="listener-safety-and-cleanup">Listener safety and cleanup</h3>
+<p>Every subscription method returns an unsubscribe function. Retain it and call it
+when the component, view, or document no longer owns the listener. Calling an
+unsubscribe function again is harmless.</p>
+<p>Listener exceptions are caught and logged so one listener cannot stop delivery
+to the remaining listeners. Handle expected failures inside the listener when
+the application needs to surface or recover from them; an exception thrown by a
+listener is not reported to the event producer.</p>
+<h3 id="example">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const events = globalThis.Arcane?.events;
+
+if (!events?.on) {
+    throw new Error(&#39;Arcane event delivery is unavailable in this document.&#39;);
+}
+
+const unsubscribe = [
+    events.on(&#39;operation.progress&#39;, function reportOperationProgress(data) {
+        console.log(&#39;Operation progress&#39;, data.progress, data.message);
+    }),
+    events.on(&#39;*&#39;, function reportObservedEvent({event}) {
+        console.debug(&#39;Arcane event&#39;, event);
+    })
+];
+
+function stopObserving() {
+    for (const off of unsubscribe.splice(0)) {
+        off();
+    }
+}
+
+globalThis.addEventListener(&#39;pagehide&#39;, stopObserving, {once: true});
+</code></pre></div>
+<h2 id="arcaneterminal">Arcane.terminal</h2>
+<h3 id="overview-1">Overview</h3>
+<p><code>Arcane.terminal</code> owns a bounded native terminal-session lifecycle. It can start
+and enumerate app-owned sessions, write input, update dimensions, send a
+supported control signal, and request closure. Process output and final exit
+state arrive through <code>Arcane.events</code>; they are not returned by <code>write()</code>,
+<code>signal()</code>, or <code>close()</code>.</p>
+<p>Terminal access is deliberately narrow. The bound application must have the
+exact id <code>terminal</code>, must be granted <code>terminal.execute</code>, and must run through an
+admitted Core or Android host. Other applications do not receive terminal access
+by default, and a standalone browser preview is not a native terminal host.</p>
+<h3 id="availability-and-capability-check">Availability and capability check</h3>
+<p>Feature detection answers whether the JavaScript surface was projected into the
+document. <code>Arcane.capabilities.list()</code> confirms the bound application identity,
+grants, and exact admitted RPC methods. Check both before presenting a terminal
+workflow.</p>
+<p>The complete namespace contains these methods:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Member</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Arcane.terminal.start(options?)</code></td>
+<td>Start one native session.</td>
+</tr>
+<tr>
+<td><code>Arcane.terminal.list()</code></td>
+<td>Return the wrapper containing current app-owned sessions.</td>
+</tr>
+<tr>
+<td><code>Arcane.terminal.write(sessionId, data)</code></td>
+<td>Write one nonempty UTF-8 input chunk.</td>
+</tr>
+<tr>
+<td><code>Arcane.terminal.resize(sessionId, columns, rows)</code></td>
+<td>Update the session&#39;s bounded dimensions.</td>
+</tr>
+<tr>
+<td><code>Arcane.terminal.signal(sessionId, signal?)</code></td>
+<td>Request <code>interrupt</code> or <code>terminate</code>.</td>
+</tr>
+<tr>
+<td><code>Arcane.terminal.close(sessionId)</code></td>
+<td>Request session closure.</td>
+</tr>
+</tbody></table>
+</div>
+<p>The host admits at most eight concurrent sessions for the application. Session
+identifiers are opaque strings returned by <code>start()</code> or <code>list()</code>; do not invent,
+parse, or persist them as durable identities.</p>
+<h3 id="session-lifecycle">Session lifecycle</h3>
+<p>Subscribe to terminal events before calling <code>start()</code>. A newly spawned process
+may produce output immediately, and the output forwarding path is active before
+the start response reaches application code. Buffer early events by <code>sessionId</code>
+until the returned session identifies the process of interest.</p>
+<p>The normal lifecycle is:</p>
+<ol>
+<li>Confirm the feature, application id, grant, and admitted methods.</li>
+<li>Subscribe to <code>terminal.output</code>, <code>terminal.exit</code>, and <code>terminal.error</code>.</li>
+<li>Call <code>start()</code> and retain the returned session object.</li>
+<li>Use <code>write()</code>, <code>resize()</code>, and, when necessary, <code>signal()</code>.</li>
+<li>Call <code>close()</code> when the application is finished with the session.</li>
+<li>Treat <code>terminal.exit</code> as the process-completion observation.</li>
+<li>Unsubscribe every listener during teardown.</li>
+</ol>
+<p>An accepted write, signal, or close request is not command completion or process
+exit. In particular, <code>close()</code> resolves when the host accepts the close request;
+observe <code>terminal.exit</code> for the final process outcome.</p>
+<h3 id="shared-values">Shared values</h3>
+<p><code>start()</code> resolves to this exact session shape:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td><code>string</code></td>
+<td>Opaque session identifier, at most 128 characters.</td>
+</tr>
+<tr>
+<td><code>shell</code></td>
+<td><code>string</code></td>
+<td>Resolved shell name.</td>
+</tr>
+<tr>
+<td><code>cwd</code></td>
+<td><code>string</code></td>
+<td>Resolved working directory.</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td><code>string</code></td>
+<td>Host-provided display title.</td>
+</tr>
+<tr>
+<td><code>columns</code></td>
+<td><code>number</code></td>
+<td>Accepted column count, from 20 through 500.</td>
+</tr>
+<tr>
+<td><code>rows</code></td>
+<td><code>number</code></td>
+<td>Accepted row count, from 5 through 200.</td>
+</tr>
+<tr>
+<td><code>createdAt</code></td>
+<td><code>string</code></td>
+<td>Host timestamp for session creation.</td>
+</tr>
+</tbody></table>
+</div>
+<p><code>list()</code> resolves to <code>{ sessions }</code>, not directly to an array. Each list entry
+contains <code>id</code>, <code>shell</code>, <code>cwd</code>, <code>columns</code>, <code>rows</code>, <code>createdAt</code>, and <code>state</code>.
+Supported state values are <code>starting</code>, <code>running</code>, <code>exited</code>, and <code>closed</code>, though a
+host may remove a completed session from the current inventory promptly.</p>
+<h3 id="terminal-events">Terminal events</h3>
+<p>Terminal events are ordinary, future-only events:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Trigger</th>
+<th>Data payload</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>terminal.output</code></td>
+<td>The host reads a stdout or stderr chunk.</td>
+<td><code>{ sessionId, stream, data }</code>, where <code>stream</code> is <code>&quot;stdout&quot;</code> or <code>&quot;stderr&quot;</code> and <code>data</code> is a string.</td>
+</tr>
+<tr>
+<td><code>terminal.exit</code></td>
+<td>The process exits and the host retires the session.</td>
+<td><code>{ sessionId, exitCode, signal }</code>; <code>exitCode</code> or <code>signal</code> may be <code>null</code>.</td>
+</tr>
+<tr>
+<td><code>terminal.error</code></td>
+<td>A host reports an asynchronous stream/session error.</td>
+<td><code>{ sessionId, message }</code>; currently used by the Android provider for output-limit and stream-read failures.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Output payloads are chunks, not lines. A chunk may contain part of a line,
+several lines, or terminal control sequences. Preserve arrival order per session
+and use a terminal-aware renderer when displaying native output.</p>
+<h3 id="platform-behavior">Platform behavior</h3>
+<p>On Microsoft NT Core hosts, <code>auto</code> resolves to PowerShell. PowerShell, Command
+Prompt, and an installed Bash are selectable; POSIX <code>sh</code> is unavailable. On
+Linux Core hosts, <code>auto</code> resolves to Bash, <code>sh</code> selects <code>/bin/sh</code>, PowerShell
+requires an installed <code>pwsh</code>, and Command Prompt is unavailable.</p>
+<p>On Android, terminal execution is confined to the Arcane Terminal application&#39;s
+ordinary app identity and private files area. Only <code>auto</code> and <code>sh</code> are accepted,
+and both resolve to the application-sandbox <code>/system/bin/sh</code>. Android stops a
+session after one MiB of emitted output and reports the condition through
+<code>terminal.error</code>.</p>
+<h3 id="errors-and-recovery">Errors and recovery</h3>
+<p>Rejected operations use <code>Arcane.Error</code>. Read <code>code</code>, <code>message</code>, and <code>resolution</code>
+instead of matching the message text. Common terminal failures include:</p>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Recovery</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>METHOD_NOT_ALLOWED</code></td>
+<td>Open Arcane Terminal through an admitted host; another app cannot self-grant <code>terminal.execute</code>.</td>
+</tr>
+<tr>
+<td><code>ARCANE_TRANSPORT_UNAVAILABLE</code></td>
+<td>Open the application through the installed Arcane host or its development launcher.</td>
+</tr>
+<tr>
+<td><code>METHOD_CONTRACT_INPUT_INVALID</code> or <code>TERMINAL_REQUEST_INVALID</code></td>
+<td>Send only the documented values and bounds.</td>
+</tr>
+<tr>
+<td><code>TERMINAL_SESSION_LIMIT</code></td>
+<td>Close an existing session before starting another.</td>
+</tr>
+<tr>
+<td><code>TERMINAL_SHELL_INVALID</code> or <code>TERMINAL_SHELL_UNAVAILABLE</code></td>
+<td>Select a supported shell for the active platform.</td>
+</tr>
+<tr>
+<td><code>TERMINAL_CWD_INVALID</code></td>
+<td>Choose an existing accessible directory allowed by the host sandbox.</td>
+</tr>
+<tr>
+<td><code>TERMINAL_START_FAILED</code></td>
+<td>Verify that the selected shell is installed and available.</td>
+</tr>
+<tr>
+<td><code>TERMINAL_SESSION_INVALID</code> or <code>TERMINAL_SESSION_NOT_FOUND</code></td>
+<td>Refresh with <code>list()</code> or start a new session; do not reuse a retired id.</td>
+</tr>
+<tr>
+<td><code>TERMINAL_DATA_INVALID</code> or <code>TERMINAL_INPUT_CLOSED</code></td>
+<td>Send a nonempty chunk no larger than 64 KiB to a running session.</td>
+</tr>
+<tr>
+<td><code>TERMINAL_SIGNAL_INVALID</code></td>
+<td>Use only <code>interrupt</code> or <code>terminate</code>.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="example-1">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const arcane = globalThis.Arcane;
+const terminal = arcane?.terminal;
+const events = arcane?.events;
+
+if (!terminal?.start || !events?.on || !arcane?.capabilities?.list) {
+    throw new Error(&#39;Open Arcane Terminal from an admitted Arcane host.&#39;);
+}
+
+const access = await arcane.capabilities.list();
+const requiredMethods = [
+    &#39;terminal.start&#39;,
+    &#39;terminal.list&#39;,
+    &#39;terminal.write&#39;,
+    &#39;terminal.resize&#39;,
+    &#39;terminal.close&#39;
+];
+
+if (
+    access.app?.id !== &#39;terminal&#39;
+    || !access.grants.includes(&#39;terminal.execute&#39;)
+    || !requiredMethods.every(function isRequiredTerminalMethodAdmitted(method) {
+        return access.methods.includes(method);
+    })
+) {
+    throw new Error(&#39;This application is not admitted for terminal execution.&#39;);
+}
+
+const earlyOutput = new Map();
+const observedExits = new Map();
+const exitWaiters = new Map();
+const maxBufferedChunksPerSession = 128;
+let activeSessionId = null;
+let session = null;
+
+function displayOutput({stream, data}) {
+    const write = stream === &#39;stderr&#39; ? console.error : console.log;
+    write(data);
+}
+
+const offOutput = events.on(&#39;terminal.output&#39;, function handleTerminalOutput(payload) {
+    if (payload.sessionId === activeSessionId) {
+        displayOutput(payload);
+        return;
+    }
+    const chunks = earlyOutput.get(payload.sessionId) ?? [];
+    chunks.push(payload);
+    // Bound pre-identification buffering; surface truncation in a real UI.
+    if (chunks.length &gt; maxBufferedChunksPerSession) {
+        chunks.shift();
+    }
+    earlyOutput.set(payload.sessionId, chunks);
+});
+
+const offExit = events.on(&#39;terminal.exit&#39;, function handleTerminalExit(payload) {
+    observedExits.set(payload.sessionId, payload);
+    const waiter = exitWaiters.get(payload.sessionId);
+    if (waiter) {
+        clearTimeout(waiter.timer);
+        exitWaiters.delete(payload.sessionId);
+        waiter.resolve(payload);
+    }
+});
+
+const offError = events.on(&#39;terminal.error&#39;, function handleTerminalError(payload) {
+    console.error(`Terminal ${payload.sessionId}: ${payload.message}`);
+});
+
+function waitForExit(sessionId, timeoutMs = 5000) {
+    if (observedExits.has(sessionId)) {
+        return Promise.resolve(observedExits.get(sessionId));
+    }
+    return new Promise(function createExitWait(resolve, reject) {
+        const timer = setTimeout(function rejectTimedOutExitWait() {
+            exitWaiters.delete(sessionId);
+            reject(new Error(`Timed out waiting for ${sessionId} to exit.`));
+        }, timeoutMs);
+        exitWaiters.set(sessionId, {resolve, timer});
+    });
+}
+
+try {
+    session = await terminal.start({
+        shell: &#39;auto&#39;,
+        cwd: &#39;&#39;,
+        columns: 120,
+        rows: 32
+    });
+    activeSessionId = session.id;
+
+    for (const payload of earlyOutput.get(session.id) ?? []) {
+        displayOutput(payload);
+    }
+    earlyOutput.delete(session.id);
+
+    await terminal.resize(session.id, 100, 30);
+    const {sessions} = await terminal.list();
+    console.log(&#39;Owned sessions&#39;, sessions);
+
+    const lineEnding = [&#39;powershell&#39;, &#39;cmd&#39;].includes(session.shell)
+        ? &#39;\r\n&#39;
+        : &#39;\n&#39;;
+    await terminal.write(
+        session.id,
+        `echo Arcane terminal ready${lineEnding}`
+    );
+
+    const exitPromise = waitForExit(session.id);
+    const closeResult = await terminal.close(session.id);
+    console.log(&#39;Close request accepted&#39;, closeResult.accepted);
+
+    const exit = await exitPromise;
+    console.log(&#39;Process exited&#39;, exit.exitCode, exit.signal);
+} catch (error) {
+    if (error instanceof arcane.Error) {
+        console.error(error.code, error.message, error.resolution);
+    } else {
+        throw error;
+    }
+} finally {
+    if (session &amp;&amp; !observedExits.has(session.id)) {
+        await terminal.close(session.id).catch(function ignoreTerminalCloseFailure() {});
+    }
+    offOutput();
+    offExit();
+    offError();
+    for (const waiter of exitWaiters.values()) {
+        clearTimeout(waiter.timer);
+    }
+    exitWaiters.clear();
+}
+</code></pre></div>
+<h2 id="arcaneprotocol">Arcane.protocol</h2>
+<h3 id="overview-2">Overview</h3>
+<p><code>Arcane.protocol</code> is the immutable wire-protocol identifier used by the current
+renderer bridge. Its value is currently the string <code>&quot;arcane/1&quot;</code>. It identifies
+the message format; it does not establish connection health, host trust,
+application admission, or feature availability.</p>
+<h3 id="when-to-use">When to use</h3>
+<p>Use this value in diagnostics or compatibility checks that need to distinguish
+the Arcane message contract. Do not use it as a capability or security decision.</p>
+<h3 id="example-2">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const protocol = globalThis.Arcane?.protocol;
+
+if (protocol !== &#39;arcane/1&#39;) {
+    throw new Error(&#39;This document does not expose the expected Arcane protocol.&#39;);
+}
+</code></pre></div>
+<h2 id="arcaneerror">Arcane.Error</h2>
+<h3 id="overview-3">Overview</h3>
+<p><code>Arcane.Error</code> is the normalized error constructor used for rejected native API
+requests. Instances always provide <code>code</code> and <code>message</code>; <code>resolution</code>,
+<code>diagnosticId</code>, <code>technicalMessage</code>, <code>hresult</code>, <code>causeName</code>, and other bounded
+diagnostic fields are present when the host supplied them. Native request
+failures reject with this type, while synchronous JavaScript argument checks can
+throw <code>TypeError</code> before a request is sent.</p>
+<h3 id="error-handling">Error handling</h3>
+<p>Branch on <code>code</code>, retain <code>diagnosticId</code> for support, and show <code>resolution</code> when
+available. Do not match changing message prose or log sensitive request or result
+data merely because an error object contains technical context.</p>
+<h3 id="example-3">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">try {
+    await globalThis.Arcane.system.ping();
+} catch (error) {
+    if (error instanceof globalThis.Arcane.Error) {
+        console.error(error.code, error.resolution ?? error.message);
+    } else {
+        throw error;
+    }
+}
+</code></pre></div>
+<h2 id="arcaneruntime">Arcane.runtime</h2>
+<h3 id="overview-4">Overview</h3>
+<p><code>Arcane.runtime</code> owns renderer-local transport inspection. Its snapshot is
+synchronous and frozen, and obtaining it sends no RPC. Transport connection,
+native-host class, and managed-local-AI host class are descriptive facts rather
+than health, admission, or trust claims.</p>
+<h3 id="when-to-use-1">When to use</h3>
+<p>Use this namespace to adapt presentation to standalone, development HTTP,
+WebView2, WebKitGTK, or Android WebView environments. Use
+<code>Arcane.capabilities.list()</code> and method-specific status calls for authority and
+service readiness.</p>
+<h3 id="example-4">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const runtime = globalThis.Arcane?.runtime?.current?.();
+
+if (runtime) {
+    console.log(runtime.transport, runtime.connected, runtime.native);
+}
+</code></pre></div>
+<h2 id="arcaneai">Arcane.ai</h2>
+<h3 id="overview-5">Overview</h3>
+<p><code>Arcane.ai</code> is the provider-neutral surface for model inventory, effective AI
+profile, chat, provider settings, and account-visible provider models. It keeps
+application code above raw provider protocols. Request and result objects use
+the checked contracts linked from the canonical method pages.</p>
+<h3 id="availability-and-security">Availability and security</h3>
+<p>Inference requires <code>ai.inference</code>. Raw local inventory is restricted to
+Settings, Shell, and Terminal with <code>ai.models.read</code>; provider settings and model
+discovery are Settings-only with <code>ai.settings.manage</code>. Credentials stay inside
+the native settings boundary and must not be logged or copied into prompts.</p>
+<h3 id="example-5">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canChat = access.methods.includes(&#39;ai.chat&#39;);
+
+console.log(&#39;Provider-neutral chat admitted:&#39;, canChat);
+</code></pre></div>
+<h2 id="arcaneenvironment">Arcane.environment</h2>
+<h3 id="overview-6">Overview</h3>
+<p><code>Arcane.environment</code> manages the Vault application&#39;s authorized environment
+profile. It separates listing, protected reads, writes, and deletion, and marks
+known sensitive names as protected by default when <code>set()</code> is called without an
+explicit protection choice.</p>
+<h3 id="availability-and-security-1">Availability and security</h3>
+<p>The namespace is restricted to app id <code>vault</code> on Core or Android hosts.
+Listing requires <code>environment.read</code>, protected reads require
+<code>environment.protected.read</code>, and mutations require <code>environment.write</code> and an
+exclusive mutation boundary. Never print protected values in examples or logs.</p>
+<h3 id="example-6">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canListEnvironmentNames = access.methods.includes(&#39;environment.list&#39;);
+
+console.log(&#39;Environment inventory admitted:&#39;, canListEnvironmentNames);
+</code></pre></div>
+<h2 id="arcanemail">Arcane.mail</h2>
+<h3 id="overview-7">Overview</h3>
+<p><code>Arcane.mail</code> sends one bounded, already-prepared report through the native mail
+gateway. It does not provide an interactive composer and a successful result
+must be interpreted using its sent, partial, uncertain, and status fields rather
+than as a blanket delivery guarantee.</p>
+<h3 id="availability-and-security-2">Availability and security</h3>
+<p><code>mail.send</code> requires the <code>mail.send</code> capability, is limited to explicitly
+admitted report applications, and is currently Core-hosted rather than
+Android-hosted. Treat recipients and report content as sensitive and use a
+stable report key to avoid ambiguous duplicates.</p>
+<h3 id="example-7">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canSendReports = access.methods.includes(&#39;mail.send&#39;);
+
+console.log(&#39;Native report delivery admitted:&#39;, canSendReports);
+</code></pre></div>
+<h2 id="arcanespeech">Arcane.speech</h2>
+<h3 id="overview-8">Overview</h3>
+<p><code>Arcane.speech</code> exposes independent local speech status, synthesis, and
+transcription through the native host. The status result keeps Kokoro and
+Whisper readiness separate; successful readiness for one role does not imply
+readiness for the other.</p>
+<h3 id="availability-and-security-3">Availability and security</h3>
+<p>All speech methods require <code>ai.inference</code>. Desktop Core uses its admitted fixed
+local services; admitted Android applications use bounded native providers.
+Transcription accepts only the documented bounded canonical audio envelope, and
+applications should not retain microphone audio without an explicit need.</p>
+<h3 id="example-8">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canReadSpeechStatus = access.methods.includes(&#39;speech.status&#39;);
+
+console.log(&#39;Speech status admitted:&#39;, canReadSpeechStatus);
+</code></pre></div>
+<h2 id="arcanelocalai">Arcane.localAI</h2>
+<h3 id="overview-9">Overview</h3>
+<p><code>Arcane.localAI</code> is the policy-filtered local-AI control surface. It covers
+readiness, Provisioner reconciliation, admitted service recovery, verified
+parallel-request configuration, and an application-owned isolated-model
+inspection and question lifecycle. Application selectors should use its
+admitted catalog rather than raw Ollama inventory.</p>
+<h3 id="availability-and-security-4">Availability and security</h3>
+<p>Status requires <code>ai.inference</code>; lifecycle methods add app-id, app-type,
+privilege, host, and exclusive-mutation restrictions. Parallel-request mutation
+is Core-only, privileged, requires <code>ai.runtime.manage</code>, and is admitted only to
+the owning application. Isolated operations are restricted to their owning
+application. Long operations can emit <code>operation.*</code>; isolated questions correlate
+<code>localai.isolated.phase</code> by <code>operationId</code>.</p>
+<h3 id="example-9">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canInspectLocalAI = access.methods.includes(&#39;localai.status&#39;);
+
+console.log(&#39;Policy-filtered local AI status admitted:&#39;, canInspectLocalAI);
+</code></pre></div>
+<h2 id="arcaneollama">Arcane.ollama</h2>
+<h3 id="overview-10">Overview</h3>
+<p><code>Arcane.ollama</code> exposes admitted Ollama inference, raw diagnostic inventory,
+managed selection and settings, and policy-controlled model management. Raw
+provider inventory is not an application&#39;s model-admission catalog. Streaming
+calls can deliver correlated <code>ollama.chunk</code> events or an <code>onChunk</code> callback.</p>
+<h3 id="availability-and-security-5">Availability and security</h3>
+<p>Inference requires <code>ai.inference</code>; diagnostic inventory requires
+<code>ai.models.read</code> and is limited to Settings, Shell, and Terminal. Mutations use
+<code>ai.models.manage</code> or Settings-only <code>ai.settings.manage</code>, frequently behind an
+exclusive mutation boundary. Android user-managed loopback admission exposes
+chat only and does not grant managed model lifecycle authority.</p>
+<h3 id="example-10">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canUseOllamaChat = access.methods.includes(&#39;ollama.chat&#39;);
+
+console.log(&#39;Native Ollama chat admitted:&#39;, canUseOllamaChat);
+</code></pre></div>
+<h2 id="arcaneapp">Arcane.app</h2>
+<h3 id="overview-11">Overview</h3>
+<p><code>Arcane.app</code> reads the immutable application identity bound to the current host
+session. The descriptor includes the app-owned id, display name, type, entry,
+version, and bounded trust-status fields. It is session evidence, not a
+caller-supplied identity.</p>
+<h3 id="availability-and-security-6">Availability and security</h3>
+<p><code>app.current</code> is a capability-free provider read on Core and Android. An
+Android app reports its independently packaged version and currently reports
+unverified publisher status; the OS bundle version remains separate.</p>
+<h3 id="example-11">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const app = await globalThis.Arcane.app.current();
+
+console.log(app.id, app.displayName, app.version);
+</code></pre></div>
+<h2 id="arcaneapplications">Arcane.applications</h2>
+<h3 id="overview-12">Overview</h3>
+<p><code>Arcane.applications</code> provides the application catalog visible to the bound
+Shell or Terminal session and requests launch by canonical application id.
+Catalog visibility and launchability are host-policy decisions; applications
+cannot register or launch arbitrary executables through this namespace.</p>
+<h3 id="availability-and-security-7">Availability and security</h3>
+<p>Listing requires <code>applications.read</code>; launching requires
+<code>applications.launch</code>. Both are restricted to Shell or Terminal on Core and
+Android. Android launch resolves only a generated package installed for the
+selected catalog entry.</p>
+<h3 id="example-12">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canListApplications = access.methods.includes(&#39;apps.list&#39;);
+
+console.log(&#39;Application catalog admitted:&#39;, canListApplications);
+</code></pre></div>
+<h2 id="arcaneexternal">Arcane.external</h2>
+<h3 id="overview-13">Overview</h3>
+<p><code>Arcane.external</code> requests a policy-validated operating-system handoff for an
+external URI. The current public contract accepts only a tightly validated
+<code>mailto:</code> URI. An <code>opened</code> result means the operating system accepted the
+handoff, not that a composer opened or a message was sent.</p>
+<h3 id="availability-and-security-8">Availability and security</h3>
+<p><code>external.open</code> requires the <code>external.open</code> capability on Core or Android.
+The host rejects whitespace, fragments, backslashes, malformed escapes,
+encoded controls, and unsupported schemes before any handoff.</p>
+<h3 id="example-13">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canRequestExternalOpen = access.methods.includes(&#39;external.open&#39;);
+
+console.log(&#39;External URI handoff admitted:&#39;, canRequestExternalOpen);
+</code></pre></div>
+<h2 id="arcanerepository">Arcane.repository</h2>
+<h3 id="overview-14">Overview</h3>
+<p><code>Arcane.repository</code> is the parent for application-owned repository services.
+The shared bridge projects fixed, package-owned workflows, while each owning
+application reference defines the exact data and mutation contract.</p>
+<h3 id="availability-and-security-9">Availability and security</h3>
+<p>Every child method is restricted by its application id and a repository-specific
+read or write capability. Repository identities, branches, paths, and mutation
+rules are fixed by native policy; callers cannot supply credentials, remotes, or
+an arbitrary checkout.</p>
+<h3 id="example-14">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const repositoryMethods = access.methods.filter(
+    function selectRepositoryMethod(method) {
+        return method.startsWith(&#39;repository.&#39;);
+    }
+);
+
+console.log(&#39;Admitted repository methods:&#39;, repositoryMethods);
+</code></pre></div>
+<h2 id="arcanecapabilities">Arcane.capabilities</h2>
+<h3 id="overview-15">Overview</h3>
+<p><code>Arcane.capabilities</code> returns the bound application descriptor, sorted grants,
+and exact method allowlist for the current session. This is the authoritative
+application-side preflight for method admission; checking that a JavaScript
+function exists is not enough because the shared surface is projected broadly.</p>
+<h3 id="availability-and-security-10">Availability and security</h3>
+<p><code>capabilities.list</code> is a read-only bridge method. Its result describes current
+admission but does not grant authority, prove dependency readiness, or replace
+method-specific status and error handling. The direct method is Core-only;
+Android callers with <code>system.read</code> use
+<code>Arcane.platform.status().capabilities</code> for the same nested snapshot.</p>
+<h3 id="example-15">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const {app, grants, methods} = await globalThis.Arcane.capabilities.list();
+
+console.log(app.id, grants.length, methods.length);
+</code></pre></div>
+<h2 id="arcaneplatform">Arcane.platform</h2>
+<h3 id="overview-16">Overview</h3>
+<p><code>Arcane.platform</code> returns bounded host platform, renderer, permission,
+capability, and execution-evidence status. It distinguishes actual host platform
+from simulated effective platform and keeps presentation labels separate from
+authorization.</p>
+<h3 id="availability-and-security-11">Availability and security</h3>
+<p><code>platform.status</code> requires <code>system.read</code> and is available on admitted Core and
+Android hosts. Treat the result as status evidence, never as a substitute for a
+capability check or a publisher, update, or release attestation.</p>
+<h3 id="example-16">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canReadPlatform = access.methods.includes(&#39;platform.status&#39;);
+
+console.log(&#39;Platform evidence admitted:&#39;, canReadPlatform);
+</code></pre></div>
+<h2 id="arcanepermissions">Arcane.permissions</h2>
+<h3 id="overview-17">Overview</h3>
+<p><code>Arcane.permissions</code> reports effective elevation and permission status exposed
+by the native host. It helps explain whether an operation may require operating-
+system authorization, but it does not itself approve or perform that operation.</p>
+<h3 id="availability-and-security-12">Availability and security</h3>
+<p><code>permissions.status</code> requires <code>system.read</code>. Permission status can change, and
+every privileged method still rechecks its own policy and operating-system
+boundary when invoked.</p>
+<h3 id="example-17">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canReadPermissions = access.methods.includes(&#39;permissions.status&#39;);
+
+console.log(&#39;Permission status admitted:&#39;, canReadPermissions);
+</code></pre></div>
+<h2 id="arcaneversion">Arcane.version</h2>
+<h3 id="overview-18">Overview</h3>
+<p><code>Arcane.version</code> separates the Arcane OS bundle or host version from
+installation status. <code>current()</code> is the session&#39;s OS version even when an
+application owns a different package version; <code>installation()</code> is an alias-like
+read of the installation-status method.</p>
+<h3 id="availability-and-security-13">Availability and security</h3>
+<p><code>version.current</code> is capability-free on Core and Android.
+<code>version.installation</code> requires <code>installation.read</code> and may not be admitted to
+the same applications. Neither result proves signing, update continuity, or
+release-candidate acceptance.</p>
+<h3 id="example-18">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const version = await globalThis.Arcane.version.current();
+
+console.log(&#39;Arcane OS host version:&#39;, version);
+</code></pre></div>
+<h2 id="arcanemachine">Arcane.machine</h2>
+<h3 id="overview-19">Overview</h3>
+<p><code>Arcane.machine</code> exposes the Provisioner&#39;s bounded machine readiness and status
+view. It is intended for planning and reconciliation, not general application
+fingerprinting or unrestricted hardware inspection.</p>
+<h3 id="availability-and-security-14">Availability and security</h3>
+<p><code>machine.status</code> requires <code>provisioning.manage</code> and the <code>provisioner</code> app type.
+Other applications cannot gain this authority by calling the shared JavaScript
+function directly.</p>
+<h3 id="example-19">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canReadMachineStatus = access.methods.includes(&#39;machine.status&#39;);
+
+console.log(&#39;Machine readiness admitted:&#39;, canReadMachineStatus);
+</code></pre></div>
+<h2 id="arcaneuser">Arcane.user</h2>
+<h3 id="overview-20">Overview</h3>
+<p><code>Arcane.user</code> reads the privacy-minimized identity bound to the current host
+session. Desktop Core can return a host-account identity; Android returns an
+anonymous local-session identity with null account identifiers.</p>
+<h3 id="availability-and-security-15">Availability and security</h3>
+<p><code>user.current</code> takes no parameters, requires <code>identity.read</code>, and is available
+on Core and Android. Use only fields returned by the host and do not infer a
+cross-device or durable person identity from the record.</p>
+<h3 id="example-20">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canReadIdentity = access.methods.includes(&#39;user.current&#39;);
+
+console.log(&#39;Bound identity read admitted:&#39;, canReadIdentity);
+</code></pre></div>
+<h2 id="arcanerequirements">Arcane.requirements</h2>
+<h3 id="overview-21">Overview</h3>
+<p><code>Arcane.requirements</code> reads the installation requirement inventory and lets the
+Provisioner ensure selected requirements. Omitting the requirement-id array
+selects only requirements marked required; <code>null</code> and an empty array have the
+same default. The interruption option is exactly <code>&quot;deny&quot;</code> or <code>&quot;allow&quot;</code> and
+defaults to <code>&quot;deny&quot;</code>.</p>
+<h3 id="availability-and-security-16">Availability and security</h3>
+<p>Listing requires <code>requirements.read</code>. Ensuring requires
+<code>provisioning.manage</code>, the <code>provisioner</code> app type, privilege, and an exclusive
+mutation boundary. <code>&quot;allow&quot;</code> does not bypass native process-identity and port
+proof before an existing user process can be interrupted.</p>
+<h3 id="example-21">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canListRequirements = access.methods.includes(&#39;requirements.list&#39;);
+
+console.log(&#39;Requirement inventory admitted:&#39;, canListRequirements);
+</code></pre></div>
+<h2 id="arcaneinstallation">Arcane.installation</h2>
+<h3 id="overview-22">Overview</h3>
+<p><code>Arcane.installation</code> reports installation status, lets the Provisioner ensure
+the required installed state, and can request the globally installed Microsoft
+NT uninstaller. Ensuring and opening the uninstaller are distinct operations;
+the latter does not uninstall through checkout-local code.</p>
+<h3 id="availability-and-security-17">Availability and security</h3>
+<p>Status requires <code>installation.read</code>. Ensure and uninstaller access require
+<code>provisioning.manage</code> and the <code>provisioner</code> app type; ensure is privileged and
+exclusive. A returned <code>opened</code> value means process creation was accepted, not
+that confirmation or uninstall completed.</p>
+<h3 id="example-22">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canReadInstallation = access.methods.includes(&#39;installation.status&#39;);
+
+console.log(&#39;Installation status admitted:&#39;, canReadInstallation);
+</code></pre></div>
+<h2 id="arcaneusers">Arcane.users</h2>
+<h3 id="overview-23">Overview</h3>
+<p><code>Arcane.users</code> owns the Provisioner&#39;s bounded account inventory, validation,
+creation, activation, temporary-password flow, and shell verification or
+restoration. Usernames are explicit inputs; password application is separate
+from password reset so the application can control disclosure and confirmation.</p>
+<h3 id="availability-and-security-18">Availability and security</h3>
+<p>Every method requires <code>users.manage</code> and the <code>provisioner</code> app type. Account and
+shell mutations add privilege or exclusive-mutation controls as declared by
+policy. Temporary passwords are sensitive: never log, persist, or place them in
+diagnostic examples.</p>
+<h3 id="example-23">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canValidateUsers = access.methods.includes(&#39;users.validate&#39;);
+
+console.log(&#39;User validation admitted:&#39;, canValidateUsers);
+</code></pre></div>
+<h2 id="arcanesystem">Arcane.system</h2>
+<h3 id="overview-24">Overview</h3>
+<p><code>Arcane.system</code> groups bounded operating-system session lock, bridge ping,
+allowed metrics, and Settings-owned verification-failure policy. Ping proves
+only that the host admitted and answered one request; it is not a health,
+privilege, trust, or release-readiness result.</p>
+<h3 id="availability-and-security-19">Availability and security</h3>
+<p>Ping is capability-free on Core and Android. Metrics require
+<code>system.metrics.read</code>; lock requires <code>session.control</code> and the Shell app type.
+Failure-policy reads and writes are Settings-only through preference
+capabilities, and writes are exclusive.</p>
+<h3 id="example-24">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const result = await globalThis.Arcane.system.ping();
+
+console.log(&#39;Host answered:&#39;, result.ok);
+</code></pre></div>
+<h2 id="arcanenetwork">Arcane.network</h2>
+<h3 id="overview-25">Overview</h3>
+<p><code>Arcane.network</code> exposes a privacy-bounded connectivity snapshot containing only
+<code>online</code> and <code>interfaceCount</code>. It counts interfaces with at least one
+non-loopback address and returns no interface name or address.</p>
+<h3 id="availability-and-security-20">Availability and security</h3>
+<p><code>network.status</code> requires <code>network.status.read</code> on Core or Android. <code>online</code>
+does not prove Internet access, DNS, route, captive-portal, or service
+reachability; probe the specific admitted service when that distinction matters.</p>
+<h3 id="example-25">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canReadNetworkStatus = access.methods.includes(&#39;network.status&#39;);
+
+console.log(&#39;Privacy-bounded network status admitted:&#39;, canReadNetworkStatus);
+</code></pre></div>
+<h2 id="arcanefirewall">Arcane.firewall</h2>
+<h3 id="overview-26">Overview</h3>
+<p><code>Arcane.firewall</code> exposes Firewall-app-only policy status, bounded audit, and
+explicitly confirmed lifecycle operations for Arcane-owned development
+simulation state. Mutation requests must carry the current positive policy and
+machine-state generations; stale expectations fail instead of silently applying
+to a different state.</p>
+<h3 id="availability-and-security-21">Availability and security</h3>
+<p>Reads require <code>firewall.read</code>; mutations require <code>firewall.manage</code>, the
+<code>firewall</code> app id, Core, privilege, and an exclusive mutation boundary. Audit
+<code>limit</code> defaults to 100 and must be an integer from 1 through 200. Current live
+machine-wide mutation is unsupported; simulation must remain labeled.</p>
+<h3 id="example-26">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canReadFirewallStatus = access.methods.includes(&#39;firewall.status&#39;);
+
+console.log(&#39;Firewall review admitted:&#39;, canReadFirewallStatus);
+</code></pre></div>
+<h2 id="arcanefilesystem">Arcane.filesystem</h2>
+<h3 id="overview-27">Overview</h3>
+<p><code>Arcane.filesystem</code> owns native directory selection. It returns a host-reviewed
+selection rather than granting arbitrary path traversal or a general-purpose
+filesystem API. The optional picker argument must be a non-array object.</p>
+<h3 id="availability-and-security-22">Availability and security</h3>
+<p>Directory selection requires <code>filesystem.directory.select</code>. The native picker,
+host sandbox, and application policy remain authoritative for what can be
+selected and what later operations may do with the returned path.</p>
+<h3 id="example-27">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canSelectDirectory = access.methods.includes(&#39;filesystem.directory.select&#39;);
+
+console.log(&#39;Directory picker admitted:&#39;, canSelectDirectory);
+</code></pre></div>
+<h2 id="arcanestorage">Arcane.storage</h2>
+<h3 id="overview-28">Overview</h3>
+<p><code>Arcane.storage</code> is app-scoped native key/value storage. It supports inventory,
+read, write, and delete without exposing another application&#39;s namespace.
+Values must satisfy the method&#39;s bounded JSON-compatible contract.</p>
+<h3 id="availability-and-security-23">Availability and security</h3>
+<p>Listing and get require <code>storage.read</code>; set and delete require <code>storage.write</code>.
+Storage admission is not permission to store credentials, protected health
+information, or other sensitive data without the owning application&#39;s explicit
+data policy.</p>
+<h3 id="example-28">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canListStorage = access.methods.includes(&#39;storage.list&#39;);
+
+console.log(&#39;App storage inventory admitted:&#39;, canListStorage);
+</code></pre></div>
+<h2 id="arcanepreferences">Arcane.preferences</h2>
+<h3 id="overview-29">Overview</h3>
+<p><code>Arcane.preferences</code> stores app-scoped user preferences. It supports individual
+reads and writes plus an atomic <code>setMany()</code> batch; the batch accepts a plain
+object with one through 32 entries and changes nothing when any entry is invalid.</p>
+<h3 id="availability-and-security-24">Availability and security</h3>
+<p>Reads require <code>preferences.read</code>; mutations require <code>preferences.write</code>.
+Preferences are for bounded settings, not secrets or large application records.
+Synchronous wrapper validation can throw <code>TypeError</code> before <code>setMany()</code> sends an
+RPC.</p>
+<h3 id="example-29">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canReadPreferences = access.methods.includes(&#39;preferences.list&#39;);
+
+console.log(&#39;Preference inventory admitted:&#39;, canReadPreferences);
+</code></pre></div>
+<h2 id="arcaneappearance">Arcane.appearance</h2>
+<h3 id="overview-30">Overview</h3>
+<p><code>Arcane.appearance</code> reads and applies the native appearance contract. Host
+appearance changes can also arrive as the future-only <code>appearance.changed</code>
+event; application code should use the returned and event payload fields rather
+than infer theme state from operating-system internals.</p>
+<h3 id="availability-and-security-25">Availability and security</h3>
+<p>Current-state reads require <code>appearance.read</code>; applying values requires
+<code>appearance.write</code>. The host validates the bounded appearance object. A method
+result or event is presentation state and must never grant authority.</p>
+<h3 id="example-30">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canReadAppearance = access.methods.includes(&#39;appearance.current&#39;);
+
+console.log(&#39;Native appearance read admitted:&#39;, canReadAppearance);
+</code></pre></div>
+<h2 id="arcanesession">Arcane.session</h2>
+<h3 id="overview-31">Overview</h3>
+<p><code>Arcane.session</code> owns the current operating-system session lifecycle. Its logout
+request is not an Arcane-only application exit and can end the user&#39;s host
+session, so it belongs behind a clear, separate confirmation journey.</p>
+<h3 id="availability-and-security-26">Availability and security</h3>
+<p><code>session.logout</code> requires <code>session.control</code>, the Shell app type, and an
+exclusive mutation boundary. Feature detection is safe; this guide deliberately
+does not invoke logout in its example.</p>
+<h3 id="example-31">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canRequestLogout = access.methods.includes(&#39;session.logout&#39;);
+
+console.log(&#39;Operating-system logout admitted:&#39;, canRequestLogout);
+</code></pre></div>
+<h2 id="arcaneprovisioning">Arcane.provisioning</h2>
+<h3 id="overview-32">Overview</h3>
+<p><code>Arcane.provisioning</code> creates a non-applying plan for one username or an array of
+usernames. Planning separates validation and review from privileged user,
+requirement, and installation mutations.</p>
+<h3 id="availability-and-security-27">Availability and security</h3>
+<p><code>provisioning.plan</code> requires <code>provisioning.manage</code> and the <code>provisioner</code> app
+type. A returned plan is evidence for review, not proof that any account or
+machine change occurred.</p>
+<h3 id="example-32">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canPlanProvisioning = access.methods.includes(&#39;provisioning.plan&#39;);
+
+console.log(&#39;Provisioning plan admitted:&#39;, canPlanProvisioning);
+</code></pre></div>
+<h2 id="arcanediagnostics">Arcane.diagnostics</h2>
+<h3 id="overview-33">Overview</h3>
+<p><code>Arcane.diagnostics</code> reads a bounded recent-error summary and retrieves one
+structured diagnostic by id. Diagnostic ids are opaque correlation values; they
+are not filesystem paths or authorization tokens.</p>
+<h3 id="availability-and-security-28">Availability and security</h3>
+<p>Both methods require <code>diagnostics.read</code>. Diagnostic records can contain
+technical context, so applications should minimize display and retention and
+must not assume the capability permits exposing them to another user or service.</p>
+<h3 id="example-33">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canReadDiagnostics = access.methods.includes(&#39;diagnostics.recent&#39;);
+
+console.log(&#39;Recent diagnostics admitted:&#39;, canReadDiagnostics);
+</code></pre></div>
+<h2 id="arcanedevelopment">Arcane.development</h2>
+<h3 id="overview-34">Overview</h3>
+<p><code>Arcane.development</code> supports approved-workspace inspection, bounded source
+context, allowlisted setup tasks, and installation of the supported Node.js
+development runtime. It is a development tool surface, not arbitrary command
+execution.</p>
+<h3 id="availability-and-security-29">Availability and security</h3>
+<p>Inspect and context require <code>development.read</code>; setup and Node installation
+require <code>development.manage</code> and the <code>developer</code> app id. Setup is exclusive;
+Node installation is additionally privileged. Roots and task ids remain subject
+to native allowlists and path validation.</p>
+<h3 id="example-34">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const access = await globalThis.Arcane.capabilities.list();
+const canInspectWorkspace = access.methods.includes(&#39;development.inspect&#39;);
+
+console.log(&#39;Development workspace inspection admitted:&#39;, canInspectWorkspace);
+</code></pre></div>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/core/reference/arcane-api/namespaces.md" target="_blank" rel="noreferrer"><code>docs/reference/core/reference/arcane-api/namespaces.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#arcaneevents">Arcane.events</a><a href="#arcaneterminal">Arcane.terminal</a><a href="#arcaneprotocol">Arcane.protocol</a><a href="#arcaneerror">Arcane.Error</a><a href="#arcaneruntime">Arcane.runtime</a><a href="#arcaneai">Arcane.ai</a><a href="#arcaneenvironment">Arcane.environment</a><a href="#arcanemail">Arcane.mail</a><a href="#arcanespeech">Arcane.speech</a><a href="#arcanelocalai">Arcane.localAI</a><a href="#arcaneollama">Arcane.ollama</a><a href="#arcaneapp">Arcane.app</a><a href="#arcaneapplications">Arcane.applications</a><a href="#arcaneexternal">Arcane.external</a><a href="#arcanerepository">Arcane.repository</a><a href="#arcanecapabilities">Arcane.capabilities</a><a href="#arcaneplatform">Arcane.platform</a><a href="#arcanepermissions">Arcane.permissions</a><a href="#arcaneversion">Arcane.version</a><a href="#arcanemachine">Arcane.machine</a><a href="#arcaneuser">Arcane.user</a><a href="#arcanerequirements">Arcane.requirements</a><a href="#arcaneinstallation">Arcane.installation</a><a href="#arcaneusers">Arcane.users</a><a href="#arcanesystem">Arcane.system</a><a href="#arcanenetwork">Arcane.network</a><a href="#arcanefirewall">Arcane.firewall</a><a href="#arcanefilesystem">Arcane.filesystem</a><a href="#arcanestorage">Arcane.storage</a><a href="#arcanepreferences">Arcane.preferences</a><a href="#arcaneappearance">Arcane.appearance</a><a href="#arcanesession">Arcane.session</a><a href="#arcaneprovisioning">Arcane.provisioning</a><a href="#arcanediagnostics">Arcane.diagnostics</a><a href="#arcanedevelopment">Arcane.development</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../../../../architecture/">Architecture</a><a href="../../../../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

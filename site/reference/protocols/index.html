@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="This is the deep reference behind the compact availability notes elsewhere. Application developers normally call one documented API and do not choose a wire…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/protocols/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Protocol and host architecture · Arcane OS SDK"><meta property="og:description" content="This is the deep reference behind the compact availability notes elsewhere. Application developers normally call one documented API and do not choose a wire…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/protocols/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Protocol and host architecture · Arcane OS SDK"><meta name="twitter:description" content="This is the deep reference behind the compact availability notes elsewhere. Application developers normally call one documented API and do not choose a wire…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Protocol and host architecture | Arcane OS SDK</title><script src="../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Protocol and host architecture</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="protocol-and-host-architecture">Protocol and host architecture</h1><p class="doc-lead">This is the deep reference behind the compact availability notes elsewhere. Application developers normally call one documented API and do not choose a wire…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="./" aria-current="page">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama module</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/protocols.md"><p>This is the deep reference behind the compact availability notes elsewhere.
+Application developers normally call one documented API and do not choose a
+wire protocol directly.</p>
+<h2 id="layer-map">Layer map</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">application code
+  |-- Node SDK API ---------------- arcane-cli-events/1 + SDK receipts
+  |-- EventManager ---------------- synchronous bus + arcane-event-stack/1
+  |
+  `-- renderer ESM / globalThis.Arcane
+        |-- standalone browser ----- standard Web APIs / allowed HTTPS
+        |-- development host ------- development HTTP bridge
+        |-- Microsoft NT native ---- WebView2 host bridge
+        |-- Linux native ----------- WebKitGTK host bridge
+        `-- Android native --------- Android WebView message bridge
+                                      |
+                                      `-- Arcane Core/provider boundary
+                                            |-- platform services
+                                            |-- ArcaneOllama loopback service
+                                            `-- explicitly selected cloud APIs
+</code></pre></div>
+<p>Each downward boundary can add authority and platform capability. None can be
+inferred merely from a function existing in shared JavaScript.</p>
+<h2 id="sdk-package-and-cli-protocols">SDK package and CLI protocols</h2>
+<p>The npm package API is ordinary Node.js ESM. The CLI and programmatic toolchain
+share one headless operation implementation. Long-running operations accept
+before blocking work, own their task, stream structured events with bounded
+backpressure, emit progress or heartbeats, support cancellation where the
+underlying operation can do so safely, and surface failure through rejection or
+a nonzero CLI status.</p>
+<p>Machine output uses <code>arcane-cli-events/1</code>. Native planning and providers use:</p>
+<ul>
+<li><code>arcane-target-adapter/1</code> for target adapters;</li>
+<li><code>arcane-native-build-plan/1</code> for immutable native plans;</li>
+<li><code>arcane-native-builder/1</code> for injected native builders;</li>
+<li><code>arcane-integrated-toolchain/1</code> for the fixed integrated shared/Core provider.</li>
+</ul>
+<p>These protocols normalize orchestration and evidence. They do not normalize a
+Windows EXE, Linux DEB, Android APK, and portable directory into the same
+artifact kind.</p>
+<h2 id="central-events-and-time-travel-data">Central events and time-travel data</h2>
+<p><code>arcane-os/event-manager</code> is host-neutral JavaScript. Its live event path is
+synchronous, in-process <code>event-pubsub</code>; it does not select WebView2,
+WebKitGTK, Android, HTTP, Core, or a kernel boundary. Optional history uses the
+strict <code>arcane-event-stack/1</code> data format. That protocol names an immutable
+diagnostic document, not a network channel and not the <code>arcane/1</code> Core RPC
+protocol.</p>
+<p>Live listeners receive the original arguments. Recording separately snapshots
+payloads and metadata with explicit depth, entry, string, and history limits;
+redaction is enabled by default. Exported stacks can be moved between Node and
+browser hosts because <code>parseEventStack()</code> validates and canonicalizes the data
+before playback. Review mode emits immutable records, events mode deliberately
+re-emits recorded event types, and neither mode restores external host side
+effects or DOM state.</p>
+<details><summary>Event-stack identity, overflow, and trust boundary</summary>
+<p>Each document carries <code>protocol</code>, <code>sessionId</code>, <code>createdAt</code>, and ordered
+<code>events</code>. Each record repeats the protocol/session and carries sequence,
+timing, nesting/causation, source/category, payload, metadata, status, and
+failure evidence. At <code>maxEvents</code>, the manager appends one terminal
+<code>arcane.time-travel.overflow</code> marker, disables recording, and stops DOM
+observation; this explicit marker is why a valid overflow document may contain
+<code>maxEvents + 1</code> records. Import is strict, rejects extra or unsafe structure,
+and grants no Core capability, app admission, or provider authority.</p>
+</details>
+<p>See <a href="../event-manager/">EventManager and time-travel review</a> for the callable
+surface, DOM privacy defaults, playback modes, and recovery behavior.</p>
+<h2 id="browser-runtime-delivery">Browser runtime delivery</h2>
+<p>External and integrated workspaces keep the same application URLs. Runtime ESM
+is served beneath <code>/arcane</code>, the vendored dependency beneath
+<code>/node_modules/strong-type</code>, and license material beneath
+<code>/licenses/arcane-os</code>. A browser import such as:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import ollama from &#39;/arcane/modules/Ollama.js&#39;;
+</code></pre></div>
+<p>uses browser ESM in every renderer. The imported module can be pure browser
+logic, standard-Web-API logic, or a client of <code>globalThis.Arcane</code>. Import
+transport and host RPC are separate layers.</p>
+<h2 id="arcane-application-protocol">Arcane application protocol</h2>
+<p><code>globalThis.Arcane.protocol</code> is <code>arcane/1</code>. The shared API wraps transport
+selection, request ids, JSON-safe values, promise settlement, <code>Arcane.Error</code>,
+and renderer events. The current transport snapshot is synchronous:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const {connected, transport, native, managedLocalAI} =
+    globalThis.Arcane.runtime.current();
+</code></pre></div>
+<p>Transport values are <code>webview2</code>, <code>webkitgtk</code>, <code>android-webview</code>,
+<code>development-http</code>, and <code>standalone</code>. <code>connected</code> means a callable transport
+was initialized. It does not prove that Core answered, the method is admitted,
+or a dependency is ready.</p>
+<h2 id="native-host-transports">Native host transports</h2>
+<h3 id="microsoft-nt-webview2">Microsoft NT / WebView2</h3>
+<p>The renderer uses the WebView2 host messaging surface. The host binds one app
+identity and native policy to the session before Core dispatch. Microsoft NT
+can expose managed-service and privileged platform operations that do not exist
+in an ordinary browser.</p>
+<h3 id="linux-webkitgtk">Linux / WebKitGTK</h3>
+<p>The renderer uses the WebKitGTK host bridge with the same application-facing
+<code>Arcane</code> protocol. Linux can implement the same normalized methods through
+different host code. Some administrator-owned service settings intentionally
+return unsupported/manual guidance rather than imitating Microsoft NT mutation.</p>
+<h3 id="android-android-webview">Android / Android WebView</h3>
+<p>Android injects a main-frame, origin-bound bridge for the packaged application.
+Its generated registry binds application identity, package version, entry,
+grants, and method policy. Android exposes a narrower surface, including an
+admitted user-managed local-AI chat projection where configured. Desktop model
+management is not projected merely because a user-managed Ollama listener is
+reachable.</p>
+<h3 id="macos">macOS</h3>
+<p>No macOS target, native bridge, Core host, artifact, or run contract is exposed
+by this SDK version. A browser may still run browser-only application code, but
+that does not create a native Arcane host or satisfy a native capability.</p>
+<h2 id="development-and-remote-http-transport">Development and remote HTTP transport</h2>
+<p>The development HTTP bridge makes the same application-facing request shape
+available without pretending the browser is a native host. It is a development
+transport, not a production isolation or authority boundary. A remotely
+operated client can use an expressly configured web transport only when the
+host, origin, application identity, and policy admit it; Arcane does not silently
+swap native calls to arbitrary remote HTTP endpoints.</p>
+<p>When transport changes while the public method remains the same, request
+settlement and public errors stay normalized. Host-specific availability and
+result detail remain documented by the method.</p>
+<h2 id="core-dispatch-and-capability-admission">Core dispatch and capability admission</h2>
+<p>The host binds the caller&#39;s application identity. Core checks the exact method,
+required capability, allowed application type/id, privilege, mutation
+exclusivity, request bounds, and relevant package policy. Renderer-supplied app
+ids or grants never replace that bound identity.</p>
+<p><code>Arcane.capabilities.list()</code> is the Core-side application preflight. It reports
+current grants and admitted methods but does not reserve authority for a later
+call. Each call is checked again.</p>
+<h2 id="arcane-ollama-protocol-path">Arcane Ollama protocol path</h2>
+<p>The safe application path is:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">renderer Ollama.js or Arcane.ollama
+  -&gt; arcane/1 host request
+  -&gt; Core capability and package-policy admission
+  -&gt; managed ArcaneOllama loopback service
+  -&gt; bounded Ollama HTTP operation
+</code></pre></div>
+<p>Applications never connect directly to <code>localhost:11434</code>. Core owns loopback
+endpoint selection, method admission, request/response limits, stream ids,
+chunk events, model-policy checks, native resource admission, and managed
+mutation workflows.</p>
+<p>Direct Ollama methods preserve the bounded provider-native success envelope.
+Arcane normalizes the outer promise/error and stream lifecycle. <code>chatText</code>,
+<code>generateText</code>, and <code>readiness</code> are helper-level normalizers.</p>
+<h2 id="explicit-cloud-provider-path">Explicit cloud provider path</h2>
+<p><code>/arcane/modules/AI.js</code> can use an explicitly selected and configured cloud
+profile over HTTPS. That path is not Core transport fallback. The module adapts
+the selected provider into its high-level application behavior, while provider
+diagnostics and optional fields can remain provider-specific. Native policy and
+network policy still govern a native renderer&#39;s outbound access.</p>
+<p>Local failure never authorizes cloud disclosure. The user or owning application
+must select and configure the cloud provider explicitly.</p>
+<h2 id="events-streaming-and-cancellation">Events, streaming, and cancellation</h2>
+<p>Renderer-visible Core events are listed in
+<a href="../core/arcane-events/">the Arcane event reference</a>. Durable
+<code>transport.ready</code> and <code>core.ready</code> completions can be observed after the fact
+with <code>Arcane.events.when()</code>. Ordinary progress, stream, terminal, and appearance
+events are future-only.</p>
+<p>Ollama streaming correlates chunks to the originating request. A renderer
+abort or timeout can stop observation without proving that a non-cooperative
+host mutation stopped. Method guides state whether Core cooperatively cancels,
+whether partial provider state can remain, and which status call must be
+refreshed before retry.</p>
+<h2 id="cross-kernel-normalization-boundary">Cross-kernel normalization boundary</h2>
+<p>The common contract ends where platform truth must remain different:</p>
+<ul>
+<li>API names, promise/error behavior, admission, request bounds, and public
+operation events are normalized;</li>
+<li>host availability, privilege model, installation/service mechanism, native
+artifact kind, and some diagnostic/result fields remain platform-specific;</li>
+<li>unsupported platforms fail or return a documented unsupported state; they do
+not run an unrelated browser implementation as a substitute;</li>
+<li>this SDK version admits a selected checkout and Core only after the current
+native plan&#39;s exact protocol, version, feature, capability, method, provider,
+and identity-bound receipt checks all pass;</li>
+<li>that current-build admission does not promise that a future SDK will accept
+this Core or that this SDK will accept a future Core.</li>
+</ul>
+<h2 id="receipt-and-generation-boundaries">Receipt and generation boundaries</h2>
+<p>SDK runtime, app releases, bundles, native plans, providers, and artifacts use
+identity-bound receipts. A receipt binds the exact location, filesystem
+identity, bytes/inventory hashes, policy, toolchain, platform/architecture,
+signer/trust result where applicable, and generation. Mutation invalidates the
+receipt before bytes or authority change.</p>
+<p>Process-local receipts do not authorize reuse across Shell, Core, providers, or
+other processes. Cross-process reuse requires an authenticated shared host or
+broker with retained handles and peer-process/generation binding.</p>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/protocols.md" target="_blank" rel="noreferrer"><code>docs/reference/protocols.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#layer-map">Layer map</a><a href="#sdk-package-and-cli-protocols">SDK package and CLI protocols</a><a href="#central-events-and-time-travel-data">Central events and time-travel data</a><a href="#browser-runtime-delivery">Browser runtime delivery</a><a href="#arcane-application-protocol">Arcane application protocol</a><a href="#native-host-transports">Native host transports</a><a href="#development-and-remote-http-transport">Development and remote HTTP transport</a><a href="#core-dispatch-and-capability-admission">Core dispatch and capability admission</a><a href="#arcane-ollama-protocol-path">Arcane Ollama protocol path</a><a href="#explicit-cloud-provider-path">Explicit cloud provider path</a><a href="#events-streaming-and-cancellation">Events, streaming, and cancellation</a><a href="#cross-kernel-normalization-boundary">Cross-kernel normalization boundary</a><a href="#receipt-and-generation-boundaries">Receipt and generation boundaries</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

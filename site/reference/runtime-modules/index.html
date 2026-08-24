@@ -1,0 +1,1642 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="Every file shipped under runtime/arcane/modules/ appears here. Start with the capability and example; expand into protocol and host architecture only when t…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane runtime module catalog · Arcane OS SDK"><meta property="og:description" content="Every file shipped under runtime/arcane/modules/ appears here. Start with the capability and example; expand into protocol and host architecture only when t…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane runtime module catalog · Arcane OS SDK"><meta name="twitter:description" content="Every file shipped under runtime/arcane/modules/ appears here. Start with the capability and example; expand into protocol and host architecture only when t…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane runtime module catalog | Arcane OS SDK</title><script src="../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane runtime module catalog</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-runtime-module-catalog">Arcane runtime module catalog</h1><p class="doc-lead">Every file shipped under runtime/arcane/modules/ appears here. Start with the capability and example; expand into protocol and host architecture only when t…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="./" aria-current="page">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama module</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/runtime-modules.md"><p>Every file shipped under <code>runtime/arcane/modules/</code> appears here. Start with the capability and example; expand into <a href="../protocols/">protocol and host architecture</a> only when transport detail matters.</p>
+<p>Apps import renderer ESM from <code>/arcane/modules/&lt;file&gt;</code>. Classic scripts, the OPFS worker, uPlot stylesheet, and vendor license are called out explicitly. Importing a module does not grant a native capability.</p>
+<h2 id="availability-shorthand">Availability shorthand</h2>
+<ul>
+<li><strong>Cross-host</strong> means in-process logic built from standard JavaScript/Web APIs.</li>
+<li><strong>Browser / native WebView</strong> means DOM, storage, media, or component behavior available in a browser renderer and in supported native WebViews.</li>
+<li><strong>Native bridge</strong> means the module requires an admitted <code>globalThis.Arcane</code> method.</li>
+<li><strong>Hybrid</strong> means one public helper deliberately selects a documented native or browser/provider path.</li>
+<li><strong>Cloud</strong> means the module can call an explicitly configured remote provider; it never implies automatic local-to-cloud fallback.</li>
+<li><strong>Node</strong>, <strong>worker</strong>, and <strong>vendor</strong> identify specialized runtimes.</li>
+</ul>
+<h2 id="canonical-inventory">Canonical inventory</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Kind</th>
+<th>Capability</th>
+<th>Availability</th>
+<th>Normalization</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="#aijs"><code>AI.js</code></a></td>
+<td>esm</td>
+<td>Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structured output, streaming, and queued audio playback.</td>
+<td>Browser + native bridge + cloud</td>
+<td>High-level chat/speech behavior is normalized; provider diagnostics and media errors remain mixed.</td>
+</tr>
+<tr>
+<td><a href="#aipreferenceruntimejs"><code>AIPreferenceRuntime.js</code></a></td>
+<td>esm</td>
+<td>Applies and reads non-persistent per-user AI preference overrides.</td>
+<td>Cross-host</td>
+<td>Normalized six-slot preference state.</td>
+</tr>
+<tr>
+<td><a href="#aipreferencetuplejs"><code>AIPreferenceTuple.js</code></a></td>
+<td>esm</td>
+<td>Normalizes and compares the six provider/model preference slots.</td>
+<td>Cross-host</td>
+<td>Fully normalized frozen tuple.</td>
+</tr>
+<tr>
+<td><a href="#airesponselengthjs"><code>AIResponseLength.js</code></a></td>
+<td>esm</td>
+<td>Normalizes concise/short/medium/long response preferences and applies the matching system instruction.</td>
+<td>Cross-host</td>
+<td>Fully normalized string/instruction contract.</td>
+</tr>
+<tr>
+<td><a href="#airesponseurlpolicyjs"><code>AIResponseURLPolicy.js</code></a></td>
+<td>esm</td>
+<td>Extracts and audits links from AI Markdown, rendered HTML, CSS, srcset, bare URLs, and email text.</td>
+<td>Cross-host</td>
+<td>Normalized frozen allowlist audit.</td>
+</tr>
+<tr>
+<td><a href="#ansitextjs"><code>AnsiText.js</code></a></td>
+<td>esm</td>
+<td>Parses terminal ANSI sequences into display spans or strips them to plain text.</td>
+<td>Cross-host</td>
+<td>Normalized text/span output.</td>
+</tr>
+<tr>
+<td><a href="#apimodeldatabasejs"><code>ApiModelDatabase.js</code></a></td>
+<td>esm</td>
+<td>Fetches an injectable HTTP JSON model with parser, cache, redacted public endpoint records, and request lifecycle events.</td>
+<td>Browser / native WebView / server with fetch</td>
+<td>Request records are normalized; fetch/provider failures remain mixed.</td>
+</tr>
+<tr>
+<td><a href="#appdatascopejs"><code>AppDataScope.js</code></a></td>
+<td>esm</td>
+<td>Reconciles declared and native application identity and scopes OPFS/localStorage ownership fail-closed.</td>
+<td>Browser / native WebView hybrid</td>
+<td>Strict normalized identifiers and coded mismatch failures.</td>
+</tr>
+<tr>
+<td><a href="#appearancepreferencesjs"><code>AppearancePreferences.js</code></a></td>
+<td>esm</td>
+<td>Defines, stores, and applies color scheme, density, reduced motion, and large-text preferences.</td>
+<td>Browser / native WebView hybrid</td>
+<td>Normalized values; storage/host failures remain mixed.</td>
+</tr>
+<tr>
+<td><a href="#arcanecommunicationbridgejs"><code>ArcaneCommunicationBridge.js</code></a></td>
+<td>esm</td>
+<td>Maps provider HTTP threads/messages/connect/disconnect endpoints to normalized communication entities.</td>
+<td>Browser / native WebView / server with fetch</td>
+<td>Entity results are normalized; provider/transport failures remain mixed.</td>
+</tr>
+<tr>
+<td><a href="#arcanenavigationpolicyjs"><code>ArcaneNavigationPolicy.js</code></a></td>
+<td>esm</td>
+<td>Creates a fail-closed HTTP(S) navigation guard with domain and CIDR policy decisions.</td>
+<td>Cross-host</td>
+<td>Normalized frozen allow/block decision.</td>
+</tr>
+<tr>
+<td><a href="#arcanenetworkpolicyjs"><code>ArcaneNetworkPolicy.js</code></a></td>
+<td>esm</td>
+<td>Validates the Arcane domain/network deny policy and matches domain, IPv4/IPv6 CIDR, protocol, and port rules.</td>
+<td>Cross-host</td>
+<td>Strict coded normalization.</td>
+</tr>
+<tr>
+<td><a href="#asyncboundaryjs"><code>AsyncBoundary.js</code></a></td>
+<td>esm</td>
+<td>Runs one asynchronous operation with timeout, abort, result validation, and stable boundary errors.</td>
+<td>Cross-host</td>
+<td>Fully normalized timeout/abort errors.</td>
+</tr>
+<tr>
+<td><a href="#browsertestsuitejs"><code>BrowserTestSuite.js</code></a></td>
+<td>esm</td>
+<td>Runs a fixed sequential browser test list with cooperative abort, per-test timeout, and lifecycle events.</td>
+<td>Browser / standard Web APIs</td>
+<td>Normalized result and skip/assertion errors.</td>
+</tr>
+<tr>
+<td><a href="#calculatorenginejs"><code>CalculatorEngine.js</code></a></td>
+<td>esm</td>
+<td>Evaluates bounded arithmetic, powers, constants, and common functions without <code>eval</code>.</td>
+<td>Cross-host</td>
+<td>Normalized <code>Calculation</code> result and parser errors.</td>
+</tr>
+<tr>
+<td><a href="#caseevidenceindexerjs"><code>CaseEvidenceIndexer.js</code></a></td>
+<td>esm</td>
+<td>Pairs and indexes structured evidence records with rendered-page provenance and SHA-256 identity.</td>
+<td>Node only</td>
+<td>Normalized naming/page helpers; filesystem errors preserved.</td>
+</tr>
+<tr>
+<td><a href="#chartlibraryjs"><code>ChartLibrary.js</code></a></td>
+<td>esm</td>
+<td>Loads the bundled uPlot classic script once and returns its global constructor.</td>
+<td>Browser / native WebView</td>
+<td>Load state/errors normalized; uPlot result is vendor-native.</td>
+</tr>
+<tr>
+<td><a href="#chatrecordsjs"><code>ChatRecords.js</code></a></td>
+<td>esm</td>
+<td>Detects whether a chat record contains a meaningful user entry.</td>
+<td>Cross-host</td>
+<td>Boolean normalized result.</td>
+</tr>
+<tr>
+<td><a href="#communicationappcontrollerjs"><code>CommunicationAppController.js</code></a></td>
+<td>esm</td>
+<td>Binds shared inbox, conversation, settings, theme, and provider workflows into one UI controller.</td>
+<td>Browser / native WebView hybrid</td>
+<td>Controller state normalized; provider/DOM failures mixed.</td>
+</tr>
+<tr>
+<td><a href="#communicationhubjs"><code>CommunicationHub.js</code></a></td>
+<td>esm</td>
+<td>Fans out provider refresh/send operations and aggregates normalized threads/messages.</td>
+<td>Cross-host with injected providers</td>
+<td>Normalized aggregates; refresh contains per-provider failures.</td>
+</tr>
+<tr>
+<td><a href="#communicationpreferencesjs"><code>CommunicationPreferences.js</code></a></td>
+<td>esm</td>
+<td>Stores app-scoped, non-secret communication provider preferences.</td>
+<td>Browser / native WebView hybrid</td>
+<td>Normalized preference record; storage failures mixed.</td>
+</tr>
+<tr>
+<td><a href="#communicationproviderregistryjs"><code>CommunicationProviderRegistry.js</code></a></td>
+<td>esm</td>
+<td>Registers and queries validated provider definitions, channels, and required methods.</td>
+<td>Cross-host</td>
+<td>Strict normalized registry.</td>
+</tr>
+<tr>
+<td><a href="#componentcontractsjs"><code>ComponentContracts.js</code></a></td>
+<td>esm</td>
+<td>Owns normalized configuration/value contracts shared by chart, dashboard, Markdown, and voice components.</td>
+<td>Cross-host</td>
+<td>Fully normalized labels, rows, definitions, visibility, formats, editor and voice options.</td>
+</tr>
+<tr>
+<td><a href="#configuredaichatsessionjs"><code>ConfiguredAIChatSession.js</code></a></td>
+<td>esm</td>
+<td>Owns bounded in-memory AI turns, context construction, response-length instruction, and atomic history commit.</td>
+<td>Native bridge by default; cross-host with injected chat</td>
+<td>Normalized session/result; provider rejection preserved.</td>
+</tr>
+<tr>
+<td><a href="#conversationactionitemsjs"><code>ConversationActionItems.js</code></a></td>
+<td>esm</td>
+<td>Normalizes, creates, updates, remembers, selects, and formats bounded conversation action items.</td>
+<td>Cross-host</td>
+<td>Fully normalized status/base/presentation contract.</td>
+</tr>
+<tr>
+<td><a href="#conversationclosingreportjs"><code>ConversationClosingReport.js</code></a></td>
+<td>esm</td>
+<td>Defines the closing-report tool, instruction, result normalizer, call classifier, and formatter.</td>
+<td>Cross-host</td>
+<td>Fully normalized report contract.</td>
+</tr>
+<tr>
+<td><a href="#conversationtimeboxjs"><code>ConversationTimebox.js</code></a></td>
+<td>esm</td>
+<td>Owns conversation limits, control messages, submission barriers, elapsed formatting, and delivery proof.</td>
+<td>Cross-host</td>
+<td>Fully normalized state/command/delivery errors.</td>
+</tr>
+<tr>
+<td><a href="#corelocalmodelcatalogjs"><code>CoreLocalModelCatalog.js</code></a></td>
+<td>esm</td>
+<td>Projects Core local-AI status into UI-safe admitted model and speech availability catalogs.</td>
+<td>Cross-host</td>
+<td>Fully normalized descriptors and stable admission labels.</td>
+</tr>
+<tr>
+<td><a href="#datamaintenancejs"><code>DataMaintenance.js</code></a></td>
+<td>esm</td>
+<td>Deletes empty chats and associated/empty memory records inside the current app data scope.</td>
+<td>Browser / native WebView</td>
+<td>Normalized counts; destructive storage failures preserved.</td>
+</tr>
+<tr>
+<td><a href="#dblsjs"><code>DBLS.js</code></a></td>
+<td>esm</td>
+<td>Provides app-scoped localStorage tables, batch reads/writes, filtering, deletion, and counts.</td>
+<td>Browser / native WebView</td>
+<td>Scoped keys and values normalized; storage failures mixed.</td>
+</tr>
+<tr>
+<td><a href="#dbopfsjs"><code>DBOPFS.js</code></a></td>
+<td>esm</td>
+<td>Provides app-scoped OPFS tables, worker I/O, backup/restore, compression, and CRUD/batch APIs.</td>
+<td>Browser / native WebView</td>
+<td>App scope normalized; DOM/storage errors preserved.</td>
+</tr>
+<tr>
+<td><a href="#dbopfsworkerjs"><code>DBOPFSWorker.js</code></a></td>
+<td>worker</td>
+<td>Serializes OPFS sync-handle read/write requests from a MessagePort.</td>
+<td>Dedicated worker</td>
+<td>Responses normalize to <code>{success,fileData?}</code> or <code>{error:{name,message}}</code>.</td>
+</tr>
+<tr>
+<td><a href="#developmentworkspacejs"><code>DevelopmentWorkspace.js</code></a></td>
+<td>esm</td>
+<td>Provides bounded workspace inspection, context, setup task, and Node installer clients without arbitrary command execution.</td>
+<td>Native bridge</td>
+<td>Inputs normalized; provider result/error preserved.</td>
+</tr>
+<tr>
+<td><a href="#directorypickerjs"><code>DirectoryPicker.js</code></a></td>
+<td>esm</td>
+<td>Wraps the provider-owned native directory chooser and normalizes selected/cancelled/error results.</td>
+<td>Native bridge</td>
+<td>Strict normalized selection and coded errors.</td>
+</tr>
+<tr>
+<td><a href="#documentnavigationjs"><code>DocumentNavigation.js</code></a></td>
+<td>esm</td>
+<td>Binds document navigation, filtering, history, current-item reveal, and load initialization.</td>
+<td>Browser / native WebView</td>
+<td>Normalized filter/navigation state; DOM effects preserved.</td>
+</tr>
+<tr>
+<td><a href="#errorsjs"><code>Errors.js</code></a></td>
+<td>esm</td>
+<td>Normalizes global errors/rejections, fingerprints and deduplicates incidents, persists a ledger, and performs bounded delivery.</td>
+<td>Browser / native WebView hybrid</td>
+<td>Incident records normalized; storage/mail failures isolated.</td>
+</tr>
+<tr>
+<td><a href="#gifencoderjs"><code>GifEncoder.js</code></a></td>
+<td>esm</td>
+<td>Encodes indexed frames into a bounded animated GIF using palette mapping and LZW.</td>
+<td>Cross-host</td>
+<td>Normalized byte output and bounds.</td>
+</tr>
+<tr>
+<td><a href="#htmlimportjs"><code>HTMLImport.js</code></a></td>
+<td>esm</td>
+<td>Defines the same-origin <code>&lt;html-import&gt;</code> loader with open shadow root, inline script execution, and readiness/error events.</td>
+<td>Browser / native WebView</td>
+<td>Public error detail normalized; fetch/DOM failure preserved.</td>
+</tr>
+<tr>
+<td><a href="#inmemorycommunicationproviderjs"><code>InMemoryCommunicationProvider.js</code></a></td>
+<td>esm</td>
+<td>Implements deterministic in-memory thread/message/send behavior for demos and tests.</td>
+<td>Cross-host</td>
+<td>Normalized communication entities.</td>
+</tr>
+<tr>
+<td><a href="#isolatedmodelquestionrunnerjs"><code>IsolatedModelQuestionRunner.js</code></a></td>
+<td>esm</td>
+<td>Inspects one exact model and runs one isolated question with proof validation.</td>
+<td>Native bridge or injected provider</td>
+<td>Strict normalized proof/coded errors.</td>
+</tr>
+<tr>
+<td><a href="#localaireadinessjs"><code>LocalAIReadiness.js</code></a></td>
+<td>esm</td>
+<td>Derives selected AI requirements and returns a frozen readiness/recovery report across browser, desktop, and Android modes.</td>
+<td>Browser/native hybrid</td>
+<td>Fully normalized report and stable error codes; browsers never probe Ollama.</td>
+</tr>
+<tr>
+<td><a href="#localaireadinesscontrollerjs"><code>LocalAIReadinessController.js</code></a></td>
+<td>esm</td>
+<td>Coordinates local-AI status component checks, ensured recovery, availability projection, and teardown.</td>
+<td>Browser/native hybrid</td>
+<td>Normalized controller state and change events.</td>
+</tr>
+<tr>
+<td><a href="#mailjs"><code>Mail.js</code></a></td>
+<td>esm</td>
+<td>Builds bounded reports and prefers the native mail capability with an explicit HTTP transport fallback.</td>
+<td>Browser/native hybrid + cloud</td>
+<td>Mail inputs/results normalized; transport failures mixed.</td>
+</tr>
+<tr>
+<td><a href="#mailtransportmjs"><code>MailTransport.mjs</code></a></td>
+<td>esm</td>
+<td>Sends one bounded mail report to a normalized HTTP(S) endpoint with timeout and response-size limits.</td>
+<td>Browser/server with fetch + cloud</td>
+<td>Normalized endpoint/timeout/size errors; remote detail bounded.</td>
+</tr>
+<tr>
+<td><a href="#markedminjs"><code>Marked.min.js</code></a></td>
+<td>esm</td>
+<td>Vendored Marked 18.0.5 Markdown lexer, parser, renderer, extension, and walk-token API.</td>
+<td>Cross-host vendor module</td>
+<td>Vendor-native Marked contract.</td>
+</tr>
+<tr>
+<td><a href="#mdjs"><code>MD.js</code></a></td>
+<td>esm</td>
+<td>Renders Markdown with Marked and exposes a DOM-sanitized projection.</td>
+<td>Browser / native WebView</td>
+<td>Raw Marked behavior plus Arcane sanitization; parse errors vendor-native.</td>
+</tr>
+<tr>
+<td><a href="#memoryrecordsjs"><code>MemoryRecords.js</code></a></td>
+<td>esm</td>
+<td>Normalizes memory content and detects meaningful stored memory.</td>
+<td>Cross-host</td>
+<td>Fully normalized string/boolean results.</td>
+</tr>
+<tr>
+<td><a href="#messageadvisoryjs"><code>MessageAdvisory.js</code></a></td>
+<td>esm</td>
+<td>Normalizes message content advisories and contains per-message inspection failures.</td>
+<td>Cross-host</td>
+<td>Normalized advisory records; inspector failures converted to unavailable results.</td>
+</tr>
+<tr>
+<td><a href="#modeldefinitionjs"><code>ModelDefinition.js</code></a></td>
+<td>esm</td>
+<td>Parses the deterministic packaged Modelfile subset and extracts the SYSTEM prompt.</td>
+<td>Cross-host</td>
+<td>Strict normalized definition with coded syntax errors.</td>
+</tr>
+<tr>
+<td><a href="#ollamajs"><code>Ollama.js</code></a></td>
+<td>esm</td>
+<td>Provides the first-class Arcane Ollama client without direct access to localhost:11434.</td>
+<td>Native bridge</td>
+<td>Principal methods preserve provider-native envelopes; readiness/text/unload helpers normalize.</td>
+</tr>
+<tr>
+<td><a href="#ollamamodelidentifierjs"><code>OllamaModelIdentifier.js</code></a></td>
+<td>esm</td>
+<td>Validates and canonicalizes the syntax of Ollama model identifiers without granting model admission.</td>
+<td>Cross-host</td>
+<td>Fully normalized string/boolean result.</td>
+</tr>
+<tr>
+<td><a href="#ollamasettingsjs"><code>OllamaSettings.js</code></a></td>
+<td>esm</td>
+<td>Defines bounded runtime/service preference schemas and deterministic Arcane brain alias names.</td>
+<td>Cross-host</td>
+<td>Fully normalized settings/name contract.</td>
+</tr>
+<tr>
+<td><a href="#openmeteoweatherproviderjs"><code>OpenMeteoWeatherProvider.js</code></a></td>
+<td>esm</td>
+<td>Searches and loads Open-Meteo data into frozen Arcane weather entities.</td>
+<td>Browser / native WebView / server with fetch + cloud</td>
+<td>Provider data normalized to entities; transport errors mixed.</td>
+</tr>
+<tr>
+<td><a href="#preferencestorejs"><code>PreferenceStore.js</code></a></td>
+<td>esm</td>
+<td>Loads and updates schema-defined app preferences through native storage with a narrow browser fallback.</td>
+<td>Browser/native hybrid</td>
+<td>Values normalized; only exact unsupported capability falls back.</td>
+</tr>
+<tr>
+<td><a href="#qrcodeminjs"><code>QRCode.min.js</code></a></td>
+<td>classic-script</td>
+<td>Vendored QRCode generator for DOM, canvas, SVG, and image output.</td>
+<td>Browser vendor script</td>
+<td>Vendor-native.</td>
+</tr>
+<tr>
+<td><a href="#questionnairejs"><code>Questionnaire.js</code></a></td>
+<td>esm</td>
+<td>Evaluates whether a one-time questionnaire prompt is due without performing the prompt.</td>
+<td>Cross-host</td>
+<td>Normalized fail-closed boolean.</td>
+</tr>
+<tr>
+<td><a href="#recordlinkindexjs"><code>RecordLinkIndex.js</code></a></td>
+<td>esm</td>
+<td>Parses record links and builds their normalized index.</td>
+<td>Cross-host</td>
+<td>Fully normalized.</td>
+</tr>
+<tr>
+<td><a href="#recordpassageindexjs"><code>RecordPassageIndex.js</code></a></td>
+<td>esm</td>
+<td>Indexes text lines, page markers, dates, rules, and excerpts for record review.</td>
+<td>Cross-host</td>
+<td>Fully normalized.</td>
+</tr>
+<tr>
+<td><a href="#recordreviewstorejs"><code>RecordReviewStore.js</code></a></td>
+<td>esm</td>
+<td>Stores normalized record-review decisions through native storage or app-scoped local fallback.</td>
+<td>Browser/native hybrid</td>
+<td>Normalized ids/reviews/snapshots; storage failures mixed.</td>
+</tr>
+<tr>
+<td><a href="#revocableprojectionledgerjs"><code>RevocableProjectionLedger.js</code></a></td>
+<td>esm</td>
+<td>Implements an append-only bounded in-memory projection/revocation ledger safe for hostile descriptor inputs.</td>
+<td>Cross-host</td>
+<td>Strict normalization with stable <code>ProjectionLedgerError</code>.</td>
+</tr>
+<tr>
+<td><a href="#risksignalanalyzerjs"><code>RiskSignalAnalyzer.js</code></a></td>
+<td>esm</td>
+<td>Matches configured risk signals and levels against bounded text.</td>
+<td>Cross-host</td>
+<td>Fully normalized.</td>
+</tr>
+<tr>
+<td><a href="#scamriskpolicyjs"><code>ScamRiskPolicy.js</code></a></td>
+<td>esm</td>
+<td>Combines deterministic scam signals with Arcane blocked-domain evidence and safety guidance.</td>
+<td>Cross-host</td>
+<td>Fully normalized.</td>
+</tr>
+<tr>
+<td><a href="#scopedopfscachejs"><code>ScopedOPFSCache.js</code></a></td>
+<td>esm</td>
+<td>Provides a narrow exact-key JSON cache inside one app-owned OPFS namespace.</td>
+<td>Browser / native WebView</td>
+<td>Keys/limits/corruption handling normalized; storage errors mixed.</td>
+</tr>
+<tr>
+<td><a href="#screencapturejs"><code>ScreenCapture.js</code></a></td>
+<td>esm</td>
+<td>Captures a display surface as image, video, or GIF with explicit lifecycle events.</td>
+<td>Browser / native WebView</td>
+<td>State/events normalized; permission and codec errors mixed.</td>
+</tr>
+<tr>
+<td><a href="#speechplaybackjs"><code>SpeechPlayback.js</code></a></td>
+<td>esm</td>
+<td>Segments bounded text, queues latest-request speech synthesis, and controls lookahead HTML audio playback.</td>
+<td>Browser + native bridge</td>
+<td>State/limits normalized; provider/media failures mixed.</td>
+</tr>
+<tr>
+<td><a href="#staticdocumentcatalogjs"><code>StaticDocumentCatalog.js</code></a></td>
+<td>esm</td>
+<td>Loads a positive static document inventory with byte/hash verification, cache, search, and bounded context.</td>
+<td>Browser / native WebView / server with fetch</td>
+<td>Strict catalog/content normalization; transport failures mixed.</td>
+</tr>
+<tr>
+<td><a href="#systemappearancejs"><code>SystemAppearance.js</code></a></td>
+<td>esm</td>
+<td>Reads or applies native appearance, returning an explicit unsupported browser state when no bridge exists.</td>
+<td>Browser/native hybrid</td>
+<td>Absent bridge normalized; native result/error preserved.</td>
+</tr>
+<tr>
+<td><a href="#systemplatformpresentationjs"><code>SystemPlatformPresentation.js</code></a></td>
+<td>classic-script</td>
+<td>Maps kernel names to presentation labels/classes without granting platform authority.</td>
+<td>Browser / native WebView classic script</td>
+<td>Fully normalized presentation only.</td>
+</tr>
+<tr>
+<td><a href="#systemtoolregistryjs"><code>SystemToolRegistry.js</code></a></td>
+<td>esm</td>
+<td>Registers validated command builders and constructs command strings without executing them.</td>
+<td>Cross-host</td>
+<td>Fully normalized definitions/quoting.</td>
+</tr>
+<tr>
+<td><a href="#terminalclientjs"><code>TerminalClient.js</code></a></td>
+<td>esm</td>
+<td>Maps native terminal sessions and Arcane events into an EventTarget client.</td>
+<td>Native bridge</td>
+<td>Client events/state normalized; native result/error mixed.</td>
+</tr>
+<tr>
+<td><a href="#terminalcommandregistryjs"><code>TerminalCommandRegistry.js</code></a></td>
+<td>esm</td>
+<td>Routes parsed command lines to injected handlers and provides definitions/completions.</td>
+<td>Cross-host</td>
+<td>Parsing/routing normalized; handler result/error preserved.</td>
+</tr>
+<tr>
+<td><a href="#themebootstrapjs"><code>ThemeBootstrap.js</code></a></td>
+<td>esm</td>
+<td>Performs import-time Arcane theme loading and subscribes to native appearance changes.</td>
+<td>Browser/native hybrid</td>
+<td>Theme state normalized; storage/native errors mixed.</td>
+</tr>
+<tr>
+<td><a href="#thememanagerjs"><code>ThemeManager.js</code></a></td>
+<td>esm</td>
+<td>Loads, applies, previews, saves, resets, and synchronizes semantic Arcane themes.</td>
+<td>Browser/native hybrid</td>
+<td>Theme values/events normalized; storage/native failures mixed.</td>
+</tr>
+<tr>
+<td><a href="#timeguardjs"><code>TimeGuard.js</code></a></td>
+<td>esm</td>
+<td>Persists and evaluates clock rollback and grace-period state.</td>
+<td>Browser / native WebView</td>
+<td>Time decisions normalized; storage lifecycle mixed.</td>
+</tr>
+<tr>
+<td><a href="#toolcallrouterjs"><code>ToolCallRouter.js</code></a></td>
+<td>esm</td>
+<td>Parses OpenAI-style tool calls and dispatches complete or streamed calls to injected handlers.</td>
+<td>Cross-host</td>
+<td>Arguments/routing normalized; handler results returned or all-settled.</td>
+</tr>
+<tr>
+<td><a href="#uplotiifeminjs"><code>uPlot.iife.min.js</code></a></td>
+<td>classic-script</td>
+<td>Vendored uPlot chart constructor and rendering runtime.</td>
+<td>Browser vendor script</td>
+<td>Vendor-native.</td>
+</tr>
+<tr>
+<td><a href="#uplotlicensetxt"><code>uPlot.LICENSE.txt</code></a></td>
+<td>license</td>
+<td>License companion for the bundled uPlot vendor runtime.</td>
+<td>Documentation asset</td>
+<td>Not executable.</td>
+</tr>
+<tr>
+<td><a href="#uplotmincss"><code>uPlot.min.css</code></a></td>
+<td>stylesheet</td>
+<td>Bundled uPlot presentation stylesheet.</td>
+<td>Browser stylesheet</td>
+<td>Presentation only.</td>
+</tr>
+<tr>
+<td><a href="#waitforcomponentjs"><code>WaitForComponent.js</code></a></td>
+<td>esm</td>
+<td>Waits for a component property, method, or readiness event with optional error event and bounded timeout.</td>
+<td>Cross-host EventTarget / browser component</td>
+<td>Normalized coded readiness, error, and timeout results.</td>
+</tr>
+<tr>
+<td><a href="#youtubemediajs"><code>YouTubeMedia.js</code></a></td>
+<td>esm</td>
+<td>Validates YouTube video/playlist locators and constructs privacy-enhanced embed URLs.</td>
+<td>Cross-host</td>
+<td>Fully normalized.</td>
+</tr>
+</tbody></table>
+</div>
+<h2 id="aijs">AI.js</h2>
+<h3 id="overview">Overview</h3>
+<p>Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structured output, streaming, and queued audio playback.</p>
+<h3 id="public-surface">Public surface</h3>
+<p>default <code>AI</code>; <code>setAI()</code>, <code>streamRequest()</code>, <code>streamMessage()</code>, <code>fetchRequest()</code>, <code>fetch()</code>, <code>streamTTS()</code>, <code>finishTTS()</code>, <code>fetchSTT()</code>, <code>stopAudio()</code>, <code>resumeAudio()</code>, <code>playAudio()</code>; installs <code>window.ai</code> and emits <code>ai-ready</code>.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization">Availability and normalization</h3>
+<p><strong>Browser + native bridge + cloud.</strong> High-level chat/speech behavior is normalized; provider diagnostics and media errors remain mixed. Transport: OpenAI HTTPS, Arcane.ollama, Arcane.speech, Android WebView bridge. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/AI.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="aipreferenceruntimejs">AIPreferenceRuntime.js</h2>
+<h3 id="overview-1">Overview</h3>
+<p>Applies and reads non-persistent per-user AI preference overrides.</p>
+<h3 id="public-surface-1">Public surface</h3>
+<p><code>setAIPreferenceRuntimeOverride()</code>, <code>getAIPreferencesForRuntime()</code>.</p>
+<p>Exact exports: <code>getAIPreferencesForRuntime</code>, <code>setAIPreferenceRuntimeOverride</code>.</p>
+<h3 id="availability-and-normalization-1">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Normalized six-slot preference state. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-1">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/AIPreferenceRuntime.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="aipreferencetuplejs">AIPreferenceTuple.js</h2>
+<h3 id="overview-2">Overview</h3>
+<p>Normalizes and compares the six provider/model preference slots.</p>
+<h3 id="public-surface-2">Public surface</h3>
+<p><code>AI_PREFERENCE_SLOT_KEYS</code>, <code>normalizeAIPreferenceTuple()</code>, <code>aiPreferenceTuplesEqual()</code>.</p>
+<p>Exact exports: <code>AI_PREFERENCE_SLOT_KEYS</code>, <code>aiPreferenceTuplesEqual</code>, <code>normalizeAIPreferenceTuple</code>.</p>
+<h3 id="availability-and-normalization-2">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Fully normalized frozen tuple. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-2">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/AIPreferenceTuple.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="airesponselengthjs">AIResponseLength.js</h2>
+<h3 id="overview-3">Overview</h3>
+<p>Normalizes concise/short/medium/long response preferences and applies the matching system instruction.</p>
+<h3 id="public-surface-3">Public surface</h3>
+<p>Response-length constants plus <code>normalizeAIResponseLength()</code>, <code>aiResponseLengthInstruction()</code>, and <code>applyAIResponseLength()</code>.</p>
+<p>Exact exports: <code>AI_RESPONSE_LENGTH_DEFAULT</code>, <code>AI_RESPONSE_LENGTH_OPTIONS</code>, <code>aiResponseLengthInstruction</code>, <code>applyAIResponseLength</code>, <code>normalizeAIResponseLength</code>.</p>
+<h3 id="availability-and-normalization-3">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Fully normalized string/instruction contract. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-3">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/AIResponseLength.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="airesponseurlpolicyjs">AIResponseURLPolicy.js</h2>
+<h3 id="overview-4">Overview</h3>
+<p>Extracts and audits links from AI Markdown, rendered HTML, CSS, srcset, bare URLs, and email text.</p>
+<h3 id="public-surface-4">Public surface</h3>
+<p><code>auditAIResponseLinks()</code>, <code>extractAIResponseLinks()</code>, <code>normalizeAIResponseLink()</code>, <code>decodeHTMLCharacterReferences()</code>.</p>
+<p>Exact exports: <code>auditAIResponseLinks</code>, <code>decodeHTMLCharacterReferences</code>, <code>extractAIResponseLinks</code>, <code>normalizeAIResponseLink</code>.</p>
+<h3 id="availability-and-normalization-4">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Normalized frozen allowlist audit. Transport: In-process; bundled Marked parser. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-4">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/AIResponseURLPolicy.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="ansitextjs">AnsiText.js</h2>
+<h3 id="overview-5">Overview</h3>
+<p>Parses terminal ANSI sequences into display spans or strips them to plain text.</p>
+<h3 id="public-surface-5">Public surface</h3>
+<p><code>parseAnsi()</code>, <code>stripAnsi()</code>.</p>
+<p>Exact exports: <code>parseAnsi</code>, <code>stripAnsi</code>.</p>
+<h3 id="availability-and-normalization-5">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Normalized text/span output. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-5">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/AnsiText.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="apimodeldatabasejs">ApiModelDatabase.js</h2>
+<h3 id="overview-6">Overview</h3>
+<p>Fetches an injectable HTTP JSON model with parser, cache, redacted public endpoint records, and request lifecycle events.</p>
+<h3 id="public-surface-6">Public surface</h3>
+<p>default <code>ApiModelDatabase</code>; <code>setEndpoint()</code>, <code>fetch()</code>, <code>cached()</code>; emits <code>api-model-request</code>, <code>api-model-success</code>, and <code>api-model-error</code>.</p>
+<p>Exact exports: <code>appendParameters</code>, <code>default</code>, <code>publicEndpoint</code>.</p>
+<h3 id="availability-and-normalization-6">Availability and normalization</h3>
+<p><strong>Browser / native WebView / server with fetch.</strong> Request records are normalized; fetch/provider failures remain mixed. Transport: HTTP(S) fetch. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-6">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ApiModelDatabase.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="appdatascopejs">AppDataScope.js</h2>
+<h3 id="overview-7">Overview</h3>
+<p>Reconciles declared and native application identity and scopes OPFS/localStorage ownership fail-closed.</p>
+<h3 id="public-surface-7">Public surface</h3>
+<p>Identity constants and <code>canonicalApplicationId()</code>, <code>resolveApplicationId()</code>, <code>resolveApplicationLocalStorageKey()</code>, <code>openApplicationDataDirectory()</code>.</p>
+<p>Exact exports: <code>APPLICATION_ID_MAX_LENGTH</code>, <code>APPLICATION_ID_PATTERN</code>, <code>APP_DATA_DIRECTORY</code>, <code>APP_LOCAL_STORAGE_PREFIX</code>, <code>canonicalApplicationId</code>, <code>declaredApplicationId</code>, <code>openApplicationDataDirectory</code>, <code>resolveApplicationId</code>, <code>resolveApplicationLocalStorageKey</code>, <code>resolveBrowserApplicationId</code>.</p>
+<h3 id="availability-and-normalization-7">Availability and normalization</h3>
+<p><strong>Browser / native WebView hybrid.</strong> Strict normalized identifiers and coded mismatch failures. Transport: Arcane.app.current, DOM declaration, OPFS. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-7">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/AppDataScope.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="appearancepreferencesjs">AppearancePreferences.js</h2>
+<h3 id="overview-8">Overview</h3>
+<p>Defines, stores, and applies color scheme, density, reduced motion, and large-text preferences.</p>
+<h3 id="public-surface-8">Public surface</h3>
+<p><code>appearancePreferenceSchema</code>, <code>createAppearancePreferenceStore()</code>, <code>applyAppearancePreferences()</code>, <code>loadAndApplyAppearancePreferences()</code>.</p>
+<p>Exact exports: <code>appearancePreferenceSchema</code>, <code>applyAppearancePreferences</code>, <code>createAppearancePreferenceStore</code>, <code>loadAndApplyAppearancePreferences</code>.</p>
+<h3 id="availability-and-normalization-8">Availability and normalization</h3>
+<p><strong>Browser / native WebView hybrid.</strong> Normalized values; storage/host failures remain mixed. Transport: PreferenceStore, DOM, optional Arcane preferences. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-8">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/AppearancePreferences.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="arcanecommunicationbridgejs">ArcaneCommunicationBridge.js</h2>
+<h3 id="overview-9">Overview</h3>
+<p>Maps provider HTTP threads/messages/connect/disconnect endpoints to normalized communication entities.</p>
+<h3 id="public-surface-9">Public surface</h3>
+<p>default <code>ArcaneCommunicationBridge</code>; <code>request()</code>, <code>listThreads()</code>, <code>getMessages()</code>, <code>send()</code>, <code>connect()</code>, <code>disconnect()</code>.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-9">Availability and normalization</h3>
+<p><strong>Browser / native WebView / server with fetch.</strong> Entity results are normalized; provider/transport failures remain mixed. Transport: JSON HTTP(S), default loopback 127.0.0.1:8020. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-9">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ArcaneCommunicationBridge.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="arcanenavigationpolicyjs">ArcaneNavigationPolicy.js</h2>
+<h3 id="overview-10">Overview</h3>
+<p>Creates a fail-closed HTTP(S) navigation guard with domain and CIDR policy decisions.</p>
+<h3 id="public-surface-10">Public surface</h3>
+<p><code>createArcaneNavigationGuard()</code>.</p>
+<p>Exact exports: <code>createArcaneNavigationGuard</code>.</p>
+<h3 id="availability-and-normalization-10">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Normalized frozen allow/block decision. Transport: Arcane network-policy document. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-10">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ArcaneNavigationPolicy.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="arcanenetworkpolicyjs">ArcaneNetworkPolicy.js</h2>
+<h3 id="overview-11">Overview</h3>
+<p>Validates the Arcane domain/network deny policy and matches domain, IPv4/IPv6 CIDR, protocol, and port rules.</p>
+<h3 id="public-surface-11">Public surface</h3>
+<p>Policy constants plus validate/load/cache/match helpers.</p>
+<p>Exact exports: <code>ARCANE_NETWORK_POLICY_SCHEMA_VERSION</code>, <code>ARCANE_NETWORK_POLICY_URL</code>, <code>canonicalNetworkHostname</code>, <code>emptyArcaneNetworkPolicy</code>, <code>findDeniedDomainRule</code>, <code>findDeniedNetworkRule</code>, <code>invalidateArcaneNetworkPolicyCache</code>, <code>loadArcaneNetworkPolicy</code>, <code>validateArcaneNetworkPolicy</code>.</p>
+<h3 id="availability-and-normalization-11">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Strict coded normalization. Transport: Same-origin policy fetch. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-11">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ArcaneNetworkPolicy.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="asyncboundaryjs">AsyncBoundary.js</h2>
+<h3 id="overview-12">Overview</h3>
+<p>Runs one asynchronous operation with timeout, abort, result validation, and stable boundary errors.</p>
+<h3 id="public-surface-12">Public surface</h3>
+<p><code>AsyncBoundaryTimeoutError</code>, <code>AsyncBoundaryAbortError</code>, defaults, <code>runAsyncBoundary()</code>, and default alias.</p>
+<p>Exact exports: <code>AsyncBoundaryAbortError</code>, <code>AsyncBoundaryTimeoutError</code>, <code>asyncBoundaryDefaults</code>, <code>default</code>, <code>runAsyncBoundary</code>.</p>
+<h3 id="availability-and-normalization-12">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Fully normalized timeout/abort errors. Transport: AbortController and timers. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-12">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/AsyncBoundary.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="browsertestsuitejs">BrowserTestSuite.js</h2>
+<h3 id="overview-13">Overview</h3>
+<p>Runs a fixed sequential browser test list with cooperative abort, per-test timeout, and lifecycle events.</p>
+<h3 id="public-surface-13">Public surface</h3>
+<p>default <code>BrowserTestSuite</code>; <code>list()</code>, <code>run()</code>; emits suite/test start/result/complete events.</p>
+<p>Exact exports: <code>assertionError</code>, <code>default</code>, <code>skipError</code>.</p>
+<h3 id="availability-and-normalization-13">Availability and normalization</h3>
+<p><strong>Browser / standard Web APIs.</strong> Normalized result and skip/assertion errors. Transport: EventTarget and timers. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-13">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/BrowserTestSuite.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="calculatorenginejs">CalculatorEngine.js</h2>
+<h3 id="overview-14">Overview</h3>
+<p>Evaluates bounded arithmetic, powers, constants, and common functions without <code>eval</code>.</p>
+<h3 id="public-surface-14">Public surface</h3>
+<p>default <code>CalculatorEngine</code>, <code>evaluateExpression()</code>; <code>calculate()</code> emits result/error events.</p>
+<p>Exact exports: <code>default</code>, <code>evaluateExpression</code>.</p>
+<h3 id="availability-and-normalization-14">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Normalized <code>Calculation</code> result and parser errors. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-14">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/CalculatorEngine.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="caseevidenceindexerjs">CaseEvidenceIndexer.js</h2>
+<h3 id="overview-15">Overview</h3>
+<p>Pairs and indexes structured evidence records with rendered-page provenance and SHA-256 identity.</p>
+<h3 id="public-surface-15">Public surface</h3>
+<p>Eight exported indexing, page, naming, stem, and digest helpers.</p>
+<p>Exact exports: <code>indexPairedRecord</code>, <code>nearestPageMarker</code>, <code>parseStructuredRecordName</code>, <code>renderedPageBlocks</code>, <code>resolveEvidenceSourcePage</code>, <code>safeName</code>, <code>sha256</code>, <code>stem</code>.</p>
+<h3 id="availability-and-normalization-15">Availability and normalization</h3>
+<p><strong>Node only and host-internal.</strong> Normalized naming/page helpers; filesystem errors preserved. The file imports <code>node:fs/promises</code>, <code>node:path</code>, and <code>node:crypto</code>, so a renderer must not import it from <code>/arcane/modules/</code>. This SDK version does not expose it as an npm subpath; the example applies to repository-owned Node tooling. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-15">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">// From a repository-owned tools/*.mjs file:
+import {safeName, stem} from &#39;../runtime/arcane/modules/CaseEvidenceIndexer.js&#39;;
+
+console.log(safeName(&#39;Evidence 01.pdf&#39;), stem(&#39;Evidence 01.pdf&#39;));
+</code></pre></div>
+<h2 id="chartlibraryjs">ChartLibrary.js</h2>
+<h3 id="overview-16">Overview</h3>
+<p>Loads the bundled uPlot classic script once and returns its global constructor.</p>
+<h3 id="public-surface-16">Public surface</h3>
+<p>default <code>loadChartLibrary()</code>.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-16">Availability and normalization</h3>
+<p><strong>Browser / native WebView.</strong> Load state/errors normalized; uPlot result is vendor-native. Transport: DOM script injection. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-16">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ChartLibrary.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="chatrecordsjs">ChatRecords.js</h2>
+<h3 id="overview-17">Overview</h3>
+<p>Detects whether a chat record contains a meaningful user entry.</p>
+<h3 id="public-surface-17">Public surface</h3>
+<p><code>hasUserEntry()</code>.</p>
+<p>Exact exports: <code>hasUserEntry</code>.</p>
+<h3 id="availability-and-normalization-17">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Boolean normalized result. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-17">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ChatRecords.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="communicationappcontrollerjs">CommunicationAppController.js</h2>
+<h3 id="overview-18">Overview</h3>
+<p>Binds shared inbox, conversation, settings, theme, and provider workflows into one UI controller.</p>
+<h3 id="public-surface-18">Public surface</h3>
+<p>default controller with <code>start()</code>, <code>bind()</code>, <code>configure()</code>, <code>refresh()</code>, <code>select()</code>, <code>send()</code>, and settings actions.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-18">Availability and normalization</h3>
+<p><strong>Browser / native WebView hybrid.</strong> Controller state normalized; provider/DOM failures mixed. Transport: DOM plus communication providers. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-18">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/CommunicationAppController.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="communicationhubjs">CommunicationHub.js</h2>
+<h3 id="overview-19">Overview</h3>
+<p>Fans out provider refresh/send operations and aggregates normalized threads/messages.</p>
+<h3 id="public-surface-19">Public surface</h3>
+<p>default <code>CommunicationHub</code>; provider enablement, <code>refresh()</code>, <code>messages()</code>, and <code>send()</code>.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-19">Availability and normalization</h3>
+<p><strong>Cross-host with injected providers.</strong> Normalized aggregates; refresh contains per-provider failures. Transport: Injected provider contract. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-19">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/CommunicationHub.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="communicationpreferencesjs">CommunicationPreferences.js</h2>
+<h3 id="overview-20">Overview</h3>
+<p>Stores app-scoped, non-secret communication provider preferences.</p>
+<h3 id="public-surface-20">Public surface</h3>
+<p>default <code>CommunicationPreferences</code>; <code>load()</code>, <code>save()</code>.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-20">Availability and normalization</h3>
+<p><strong>Browser / native WebView hybrid.</strong> Normalized preference record; storage failures mixed. Transport: Arcane.preferences or localStorage. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-20">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/CommunicationPreferences.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="communicationproviderregistryjs">CommunicationProviderRegistry.js</h2>
+<h3 id="overview-21">Overview</h3>
+<p>Registers and queries validated provider definitions, channels, and required methods.</p>
+<h3 id="public-surface-21">Public surface</h3>
+<p>default registry with <code>register()</code>, <code>get()</code>, <code>has()</code>, <code>list()</code>.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-21">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Strict normalized registry. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-21">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/CommunicationProviderRegistry.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="componentcontractsjs">ComponentContracts.js</h2>
+<h3 id="overview-22">Overview</h3>
+<p>Owns normalized configuration/value contracts shared by chart, dashboard, Markdown, and voice components.</p>
+<h3 id="public-surface-22">Public surface</h3>
+<p>Six constant sets and twelve normalization/formatting helpers.</p>
+<p>Exact exports: <code>CHART_LABELS</code>, <code>DASHBOARD_LABELS</code>, <code>MARKDOWN_FORMATS</code>, <code>MARKDOWN_LABELS</code>, <code>VOICE_LABELS</code>, <code>VOICE_MESSAGES</code>, <code>appendTranscription</code>, <code>applyMarkdownFormat</code>, <code>effectiveDashboardVisibility</code>, <code>normalizeChartOptions</code>, <code>normalizeChartRows</code>, <code>normalizeDashboardDefinitions</code>, <code>normalizeDashboardOptions</code>, <code>normalizeDashboardVisibility</code>, <code>normalizeMarkdownFormats</code>, <code>normalizeMarkdownOptions</code>, <code>normalizeVoiceOptions</code>.</p>
+<h3 id="availability-and-normalization-22">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Fully normalized labels, rows, definitions, visibility, formats, editor and voice options. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-22">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ComponentContracts.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="configuredaichatsessionjs">ConfiguredAIChatSession.js</h2>
+<h3 id="overview-23">Overview</h3>
+<p>Owns bounded in-memory AI turns, context construction, response-length instruction, and atomic history commit.</p>
+<h3 id="public-surface-23">Public surface</h3>
+<p>default <code>ConfiguredAIChatSession</code>; <code>history()</code>, <code>clear()</code>, <code>send()</code>.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-23">Availability and normalization</h3>
+<p><strong>Native bridge by default; cross-host with injected chat.</strong> Normalized session/result; provider rejection preserved. Transport: Arcane.ai.chat or injected provider. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-23">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ConfiguredAIChatSession.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="conversationactionitemsjs">ConversationActionItems.js</h2>
+<h3 id="overview-24">Overview</h3>
+<p>Normalizes, creates, updates, remembers, selects, and formats bounded conversation action items.</p>
+<h3 id="public-surface-24">Public surface</h3>
+<p>Action-item constants and lifecycle/formatting helpers.</p>
+<p>Exact exports: <code>CONVERSATION_ACTION_ITEM_BASES</code>, <code>CONVERSATION_ACTION_ITEM_PRESENTATION_COOLDOWN_MS</code>, <code>CONVERSATION_ACTION_ITEM_STATUSES</code>, <code>MAX_CONVERSATION_ACTION_ITEMS</code>, <code>MAX_CONVERSATION_ACTION_ITEM_CHARACTERS</code>, <code>MAX_CONVERSATION_REMEMBERED_ACTIONS</code>, <code>conversationActionItemsInstruction</code>, <code>createConversationActionItem</code>, <code>formatConversationActionItemCheckIn</code>, <code>markConversationActionItemsPresented</code>, <code>normalizeConversationActionItem</code>, <code>normalizeConversationActionItems</code>, <code>normalizeRememberedConversationActions</code>, <code>outstandingConversationActionItems</code>, <code>rememberConversationActionItems</code>, <code>removeConversationActionItem</code>, <code>selectConversationActionItemsForPresentation</code>, <code>updateConversationActionItem</code>.</p>
+<h3 id="availability-and-normalization-24">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Fully normalized status/base/presentation contract. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-24">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ConversationActionItems.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="conversationclosingreportjs">ConversationClosingReport.js</h2>
+<h3 id="overview-25">Overview</h3>
+<p>Defines the closing-report tool, instruction, result normalizer, call classifier, and formatter.</p>
+<h3 id="public-surface-25">Public surface</h3>
+<p>Six constants/helpers for closing reports.</p>
+<p>Exact exports: <code>CONVERSATION_CLOSING_REPORT_TOOL_NAME</code>, <code>classifyConversationClosingReportCalls</code>, <code>conversationClosingReportInstruction</code>, <code>createConversationClosingReportTool</code>, <code>formatConversationClosingReport</code>, <code>normalizeConversationClosingReport</code>.</p>
+<h3 id="availability-and-normalization-25">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Fully normalized report contract. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-25">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ConversationClosingReport.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="conversationtimeboxjs">ConversationTimebox.js</h2>
+<h3 id="overview-26">Overview</h3>
+<p>Owns conversation limits, control messages, submission barriers, elapsed formatting, and delivery proof.</p>
+<h3 id="public-surface-26">Public surface</h3>
+<p>default <code>ConversationTimebox</code>, <code>ConversationSubmissionBarrier</code>, constants and control helpers.</p>
+<p>Exact exports: <code>CONVERSATION_TIMEBOX_LIMIT_MESSAGE</code>, <code>CONVERSATION_TIMEBOX_OPENING_INSTRUCTION</code>, <code>CONVERSATION_TIMEBOX_TOOL_NAME</code>, <code>ConversationSubmissionBarrier</code>, <code>appendConversationTimeboxOpeningInstruction</code>, <code>consumeConversationTimeboxCall</code>, <code>conversationTimeboxSubmissionKey</code>, <code>conversationTimeboxTool</code>, <code>createConversationTimeboxControlMessage</code>, <code>default</code>, <code>formatConversationElapsed</code>, <code>normalizeConversationTimeboxCommand</code>, <code>requireConversationTimeboxDelivery</code>.</p>
+<h3 id="availability-and-normalization-26">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Fully normalized state/command/delivery errors. Transport: Clock/timers and callbacks. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-26">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ConversationTimebox.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="corelocalmodelcatalogjs">CoreLocalModelCatalog.js</h2>
+<h3 id="overview-27">Overview</h3>
+<p>Projects Core local-AI status into UI-safe admitted model and speech availability catalogs.</p>
+<h3 id="public-surface-27">Public surface</h3>
+<p>Provider-mode constant and four catalog/availability helpers.</p>
+<p>Exact exports: <code>USER_MANAGED_LOOPBACK_PROVIDER_MODE</code>, <code>getCoreLocalModelCatalog</code>, <code>getCoreLocalModelCatalogWithAdmissionFailures</code>, <code>getCoreLocalSpeechAvailability</code>, <code>isUserManagedLoopbackLocalAIStatus</code>.</p>
+<h3 id="availability-and-normalization-27">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Fully normalized descriptors and stable admission labels. Transport: In-process projection of Core status. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-27">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/CoreLocalModelCatalog.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="datamaintenancejs">DataMaintenance.js</h2>
+<h3 id="overview-28">Overview</h3>
+<p>Deletes empty chats and associated/empty memory records inside the current app data scope.</p>
+<h3 id="public-surface-28">Public surface</h3>
+<p><code>clearEmptyChatsAndMemories()</code> plus content predicates.</p>
+<p>Exact exports: <code>clearEmptyChatsAndMemories</code>, <code>hasMemoryContent</code>, <code>hasUserEntry</code>.</p>
+<h3 id="availability-and-normalization-28">Availability and normalization</h3>
+<p><strong>Browser / native WebView.</strong> Normalized counts; destructive storage failures preserved. Transport: Global DBOPFS. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-28">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/DataMaintenance.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="dblsjs">DBLS.js</h2>
+<h3 id="overview-29">Overview</h3>
+<p>Provides app-scoped localStorage tables, batch reads/writes, filtering, deletion, and counts.</p>
+<h3 id="public-surface-29">Public surface</h3>
+<p>default <code>DBLS</code>; installs <code>window.dbls</code>, emits <code>dbls-ready</code>; CRUD/batch/key APIs.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-29">Availability and normalization</h3>
+<p><strong>Browser / native WebView.</strong> Scoped keys and values normalized; storage failures mixed. Transport: localStorage + AppDataScope. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-29">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/DBLS.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="dbopfsjs">DBOPFS.js</h2>
+<h3 id="overview-30">Overview</h3>
+<p>Provides app-scoped OPFS tables, worker I/O, backup/restore, compression, and CRUD/batch APIs.</p>
+<h3 id="public-surface-30">Public surface</h3>
+<p>default <code>DBOPFS</code>; installs <code>window.dbopfs</code>, emits <code>dbopfs-ready</code>; table/file/backup APIs.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-30">Availability and normalization</h3>
+<p><strong>Browser / native WebView.</strong> App scope normalized; DOM/storage errors preserved. Transport: OPFS, DBOPFSWorker, Compression Streams. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-30">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/DBOPFS.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="dbopfsworkerjs">DBOPFSWorker.js</h2>
+<h3 id="overview-31">Overview</h3>
+<p>Serializes OPFS sync-handle read/write requests from a MessagePort.</p>
+<h3 id="public-surface-31">Public surface</h3>
+<p>No ESM exports; accepts <code>read</code> and <code>write</code> port requests.</p>
+<p>This is a dedicated worker protocol and has no ESM exports.</p>
+<h3 id="availability-and-normalization-31">Availability and normalization</h3>
+<p><strong>Dedicated worker.</strong> Responses normalize to <code>{success,fileData?}</code> or <code>{error:{name,message}}</code>. Transport: MessageChannel + OPFS sync access handle. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-31">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const worker = new Worker(&#39;/arcane/modules/DBOPFSWorker.js&#39;, {type: &#39;module&#39;});
+</code></pre></div>
+<h2 id="developmentworkspacejs">DevelopmentWorkspace.js</h2>
+<h3 id="overview-32">Overview</h3>
+<p>Provides bounded workspace inspection, context, setup task, and Node installer clients without arbitrary command execution.</p>
+<h3 id="public-surface-32">Public surface</h3>
+<p>default <code>DevelopmentWorkspace</code> and input validators; <code>inspect()</code>, <code>context()</code>, <code>setup()</code>, <code>installNode()</code>.</p>
+<p>Exact exports: <code>contextQuery</code>, <code>default</code>, <code>setupTaskId</code>, <code>workspaceRoot</code>.</p>
+<h3 id="availability-and-normalization-32">Availability and normalization</h3>
+<p><strong>Native bridge.</strong> Inputs normalized; provider result/error preserved. Transport: Arcane.development. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-32">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/DevelopmentWorkspace.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="directorypickerjs">DirectoryPicker.js</h2>
+<h3 id="overview-33">Overview</h3>
+<p>Wraps the provider-owned native directory chooser and normalizes selected/cancelled/error results.</p>
+<h3 id="public-surface-33">Public surface</h3>
+<p>default <code>DirectoryPicker</code>, <code>normalizeDirectoryPickerOptions()</code>, <code>normalizeDirectorySelection()</code>.</p>
+<p>Exact exports: <code>default</code>, <code>normalizeDirectoryPickerOptions</code>, <code>normalizeDirectorySelection</code>.</p>
+<h3 id="availability-and-normalization-33">Availability and normalization</h3>
+<p><strong>Native bridge.</strong> Strict normalized selection and coded errors. Transport: Arcane.filesystem.selectDirectory. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-33">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/DirectoryPicker.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="documentnavigationjs">DocumentNavigation.js</h2>
+<h3 id="overview-34">Overview</h3>
+<p>Binds document navigation, filtering, history, current-item reveal, and load initialization.</p>
+<h3 id="public-surface-34">Public surface</h3>
+<p>Five binding/filter/reveal helpers.</p>
+<p>Exact exports: <code>applyDocumentNavigationFilter</code>, <code>bindDocumentNavigation</code>, <code>clearDocumentNavigationFilter</code>, <code>initializeDocumentNavigation</code>, <code>revealCurrentDocumentNavigationItem</code>.</p>
+<h3 id="availability-and-normalization-34">Availability and normalization</h3>
+<p><strong>Browser / native WebView.</strong> Normalized filter/navigation state; DOM effects preserved. Transport: DOM and history. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-34">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/DocumentNavigation.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="errorsjs">Errors.js</h2>
+<h3 id="overview-35">Overview</h3>
+<p>Normalizes global errors/rejections, fingerprints and deduplicates incidents, persists a ledger, and performs bounded delivery.</p>
+<h3 id="public-surface-35">Public surface</h3>
+<p>default <code>Errors</code>; event normalizers/fingerprint plus lifecycle, capture, delivery and teardown methods.</p>
+<p>Exact exports: <code>default</code>, <code>fingerprintIncident</code>, <code>normalizeErrorEvent</code>, <code>normalizeRejectionEvent</code>.</p>
+<h3 id="availability-and-normalization-35">Availability and normalization</h3>
+<p><strong>Browser / native WebView hybrid.</strong> Incident records normalized; storage/mail failures isolated. Transport: Window events, DBOPFS, Mail. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-35">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/Errors.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="gifencoderjs">GifEncoder.js</h2>
+<h3 id="overview-36">Overview</h3>
+<p>Encodes indexed frames into a bounded animated GIF using palette mapping and LZW.</p>
+<h3 id="public-surface-36">Public surface</h3>
+<p>default <code>GifEncoder</code>, <code>indexPixels()</code>, <code>lzw()</code>.</p>
+<p>Exact exports: <code>default</code>, <code>indexPixels</code>, <code>lzw</code>.</p>
+<h3 id="availability-and-normalization-36">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Normalized byte output and bounds. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-36">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/GifEncoder.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="htmlimportjs">HTMLImport.js</h2>
+<h3 id="overview-37">Overview</h3>
+<p>Defines the same-origin <code>&lt;html-import&gt;</code> loader with open shadow root, inline script execution, and readiness/error events.</p>
+<h3 id="public-surface-37">Public surface</h3>
+<p>default <code>HTMLImport</code>; registers <code>html-import</code>; <code>connectedCallback()</code> and <code>ready</code>.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-37">Availability and normalization</h3>
+<p><strong>Browser / native WebView.</strong> Public error detail normalized; fetch/DOM failure preserved. Transport: Same-origin fetch + DOM. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-37">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/HTMLImport.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="inmemorycommunicationproviderjs">InMemoryCommunicationProvider.js</h2>
+<h3 id="overview-38">Overview</h3>
+<p>Implements deterministic in-memory thread/message/send behavior for demos and tests.</p>
+<h3 id="public-surface-38">Public surface</h3>
+<p>default provider with <code>listThreads()</code>, <code>getMessages()</code>, <code>send()</code>.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-38">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Normalized communication entities. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-38">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/InMemoryCommunicationProvider.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="isolatedmodelquestionrunnerjs">IsolatedModelQuestionRunner.js</h2>
+<h3 id="overview-39">Overview</h3>
+<p>Inspects one exact model and runs one isolated question with proof validation.</p>
+<h3 id="public-surface-39">Public surface</h3>
+<p>default/named runner, <code>countSentences()</code>, <code>inspectModel()</code>, <code>runQuestion()</code>.</p>
+<p>Exact exports: <code>IsolatedModelQuestionRunner</code>, <code>countSentences</code>, <code>default</code>.</p>
+<h3 id="availability-and-normalization-39">Availability and normalization</h3>
+<p><strong>Native bridge or injected provider.</strong> Strict normalized proof/coded errors. Transport: localAI isolated-model methods. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-39">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/IsolatedModelQuestionRunner.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="localaireadinessjs">LocalAIReadiness.js</h2>
+<h3 id="overview-40">Overview</h3>
+<p>Derives selected AI requirements and returns a frozen readiness/recovery report across browser, desktop, and Android modes.</p>
+<h3 id="public-surface-40">Public surface</h3>
+<p>Endpoint constant plus requirements, speech-health, and readiness helpers.</p>
+<p>Exact exports: <code>LOCAL_AI_BROWSER_ENDPOINTS</code>, <code>checkLocalAIReadiness</code>, <code>deriveLocalAIRequirements</code>, <code>evaluateLocalSpeechHealth</code>.</p>
+<h3 id="availability-and-normalization-40">Availability and normalization</h3>
+<p><strong>Browser/native hybrid.</strong> Fully normalized report and stable error codes; browsers never probe Ollama. Transport: Arcane.localAI, Arcane.speech, bounded browser speech health. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-40">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/LocalAIReadiness.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="localaireadinesscontrollerjs">LocalAIReadinessController.js</h2>
+<h3 id="overview-41">Overview</h3>
+<p>Coordinates local-AI status component checks, ensured recovery, availability projection, and teardown.</p>
+<h3 id="public-surface-41">Public surface</h3>
+<p><code>createLocalAIReadinessController()</code>, <code>availabilityFromReport()</code>.</p>
+<p>Exact exports: <code>availabilityFromReport</code>, <code>createLocalAIReadinessController</code>.</p>
+<h3 id="availability-and-normalization-41">Availability and normalization</h3>
+<p><strong>Browser/native hybrid.</strong> Normalized controller state and change events. Transport: LocalAIReadiness + component events. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-41">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/LocalAIReadinessController.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="mailjs">Mail.js</h2>
+<h3 id="overview-42">Overview</h3>
+<p>Builds bounded reports and prefers the native mail capability with an explicit HTTP transport fallback.</p>
+<h3 id="public-surface-42">Public surface</h3>
+<p>default <code>Mail</code>, <code>resolveMailConfig()</code>; installs <code>window.mail</code>; <code>send()</code>.</p>
+<p>Exact exports: <code>default</code>, <code>resolveMailConfig</code>.</p>
+<h3 id="availability-and-normalization-42">Availability and normalization</h3>
+<p><strong>Browser/native hybrid + cloud.</strong> Mail inputs/results normalized; transport failures mixed. Transport: Arcane.mail.send or MailTransport HTTP(S). <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-42">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/Mail.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="mailtransportmjs">MailTransport.mjs</h2>
+<h3 id="overview-43">Overview</h3>
+<p>Sends one bounded mail report to a normalized HTTP(S) endpoint with timeout and response-size limits.</p>
+<h3 id="public-surface-43">Public surface</h3>
+<p>Timeout/size constants, <code>normalizeMailEndpoint()</code>, <code>sendMailReport()</code>.</p>
+<p>Exact exports: <code>DEFAULT_MAIL_REQUEST_TIMEOUT_MS</code>, <code>MAX_MAIL_RESPONSE_BYTES</code>, <code>normalizeMailEndpoint</code>, <code>sendMailReport</code>.</p>
+<h3 id="availability-and-normalization-43">Availability and normalization</h3>
+<p><strong>Browser/server with fetch + cloud.</strong> Normalized endpoint/timeout/size errors; remote detail bounded. Transport: HTTP(S) fetch + AbortController. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-43">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/MailTransport.mjs&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="markedminjs">Marked.min.js</h2>
+<h3 id="overview-44">Overview</h3>
+<p>Vendored Marked 18.0.5 Markdown lexer, parser, renderer, extension, and walk-token API.</p>
+<h3 id="public-surface-44">Public surface</h3>
+<p>Twenty named/default-style Marked exports; see bundled license notice.</p>
+<p>Exact exports: <code>Hooks</code>, <code>Lexer</code>, <code>Marked</code>, <code>Parser</code>, <code>Renderer</code>, <code>TextRenderer</code>, <code>Tokenizer</code>, <code>defaults</code>, <code>getDefaults</code>, <code>lexer</code>, <code>marked</code>, <code>options</code>, <code>parse</code>, <code>parseInline</code>, <code>parser</code>, <code>setOptions</code>, <code>use</code>, <code>walkTokens</code>.</p>
+<h3 id="availability-and-normalization-44">Availability and normalization</h3>
+<p><strong>Cross-host vendor module.</strong> Vendor-native Marked contract. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-44">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/Marked.min.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="mdjs">MD.js</h2>
+<h3 id="overview-45">Overview</h3>
+<p>Renders Markdown with Marked and exposes a DOM-sanitized projection.</p>
+<h3 id="public-surface-45">Public surface</h3>
+<p>default <code>MD</code>; <code>raw</code>, <code>rendered</code>, <code>safeRendered</code>, <code>append()</code>.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-45">Availability and normalization</h3>
+<p><strong>Browser / native WebView.</strong> Raw Marked behavior plus Arcane sanitization; parse errors vendor-native. Transport: Marked + DOM template sanitization. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-45">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/MD.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="memoryrecordsjs">MemoryRecords.js</h2>
+<h3 id="overview-46">Overview</h3>
+<p>Normalizes memory content and detects meaningful stored memory.</p>
+<h3 id="public-surface-46">Public surface</h3>
+<p><code>normalizeMemoryContent()</code>, <code>hasMemoryContent()</code>.</p>
+<p>Exact exports: <code>hasMemoryContent</code>, <code>normalizeMemoryContent</code>.</p>
+<h3 id="availability-and-normalization-46">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Fully normalized string/boolean results. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-46">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/MemoryRecords.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="messageadvisoryjs">MessageAdvisory.js</h2>
+<h3 id="overview-47">Overview</h3>
+<p>Normalizes message content advisories and contains per-message inspection failures.</p>
+<h3 id="public-surface-47">Public surface</h3>
+<p>Three advisory/inspection helpers.</p>
+<p>Exact exports: <code>inspectMessageRecords</code>, <code>normalizeContentAdvisory</code>, <code>unavailableMessageInspection</code>.</p>
+<h3 id="availability-and-normalization-47">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Normalized advisory records; inspector failures converted to unavailable results. Transport: Injected inspector. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-47">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/MessageAdvisory.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="modeldefinitionjs">ModelDefinition.js</h2>
+<h3 id="overview-48">Overview</h3>
+<p>Parses the deterministic packaged Modelfile subset and extracts the SYSTEM prompt.</p>
+<h3 id="public-surface-48">Public surface</h3>
+<p><code>parseModelDefinition()</code>, <code>loadModelDefinitionSystemPrompt()</code>.</p>
+<p>Exact exports: <code>loadModelDefinitionSystemPrompt</code>, <code>parseModelDefinition</code>.</p>
+<h3 id="availability-and-normalization-48">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Strict normalized definition with coded syntax errors. Transport: Optional same-origin read-only fetch. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-48">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ModelDefinition.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="ollamajs">Ollama.js</h2>
+<h3 id="overview-49">Overview</h3>
+<p>Provides the first-class Arcane Ollama client without direct access to localhost:11434.</p>
+<h3 id="public-surface-49">Public surface</h3>
+<p><code>Ollama</code>, singleton/default <code>ollama</code>; 24 methods; installs <code>globalThis.arcaneOllama</code>, emits <code>arcane-ollama-ready</code>.</p>
+<p>Exact exports: <code>Ollama</code>, <code>default</code>, <code>ollama</code>.</p>
+<h3 id="availability-and-normalization-49">Availability and normalization</h3>
+<p><strong>Native bridge.</strong> Principal methods preserve provider-native envelopes; readiness/text/unload helpers normalize. Transport: Arcane.ollama through Core. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-49">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/Ollama.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="ollamamodelidentifierjs">OllamaModelIdentifier.js</h2>
+<h3 id="overview-50">Overview</h3>
+<p>Validates and canonicalizes the syntax of Ollama model identifiers without granting model admission.</p>
+<h3 id="public-surface-50">Public surface</h3>
+<p><code>normalizeOllamaModelIdentifier()</code>, <code>isOllamaModelIdentifier()</code>.</p>
+<p>Exact exports: <code>isOllamaModelIdentifier</code>, <code>normalizeOllamaModelIdentifier</code>.</p>
+<h3 id="availability-and-normalization-50">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Fully normalized string/boolean result. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-50">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/OllamaModelIdentifier.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="ollamasettingsjs">OllamaSettings.js</h2>
+<h3 id="overview-51">Overview</h3>
+<p>Defines bounded runtime/service preference schemas and deterministic Arcane brain alias names.</p>
+<h3 id="public-surface-51">Public surface</h3>
+<p><code>ollamaRuntimeSchema</code>, <code>ollamaServiceSchema</code>, <code>arcaneBrainModelName()</code>.</p>
+<p>Exact exports: <code>arcaneBrainModelName</code>, <code>ollamaRuntimeSchema</code>, <code>ollamaServiceSchema</code>.</p>
+<h3 id="availability-and-normalization-51">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Fully normalized settings/name contract. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-51">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/OllamaSettings.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="openmeteoweatherproviderjs">OpenMeteoWeatherProvider.js</h2>
+<h3 id="overview-52">Overview</h3>
+<p>Searches and loads Open-Meteo data into frozen Arcane weather entities.</p>
+<h3 id="public-surface-52">Public surface</h3>
+<p>Endpoint constants, default provider, <code>mapForecast()</code>; search/load methods and lifecycle events.</p>
+<p>Exact exports: <code>OPEN_METEO_ENDPOINTS</code>, <code>default</code>, <code>mapForecast</code>.</p>
+<h3 id="availability-and-normalization-52">Availability and normalization</h3>
+<p><strong>Browser / native WebView / server with fetch + cloud.</strong> Provider data normalized to entities; transport errors mixed. Transport: Open-Meteo HTTPS. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-52">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/OpenMeteoWeatherProvider.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="preferencestorejs">PreferenceStore.js</h2>
+<h3 id="overview-53">Overview</h3>
+<p>Loads and updates schema-defined app preferences through native storage with a narrow browser fallback.</p>
+<h3 id="public-surface-53">Public surface</h3>
+<p>default <code>PreferenceStore</code>, re-exported <code>Preference</code>/schema; load/set/reset APIs and events.</p>
+<p>Exact exports: <code>Preference</code>, <code>default</code>, <code>preferenceSchema</code>.</p>
+<h3 id="availability-and-normalization-53">Availability and normalization</h3>
+<p><strong>Browser/native hybrid.</strong> Values normalized; only exact unsupported capability falls back. Transport: Arcane.preferences or app-scoped localStorage. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-53">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/PreferenceStore.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="qrcodeminjs">QRCode.min.js</h2>
+<h3 id="overview-54">Overview</h3>
+<p>Vendored QRCode generator for DOM, canvas, SVG, and image output.</p>
+<h3 id="public-surface-54">Public surface</h3>
+<p>No ESM exports; global <code>QRCode</code>, <code>makeCode()</code>, <code>makeImage()</code>, <code>clear()</code>, <code>CorrectLevel</code>.</p>
+<p>This is a classic global script and has no ESM exports.</p>
+<h3 id="availability-and-normalization-54">Availability and normalization</h3>
+<p><strong>Browser vendor script.</strong> Vendor-native. Transport: Classic script global + DOM/canvas/SVG. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-54">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;script src=&quot;/arcane/modules/QRCode.min.js&quot;&gt;&lt;/script&gt;
+</code></pre></div>
+<h2 id="questionnairejs">Questionnaire.js</h2>
+<h3 id="overview-55">Overview</h3>
+<p>Evaluates whether a one-time questionnaire prompt is due without performing the prompt.</p>
+<h3 id="public-surface-55">Public surface</h3>
+<p>Notification default and <code>Questionnaire</code> with timing/check methods.</p>
+<p>Exact exports: <code>DEFAULT_QUESTIONNAIRE_NOTIFICATION_TIME_MS</code>, <code>Questionnaire</code>.</p>
+<h3 id="availability-and-normalization-55">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Normalized fail-closed boolean. Transport: In-process clock only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-55">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/Questionnaire.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="recordlinkindexjs">RecordLinkIndex.js</h2>
+<h3 id="overview-56">Overview</h3>
+<p>Parses record links and builds their normalized index.</p>
+<h3 id="public-surface-56">Public surface</h3>
+<p><code>parseRecordLinks()</code>, <code>buildRecordLinkIndex()</code>.</p>
+<p>Exact exports: <code>buildRecordLinkIndex</code>, <code>parseRecordLinks</code>.</p>
+<h3 id="availability-and-normalization-56">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Fully normalized. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-56">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/RecordLinkIndex.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="recordpassageindexjs">RecordPassageIndex.js</h2>
+<h3 id="overview-57">Overview</h3>
+<p>Indexes text lines, page markers, dates, rules, and excerpts for record review.</p>
+<h3 id="public-surface-57">Public surface</h3>
+<p>Eight text/page/date/rule helper exports.</p>
+<p>Exact exports: <code>cleanExcerpt</code>, <code>extractDateMentions</code>, <code>findRulePassages</code>, <code>pageAtLine</code>, <code>pageMarkers</code>, <code>parseDateMention</code>, <code>textLines</code>, <code>validIsoDate</code>.</p>
+<h3 id="availability-and-normalization-57">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Fully normalized. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-57">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/RecordPassageIndex.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="recordreviewstorejs">RecordReviewStore.js</h2>
+<h3 id="overview-58">Overview</h3>
+<p>Stores normalized record-review decisions through native storage or app-scoped local fallback.</p>
+<h3 id="public-surface-58">Public surface</h3>
+<p>default store, record/review normalizers; <code>load()</code>, <code>get()</code>, <code>set()</code>, <code>snapshot()</code>, change event.</p>
+<p>Exact exports: <code>default</code>, <code>normalizeRecordId</code>, <code>normalizeReview</code>.</p>
+<h3 id="availability-and-normalization-58">Availability and normalization</h3>
+<p><strong>Browser/native hybrid.</strong> Normalized ids/reviews/snapshots; storage failures mixed. Transport: Arcane.storage or localStorage. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-58">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/RecordReviewStore.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="revocableprojectionledgerjs">RevocableProjectionLedger.js</h2>
+<h3 id="overview-59">Overview</h3>
+<p>Implements an append-only bounded in-memory projection/revocation ledger safe for hostile descriptor inputs.</p>
+<h3 id="public-surface-59">Public surface</h3>
+<p>Ledger classes, limits/status/reason constants, clone/fingerprint/port helpers, append/query/list APIs.</p>
+<p>Exact exports: <code>DEFAULT_PROJECTION_LEDGER_CAPACITY</code>, <code>DEFAULT_PROJECTION_LEDGER_STORED_CHARACTERS</code>, <code>DEFAULT_PROJECTION_LEDGER_STORED_NODES</code>, <code>DEFAULT_PROJECTION_LEDGER_STORED_UTF8_BYTES</code>, <code>MAX_PROJECTION_LEDGER_CAPACITY</code>, <code>MAX_PROJECTION_LEDGER_STORED_CHARACTERS</code>, <code>MAX_PROJECTION_LEDGER_STORED_NODES</code>, <code>MAX_PROJECTION_LEDGER_STORED_UTF8_BYTES</code>, <code>PROJECTION_LEDGER_LIMITS</code>, <code>PROJECTION_LEDGER_REASON_CODES</code>, <code>PROJECTION_LEDGER_SCHEMA_VERSION</code>, <code>PROJECTION_LEDGER_STATUSES</code>, <code>ProjectionLedgerError</code>, <code>RevocableProjectionLedger</code>, <code>cloneProjectionLedgerValue</code>, <code>createProjectionLedgerFingerprint</code>, <code>createRevocableProjectionLedgerPortAdapter</code>, <code>default</code>.</p>
+<h3 id="availability-and-normalization-59">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Strict normalization with stable <code>ProjectionLedgerError</code>. Transport: In-process or explicit port adapter. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-59">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/RevocableProjectionLedger.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="risksignalanalyzerjs">RiskSignalAnalyzer.js</h2>
+<h3 id="overview-60">Overview</h3>
+<p>Matches configured risk signals and levels against bounded text.</p>
+<h3 id="public-surface-60">Public surface</h3>
+<p><code>DEFAULT_LEVELS</code>, <code>analyzeRiskSignals()</code>.</p>
+<p>Exact exports: <code>DEFAULT_LEVELS</code>, <code>analyzeRiskSignals</code>.</p>
+<h3 id="availability-and-normalization-60">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Fully normalized. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-60">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/RiskSignalAnalyzer.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="scamriskpolicyjs">ScamRiskPolicy.js</h2>
+<h3 id="overview-61">Overview</h3>
+<p>Combines deterministic scam signals with Arcane blocked-domain evidence and safety guidance.</p>
+<h3 id="public-surface-61">Public surface</h3>
+<p>Signals plus load, assess, and guidance helpers.</p>
+<p>Exact exports: <code>assessScamRisk</code>, <code>loadScamNetworkPolicy</code>, <code>scamRiskSignals</code>, <code>scamSafetyGuidance</code>.</p>
+<h3 id="availability-and-normalization-61">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Fully normalized. Transport: Arcane network policy fetch. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-61">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ScamRiskPolicy.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="scopedopfscachejs">ScopedOPFSCache.js</h2>
+<h3 id="overview-62">Overview</h3>
+<p>Provides a narrow exact-key JSON cache inside one app-owned OPFS namespace.</p>
+<h3 id="public-surface-62">Public surface</h3>
+<p>default <code>ScopedOPFSCache</code>; support check and get/set/delete APIs.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-62">Availability and normalization</h3>
+<p><strong>Browser / native WebView.</strong> Keys/limits/corruption handling normalized; storage errors mixed. Transport: OPFS + AppDataScope. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-62">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ScopedOPFSCache.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="screencapturejs">ScreenCapture.js</h2>
+<h3 id="overview-63">Overview</h3>
+<p>Captures a display surface as image, video, or GIF with explicit lifecycle events.</p>
+<h3 id="public-surface-63">Public surface</h3>
+<p>default <code>ScreenCapture</code>; acquire/capture/start/stop/reset methods.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-63">Availability and normalization</h3>
+<p><strong>Browser / native WebView.</strong> State/events normalized; permission and codec errors mixed. Transport: getDisplayMedia, MediaRecorder, canvas, GifEncoder. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-63">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ScreenCapture.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="speechplaybackjs">SpeechPlayback.js</h2>
+<h3 id="overview-64">Overview</h3>
+<p>Segments bounded text, queues latest-request speech synthesis, and controls lookahead HTML audio playback.</p>
+<h3 id="public-surface-64">Public surface</h3>
+<p>SpeechPlayback class/default, voice/limit constants, <code>splitSpeechText()</code>, playback lifecycle APIs.</p>
+<p>Exact exports: <code>MAX_SPEECH_CHARACTERS</code>, <code>MAX_SPEECH_CHUNKS</code>, <code>MAX_SPEECH_INPUT</code>, <code>PREFERRED_STREAM_SEGMENT</code>, <code>SPEECH_VOICE_ALIASES</code>, <code>SPEECH_VOICE_OPTIONS</code>, <code>SpeechPlayback</code>, <code>default</code>, <code>splitSpeechText</code>.</p>
+<h3 id="availability-and-normalization-64">Availability and normalization</h3>
+<p><strong>Browser + native bridge.</strong> State/limits normalized; provider/media failures mixed. Transport: Arcane.speech.synthesize, Blob URLs, audio element. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-64">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/SpeechPlayback.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="staticdocumentcatalogjs">StaticDocumentCatalog.js</h2>
+<h3 id="overview-65">Overview</h3>
+<p>Loads a positive static document inventory with byte/hash verification, cache, search, and bounded context.</p>
+<h3 id="public-surface-65">Public surface</h3>
+<p>default catalog, schema constant, catalog normalizer/cache-key; list/get/search/hydrate/context APIs.</p>
+<p>Exact exports: <code>CATALOG_SCHEMA_VERSION</code>, <code>default</code>, <code>normalizeStaticDocumentCatalog</code>, <code>staticDocumentCacheKey</code>.</p>
+<h3 id="availability-and-normalization-65">Availability and normalization</h3>
+<p><strong>Browser / native WebView / server with fetch.</strong> Strict catalog/content normalization; transport failures mixed. Transport: HTTP(S), crypto.subtle, optional cache. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-65">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/StaticDocumentCatalog.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="systemappearancejs">SystemAppearance.js</h2>
+<h3 id="overview-66">Overview</h3>
+<p>Reads or applies native appearance, returning an explicit unsupported browser state when no bridge exists.</p>
+<h3 id="public-surface-66">Public surface</h3>
+<p>default <code>SystemAppearance</code>; <code>available()</code>, <code>current()</code>, <code>apply()</code>.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-66">Availability and normalization</h3>
+<p><strong>Browser/native hybrid.</strong> Absent bridge normalized; native result/error preserved. Transport: Arcane.appearance. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-66">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/SystemAppearance.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="systemplatformpresentationjs">SystemPlatformPresentation.js</h2>
+<h3 id="overview-67">Overview</h3>
+<p>Maps kernel names to presentation labels/classes without granting platform authority.</p>
+<h3 id="public-surface-67">Public surface</h3>
+<p>No ESM exports; global <code>ArcaneSystemPlatformPresentation</code> with <code>kernelType()</code>, <code>displayName()</code>, <code>apply()</code>.</p>
+<p>This is a classic global script and has no ESM exports.</p>
+<h3 id="availability-and-normalization-67">Availability and normalization</h3>
+<p><strong>Browser / native WebView classic script.</strong> Fully normalized presentation only. Transport: DOM. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-67">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;script src=&quot;/arcane/modules/SystemPlatformPresentation.js&quot;&gt;&lt;/script&gt;
+</code></pre></div>
+<h2 id="systemtoolregistryjs">SystemToolRegistry.js</h2>
+<h3 id="overview-68">Overview</h3>
+<p>Registers validated command builders and constructs command strings without executing them.</p>
+<h3 id="public-surface-68">Public surface</h3>
+<p>default registry, <code>quoteArgument()</code>, register/list/get/build APIs.</p>
+<p>Exact exports: <code>default</code>, <code>quoteArgument</code>.</p>
+<h3 id="availability-and-normalization-68">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Fully normalized definitions/quoting. Transport: In-process only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-68">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/SystemToolRegistry.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="terminalclientjs">TerminalClient.js</h2>
+<h3 id="overview-69">Overview</h3>
+<p>Maps native terminal sessions and Arcane events into an EventTarget client.</p>
+<h3 id="public-surface-69">Public surface</h3>
+<p>default <code>TerminalClient</code>; start/write/resize/signal/close/receive/destroy APIs and terminal events.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-69">Availability and normalization</h3>
+<p><strong>Native bridge.</strong> Client events/state normalized; native result/error mixed. Transport: Arcane.terminal + Arcane.events. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-69">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/TerminalClient.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="terminalcommandregistryjs">TerminalCommandRegistry.js</h2>
+<h3 id="overview-70">Overview</h3>
+<p>Routes parsed command lines to injected handlers and provides definitions/completions.</p>
+<h3 id="public-surface-70">Public surface</h3>
+<p>default registry, <code>splitCommandLine()</code>, register/resolve/definitions/completions/execute APIs.</p>
+<p>Exact exports: <code>default</code>, <code>splitCommandLine</code>.</p>
+<h3 id="availability-and-normalization-70">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Parsing/routing normalized; handler result/error preserved. Transport: Injected handlers. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-70">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/TerminalCommandRegistry.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="themebootstrapjs">ThemeBootstrap.js</h2>
+<h3 id="overview-71">Overview</h3>
+<p>Performs import-time Arcane theme loading and subscribes to native appearance changes.</p>
+<h3 id="public-surface-71">Public surface</h3>
+<p><code>bootstrapArcaneTheme()</code>, <code>arcaneThemeReady</code>, default ready promise.</p>
+<p>Exact exports: <code>arcaneThemeReady</code>, <code>bootstrapArcaneTheme</code>, <code>default</code>.</p>
+<h3 id="availability-and-normalization-71">Availability and normalization</h3>
+<p><strong>Browser/native hybrid.</strong> Theme state normalized; storage/native errors mixed. Transport: ThemeManager + Arcane.events. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-71">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ThemeBootstrap.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="thememanagerjs">ThemeManager.js</h2>
+<h3 id="overview-72">Overview</h3>
+<p>Loads, applies, previews, saves, resets, and synchronizes semantic Arcane themes.</p>
+<h3 id="public-surface-72">Public surface</h3>
+<p>default <code>ThemeManager</code>, <code>loadAndApplyTheme()</code>; scheme/custom/system APIs and <code>arcane-theme-change</code>.</p>
+<p>Exact exports: <code>default</code>, <code>loadAndApplyTheme</code>.</p>
+<h3 id="availability-and-normalization-72">Availability and normalization</h3>
+<p><strong>Browser/native hybrid.</strong> Theme values/events normalized; storage/native failures mixed. Transport: PreferenceStore, DOM, Arcane.appearance. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-72">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ThemeManager.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="timeguardjs">TimeGuard.js</h2>
+<h3 id="overview-73">Overview</h3>
+<p>Persists and evaluates clock rollback and grace-period state.</p>
+<h3 id="public-surface-73">Public surface</h3>
+<p>default <code>TimeGuard</code>; installs <code>window.timeguard</code>, emits <code>time-guard-ready</code>; clock methods.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-73">Availability and normalization</h3>
+<p><strong>Browser / native WebView.</strong> Time decisions normalized; storage lifecycle mixed. Transport: User + DBOPFS. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-73">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/TimeGuard.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="toolcallrouterjs">ToolCallRouter.js</h2>
+<h3 id="overview-74">Overview</h3>
+<p>Parses OpenAI-style tool calls and dispatches complete or streamed calls to injected handlers.</p>
+<h3 id="public-surface-74">Public surface</h3>
+<p><code>parseArguments()</code>, <code>handleResponse()</code>, <code>handleStreamedCalls()</code>.</p>
+<p>Exact exports: <code>handleResponse</code>, <code>handleStreamedCalls</code>, <code>parseArguments</code>.</p>
+<h3 id="availability-and-normalization-74">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Arguments/routing normalized; handler results returned or all-settled. Transport: Injected handlers. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-74">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/ToolCallRouter.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="uplotiifeminjs">uPlot.iife.min.js</h2>
+<h3 id="overview-75">Overview</h3>
+<p>Vendored uPlot chart constructor and rendering runtime.</p>
+<h3 id="public-surface-75">Public surface</h3>
+<p>No ESM exports; global <code>uPlot</code> with data/series/scale/cursor/hook/selection/destroy APIs.</p>
+<p>This is a classic global script and has no ESM exports.</p>
+<h3 id="availability-and-normalization-75">Availability and normalization</h3>
+<p><strong>Browser vendor script.</strong> Vendor-native. Transport: Classic script + canvas/DOM. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-75">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;script src=&quot;/arcane/modules/uPlot.iife.min.js&quot;&gt;&lt;/script&gt;
+</code></pre></div>
+<h2 id="uplotlicensetxt">uPlot.LICENSE.txt</h2>
+<h3 id="overview-76">Overview</h3>
+<p>License companion for the bundled uPlot vendor runtime.</p>
+<h3 id="public-surface-76">Public surface</h3>
+<p>MIT license text.</p>
+<h3 id="availability-and-normalization-76">Availability and normalization</h3>
+<p><strong>Documentation asset.</strong> Not executable. Transport: None. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-76">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">/arcane/modules/uPlot.LICENSE.txt
+</code></pre></div>
+<h2 id="uplotmincss">uPlot.min.css</h2>
+<h3 id="overview-77">Overview</h3>
+<p>Bundled uPlot presentation stylesheet.</p>
+<h3 id="public-surface-77">Public surface</h3>
+<p>Load with a stylesheet link before rendering uPlot charts.</p>
+<h3 id="availability-and-normalization-77">Availability and normalization</h3>
+<p><strong>Browser stylesheet.</strong> Presentation only. Transport: CSS. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-77">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;link rel=&quot;stylesheet&quot; href=&quot;/arcane/modules/uPlot.min.css&quot;&gt;
+</code></pre></div>
+<h2 id="waitforcomponentjs">WaitForComponent.js</h2>
+<h3 id="overview-78">Overview</h3>
+<p>Waits for a component property, method, or readiness event with optional error event and bounded timeout.</p>
+<h3 id="public-surface-78">Public surface</h3>
+<p>default <code>waitForComponent()</code>.</p>
+<p>Exact exports: <code>default</code>.</p>
+<h3 id="availability-and-normalization-78">Availability and normalization</h3>
+<p><strong>Cross-host EventTarget / browser component.</strong> Normalized coded readiness, error, and timeout results. Transport: EventTarget + timers. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-78">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/WaitForComponent.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="youtubemediajs">YouTubeMedia.js</h2>
+<h3 id="overview-79">Overview</h3>
+<p>Validates YouTube video/playlist locators and constructs privacy-enhanced embed URLs.</p>
+<h3 id="public-surface-79">Public surface</h3>
+<p><code>parseYouTubeMedia()</code>, <code>youtubeEmbedUrl()</code>.</p>
+<p>Exact exports: <code>parseYouTubeMedia</code>, <code>youtubeEmbedUrl</code>.</p>
+<h3 id="availability-and-normalization-79">Availability and normalization</h3>
+<p><strong>Cross-host.</strong> Fully normalized. Transport: URL construction only. <a href="../protocols/">Deep protocol details</a>.</p>
+<h3 id="example-79">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import * as module from &#39;/arcane/modules/YouTubeMedia.js&#39;;
+
+console.log(Object.keys(module));
+</code></pre></div>
+<h2 id="entity-and-component-continuations">Entity and component continuations</h2>
+<ul>
+<li><a href="../runtime-entities/">Runtime entity modules</a> explains all 15 modules, and <a href="../core/arcane-entities/">shared entity contracts</a> owns all 35 exports.</li>
+<li><a href="../runtime-components/">Runtime components</a> owns all 39 HTML-import fragments, methods, slots, and events.</li>
+<li><a href="../arcane-ollama/">Arcane Ollama</a> expands the raw-versus-normalized behavior of <code>Ollama.js</code>.</li>
+</ul>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/runtime-modules.md" target="_blank" rel="noreferrer"><code>docs/reference/runtime-modules.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#availability-shorthand">Availability shorthand</a><a href="#canonical-inventory">Canonical inventory</a><a href="#aijs">AI.js</a><a href="#aipreferenceruntimejs">AIPreferenceRuntime.js</a><a href="#aipreferencetuplejs">AIPreferenceTuple.js</a><a href="#airesponselengthjs">AIResponseLength.js</a><a href="#airesponseurlpolicyjs">AIResponseURLPolicy.js</a><a href="#ansitextjs">AnsiText.js</a><a href="#apimodeldatabasejs">ApiModelDatabase.js</a><a href="#appdatascopejs">AppDataScope.js</a><a href="#appearancepreferencesjs">AppearancePreferences.js</a><a href="#arcanecommunicationbridgejs">ArcaneCommunicationBridge.js</a><a href="#arcanenavigationpolicyjs">ArcaneNavigationPolicy.js</a><a href="#arcanenetworkpolicyjs">ArcaneNetworkPolicy.js</a><a href="#asyncboundaryjs">AsyncBoundary.js</a><a href="#browsertestsuitejs">BrowserTestSuite.js</a><a href="#calculatorenginejs">CalculatorEngine.js</a><a href="#caseevidenceindexerjs">CaseEvidenceIndexer.js</a><a href="#chartlibraryjs">ChartLibrary.js</a><a href="#chatrecordsjs">ChatRecords.js</a><a href="#communicationappcontrollerjs">CommunicationAppController.js</a><a href="#communicationhubjs">CommunicationHub.js</a><a href="#communicationpreferencesjs">CommunicationPreferences.js</a><a href="#communicationproviderregistryjs">CommunicationProviderRegistry.js</a><a href="#componentcontractsjs">ComponentContracts.js</a><a href="#configuredaichatsessionjs">ConfiguredAIChatSession.js</a><a href="#conversationactionitemsjs">ConversationActionItems.js</a><a href="#conversationclosingreportjs">ConversationClosingReport.js</a><a href="#conversationtimeboxjs">ConversationTimebox.js</a><a href="#corelocalmodelcatalogjs">CoreLocalModelCatalog.js</a><a href="#datamaintenancejs">DataMaintenance.js</a><a href="#dblsjs">DBLS.js</a><a href="#dbopfsjs">DBOPFS.js</a><a href="#dbopfsworkerjs">DBOPFSWorker.js</a><a href="#developmentworkspacejs">DevelopmentWorkspace.js</a><a href="#directorypickerjs">DirectoryPicker.js</a><a href="#documentnavigationjs">DocumentNavigation.js</a><a href="#errorsjs">Errors.js</a><a href="#gifencoderjs">GifEncoder.js</a><a href="#htmlimportjs">HTMLImport.js</a></nav><p class="toc-more">43 additional sections remain searchable in the page.</p></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>

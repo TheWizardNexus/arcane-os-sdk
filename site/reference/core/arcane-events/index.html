@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="Arcane.events delivers renderer-visible host and Core events. A named subscription such as Arcane.events.on(&#39;operation.progress&#39;, listener) receives that ev…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-events/"><link rel="icon" type="image/png" href="../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../styles.css"><link rel="stylesheet" href="../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane events · Arcane OS SDK"><meta property="og:description" content="Arcane.events delivers renderer-visible host and Core events. A named subscription such as Arcane.events.on(&#39;operation.progress&#39;, listener) receives that ev…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-events/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane events · Arcane OS SDK"><meta name="twitter:description" content="Arcane.events delivers renderer-visible host and Core events. A named subscription such as Arcane.events.on(&#39;operation.progress&#39;, listener) receives that ev…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane events | Arcane OS SDK</title><script src="../../../app.js" defer></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../">Overview</a><a href="../../../guides/">Guides</a><a href="../../../examples/">Examples</a><a href="../../../playground/">Playground</a><a href="../../../testing/">Testing</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="../../">Reference home</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Core</a><span aria-hidden="true">/</span><span aria-current="page">Arcane events</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-events">Arcane events</h1><p class="doc-lead">Arcane.events delivers renderer-visible host and Core events. A named subscription such as Arcane.events.on(&#39;operation.progress&#39;, listener) receives that ev…</p><div class="doc-meta"><span>SDK 0.1.0-dev.5</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Arcane Ollama</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../">Core map</a><a href="../arcane-api/">Arcane API</a><a href="./" aria-current="page">Events</a><a href="../arcane-ai-contracts/">AI contracts</a><a href="../arcane-entities/">Entity exports</a><a href="../ollama-module/">Ollama module</a><a href="../reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/core/arcane-events.md"><p><code>Arcane.events</code> delivers renderer-visible host and Core events. A named subscription such as <code>Arcane.events.on(&#39;operation.progress&#39;, listener)</code> receives that event&#39;s payload object directly. A wildcard subscription made with <code>Arcane.events.on(&#39;*&#39;, listener)</code> receives an envelope shaped as <code>{ event, data }</code>; <code>*</code> is a subscription selector, not an emitted event name.</p>
+<p><code>Arcane.events.on()</code> and <code>Arcane.events.once()</code> observe only future deliveries. <code>Arcane.events.once()</code> removes its subscription before invoking the listener and therefore observes only the next matching delivery. Most events are live notifications and are not replayed, so subscribe before starting the work that can emit them.</p>
+<p><code>transport.ready</code> and <code>core.ready</code> are the two durable completion events. <code>Arcane.events.when(name, listener)</code> accepts only those names. It waits once when completion has not happened, or asynchronously replays the first deeply frozen JSON snapshot when completion has already happened. <code>Arcane.events.completed(name)</code> reports whether a designated durable event has completed; it is not a payload accessor.</p>
+<p>Every subscription method returns an unsubscribe function. Call it when the owning view or task is torn down. An exception thrown by one listener is caught and reported to the console, and does not stop the remaining named or wildcard listeners.</p>
+<h2 id="event-inventory">Event inventory</h2>
+<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Delivery</th>
+<th>Hosts</th>
+<th>Trigger</th>
+<th>Payload</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>transport.ready</code></td>
+<td>Durable completion. The first payload is frozen; a late <code>when()</code> subscriber receives an asynchronous replay.</td>
+<td>Every initialized Arcane transport: Microsoft NT WebView2, Linux WebKitGTK, Android WebView, and development HTTP.</td>
+<td>The renderer initializes the bridge and selects its available transport.</td>
+<td><code>protocol</code> is the selected wire-protocol identifier; <code>transport</code> is <code>webview2</code>, <code>webkitgtk</code>, <code>android-webview</code>, or <code>development-http</code>.</td>
+</tr>
+<tr>
+<td><code>core.ready</code></td>
+<td>Durable completion. The first payload is frozen; a late <code>when()</code> subscriber receives an asynchronous replay.</td>
+<td>Core-backed Microsoft NT, Linux, and development HTTP hosts.</td>
+<td>The Core has installed its input handlers and is ready to accept requests.</td>
+<td><code>pid</code> is the Core process ID; <code>version</code> is its Arcane version; <code>app</code> is the active application mode; <code>platform</code> is the public operating-system snapshot; <code>elevated</code> reports elevated execution; <code>simulation</code> reports simulation mode.</td>
+</tr>
+<tr>
+<td><code>core.error</code></td>
+<td>Live, future-only notification.</td>
+<td>Core-backed Microsoft NT, Linux, and development HTTP hosts.</td>
+<td>The Core cannot decode or handle an inbound control frame.</td>
+<td>A normalized error object: <code>code</code> and <code>message</code> identify the failure; fields such as <code>resolution</code>, <code>technicalMessage</code>, <code>status</code>, <code>retryable</code>, and <code>diagnosticId</code> provide recovery and diagnostic context when available.</td>
+</tr>
+<tr>
+<td><code>operation.started</code></td>
+<td>Live, future-only operation notification.</td>
+<td>Core-backed Microsoft NT, Linux, and development HTTP hosts.</td>
+<td>A tracked Core operation is created.</td>
+<td><code>requestId</code> correlates the initiating API request; <code>operationId</code> identifies the tracked operation; <code>operationType</code> names its kind; <code>time</code> is the operation start timestamp.</td>
+</tr>
+<tr>
+<td><code>operation.log</code></td>
+<td>Live, future-only operation notification; one operation can emit many entries.</td>
+<td>Core-backed Microsoft NT, Linux, and development HTTP hosts.</td>
+<td>A tracked operation records a log entry.</td>
+<td><code>requestId</code>, <code>operationId</code>, and <code>operationType</code> correlate the operation; <code>time</code> timestamps the entry; <code>level</code> classifies it; <code>message</code> is the readable entry; <code>details</code> carries optional structured context.</td>
+</tr>
+<tr>
+<td><code>operation.progress</code></td>
+<td>Live, future-only operation notification; one operation can emit many updates.</td>
+<td>Core-backed Microsoft NT, Linux, and development HTTP hosts.</td>
+<td>A tracked operation advances or reports its current step.</td>
+<td><code>requestId</code>, <code>operationId</code>, and <code>operationType</code> correlate the operation; <code>progress</code> is its nondecreasing percentage; <code>message</code> describes the current step; <code>details</code> is optional structured progress context.</td>
+</tr>
+<tr>
+<td><code>operation.completed</code></td>
+<td>Live, future-only terminal operation notification.</td>
+<td>Core-backed Microsoft NT, Linux, and development HTTP hosts.</td>
+<td>A tracked operation finishes successfully, including success with warnings.</td>
+<td><code>requestId</code>, <code>operationId</code>, and <code>operationType</code> correlate the operation; <code>result</code> is its public result; <code>credentials</code> carries any operation-issued credentials and must be treated as sensitive; <code>details</code> is final progress context; <code>warningCount</code> counts warnings; <code>message</code> summarizes completion; <code>time</code> is the completion timestamp.</td>
+</tr>
+<tr>
+<td><code>operation.failed</code></td>
+<td>Live, future-only terminal operation notification.</td>
+<td>Core-backed Microsoft NT, Linux, and development HTTP hosts.</td>
+<td>A tracked operation reaches its failure path.</td>
+<td><code>requestId</code>, <code>operationId</code>, and <code>operationType</code> correlate the operation; <code>error</code> is the normalized failure object; <code>details</code> is final progress context; <code>time</code> is the failure timestamp.</td>
+</tr>
+<tr>
+<td><code>ollama.chunk</code></td>
+<td>Live, future-only correlated stream notification.</td>
+<td>Core-backed hosts and admitted Android application hosts for proxied chat streaming.</td>
+<td>An Ollama streaming operation receives its next response chunk.</td>
+<td><code>streamId</code> identifies the stream selected by the caller or Arcane; <code>operation</code> names the streamed Ollama operation; <code>chunk</code> is the provider response object for that delivery.</td>
+</tr>
+<tr>
+<td><code>localai.isolated.phase</code></td>
+<td>Live, future-only correlated operation notification.</td>
+<td>Core-backed hosts for an application admitted to isolated inference.</td>
+<td>An isolated-model question enters a lifecycle phase or emits a chat heartbeat.</td>
+<td><code>operationId</code> correlates the request; <code>phase</code> is <code>unload_before</code>, <code>verify_before</code>, <code>chat</code>, <code>unload_after</code>, or <code>verify_after</code>; chat heartbeats additionally set <code>heartbeat</code> to <code>true</code>, report <code>elapsedMs</code>, and timestamp themselves with <code>at</code>.</td>
+</tr>
+<tr>
+<td><code>terminal.output</code></td>
+<td>Live, future-only correlated session stream.</td>
+<td>Core-backed Arcane Terminal and Android Arcane Terminal hosts.</td>
+<td>A terminal process produces standard output or standard error.</td>
+<td><code>sessionId</code> identifies the terminal session; <code>stream</code> is <code>stdout</code> or <code>stderr</code>; <code>data</code> is a UTF-8 text chunk and is not guaranteed to be a complete line.</td>
+</tr>
+<tr>
+<td><code>terminal.exit</code></td>
+<td>Live, future-only terminal session notification.</td>
+<td>Core-backed Arcane Terminal and Android Arcane Terminal hosts.</td>
+<td>A terminal process exits and the host removes its session.</td>
+<td><code>sessionId</code> identifies the terminal session; <code>exitCode</code> is the process exit code when available; <code>signal</code> is the terminating signal name or <code>null</code>.</td>
+</tr>
+<tr>
+<td><code>terminal.error</code></td>
+<td>Live, future-only terminal session notification.</td>
+<td>Android Arcane Terminal hosts.</td>
+<td>Android stops a session at its output limit or cannot read one of its output streams.</td>
+<td><code>sessionId</code> identifies the terminal session; <code>message</code> explains the output-limit or stream-reading failure.</td>
+</tr>
+<tr>
+<td><code>appearance.changed</code></td>
+<td>Live, future-only host notification.</td>
+<td>Microsoft NT WebView2 hosts.</td>
+<td>The host observes an operating-system appearance change.</td>
+<td><code>scheme</code> is the configured host scheme; <code>effectiveScheme</code> is the resolved <code>dark</code> or <code>light</code> scheme; <code>source</code> is <code>windows</code>.</td>
+</tr>
+</tbody></table>
+</div>
+<h3 id="subscribe-and-clean-up">Subscribe and clean up</h3>
+<p>Keep the returned function with the UI or operation that owns the subscription:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const stopProgress = Arcane.events.on(&#39;operation.progress&#39;, function handleOperationProgress(data) {
+  console.info(`${data.operationId}: ${data.progress}%`, data.message);
+});
+
+window.addEventListener(&#39;pagehide&#39;, stopProgress, { once: true });
+</code></pre></div>
+<p>A wildcard listener is useful for routing or diagnostics, but its callback shape differs from a named listener. Avoid logging payloads indiscriminately because results can contain credentials or other sensitive values.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const observedEventNames = [];
+const stopObserving = Arcane.events.on(&#39;*&#39;, function handleAnyArcaneEvent({ event, data }) {
+  observedEventNames.push(event);
+  routeArcaneEvent(event, data);
+});
+
+window.addEventListener(&#39;pagehide&#39;, stopObserving, { once: true });
+</code></pre></div>
+<h3 id="wait-for-durable-readiness">Wait for durable readiness</h3>
+<p>Use <code>when()</code> when a component can mount before or after readiness. The callback is still asynchronous when the durable completion already exists.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const stopReady = Arcane.events.when(&#39;core.ready&#39;, function handleCoreReady({ version, platform }) {
+  showRuntimeReady({ version, platform });
+});
+
+if (Arcane.events.completed(&#39;core.ready&#39;)) {
+  showRuntimeConnecting(false);
+}
+
+window.addEventListener(&#39;pagehide&#39;, stopReady, { once: true });
+</code></pre></div>
+<p>Do not use <code>when()</code> for operation, streaming, terminal, appearance, or error events. Those events have no retained completion value.</p>
+<h3 id="follow-a-terminal-lifecycle">Follow a terminal lifecycle</h3>
+<p>Subscribe before <code>Arcane.terminal.start()</code>. Output, exit, or error delivery can race the start response, so buffer by <code>sessionId</code> until the returned session identifies the stream to keep. Append <code>data</code> chunks as delivered rather than assuming one event equals one line.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const terminalOutput = document.querySelector(&#39;[data-terminal-output]&#39;);
+const buffered = [];
+const maxBufferedEvents = 128;
+let sessionId = null;
+
+function handleTerminalEvent(event, data) {
+  if (sessionId === null) {
+    buffered.push({ event, data });
+    // Bound pre-identification buffering; surface truncation in a real UI.
+    if (buffered.length &gt; maxBufferedEvents) buffered.shift();
+    return;
+  }
+  if (data.sessionId !== sessionId) return;
+  if (event === &#39;terminal.output&#39;) {
+    terminalOutput?.append(document.createTextNode(data.data));
+  } else if (event === &#39;terminal.exit&#39;) {
+    terminalOutput?.append(document.createTextNode(`\n[exit ${data.exitCode}]`));
+  } else {
+    terminalOutput?.append(document.createTextNode(`\n[terminal error: ${data.message}]`));
+  }
+}
+
+const stopTerminalEvents = [
+  Arcane.events.on(&#39;terminal.output&#39;, function handleTerminalOutput(data) {
+    handleTerminalEvent(&#39;terminal.output&#39;, data);
+  }),
+  Arcane.events.on(&#39;terminal.exit&#39;, function handleTerminalExit(data) {
+    handleTerminalEvent(&#39;terminal.exit&#39;, data);
+  }),
+  Arcane.events.on(&#39;terminal.error&#39;, function handleTerminalError(data) {
+    handleTerminalEvent(&#39;terminal.error&#39;, data);
+  }),
+];
+
+try {
+  const session = await Arcane.terminal.start({ shell: &#39;auto&#39; });
+  sessionId = session.id;
+  for (const item of buffered.splice(0)) handleTerminalEvent(item.event, item.data);
+  const lineEnding = [&#39;powershell&#39;, &#39;cmd&#39;].includes(session.shell) ? &#39;\r\n&#39; : &#39;\n&#39;;
+  await Arcane.terminal.write(sessionId, `echo ready${lineEnding}`);
+} finally {
+  if (sessionId !== null) {
+    await Arcane.terminal.close(sessionId).catch(function ignoreTerminalCloseFailure() {});
+  }
+  for (const stop of stopTerminalEvents) stop();
+}
+</code></pre></div>
+<p>Use the host-appropriate line ending when submitting interactive commands: <code>\r\n</code> for PowerShell or Command Prompt and <code>\n</code> for POSIX shells.</p>
+<h3 id="event-lifecycle-guidance">Event lifecycle guidance</h3>
+<ul>
+<li>Subscribe before starting work, then correlate with <code>requestId</code>, <code>operationId</code>, <code>streamId</code>, or <code>sessionId</code>. Unrelated work can emit the same named event concurrently.</li>
+<li>Treat <code>operation.completed</code> and <code>operation.failed</code> as the terminal event for an <code>operationId</code>; progress and log events are intermediate and are not retained.</li>
+<li>Treat <code>operation.completed.credentials</code> as sensitive. Do not write it to logs or durable application storage.</li>
+<li>Treat streaming and terminal payloads as ordered deliveries for their correlation ID, not as complete messages or lines. Apply resource bounds when buffering.</li>
+<li>Unsubscribe on teardown even after a one-shot workflow. <code>once()</code> and a pending <code>when()</code> clean themselves up when invoked, but their returned unsubscribe function cancels an abandoned wait.</li>
+<li>Host scope describes where an event can be emitted; it does not grant the capability needed to start the underlying operation.</li>
+</ul>
+<p class="reference-source">Canonical source: <a class="reference-source-link" href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/core/arcane-events.md" target="_blank" rel="noreferrer"><code>docs/reference/core/arcane-events.md</code> <span aria-hidden="true">↗</span></a></p></article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#event-inventory">Event inventory</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.0-dev.5, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
+</body>
+</html>
