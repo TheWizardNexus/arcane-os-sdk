@@ -35,6 +35,13 @@ test('packed npm artifact installs and drives an external repository end to end'
     let workspaceRoot;
     let appRoot;
     let installedCli;
+    const exactArtifactRequired=process.env.ARCANE_SDK_EXACT_ARTIFACT_REQUIRED==='true';
+
+    if(exactArtifactRequired){
+        assert.ok(releaseMetadataPath,'The exact-artifact matrix requires producer metadata.');
+        assert.ok(process.env.ARCANE_SDK_EXPECTED_PLATFORM,'The exact-artifact matrix requires a platform identity.');
+        assert.ok(process.env.ARCANE_SDK_EXPECTED_ARCHITECTURE,'The exact-artifact matrix requires an architecture identity.');
+    }
 
     if(process.env.CI==='true'&&!releaseMetadataPath){
         await t.test('defers release packing to the single CI producer',()=>{
@@ -217,6 +224,10 @@ async function npmExec(arguments_){
 }
 
 test('installed SDK lifecycle exercises its project-local Arcane CLI',async t=>{
+    await t.test('runs on the required native host',()=>{
+        assert.equal(process.platform,${JSON.stringify(process.env.ARCANE_SDK_EXPECTED_PLATFORM??process.platform)});
+        assert.equal(process.arch,${JSON.stringify(process.env.ARCANE_SDK_EXPECTED_ARCHITECTURE??process.arch)});
+    });
     await t.test('reports the packed SDK version',async()=>{
         const result=await npmExec(['exec','--offline','--','arcane','version','--output','json']);
         assert.equal(result.code,0,result.stderr);
@@ -324,7 +335,7 @@ test('installed SDK lifecycle exercises its project-local Arcane CLI',async t=>{
         assert.equal(verification.bundleSha256,bundleResult.bundleSha256);
     });
 
-    await t.test('builds a portable artifact through a loaded native provider',async()=>{
+    await t.test('enforces the portable provider host contract',async()=>{
         const arcaneRoot=path.join(temporary,'synthetic-arcane');
         const providerPath=path.join(
             arcaneRoot,'machine_bundles','arcane-os-machine-bundle','tools','portable-native-provider.mjs'
@@ -351,14 +362,17 @@ const provider={
     if(!toolchains.has(receipt))throw new Error('foreign toolchain receipt');
     return receipt;
   },
-  async build({toolchainReceipt,appDescriptor,appReleaseReceipt,readAppReleaseFile,outputRoot}){
+  async build({toolchainReceipt,appDescriptor,appReleaseReceipt,readAppReleaseFile,outputRoot,targetRequest}){
     if(!toolchains.has(toolchainReceipt))throw new Error('foreign toolchain receipt');
     const selected=appReleaseReceipt.files.find(file=>file.path.endsWith('/index.html'))??appReleaseReceipt.files[0];
     const bytes=await readAppReleaseFile(selected.path);
     const artifactRoot=path.join(outputRoot,appDescriptor.id);
     await mkdir(artifactRoot,{recursive:true});
     await writeFile(path.join(artifactRoot,'PACKED_SDK_NATIVE_PROOF.txt'),bytes);
-    const artifactReceipt=Object.freeze({kind:'packed-sdk-native-artifact',artifactRoot,sourcePath:selected.path,bytes:bytes.length});
+    const artifactReceipt=Object.freeze({
+      kind:'packed-sdk-native-artifact',artifactRoot,sourcePath:selected.path,bytes:bytes.length,
+      platform:targetRequest.platform,architecture:targetRequest.architecture
+    });
     artifacts.add(artifactReceipt);
     return {artifactReceipt};
   },
@@ -375,10 +389,25 @@ export default arcaneNativeBuilderProvider;
             installedCli,'build','--target','portable','--workspace',workspaceRoot,
             '--arcane-root',arcaneRoot,'--output','json'
         ],{cwd:workspaceRoot,timeout:60_000});
+        if(process.platform==='darwin'){
+            assert.equal(nativeBuilt.code,1,`${nativeBuilt.stdout}\n${nativeBuilt.stderr}`);
+            const nativeFailure=JSON.parse(nativeBuilt.stdout);
+            assert.equal(nativeFailure.error.code,'ARCANE_TARGET_UNAVAILABLE');
+            assert.equal(
+                nativeFailure.error.message,
+                `The portable native provider does not support ${process.platform}/${process.arch}.`
+            );
+            return;
+        }
         assert.equal(nativeBuilt.code,0,`${nativeBuilt.stdout}\n${nativeBuilt.stderr}`);
         const nativeResult=JSON.parse(nativeBuilt.stdout).result;
         assert.equal(nativeResult.artifactReceipt.kind,'packed-sdk-native-artifact');
         assert.ok(nativeResult.artifactReceipt.bytes>0);
+        assert.equal(
+            nativeResult.artifactReceipt.platform,
+            process.platform==='win32'?'windows':process.platform
+        );
+        assert.equal(nativeResult.artifactReceipt.architecture,process.arch);
         assert.equal(
             await readFile(path.join(
                 workspaceRoot,'build','portable','external-app','PACKED_SDK_NATIVE_PROOF.txt'

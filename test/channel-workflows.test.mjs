@@ -66,6 +66,8 @@ test('Check builds one npm tarball and executes those exact bytes on every suppo
     assert.match(exerciseJob,/Exercise the downloaded tarball through Vanilla Test[\s\S]*npm_config_cache:/u);
     assert.match(workflow,/Use the pinned native test toolchain[\s\S]*node-version: 22\.23\.2/u);
     assert.match(workflow,/ARCANE_SDK_NPM_RELEASE_METADATA:[\s\S]*bin\/arcane-test\.mjs test\/tarball\.test\.mjs/u);
+    assert.match(exerciseJob,/ARCANE_SDK_EXACT_ARTIFACT_REQUIRED: true/u);
+    assert.doesNotMatch(exerciseJob,/continue-on-error:\s*true/u);
     assert.match(workflow,/npm_release_ready:[\s\S]*PACK_RESULT[\s\S]*MATRIX_RESULT/u);
     assert.doesNotMatch(workflow,/npm install --global/u);
 });
