@@ -29,36 +29,36 @@
     ]
   },
   "fileCount": 18,
-  "totalBytes": 9134804,
-  "contentSha256": "d11bb6aba5d0f69709054121fb6681b6d4b269016717a1c96b02acc9fce787c7",
+  "totalBytes": 9148806,
+  "contentSha256": "7094080260359caf25ac748d4b80ce96a1ba88c07f24e68b3d3c326a8fef1df7",
   "files": [
     {
       "path": "ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json",
       "sourcePath": "browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json",
       "provenance": "sdk-source-identity",
-      "bytes": 3136,
-      "sha256": "6cb3227e88a2ccb329c14a069d55f76c694b836ce58927f3688d5816c43cd8c9"
+      "bytes": 3173,
+      "sha256": "5e3868eb6ec9d0ca0df6797c22b56209fce6f210638b49f41b26edb374f7c1a3"
     },
     {
       "path": "ai/browser-wasm-llm-provider.mjs",
       "sourcePath": "browser-runtime/ai/browser-wasm-llm-provider.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 46058,
-      "sha256": "06dd4ca7d3e9de410b6a9e587ea4fe7650abbb97fc8050bd5900c00de5181652"
+      "bytes": 55047,
+      "sha256": "bdee1bd818d3ac4c943eb126803859227440efd4be07dac149b62744e690cfec"
     },
     {
       "path": "ai/browser-wasm.mjs",
       "sourcePath": "browser-runtime/ai/browser-wasm.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 1593,
-      "sha256": "2f8dc34c81b293a3410e96854dda2953ba2513b0e7d6ce025a5295aef0507356"
+      "bytes": 1820,
+      "sha256": "d4042863879a9d2af5801f9b0ba747ecd0d2110d6aa83147cbac37b63453f02e"
     },
     {
       "path": "ai/browser-wllama-runtime.mjs",
       "sourcePath": "browser-runtime/ai/browser-wllama-runtime.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 24362,
-      "sha256": "a2d0abc9f1c45f7f86811459d9cf0ae024d04a8df9db8a1d3fba113c5c4a6964"
+      "bytes": 24598,
+      "sha256": "d7027a2c9b463f325ea0410bb46df869cea926a85f5fe16f826f45be38ebea52"
     },
     {
       "path": "ai/internal/sha256.mjs",
@@ -71,8 +71,8 @@
       "path": "ai/model-controller.mjs",
       "sourcePath": "browser-runtime/ai/model-controller.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 19159,
-      "sha256": "922a9653f48c19093f02d7307c9600c70a1742c3b7a315df3ab2023db8025905"
+      "bytes": 23672,
+      "sha256": "a36aea3e62835cf568bd03ebc4be0fa8e0112a15dc9fec3c213b1c8cefa33b56"
     },
     {
       "path": "ai/wllama/LICENCE",

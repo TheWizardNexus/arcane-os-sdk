@@ -1,5 +1,96 @@
 export const ARCANE_AI_ADAPTER_PROTOCOL = "arcane-ai-adapter/1";
 
+const SECURITY_KEYS = Object.freeze(["secure", "checks"]);
+const SECURITY_CHECK_KEYS = Object.freeze(["byteLength", "sha256"]);
+const EMPTY_SECURITY_CHECKS = Object.freeze({});
+const EMPTY_MODEL_SECURITY = Object.freeze({ checks: EMPTY_SECURITY_CHECKS });
+
+function closedSecurityRecord(value, keys, label) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new TypeError(`${label} must be a plain object when provided.`);
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new TypeError(`${label} must be a plain object when provided.`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== "string" || !keys.includes(key)) {
+      throw new TypeError(`${label} contains an unknown ${String(key)} field.`);
+    }
+    if (descriptors[key].get || descriptors[key].set) {
+      throw new TypeError(`${label}.${key} must be a data property.`);
+    }
+  }
+  return descriptors;
+}
+
+export function normalizeModelSecurity(value, label = "security") {
+  if (value === undefined) return EMPTY_MODEL_SECURITY;
+  const descriptors = closedSecurityRecord(value, SECURITY_KEYS, label);
+  const normalized = {};
+  if (descriptors.secure?.value !== undefined) {
+    if (typeof descriptors.secure.value !== "boolean") {
+      throw new TypeError(`${label}.secure must be a boolean when provided.`);
+    }
+    normalized.secure = descriptors.secure.value;
+  }
+
+  let checks = EMPTY_SECURITY_CHECKS;
+  if (descriptors.checks?.value !== undefined) {
+    const checkDescriptors = closedSecurityRecord(
+      descriptors.checks.value,
+      SECURITY_CHECK_KEYS,
+      `${label}.checks`,
+    );
+    const normalizedChecks = {};
+    for (const check of SECURITY_CHECK_KEYS) {
+      if (checkDescriptors[check]?.value === undefined) continue;
+      if (typeof checkDescriptors[check].value !== "boolean") {
+        throw new TypeError(`${label}.checks.${check} must be a boolean when provided.`);
+      }
+      normalizedChecks[check] = checkDescriptors[check].value;
+    }
+    checks = Object.freeze(normalizedChecks);
+  }
+  normalized.checks = checks;
+  return Object.freeze(normalized);
+}
+
+export function resolveModelSecurity({ app, binding, load } = {}) {
+  const scopes = [
+    normalizeModelSecurity(app, "app security"),
+    normalizeModelSecurity(binding, "provider security"),
+    normalizeModelSecurity(load, "load security"),
+  ];
+  let secure = false;
+  let byteLength;
+  let sha256;
+  for (const scope of scopes) {
+    if (Object.hasOwn(scope, "secure")) secure = scope.secure;
+    if (Object.hasOwn(scope.checks, "byteLength")) byteLength = scope.checks.byteLength;
+    if (Object.hasOwn(scope.checks, "sha256")) sha256 = scope.checks.sha256;
+  }
+  return Object.freeze({
+    secure,
+    checks: Object.freeze({
+      byteLength: byteLength ?? secure,
+      sha256: sha256 ?? secure,
+    }),
+  });
+}
+
+export function sameModelSecurity(left, right) {
+  return left?.checks?.byteLength === right?.checks?.byteLength
+    && left?.checks?.sha256 === right?.checks?.sha256;
+}
+
+function hasModelSecurityOverrides(value) {
+  return Object.hasOwn(value, "secure")
+    || Object.hasOwn(value.checks, "byteLength")
+    || Object.hasOwn(value.checks, "sha256");
+}
+
 const ERROR_CODES = Object.freeze({
   load: "ARCANE_AI_LOAD_FAILED",
   unload: "ARCANE_AI_UNLOAD_FAILED",
@@ -133,8 +224,10 @@ function toolRecordFromCompletion(completion) {
 export class ModelController {
   #provider;
   #loadPolicy;
+  #security;
   #listeners = new Map();
   #loadPromise = null;
+  #readyPolicyResolved = false;
   #unloadPromise = null;
   #disposePromise = null;
   #operationGeneration = 0;
@@ -145,7 +238,7 @@ export class ModelController {
   #progress = null;
   #error = null;
 
-  constructor({ provider, loadPolicy = "on-demand" } = {}) {
+  constructor({ provider, loadPolicy = "on-demand", security } = {}) {
     if (!provider || typeof provider !== "object") {
       throw new TypeError("ModelController requires an LLM provider.");
     }
@@ -164,10 +257,13 @@ export class ModelController {
     }
     this.#provider = provider;
     this.#loadPolicy = loadPolicy;
+    this.#security = normalizeModelSecurity(security, "app security");
   }
 
   status() {
-    const providerStatus = providerMethod(this.#provider, "status")?.() ?? {};
+    const providerStatus = providerMethod(this.#provider, "status")?.(
+      Object.freeze({ security: this.#security }),
+    ) ?? {};
     return Object.freeze({
       ...providerStatus,
       kind: "llm",
@@ -221,16 +317,40 @@ export class ModelController {
         { operation: "load" },
       );
     }
-    if (state === "ready") return this.status();
-    if (this.#loadPromise) return this.#loadPromise;
     const load = providerMethod(this.#provider, "load");
     if (!load) throw new ArcaneAIError("ARCANE_AI_UNAVAILABLE", "The LLM provider cannot load a model.");
     const signal = options.signal ?? null;
+    const explicitOperationSecurity = options.security !== undefined;
+    const securityMustResolve = explicitOperationSecurity
+      || (
+        state === "ready"
+        && !this.#readyPolicyResolved
+        && hasModelSecurityOverrides(this.#security)
+      );
+    if (state === "ready" && !securityMustResolve) return this.status();
+    if (this.#loadPromise) {
+      if (!explicitOperationSecurity) return this.#loadPromise;
+      try {
+        await load(options, Object.freeze({
+          protocol: ARCANE_AI_ADAPTER_PROTOCOL,
+          kind: "llm",
+          operation: "load",
+          signal,
+          security: this.#security,
+        }));
+        return this.status();
+      } catch (error) {
+        throw normalizeArcaneAIError(error, { operation: "load", signal });
+      }
+    }
+    const wasReady = state === "ready";
     const operationGeneration = ++this.#operationGeneration;
-    this.#fallbackState = "loading";
-    this.#progress = null;
-    this.#error = null;
-    this.#emit("statechange");
+    if (!wasReady) {
+      this.#fallbackState = "loading";
+      this.#progress = null;
+      this.#error = null;
+      this.#emit("statechange");
+    }
     this.#loadPromise = (async () => {
       try {
         await load(options, Object.freeze({
@@ -238,6 +358,7 @@ export class ModelController {
           kind: "llm",
           operation: "load",
           signal,
+          security: this.#security,
           reportProgress: (progress) => {
             if (
               operationGeneration !== this.#operationGeneration
@@ -253,9 +374,12 @@ export class ModelController {
           || this.#disposing
           || this.#disposed
         ) return this.status();
-        this.#fallbackState = "ready";
-        this.#progress = null;
-        this.#emit("statechange");
+        this.#readyPolicyResolved = true;
+        if (!wasReady) {
+          this.#fallbackState = "ready";
+          this.#progress = null;
+          this.#emit("statechange");
+        }
         return this.status();
       } catch (error) {
         const normalized = normalizeArcaneAIError(error, { operation: "load", signal });
@@ -263,6 +387,7 @@ export class ModelController {
           operationGeneration === this.#operationGeneration
           && !this.#disposing
           && !this.#disposed
+          && !wasReady
         ) {
           this.#fallbackState = "error";
           this.#error = normalized;
@@ -286,7 +411,7 @@ export class ModelController {
         { operation: "request" },
       );
     }
-    if (state === "ready") return;
+    if (state === "ready") return void await this.load(loadOptions);
     if (this.#loadPolicy === "manual") {
       throw new ArcaneAIError(
         "ARCANE_AI_NOT_READY",
@@ -330,6 +455,7 @@ export class ModelController {
         }
         if (operationGeneration === this.#operationGeneration) {
           this.#fallbackState = "unloaded";
+          this.#readyPolicyResolved = false;
           this.#progress = null;
           this.#error = null;
           this.#emit("statechange");

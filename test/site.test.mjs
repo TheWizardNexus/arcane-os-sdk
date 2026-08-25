@@ -505,10 +505,12 @@ test('the complete API reference is a first-party generated Pages corpus',async 
         assert.match(landing,/<strong>163<\/strong>[\s\S]*12 JavaScript package entrypoints/u);
         assert.match(normalized,/Application default[.][\s\S]*browser-wasm-local-text-inference/u);
         assert.match(decodedNormalized,/arcane-os\/ai\/browser-wasm/u);
-        assert.match(decodedNormalized,/byte length, SHA-256/u);
-        assert.match(decodedGuide,/arcane-ai-browser-wasm\/1/u);
+        assert.match(decodedNormalized,/\{id, url, bytes\?, sha256\?\}/u);
+        assert.match(decodedGuide,/arcane-ai-browser-wasm\/2/u);
         assert.match(decodedGuide,/@wllama\/wllama[\s\S]*3[.]6[.]0/u);
-        assert.match(decodedGuide,/arcane[.]ai[.]browser-wasm[.]model[.]v2/u);
+        assert.match(decodedGuide,/arcane[.]ai[.]browser-wasm[.]model[.]v3/u);
+        assert.match(decodedGuide,/SDK default is secure:false/u);
+        assert.match(decodedGuide,/observed byte length/u);
         assert.match(decodedGuide,/load\(\{offline:true\}\)[\s\S]*ARCANE_AI_MODEL_OFFLINE_MISS/u);
         assert.match(decodedGuide,/AbortSignal[\s\S]*ARCANE_AI_REQUEST_ABORTED/u);
         assert.match(decodedGuide,/never invokes a handler or executes a tool/u);
@@ -1555,12 +1557,9 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         assert.match(script,/resolveApplicationLocalStorageKey\('hello-count',\{applicationId:appId\}\)/u);
         for(const modelAuthority of [
             "id:'ibm-granite-4.1-3b-q4-k-s'",
-            "name:'granite-4.1-3b-Q4_K_S.gguf'",
-            "immutableUrl:'https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/ab4701481089b58a082ef63cc1cee738887293ff/granite-4.1-3b-Q4_K_S.gguf'",
+            "url:'https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/ab4701481089b58a082ef63cc1cee738887293ff/granite-4.1-3b-Q4_K_S.gguf'",
             'bytes:1_998_371_424',
-            "sha256:'ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a'",
-            "licenseSpdx:'Apache-2.0'",
-            "sourceRevision:'ab4701481089b58a082ef63cc1cee738887293ff'"
+            "sha256:'ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a'"
         ])assert.equal(script.includes(modelAuthority),true,modelAuthority);
         assert.match(html,/No model weights ship[\s\S]*no model download starts/iu);
         assert.match(html,/1,998,371,424 bytes \(1[.]86 GiB\)/u);
@@ -1568,7 +1567,7 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         assert.match(script,/new DBOPFS\(\{applicationId:appId\}\)/u);
         assert.match(script,/await dbopfs[.]readyPromise/u);
         assert.match(script,/dbopfs[.]applicationId!==appId/u);
-        assert.match(script,/createArcaneAI\(\{provider,loadPolicy:'manual'\}\)/u);
+        assert.match(script,/createArcaneAI\(\{[\s\S]*provider,[\s\S]*loadPolicy:'manual',[\s\S]*security:\{secure:true\}[\s\S]*\}\)/u);
         assert.match(script,/renderProgress\(event[.]detail[?][.]progress\)/u);
         assert.match(script,/local[.]load\(\{signal:controller[.]signal,offline\}\)/u);
         assert.match(script,/local[.]streamRequest\(\{[\s\S]*localOnly:true,[\s\S]*signal:controller[.]signal,[\s\S]*tools:\[SHOW_GREETING_TOOL\]/u);

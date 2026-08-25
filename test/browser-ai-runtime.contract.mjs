@@ -66,12 +66,9 @@ const EXACT_EXPORTS=Object.freeze([
 ]);
 const GRANITE_AUTHORITY=Object.freeze({
     id:'ibm-granite-4.1-3b-q4-k-s',
-    name:'granite-4.1-3b-Q4_K_S.gguf',
-    immutableUrl:'https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/ab4701481089b58a082ef63cc1cee738887293ff/granite-4.1-3b-Q4_K_S.gguf',
+    url:'https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/ab4701481089b58a082ef63cc1cee738887293ff/granite-4.1-3b-Q4_K_S.gguf',
     bytes:1_998_371_424,
-    sha256:'ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a',
-    licenseSpdx:'Apache-2.0',
-    sourceRevision:'ab4701481089b58a082ef63cc1cee738887293ff'
+    sha256:'ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a'
 });
 
 function json(value){
@@ -125,12 +122,9 @@ async function debugAuthority(){
         path:absolute,
         descriptor:Object.freeze({
             id:`disposable-debug-${sha256.slice(0,16)}`,
-            name,
-            immutableUrl:`https://debug.invalid/arcane/${sha256}/${encodeURIComponent(name)}`,
+            url:`https://debug.invalid/arcane/${sha256}/${encodeURIComponent(name)}`,
             bytes:info.size,
-            sha256,
-            licenseSpdx:'DEBUG-ONLY-NOT-FOR-RELEASE',
-            sourceRevision:`disposable-debug-${sha256}`
+            sha256
         })
     });
 }
@@ -374,6 +368,9 @@ const DEBUG=${JSON.stringify(debug)};
 const WARM_ONLY=${JSON.stringify(warmOnly)};
 const APPLICATION_ID=${JSON.stringify(applicationId)};
 const EXACT_EXPORTS=${JSON.stringify(EXACT_EXPORTS)};
+const MODEL_FILE_NAME=decodeURIComponent(
+    new URL(MODEL.url).pathname.split('/').filter(Boolean).pop()
+);
 
 function invariant(value,message){
     if(!value)throw new Error(message);
@@ -422,6 +419,10 @@ function projectProviderStatus(status,{inference=false,cancellation=false,cleanu
         equal(evidence.cleanup?.kind,'worker-terminated','Worker termination was not proved');
         equal(evidence.webgpu?.lastObservedOperational,true,'Unload lost prior WebGPU evidence');
     }else{
+        equal(status.security?.secure,true,'Strict browser contract lost secure mode');
+        equal(status.security?.checks?.byteLength,true,'Strict byte-length check was disabled');
+        equal(status.security?.checks?.sha256,true,'Strict SHA-256 check was disabled');
+        equal(status.integrity?.state,'verified','Strict model integrity was not verified');
         equal(status.capabilities?.webgpuOperational,true,'Provider did not admit operational WebGPU');
         equal(status.capabilities?.webgpuEvidenceProtocol,'arcane-wllama-runtime-evidence/1','Capability evidence protocol drifted');
         equal(evidence.state,'ready','Runtime evidence is not ready');
@@ -457,6 +458,8 @@ function projectProviderStatus(status,{inference=false,cancellation=false,cleanu
         state:status.state,
         loaded:status.loaded,
         cache:status.cache?.state??null,
+        security:status.security??null,
+        integrity:status.integrity??null,
         capabilities:{
             webgpuOperational:status.capabilities?.webgpuOperational===true,
             evidenceProtocol:status.capabilities?.webgpuEvidenceProtocol??null
@@ -485,14 +488,15 @@ function projectProviderStatus(status,{inference=false,cancellation=false,cleanu
 
 async function cacheSnapshot(table){
     const safeId=MODEL.id.replace(/[^a-z0-9._-]+/giu,'_');
-    const modelFile=await (await table.getFileHandle(safeId+'--'+MODEL.name,{create:false})).getFile();
+    const modelFile=await (await table.getFileHandle(safeId+'--'+MODEL_FILE_NAME,{create:false})).getFile();
     const manifestFile=await (await table.getFileHandle(safeId+'.complete.json',{create:false})).getFile();
     const manifestText=await manifestFile.text();
     const manifest=JSON.parse(manifestText);
     equal(modelFile.size,MODEL.bytes,'DBOPFS model bytes drifted');
-    equal(manifest.schema,'arcane.ai.browser-wasm.model.v2','DBOPFS completion schema drifted');
+    equal(manifest.schema,'arcane.ai.browser-wasm.model.v3','DBOPFS completion schema drifted');
     equal(manifest.complete,true,'DBOPFS completion marker drifted');
-    for(const field of ['id','name','immutableUrl','bytes','sha256','licenseSpdx','sourceRevision']){
+    equal(manifest.observedBytes,MODEL.bytes,'DBOPFS observed byte metadata drifted');
+    for(const field of ['id','url']){
         equal(manifest.model?.[field],MODEL[field],'DBOPFS completion authority drifted for '+field);
     }
     return {modelFile,manifestFile,manifestText,manifest};
@@ -529,6 +533,11 @@ async function run(){
     const components=await componentResponse.json();
     equal(components.protocol,'arcane-ai-browser-wasm/2','Component receipt protocol drifted');
     equal(components.packageExport,'arcane-os/ai/browser-wasm','Component export authority drifted');
+    equal(
+        components.runtimePolicy.modelAuthorities,
+        'fieldwise-security-default-false-with-optional-byteLength-and-sha256-checks',
+        'Component model-security policy drifted'
+    );
     equal(components.runtimePolicy.modelWeightsPacked,false,'Model weights entered the package');
     equal(components.runtimePolicy.webgpuAdmission,'adapter-plus-full-offload-plus-buffer-queue-and-settled-fence-evidence','WebGPU receipt policy drifted');
     equal(components.runtimePolicy.cpuFallback,false,'CPU fallback entered the WebGPU-required release');
@@ -643,7 +652,7 @@ async function run(){
             return {
                 ok:response.ok,
                 status:response.status,
-                url:MODEL.immutableUrl,
+                url:MODEL.url,
                 headers:response.headers,
                 body:response.body
             };
@@ -663,7 +672,11 @@ async function run(){
     equal(adapted.localOnly,true,'Adapted provider lost local-only admission');
     equal(adapted.catalog().length,1,'Adapted provider catalog drifted');
     equal(adapted.catalog()[0].id,MODEL.id,'Adapted provider model authority drifted');
-    const ai=api.createArcaneAI({provider,loadPolicy:'manual'});
+    const ai=api.createArcaneAI({
+        provider,
+        loadPolicy:'manual',
+        security:{secure:true}
+    });
     const lifecycle=[];
     const progress=[];
     ai.llm.addEventListener('statechange',event=>lifecycle.push(event.detail.state));
@@ -675,7 +688,7 @@ async function run(){
         const cacheBefore=await cacheSnapshot(table);
         const warm=await ai.load({offline:true});
         equal(warm.state,'ready','Final warm model load did not reach ready');
-        equal(warm.cache.state,'verified','Final warm model load did not use verified DBOPFS bytes');
+        equal(warm.cache.state,'cached','Final warm model load did not use checked DBOPFS bytes');
         equal(prohibitedFetches,0,'Final warm load attempted model networking');
         invariant(progress.some(value=>value.phase==='verify-cache'&&value.loaded===MODEL.bytes),'Final warm cache was not actual-byte rehashed');
         const loadEvidence=projectProviderStatus(provider.status());
@@ -733,7 +746,7 @@ async function run(){
             exports:Object.keys(api).sort(),
             mode:'granite-final-warm-only',
             authoritative:true,
-            model:{id:MODEL.id,name:MODEL.name,bytes:MODEL.bytes,sha256:MODEL.sha256},
+            model:{id:MODEL.id,url:MODEL.url,bytes:MODEL.bytes,sha256:MODEL.sha256},
             runtime:api.BROWSER_WASM_RUNTIME_AUTHORITY,
             receipt:{
                 protocol:components.protocol,
@@ -744,7 +757,7 @@ async function run(){
                 protocol:adapted.protocol,
                 role:adapted.role,
                 localOnly:adapted.localOnly,
-                catalog:adapted.catalog().map(item=>({id:item.id,name:item.name,sha256:item.sha256}))
+                catalog:adapted.catalog().map(item=>({id:item.id,url:item.url,sha256:item.sha256}))
             },
             compatibility,
             finalWarm:{
@@ -767,15 +780,17 @@ async function run(){
     equal(cold.state,'ready','Cold model load did not reach ready');
     equal(cold.cache.state,'installed','A clean browser profile did not install the model');
     invariant(progress.some(value=>value.phase==='download'&&value.loaded===MODEL.bytes),'The model download did not reach its exact byte length');
-    invariant(progress.some(value=>value.phase==='verify-cache'&&value.loaded===MODEL.bytes),'The installed model was not actual-byte rehashed');
+    invariant(progress.some(value=>value.phase==='verify-download'&&value.loaded===MODEL.bytes),'The installed model was not SHA-256 checked');
     const safeId=MODEL.id.replace(/[^a-z0-9._-]+/giu,'_');
-    const modelFile=await (await table.getFileHandle(safeId+'--'+MODEL.name,{create:false})).getFile();
+    const modelFile=await (await table.getFileHandle(safeId+'--'+MODEL_FILE_NAME,{create:false})).getFile();
     const manifestFile=await (await table.getFileHandle(safeId+'.complete.json',{create:false})).getFile();
     const completionManifest=JSON.parse(await manifestFile.text());
     equal(modelFile.size,MODEL.bytes,'DBOPFS model bytes drifted');
     invariant(manifestFile.lastModified>=modelFile.lastModified,'The completion manifest was not committed after model bytes');
-    equal(completionManifest.schema,'arcane.ai.browser-wasm.model.v2','DBOPFS completion schema drifted');
-    equal(completionManifest.model.sha256,MODEL.sha256,'DBOPFS completion digest drifted');
+    equal(completionManifest.schema,'arcane.ai.browser-wasm.model.v3','DBOPFS completion schema drifted');
+    equal(completionManifest.observedBytes,MODEL.bytes,'DBOPFS observed byte metadata drifted');
+    equal(completionManifest.model.id,MODEL.id,'DBOPFS completion model ID drifted');
+    equal(completionManifest.model.url,MODEL.url,'DBOPFS completion model URL drifted');
 
     const coldCallbacks={request:null,response:null};
     const coldCompletion=await ai.fetchRequest({
@@ -831,14 +846,18 @@ async function run(){
         store,
         loadDefaults
     });
-    const offlineAi=api.createArcaneAI({provider:offlineProvider,loadPolicy:'manual'});
+    const offlineAi=api.createArcaneAI({
+        provider:offlineProvider,
+        loadPolicy:'manual',
+        security:{secure:true}
+    });
     const offlineProgress=[];
     offlineAi.llm.addEventListener('progress',event=>{
         if(event.detail.progress)offlineProgress.push(event.detail.progress);
     });
     const warm=await offlineAi.load({offline:true});
     equal(warm.state,'ready','Offline model reload did not reach ready');
-    equal(warm.cache.state,'verified','Offline reload did not use the verified DBOPFS cache');
+    equal(warm.cache.state,'cached','Offline reload did not use the checked DBOPFS cache');
     equal(offlineFetches,0,'Offline DBOPFS reload used the model network');
     invariant(offlineProgress.some(value=>value.phase==='verify-cache'&&value.loaded===MODEL.bytes),'Warm cache was not actual-byte rehashed');
     const warmCompletion=await offlineAi.fetchRequest({
@@ -858,7 +877,7 @@ async function run(){
         exports:Object.keys(api).sort(),
         mode:DEBUG?'disposable-debug':'granite-authority',
         authoritative:!DEBUG,
-        model:{id:MODEL.id,name:MODEL.name,bytes:MODEL.bytes,sha256:MODEL.sha256},
+        model:{id:MODEL.id,url:MODEL.url,bytes:MODEL.bytes,sha256:MODEL.sha256},
         runtime:api.BROWSER_WASM_RUNTIME_AUTHORITY,
         compatibility,
         cold:{
@@ -895,7 +914,7 @@ if(!ENABLED){
     test('the installed real-Chrome browser-WASM contract remains an explicit one-host gate',()=>{
         assert.equal(ENABLED,false);
         assert.deepEqual(Object.keys(GRANITE_AUTHORITY),[
-            'id','name','immutableUrl','bytes','sha256','licenseSpdx','sourceRevision'
+            'id','url','bytes','sha256'
         ]);
         assert.equal(GRANITE_AUTHORITY.bytes,1_998_371_424);
         assert.equal(
@@ -1131,12 +1150,12 @@ if(!ENABLED){
             localOnly:true,
             catalog:[{
                 id:GRANITE_AUTHORITY.id,
-                name:GRANITE_AUTHORITY.name,
+                url:GRANITE_AUTHORITY.url,
                 sha256:GRANITE_AUTHORITY.sha256
             }]
         });
         const finalWarm=report.result.finalWarm;
-        assert.equal(finalWarm.cache,'verified');
+        assert.equal(finalWarm.cache,'cached');
         assert.equal(finalWarm.modelFetches,0);
         assert.ok(finalWarm.text.trim());
         assert.equal(finalWarm.cachePreserved,true);
@@ -1166,7 +1185,7 @@ if(!ENABLED){
         assert.equal(report.result.cold.cache,'installed');
         assert.ok(report.result.cold.text.trim());
         assert.equal(report.result.cancellation.code,'ARCANE_AI_REQUEST_ABORTED');
-        assert.equal(report.result.offline.cache,'verified');
+        assert.equal(report.result.offline.cache,'cached');
         assert.equal(report.result.offline.modelFetches,0);
         assert.ok(report.result.offline.text.trim());
     }

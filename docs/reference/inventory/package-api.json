@@ -2641,7 +2641,7 @@
       "group": "Browser-WASM local AI",
       "summary": "Deep-frozen authority for the packaged Wllama and llama.cpp runtime, authenticated JS and WASM assets, licensing, and disabled compatibility-network policy.",
       "availability": "Browser metadata; import and inspection require neither DBOPFS nor a loaded model",
-      "protocol": "arcane-ai-browser-wasm/1 over the provider-neutral arcane-ai-adapter/1 boundary",
+      "protocol": "arcane-ai-browser-wasm/2 over the provider-neutral arcane-ai-adapter/1 boundary",
       "normalization": "Exact immutable runtime and component identity; it contains no model weights or model catalog"
     },
     {
@@ -2649,7 +2649,7 @@
       "name": "createArcaneAI",
       "displayName": "createArcaneAI()",
       "kind": "function",
-      "signature": "createArcaneAI({ llm=null, provider=null, loadPolicy='on-demand' }={})",
+      "signature": "createArcaneAI({ llm=null, provider=null, loadPolicy='on-demand', security }={})",
       "entrypoints": [
         "arcane-os/ai/browser-wasm"
       ],
@@ -2658,7 +2658,7 @@
       "summary": "Creates the provider-neutral browser AI facade and LLM lifecycle controller around one compatible provider or controller.",
       "availability": "Browser; the selected provider observes its own WebAssembly, storage, and model readiness",
       "protocol": "arcane-ai-adapter/1",
-      "normalization": "Normalizes lazy or manual load, lifecycle status, cancellation, streaming completion, and structural tool-call visibility without executing tools"
+      "normalization": "Normalizes lazy or manual load, fieldwise app/provider/load security inheritance from SDK secure:false, lifecycle status, cancellation, streaming completion, and structural tool-call visibility without executing tools"
     },
     {
       "id": "browser-wasm:createBrowserModelSource",
@@ -2671,26 +2671,26 @@
       ],
       "primaryImport": "arcane-os/ai/browser-wasm",
       "group": "Browser-WASM local AI",
-      "summary": "Validates a caller-supplied immutable HTTPS model authority and creates its cancellable no-credentials download source.",
+      "summary": "Validates a canonical caller-supplied {id, url, bytes?, sha256?} descriptor and creates its cancellable no-credentials HTTPS download source.",
       "availability": "Browser with Fetch and a readable response body; each direct open call performs its configured HTTPS fetch",
-      "protocol": "Caller-supplied exact model URL, expected byte length, SHA-256, license identifier, and source revision",
-      "normalization": "Canonical frozen descriptor and download handle; byte integrity is verified by the model store before admission"
+      "protocol": "Caller-supplied immutable HTTPS model URL with optional expected byte length and SHA-256",
+      "normalization": "Canonical frozen descriptor and download handle; expected fields are required and enforced only for their effective enabled checks, and model license is not runtime admission"
     },
     {
       "id": "browser-wasm:createBrowserWasmLlmProvider",
       "name": "createBrowserWasmLlmProvider",
       "displayName": "createBrowserWasmLlmProvider()",
       "kind": "function",
-      "signature": "createBrowserWasmLlmProvider({ source, store, loadDefaults={}, logger=console }={})",
+      "signature": "createBrowserWasmLlmProvider({ source, store, loadDefaults={}, security, logger=console }={})",
       "entrypoints": [
         "arcane-os/ai/browser-wasm"
       ],
       "primaryImport": "arcane-os/ai/browser-wasm",
       "group": "Browser-WASM local AI",
-      "summary": "Creates the packaged Wllama browser provider with verified model admission, serialized inference, streaming, abort, unload, and probe operations.",
-      "availability": "Browser; WebAssembly required, WebGPU optional, and model loading requires verified DBOPFS bytes",
+      "summary": "Creates the packaged Wllama browser provider with effective-check disclosure, honest integrity status, serialized inference, streaming, abort, unload, and probe operations.",
+      "availability": "Browser; WebAssembly required, WebGPU optional, enabled checks fail closed, and successful Wllama loading is always required",
       "protocol": "arcane-ai-adapter/1 with OpenAI-like chat completion and streaming envelopes",
-      "normalization": "Frozen lifecycle/status/capability records and structured tool-call data; the SDK never invokes application tools"
+      "normalization": "Frozen lifecycle/status/security/integrity records and structured tool-call data; security fields inherit by scope and the SDK never invokes application tools"
     },
     {
       "id": "browser-wasm:createDbopfsModelStore",
@@ -2703,10 +2703,10 @@
       ],
       "primaryImport": "arcane-os/ai/browser-wasm",
       "group": "Browser-WASM local AI",
-      "summary": "Adapts an existing DBOPFS instance into an authenticated model cache that commits metadata last and rehashes cached bytes before reuse.",
+      "summary": "Adapts an existing DBOPFS instance into a model cache that records observed bytes, commits metadata last, and hashes only when SHA-256 checking is enabled.",
       "availability": "Browser with a ready DBOPFS instance and OPFS support",
-      "protocol": "arcane.ai.browser-wasm.model.v2 completion manifests over existing DBOPFS method semantics",
-      "normalization": "Returns verified or installed cache receipts, fail-closed offline misses, progress snapshots, and explicit removal without changing DBOPFS public names"
+      "protocol": "arcane.ai.browser-wasm.model.v3 completion manifests over existing DBOPFS method semantics",
+      "normalization": "Returns cached or installed receipts with observed byte count and per-check outcomes; disabled expected-length and SHA-256 checks do not compare or hash, while enabled checks fail closed"
     }
   ]
 }

@@ -124,6 +124,7 @@ test("AbortSignal delivery suppression remains distinct from upstream cancellati
   );
   assert.match(runtime, /Object\.hasOwn\(options, "signal"\)/u);
   assert.match(runtime, /accepts abortSignal, not signal/u);
+  assert.match(runtime, /next\.isModelLoaded\(\) !== true/u);
   assert.match(runtime, /kind: "llama-request-cancel-acknowledged"/u);
   assert.match(runtime, /immediateGpuKernelPreemptionClaimed: false/u);
   assert.match(runtime, /kind: "worker-terminated"/u);

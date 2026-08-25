@@ -13,12 +13,9 @@ import {
 
 const MODEL=Object.freeze({
     id:'ibm-granite-4.1-3b-q4-k-s',
-    name:'granite-4.1-3b-Q4_K_S.gguf',
-    immutableUrl:'https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/ab4701481089b58a082ef63cc1cee738887293ff/granite-4.1-3b-Q4_K_S.gguf',
+    url:'https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/ab4701481089b58a082ef63cc1cee738887293ff/granite-4.1-3b-Q4_K_S.gguf',
     bytes:1_998_371_424,
-    sha256:'ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a',
-    licenseSpdx:'Apache-2.0',
-    sourceRevision:'ab4701481089b58a082ef63cc1cee738887293ff'
+    sha256:'ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a'
 });
 
 const SHOW_GREETING_TOOL=Object.freeze({
@@ -124,7 +121,8 @@ function renderProgress(value){
     const total=Number(value.total)||MODEL.bytes;
     const loaded=Math.min(total,Math.max(0,Number(value.loaded)||0));
     const phase={
-        download:'Downloading authenticated model bytes',
+        download:'Downloading model bytes',
+        'verify-download':'Verifying the downloaded model SHA-256',
         'verify-cache':'Rehashing the DBOPFS cache',
         initialize:'Starting the browser-local runtime'
     }[value.phase]??'Preparing local AI';
@@ -192,7 +190,11 @@ async function localAI(){
                 gpuLayers:0
             }
         });
-        const created=createArcaneAI({provider,loadPolicy:'manual'});
+        const created=createArcaneAI({
+            provider,
+            loadPolicy:'manual',
+            security:{secure:true}
+        });
         created.llm.addEventListener('progress',event=>{
             renderProgress(event.detail?.progress);
         });
@@ -212,7 +214,7 @@ async function loadModel({offline=false}={}){
     if(!controller)return;
     aiStatus.textContent=offline
         ?'Checking the verified DBOPFS cache without a model-source request. Packaged same-origin Wllama/WASM assets may still load.'
-        :'Checking the verified cache. A 1.86 GiB model download starts only if it is missing.';
+        :'Checking the strict cache. A 1.86 GiB model download starts only if it is missing.';
     aiProgress.hidden=true;
     aiProgressLabel.textContent='';
     try{

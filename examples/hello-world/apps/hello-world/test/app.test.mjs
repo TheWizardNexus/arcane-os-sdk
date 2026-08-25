@@ -9,12 +9,9 @@ import test from 'arcane-os/testing';
 const appRoot=new URL('../',import.meta.url);
 const MODEL=Object.freeze({
     id:'ibm-granite-4.1-3b-q4-k-s',
-    name:'granite-4.1-3b-Q4_K_S.gguf',
-    immutableUrl:'https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/ab4701481089b58a082ef63cc1cee738887293ff/granite-4.1-3b-Q4_K_S.gguf',
+    url:'https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/ab4701481089b58a082ef63cc1cee738887293ff/granite-4.1-3b-Q4_K_S.gguf',
     bytes:1_998_371_424,
-    sha256:'ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a',
-    licenseSpdx:'Apache-2.0',
-    sourceRevision:'ab4701481089b58a082ef63cc1cee738887293ff'
+    sha256:'ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a'
 });
 
 async function runtimeRoot(){
@@ -206,10 +203,10 @@ function aiHarness(options={}){
                         'PRIVATE OFFLINE PROVIDER DETAIL'
                     );
                 }
-                cacheState='verified';
+                cacheState='cached';
             }else{
                 report('download',Math.floor(MODEL.bytes/2));
-                report('verify-cache',MODEL.bytes);
+                report('verify-download',MODEL.bytes);
                 cacheState='installed';
             }
             report('initialize',MODEL.bytes);
@@ -565,6 +562,7 @@ test('online load authenticates the exact model and request stays local',async f
         assert.equal(aiRuntime.calls.store[0].dbopfs.applicationId,'hello-world');
         assert.equal(aiRuntime.calls.createAI.length,1);
         assert.equal(aiRuntime.calls.createAI[0].loadPolicy,'manual');
+        assert.deepEqual(aiRuntime.calls.createAI[0].security,{secure:true});
         assert.deepEqual(aiRuntime.calls.provider[0].loadDefaults,{
             contextTokens:1024,
             threads:1,

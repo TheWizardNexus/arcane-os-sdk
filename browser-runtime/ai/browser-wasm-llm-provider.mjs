@@ -1,15 +1,20 @@
 import {
   ARCANE_AI_ADAPTER_PROTOCOL,
   ArcaneAIError,
+  normalizeModelSecurity,
   normalizeArcaneAIError,
+  resolveModelSecurity,
+  sameModelSecurity,
 } from "./model-controller.mjs";
 import { createPackagedWllamaRuntime } from "./browser-wllama-runtime.mjs";
 import { createStreamingSha256 } from "./internal/sha256.mjs";
 
-const MODEL_MANIFEST_SCHEMA = "arcane.ai.browser-wasm.model.v2";
+const MODEL_MANIFEST_SCHEMA = "arcane.ai.browser-wasm.model.v3";
+const LEGACY_MODEL_MANIFEST_SCHEMA = "arcane.ai.browser-wasm.model.v2";
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 const MUTABLE_PATH_PATTERN = /\/(?:resolve\/)?(?:main|master|latest)(?:\/|$)/iu;
 const BROWSER_MODEL_SOURCES = new WeakSet();
+const BROWSER_MODEL_SOURCE_METADATA = new WeakMap();
 const DBOPFS_MODEL_STORES = new WeakSet();
 const V1_LLM_PROVIDER_ADAPTERS = new WeakMap();
 const AI_PROVIDER_PROTOCOL = "arcane-ai-provider/2";
@@ -65,56 +70,92 @@ function modelDescriptor(value) {
     throw new TypeError("A browser model descriptor is required.");
   }
   const id = requiredText(value.id, "id");
-  const name = requiredText(value.name, "name");
-  if (name !== name.split(/[\\/]/u).pop() || name === "." || name === "..") {
-    throw new TypeError("Browser model name must be a single filename.");
+  if (
+    value.url !== undefined
+    && value.immutableUrl !== undefined
+    && value.url !== value.immutableUrl
+  ) {
+    throw new TypeError("Browser model url and legacy immutableUrl must match when both are provided.");
   }
-  const immutableUrl = immutableHttpsUrl(value.immutableUrl);
-  if (!immutableUrl) {
-    throw new TypeError("Browser model immutableUrl must be immutable HTTPS without credentials or fragments.");
+  const url = immutableHttpsUrl(value.url ?? value.immutableUrl);
+  if (!url) {
+    throw new TypeError("Browser model url must be immutable HTTPS without credentials or fragments.");
   }
-  const bytes = Number(value.bytes);
-  if (!Number.isSafeInteger(bytes) || bytes < 1) {
-    throw new TypeError("Browser model bytes must be a positive safe integer.");
+  let bytes;
+  if (value.bytes !== undefined) {
+    if (!Number.isSafeInteger(value.bytes) || value.bytes < 1) {
+      throw new TypeError("Browser model bytes must be a positive safe integer when provided.");
+    }
+    bytes = value.bytes;
   }
-  const sha256 = requiredText(value.sha256, "sha256").toLowerCase();
-  if (!SHA256_PATTERN.test(sha256)) {
-    throw new TypeError("Browser model sha256 must be exactly 64 lowercase hexadecimal characters.");
+  let sha256;
+  if (value.sha256 !== undefined) {
+    sha256 = requiredText(value.sha256, "sha256").toLowerCase();
+    if (!SHA256_PATTERN.test(sha256)) {
+      throw new TypeError("Browser model sha256 must be exactly 64 hexadecimal characters when provided.");
+    }
   }
-  const licenseSpdx = requiredText(value.licenseSpdx, "licenseSpdx");
-  const sourceRevision = requiredText(value.sourceRevision, "sourceRevision");
-  return Object.freeze({
+  const descriptor = {
     id,
-    name,
-    immutableUrl: immutableUrl.href,
-    bytes,
-    sha256,
-    licenseSpdx,
-    sourceRevision,
-  });
+    url: url.href,
+  };
+  if (bytes !== undefined) descriptor.bytes = bytes;
+  if (sha256 !== undefined) descriptor.sha256 = sha256;
+  return Object.freeze(descriptor);
 }
 
 function publicDescriptor(source) {
-  return Object.freeze({
+  const descriptor = {
     id: source.id,
-    name: source.name,
-    immutableUrl: source.immutableUrl,
-    bytes: source.bytes,
-    sha256: source.sha256,
-    licenseSpdx: source.licenseSpdx,
-    sourceRevision: source.sourceRevision,
-  });
+    url: source.url,
+  };
+  if (source.bytes !== undefined) descriptor.bytes = source.bytes;
+  if (source.sha256 !== undefined) descriptor.sha256 = source.sha256;
+  return Object.freeze(descriptor);
+}
+
+function manifestModelIdentity(source) {
+  return Object.freeze({ id: source.id, url: source.url });
+}
+
+function modelFileName(value, model) {
+  if (value.name !== undefined) {
+    const legacyName = requiredText(value.name, "legacy name");
+    if (
+      legacyName !== legacyName.split(/[\\/]/u).pop()
+      || legacyName === "."
+      || legacyName === ".."
+    ) {
+      throw new TypeError("Browser model legacy name must be a single filename.");
+    }
+    return legacyName;
+  }
+  const encoded = new URL(model.url).pathname.split("/").filter(Boolean).pop() ?? "";
+  let decoded = "";
+  try {
+    decoded = decodeURIComponent(encoded);
+  } catch {
+    decoded = "";
+  }
+  if (
+    decoded
+    && decoded === decoded.split(/[\\/]/u).pop()
+    && decoded !== "."
+    && decoded !== ".."
+  ) return decoded;
+  const safeId = model.id.replace(/[^a-z0-9._-]+/giu, "_");
+  return `${safeId}.gguf`;
 }
 
 /**
- * Creates an authenticated browser download authority for one caller-supplied
- * immutable model. Arcane verifies the response bytes; it never trusts an
- * ETag, server digest, mutable model catalog, or URL helper.
+ * Creates a browser download authority for one caller-supplied immutable
+ * model. Effective load security decides which expected-byte checks run.
  */
 export function createBrowserModelSource(descriptor, {
   fetchImpl = null,
 } = {}) {
   const model = modelDescriptor(descriptor);
+  const fileName = modelFileName(descriptor, model);
 
   async function open({ signal } = {}) {
     throwIfAborted(signal, "install");
@@ -125,7 +166,7 @@ export function createBrowserModelSource(descriptor, {
 
     let response;
     try {
-      response = await fetchFunction(model.immutableUrl, {
+      response = await fetchFunction(model.url, {
         cache: "no-store",
         credentials: "omit",
         mode: "cors",
@@ -146,7 +187,7 @@ export function createBrowserModelSource(descriptor, {
     }
     let finalUrl;
     try {
-      finalUrl = new URL(response.url || model.immutableUrl);
+      finalUrl = new URL(response.url || model.url);
     } catch {
       finalUrl = null;
     }
@@ -158,31 +199,31 @@ export function createBrowserModelSource(descriptor, {
       throw fail("ARCANE_AI_MODEL_SOURCE_INVALID", "The model response did not provide a byte stream.");
     }
     const header = response.headers?.get?.("content-length");
-    if (header !== null && header !== undefined && header !== "") {
-      const reported = Number(header);
-      if (!Number.isSafeInteger(reported) || reported !== model.bytes) {
-        await response.body.cancel().catch(() => undefined);
-        throw fail(
-          "ARCANE_AI_MODEL_SIZE_MISMATCH",
-          `The model server reported ${String(header)} bytes; expected ${model.bytes}.`,
-        );
-      }
-    }
+    const reported = header === null || header === undefined || header === ""
+      ? null
+      : Number(header);
     return Object.freeze({
       body: response.body,
-      requestedUrl: model.immutableUrl,
+      requestedUrl: model.url,
       finalUrl: finalUrl.href,
+      reportedBytes: Number.isSafeInteger(reported) && reported >= 0 ? reported : null,
       cancel: (reason) => response.body.cancel(reason),
     });
   }
 
-  const source = Object.freeze({
-    kind: "arcane-authenticated-browser-model-source",
+  const sourceRecord = {
+    kind: "arcane-browser-model-source",
     ...model,
     descriptor: publicDescriptor(model),
     open,
+  };
+  Object.defineProperties(sourceRecord, {
+    name: { value: fileName, enumerable: false },
+    immutableUrl: { value: model.url, enumerable: false },
   });
+  const source = Object.freeze(sourceRecord);
   BROWSER_MODEL_SOURCES.add(source);
+  BROWSER_MODEL_SOURCE_METADATA.set(source, Object.freeze({ fileName }));
   return source;
 }
 
@@ -237,49 +278,119 @@ async function* byteChunks(body, signal) {
 
 function storageName(source) {
   const safeId = source.id.replace(/[^a-z0-9._-]+/giu, "_");
+  const fileName = BROWSER_MODEL_SOURCE_METADATA.get(source)?.fileName ?? source.name;
   return Object.freeze({
-    model: `${safeId}--${source.name}`,
+    model: `${safeId}--${fileName}`,
     manifest: `${safeId}.complete.json`,
   });
 }
 
-function manifestFor(source, finalUrl) {
+function manifestFor(source, finalUrl, observedBytes) {
   return Object.freeze({
     schema: MODEL_MANIFEST_SCHEMA,
     complete: true,
-    model: publicDescriptor(source),
+    model: manifestModelIdentity(source),
+    observedBytes,
     finalUrl,
     completedAt: new Date().toISOString(),
   });
 }
 
-function manifestMatches(manifest, source) {
+function manifestKind(manifest, source) {
   const model = manifest?.model;
-  return manifest?.schema === MODEL_MANIFEST_SCHEMA
+  if (
+    manifest?.schema === MODEL_MANIFEST_SCHEMA
     && manifest?.complete === true
     && model?.id === source.id
-    && model?.name === source.name
-    && model?.immutableUrl === source.immutableUrl
-    && model?.bytes === source.bytes
-    && model?.sha256 === source.sha256
-    && model?.licenseSpdx === source.licenseSpdx
-    && model?.sourceRevision === source.sourceRevision;
+    && model?.url === source.url
+    && Number.isSafeInteger(manifest.observedBytes)
+    && manifest.observedBytes >= 0
+  ) return "current";
+  const fileName = BROWSER_MODEL_SOURCE_METADATA.get(source)?.fileName ?? source.name;
+  if (
+    manifest?.schema === LEGACY_MODEL_MANIFEST_SCHEMA
+    && manifest?.complete === true
+    && model?.id === source.id
+    && model?.name === fileName
+    && model?.immutableUrl === source.url
+  ) return "legacy";
+  return null;
 }
 
-function progress(source, phase, loaded) {
+function progress(source, phase, loaded, total = null) {
   return Object.freeze({
     modelId: source.id,
     phase,
     loaded,
-    total: source.bytes,
-    percent: source.bytes ? (loaded / source.bytes) * 100 : null,
+    total,
+    percent: Number.isSafeInteger(total) && total > 0 ? (loaded / total) * 100 : null,
+  });
+}
+
+function securitySnapshot(security) {
+  return Object.freeze({
+    secure: security.secure,
+    checks: Object.freeze({
+      byteLength: security.checks.byteLength,
+      sha256: security.checks.sha256,
+    }),
+  });
+}
+
+function assertDescriptorChecks(source, security) {
+  if (security.checks.byteLength && source.bytes === undefined) {
+    throw fail(
+      "ARCANE_AI_MODEL_SOURCE_INVALID",
+      "Browser model bytes is required when the byteLength check is enabled.",
+    );
+  }
+  if (security.checks.sha256 && source.sha256 === undefined) {
+    throw fail(
+      "ARCANE_AI_MODEL_SOURCE_INVALID",
+      "Browser model sha256 is required when the sha256 check is enabled.",
+    );
+  }
+}
+
+function integritySnapshot(security, source, {
+  observedBytes = null,
+  byteLength = security.checks.byteLength ? "pending" : "unchecked",
+  sha256 = security.checks.sha256 ? "pending" : "unchecked",
+  actualSha256 = null,
+} = {}) {
+  const enabledStates = [];
+  if (security.checks.byteLength) enabledStates.push(byteLength);
+  if (security.checks.sha256) enabledStates.push(sha256);
+  const state = enabledStates.length === 0
+    ? "unchecked"
+    : enabledStates.every((value) => value === "verified")
+      ? "verified"
+      : enabledStates.some((value) => value === "failed")
+        ? "failed"
+        : "pending";
+  return Object.freeze({
+    state,
+    observedBytes,
+    byteLength: Object.freeze({
+      enabled: security.checks.byteLength,
+      state: byteLength,
+      expected: source.bytes ?? null,
+      observed: observedBytes,
+    }),
+    sha256: Object.freeze({
+      enabled: security.checks.sha256,
+      state: sha256,
+      expected: source.sha256 ?? null,
+      actual: actualSha256,
+    }),
   });
 }
 
 /**
  * Adapts an existing Arcane DBOPFS singleton without rebinding or changing any
  * of its public methods. The completion manifest is committed only after the
- * exact model file has been written and hashed.
+ * model file has been written. SHA-256 is read and computed only when its
+ * effective check is enabled.
  */
 export function createDbopfsModelStore({
   dbopfs,
@@ -367,72 +478,165 @@ export function createDbopfsModelStore({
     return removed.some(Boolean);
   }
 
-  async function openVerified(source, { signal, onProgress } = {}) {
+  async function writeManifest(name, manifest, signal) {
+    const encoded = new TextEncoder().encode(`${JSON.stringify(manifest)}\n`);
+    await write(name, encoded, { signal });
+  }
+
+  async function verifySha256(source, modelFile, { signal, onProgress, phase }) {
+    const digest = createStreamingSha256();
+    let hashed = 0;
+    for await (const chunk of byteChunks(modelFile, signal)) {
+      digest.update(chunk);
+      hashed += chunk.byteLength;
+      onProgress?.(progress(source, phase, hashed, modelFile.size));
+    }
+    return Object.freeze({ hashed, sha256: digest.digestHex() });
+  }
+
+  async function openCached(source, {
+    signal,
+    onProgress,
+    security = resolveModelSecurity(),
+  } = {}) {
+    assertDescriptorChecks(source, security);
     const names = storageName(source);
     const manifest = await readManifest(names.manifest);
-    if (!manifestMatches(manifest, source)) {
+    const kind = manifestKind(manifest, source);
+    if (!kind) {
       // A model file without the exact completion manifest is a partial, even
       // when the manifest is missing or malformed rather than merely stale.
       await remove(source);
       return null;
     }
     const modelFile = await file(names.model);
-    if (!modelFile || modelFile.size !== source.bytes) {
+    if (!modelFile) {
       await remove(source);
       return null;
     }
-    const digest = createStreamingSha256();
-    let hashed = 0;
+    const observedBytes = modelFile.size;
+    if (kind === "current" && manifest.observedBytes !== observedBytes) {
+      await remove(source);
+      return null;
+    }
+    if (security.checks.byteLength && observedBytes !== source.bytes) {
+      await remove(source);
+      return null;
+    }
+    let actualSha256 = null;
     try {
-      for await (const chunk of byteChunks(modelFile, signal)) {
-        digest.update(chunk);
-        hashed += chunk.byteLength;
-        onProgress?.(progress(source, "verify-cache", hashed));
+      if (security.checks.sha256) {
+        const verification = await verifySha256(source, modelFile, {
+          signal,
+          onProgress,
+          phase: "verify-cache",
+        });
+        actualSha256 = verification.sha256;
+        if (verification.hashed !== observedBytes || actualSha256 !== source.sha256) {
+          await remove(source);
+          return null;
+        }
+      } else {
+        onProgress?.(progress(source, "cache", observedBytes, observedBytes));
       }
-      if (hashed !== source.bytes || digest.digestHex() !== source.sha256) {
-        await remove(source);
-        return null;
+      let completion = manifest;
+      if (kind === "legacy") {
+        completion = manifestFor(source, manifest.finalUrl ?? source.url, observedBytes);
+        await writeManifest(names.manifest, completion, signal);
       }
-      return Object.freeze({ file: modelFile, manifest });
+      return Object.freeze({
+        file: modelFile,
+        manifest: completion,
+        observedBytes,
+        integrity: integritySnapshot(security, source, {
+          observedBytes,
+          byteLength: security.checks.byteLength ? "verified" : "unchecked",
+          sha256: security.checks.sha256 ? "verified" : "unchecked",
+          actualSha256,
+        }),
+      });
     } catch (error) {
       if (!signal?.aborted) await remove(source);
       throw error;
     }
   }
 
-  async function install(source, { signal, onProgress } = {}) {
+  async function openVerified(source, { signal, onProgress } = {}) {
+    const security = resolveModelSecurity({ load: { secure: true } });
+    return openCached(source, { signal, onProgress, security });
+  }
+
+  async function install(source, { signal, onProgress, security: configuredSecurity } = {}) {
+    const security = resolveModelSecurity({ load: configuredSecurity });
+    assertDescriptorChecks(source, security);
     const names = storageName(source);
     await remove(source);
     const opened = await source.open({ signal });
-    const digest = createStreamingSha256();
     try {
+      if (
+        security.checks.byteLength
+        && opened.reportedBytes !== null
+        && opened.reportedBytes !== source.bytes
+      ) {
+        throw fail(
+          "ARCANE_AI_MODEL_SIZE_MISMATCH",
+          "The model response Content-Length did not match the expected byte length.",
+        );
+      }
       const written = await write(names.model, opened.body, {
         signal,
-        async onChunk(chunk, loaded) {
-          digest.update(chunk);
-          if (loaded > source.bytes) {
+        async onChunk(_chunk, loaded) {
+          if (security.checks.byteLength && loaded > source.bytes) {
             throw fail("ARCANE_AI_MODEL_SIZE_MISMATCH", "Downloaded model exceeded its declared size.");
           }
-          onProgress?.(progress(source, "download", loaded));
+          const total = security.checks.byteLength ? source.bytes : null;
+          onProgress?.(progress(source, "download", loaded, total));
         },
       });
-      const actualSha256 = digest.digestHex();
-      if (written !== source.bytes || actualSha256 !== source.sha256) {
+      onProgress?.(progress(source, "download", written, written));
+      if (security.checks.byteLength && written !== source.bytes) {
         throw fail(
-          actualSha256 === source.sha256
-            ? "ARCANE_AI_MODEL_SIZE_MISMATCH"
-            : "ARCANE_AI_MODEL_DIGEST_MISMATCH",
-          "Downloaded model bytes did not match the caller-supplied authority.",
+          "ARCANE_AI_MODEL_SIZE_MISMATCH",
+          "Downloaded model bytes did not match the caller-supplied expected byte length.",
         );
+      }
+      const modelFile = await file(names.model);
+      if (!modelFile || modelFile.size !== written) {
+        throw fail(
+          "ARCANE_AI_MODEL_CACHE_REJECTED",
+          "The stored model did not preserve the observed downloaded byte count.",
+        );
+      }
+      let actualSha256 = null;
+      if (security.checks.sha256) {
+        const verification = await verifySha256(source, modelFile, {
+          signal,
+          onProgress,
+          phase: "verify-download",
+        });
+        actualSha256 = verification.sha256;
+        if (verification.hashed !== written || actualSha256 !== source.sha256) {
+          throw fail(
+            "ARCANE_AI_MODEL_DIGEST_MISMATCH",
+            "Downloaded model bytes did not match the caller-supplied SHA-256 value.",
+          );
+        }
       }
       // Completion is the final storage mutation. A file without this exact
       // manifest is never admitted for inference or offline reuse.
-      const manifest = manifestFor(source, opened.finalUrl);
-      const encoded = new TextEncoder().encode(`${JSON.stringify(manifest)}\n`);
-      await write(names.manifest, encoded, { signal });
-      const admitted = await openVerified(source, { signal, onProgress });
-      if (!admitted) throw fail("ARCANE_AI_MODEL_CACHE_REJECTED", "The completed model cache failed revalidation.");
-      return admitted;
+      const manifest = manifestFor(source, opened.finalUrl, written);
+      await writeManifest(names.manifest, manifest, signal);
+      return Object.freeze({
+        file: modelFile,
+        manifest,
+        observedBytes: written,
+        integrity: integritySnapshot(security, source, {
+          observedBytes: written,
+          byteLength: security.checks.byteLength ? "verified" : "unchecked",
+          sha256: security.checks.sha256 ? "verified" : "unchecked",
+          actualSha256,
+        }),
+      });
     } catch (error) {
       await opened.cancel?.(error).catch(() => undefined);
       await remove(source).catch(() => undefined);
@@ -440,13 +644,20 @@ export function createDbopfsModelStore({
     }
   }
 
-  async function ensure(source, { signal, onProgress, offline = false } = {}) {
-    const cached = await openVerified(source, { signal, onProgress });
-    if (cached) return Object.freeze({ ...cached, cache: "verified" });
+  async function ensure(source, {
+    signal,
+    onProgress,
+    offline = false,
+    security: configuredSecurity,
+  } = {}) {
+    const security = resolveModelSecurity({ load: configuredSecurity });
+    assertDescriptorChecks(source, security);
+    const cached = await openCached(source, { signal, onProgress, security });
+    if (cached) return Object.freeze({ ...cached, cache: "cached" });
     if (offline) {
-      throw fail("ARCANE_AI_MODEL_OFFLINE_MISS", "No verified offline model cache is available.");
+      throw fail("ARCANE_AI_MODEL_OFFLINE_MISS", "No admitted offline model cache is available.");
     }
-    const installed = await install(source, { signal, onProgress });
+    const installed = await install(source, { signal, onProgress, security });
     return Object.freeze({ ...installed, cache: "installed" });
   }
 
@@ -870,6 +1081,7 @@ export function createBrowserWasmLlmProvider({
   source,
   store,
   loadDefaults = {},
+  security,
   logger = console,
 } = {}) {
   if (!BROWSER_MODEL_SOURCES.has(source)) {
@@ -878,12 +1090,19 @@ export function createBrowserWasmLlmProvider({
   if (!DBOPFS_MODEL_STORES.has(store)) {
     throw new TypeError("createBrowserWasmLlmProvider requires createDbopfsModelStore().");
   }
+  const bindingSecurity = normalizeModelSecurity(security, "provider security");
+  const runtimeLoadDefaults = { ...loadDefaults };
+  delete runtimeLoadDefaults.security;
+  delete runtimeLoadDefaults.offline;
+  delete runtimeLoadDefaults.onProgress;
 
   const runtime = createPackagedWllamaRuntime({ logger });
   let state = "unloaded";
   let progressState = null;
   let errorState = null;
   let cacheState = "unknown";
+  let activeSecurity = null;
+  let activeIntegrity = null;
   let queueDepth = 0;
   let disposed = false;
   let disposing = false;
@@ -913,7 +1132,12 @@ export function createBrowserWasmLlmProvider({
     });
   }
 
-  function status() {
+  function status(context = {}) {
+    const effectiveSecurity = activeSecurity ?? resolveModelSecurity({
+      app: context?.security,
+      binding: bindingSecurity,
+    });
+    const integrity = activeIntegrity ?? integritySnapshot(effectiveSecurity, source);
     return Object.freeze({
       protocol: ARCANE_AI_ADAPTER_PROTOCOL,
       provider: "arcane-browser-wasm-wllama",
@@ -923,6 +1147,8 @@ export function createBrowserWasmLlmProvider({
       queued: Math.max(0, queueDepth - activeCount),
       model: publicDescriptor(source),
       cache: Object.freeze({ state: cacheState, schema: MODEL_MANIFEST_SCHEMA }),
+      security: securitySnapshot(effectiveSecurity),
+      integrity,
       progress: progressState,
       error: errorState,
       runtime: runtime.authority,
@@ -966,13 +1192,39 @@ export function createBrowserWasmLlmProvider({
         "The browser-WASM model cannot load while unload is in progress.",
       );
     }
-    if (state === "ready") return Object.freeze({ model: publicDescriptor(source), status: status() });
-    if (loadPromise) return loadPromise;
+    const effectiveSecurity = resolveModelSecurity({
+      app: context.security,
+      binding: bindingSecurity,
+      load: options.security,
+    });
+    assertDescriptorChecks(source, effectiveSecurity);
+    if (state === "ready") {
+      if (sameModelSecurity(activeSecurity, effectiveSecurity)) {
+        activeSecurity = effectiveSecurity;
+        return Object.freeze({ model: publicDescriptor(source), status: status() });
+      }
+      throw fail(
+        "ARCANE_AI_SECURITY_RELOAD_REQUIRED",
+        "Unload the browser-WASM model before changing its effective security checks.",
+      );
+    }
+    if (loadPromise) {
+      if (sameModelSecurity(activeSecurity, effectiveSecurity)) {
+        activeSecurity = effectiveSecurity;
+        return loadPromise;
+      }
+      throw fail(
+        "ARCANE_AI_SECURITY_RELOAD_REQUIRED",
+        "The in-flight browser-WASM load uses different effective security checks.",
+      );
+    }
     const externalSignal = options.signal ?? context.signal ?? null;
     const linked = linkAbortSignal(externalSignal);
     const signal = linked.controller.signal;
     const generation = ++lifecycleGeneration;
     loadAbort = linked.controller;
+    activeSecurity = effectiveSecurity;
+    activeIntegrity = integritySnapshot(effectiveSecurity, source);
     state = "loading";
     progressState = null;
     errorState = null;
@@ -982,14 +1234,20 @@ export function createBrowserWasmLlmProvider({
         const admitted = await store.ensure(source, {
           signal,
           offline: options.offline === true,
+          security: effectiveSecurity,
           onProgress: (value) => report(value, options, context),
         });
         cacheState = admitted.cache;
+        activeIntegrity = admitted.integrity;
         throwIfAborted(signal, "load");
         if (generation !== lifecycleGeneration || state !== "loading") {
           throw fail("ARCANE_AI_OPERATION_SUPERSEDED", "The model load was superseded by unload.");
         }
-        report(progress(source, "initialize", source.bytes), options, context);
+        report(
+          progress(source, "initialize", admitted.observedBytes, admitted.observedBytes),
+          options,
+          context,
+        );
         throwIfAborted(signal, "load");
         if (generation !== lifecycleGeneration || state !== "loading") {
           throw fail("ARCANE_AI_OPERATION_SUPERSEDED", "The model load was superseded by unload.");
@@ -997,11 +1255,21 @@ export function createBrowserWasmLlmProvider({
         const modelFile = typeof globalThis.File === "function"
           ? new File([admitted.file], source.name, { type: "application/octet-stream" })
           : admitted.file;
+        const runtimeOptions = { ...options };
+        delete runtimeOptions.security;
+        delete runtimeOptions.offline;
+        delete runtimeOptions.onProgress;
         await runtime.load([modelFile], {
-          ...loadDefaults,
-          ...options,
+          ...runtimeLoadDefaults,
+          ...runtimeOptions,
           signal,
         });
+        if (!runtime.isLoaded()) {
+          throw fail(
+            "ARCANE_AI_LOAD_FAILED",
+            "Wllama did not confirm that the model loaded successfully.",
+          );
+        }
         throwIfAborted(signal, "load");
         if (generation !== lifecycleGeneration || state !== "loading") {
           await runtime.exit();
@@ -1131,6 +1399,8 @@ export function createBrowserWasmLlmProvider({
         state = "unloaded";
         progressState = null;
         errorState = null;
+        activeSecurity = null;
+        activeIntegrity = null;
         return status();
       } catch (error) {
         const normalized = normalizeArcaneAIError(error, {
@@ -1214,14 +1484,13 @@ function assertV1LlmAdapterSelection(selection, providerId, modelId, role) {
 function provider2ByteProgress(value) {
   const phase = typeof value?.phase === "string" ? value.phase.trim() : "";
   const completed = Number(value?.loaded);
-  const total = Number(value?.total);
+  const total = value?.total === null ? null : Number(value?.total);
   if (
     !phase
     || !Number.isSafeInteger(completed)
     || completed < 0
-    || !Number.isSafeInteger(total)
-    || total < 1
-    || completed > total
+    || (total !== null && (!Number.isSafeInteger(total) || total < 0))
+    || (total !== null && completed > total)
   ) {
     throw fail("ARCANE_AI_PROVIDER_PROGRESS_INVALID", "The browser-WASM provider returned invalid byte progress.");
   }
@@ -1287,6 +1556,9 @@ export function adaptV1LlmProvider(provider) {
       state: disposed ? "disposed" : value.state,
       loaded: disposed ? false : value.loaded,
       busy: disposed ? false : value.busy,
+      cache: value.cache,
+      security: value.security,
+      integrity: value.integrity,
     });
   }
 
@@ -1324,7 +1596,13 @@ export function adaptV1LlmProvider(provider) {
       return Object.freeze({ available: true, authority });
     },
     status,
-    async load({ role = "llm", selection, signal = null, progress = null } = {}) {
+    async load({
+      role = "llm",
+      selection,
+      signal = null,
+      progress = null,
+      security,
+    } = {}) {
       assertSelection(selection, role);
       throwIfAborted(signal, "load");
       if (progress !== null && typeof progress !== "function") {
@@ -1332,6 +1610,7 @@ export function adaptV1LlmProvider(provider) {
       }
       await methods.load({
         signal,
+        security,
         ...(progress ? { onProgress: (value) => progress(provider2ByteProgress(value)) } : {}),
       });
       return status();

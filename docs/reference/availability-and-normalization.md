@@ -29,7 +29,7 @@ version; WebKitGTK availability must not be generalized to macOS.
 | Scaffold, inspect, test, package, bundle, build, verify, or run an app | `arcane` CLI or `arcane-os` package functions | **Node**; native targets invoke one explicit provider | CLI events and SDK errors/results are normalized by versioned SDK contracts. Native artifact receipts remain target-specific inside a common receipt lifecycle. |
 | Publish application events or review a bounded event history | `arcane-os/event-manager` | **Node** and **Browser**; optional DOM capture needs a browser DOM or compatible host | Live listeners receive original arguments. Recorded payloads and metadata become bounded, redacted, deeply frozen `arcane-event-stack/1` snapshots. The stack format is local diagnostic data, not a host transport. |
 | Build browser UI and app-local behavior | `/arcane/modules/*.js`, shared entities, and components | **Browser**; many modules also run inside every native renderer | Pure modules own their result contracts. Modules that call `Arcane` inherit the bridge boundary described below. |
-| Run a caller-selected local LLM entirely in a browser renderer | `arcane-os/ai/browser-wasm` through `createArcaneAI()` | **Browser** only; WebAssembly and OPFS/DBOPFS are required, WebGPU is optional, and a cache miss uses the caller's admitted HTTPS model URL unless `offline:true` | The facade normalizes lifecycle, status, streaming, cancellation, and structural tool-call visibility. Model URL, byte length, SHA-256, license identifier, and revision remain explicit caller authority. |
+| Run a caller-selected local LLM entirely in a browser renderer | `arcane-os/ai/browser-wasm` through `createArcaneAI()` | **Browser** only; WebAssembly and OPFS/DBOPFS are required, WebGPU is optional, and a cache miss uses the caller's HTTPS model URL unless `offline:true` | The facade normalizes lifecycle, status, security precedence, effective-check disclosure, streaming, cancellation, and structural tool-call visibility. The canonical model descriptor is `{id, url, bytes?, sha256?}`; license is application provenance policy, not a runtime admission check. |
 | Read host identity, capabilities, storage, preferences, appearance, or platform state | `globalThis.Arcane` | **Cross-host** where the method is implemented and admitted | Promise behavior and `Arcane.Error` are normalized. Result fields are normalized unless the method explicitly documents a platform-dependent snapshot. |
 | Use local AI without coupling app code to Ollama HTTP | `Arcane.localAI`, `Arcane.ai`, or `/arcane/modules/Ollama.js` | Primarily **Native**; Android exposes a narrower admitted inference projection | Admission, errors, and managed-operation events are normalized. Direct Ollama response envelopes remain **Provider-native**. |
 | Use OpenAI from the renderer profile | `/arcane/modules/AI.js` | **Cloud** from an allowed browser/native renderer | High-level AI chat/text behavior is normalized by the module; raw provider diagnostics and some response detail remain provider-specific. No automatic cloud fallback is inferred from local failure. |
@@ -89,10 +89,24 @@ resource limits still apply.
 
 `localOnly:true` describes inference after load; it does not promise that load
 is offline. A normal cache miss downloads from the exact caller-supplied HTTPS
-URL. `load({offline:true})` permits only an existing cache entry whose model
-bytes are fully rehashed, otherwise it rejects with
-`ARCANE_AI_MODEL_OFFLINE_MISS`. Tool calls are result data for application
-review and dispatch; the SDK never executes them.
+URL. App, provider/model-binding, and load-operation options use
+`{security:{secure?:boolean, checks?:{byteLength?:boolean, sha256?:boolean}}}`.
+Fields resolve independently from load operation to provider/model binding to
+app configuration to the SDK default `secure:false`; omitted fields inherit.
+The resolved `secure` value supplies the default for both checks, and an
+explicit per-check boolean overrides that default.
+
+An enabled check requires and verifies its matching descriptor field. A
+disabled byte-length check permits `bytes` to be absent and never compares an
+expected size, although the actual downloaded or cached byte count is always
+recorded for storage and progress metadata. A disabled SHA-256 check permits
+`sha256` to be absent and performs no hash or digest-only reread. Status reports
+the effective checks and distinguishes unchecked integrity from successful
+verification of the enabled checks. Only enabled checks fail closed, while
+successful Wllama model loading remains mandatory. `load({offline:true})` permits only a compatible
+cache entry and otherwise rejects with `ARCANE_AI_MODEL_OFFLINE_MISS`. Tool
+calls are result data for application review and dispatch; the SDK never
+executes them.
 
 ### Arcane bridge-normalized
 

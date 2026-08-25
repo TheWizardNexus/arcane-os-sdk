@@ -106,12 +106,9 @@ function modelAuthority({id='release-regression',byte=42}={}){
     return Object.freeze({
         descriptor:Object.freeze({
             id,
-            name:`${id}.gguf`,
-            immutableUrl:`https://example.invalid/models/0123456789abcdef/${id}.gguf`,
+            url:`https://example.invalid/models/0123456789abcdef/${id}.gguf`,
             bytes:bytes.byteLength,
-            sha256:createHash('sha256').update(bytes).digest('hex'),
-            licenseSpdx:'Apache-2.0',
-            sourceRevision:'0123456789abcdef'
+            sha256:createHash('sha256').update(bytes).digest('hex')
         }),
         bytes
     });
@@ -322,6 +319,13 @@ sourceTest('browser-WASM provider admits only module-branded model sources and s
     const provider=createBrowserWasmLlmProvider({source,store});
     assert.equal(provider.status().state,'unloaded');
     assert.equal(provider.model.id,'brand-regression');
+    assert.equal(source.kind,'arcane-browser-model-source');
+    assert.deepEqual(Object.keys(source.descriptor),['id','url','bytes','sha256']);
+    assert.deepEqual(provider.status().security,{
+        secure:false,
+        checks:{byteLength:false,sha256:false}
+    });
+    assert.equal(provider.status().integrity.state,'unchecked');
 });
 
 sourceTest('browser-WASM provider serializes unload and retries failed disposal cleanup',async t=>{
@@ -574,6 +578,10 @@ test('the exact npm artifact exposes the supported installed capability contract
         'utf8'
     ));
     assert.equal(browserAiComponents.packageExport,'arcane-os/ai/browser-wasm');
+    assert.equal(
+        browserAiComponents.runtimePolicy.modelAuthorities,
+        'fieldwise-security-default-false-with-optional-byteLength-and-sha256-checks'
+    );
     assert.equal(browserAiComponents.runtimePolicy.modelWeightsPacked,false);
     assert.equal(browserAiComponents.runtimePolicy.remoteModelHelpers,false);
     assert.equal(browserAiComponents.runtimePolicy.toolCalls,'structural-only-never-executed');
@@ -650,12 +658,9 @@ test('installed public SDK capabilities are coherent',async()=>{
     let modelFetches=0;
     const source=browserWasm.createBrowserModelSource({
         id:'installed-smoke-model',
-        name:'installed-smoke.gguf',
-        immutableUrl:'https://example.invalid/models/0123456789abcdef/installed-smoke.gguf',
+        url:'https://example.invalid/models/0123456789abcdef/installed-smoke.gguf',
         bytes:1,
-        sha256:'${'0'.repeat(64)}',
-        licenseSpdx:'Apache-2.0',
-        sourceRevision:'0123456789abcdef'
+        sha256:'${'0'.repeat(64)}'
     },{fetchImpl:async()=>{modelFetches+=1;throw new Error('network must remain idle');}});
     const directory={
         async getFileHandle(){throw Object.assign(new Error('missing'),{name:'NotFoundError'});},
@@ -671,6 +676,9 @@ test('installed public SDK capabilities are coherent',async()=>{
     assert.equal(provider2.role,'llm');
     assert.equal(provider2.localOnly,true);
     assert.equal(provider2.status().state,'unloaded');
+    assert.equal(provider2.status().security.secure,false);
+    assert.deepEqual(provider2.status().security.checks,{byteLength:false,sha256:false});
+    assert.equal(provider2.status().integrity.state,'unchecked');
     assert.deepEqual(provider2.catalog().map(model=>model.id),['installed-smoke-model']);
     const ai=browserWasm.createArcaneAI({provider,loadPolicy:'manual'});
     assert.equal(ai.status().llm.state,'unloaded');

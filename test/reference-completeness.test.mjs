@@ -151,9 +151,9 @@ test('the public package API inventory matches every JavaScript export and MDN e
 
         const browserWasmSignatures=new Map([
             ['BROWSER_WASM_RUNTIME_AUTHORITY','const BROWSER_WASM_RUNTIME_AUTHORITY'],
-            ['createArcaneAI',"createArcaneAI({ llm=null, provider=null, loadPolicy='on-demand' }={})"],
+            ['createArcaneAI',"createArcaneAI({ llm=null, provider=null, loadPolicy='on-demand', security }={})"],
             ['createBrowserModelSource','createBrowserModelSource(descriptor, { fetchImpl=null }={})'],
-            ['createBrowserWasmLlmProvider','createBrowserWasmLlmProvider({ source, store, loadDefaults={}, logger=console }={})'],
+            ['createBrowserWasmLlmProvider','createBrowserWasmLlmProvider({ source, store, loadDefaults={}, security, logger=console }={})'],
             ['createDbopfsModelStore',"createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models' }={})"]
         ]);
         const browserWasmMembers=inventory.members.filter(member=>
@@ -236,7 +236,7 @@ test('the public package API inventory matches every JavaScript export and MDN e
         const sdkSections=sectionsByHeading(guide);
         assert.deepEqual([...focusedSections.keys()],[
             'Lifecycle at a glance',
-            'Model authority and cache admission',
+            'Model authority, security, and cache admission',
             'Streaming, cancellation, and tools',
             'Errors and unavailable states',
             'BROWSER_WASM_RUNTIME_AUTHORITY',
@@ -261,25 +261,29 @@ test('the public package API inventory matches every JavaScript export and MDN e
         }
         for(const value of [
             'arcane-os/ai/browser-wasm',
-            'arcane-ai-browser-wasm/1',
+            'arcane-ai-browser-wasm/2',
             '@wllama/wllama',
             '3.6.0',
             'id',
-            'name',
-            'immutableUrl',
+            'url',
             'bytes',
             'sha256',
-            'licenseSpdx',
-            'sourceRevision',
+            'security',
+            'secure:false',
+            'checks.byteLength',
+            'checks.sha256',
+            'observed byte length',
             'DBOPFS',
-            'arcane.ai.browser-wasm.model.v2',
+            'arcane.ai.browser-wasm.model.v3',
             'load({offline:true})',
             'ARCANE_AI_MODEL_OFFLINE_MISS',
             'AbortSignal',
             'ARCANE_AI_REQUEST_ABORTED'
         ])assert.match(browserWasmGuide,new RegExp(escapeRegExp(value),'u'),value);
         assert.match(browserWasmGuide,/packages no model weights/u);
-        assert.match(browserWasmGuide,/fully\s+rehashes|rehashes the bytes/u);
+        assert.match(browserWasmGuide,/does not hash or reread a multi-gigabyte model/u);
+        assert.match(browserWasmGuide,/Wllama reports that the model is loaded/u);
+        assert.match(browserWasmGuide,/licenseSpdx[\s\S]*not canonical descriptor fields or runtime admission checks/u);
         assert.match(browserWasmGuide,/structural data/u);
         assert.match(browserWasmGuide,/never (?:invokes a handler or )?executes a tool/u);
         assert.doesNotMatch(browserWasmGuide,/browser-WASM (?:speech|transcription|native) (?:API|provider) is (?:available|shipped)/iu);

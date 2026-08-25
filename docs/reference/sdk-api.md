@@ -29,7 +29,7 @@ for that 86-entry physical-runtime contract.
 | `arcane-os/packager` | Low-level browser app packager. |
 | `arcane-os/release-bundle` | Deterministic external release bundles. |
 | `arcane-os/event-manager` | Central synchronous events, bounded time-travel history, playback, and optional DOM instrumentation. |
-| `arcane-os/ai/browser-wasm` | Caller-authenticated browser-local Wllama inference, verified DBOPFS model caching, streaming, cancellation, and structural tool-call results. |
+| `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, configurable DBOPFS model checks, streaming, cancellation, and structural tool-call results. |
 
 JSON schemas, the runtime manifest, and `package.json` are data-only export subpaths. In Node ESM, import JSON with `with {type: 'json'}`, or resolve and read it explicitly.
 
@@ -89,7 +89,7 @@ Protocol mechanics are intentionally kept in the [deep protocol guide](protocols
 | `createArcaneAI()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser; compatible LLM provider or controller required |
 | `createAppReleaseBundle()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `createBrowserModelSource()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser Fetch with a readable response body |
-| `createBrowserWasmLlmProvider()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser; WebAssembly and verified DBOPFS model bytes |
+| `createBrowserWasmLlmProvider()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser; WebAssembly and DBOPFS model bytes |
 | `createCanonicalUstarHeader()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `createDbopfsModelStore()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser with a ready DBOPFS instance and OPFS |
 | `createNativeBuildPlan()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
@@ -4941,7 +4941,7 @@ console.log(stack.sessionId, stack.events.length);
 
 Deep-frozen authority for the browser-only runtime behind
 `arcane-os/ai/browser-wasm`. It records protocol
-`arcane-ai-browser-wasm/1`, `@wllama/wllama` `3.6.0`, the embedded llama.cpp
+`arcane-ai-browser-wasm/2`, `@wllama/wllama` `3.6.0`, the embedded llama.cpp
 revision, the exact packaged JavaScript and WebAssembly assets, retained MIT
 licenses, and the disabled compatibility-runtime/remote-model-helper policy.
 It contains no model weights or model catalog.
@@ -4984,7 +4984,7 @@ requires an explicit successful `load()` before requests. When both `llm` and
 ### Signature and result
 
 ```text
-createArcaneAI({ llm=null, provider=null, loadPolicy='on-demand' }={})
+createArcaneAI({ llm=null, provider=null, loadPolicy='on-demand', security }={})
 ```
 
 At least one `llm` or `provider` is required. The frozen facade contains
@@ -4993,6 +4993,12 @@ At least one `llm` or `provider` is required. The frozen facade contains
 methods return the flat LLM status. `fetchRequest()` returns the completion.
 `streamRequest()` consumes streaming and returns text or a tool-name-to-JSON-
 argument-string record. Use `ai.llm.stream()` for the async iterator.
+
+App and load-operation security use
+`{security:{secure?:boolean, checks?:{byteLength?:boolean, sha256?:boolean}}}`.
+The SDK/app default is `secure:false`. Each omitted field inherits and an
+operation field overrides the corresponding app field. The provider/model
+binding scope, documented below, sits between those scopes.
 
 ### Availability and normalization
 
@@ -5014,10 +5020,9 @@ stop();
 ### Overview
 
 Validates a caller-owned model descriptor and creates the cancellable HTTPS
-source accepted by the browser-WASM store/provider. Required fields are `id`,
-`name`, `immutableUrl`, `bytes`, `sha256`, `licenseSpdx`, and
-`sourceRevision`. `bytes` is the expected positive safe-integer byte length,
-not inline data.
+source accepted by the browser-WASM store/provider. The canonical descriptor is
+`{id, url, bytes?, sha256?}`. `id` and `url` are required. `bytes`, when
+present, is the expected positive safe-integer byte length, not inline data.
 
 ### Signature and result
 
@@ -5026,30 +5031,34 @@ createBrowserModelSource(descriptor, { fetchImpl=null }={})
 ```
 
 The URL must be absolute HTTPS with no credentials or fragment and no
-revision-floating `main`, `master`, or `latest` path. The SHA-256 value is
-exactly 64 hexadecimal characters. The frozen source exposes its canonical
+revision-floating `main`, `master`, or `latest` path. A supplied SHA-256 value
+is exactly 64 hexadecimal characters. The frozen source exposes its canonical
 descriptor and `open({signal})`, which returns `{body, requestedUrl, finalUrl,
-cancel}`. Every direct `open()` performs the configured fetch. The SDK records
-but does not independently prove the supplied license identifier or revision.
+reportedBytes, cancel}`. `reportedBytes` is the nullable valid nonnegative
+`Content-Length` observation; it is not an unconditional admission check. Every
+direct `open()` performs the configured fetch.
+
+For compatibility, `immutableUrl` remains an alias for `url` and `name` can
+remain a cache-filename hint; `url` and `immutableUrl` must match when both are
+present. Legacy `licenseSpdx` and `sourceRevision` properties are not canonical
+descriptor fields, runtime admission checks, or proof of license rights.
 
 ### Availability and normalization
 
 **Browser Fetch with CORS and a readable response body.** Downloads omit
 credentials/referrer, disable HTTP caching, follow redirects, require a final
-HTTPS URL, compare `Content-Length` when present, and honor `AbortSignal`.
-Actual length and digest admission belongs to the DBOPFS store.
+HTTPS URL, and honor `AbortSignal`. The DBOPFS store always counts and records
+actual bytes; it compares expected length or hashes bytes only when the
+corresponding effective check is enabled.
 
 ### Example
 
 ```javascript
 const source = createBrowserModelSource({
     id:'reviewed-model',
-    name:'model-q4.gguf',
-    immutableUrl:'https://models.example/revisions/4f7c/model-q4.gguf',
+    url:'https://models.example/revisions/4f7c/model-q4.gguf',
     bytes:123456789,
-    sha256:'0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
-    licenseSpdx:'Apache-2.0',
-    sourceRevision:'4f7c'
+    sha256:'0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
 });
 ```
 
@@ -5064,7 +5073,7 @@ created by this module. It serializes requests and exposes provider states
 ### Signature and result
 
 ```text
-createBrowserWasmLlmProvider({ source, store, loadDefaults={}, logger=console }={})
+createBrowserWasmLlmProvider({ source, store, loadDefaults={}, security, logger=console }={})
 ```
 
 The frozen provider exposes `protocol`, `id`, `model`, `capabilities`,
@@ -5075,12 +5084,24 @@ OpenAI-like message/generation fields, tools, tool choice, parallel tool-call
 preference, and JSON/JSON-Schema structured output. `stream()` returns a frozen
 async iterator with `result` and `cancel(reason)`.
 
+Provider `security` is the provider/model-binding scope. Security fields resolve
+independently by precedence: load operation, provider/model binding, app SDK
+configuration, then SDK default `secure:false`. Omitted fields inherit. After
+resolution, `secure:true` enables both byte-length and SHA-256 checks by default;
+`secure:false` disables both by default. An explicit per-check boolean overrides
+the resolved secure default. Enabled checks require their corresponding
+descriptor fields and fail closed; disabled checks permit those fields to be
+absent. Changing effective checks for an already loaded or in-flight model
+requires unload and reload.
+
 ### Availability and normalization
 
-**Browser with WebAssembly and a verified DBOPFS model.** WebGPU and
-cross-origin isolation are capability observations, not promised gates.
-Returned tools are validated structural data; the SDK never calls a handler.
-Cancellation normalizes to `ARCANE_AI_REQUEST_ABORTED`.
+**Browser with WebAssembly and a DBOPFS model.** A load succeeds only after
+Wllama confirms the model is loaded. WebGPU and cross-origin isolation are
+capability observations, not promised gates. Status discloses effective
+`security` and per-check `integrity`; unchecked bytes are never labeled SHA-256
+verified. Returned tools are validated structural data; the SDK never calls a
+handler. Cancellation normalizes to `ARCANE_AI_REQUEST_ABORTED`.
 
 ### Example
 
@@ -5088,6 +5109,7 @@ Cancellation normalizes to `ARCANE_AI_REQUEST_ABORTED`.
 const provider = createBrowserWasmLlmProvider({
     source,
     store,
+    security:{secure:true},
     loadDefaults:{threads:1, contextTokens:4096, gpuLayers:0}
 });
 console.log(provider.status().state); // unloaded
@@ -5097,10 +5119,10 @@ console.log(provider.status().state); // unloaded
 
 ### Overview
 
-Adapts an existing DBOPFS instance into an authenticated model cache without
-renaming its public methods. The adapter commits model bytes before the
-`arcane.ai.browser-wasm.model.v2` completion manifest and then reopens and
-rehashes the stored file.
+Adapts an existing DBOPFS instance into a model cache without renaming its
+public methods. The adapter commits model bytes before the
+`arcane.ai.browser-wasm.model.v3` completion manifest and always records the
+observed downloaded or cached byte length.
 
 ### Signature and result
 
@@ -5110,14 +5132,22 @@ createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models' }={})
 
 The frozen result contains `kind`, `tableName`, the original `adapter`, and
 `ready`, `openVerified`, `install`, `ensure`, and `remove`. `ensure()` returns
-`{file, manifest, cache:'verified'|'installed'}`. Every cache reuse rehashes the
-actual bytes. `offline:true` never downloads and rejects a miss with
-`ARCANE_AI_MODEL_OFFLINE_MISS`. Invalid cache records are removed fail closed.
+the file, manifest, `observedBytes`, integrity detail, and
+`cache:'cached'|'installed'`. `openVerified()` is a compatibility helper that
+forces both checks on. Ordinary install/reuse compares expected length only
+when effective `checks.byteLength` is true and hashes only when effective
+`checks.sha256` is true. `offline:true` never downloads and rejects a miss with
+`ARCANE_AI_MODEL_OFFLINE_MISS`. Version-2 manifests with matching model identity
+can migrate to version 3 without fabricating verification.
 
 ### Availability and normalization
 
-**Browser with a ready DBOPFS instance and OPFS.** The cache is local integrity
-evidence, not a transferable capability or license proof. Unload/dispose keep
+**Browser with a ready DBOPFS instance and OPFS.** The cache reports only checks
+actually performed. Disabled byte-length checks do not compare descriptor
+`bytes`, disabled SHA-256 checks do not hash or reread solely for a digest, and
+overall integrity is `verified` when every enabled check succeeds or
+`unchecked` when neither check is enabled. Cache
+metadata is not a transferable capability or license proof. Unload/dispose keep
 the cache; `store.remove(source)` explicitly deletes it.
 
 ### Example

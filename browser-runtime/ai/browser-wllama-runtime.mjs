@@ -447,6 +447,12 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
     try {
       await loadOperation;
       if (pending?.engine !== next) throw new Error("Wllama load was cancelled.");
+      if (typeof next.isModelLoaded !== "function" || next.isModelLoaded() !== true) {
+        throw runtimeFailure(
+          "ARCANE_AI_LOAD_FAILED",
+          "Wllama did not confirm a successfully loaded model.",
+        );
+      }
       const projected = verifyProjectedTelemetry(await next.arcaneTelemetry());
       const webgpu = admittedLoadEvidence(sessionObservers.get(next).snapshot(), projected);
       pending = null;

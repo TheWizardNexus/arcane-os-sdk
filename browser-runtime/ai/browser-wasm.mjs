@@ -16,12 +16,18 @@ function createArcaneAI({
   llm = null,
   provider = null,
   loadPolicy = "on-demand",
+  security,
 } = {}) {
   const selected = llm ?? provider;
   if (!selected) throw new TypeError("createArcaneAI requires an llm provider.");
+  if (selected instanceof ModelController && security !== undefined) {
+    throw new TypeError(
+      "createArcaneAI security must be configured when the existing ModelController is created.",
+    );
+  }
   const controller = selected instanceof ModelController
     ? selected
-    : createModelController({ provider: selected, loadPolicy });
+    : createModelController({ provider: selected, loadPolicy, security });
 
   return Object.freeze({
     llm: controller,
