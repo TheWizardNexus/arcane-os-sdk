@@ -3,7 +3,6 @@ import {spawn} from 'node:child_process';
 import {createHash,randomBytes} from 'node:crypto';
 import {createReadStream} from 'node:fs';
 import {
-    access,
     lstat,
     mkdtemp,
     readFile,
@@ -25,6 +24,32 @@ const DEBUG_PATH_PRESENT=Object.hasOwn(
     process.env,
     'ARCANE_BROWSER_AI_DEBUG_MODEL_PATH'
 );
+const FINAL_WARM_KEYS=Object.freeze([
+    'ARCANE_BROWSER_AI_FINAL_WARM_PROFILE',
+    'ARCANE_BROWSER_AI_FINAL_WARM_PORT',
+    'ARCANE_BROWSER_AI_FINAL_WARM_APPLICATION_ID',
+    'ARCANE_BROWSER_AI_FINAL_WARM_PROFILE_DIRECTORY'
+]);
+const FINAL_WARM_PRESENT=FINAL_WARM_KEYS.filter(key=>Object.hasOwn(process.env,key));
+if(FINAL_WARM_PRESENT.length!==0&&FINAL_WARM_PRESENT.length!==FINAL_WARM_KEYS.length){
+    throw new Error('The final warm browser-AI environment must provide all four exact keys.');
+}
+const FINAL_WARM_ONLY=FINAL_WARM_PRESENT.length===FINAL_WARM_KEYS.length;
+if(FINAL_WARM_ONLY&&!AUTHORITATIVE_ENABLED){
+    throw new Error('The final warm browser-AI environment requires the authoritative installed-artifact gate.');
+}
+if(FINAL_WARM_ONLY&&FINAL_WARM_KEYS.some(key=>!process.env[key]?.trim())){
+    throw new Error('The final warm browser-AI environment rejects empty values.');
+}
+const FINAL_WARM_PORT=FINAL_WARM_ONLY
+    ?Number(process.env.ARCANE_BROWSER_AI_FINAL_WARM_PORT)
+    :0;
+const FINAL_WARM_APPLICATION_ID=FINAL_WARM_ONLY
+    ?process.env.ARCANE_BROWSER_AI_FINAL_WARM_APPLICATION_ID
+    :null;
+const FINAL_WARM_PROFILE_DIRECTORY=FINAL_WARM_ONLY
+    ?process.env.ARCANE_BROWSER_AI_FINAL_WARM_PROFILE_DIRECTORY
+    :null;
 const ENABLED=AUTHORITATIVE_ENABLED||DEBUG_ENABLED;
 const REPORT_PATH='/__arcane_browser_ai_contract_report';
 const DEBUG_MODEL_PATH='/__arcane_browser_ai_debug_model';
@@ -33,6 +58,7 @@ const OPERATION_TIMEOUT_MS=45*60*1000;
 const PROFILE_CLEANUP_TIMEOUT_MS=60*1000;
 const EXACT_EXPORTS=Object.freeze([
     'BROWSER_WASM_RUNTIME_AUTHORITY',
+    'adaptV1LlmProvider',
     'createArcaneAI',
     'createBrowserModelSource',
     'createBrowserWasmLlmProvider',
@@ -193,6 +219,59 @@ async function terminateProcess(child){
     }
 }
 
+async function activeWindowsChromeProfileOwners(profile){
+    assert.equal(process.platform,'win32','Chrome profile ownership inspection is Windows-only.');
+    const script=[
+        "$ErrorActionPreference='Stop'",
+        '$target=[IO.Path]::GetFullPath($args[0]).ToLowerInvariant()',
+        "$owners=@(Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | "+
+            'Where-Object { $_.CommandLine -and $_.CommandLine.ToLowerInvariant().Contains($target) } | '+
+            'Select-Object -ExpandProperty ProcessId)',
+        "[Console]::Out.Write(($owners -join ','))"
+    ].join(';');
+    const inspector=spawn('powershell.exe',[
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        script,
+        profile
+    ],{
+        stdio:['ignore','pipe','pipe'],
+        windowsHide:true
+    });
+    let stdout=Buffer.alloc(0);
+    let stderr=Buffer.alloc(0);
+    inspector.stdout.on('data',chunk=>{stdout=appendTail(stdout,chunk,8*1024);});
+    inspector.stderr.on('data',chunk=>{stderr=appendTail(stderr,chunk,8*1024);});
+    let timer=null;
+    const timeout=new Promise((_,reject)=>{
+        timer=setTimeout(
+            ()=>reject(new Error('Chrome profile ownership inspection exceeded 15 seconds.')),
+            15_000
+        );
+        timer.unref?.();
+    });
+    void timeout.catch(()=>{});
+    let result;
+    try{
+        result=await Promise.race([waitForExit(inspector),timeout]);
+    }catch(error){
+        await terminateProcess(inspector);
+        throw error;
+    }finally{
+        if(timer!==null)clearTimeout(timer);
+    }
+    assert.equal(
+        result.code,
+        0,
+        `Chrome profile ownership inspection failed: ${stderr.toString('utf8').trim()}`
+    );
+    assert.equal(result.signal,null,'Chrome profile ownership inspection was terminated.');
+    const output=stdout.toString('utf8').trim();
+    return output?output.split(',').filter(Boolean):[];
+}
+
 function closeServer(server){
     server.closeIdleConnections?.();
     server.closeAllConnections?.();
@@ -200,7 +279,7 @@ function closeServer(server){
     return new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));
 }
 
-async function createContractServer({root,token,debugModel}){
+async function createContractServer({root,token,debugModel,port=0}){
     const requests=[];
     let reportResolve;
     let reportReject;
@@ -276,7 +355,7 @@ async function createContractServer({root,token,debugModel}){
     });
     await new Promise((resolve,reject)=>{
         server.once('error',reject);
-        server.listen(0,'127.0.0.1',resolve);
+        server.listen(port,'127.0.0.1',resolve);
     });
     const address=server.address();
     assert.ok(address&&typeof address==='object');
@@ -288,10 +367,12 @@ async function createContractServer({root,token,debugModel}){
     });
 }
 
-function browserProbeSource({token,model,debug}){
+function browserProbeSource({token,model,debug,warmOnly,applicationId}){
     return `const TOKEN=${JSON.stringify(token)};
 const MODEL=${JSON.stringify(model)};
 const DEBUG=${JSON.stringify(debug)};
+const WARM_ONLY=${JSON.stringify(warmOnly)};
+const APPLICATION_ID=${JSON.stringify(applicationId)};
 const EXACT_EXPORTS=${JSON.stringify(EXACT_EXPORTS)};
 
 function invariant(value,message){
@@ -300,6 +381,121 @@ function invariant(value,message){
 
 function equal(actual,expected,message){
     if(actual!==expected)throw new Error(message+' (actual '+String(actual)+', expected '+String(expected)+')');
+}
+
+function positiveInteger(value,message){
+    invariant(Number.isSafeInteger(value)&&value>0,message);
+}
+
+async function openReadOnlyDbopfs(applicationId,tableName){
+    const root=await navigator.storage.getDirectory();
+    const applications=await root.getDirectoryHandle('apps',{create:false});
+    const application=await applications.getDirectoryHandle(applicationId,{create:false});
+    const table=await application.getDirectoryHandle(tableName,{create:false});
+    const readOnlyTable=Object.freeze({
+        async getFileHandle(entry,options={}){
+            if(options?.create===true)throw new Error('Final warm proof cannot create DBOPFS entries');
+            const handle=await table.getFileHandle(entry,{create:false});
+            return Object.freeze({
+                getFile:()=>handle.getFile(),
+                async createWritable(){throw new Error('Final warm proof cannot write DBOPFS entries');}
+            });
+        },
+        async removeEntry(){throw new Error('Final warm proof cannot remove DBOPFS entries');}
+    });
+    return Object.freeze({
+        readyPromise:Promise.resolve(),
+        async getTableHandle(name){
+            equal(name,tableName,'Final warm proof requested an unexpected DBOPFS table');
+            return readOnlyTable;
+        }
+    });
+}
+
+function projectProviderStatus(status,{inference=false,cancellation=false,cleanup=false}={}){
+    const evidence=status?.runtimeEvidence;
+    equal(evidence?.protocol,'arcane-wllama-runtime-evidence/1','Runtime evidence protocol drifted');
+    if(cleanup){
+        equal(status.state,'unloaded','Provider did not settle at unloaded');
+        equal(status.loaded,false,'Unloaded provider still reports loaded');
+        equal(evidence.state,'unloaded','Runtime evidence did not settle at unloaded');
+        equal(evidence.cleanup?.kind,'worker-terminated','Worker termination was not proved');
+        equal(evidence.webgpu?.lastObservedOperational,true,'Unload lost prior WebGPU evidence');
+    }else{
+        equal(status.capabilities?.webgpuOperational,true,'Provider did not admit operational WebGPU');
+        equal(status.capabilities?.webgpuEvidenceProtocol,'arcane-wllama-runtime-evidence/1','Capability evidence protocol drifted');
+        equal(evidence.state,'ready','Runtime evidence is not ready');
+        equal(evidence.webgpu?.observed,true,'WebGPU operation was not observed');
+        invariant(evidence.webgpu?.adapter&&typeof evidence.webgpu.adapter.name==='string','WebGPU adapter evidence is absent');
+        const offload=evidence.webgpu?.offload;
+        positiveInteger(offload?.totalLayers,'Total model-layer evidence is absent');
+        equal(offload.layers,offload.totalLayers,'Not all reported model layers were offloaded');
+        equal(offload.allReportedModelLayers,true,'Full-offload admission marker is absent');
+        positiveInteger(evidence.webgpu?.buffers?.count,'GPU buffer evidence is absent');
+        positiveInteger(evidence.webgpu?.buffers?.descriptorBytes,'GPU buffer-byte evidence is absent');
+        const queue=evidence.webgpu?.queue;
+        positiveInteger(queue?.submissions,'WebGPU queue submission evidence is absent');
+        positiveInteger(queue?.commandBuffers,'WebGPU command-buffer evidence is absent');
+        positiveInteger(queue?.fenceRequests,'WebGPU queue-fence evidence is absent');
+        invariant(queue.fenceCompletions>=queue.fenceRequests,'WebGPU queue fences did not settle');
+        if(inference){
+            const last=evidence.webgpu?.lastInference;
+            positiveInteger(last?.submissions,'Inference submitted no WebGPU work');
+            positiveInteger(last?.commandBuffers,'Inference produced no WebGPU command buffers');
+            positiveInteger(last?.fenceRequests,'Inference requested no WebGPU completion fence');
+            invariant(last.fenceCompletions>=last.fenceRequests,'Inference WebGPU fences did not settle');
+        }
+        if(cancellation){
+            equal(evidence.cancellation?.deliverySuppressed,true,'Cancelled delivery was not suppressed');
+            equal(evidence.cancellation?.upstream?.kind,'llama-request-cancel-acknowledged','Upstream cancellation was not acknowledged');
+            equal(evidence.cancellation?.upstream?.responseName,'cncl_res','Cancellation response drifted');
+            equal(evidence.cancellation?.upstream?.acknowledged,true,'Cancellation acknowledgement is absent');
+            equal(evidence.cancellation?.upstream?.failed,false,'Cancellation acknowledgement reported failure');
+        }
+    }
+    return {
+        state:status.state,
+        loaded:status.loaded,
+        cache:status.cache?.state??null,
+        capabilities:{
+            webgpuOperational:status.capabilities?.webgpuOperational===true,
+            evidenceProtocol:status.capabilities?.webgpuEvidenceProtocol??null
+        },
+        runtimeEvidence:{
+            protocol:evidence.protocol,
+            state:evidence.state,
+            webgpu:{
+                observed:evidence.webgpu?.observed===true,
+                lastObservedOperational:evidence.webgpu?.lastObservedOperational===true,
+                adapter:evidence.webgpu?.adapter?{
+                    vendorId:evidence.webgpu.adapter.vendorId,
+                    deviceId:evidence.webgpu.adapter.deviceId,
+                    name:String(evidence.webgpu.adapter.name).slice(0,256)
+                }:null,
+                offload:evidence.webgpu?.offload??null,
+                buffers:evidence.webgpu?.buffers??null,
+                queue:evidence.webgpu?.queue??null,
+                lastInference:evidence.webgpu?.lastInference??null
+            },
+            cancellation:evidence.cancellation??null,
+            cleanup:evidence.cleanup??null
+        }
+    };
+}
+
+async function cacheSnapshot(table){
+    const safeId=MODEL.id.replace(/[^a-z0-9._-]+/giu,'_');
+    const modelFile=await (await table.getFileHandle(safeId+'--'+MODEL.name,{create:false})).getFile();
+    const manifestFile=await (await table.getFileHandle(safeId+'.complete.json',{create:false})).getFile();
+    const manifestText=await manifestFile.text();
+    const manifest=JSON.parse(manifestText);
+    equal(modelFile.size,MODEL.bytes,'DBOPFS model bytes drifted');
+    equal(manifest.schema,'arcane.ai.browser-wasm.model.v2','DBOPFS completion schema drifted');
+    equal(manifest.complete,true,'DBOPFS completion marker drifted');
+    for(const field of ['id','name','immutableUrl','bytes','sha256','licenseSpdx','sourceRevision']){
+        equal(manifest.model?.[field],MODEL[field],'DBOPFS completion authority drifted for '+field);
+    }
+    return {modelFile,manifestFile,manifestText,manifest};
 }
 
 function scriptedHandle(chunks,completion){
@@ -331,9 +527,18 @@ async function run(){
     const componentResponse=await fetch('/arcane/sdk/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json');
     invariant(componentResponse.ok,'The authenticated browser-AI component receipt was not served');
     const components=await componentResponse.json();
+    equal(components.protocol,'arcane-ai-browser-wasm/2','Component receipt protocol drifted');
     equal(components.packageExport,'arcane-os/ai/browser-wasm','Component export authority drifted');
     equal(components.runtimePolicy.modelWeightsPacked,false,'Model weights entered the package');
+    equal(components.runtimePolicy.webgpuAdmission,'adapter-plus-full-offload-plus-buffer-queue-and-settled-fence-evidence','WebGPU receipt policy drifted');
+    equal(components.runtimePolicy.cpuFallback,false,'CPU fallback entered the WebGPU-required release');
+    equal(components.runtimePolicy.cancellation,'abortSignal-plus-llama-cancel-acknowledgement','Cancellation receipt policy drifted');
+    equal(components.runtimePolicy.cleanup,'worker-termination-only-no-native-unload-claim','Cleanup receipt policy drifted');
     equal(components.runtimePolicy.toolCalls,'structural-only-never-executed','Tool policy drifted');
+    const projectedModule=components.components
+        .find(component=>component.name==='@wllama/wllama')?.files
+        ?.find(file=>file.role==='runtime-module');
+    equal(projectedModule?.sha256,'ae9a6ba2aa8687785ed651e28ef92573b409d5e6d3470bfd53340225287908b8','Projected Wllama receipt digest drifted');
 
     let fakeState='ready';
     const compatibility={requests:[],responses:[],chunks:[],completions:[],tools:[],executions:0};
@@ -414,13 +619,24 @@ async function run(){
     equal(compatibility.executions,0,'The SDK executed an application-owned tool');
     await compatibilityAi.dispose();
 
-    const {default:DBOPFS}=await import('arcane/DBOPFS');
-    const dbopfs=globalThis.dbopfs||new DBOPFS({applicationId:'arcane-browser-ai-contract'});
-    await dbopfs.readyPromise;
+    let dbopfs;
+    if(WARM_ONLY){
+        dbopfs=await openReadOnlyDbopfs(APPLICATION_ID,'arcane_ai_browser_models');
+    }else{
+        const {default:DBOPFS}=await import('arcane/DBOPFS');
+        dbopfs=globalThis.dbopfs||new DBOPFS({applicationId:APPLICATION_ID});
+        await dbopfs.readyPromise;
+    }
     const store=api.createDbopfsModelStore({dbopfs});
     await store.ready();
     let debugFetches=0;
-    const source=api.createBrowserModelSource(MODEL,DEBUG?{
+    let prohibitedFetches=0;
+    const source=api.createBrowserModelSource(MODEL,WARM_ONLY?{
+        fetchImpl:async()=>{
+            prohibitedFetches+=1;
+            throw new Error('Final warm proof attempted model networking');
+        }
+    }:DEBUG?{
         fetchImpl:async(_url,options)=>{
             debugFetches+=1;
             const response=await fetch(${JSON.stringify(DEBUG_MODEL_PATH)},{signal:options?.signal,cache:'no-store'});
@@ -438,9 +654,15 @@ async function run(){
         threads:Math.max(1,Math.min(8,(navigator.hardwareConcurrency||2)-1)),
         batchTokens:DEBUG?64:256,
         microBatchTokens:64,
-        gpuLayers:0
+        gpuLayers:99_999
     };
     const provider=api.createBrowserWasmLlmProvider({source,store,loadDefaults});
+    const adapted=api.adaptV1LlmProvider(provider);
+    equal(adapted.protocol,'arcane-ai-provider/2','Adapted provider protocol drifted');
+    equal(adapted.role,'llm','Adapted provider role drifted');
+    equal(adapted.localOnly,true,'Adapted provider lost local-only admission');
+    equal(adapted.catalog().length,1,'Adapted provider catalog drifted');
+    equal(adapted.catalog()[0].id,MODEL.id,'Adapted provider model authority drifted');
     const ai=api.createArcaneAI({provider,loadPolicy:'manual'});
     const lifecycle=[];
     const progress=[];
@@ -448,12 +670,104 @@ async function run(){
     ai.llm.addEventListener('progress',event=>{
         if(event.detail.progress)progress.push(event.detail.progress);
     });
+    const table=await dbopfs.getTableHandle(store.tableName);
+    if(WARM_ONLY){
+        const cacheBefore=await cacheSnapshot(table);
+        const warm=await ai.load({offline:true});
+        equal(warm.state,'ready','Final warm model load did not reach ready');
+        equal(warm.cache.state,'verified','Final warm model load did not use verified DBOPFS bytes');
+        equal(prohibitedFetches,0,'Final warm load attempted model networking');
+        invariant(progress.some(value=>value.phase==='verify-cache'&&value.loaded===MODEL.bytes),'Final warm cache was not actual-byte rehashed');
+        const loadEvidence=projectProviderStatus(provider.status());
+        const warmCompletion=await ai.fetchRequest({
+            id:'wasm-final-warm-inference',
+            localOnly:true,
+            messages:[{role:'user',content:'Reply with a short greeting.'}],
+            temperature:0,
+            maxTokens:24
+        });
+        const warmText=warmCompletion?.choices?.[0]?.message?.content;
+        invariant(typeof warmText==='string'&&warmText.trim(),'Packaged Wllama produced no final warm inference text');
+        const inferenceEvidence=projectProviderStatus(provider.status(),{inference:true});
+
+        const cancelController=new AbortController();
+        let cancelTrigger='deadline';
+        const cancelTimer=setTimeout(()=>cancelController.abort('final warm contract deadline cancellation'),30_000);
+        let cancelCode=null;
+        try{
+            await ai.streamRequest({
+                id:'wasm-final-warm-cancel',
+                localOnly:true,
+                signal:cancelController.signal,
+                messages:[{role:'user',content:'Write an extremely long numbered list without stopping.'}],
+                temperature:0,
+                maxTokens:512,
+                onChunk:()=>{
+                    cancelTrigger='chunk';
+                    cancelController.abort('final warm contract in-flight cancellation');
+                }
+            });
+        }catch(error){
+            cancelCode=error?.code||null;
+        }finally{
+            clearTimeout(cancelTimer);
+        }
+        equal(cancelCode,'ARCANE_AI_REQUEST_ABORTED','Final warm AbortSignal did not cancel active inference');
+        const cancellationEvidence=projectProviderStatus(provider.status(),{
+            inference:true,
+            cancellation:true
+        });
+        const unloaded=await ai.unload();
+        equal(unloaded.state,'unloaded','Final warm provider did not unload');
+        const cleanupEvidence=projectProviderStatus(provider.status(),{cleanup:true});
+        await ai.dispose();
+
+        const cacheAfter=await cacheSnapshot(table);
+        equal(cacheAfter.modelFile.size,cacheBefore.modelFile.size,'Final warm proof changed model size');
+        equal(cacheAfter.modelFile.lastModified,cacheBefore.modelFile.lastModified,'Final warm proof changed model bytes');
+        equal(cacheAfter.manifestFile.lastModified,cacheBefore.manifestFile.lastModified,'Final warm proof changed completion metadata');
+        equal(cacheAfter.manifestText,cacheBefore.manifestText,'Final warm proof changed completion authority');
+        equal(prohibitedFetches,0,'Final warm proof used the model network');
+
+        return {
+            exports:Object.keys(api).sort(),
+            mode:'granite-final-warm-only',
+            authoritative:true,
+            model:{id:MODEL.id,name:MODEL.name,bytes:MODEL.bytes,sha256:MODEL.sha256},
+            runtime:api.BROWSER_WASM_RUNTIME_AUTHORITY,
+            receipt:{
+                protocol:components.protocol,
+                runtimePolicy:components.runtimePolicy,
+                projectedModule:{bytes:projectedModule.bytes,sha256:projectedModule.sha256}
+            },
+            adapted:{
+                protocol:adapted.protocol,
+                role:adapted.role,
+                localOnly:adapted.localOnly,
+                catalog:adapted.catalog().map(item=>({id:item.id,name:item.name,sha256:item.sha256}))
+            },
+            compatibility,
+            finalWarm:{
+                cache:warm.cache.state,
+                text:warmText.slice(0,256),
+                progressPhases:[...new Set(progress.map(value=>value.phase))],
+                modelFetches:prohibitedFetches,
+                loadEvidence,
+                inferenceEvidence,
+                cancellation:{code:cancelCode,trigger:cancelTrigger,evidence:cancellationEvidence},
+                cleanupEvidence,
+                cachePreserved:true
+            },
+            origin:location.origin,
+            secureContext:isSecureContext,
+            crossOriginIsolated
+        };
+    }
     const cold=await ai.load();
     equal(cold.state,'ready','Cold model load did not reach ready');
     equal(cold.cache.state,'installed','A clean browser profile did not install the model');
     invariant(progress.some(value=>value.phase==='download'&&value.loaded===MODEL.bytes),'The model download did not reach its exact byte length');
     invariant(progress.some(value=>value.phase==='verify-cache'&&value.loaded===MODEL.bytes),'The installed model was not actual-byte rehashed');
-    const table=await dbopfs.getTableHandle(store.tableName);
     const safeId=MODEL.id.replace(/[^a-z0-9._-]+/giu,'_');
     const modelFile=await (await table.getFileHandle(safeId+'--'+MODEL.name,{create:false})).getFile();
     const manifestFile=await (await table.getFileHandle(safeId+'.complete.json',{create:false})).getFile();
@@ -603,6 +917,12 @@ if(!ENABLED){
             false,
             'Authoritative Granite validation rejects the disposable debug model environment.'
         );
+        if(FINAL_WARM_ONLY){
+            assert.equal(process.platform,'win32','The retained final warm authority is Windows-only.');
+            assert.equal(FINAL_WARM_PORT,8000,'The retained final warm origin must use port 8000.');
+            assert.equal(FINAL_WARM_APPLICATION_ID,'boss','The retained final warm DBOPFS application must be boss.');
+            assert.equal(FINAL_WARM_PROFILE_DIRECTORY,'Default','The retained final warm Chrome profile must be Default.');
+        }
     }else{
         assert.equal(
             DEBUG_PATH_PRESENT,
@@ -632,15 +952,18 @@ if(!ENABLED){
     const debugModel=DEBUG_ENABLED?await debugAuthority():null;
     if(DEBUG_ENABLED)assert.ok(debugModel,'Disposable-debug model authority is required.');
     const model=debugModel?.descriptor??GRANITE_AUTHORITY;
+    const applicationId=FINAL_WARM_ONLY
+        ?FINAL_WARM_APPLICATION_ID
+        :'arcane-browser-ai-contract';
     const token=randomBytes(32).toString('hex');
     const htmlPath=path.join(workspaceRoot,'browser-ai-runtime.contract.html');
     const probePath=path.join(workspaceRoot,'browser-ai-runtime.contract.probe.mjs');
     const safeImportMap=JSON.stringify(map).replaceAll('<','\\u003c');
     await writeFile(htmlPath,`<!doctype html>
-<html lang="en" data-arcane-app-id="arcane-browser-ai-contract">
+<html lang="en" data-arcane-app-id="${applicationId}">
 <head>
 <meta charset="utf-8">
-<meta name="arcane-app-id" content="arcane-browser-ai-contract">
+<meta name="arcane-app-id" content="${applicationId}">
 <title>Arcane installed browser-WASM contract</title>
 <script type="importmap">${safeImportMap}</script>
 <script type="module" src="/browser-ai-runtime.contract.probe.mjs"></script>
@@ -651,24 +974,55 @@ if(!ENABLED){
     await writeFile(probePath,browserProbeSource({
         token,
         model,
-        debug:Boolean(debugModel)
+        debug:Boolean(debugModel),
+        warmOnly:FINAL_WARM_ONLY,
+        applicationId
     }));
     t.after(()=>rm(htmlPath,{force:true}));
     t.after(()=>rm(probePath,{force:true}));
 
+    let profileOwned=false;
+    let profile;
+    if(FINAL_WARM_ONLY){
+        const configuredProfile=process.env.ARCANE_BROWSER_AI_FINAL_WARM_PROFILE;
+        assert.equal(
+            path.isAbsolute(configuredProfile),
+            true,
+            'The external warm profile root must be an absolute path.'
+        );
+        profile=path.resolve(configuredProfile);
+        const profileInfo=await lstat(profile);
+        assert.equal(profileInfo.isSymbolicLink(),false,'The external warm profile root must not be a link.');
+        assert.equal(profileInfo.isDirectory(),true,'The external warm profile root must be a directory.');
+        const selectedProfileInfo=await lstat(path.join(profile,FINAL_WARM_PROFILE_DIRECTORY));
+        assert.equal(selectedProfileInfo.isSymbolicLink(),false,'The selected warm profile must not be a link.');
+        assert.equal(selectedProfileInfo.isDirectory(),true,'The selected warm profile must be a directory.');
+        const owners=await activeWindowsChromeProfileOwners(profile);
+        assert.deepEqual(
+            owners,
+            [],
+            `The external warm Chrome profile is already owned by process IDs: ${owners.join(', ')}.`
+        );
+    }else{
+        profile=await mkdtemp(path.join(os.tmpdir(),'arcane-browser-ai-chrome-'));
+        profileOwned=true;
+    }
+
     const contractServer=await createContractServer({
         root:workspaceRoot,
         token,
-        debugModel
+        debugModel,
+        port:FINAL_WARM_PORT
     });
-    const profile=await mkdtemp(path.join(os.tmpdir(),'arcane-browser-ai-chrome-'));
     let chrome=null;
     t.after(async()=>{
         let cleanupTimer=null;
         const cleanup=(async()=>{
             await terminateProcess(chrome);
             await closeServer(contractServer.server);
-            await rm(profile,{recursive:true,force:true,maxRetries:10,retryDelay:250});
+            if(profileOwned){
+                await rm(profile,{recursive:true,force:true,maxRetries:10,retryDelay:250});
+            }
         })();
         void cleanup.catch(()=>{});
         const cleanupTimeout=new Promise((_,reject)=>{
@@ -696,13 +1050,13 @@ if(!ENABLED){
         '--disable-default-apps',
         '--disable-extensions',
         '--disable-features=MediaRouter,DialMediaRouteProvider,OptimizationHints',
-        '--disable-gpu',
         '--disable-sync',
         '--metrics-recording-only',
         '--no-default-browser-check',
         '--no-first-run',
         '--password-store=basic',
         `--user-data-dir=${profile}`,
+        ...(FINAL_WARM_ONLY?[`--profile-directory=${FINAL_WARM_PROFILE_DIRECTORY}`]:[]),
         ...(process.platform==='darwin'?['--use-mock-keychain']:[]),
         ...(typeof process.getuid==='function'&&process.getuid()===0?['--no-sandbox']:[]),
         contractServer.url
@@ -739,17 +1093,83 @@ if(!ENABLED){
     }finally{
         if(operationTimer!==null)clearTimeout(operationTimer);
     }
+    await new Promise(resolve=>setTimeout(resolve,2_000));
+    assert.equal(
+        chrome.exitCode,
+        null,
+        'The proof-owned Chrome process exited; refusing a report that may have been delegated to an existing profile owner.'
+    );
+    assert.equal(
+        chrome.signalCode,
+        null,
+        'The proof-owned Chrome process was signalled before report acceptance.'
+    );
     assert.equal(report.ok,true,report.error?.message??'Browser-AI contract failed.');
     assert.deepEqual(report.result.exports,EXACT_EXPORTS);
+    assert.equal(report.result.runtime.protocol,'arcane-ai-browser-wasm/2');
+    assert.equal(report.result.runtime.executionPolicy.cpuFallback,false);
+    assert.equal(
+        report.result.runtime.executionPolicy.operationalEvidence,
+        'arcane-wllama-runtime-evidence/1'
+    );
+    assert.equal(report.result.runtime.runtimeAssets.module.sha256,
+        'ae9a6ba2aa8687785ed651e28ef92573b409d5e6d3470bfd53340225287908b8');
     assert.equal(report.result.runtime.runtimeAssets.wasm.sha256,
         '95c6ff9ef2a03ff2c63bc91db132f0126a0bd0456b272cd8ae2e0f592fb059f6');
     assert.equal(report.result.compatibility.executions,0);
-    assert.equal(report.result.cold.cache,'installed');
-    assert.ok(report.result.cold.text.trim());
-    assert.equal(report.result.cancellation.code,'ARCANE_AI_REQUEST_ABORTED');
-    assert.equal(report.result.offline.cache,'verified');
-    assert.equal(report.result.offline.modelFetches,0);
-    assert.ok(report.result.offline.text.trim());
+    if(FINAL_WARM_ONLY){
+        assert.equal(report.result.mode,'granite-final-warm-only');
+        assert.equal(report.result.origin,'http://127.0.0.1:8000');
+        assert.equal(report.result.receipt.protocol,'arcane-ai-browser-wasm/2');
+        assert.equal(report.result.receipt.runtimePolicy.cpuFallback,false);
+        assert.equal(report.result.receipt.projectedModule.bytes,389_765);
+        assert.equal(report.result.receipt.projectedModule.sha256,
+            'ae9a6ba2aa8687785ed651e28ef92573b409d5e6d3470bfd53340225287908b8');
+        assert.deepEqual(report.result.adapted,{
+            protocol:'arcane-ai-provider/2',
+            role:'llm',
+            localOnly:true,
+            catalog:[{
+                id:GRANITE_AUTHORITY.id,
+                name:GRANITE_AUTHORITY.name,
+                sha256:GRANITE_AUTHORITY.sha256
+            }]
+        });
+        const finalWarm=report.result.finalWarm;
+        assert.equal(finalWarm.cache,'verified');
+        assert.equal(finalWarm.modelFetches,0);
+        assert.ok(finalWarm.text.trim());
+        assert.equal(finalWarm.cachePreserved,true);
+        assert.equal(finalWarm.loadEvidence.runtimeEvidence.protocol,'arcane-wllama-runtime-evidence/1');
+        assert.equal(finalWarm.loadEvidence.capabilities.webgpuOperational,true);
+        assert.equal(finalWarm.inferenceEvidence.runtimeEvidence.webgpu.observed,true);
+        assert.ok(finalWarm.inferenceEvidence.runtimeEvidence.webgpu.lastInference.submissions>0);
+        assert.ok(finalWarm.inferenceEvidence.runtimeEvidence.webgpu.lastInference.fenceRequests>0);
+        assert.ok(
+            finalWarm.inferenceEvidence.runtimeEvidence.webgpu.lastInference.fenceCompletions>=
+            finalWarm.inferenceEvidence.runtimeEvidence.webgpu.lastInference.fenceRequests
+        );
+        assert.equal(finalWarm.cancellation.code,'ARCANE_AI_REQUEST_ABORTED');
+        assert.equal(
+            finalWarm.cancellation.evidence.runtimeEvidence.cancellation.upstream.kind,
+            'llama-request-cancel-acknowledged'
+        );
+        assert.equal(
+            finalWarm.cancellation.evidence.runtimeEvidence.cancellation.upstream.responseName,
+            'cncl_res'
+        );
+        assert.equal(
+            finalWarm.cleanupEvidence.runtimeEvidence.cleanup.kind,
+            'worker-terminated'
+        );
+    }else{
+        assert.equal(report.result.cold.cache,'installed');
+        assert.ok(report.result.cold.text.trim());
+        assert.equal(report.result.cancellation.code,'ARCANE_AI_REQUEST_ABORTED');
+        assert.equal(report.result.offline.cache,'verified');
+        assert.equal(report.result.offline.modelFetches,0);
+        assert.ok(report.result.offline.text.trim());
+    }
     if(AUTHORITATIVE_ENABLED)assert.equal(report.result.authoritative,true);
     else assert.equal(report.result.authoritative,false);
     assert.equal(report.result.crossOriginIsolated,false);

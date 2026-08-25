@@ -11,6 +11,9 @@ const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 const MUTABLE_PATH_PATTERN = /\/(?:resolve\/)?(?:main|master|latest)(?:\/|$)/iu;
 const BROWSER_MODEL_SOURCES = new WeakSet();
 const DBOPFS_MODEL_STORES = new WeakSet();
+const V1_LLM_PROVIDER_ADAPTERS = new WeakMap();
+const AI_PROVIDER_PROTOCOL = "arcane-ai-provider/2";
+const AI_MODEL_AUTHORITY_PROTOCOL = "arcane-ai-model-authority/1";
 
 function fail(code, message, cause) {
   return new ArcaneAIError(code, message, {
@@ -27,6 +30,10 @@ function throwIfAborted(signal, operation = "request") {
     "The Arcane AI request was cancelled.",
     { cause: signal.reason, kind: "llm", operation },
   );
+}
+
+function normalizationSignal(error, signal) {
+  return error?.code === "ARCANE_AI_WORKER_TERMINATION_UNCONFIRMED" ? null : signal;
 }
 
 function immutableHttpsUrl(value) {
@@ -769,6 +776,9 @@ function callbackStreamHandle({ runtime, request, signal, onSettled }) {
   let terminalError = null;
 
   function deliver(value) {
+    // This gate prevents delivery after public cancellation. It is not proof
+    // that the underlying request stopped; the runtime records that separately.
+    if (ended || linked.controller.signal.aborted) return;
     const chunk = request.id === undefined ? value : { ...value, id: request.id };
     accumulator.push(chunk);
     const waiter = waiters.shift();
@@ -779,6 +789,7 @@ function callbackStreamHandle({ runtime, request, signal, onSettled }) {
   function finish(error = null) {
     ended = true;
     terminalError = error;
+    if (error) chunks.length = 0;
     while (waiters.length) {
       const waiter = waiters.shift();
       if (error) waiter.reject(error);
@@ -790,24 +801,25 @@ function callbackStreamHandle({ runtime, request, signal, onSettled }) {
     completionOptions(request, linked.controller.signal, true),
     deliver,
   );
-  const result = Promise.resolve(terminal).then(
-    () => {
+  const result = (async () => {
+    try {
+      await terminal;
+      throwIfAborted(linked.controller.signal);
       const value = accumulator.result();
       finish();
       return value;
-    },
-    (error) => {
+    } catch (error) {
       const normalized = normalizeArcaneAIError(error, {
         kind: "llm",
         operation: "request",
-        signal: linked.controller.signal,
+        signal: normalizationSignal(error, linked.controller.signal),
       });
       finish(normalized);
       throw normalized;
-    },
-  ).finally(() => {
+    }
+  })().finally(() => {
     linked.release();
-    onSettled();
+    onSettled(terminalError);
   });
   result.catch(() => undefined);
 
@@ -833,8 +845,9 @@ function callbackStreamHandle({ runtime, request, signal, onSettled }) {
       return cancelPromise;
     },
     async next() {
-      if (chunks.length) return { value: chunks.shift(), done: false };
       if (terminalError) throw terminalError;
+      throwIfAborted(linked.controller.signal);
+      if (chunks.length) return { value: chunks.shift(), done: false };
       if (ended) return { value: undefined, done: true };
       return new Promise((resolve, reject) => waiters.push({ resolve, reject }));
     },
@@ -891,6 +904,9 @@ export function createBrowserWasmLlmProvider({
       webAssembly: runtimeCapabilities.webAssembly,
       opfs: runtimeCapabilities.opfs,
       webgpu: runtimeCapabilities.webgpu,
+      webgpuApiPresent: runtimeCapabilities.webgpuApiPresent,
+      webgpuOperational: runtimeCapabilities.webgpuOperational,
+      webgpuEvidenceProtocol: runtimeCapabilities.webgpuEvidenceProtocol,
       crossOriginIsolated: runtimeCapabilities.crossOriginIsolated,
       secureContext: runtimeCapabilities.secureContext,
       hardwareConcurrency: runtimeCapabilities.hardwareConcurrency,
@@ -910,9 +926,28 @@ export function createBrowserWasmLlmProvider({
       progress: progressState,
       error: errorState,
       runtime: runtime.authority,
+      runtimeEvidence: runtime.evidence(),
       capabilities: capabilities(),
       origin: globalThis.location?.origin ?? null,
     });
+  }
+
+  function reconcileRuntimeAfterRequestError(error) {
+    if (runtime.isLoaded()) return;
+    const runtimeState = runtime.evidence()?.state;
+    state = runtimeState === "error"
+      || error?.code === "ARCANE_AI_WORKER_TERMINATION_UNCONFIRMED"
+      ? "error"
+      : "unloaded";
+    progressState = null;
+    errorState = state === "error"
+      ? Object.freeze({
+        code: typeof error?.code === "string" ? error.code : "ARCANE_AI_RUNTIME_FAILED",
+        message: typeof error?.message === "string"
+          ? error.message
+          : "The browser-WASM runtime failed.",
+      })
+      : null;
   }
 
   function report(value, options, context) {
@@ -976,11 +1011,17 @@ export function createBrowserWasmLlmProvider({
         progressState = null;
         return Object.freeze({ model: publicDescriptor(source), status: status() });
       } catch (error) {
-        await runtime.exit().catch(() => undefined);
-        const normalized = normalizeArcaneAIError(error, {
+        let cleanupFailure = null;
+        try {
+          await runtime.exit();
+        } catch (cleanupError) {
+          cleanupFailure = cleanupError;
+        }
+        const surfaced = cleanupFailure ?? error;
+        const normalized = normalizeArcaneAIError(surfaced, {
           kind: "llm",
           operation: "load",
-          signal,
+          signal: normalizationSignal(surfaced, signal),
         });
         if (generation === lifecycleGeneration && state === "loading") {
           state = "error";
@@ -1020,11 +1061,13 @@ export function createBrowserWasmLlmProvider({
         throwIfAborted(linked.controller.signal);
         return validateCompletion(completion, request.id);
       } catch (error) {
-        throw normalizeArcaneAIError(error, {
+        const normalized = normalizeArcaneAIError(error, {
           kind: "llm",
           operation: "request",
-          signal: linked.controller.signal,
+          signal: normalizationSignal(error, linked.controller.signal),
         });
+        reconcileRuntimeAfterRequestError(normalized);
+        throw normalized;
       } finally {
         activeCount -= 1;
         activeAbort = null;
@@ -1044,11 +1087,12 @@ export function createBrowserWasmLlmProvider({
         runtime,
         request,
         signal: externalSignal,
-        onSettled() {
+        onSettled(error) {
           if (settled) return;
           settled = true;
           activeCount -= 1;
           activeAbort = null;
+          if (error) reconcileRuntimeAfterRequestError(error);
         },
       });
       activeAbort = Object.freeze({
@@ -1092,7 +1136,7 @@ export function createBrowserWasmLlmProvider({
         const normalized = normalizeArcaneAIError(error, {
           kind: "llm",
           operation: "unload",
-          signal,
+          signal: normalizationSignal(error, signal),
         });
         state = "error";
         errorState = Object.freeze({ code: normalized.code, message: normalized.message });
@@ -1146,6 +1190,175 @@ export function createBrowserWasmLlmProvider({
     probe,
     dispose,
   });
+}
+
+function assertV1LlmAdapterSelection(selection, providerId, modelId, role) {
+  if (role !== "llm") {
+    throw fail("ARCANE_AI_PROVIDER_ROLE_MISMATCH", "The browser-WASM adapter serves only the LLM role.");
+  }
+  if (
+    !selection
+    || typeof selection !== "object"
+    || Array.isArray(selection)
+    || selection.providerId !== providerId
+    || selection.modelId !== modelId
+    || selection.localOnly !== true
+  ) {
+    throw fail(
+      "ARCANE_AI_MODEL_AUTHORITY_REQUIRED",
+      "The browser-WASM adapter requires its exact local-only provider and model selection.",
+    );
+  }
+}
+
+function provider2ByteProgress(value) {
+  const phase = typeof value?.phase === "string" ? value.phase.trim() : "";
+  const completed = Number(value?.loaded);
+  const total = Number(value?.total);
+  if (
+    !phase
+    || !Number.isSafeInteger(completed)
+    || completed < 0
+    || !Number.isSafeInteger(total)
+    || total < 1
+    || completed > total
+  ) {
+    throw fail("ARCANE_AI_PROVIDER_PROGRESS_INVALID", "The browser-WASM provider returned invalid byte progress.");
+  }
+  return Object.freeze({ phase, completed, total, unit: "bytes", heartbeat: false });
+}
+
+/**
+ * Projects the existing browser-WASM LLM provider into the provider-neutral
+ * Arcane AI /2 lifecycle without changing the provider's public v1 contract.
+ * The adapter is local-only, never falls back, and never executes tool calls.
+ */
+export function adaptV1LlmProvider(provider) {
+  if (!provider || typeof provider !== "object" || Array.isArray(provider)) {
+    throw new TypeError("adaptV1LlmProvider requires an Arcane browser-WASM LLM provider.");
+  }
+  const existing = V1_LLM_PROVIDER_ADAPTERS.get(provider);
+  if (existing) return existing;
+  if (provider.protocol !== ARCANE_AI_ADAPTER_PROTOCOL) {
+    throw new TypeError(`The browser-WASM LLM provider protocol must equal ${ARCANE_AI_ADAPTER_PROTOCOL}.`);
+  }
+
+  const providerId = requiredText(provider.id, "provider id");
+  const model = modelDescriptor(provider.model);
+  const requiredMethods = ["capabilities", "status", "load", "unload", "chat", "stream", "dispose"];
+  const methods = Object.create(null);
+  for (const method of requiredMethods) {
+    if (typeof provider[method] !== "function") {
+      throw new TypeError(`The browser-WASM LLM provider is missing ${method}().`);
+    }
+    methods[method] = provider[method].bind(provider);
+  }
+  if (methods.capabilities()?.localOnly !== true) {
+    throw new TypeError("The browser-WASM LLM provider must be explicitly local-only.");
+  }
+
+  const authority = Object.freeze({
+    protocol: AI_MODEL_AUTHORITY_PROTOCOL,
+    providerId,
+    modelId: model.id,
+    admitted: true,
+    localOnly: true,
+    model,
+  });
+  const catalog = Object.freeze([model]);
+  let disposed = false;
+
+  function assertSelection(selection, role) {
+    assertV1LlmAdapterSelection(selection, providerId, model.id, role);
+  }
+
+  function status() {
+    const value = methods.status();
+    if (
+      !value
+      || typeof value !== "object"
+      || typeof value.state !== "string"
+      || typeof value.loaded !== "boolean"
+      || typeof value.busy !== "boolean"
+    ) {
+      throw fail("ARCANE_AI_PROVIDER_STATUS_INVALID", "The browser-WASM provider returned an invalid status.");
+    }
+    return Object.freeze({
+      state: disposed ? "disposed" : value.state,
+      loaded: disposed ? false : value.loaded,
+      busy: disposed ? false : value.busy,
+    });
+  }
+
+  const adapted = Object.freeze({
+    protocol: AI_PROVIDER_PROTOCOL,
+    role: "llm",
+    id: providerId,
+    localOnly: true,
+    catalog: () => catalog,
+    async inspect(selection, { role = "llm", signal = null } = {}) {
+      assertSelection(selection, role);
+      throwIfAborted(signal, "inspect");
+      if (disposed) {
+        return Object.freeze({
+          available: false,
+          code: "ARCANE_AI_DISPOSED",
+          message: "The browser-WASM provider is disposed.",
+        });
+      }
+      const capabilities = methods.capabilities();
+      const requirements = [
+        [capabilities?.webAssembly === true, "WebAssembly"],
+        [capabilities?.opfs === true, "OPFS"],
+        [capabilities?.secureContext === true, "a secure context"],
+        [capabilities?.webgpuApiPresent === true, "the WebGPU API"],
+      ];
+      const missing = requirements.find(([available]) => !available)?.[1] ?? null;
+      if (missing) {
+        return Object.freeze({
+          available: false,
+          code: "ARCANE_AI_PROVIDER_UNAVAILABLE",
+          message: `The browser-WASM provider requires ${missing}.`,
+        });
+      }
+      return Object.freeze({ available: true, authority });
+    },
+    status,
+    async load({ role = "llm", selection, signal = null, progress = null } = {}) {
+      assertSelection(selection, role);
+      throwIfAborted(signal, "load");
+      if (progress !== null && typeof progress !== "function") {
+        throw new TypeError("The provider/2 progress sink must be a function or null.");
+      }
+      await methods.load({
+        signal,
+        ...(progress ? { onProgress: (value) => progress(provider2ByteProgress(value)) } : {}),
+      });
+      return status();
+    },
+    request({ role = "llm", selection, operation, payload, signal = null } = {}) {
+      assertSelection(selection, role);
+      throwIfAborted(signal);
+      if (operation === "chat") return methods.chat(payload, { signal });
+      if (operation === "stream") return methods.stream(payload, { signal });
+      throw fail("ARCANE_AI_PROVIDER_OPERATION_UNAVAILABLE", "The browser-WASM adapter supports only chat and stream.");
+    },
+    async unload({ role = "llm", selection, signal = null } = {}) {
+      assertSelection(selection, role);
+      throwIfAborted(signal, "unload");
+      await methods.unload({ signal });
+      return status();
+    },
+    async dispose({ role = "llm", selection, signal = null } = {}) {
+      assertSelection(selection, role);
+      throwIfAborted(signal, "dispose");
+      await methods.dispose({ signal });
+      disposed = true;
+      return status();
+    },
+  });
+  V1_LLM_PROVIDER_ADAPTERS.set(provider, adapted);
+  return adapted;
 }
 
 export { MODEL_MANIFEST_SCHEMA };

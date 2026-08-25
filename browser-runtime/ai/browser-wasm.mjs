@@ -1,5 +1,6 @@
 import { createModelController, ModelController } from "./model-controller.mjs";
 import {
+  adaptV1LlmProvider,
   createBrowserModelSource,
   createBrowserWasmLlmProvider,
   createDbopfsModelStore,
@@ -37,6 +38,7 @@ function createArcaneAI({
 
 export {
   BROWSER_WASM_RUNTIME_AUTHORITY,
+  adaptV1LlmProvider,
   createArcaneAI,
   createBrowserModelSource,
   createBrowserWasmLlmProvider,

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "builder": "arcane-sdk-browser-runtime-v1",
-  "sdkVersion": "0.1.2",
+  "sdkVersion": "0.2.0",
   "source": {
     "authority": "arcane-os-sdk",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
@@ -29,36 +29,36 @@
     ]
   },
   "fileCount": 18,
-  "totalBytes": 9099015,
-  "contentSha256": "5e03f45a732db51cb5a2b2193cc79ecda34501d07a9b2e82e794e5fa37d55d00",
+  "totalBytes": 9134804,
+  "contentSha256": "d11bb6aba5d0f69709054121fb6681b6d4b269016717a1c96b02acc9fce787c7",
   "files": [
     {
       "path": "ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json",
       "sourcePath": "browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json",
       "provenance": "sdk-source-identity",
-      "bytes": 2554,
-      "sha256": "9f6e710f6b6aa8ea42f69823931b2b56a2eec9db242e3c95c6d6f6a6ce77a03b"
+      "bytes": 3136,
+      "sha256": "6cb3227e88a2ccb329c14a069d55f76c694b836ce58927f3688d5816c43cd8c9"
     },
     {
       "path": "ai/browser-wasm-llm-provider.mjs",
       "sourcePath": "browser-runtime/ai/browser-wasm-llm-provider.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 37944,
-      "sha256": "c89042b541c64de8b6528ee3a7dce0e2b62be8b5c229875fd8a26a1efded26a2"
+      "bytes": 46058,
+      "sha256": "06dd4ca7d3e9de410b6a9e587ea4fe7650abbb97fc8050bd5900c00de5181652"
     },
     {
       "path": "ai/browser-wasm.mjs",
       "sourcePath": "browser-runtime/ai/browser-wasm.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 1549,
-      "sha256": "b6536f6869a080e6cf167965da1dd8b473c172c6cbce1f5ee6a6142dd06c93f2"
+      "bytes": 1593,
+      "sha256": "2f8dc34c81b293a3410e96854dda2953ba2513b0e7d6ce025a5295aef0507356"
     },
     {
       "path": "ai/browser-wllama-runtime.mjs",
       "sourcePath": "browser-runtime/ai/browser-wllama-runtime.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 13559,
-      "sha256": "946f1814b7374baa6a6e33a4e4f9790c8f1504c65104e05cbe640005687d94f5"
+      "bytes": 24362,
+      "sha256": "a2d0abc9f1c45f7f86811459d9cf0ae024d04a8df9db8a1d3fba113c5c4a6964"
     },
     {
       "path": "ai/internal/sha256.mjs",
@@ -83,10 +83,10 @@
     },
     {
       "path": "ai/wllama/index.mjs",
-      "sourcePath": "node_modules/@wllama/wllama/esm/index.js",
-      "provenance": "vendor-package-identity",
-      "bytes": 373519,
-      "sha256": "4637e42d636010493a9b274fbbe70bfd8120365da726b1d9e589d85ca84a00d6"
+      "sourcePath": "browser-runtime/ai/wllama/index.mjs",
+      "provenance": "deterministic-derived-vendor",
+      "bytes": 389765,
+      "sha256": "ae9a6ba2aa8687785ed651e28ef92573b409d5e6d3470bfd53340225287908b8"
     },
     {
       "path": "ai/wllama/llama.cpp-LICENSE",

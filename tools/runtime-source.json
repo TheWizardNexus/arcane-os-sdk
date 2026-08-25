@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
-  "commit": "317af82799a59b99bcd26a170f136635d6f3647a",
+  "commit": "c540014afe69f14cf5ae60493b7295f36dbcec64",
   "bundleVersion": "0.8.12",
   "protocol": "arcane/1",
   "runtimeDirectories": [

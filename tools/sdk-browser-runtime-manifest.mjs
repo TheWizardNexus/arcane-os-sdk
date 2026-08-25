@@ -6,6 +6,13 @@ import {lstat,open,readdir,realpath,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {SDK_VERSION} from '../src/constants.mjs';
+import {
+    WLLAMA_PROJECTED_BYTES,
+    WLLAMA_PROJECTED_SHA256,
+    WLLAMA_UPSTREAM_AUTHORITY,
+    WLLAMA_WEBGPU_EVIDENCE_PROTOCOL,
+    projectWllamaWebgpuRuntime,
+} from './project-wllama-webgpu-runtime.mjs';
 
 const MANIFEST_NAME='ARCANE_SDK_BROWSER_RELEASE.json';
 const BUILDER='arcane-sdk-browser-runtime-v1';
@@ -40,7 +47,7 @@ const dependencyIdentities=Object.freeze([
 const expectedAiComponents=Object.freeze({
     schemaVersion:1,
     kind:'arcane-ai-browser-wasm-components',
-    protocol:'arcane-ai-browser-wasm/1',
+    protocol:'arcane-ai-browser-wasm/2',
     packageExport:'arcane-os/ai/browser-wasm',
     browserEntry:'ai/browser-wasm.mjs',
     runtimePolicy:{
@@ -48,6 +55,10 @@ const expectedAiComponents=Object.freeze({
         modelWeightsPacked:false,
         remoteModelHelpers:false,
         compatibilityRuntime:false,
+        webgpuAdmission:'adapter-plus-full-offload-plus-buffer-queue-and-settled-fence-evidence',
+        cpuFallback:false,
+        cancellation:'abortSignal-plus-llama-cancel-acknowledgement',
+        cleanup:'worker-termination-only-no-native-unload-claim',
         toolCalls:'structural-only-never-executed'
     },
     components:[
@@ -67,9 +78,16 @@ const expectedAiComponents=Object.freeze({
                 {
                     role:'runtime-module',
                     path:'ai/wllama/index.mjs',
-                    sourcePath:'node_modules/@wllama/wllama/esm/index.js',
-                    bytes:373519,
-                    sha256:'4637e42d636010493a9b274fbbe70bfd8120365da726b1d9e589d85ca84a00d6'
+                    sourcePath:'browser-runtime/ai/wllama/index.mjs',
+                    bytes:WLLAMA_PROJECTED_BYTES,
+                    sha256:WLLAMA_PROJECTED_SHA256,
+                    projection:{
+                        protocol:WLLAMA_WEBGPU_EVIDENCE_PROTOCOL,
+                        inputPath:'node_modules/@wllama/wllama/esm/index.js',
+                        inputBytes:WLLAMA_UPSTREAM_AUTHORITY.bytes,
+                        inputSha256:WLLAMA_UPSTREAM_AUTHORITY.sha256,
+                        wasmModified:false
+                    }
                 },
                 {
                     role:'runtime-wasm',
@@ -115,7 +133,7 @@ const expectedFiles=Object.freeze([
     ['ai/internal/sha256.mjs','browser-runtime/ai/internal/sha256.mjs','sdk-source-identity'],
     ['ai/model-controller.mjs','browser-runtime/ai/model-controller.mjs','sdk-source-identity'],
     ['ai/wllama/LICENCE','node_modules/@wllama/wllama/LICENCE','vendor-package-identity'],
-    ['ai/wllama/index.mjs','node_modules/@wllama/wllama/esm/index.js','vendor-package-identity'],
+    ['ai/wllama/index.mjs','browser-runtime/ai/wllama/index.mjs','deterministic-derived-vendor'],
     ['ai/wllama/llama.cpp-LICENSE','browser-runtime/ai/wllama/llama.cpp-LICENSE','vendor-source-identity'],
     ['ai/wllama/wllama.wasm','node_modules/@wllama/wllama/esm/wasm/wllama.wasm','vendor-package-identity'],
     ['dependencies/event-pubsub/index.js','node_modules/event-pubsub/index.js','vendor-package-identity'],
@@ -212,9 +230,17 @@ async function snapshotInventory(){
     await visit(browserRuntimeRoot);
     files.sort(compareText);
     directories.sort(compareText);
-    if(JSON.stringify(files)!==JSON.stringify(expectedFiles.map(file=>file.path))
+    const expectedFilePaths=expectedFiles.map(file=>file.path);
+    if(JSON.stringify(files)!==JSON.stringify(expectedFilePaths)
         ||JSON.stringify(directories)!==JSON.stringify(expectedDirectories)){
-        throw new Error('SDK browser runtime contains missing or extra files or directories.');
+        const missing=[...expectedFilePaths,...expectedDirectories]
+            .filter(entry=>!files.includes(entry)&&!directories.includes(entry));
+        const extra=[...files,...directories]
+            .filter(entry=>!expectedFilePaths.includes(entry)&&!expectedDirectories.includes(entry));
+        throw new Error(
+            `SDK browser runtime inventory drifted; missing=${JSON.stringify(missing)}, `
+            +`extra=${JSON.stringify(extra)}.`
+        );
     }
 }
 
@@ -310,6 +336,20 @@ async function sourceBytesByPath(){
         ||wllamaPackage.name!=='@wllama/wllama'||wllamaPackage.version!=='3.6.0'
         ||wllamaPackage.license!=='MIT'){
         throw new Error('SDK browser dependency package identity is invalid.');
+    }
+    const upstreamWllama=await readRealFile(
+        path.join(wllamaRoot,'esm','index.js'),
+        '@wllama/wllama authenticated ESM source'
+    );
+    if(upstreamWllama.length!==WLLAMA_UPSTREAM_AUTHORITY.bytes
+        ||createHash('sha256').update(upstreamWllama).digest('hex')
+            !==WLLAMA_UPSTREAM_AUTHORITY.sha256){
+        throw new Error('Authenticated Wllama ESM source identity drifted.');
+    }
+    const projectedWllama=projectWllamaWebgpuRuntime(upstreamWllama);
+    const projectedSnapshot=sourceBytes.get('browser-runtime/ai/wllama/index.mjs');
+    if(!projectedSnapshot||!projectedSnapshot.equals(projectedWllama)){
+        throw new Error('Packaged Wllama ESM is not the deterministic authenticated projection.');
     }
     validateAiComponents(sourceBytes);
     const eventManagerText=sourceBytes.get('src/event-manager.mjs').toString('utf8');

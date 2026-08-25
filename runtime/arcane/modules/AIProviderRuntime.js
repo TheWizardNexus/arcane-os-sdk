@@ -57,7 +57,8 @@ function operationError(message, code, cause) {
 }
 
 function normalizedAbort(cause) {
-    if (cause?.code === 'ARCANE_AI_REQUEST_ABORTED') {
+    if (cause?.code === 'ARCANE_AI_REQUEST_ABORTED'
+        && cause?.name === 'AbortError') {
         return cause;
     }
 
@@ -293,6 +294,31 @@ function immutableStartupOptions(options) {
     return Object.freeze({startMuted, signal});
 }
 
+function immutableInspectionOptions(options) {
+    assertPlainObject(options, 'AI provider inspection options');
+    const descriptors = Object.getOwnPropertyDescriptors(options);
+    for (const key of Reflect.ownKeys(descriptors)) {
+        if (typeof key === 'symbol'
+            || (key !== 'localOnly' && key !== 'signal')) {
+            fail('AI provider inspection options contain an unknown option.');
+        }
+        if (!Object.hasOwn(descriptors[key], 'value')) {
+            fail(`AI provider inspection options.${key} must be a data property.`);
+        }
+    }
+    const localOnly = Object.hasOwn(descriptors, 'localOnly')
+        ? descriptors.localOnly.value
+        : false;
+    const signal = Object.hasOwn(descriptors, 'signal')
+        ? descriptors.signal.value
+        : null;
+    if (typeof localOnly !== 'boolean') {
+        fail('AI provider inspection localOnly must be a boolean.');
+    }
+    assertAbortSignal(signal);
+    return Object.freeze({localOnly, signal});
+}
+
 function nullableTupleIdentifier(value) {
     return typeof value === 'string' && value.trim()
         ? value.trim()
@@ -462,6 +488,7 @@ export class AIProviderRuntime {
     #configured = false;
     #configuring = false;
     #disposeAllPromise = null;
+    #disposeAllCompletedProviders = new Set();
 
     constructor(authority) {
         if (authority !== RUNTIME_CONSTRUCTION_AUTHORITY) {
@@ -503,19 +530,62 @@ export class AIProviderRuntime {
             );
         }
         const slot = this.#slots[admitted.role];
+        const nextRoutes = {
+            default: slot.routes.default,
+            localOnly: slot.routes.localOnly
+        };
+        let reconciled = false;
         for (const routeName of ROUTE_KEYS) {
             const selection = slot.routes[routeName];
             if (!selection || selection.providerId !== admitted.id) {
                 continue;
             }
-            if (selection.localOnly !== admitted.localOnly) {
+            if (selection.localOnly !== null
+                && selection.localOnly !== admitted.localOnly) {
                 throw operationError(
                     `AI provider ${key} does not match the configured ${routeName} route locality.`,
                     'ARCANE_AI_PROVIDER_LOCALITY_MISMATCH'
                 );
             }
+            if (selection.localOnly === null) {
+                nextRoutes[routeName] = Object.freeze(
+                    {
+                        providerId: selection.providerId,
+                        modelId: selection.modelId,
+                        localOnly: admitted.localOnly
+                    }
+                );
+                reconciled = true;
+            }
+        }
+        if (reconciled
+            && admitted.localOnly
+            && !nextRoutes.localOnly
+            && nextRoutes.default?.providerId === admitted.id) {
+            nextRoutes.localOnly = nextRoutes.default;
         }
         this.#providers.set(key, admitted);
+        if (reconciled) {
+            const previousSelection = slot.selection;
+            slot.routes = Object.freeze(nextRoutes);
+            if (previousSelection?.providerId === admitted.id
+                && previousSelection.localOnly === null) {
+                slot.generation += 1;
+                slot.selection = slot.routes.default?.providerId === admitted.id
+                    && slot.routes.default.modelId === previousSelection.modelId
+                    ? slot.routes.default
+                    : Object.values(slot.routes).find(
+                        function findReconciledAIProviderSelection(selection) {
+                            return selection?.providerId === admitted.id
+                                && selection.modelId === previousSelection.modelId;
+                        }
+                    ) ?? previousSelection;
+                publishAIRuntimeRoleState(
+                    admitted.role,
+                    roleRecord(admitted.role, slot.selection)
+                );
+            }
+        }
 
         const runtime = this;
         let active = true;
@@ -551,6 +621,7 @@ export class AIProviderRuntime {
             );
         }
         this.#providers.delete(key);
+        this.#disposeAllCompletedProviders.delete(provider);
         return true;
     }
 
@@ -703,20 +774,14 @@ export class AIProviderRuntime {
                     'ARCANE_AI_SELECTION_INCOMPLETE'
                 );
             }
-            if (!provider) {
-                throw operationError(
-                    `AI ${role} provider ${providerId} is not registered.`,
-                    'ARCANE_AI_PROVIDER_UNAVAILABLE'
-                );
-            }
             const selection = {
                 providerId,
                 modelId,
-                localOnly: provider.localOnly
+                localOnly: provider?.localOnly ?? null
             };
             selections[role] = {
                 default: selection,
-                localOnly: provider.localOnly === true
+                localOnly: provider?.localOnly === true
                     ? {...selection, localOnly: true}
                     : null
             };
@@ -757,20 +822,17 @@ export class AIProviderRuntime {
     }
 
     async inspect(role, options = {}) {
+        this.#assertOpen();
+        this.#assertNotConfiguring();
         assertRole(role);
-        assertPlainObject(options, 'AI provider inspection options');
-        for (const key of Reflect.ownKeys(options)) {
-            if (key !== 'localOnly' && key !== 'signal') {
-                fail('AI provider inspection options contain an unknown option.');
-            }
+        const {localOnly, signal} = immutableInspectionOptions(options);
+        this.#assertOpen();
+        this.#assertNotConfiguring();
+        if (signal?.aborted) {
+            throw normalizedAbort();
         }
-        const localOnly = Object.hasOwn(options, 'localOnly')
-            ? options.localOnly
-            : false;
-        const signal = Object.hasOwn(options, 'signal')
-            ? options.signal
-            : null;
-        assertAbortSignal(signal);
+        const slot = this.#slots[role];
+        const generation = slot.generation;
         const selection = this.selection(role, {localOnly});
         if (!selection) {
             return Object.freeze(
@@ -794,31 +856,53 @@ export class AIProviderRuntime {
             );
         }
 
+        let inspection;
         try {
             if (signal?.aborted) {
                 throw normalizedAbort();
             }
-            const inspection = await provider.inspect(
+            inspection = await provider.inspect(
                 selection,
                 {role, signal}
             );
             if (signal?.aborted) {
                 throw normalizedAbort();
             }
-            validateInspection(inspection, selection);
-            return inspection;
         } catch (error) {
+            if (isAbort(error, signal)) {
+                throw normalizedAbort(error);
+            }
+            this.#assertOpen();
+            this.#assertNotConfiguring();
+            this.#assertCurrentOperation(slot, generation, signal);
+            const unavailable = stateError(
+                error,
+                'ARCANE_AI_PROVIDER_AUTHORITY_BLOCKED'
+            );
             return Object.freeze(
                 {
                     available: false,
-                    code: stateError(
-                        error,
-                        'ARCANE_AI_PROVIDER_AUTHORITY_BLOCKED'
-                    ).code,
-                    message: stateError(
-                        error,
-                        'ARCANE_AI_PROVIDER_AUTHORITY_BLOCKED'
-                    ).message
+                    code: unavailable.code,
+                    message: unavailable.message
+                }
+            );
+        }
+        this.#assertOpen();
+        this.#assertNotConfiguring();
+        this.#assertCurrentOperation(slot, generation, signal);
+        try {
+            validateInspection(inspection, selection);
+            return inspection;
+        } catch (error) {
+            const unavailable = stateError(
+                error,
+                'ARCANE_AI_PROVIDER_AUTHORITY_BLOCKED'
+            );
+            return Object.freeze(
+                {
+                    available: false,
+                    code: unavailable.code,
+                    message: unavailable.message
                 }
             );
         }
@@ -1288,6 +1372,14 @@ export class AIProviderRuntime {
 
     disposeAll(options = {}) {
         this.#assertNotConfiguring();
+        assertPlainObject(options, 'AI provider dispose-all options');
+        for (const key of Reflect.ownKeys(options)) {
+            if (key !== 'signal') {
+                fail('AI provider dispose-all options contain an unknown option.');
+            }
+        }
+        const signal = Object.hasOwn(options, 'signal') ? options.signal : null;
+        assertAbortSignal(signal);
         if (this.#disposeAllPromise) {
             return this.#disposeAllPromise;
         }
@@ -1297,28 +1389,116 @@ export class AIProviderRuntime {
         this.#closing = true;
         const runtime = this;
         const disposing = (async function disposeAIProviderRuntime() {
-            const results = await Promise.allSettled(
-                AI_RUNTIME_ROLES.map(
-                    function disposeAIProviderRuntimeRole(role) {
-                        return runtime.dispose(role, options);
+            const selectedProviders = new Set();
+            const tasks = [];
+            for (const role of AI_RUNTIME_ROLES) {
+                const selectedProvider = runtime.#providerFor(runtime.#slots[role]);
+                if (selectedProvider) {
+                    selectedProviders.add(selectedProvider);
+                }
+                tasks.push(
+                    {
+                        provider: selectedProvider,
+                        operation: runtime.dispose(role, {signal})
                     }
-                )
+                );
+            }
+            const uniqueProviders = new Set(runtime.#providers.values());
+            for (const provider of uniqueProviders) {
+                if (selectedProviders.has(provider)
+                    || runtime.#disposeAllCompletedProviders.has(provider)) {
+                    continue;
+                }
+                const slot = runtime.#slots[provider.role];
+                const selection = ROUTE_KEYS.map(
+                    function selectRegisteredAIProviderRoute(routeName) {
+                        return slot.routes[routeName];
+                    }
+                ).find(
+                    function findRegisteredAIProviderRoute(candidate) {
+                        return candidate?.providerId === provider.id;
+                    }
+                ) ?? null;
+                tasks.push(
+                    {
+                        provider,
+                        operation: Promise.resolve().then(
+                            async function disposeUnselectedAIProvider() {
+                                if (signal?.aborted) {
+                                    throw normalizedAbort();
+                                }
+                                await provider.dispose(
+                                    {
+                                        role: provider.role,
+                                        selection,
+                                        signal
+                                    }
+                                );
+                                const disposedStatus = validateProviderStatus(
+                                    provider.status()
+                                );
+                                if (disposedStatus.loaded || disposedStatus.busy) {
+                                    throw operationError(
+                                        `AI provider ${providerKey(provider.role, provider.id)} remained active after disposal.`,
+                                        'ARCANE_AI_PROVIDER_DISPOSE_INCOMPLETE'
+                                    );
+                                }
+                            }
+                        )
+                    }
+                );
+            }
+            const results = await Promise.allSettled(
+                tasks.map(function runAIProviderDisposal(task) {
+                    return task.operation;
+                })
             );
+            results.forEach(function retainCompletedAIProviderDisposal(result, index) {
+                const provider = tasks[index].provider;
+                if (result.status === 'fulfilled' && provider) {
+                    runtime.#disposeAllCompletedProviders.add(provider);
+                }
+            });
             const failed = results.find(function findFailedDispose(result) {
                 return result.status === 'rejected';
             });
             if (failed) {
                 throw failed.reason;
             }
-            runtime.#closed = true;
+            runtime.#providers.clear();
+            runtime.#disposeAllCompletedProviders.clear();
+            for (const role of AI_RUNTIME_ROLES) {
+                const slot = runtime.#slots[role];
+                slot.generation += 1;
+                slot.routes = Object.freeze({default: null, localOnly: null});
+                slot.selection = null;
+                slot.loadController = null;
+                slot.loadPromise = null;
+                slot.unloadPromise = null;
+                slot.disposePromise = null;
+                slot.request = null;
+                slot.ready = false;
+                slot.disposed = true;
+            }
+            publishAIRuntimeRolesState(
+                {
+                    llm: roleRecord('llm', null, {state: 'disposed'}),
+                    stt: roleRecord('stt', null, {state: 'disposed'}),
+                    tts: roleRecord('tts', null, {state: 'disposed'})
+                }
+            );
             runtime.#closing = false;
+            runtime.#closed = true;
             runtime.#unsubscribeIntents?.();
             runtime.#unsubscribeIntents = null;
             return runtime.status();
         })();
-        this.#disposeAllPromise = disposing.catch(
+        this.#disposeAllPromise = disposing.then(
+            function releaseCompletedAIProviderRuntimeDisposal(result) {
+                runtime.#disposeAllPromise = null;
+                return result;
+            },
             function releaseFailedAIProviderRuntimeDisposal(error) {
-                runtime.#closing = false;
                 runtime.#disposeAllPromise = null;
                 throw error;
             }
@@ -1498,6 +1678,7 @@ export class AIProviderRuntime {
 
         if (options.operation === 'stream') {
             let providerHandle = null;
+            let providerOpenPromise = null;
             let iterator = null;
             let cleanupPromise = null;
             let terminalSettled = false;
@@ -1532,7 +1713,7 @@ export class AIProviderRuntime {
                 }
             }
 
-            async function cleanupAIProviderStreamHandle(opened, activeIterator, reason) {
+            function beginAIProviderStreamHandleCleanup(opened, activeIterator, reason) {
                 const cleanup = [];
                 if (typeof opened?.cancel === 'function') {
                     cleanup.push(
@@ -1548,7 +1729,55 @@ export class AIProviderRuntime {
                         })
                     );
                 }
-                return awaitBoundedStreamCleanup(Promise.allSettled(cleanup));
+                return Promise.allSettled(cleanup);
+            }
+
+            async function cleanupAIProviderStreamHandle(opened, activeIterator, reason) {
+                return awaitBoundedStreamCleanup(
+                    beginAIProviderStreamHandleCleanup(
+                        opened,
+                        activeIterator,
+                        reason
+                    )
+                );
+            }
+
+            async function cleanupOwnedAIProviderStream(reason) {
+                if (providerHandle) {
+                    return cleanupAIProviderStreamHandle(
+                        providerHandle,
+                        iterator,
+                        reason
+                    );
+                }
+                if (!providerOpenPromise) {
+                    return {completed: true, results: []};
+                }
+                const lateCleanup = providerOpenPromise.then(
+                    async function cleanupLateAIProviderStream(lateHandle) {
+                        if (!lateHandle || typeof lateHandle.cancel !== 'function') {
+                            throw operationError(
+                                'The late AI provider stream did not expose cancellable ownership.',
+                                'ARCANE_AI_STREAM_CLEANUP_INCOMPLETE'
+                            );
+                        }
+                        providerHandle = lateHandle;
+                        const results = await beginAIProviderStreamHandleCleanup(
+                            lateHandle,
+                            null,
+                            reason
+                        );
+                        assertStreamCleanupComplete(
+                            {completed: true, results}
+                        );
+                    },
+                    function confirmRejectedAIProviderStreamOpen() {
+                        // A rejected open confirms that no provider handle was returned.
+                    }
+                );
+                return awaitBoundedStreamCleanup(
+                    Promise.allSettled([lateCleanup])
+                );
             }
 
             async function cancelAIProviderStream(reason, terminalError = null) {
@@ -1565,24 +1794,29 @@ export class AIProviderRuntime {
                 );
                 controller.abort();
                 (async function closeAIProviderStream() {
-                    const cleanupOutcome = providerHandle
-                        ? await cleanupAIProviderStreamHandle(
-                            providerHandle,
-                            iterator,
-                            reason
-                        )
-                        : {completed: true, results: []};
-                    settleAIProviderStream(
-                        terminalError ?? normalizedAbort(
-                            reason instanceof Error
-                                ? reason
-                                : operationError(
-                                    'The AI stream was cancelled.',
-                                    'ARCANE_AI_REQUEST_ABORTED'
-                                )
-                        )
+                    const terminalOutcome = terminalError ?? normalizedAbort(
+                        reason instanceof Error
+                            ? reason
+                            : operationError(
+                                'The AI stream was cancelled.',
+                                'ARCANE_AI_REQUEST_ABORTED'
+                            )
                     );
-                    assertStreamCleanupComplete(cleanupOutcome);
+                    try {
+                        const cleanupOutcome = await cleanupOwnedAIProviderStream(reason);
+                        assertStreamCleanupComplete(cleanupOutcome);
+                        settleAIProviderStream(terminalOutcome);
+                    } catch (cleanupError) {
+                        const incomplete = cleanupError?.code === 'ARCANE_AI_STREAM_CLEANUP_INCOMPLETE'
+                            ? cleanupError
+                            : operationError(
+                                'The AI provider stream did not confirm bounded cleanup.',
+                                'ARCANE_AI_STREAM_CLEANUP_INCOMPLETE',
+                                cleanupError
+                            );
+                        settleAIProviderStream(incomplete);
+                        throw incomplete;
+                    }
                 })().then(resolveCleanup, rejectCleanup);
                 await cleanupPromise;
             }
@@ -1605,7 +1839,7 @@ export class AIProviderRuntime {
                     if (controller.signal.aborted) {
                         throw normalizedAbort();
                     }
-                    const providerOpen = Promise.resolve().then(
+                    providerOpenPromise = Promise.resolve().then(
                         function requestAIProviderStream() {
                             return provider.request(
                                 {
@@ -1617,21 +1851,6 @@ export class AIProviderRuntime {
                                 }
                             );
                         }
-                    );
-                    providerOpen.then(
-                        function cleanupLateAIProviderStream(lateHandle) {
-                            if (!controller.signal.aborted || providerHandle === lateHandle) {
-                                return;
-                            }
-                            cleanupAIProviderStreamHandle(
-                                lateHandle,
-                                null,
-                                normalizedAbort()
-                            ).catch(
-                                function retainLateAIProviderStreamCleanupFailure() {}
-                            );
-                        },
-                        function retainLateAIProviderStreamOpenFailure() {}
                     );
                     const abortedOpen = new Promise(function rejectAbortedAIStreamOpen(resolve, reject) {
                         function rejectAIStreamOpenAbort() {
@@ -1649,7 +1868,7 @@ export class AIProviderRuntime {
                             );
                         };
                     });
-                    opened = await Promise.race([providerOpen, abortedOpen]);
+                    opened = await Promise.race([providerOpenPromise, abortedOpen]);
                     if (!opened
                         || typeof opened[Symbol.asyncIterator] !== 'function'
                         || typeof opened.cancel !== 'function'
@@ -1726,7 +1945,13 @@ export class AIProviderRuntime {
                     const normalized = isAbort(error, controller.signal)
                         ? normalizedAbort(error)
                         : error;
-                    if (providerHandle) {
+                    if (cleanupPromise) {
+                        try {
+                            await cleanupPromise;
+                        } catch (cleanupError) {
+                            throw cleanupError;
+                        }
+                    } else if (providerHandle) {
                         try {
                             await cancelAIProviderStream(normalized, normalized);
                         } catch {

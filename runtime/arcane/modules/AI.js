@@ -350,29 +350,12 @@ class AI {
         return Object.freeze(next);
     }
 
-    #assertRegisteredProviderTuple(tuple){
+    #assertValidProviderTuple(tuple){
         if(tuple[0]==='OLLAMA'){
             const mappedModel=tuple[3]==='OPENAI'?null:this.#models[tuple[3]];
             if(!mappedModel&&!normalizeOllamaModelIdentifier(tuple[3])){
                 const error=new TypeError('The Ollama model preference is invalid.');
                 error.code='AI_MODEL_INVALID';
-                throw error;
-            }
-        }
-        const rolePreferences=[
-            ['llm',tuple[0],tuple[3]],
-            ['stt',tuple[1],tuple[5]],
-            ['tts',tuple[2],tuple[4]]
-        ];
-        for(const [role,providerId,modelId] of rolePreferences){
-            if(!providerId||!modelId||LEGACY_AI_SERVICES.has(providerId)){
-                continue;
-            }
-            if(!this.#providerRuntime.hasProvider(role,providerId)){
-                const error=new Error(
-                    `AI ${role} provider ${providerId} must be registered before selection.`
-                );
-                error.code='ARCANE_AI_PROVIDER_UNAVAILABLE';
                 throw error;
             }
         }
@@ -432,18 +415,23 @@ class AI {
             const identity=providerId&&modelId
                 ?this.#providerRuntime.providerIdentity(role,providerId)
                 :null;
-            if(!identity){
+            const pendingNonLegacy=Boolean(
+                providerId
+                &&modelId
+                &&!LEGACY_AI_SERVICES.has(providerId)
+            );
+            if(!identity&&!pendingNonLegacy){
                 selections[role]={default:null,localOnly:null};
                 continue;
             }
             const selection={
                 providerId,
                 modelId,
-                localOnly:identity.localOnly
+                localOnly:identity?.localOnly??null
             };
             selections[role]={
                 default:selection,
-                localOnly:identity.localOnly
+                localOnly:identity?.localOnly===true
                     ?{...selection,localOnly:true}
                     :null
             };
@@ -512,7 +500,7 @@ class AI {
             modelTTS,
             modelSTT
         ]);
-        this.#assertRegisteredProviderTuple(tuple);
+        this.#assertValidProviderTuple(tuple);
         this.#providerRuntime.configure(this.#routesFromPreferenceTuple(tuple));
         this.#applyPreferenceTuple(tuple);
         return true;
@@ -541,7 +529,7 @@ class AI {
             modelTTS,
             modelSTT
         ]);
-        this.#assertRegisteredProviderTuple(tuple);
+        this.#assertValidProviderTuple(tuple);
         this.stopAudio();
         await this.#unloadProviderRolesForTransition();
         this.#providerRuntime.configure(this.#routesFromPreferenceTuple(tuple));

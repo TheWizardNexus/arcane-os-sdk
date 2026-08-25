@@ -19,6 +19,9 @@ const FORBIDDEN_PACKED_ASSET_EXTENSION=
 const PACKED_WASM_ALLOWLIST=Object.freeze([
     'browser-runtime/ai/wllama/wllama.wasm'
 ]);
+const sourceTest=process.env.ARCANE_SDK_EXACT_ARTIFACT_REQUIRED==='true'
+    ?()=>undefined
+    :test;
 
 function deferred(){
     let resolve;
@@ -141,7 +144,7 @@ function runNpm(arguments_,options){
     return runCommand('npm',arguments_,options);
 }
 
-test('model controller supersedes late loads and treats unload as a request barrier',async()=>{
+sourceTest('model controller supersedes late loads and treats unload as a request barrier',async()=>{
     {
         const unloadStarted=deferred();
         const releaseUnload=deferred();
@@ -224,7 +227,7 @@ test('model controller supersedes late loads and treats unload as a request barr
     }
 });
 
-test('model controller disposal supersedes a load and is an immediate barrier',async()=>{
+sourceTest('model controller disposal supersedes a load and is an immediate barrier',async()=>{
     const loadStarted=deferred();
     const releaseLoad=deferred();
     let state='unloaded';
@@ -263,7 +266,7 @@ test('model controller disposal supersedes a load and is an immediate barrier',a
     await assert.rejects(controller.load(),errorWithCode('ARCANE_AI_DISPOSED'));
 });
 
-test('model controller retries disposal after provider cleanup fails',async()=>{
+sourceTest('model controller retries disposal after provider cleanup fails',async()=>{
     const failedUnloadStarted=deferred();
     const releaseFailedUnload=deferred();
     let state='ready';
@@ -300,7 +303,7 @@ test('model controller retries disposal after provider cleanup fails',async()=>{
     await assert.rejects(controller.load(),errorWithCode('ARCANE_AI_DISPOSED'));
 });
 
-test('browser-WASM provider admits only module-branded model sources and stores',()=>{
+sourceTest('browser-WASM provider admits only module-branded model sources and stores',()=>{
     const {source,store}=genuineSourceAndStore({
         createBrowserModelSource,
         createDbopfsModelStore
@@ -321,7 +324,7 @@ test('browser-WASM provider admits only module-branded model sources and stores'
     assert.equal(provider.model.id,'brand-regression');
 });
 
-test('browser-WASM provider serializes unload and retries failed disposal cleanup',async t=>{
+sourceTest('browser-WASM provider serializes unload and retries failed disposal cleanup',async t=>{
     const temporary=await temporaryDirectory(t,{prefix:'arcane-provider-lifecycle-'});
     const internal=path.join(temporary,'internal');
     await mkdir(internal);
@@ -428,7 +431,7 @@ export function createPackagedWllamaRuntime(){
     await assert.rejects(secondProvider.load(),errorWithCode('ARCANE_AI_DISPOSED'));
 });
 
-test('packaged Wllama runtime retains and retries failed session exits',async t=>{
+sourceTest('packaged Wllama runtime retains and retries failed session exits',async t=>{
     const temporary=await temporaryDirectory(t,{prefix:'arcane-wllama-exit-'});
     const wllamaDirectory=path.join(temporary,'wllama');
     await mkdir(wllamaDirectory);
@@ -616,13 +619,14 @@ test('installed public SDK capabilities are coherent',async()=>{
 
     assert.deepEqual(Object.keys(browserWasm).sort(),[
         'BROWSER_WASM_RUNTIME_AUTHORITY',
+        'adaptV1LlmProvider',
         'createArcaneAI',
         'createBrowserModelSource',
         'createBrowserWasmLlmProvider',
         'createDbopfsModelStore'
     ]);
     const authority=browserWasm.BROWSER_WASM_RUNTIME_AUTHORITY;
-    assert.equal(authority.protocol,'arcane-ai-browser-wasm/1');
+    assert.equal(authority.protocol,'arcane-ai-browser-wasm/2');
     assert.deepEqual({
         name:authority.package.name,
         version:authority.package.version,
@@ -637,8 +641,8 @@ test('installed public SDK capabilities are coherent',async()=>{
         licenseSpdx:'MIT'
     });
     assert.equal(authority.llamaCpp.sourceRevision,'4df29be4f4c3673f428170fda944a5b19f743bb8');
-    assert.equal(authority.runtimeAssets.module.bytes,373519);
-    assert.equal(authority.runtimeAssets.module.sha256,'4637e42d636010493a9b274fbbe70bfd8120365da726b1d9e589d85ca84a00d6');
+    assert.equal(authority.runtimeAssets.module.bytes,389765);
+    assert.equal(authority.runtimeAssets.module.sha256,'ae9a6ba2aa8687785ed651e28ef92573b409d5e6d3470bfd53340225287908b8');
     assert.equal(authority.runtimeAssets.wasm.bytes,8524865);
     assert.equal(authority.runtimeAssets.wasm.sha256,'95c6ff9ef2a03ff2c63bc91db132f0126a0bd0456b272cd8ae2e0f592fb059f6');
     assert.equal(authority.networkPolicy.remoteModelHelpers,false);
@@ -662,6 +666,12 @@ test('installed public SDK capabilities are coherent',async()=>{
     });
     await store.ready();
     const provider=browserWasm.createBrowserWasmLlmProvider({source,store});
+    const provider2=browserWasm.adaptV1LlmProvider(provider);
+    assert.equal(provider2.protocol,'arcane-ai-provider/2');
+    assert.equal(provider2.role,'llm');
+    assert.equal(provider2.localOnly,true);
+    assert.equal(provider2.status().state,'unloaded');
+    assert.deepEqual(provider2.catalog().map(model=>model.id),['installed-smoke-model']);
     const ai=browserWasm.createArcaneAI({provider,loadPolicy:'manual'});
     assert.equal(ai.status().llm.state,'unloaded');
     assert.equal(ai.status().llm.capabilities.localOnly,true);

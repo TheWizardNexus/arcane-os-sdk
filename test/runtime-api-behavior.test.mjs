@@ -992,25 +992,26 @@ test(
         runtime.register(localSTT);
         runtime.register(localTTS);
 
-        const beforeUnregisteredTuple = runtime.status();
-        assert.throws(
-            function rejectUnregisteredTupleProvider() {
-                runtime.configureFromTuple(
-                    [
-                        'missing-llm',
-                        'local-stt',
-                        'local-tts',
-                        'missing-llm-model',
-                        'local-tts-model',
-                        'local-stt-model'
-                    ]
-                );
-            },
-            function isUnavailableTupleProvider(error) {
-                return error?.code === 'ARCANE_AI_PROVIDER_UNAVAILABLE';
-            }
+        const pendingTupleRoutes = runtime.configureFromTuple(
+            [
+                'missing-llm',
+                'local-stt',
+                'local-tts',
+                'missing-llm-model',
+                'local-tts-model',
+                'local-stt-model'
+            ]
         );
-        assert.equal(runtime.status(), beforeUnregisteredTuple);
+        assert.deepEqual(
+            pendingTupleRoutes.llm.default,
+            selection('missing-llm', 'missing-llm-model', null)
+        );
+        const pendingLLM = createProvider('llm', 'missing-llm', true, 'pending result');
+        const unregisterPendingLLM = runtime.register(pendingLLM);
+        assert.deepEqual(
+            runtime.selection('llm', {localOnly: true}),
+            selection('missing-llm', 'missing-llm-model', true)
+        );
 
         const localRoutes = runtime.configure(
             {
@@ -1028,6 +1029,7 @@ test(
                 }
             }
         );
+        assert.equal(unregisterPendingLLM(), true);
         assert.ok(Object.isFrozen(localRoutes));
         assert.equal(runtime.protocol, AI_PROVIDER_RUNTIME_PROTOCOL);
         assert.equal(runtime.status('llm').state, 'unloaded');

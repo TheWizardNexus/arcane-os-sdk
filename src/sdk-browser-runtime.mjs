@@ -9,9 +9,9 @@ const MANIFEST_NAME='ARCANE_SDK_BROWSER_RELEASE.json';
 const BUILDER='arcane-sdk-browser-runtime-v1';
 const PROTOCOL='arcane-sdk-browser-runtime/1';
 export const SDK_BROWSER_RUNTIME_MANIFEST_SHA256=
-    '88395493b411fd5461fbb2bb065ae2b745f6d1672f796583fd248ec97f71f4f7';
+    'ce1fa716477d667c6222310063390ee9d5e49bd3ffd6d1304cf6529adad17448';
 export const SDK_BROWSER_RUNTIME_CONTENT_SHA256=
-    '5e03f45a732db51cb5a2b2193cc79ecda34501d07a9b2e82e794e5fa37d55d00';
+    'd11bb6aba5d0f69709054121fb6681b6d4b269016717a1c96b02acc9fce787c7';
 const REPOSITORY='https://github.com/TheWizardNexus/arcane-os-sdk.git';
 const SHA256_PATTERN=/^[a-f0-9]{64}$/u;
 const READ_ONLY_NO_FOLLOW=FS_CONSTANTS.O_RDONLY|(FS_CONSTANTS.O_NOFOLLOW??0);
@@ -22,7 +22,7 @@ const issuedReceipts=new WeakSet();
 const expectedAiComponents=Object.freeze({
     schemaVersion:1,
     kind:'arcane-ai-browser-wasm-components',
-    protocol:'arcane-ai-browser-wasm/1',
+    protocol:'arcane-ai-browser-wasm/2',
     packageExport:'arcane-os/ai/browser-wasm',
     browserEntry:'ai/browser-wasm.mjs',
     runtimePolicy:{
@@ -30,6 +30,10 @@ const expectedAiComponents=Object.freeze({
         modelWeightsPacked:false,
         remoteModelHelpers:false,
         compatibilityRuntime:false,
+        webgpuAdmission:'adapter-plus-full-offload-plus-buffer-queue-and-settled-fence-evidence',
+        cpuFallback:false,
+        cancellation:'abortSignal-plus-llama-cancel-acknowledgement',
+        cleanup:'worker-termination-only-no-native-unload-claim',
         toolCalls:'structural-only-never-executed'
     },
     components:[
@@ -49,9 +53,16 @@ const expectedAiComponents=Object.freeze({
                 {
                     role:'runtime-module',
                     path:'ai/wllama/index.mjs',
-                    sourcePath:'node_modules/@wllama/wllama/esm/index.js',
-                    bytes:373519,
-                    sha256:'4637e42d636010493a9b274fbbe70bfd8120365da726b1d9e589d85ca84a00d6'
+                    sourcePath:'browser-runtime/ai/wllama/index.mjs',
+                    bytes:389765,
+                    sha256:'ae9a6ba2aa8687785ed651e28ef92573b409d5e6d3470bfd53340225287908b8',
+                    projection:{
+                        protocol:'arcane-wllama-webgpu-evidence/1',
+                        inputPath:'node_modules/@wllama/wllama/esm/index.js',
+                        inputBytes:373519,
+                        inputSha256:'4637e42d636010493a9b274fbbe70bfd8120365da726b1d9e589d85ca84a00d6',
+                        wasmModified:false
+                    }
                 },
                 {
                     role:'runtime-wasm',
@@ -97,7 +108,7 @@ const expectedFiles=Object.freeze([
     ['ai/internal/sha256.mjs','browser-runtime/ai/internal/sha256.mjs','sdk-source-identity'],
     ['ai/model-controller.mjs','browser-runtime/ai/model-controller.mjs','sdk-source-identity'],
     ['ai/wllama/LICENCE','node_modules/@wllama/wllama/LICENCE','vendor-package-identity'],
-    ['ai/wllama/index.mjs','node_modules/@wllama/wllama/esm/index.js','vendor-package-identity'],
+    ['ai/wllama/index.mjs','browser-runtime/ai/wllama/index.mjs','deterministic-derived-vendor'],
     ['ai/wllama/llama.cpp-LICENSE','browser-runtime/ai/wllama/llama.cpp-LICENSE','vendor-source-identity'],
     ['ai/wllama/wllama.wasm','node_modules/@wllama/wllama/esm/wasm/wllama.wasm','vendor-package-identity'],
     ['dependencies/event-pubsub/index.js','node_modules/event-pubsub/index.js','vendor-package-identity'],

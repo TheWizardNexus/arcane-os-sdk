@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
   "builder": "arcane-sdk-runtime-v1",
-  "sdkVersion": "0.1.2",
+  "sdkVersion": "0.2.0",
   "source": {
     "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
-    "commit": "317af82799a59b99bcd26a170f136635d6f3647a",
+    "commit": "c540014afe69f14cf5ae60493b7295f36dbcec64",
     "bundleVersion": "0.8.12",
     "protocol": "arcane/1"
   },
   "fileCount": 157,
-  "totalBytes": 3474978,
-  "contentSha256": "cf2f24299ae0540819b8ff8c11d8a4acea9785d430daf1c3208ac9c2e895155d",
+  "totalBytes": 3484203,
+  "contentSha256": "3d850ad9c089128ca56ae55e9a9625abe24d7ef67fc7b3d789f0a6464cc11d9d",
   "files": [
     {
       "path": "arcane/components/app-bar.html",
@@ -369,8 +369,8 @@
     },
     {
       "path": "arcane/modules/AI.js",
-      "bytes": 81549,
-      "sha256": "87d29e40ffd3f79372f9f600ca6f305fad68ce72bc181ac9c311381af31ac116"
+      "bytes": 81061,
+      "sha256": "8e34445ad394064dae970583147b635de81d878a6caebb8a60d64b34dbc9e658"
     },
     {
       "path": "arcane/modules/AIPreferenceRuntime.js",
@@ -384,8 +384,8 @@
     },
     {
       "path": "arcane/modules/AIProviderRuntime.js",
-      "bytes": 73548,
-      "sha256": "0085f9f07c51e3f762a7d957c1f5e67e250b599b2318f567da9089f8532e6719"
+      "bytes": 83261,
+      "sha256": "32aa65b464ea9a9317d47f382063fc052e1f47e63e6c65c28e58898e0ab4911a"
     },
     {
       "path": "arcane/modules/AIResponseLength.js",
