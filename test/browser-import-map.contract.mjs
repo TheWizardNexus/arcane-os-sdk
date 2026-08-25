@@ -65,7 +65,8 @@ const REQUIRED_BROWSER_RESOURCES=Object.freeze([
     '/arcane/modules/TimeGuard.js',
     '/arcane/sdk/dependencies/event-pubsub/index.js',
     '/arcane/sdk/dependencies/strong-type/index.js',
-    '/arcane/sdk/event-manager.mjs'
+    '/arcane/sdk/event-manager.mjs',
+    '/arcane/sdk/ai/wllama/wllama.wasm'
 ]);
 
 function sha256(bytes){
@@ -277,7 +278,8 @@ try{
         timeGuardModule,
         fileModule,
         chatModule,
-        userModule
+        userModule,
+        browserAiModule
     ]=await Promise.all([
         import('arcane-os/event-manager'),
         import('arcane/DBOPFS'),
@@ -285,7 +287,8 @@ try{
         import('arcane/TimeGuard'),
         import('../../../arcane/entities/File.js'),
         import('../../../arcane/entities/Chat.js'),
-        import('arcane/entities/User')
+        import('arcane/entities/User'),
+        import('arcane-os/ai/browser-wasm')
     ]);
     const {ARCANE_EVENT_STACK_PROTOCOL,createEventManager}=eventManagerModule;
     const {default:DBOPFS}=dbopfsModule;
@@ -294,6 +297,7 @@ try{
     const {default:FileEntity}=fileModule;
     const {default:ChatEntity}=chatModule;
     const {default:UserEntity}=userModule;
+    const {BROWSER_WASM_RUNTIME_AUTHORITY}=browserAiModule;
     const constructors={
         DBOPFS:typeof DBOPFS,
         MD:typeof MD,
@@ -324,6 +328,56 @@ try{
     requireCondition(runtimeStrongType.version==='1.1.0','Arcane runtime strong-type identity drifted.');
     requireCondition(eventPubSub.version==='6.1.0','SDK event-pubsub identity drifted.');
     requireCondition(sdkStrongType.version==='2.0.0','SDK sibling strong-type identity drifted.');
+
+    const documentResponse=await fetch(location.href,{cache:'no-store'});
+    requireCondition(documentResponse.ok,'The Arcane browser server did not return its document.');
+    const policy=documentResponse.headers.get('content-security-policy')||'';
+    const scriptDirective=policy.split(';')
+        .map(value=>value.trim())
+        .find(value=>value.startsWith('script-src '));
+    const scriptTokens=(scriptDirective||'').split(/\\s+/u).slice(1);
+    requireCondition(
+        JSON.stringify(scriptTokens)===JSON.stringify([
+            "'self'","'unsafe-inline'","'wasm-unsafe-eval'"
+        ]),
+        'The Arcane browser server did not return the narrow WebAssembly CSP: '
+            +JSON.stringify(scriptTokens)+'.'
+    );
+    requireCondition(!scriptTokens.includes("'unsafe-eval'"),'Broad string evaluation was enabled.');
+
+    let evalError=null;
+    let functionError=null;
+    try{globalThis.eval('1');}
+    catch(error){evalError=error;}
+    try{new Function('return 1')();}
+    catch(error){functionError=error;}
+    requireCondition(evalError?.name==='EvalError','CSP did not deny indirect string eval.');
+    requireCondition(functionError?.name==='EvalError','CSP did not deny Function construction.');
+
+    const wasmUrl=BROWSER_WASM_RUNTIME_AUTHORITY.runtimeAssets.wasm.url;
+    const reflectedResponse=await fetch(wasmUrl,{cache:'no-store'});
+    requireCondition(reflectedResponse.ok,'The authenticated Wllama WASM was not served.');
+    requireCondition(
+        reflectedResponse.headers.get('content-type')==='application/wasm',
+        'The authenticated Wllama WASM media type drifted.'
+    );
+    const wasmBytes=await reflectedResponse.arrayBuffer();
+    requireCondition(
+        wasmBytes.byteLength===BROWSER_WASM_RUNTIME_AUTHORITY.runtimeAssets.wasm.bytes,
+        'The authenticated Wllama WASM byte length drifted.'
+    );
+    const wasmSha256=[...new Uint8Array(await crypto.subtle.digest('SHA-256',wasmBytes))]
+        .map(value=>value.toString(16).padStart(2,'0'))
+        .join('');
+    requireCondition(
+        wasmSha256===BROWSER_WASM_RUNTIME_AUTHORITY.runtimeAssets.wasm.sha256,
+        'The authenticated Wllama WASM digest drifted.'
+    );
+    const reflectedModule=await WebAssembly.compile(wasmBytes);
+    requireCondition(
+        reflectedModule instanceof WebAssembly.Module,
+        'The authenticated Wllama WASM did not compile.'
+    );
 
     const trapFetches={
         strongType:(await fetch('./node_modules/strong-type/index.js',{cache:'no-store'})).status,
@@ -371,6 +425,14 @@ try{
             sdkStrongType:sdkStrongType.version
         },
         userAgent:navigator.userAgent,
+        csp:{
+            scriptTokens,
+            evalError:evalError.name,
+            functionError:functionError.name,
+            wasmBytes:wasmBytes.byteLength,
+            wasmSha256,
+            compiled:true
+        },
         trapFetches,
         resources:contractResources,
         nodeModuleResources
@@ -1325,6 +1387,14 @@ function assertBrowserReport(report,{chromeMajor}){
     assert.match(report.userAgent,/\bHeadlessChrome\/\d+(?:\.\d+){3}\b/u);
     assert.doesNotMatch(report.userAgent,/\b(?:Edg|OPR)\//u);
     assert.equal(Number(report.userAgent.match(/HeadlessChrome\/(\d+)\./u)?.[1]),chromeMajor);
+    assert.deepEqual(report.csp,{
+        scriptTokens:["'self'","'unsafe-inline'","'wasm-unsafe-eval'"],
+        evalError:'EvalError',
+        functionError:'EvalError',
+        wasmBytes:8_524_865,
+        wasmSha256:'95c6ff9ef2a03ff2c63bc91db132f0126a0bd0456b272cd8ae2e0f592fb059f6',
+        compiled:true
+    });
     assert.deepEqual(report.trapFetches,{strongType:404,eventPubSub:404});
     assert.ok(Array.isArray(report.resources));
     assert.ok(Array.isArray(report.nodeModuleResources));

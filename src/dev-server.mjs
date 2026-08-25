@@ -31,6 +31,7 @@ const MIME_TYPES=new Map([
     ['.png','image/png'],
     ['.svg','image/svg+xml; charset=utf-8'],
     ['.txt','text/plain; charset=utf-8'],
+    ['.wasm','application/wasm'],
     ['.webp','image/webp'],
     ['.woff','font/woff'],
     ['.woff2','font/woff2']
@@ -51,7 +52,7 @@ const PRIVATE_SOURCE_SEGMENTS=new Set([
 // development CSP from being exposed as a general network service.
 const DEVELOPMENT_CSP=[
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline'",
+    "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: http: https:",
     "font-src 'self' data:",

@@ -10,6 +10,33 @@ import {projectPackageManifest} from '../src/app-descriptor.mjs';
 import {packageApp} from '../src/packager/core.mjs';
 import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
 
+const BROWSER_RUNTIME_CSP=[
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: http: https:",
+    "font-src 'self' data:",
+    "connect-src 'self' data: blob: http: https: ws: wss:",
+    "worker-src 'self' blob:",
+    "frame-src 'self' data: blob: http: https:",
+    "media-src 'self' data: blob: http: https:",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'"
+].join('; ');
+
+function assertBrowserRuntimeCsp(response){
+    const policy=response.headers.get('content-security-policy');
+    assert.equal(policy,BROWSER_RUNTIME_CSP);
+    const scriptTokens=policy.split('; ')
+        .find(directive=>directive.startsWith('script-src '))
+        .split(/\s+/u)
+        .slice(1);
+    assert.deepEqual(scriptTokens,["'self'","'unsafe-inline'","'wasm-unsafe-eval'"]);
+    assert.equal(scriptTokens.includes("'unsafe-eval'"),false);
+}
+
 async function request(origin,requestPath,options={}){
     const {cookie,...fetchOptions}=options;
     const headers=new Headers(fetchOptions.headers);
@@ -123,12 +150,22 @@ test('source server exposes only the selected app and SDK browser routes',async 
 
     assert.ok(events.find(event=>event.type==='server.starting'));
     assert.equal(events.at(-1).type,'server.started');
-    assert.equal((await request(origin,'/apps/served-app/index.html')).status,403);
-    assert.equal((await requestWithHost(
+    const unauthorized=await request(origin,'/apps/served-app/index.html');
+    assert.equal(unauthorized.status,403);
+    assert.equal(
+        unauthorized.headers.get('content-security-policy'),
+        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+    );
+    const misdirected=await requestWithHost(
         instance,
         '/apps/served-app/index.html',
         'attacker.invalid'
-    )).statusCode,421);
+    );
+    assert.equal(misdirected.statusCode,421);
+    assert.equal(
+        misdirected.headers['content-security-policy'],
+        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+    );
     const {cookie}=await authorize(instance);
     const root=await request(origin,'/',{cookie});
     assert.equal(root.status,302);
@@ -137,7 +174,7 @@ test('source server exposes only the selected app and SDK browser routes',async 
     const app=await request(origin,'/apps/served-app/index.html',{cookie});
     assert.equal(app.status,200);
     assert.match(app.headers.get('content-type'),/^text\/html/);
-    assert.match(app.headers.get('content-security-policy'),/script-src 'self' 'unsafe-inline'/);
+    assertBrowserRuntimeCsp(app);
     assert.match(app.headers.get('content-security-policy'),/connect-src[^;]*http:/);
     assert.equal(app.headers.get('cross-origin-resource-policy'),'same-origin');
     assert.match(await app.text(),/<meta name="arcane-app-id" content="served-app">/);
@@ -236,6 +273,7 @@ test('packaged server redirects to index and withholds its integrity receipt',as
     assert.equal(root.headers.get('location'),'/index.html');
     const entry=await request(origin,'/index.html',{cookie});
     assert.equal(entry.status,200);
+    assertBrowserRuntimeCsp(entry);
     assert.match(await entry.text(),/Packaged App/);
     const receipt=await request(origin,'/ARCANE_APP_RELEASE.json',{cookie});
     assert.equal(receipt.status,404);
