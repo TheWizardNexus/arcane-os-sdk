@@ -386,22 +386,19 @@ test('native build plan schema publishes only the exact dev.4 target matrix',asy
 });
 
 test('CI, reusable app release, and trusted publishing workflows retain narrow authority',async t=>{
-    const [checkWorkflow,publishWorkflow,appReleaseWorkflow,publishingGuide]=await Promise.all([
+    const [checkWorkflow,publishWorkflow,appReleaseWorkflow]=await Promise.all([
         readFile(path.join(repositoryRoot,'.github','workflows','check.yml'),'utf8'),
         readFile(path.join(repositoryRoot,'.github','workflows','publish-dev.yml'),'utf8'),
-        readFile(path.join(repositoryRoot,'.github','workflows','release-app.yml'),'utf8'),
-        readFile(path.join(repositoryRoot,'docs','publishing.md'),'utf8')
+        readFile(path.join(repositoryRoot,'.github','workflows','release-app.yml'),'utf8')
     ]);
     const buildStart=appReleaseWorkflow.indexOf('\n  build:');
     const verifyStart=appReleaseWorkflow.indexOf('\n  verify:');
-    const attestStart=appReleaseWorkflow.indexOf('\n  attest:');
     assert.ok(
-        buildStart>=0&&verifyStart>buildStart&&attestStart>verifyStart,
-        'release-app.yml must keep separate build, post-upload verification, and attest jobs'
+        buildStart>=0&&verifyStart>buildStart,
+        'release-app.yml must keep separate build and post-upload verification jobs'
     );
     const buildSection=appReleaseWorkflow.slice(buildStart,verifyStart);
-    const verifySection=appReleaseWorkflow.slice(verifyStart,attestStart);
-    const attestSection=appReleaseWorkflow.slice(attestStart);
+    const verifySection=appReleaseWorkflow.slice(verifyStart);
     await t.test('Check runs only for main pull requests and pushes',()=>{
         assert.match(checkWorkflow,/pull_request:\s*\n\s+branches:\s*\n\s+- main/u);
         assert.match(checkWorkflow,/push:\s*\n\s+branches:\s*\n\s+- main/u);
@@ -566,22 +563,29 @@ test('CI, reusable app release, and trusted publishing workflows retain narrow a
         }
         assert.doesNotMatch(appReleaseWorkflow,/strategy:\s*\n\s+matrix:/u);
     });
-    await t.test('caller code and post-upload verification have no attestation or OIDC authority',()=>{
-        assert.match(buildSection,/permissions:\s*\n\s+contents:\s*read/u);
-        assert.doesNotMatch(buildSection,/attestations:\s*write|id-token:\s*write/u);
-        assert.doesNotMatch(buildSection,/attest-build-provenance/u);
-        assert.match(verifySection,/permissions:\s*\n\s+contents:\s*read/u);
-        assert.doesNotMatch(verifySection,/attestations:\s*write|id-token:\s*write|attest-build-provenance/u);
-        assert.equal((appReleaseWorkflow.match(/attestations:\s*write/gu)??[]).length,1);
-        assert.equal((appReleaseWorkflow.match(/id-token:\s*write/gu)??[]).length,1);
-    });
-    await t.test('attesting callers grant the reusable job permission ceiling explicitly',()=>{
+    await t.test('attest:false callers need only contents read and expose no privileged nested job',()=>{
         assert.match(
-            publishingGuide,
-            /jobs:\s*\n\s+release-app:\s*\n\s+permissions:\s*\n\s+contents:\s*read\s*\n\s+id-token:\s*write\s*\n\s+attestations:\s*write[\s\S]*attest:\s*true/u
+            appReleaseWorkflow,
+            /      attest:\s*\n\s+description:[^\n]*requires false\.\s*\n\s+required: false\s*\n\s+default: false\s*\n\s+type: boolean/u
         );
-        assert.match(publishingGuide,/called workflow[\s\S]*caller job's permission ceiling/u);
-        assert.match(publishingGuide,/Without that caller grant,[^\n]*fails/u);
+        assert.match(buildSection,/name: Require the least-authority caller shape/u);
+        assert.match(buildSection,/if: \$\{\{ inputs\.attest \}\}/u);
+        assert.match(buildSection,/requires attest: false and never requests attestation authority/u);
+        assert.match(
+            buildSection,
+            /name: Require the least-authority caller shape[\s\S]*?if: \$\{\{ inputs\.attest \}\}[\s\S]*?exit 1/u
+        );
+        assert.match(buildSection,/permissions:\s*\n\s+contents:\s*read/u);
+        assert.match(verifySection,/permissions:\s*\n\s+contents:\s*read/u);
+        assert.doesNotMatch(
+            appReleaseWorkflow,
+            /attestations:\s*write|id-token:\s*write|attest-build-provenance/u
+        );
+        assert.deepEqual(
+            [...appReleaseWorkflow.slice(appReleaseWorkflow.indexOf('\njobs:')).matchAll(/^  ([a-z][a-z0-9_]*):$/gmu)]
+                .map(match=>match[1]),
+            ['build','verify']
+        );
     });
     await t.test('fresh post-upload job is the sole identity source and executes no caller code',()=>{
         assert.match(verifySection,/if: always\(\) && needs\.build\.result == 'success'/u);
@@ -598,35 +602,15 @@ test('CI, reusable app release, and trusted publishing workflows retain narrow a
             /\$\{\{ inputs\.workspace \}\}|npm (?:ci|install|exec)|node_modules|arcane check|arcane package|arcane bundle/u
         );
         assert.doesNotMatch(buildSection,/steps\.identity\.outputs/u);
-    });
-    await t.test('privileged attestation uses only downloaded and independently reverified bytes',()=>{
-        assert.match(attestSection,/if: inputs\.attest && needs\.verify\.result == 'success'/u);
-        assert.match(attestSection,/needs: \[build, verify\]/u);
-        assert.match(attestSection,/attestations:\s*write/u);
-        assert.match(attestSection,/id-token:\s*write/u);
-        assert.match(attestSection,/actions\/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0/u);
-        assert.match(attestSection,/artifact-ids: \$\{\{ needs\.build\.outputs\.artifact-id \}\}/u);
-        assert.match(attestSection,/repository: \$\{\{ job\.workflow_repository \}\}/u);
-        assert.match(attestSection,/ref: \$\{\{ job\.workflow_sha \}\}/u);
-        assert.match(attestSection,/TRUSTED_SDK_ROOT: \$\{\{ github\.workspace \}\}\/trusted-sdk/u);
-        assert.match(attestSection,/process\.env\.TRUSTED_SDK_ROOT[\s\S]*'src','release-bundle\.mjs'/u);
-        assert.match(attestSection,/node-version: 24/u);
-        assert.match(attestSection,/receipt\.app\.id!==process\.env\.EXPECTED_APP_ID/u);
-        assert.match(attestSection,/needs\.verify\.outputs\.bundle-sha256/u);
-        assert.match(attestSection,/verifyAppReleaseBundle/u);
-        assert.match(attestSection,/Downloaded metadata does not match the independently verified bundle/u);
-        assert.match(attestSection,/subject-path: verified-release\/arcane-app-release\.arcane-app\.tar\.gz/u);
-        assert.doesNotMatch(attestSection,/\$\{\{ inputs\.workspace \}\}|npm ci|arcane check|arcane package|arcane bundle/u);
-        assert.doesNotMatch(attestSection,/npm (?:ci|install|exec)|node_modules/u);
         assert.equal(
             (appReleaseWorkflow.match(/actions\/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0/gu)??[]).length,
-            2
+            1
         );
     });
     await t.test('app release actions are immutable and no publishing authority is present',()=>{
         const actionReferences=[...appReleaseWorkflow.matchAll(/uses:\s*([^\s#]+)/gu)]
             .map(match=>match[1]);
-        assert.ok(actionReferences.length>=9);
+        assert.equal(actionReferences.length,6);
         assert.ok(actionReferences.every(reference=>/@[0-9a-f]{40}$/u.test(reference)));
         assert.doesNotMatch(appReleaseWorkflow,/gh release|npm publish/u);
     });
