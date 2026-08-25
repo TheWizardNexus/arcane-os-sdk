@@ -1096,7 +1096,7 @@
                         }
                     )
                 );
-                console.error('The conversation timebox message could not be sent.',error);
+                console.error('The conversation timebox message could not be sent.');
                 return false;
             }
         );
@@ -1306,7 +1306,7 @@
                         }
                     )
                 );
-                console.error('The chat message could not be submitted.',error);
+                console.error('The chat message could not be submitted.');
                 return false;
             }
         );
@@ -1337,7 +1337,6 @@
             return false;
         }
         const messageTime = getMilTime();
-        console.info("Dispatching message:", text);
         if(!submissionContext.preserveDraft){
             textArea.value='';
         }
@@ -1428,7 +1427,7 @@
                 }
             )
         );
-        console.error(message,error);
+        console.error('Speech synthesis failed.');
     }
 
     function destroy(){

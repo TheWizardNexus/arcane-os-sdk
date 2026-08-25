@@ -139,7 +139,7 @@
 <script type="module">
     void import('../modules/DBLS.js').catch(
         function reportDBLSImportFailure(error) {
-            console.error('The shared database runtime could not load.', error);
+            console.error('The shared database runtime could not load.');
         }
     );
     const aiModuleImport = import('../modules/AI.js?v=7');
@@ -215,7 +215,7 @@
     void aiModuleImport.then(
         synchronizeAIMutedState,
         function reportAIModuleImportFailure(error) {
-            console.error('The shared AI runtime could not load.', error);
+            console.error('The shared AI runtime could not load.');
         }
     );
 
@@ -1172,7 +1172,7 @@
         if (session.audioContext.state !== 'closed') {
             void session.audioContext.close().catch(
                 function reportAudioContextCloseFailure(error) {
-                    console.warn('The microphone audio context could not close.', error);
+                    console.warn('The microphone audio context could not close.');
                 }
             );
         }

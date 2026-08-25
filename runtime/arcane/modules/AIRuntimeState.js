@@ -475,7 +475,7 @@ function startupReport(snapshot, startRevision, startMuted, requestedRoles) {
 function normalizedAIRuntimeStartupAbort() {
     const error = new Error('The AI runtime startup was cancelled.');
     error.name = 'AbortError';
-    error.code = 'AI_REQUEST_ABORTED';
+    error.code = 'ARCANE_AI_REQUEST_ABORTED';
     return error;
 }
 
@@ -583,6 +583,43 @@ export function publishAIRuntimeRoleState(role, completeRecord) {
 }
 
 /**
+ * Atomically replaces all three role records and emits one coherent snapshot.
+ * Provider routing commits use this boundary so synchronous subscribers never
+ * observe a partially configured role set.
+ */
+export function publishAIRuntimeRolesState(completeRecords) {
+    assertClosedRecord(completeRecords, AI_RUNTIME_ROLES, 'runtime role states');
+    const nextRoles = Object.freeze(
+        {
+            llm: copyRoleRecord('llm', completeRecords.llm),
+            stt: copyRoleRecord('stt', completeRecords.stt),
+            tts: copyRoleRecord('tts', completeRecords.tts)
+        }
+    );
+    if (currentSnapshot.revision === Number.MAX_SAFE_INTEGER) {
+        throw new RangeError(
+            'ARCANE_AI_RUNTIME_STATE_INVALID: state revision exhausted.'
+        );
+    }
+    currentSnapshot = Object.freeze(
+        {
+            protocol: AI_RUNTIME_PROTOCOL,
+            revision: currentSnapshot.revision + 1,
+            roles: nextRoles
+        }
+    );
+    aiRuntimeEvents.dispatchEvent(
+        new CustomEvent(
+            AI_RUNTIME_STATE_EVENT,
+            {
+                detail: currentSnapshot
+            }
+        )
+    );
+    return currentSnapshot;
+}
+
+/**
  * Emits an immutable capability-neutral lifecycle request. This function does
  * not execute, authorize, fetch, load, unload, dispose, or select a fallback.
  */
@@ -637,6 +674,11 @@ export function startAIRuntime(options) {
     let unsubscribeState = null;
     let started = false;
     let cancelled = false;
+    const loadRequested = {
+        llm: false,
+        stt: false,
+        tts: false
+    };
     let barrierResolved = false;
     let settledResolved = false;
     let resolveBarrier;
@@ -734,7 +776,28 @@ export function startAIRuntime(options) {
     function observeAIRuntimeStartupState() {
         latestSnapshot = currentSnapshot;
         if (started) {
+            requestPendingAIRuntimeStartupLoads(latestSnapshot);
             evaluateAIRuntimeStartup(latestSnapshot);
+        }
+    }
+
+    function requestPendingAIRuntimeStartupLoads(snapshot) {
+        for (const role of AI_RUNTIME_ROLES) {
+            const roleState = snapshot.roles[role];
+            if (!cancelled
+                && requestedRoles[role]
+                && !loadRequested[role]
+                && hasAIRuntimeSelection(roleState)
+                && roleState.state === 'unloaded') {
+                loadRequested[role] = true;
+                requestAIRuntimeIntent(
+                    {
+                        role,
+                        action: 'load',
+                        reason: 'startup'
+                    }
+                );
+            }
         }
     }
 
@@ -798,24 +861,7 @@ export function startAIRuntime(options) {
         return handle;
     }
 
-    for (const role of AI_RUNTIME_ROLES) {
-        if (cancelled) {
-            break;
-        }
-
-        const roleState = currentSnapshot.roles[role];
-        if (requestedRoles[role]
-            && hasAIRuntimeSelection(roleState)
-            && roleState.state === 'unloaded') {
-            requestAIRuntimeIntent(
-                {
-                    role,
-                    action: 'load',
-                    reason: 'startup'
-                }
-            );
-        }
-    }
+    requestPendingAIRuntimeStartupLoads(currentSnapshot);
 
     if (!cancelled) {
         started = true;

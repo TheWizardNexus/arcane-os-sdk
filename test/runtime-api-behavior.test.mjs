@@ -33,6 +33,13 @@ import {
     subscribeAIRuntimeIntents,
     subscribeAIRuntimeState
 } from '../runtime/arcane/modules/AIRuntimeState.js';
+import {
+    AI_MODEL_AUTHORITY_PROTOCOL,
+    AI_PROVIDER_PROTOCOL,
+    AI_PROVIDER_RUNTIME_PROTOCOL,
+    AIProviderRuntime,
+    getAIProviderRuntime
+} from '../runtime/arcane/modules/AIProviderRuntime.js';
 
 const readyEvents=[];
 const previousDispatchEvent=globalThis.dispatchEvent;
@@ -782,7 +789,10 @@ test(
                 assert.equal(cancellation[1].status, 'rejected');
                 assert.equal(cancellation[0].reason, cancellation[1].reason);
                 assert.equal(cancellation[0].reason.name, 'AbortError');
-                assert.equal(cancellation[0].reason.code, 'AI_REQUEST_ABORTED');
+                assert.equal(
+                    cancellation[0].reason.code,
+                    'ARCANE_AI_REQUEST_ABORTED'
+                );
                 assert.deepEqual(
                     startupIntents,
                     [
@@ -818,5 +828,368 @@ test(
                 observeStateEvent
             );
         }
+    }
+);
+
+test(
+    'AI provider runtime owns explicit routes, startup settlement, and independent speech lifecycle',
+    async function testAIProviderRuntimeContract() {
+        assert.equal(AI_PROVIDER_PROTOCOL, 'arcane-ai-provider/2');
+        assert.equal(AI_PROVIDER_RUNTIME_PROTOCOL, 'arcane-ai-runtime/2');
+        assert.equal(
+            AI_MODEL_AUTHORITY_PROTOCOL,
+            'arcane-ai-model-authority/1'
+        );
+
+        function createProvider(role, id, localOnly, response) {
+            const counters = {
+                load: 0,
+                request: 0,
+                unload: 0,
+                dispose: 0
+            };
+            let state = 'unloaded';
+            let loaded = false;
+            let requestError = null;
+            let heldLoad = null;
+            return {
+                protocol: AI_PROVIDER_PROTOCOL,
+                role,
+                id,
+                localOnly,
+                counters,
+                failNextRequest: function failNextTestProviderRequest(error) {
+                    requestError = error;
+                },
+                holdNextLoad: function holdNextTestProviderLoad() {
+                    let markStarted;
+                    let release;
+                    const started = new Promise(function createHeldLoadStart(resolve) {
+                        markStarted = resolve;
+                    });
+                    const released = new Promise(function createHeldLoadRelease(resolve) {
+                        release = resolve;
+                    });
+                    heldLoad = {markStarted, released};
+                    return {started, release};
+                },
+                catalog: function catalogTestProvider() {
+                    return [{id: `${id}-model`}];
+                },
+                inspect: function inspectTestProvider(selection) {
+                    return {
+                        available: true,
+                        authority: {
+                            protocol: AI_MODEL_AUTHORITY_PROTOCOL,
+                            providerId: id,
+                            modelId: selection.modelId,
+                            admitted: true
+                        }
+                    };
+                },
+                status: function statusTestProvider() {
+                    return {
+                        state,
+                        loaded,
+                        busy: false
+                    };
+                },
+                load: async function loadTestProvider({progress, signal}) {
+                    counters.load += 1;
+                    progress(
+                        {
+                            phase: 'initialize',
+                            completed: 0,
+                            total: null,
+                            unit: 'items',
+                            heartbeat: true
+                        }
+                    );
+                    if (signal.aborted) {
+                        const error = new Error('cancelled');
+                        error.name = 'AbortError';
+                        throw error;
+                    }
+                    if (heldLoad) {
+                        const gate = heldLoad;
+                        heldLoad = null;
+                        gate.markStarted();
+                        await Promise.race(
+                            [
+                                gate.released,
+                                new Promise(function rejectHeldLoadOnAbort(resolve, reject) {
+                                    signal.addEventListener(
+                                        'abort',
+                                        function abortHeldTestProviderLoad() {
+                                            const error = new Error('cancelled');
+                                            error.name = 'AbortError';
+                                            reject(error);
+                                        },
+                                        {once: true}
+                                    );
+                                })
+                            ]
+                        );
+                    }
+                    if (signal.aborted) {
+                        const error = new Error('cancelled');
+                        error.name = 'AbortError';
+                        throw error;
+                    }
+                    state = 'ready';
+                    loaded = true;
+                },
+                request: async function requestTestProvider({signal}) {
+                    counters.request += 1;
+                    if (signal.aborted) {
+                        const error = new Error('cancelled');
+                        error.name = 'AbortError';
+                        throw error;
+                    }
+                    if (requestError) {
+                        const error = requestError;
+                        requestError = null;
+                        throw error;
+                    }
+                    return response;
+                },
+                unload: async function unloadTestProvider() {
+                    counters.unload += 1;
+                    state = 'unloaded';
+                    loaded = false;
+                },
+                dispose: async function disposeTestProvider() {
+                    counters.dispose += 1;
+                    state = 'disposed';
+                    loaded = false;
+                }
+            };
+        }
+
+        function selection(providerId, modelId, localOnly) {
+            return {
+                providerId,
+                modelId,
+                localOnly
+            };
+        }
+
+        assert.throws(
+            function rejectSecondAIProviderRuntime() {
+                return new AIProviderRuntime();
+            },
+            function isSingletonRuntimeError(error) {
+                return error?.code === 'ARCANE_AI_RUNTIME_SINGLETON_REQUIRED';
+            }
+        );
+        const runtime = getAIProviderRuntime();
+        const localLLM = createProvider('llm', 'local-llm', true, 'local result');
+        const cloudLLM = createProvider('llm', 'cloud-llm', false, 'cloud result');
+        const localSTT = createProvider('stt', 'local-stt', true, {text: 'hello'});
+        const localTTS = createProvider('tts', 'local-tts', true, new Uint8Array([1]));
+        runtime.register(localLLM);
+        runtime.register(cloudLLM);
+        runtime.register(localSTT);
+        runtime.register(localTTS);
+
+        const beforeUnregisteredTuple = runtime.status();
+        assert.throws(
+            function rejectUnregisteredTupleProvider() {
+                runtime.configureFromTuple(
+                    [
+                        'missing-llm',
+                        'local-stt',
+                        'local-tts',
+                        'missing-llm-model',
+                        'local-tts-model',
+                        'local-stt-model'
+                    ]
+                );
+            },
+            function isUnavailableTupleProvider(error) {
+                return error?.code === 'ARCANE_AI_PROVIDER_UNAVAILABLE';
+            }
+        );
+        assert.equal(runtime.status(), beforeUnregisteredTuple);
+
+        const localRoutes = runtime.configure(
+            {
+                llm: {
+                    default: selection('local-llm', 'local-llm-model', true),
+                    localOnly: selection('local-llm', 'local-llm-model', true)
+                },
+                stt: {
+                    default: selection('local-stt', 'local-stt-model', true),
+                    localOnly: selection('local-stt', 'local-stt-model', true)
+                },
+                tts: {
+                    default: selection('local-tts', 'local-tts-model', true),
+                    localOnly: selection('local-tts', 'local-tts-model', true)
+                }
+            }
+        );
+        assert.ok(Object.isFrozen(localRoutes));
+        assert.equal(runtime.protocol, AI_PROVIDER_RUNTIME_PROTOCOL);
+        assert.equal(runtime.status('llm').state, 'unloaded');
+        assert.equal(runtime.status('llm').providerId, 'local-llm');
+        assert.equal(runtime.status('stt').providerId, 'local-stt');
+        assert.equal(runtime.status('tts').providerId, 'local-tts');
+
+        const invalidStartupOptions = {};
+        Object.defineProperty(
+            invalidStartupOptions,
+            'startMuted',
+            {
+                enumerable: true,
+                get: function readForbiddenStartupAccessor() {
+                    return true;
+                }
+            }
+        );
+        const beforeInvalidStartup = runtime.status();
+        await assert.rejects(
+            runtime.start(invalidStartupOptions),
+            function rejectsStartupAccessor(error) {
+                return error?.code === 'ARCANE_AI_PROVIDER_RUNTIME_INVALID';
+            }
+        );
+        assert.equal(runtime.status(), beforeInvalidStartup);
+
+        const startupOptions = {startMuted: true};
+        const startupPromise = runtime.start(startupOptions);
+        startupOptions.startMuted = false;
+        const startup = await startupPromise;
+        const barrier = await startup.barrier;
+        const settled = await startup.settled;
+        assert.equal(barrier.chatReady, true);
+        assert.equal(settled.chatReady, true);
+        assert.equal(settled.roles.llm.state.state, 'ready');
+        assert.equal(settled.roles.stt.state.state, 'ready');
+        assert.equal(settled.roles.tts.requested, false);
+        assert.equal(localLLM.counters.load, 1);
+        assert.equal(localSTT.counters.load, 1);
+        assert.equal(localTTS.counters.load, 0);
+
+        assert.equal(
+            await runtime.chat(
+                {messages: []},
+                {localOnly: true}
+            ),
+            'local result'
+        );
+        await assert.rejects(
+            runtime.request(
+                'llm',
+                {
+                    operation: 'chat',
+                    payload: {messages: [], onChunk: function forbiddenCallback() {}},
+                    localOnly: true,
+                    signal: null
+                }
+            ),
+            function rejectProviderCallbackPayload(error) {
+                return error?.code === 'ARCANE_AI_PROVIDER_CALLBACK_BOUNDARY';
+            }
+        );
+        const requestFailure = new Error('C:\\private\\prompt-response.txt');
+        requestFailure.code = 'ARCANE_AI_PROVIDER_REQUEST_FAILED';
+        localLLM.failNextRequest(requestFailure);
+        await assert.rejects(
+            runtime.chat({messages: []}, {localOnly: true}),
+            requestFailure
+        );
+        assert.equal(runtime.status('llm').state, 'ready');
+        assert.equal(runtime.status('llm').error, null);
+        await runtime.setSpeechMuted(false);
+        assert.equal(localTTS.counters.load, 1);
+        assert.equal(runtime.status('tts').state, 'ready');
+        const rapidMute = runtime.setSpeechMuted(true);
+        const rapidUnmute = runtime.setSpeechMuted(false);
+        await Promise.all([rapidMute, rapidUnmute]);
+        assert.equal(runtime.speechMuted, false);
+        assert.equal(runtime.status('tts').state, 'ready');
+        await runtime.setSpeechMuted(true);
+        assert.ok(localTTS.counters.unload >= 1);
+        assert.equal(runtime.status('tts').state, 'unloaded');
+        const heldTTSLoad = localTTS.holdNextLoad();
+        const unmuteDuringHeldLoad = runtime.setSpeechMuted(false);
+        await heldTTSLoad.started;
+        const muteDuringHeldLoad = runtime.setSpeechMuted(true);
+        await assert.rejects(
+            unmuteDuringHeldLoad,
+            function isCancelledHeldTTSLoad(error) {
+                return error?.code === 'ARCANE_AI_REQUEST_ABORTED';
+            }
+        );
+        await muteDuringHeldLoad;
+        assert.equal(runtime.speechMuted, true);
+        assert.equal(runtime.status('tts').state, 'unloaded');
+
+        await runtime.unload('llm');
+        await runtime.unload('stt');
+        runtime.configure(
+            {
+                llm: {
+                    default: selection('cloud-llm', 'cloud-llm-model', false),
+                    localOnly: selection('local-llm', 'local-llm-model', true)
+                },
+                stt: {
+                    default: selection('local-stt', 'local-stt-model', true),
+                    localOnly: selection('local-stt', 'local-stt-model', true)
+                },
+                tts: {
+                    default: selection('local-tts', 'local-tts-model', true),
+                    localOnly: selection('local-tts', 'local-tts-model', true)
+                }
+            }
+        );
+        await runtime.load('llm');
+        await assert.rejects(
+            runtime.request(
+                'llm',
+                {
+                    operation: 'chat',
+                    payload: {messages: []},
+                    localOnly: true,
+                    signal: null
+                }
+            ),
+            function rejectDefaultRouteForLocalOnly(error) {
+                return error?.code === 'ARCANE_AI_ROUTE_NOT_READY';
+            }
+        );
+        assert.equal(cloudLLM.counters.request, 0);
+        await runtime.unload('llm');
+        await runtime.load('llm', {localOnly: true});
+        assert.equal(
+            await runtime.request(
+                'llm',
+                {
+                    operation: 'chat',
+                    payload: {messages: []},
+                    localOnly: true,
+                    signal: null
+                }
+            ),
+            'local result'
+        );
+        assert.equal(cloudLLM.counters.request, 0);
+        await runtime.dispose('llm');
+        await runtime.dispose('stt');
+        await runtime.dispose('tts');
+        assert.equal(runtime.status('llm').state, 'disposed');
+        assert.equal(runtime.status('stt').state, 'disposed');
+        assert.equal(runtime.status('tts').state, 'disposed');
+        runtime.configure(
+            {
+                llm: {default: null, localOnly: null},
+                stt: {default: null, localOnly: null},
+                tts: {default: null, localOnly: null}
+            }
+        );
+        assert.equal(runtime.unregister('llm', 'local-llm'), true);
+        assert.equal(runtime.unregister('llm', 'cloud-llm'), true);
+        assert.equal(runtime.unregister('stt', 'local-stt'), true);
+        assert.equal(runtime.unregister('tts', 'local-tts'), true);
     }
 );
