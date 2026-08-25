@@ -61,12 +61,19 @@ before enabling DOM values, node content, event details, source stacks, or live
 event redispatch. Password targets, text-entry details, clipboard data, URL
 attributes, and common credential keys are excluded or redacted by default.
 
-## Runtime synchronization
+## Runtime source ownership and transitional synchronization
 
-SDK maintainers update the pinned browser runtime only from Arcane's canonical,
-clean `main` checkout. The sync command validates that checkout, its exact
-machine-bundle version, the dependency lock, and the fixed shared-payload
-selection before replacing any SDK runtime bytes:
+The SDK repository is the canonical source for portable shared runtime modules,
+entities, components, themes, browser providers and workers, public contracts,
+and their packaged byte receipts. Arcane OS and every other application consume
+those SDK-owned paths; a portable application never reads an Arcane OS install
+or source checkout at runtime.
+
+The current OS-to-SDK synchronization command remains a transitional provenance
+path for compatibility bytes that have not completed the SDK-owned projection
+cutover. It validates the selected Arcane checkout, its exact machine-bundle
+version, the dependency lock, and the fixed shared-payload selection before
+replacing those transitional bytes:
 
 ```bash
 npm run runtime:sync -- --arcane-root /path/to/canonical/ARCANE-OS
@@ -74,8 +81,14 @@ node tools/runtime-manifest.mjs --write
 npm run check
 ```
 
-`tools/runtime-source.json` records the reviewed upstream identity and fixed
-selection. The generated runtime manifest remains the published byte receipt.
+`tools/runtime-source.json` records the reviewed provenance of that existing
+snapshot; it is not durable source ownership for reusable portable code. Do not
+use the transitional sync to overwrite SDK-canonical shared AI startup/runtime
+contracts or shared chat/speech components. The separately leased source
+cutover replaces this direction with an authenticated SDK-owned source and
+projection model, after which Arcane OS consumes the same locked SDK bytes as
+other applications. The generated runtime manifest remains the published byte
+receipt throughout the migration.
 
 ## Install
 

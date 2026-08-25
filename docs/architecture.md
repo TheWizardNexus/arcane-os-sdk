@@ -7,32 +7,91 @@ same structured event stream; the GUI is not a second build system.
 ```text
 external app repository -----+
                               |
-integrated Arcane checkout ---+-- CLI / future GUI / Codex / CI
+Arcane OS consumer checkout --+-- CLI / future GUI / Codex / CI
                                       |
                                shared toolchain API
                                       |
                        browser package or explicit target adapter
 ```
 
+## Canonical ownership and portability boundary
+
+The SDK repository is the canonical source for every mechanism that can be
+reused by a portable Arcane application. That includes shared modules,
+entities, components, themes, browser runtimes, providers, workers and assets;
+protocol, state, startup, readiness, progress, cancellation, unload and dispose
+machinery; public native contracts and adapters; the development source mount;
+and the packaging, license, receipt and verification boundaries for those
+portable bytes. In particular, shared AI selected-role hydration,
+startup-settled state and events, fail-closed role readiness, lifecycle and
+cancellation contracts, and the shared chat and speech components are
+SDK-owned source and contracts rather than Arcane OS–owned snapshots.
+
+Every portable application artifact materializes an immutable, locked and
+verified projection of the SDK runtime bytes, assets, workers, licenses and
+public contracts it uses. It remains self-contained whether it runs as plain
+HTML or inside an executable wrapper. It has no runtime dependency on an
+Arcane OS installation, source checkout or private Arcane OS import.
+
+Arcane OS is an SDK consumer like other applications. Its orchestrator,
+launcher, Shell, Provisioner, system AI application and internal tools use the
+same SDK modules and components rather than maintaining private runtime copies.
+Arcane OS and Core own the privileged host implementations, app/session
+admission and authorization, native transport and lifecycle, launcher and
+Shell orchestration, and system-AI policy specific to the Shell. The SDK may
+publish the capability-neutral Core bridge contract and adapters, but it does
+not embed Core or inherit another application's policy.
+
+Each application owns its branding, prompts, data, tools, business policy,
+model authorities and app-specific orchestration. Apply this decision order:
+
+| Responsibility | Canonical owner |
+|---|---|
+| Reusable by any portable application | Arcane SDK |
+| Host privilege, launcher, Shell or app/session admission | Arcane OS / Core |
+| Behavior unique to one product | That application |
+
+Do not copy a reusable implementation between the SDK, Arcane OS and an app,
+and do not create a hidden Arcane OS source dependency. Extend one neutral SDK
+contract and keep product policy in the consumer.
+
+Development and distribution use different authority. The explicit
+`arcane dev --sdk-runtime-source <sdk-root>` development-only live source mount
+lets a refresh read the saved SDK source without copying it into the app.
+Distribution never follows that mount. It embeds and verifies the application's
+locked immutable SDK projection.
+
+The existing `tools/runtime-source.json` Arcane OS commit pin and
+OS-to-SDK synchronization command record provenance for already published
+compatibility bytes during migration; they do not define durable canonical
+ownership. A separately leased source/projection cutover must replace that
+direction before the ownership migration is called complete. Until then, do
+not use the transitional synchronization path to overwrite SDK-canonical
+shared AI runtime or shared component sources.
+
 ## Workspace profiles
 
 An external workspace maps the exact runtime shipped by its locked `arcane-os`
-dependency. An integrated workspace maps the live `arcane/` and
-`node_modules/strong-type` directories already owned by the Arcane checkout.
-The development server and packager consume the same route destinations in
-both cases, so app imports do not change. Integrated initialization creates
-only app-owned files and never rewrites Arcane root configuration.
+dependency. An Arcane OS checkout is an integrated SDK consumer, not the owner
+of portable runtime source. For live shared development, the explicit
+development-only SDK source mount maps the canonical SDK runtime and dependency
+paths into that consumer. Without the mount, the workspace uses its locked SDK
+projection. The development server and packager consume the same route
+destinations in both cases, so app imports do not change. Integrated
+initialization creates only app-owned files and never rewrites Arcane OS or SDK
+root configuration.
 
 The shared/Core development profile is a separate integrated-only scope selected
 with `--scope shared`. The SDK loads exactly
-`tools/integrated-development-provider.mjs` from the selected Arcane checkout as
-one process generation. That provider admits only one exact repository-relative
-focused `.test.mjs` through Arcane's canonical focused runner or Arcane's
-canonical development check. External workspaces cannot use the scope, and
-shared operations never enter app discovery, packaging, target planning, build,
-verification, or run paths. Provider bytes and filesystem identity are
-authenticated before and after the owned child operation; a generation change
-poisons that pairing and requires a new CLI process.
+`tools/integrated-development-provider.mjs` from the selected Arcane OS checkout
+as one process generation. This is a privileged host-development provider, not
+a source of portable SDK runtime bytes. That provider admits only one exact
+repository-relative focused `.test.mjs` through Arcane's canonical focused
+runner or Arcane's canonical development check. External workspaces cannot use
+the scope, and shared operations never enter app discovery, packaging, target
+planning, build, verification, or run paths. Provider bytes and filesystem
+identity are authenticated before and after the owned child operation; a
+generation change poisons that pairing and requires a new CLI process.
 Integrated app testing remains isolated to the selected `apps/<id>/test/`
 tree; it cannot recursively select Arcane root tests or another app's tests.
 External repositories retain their existing workspace-root plus selected-app
@@ -101,11 +160,13 @@ exact schema-1 `arcane-package.json` for current consumers. Existing Arcane
 apps synthesize that descriptor from their schema-1 package plus the current
 native registry during migration.
 
-An external app's `arcane-packager.json` has three exact shared routes. They map the
-installed SDK runtime to `/arcane`, its vendored strong-type dependency to
+An external app's `arcane-packager.json` has three exact shared routes. They map
+the installed SDK runtime to `/arcane`, its vendored strong-type dependency to
 `/node_modules/strong-type`, and the SDK's `LICENSE`,
-`COMMERCIAL-LICENSE.md`, and `NOTICE` to `/licenses/arcane-os`. The app does not
-copy Arcane runtime source into its repository.
+`COMMERCIAL-LICENSE.md`, and `NOTICE` to `/licenses/arcane-os`. Development does
+not copy SDK runtime source into the app repository. Distribution materializes
+those exact locked SDK routes inside the portable artifact and verifies their
+immutable inventory, so the finished app has no Arcane OS runtime dependency.
 
 Release schema 1 and builder identity `arcane-app-packager-v1` remain unchanged
 because current Arcane native admission treats them as exact contracts. Native
@@ -196,8 +257,11 @@ failure propagation. No app or target loop exists in that scope.
 
 ## Verification receipts
 
-Runtime verification binds the exact SDK version, upstream Arcane commit,
-runtime inventory, byte counts, and SHA-256 hashes. Packaging writes the full
+Runtime verification binds the exact SDK version, canonical SDK source
+identity, runtime inventory, byte counts, and SHA-256 hashes. During the
+source-ownership migration it may additionally record imported Arcane OS
+provenance for compatibility bytes, but that field does not transfer canonical
+ownership. Packaging writes the full
 schema-1 release inventory to `ARCANE_APP_RELEASE.json`; its operation result
 returns a deeply immutable, process-authenticated receipt that binds the
 canonical location, app policy, complete inventory, content digest, and verified

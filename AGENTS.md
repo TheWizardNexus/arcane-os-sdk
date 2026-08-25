@@ -12,7 +12,28 @@
 - Every potentially blocking CLI operation must acknowledge first, own its work, stream progress or heartbeat events, support safe cancellation, and surface a nonzero exit status on failure.
 - Default build cardinality is one workspace, one app, one target, one architecture, one format, and one signing profile. Never add implicit all-app or all-target loops.
 - Reuse one immutable verification receipt for unchanged artifact bytes, policy, identity, location, and toolchain. Invalidate before mutation.
-- Applications must use the shared Arcane theme and `ThemeBootstrap.js`; reusable behavior belongs in the Arcane runtime, not an app-local copy.
+- Applications must use the shared Arcane theme and `ThemeBootstrap.js`.
+  Anything reusable by a portable application belongs canonically in this SDK,
+  including shared modules, entities, components, themes, browser runtimes and
+  providers, protocol/state/lifecycle machinery, public native contracts and
+  adapters, development source mounts, packaging, licenses, and verification.
+  Never keep a copied app or Arcane OS fork of that behavior.
+- Every portable application artifact must contain an immutable, verified copy
+  of its locked SDK runtime bytes, assets, workers, licenses, and public
+  contracts. A portable app must never require an Arcane OS installation or
+  source checkout at runtime. Arcane OS, Shell, Provisioner, and internal tools
+  consume these same SDK paths; they do not own private portable-runtime
+  imports.
+- Arcane OS and Core own privileged host implementations, app/session
+  admission, launcher and Shell orchestration, and Shell-specific system-AI
+  policy. The SDK may define the public Core bridge contract but must not embed
+  Core. Each application owns its branding, prompts, data, tools, business
+  policy, model authorities, and app-specific orchestration.
+- Apply this placement order before implementation: reusable by any portable
+  app -> SDK; host privilege, launcher, or Shell responsibility -> Arcane OS;
+  one-product behavior -> that app. Development may use only the explicit
+  dev-only live SDK source mount; distribution always embeds and verifies the
+  locked SDK bytes, with no hidden OS source dependency.
 - Applications use a browser-first plain HTML, CSS, and JavaScript baseline. Native targets progressively enhance that same application through explicitly available Arcane Core capabilities; ordinary browser development must not depend on native or Core access.
 - Keep development increments small and independently understandable so each observed change has one clear cause and mistakes remain easy to isolate. Development commands do not automatically run tests, checks, packaging, or distribution work. Run tests or checks only when the user explicitly requests them or when building, verifying, or releasing a selected `dist`, package, artifact, or other release output.
 - For rapid browser development, use `arcane dev`. It serves the selected application's canonical source files with the live mapped SDK/runtime dependencies, so saved source changes appear on browser refresh without packaging, copying files into `dist`, or restarting the server.
