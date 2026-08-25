@@ -6,7 +6,9 @@
   "entry": "index.html",
   "strategy": "static",
   "security": {
-    "connectOrigins": [],
+    "connectOrigins": [
+      "https://huggingface.co"
+    ],
     "frameOrigins": [],
     "mediaOrigins": []
   },

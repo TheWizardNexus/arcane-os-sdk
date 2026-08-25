@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sdk": {
     "name": "arcane-os",
-    "version": "0.1.0"
+    "version": "0.1.1"
   },
   "runtime": {
     "manifest": "node_modules/arcane-os/runtime/ARCANE_RUNTIME_RELEASE.json",
@@ -11,10 +11,10 @@
   },
   "sdkBrowserRuntime": {
     "manifest": "node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json",
-    "manifestSha256": "43baaec850291c28795f6c194001deb5febab88ccab1b033bce6597dd6f6f08f",
-    "contentSha256": "0caa302bc07d4a45f5290504ec62ddce98fdf5e3412f916c10aae3d51b1e5f7c",
+    "manifestSha256": "33396b3d35322b784929270e7ca0a2a8b31d899c6e77bcb227edc95b37d0ae7d",
+    "contentSha256": "5e03f45a732db51cb5a2b2193cc79ecda34501d07a9b2e82e794e5fa37d55d00",
     "builder": "arcane-sdk-browser-runtime-v1",
-    "sdkVersion": "0.1.0",
+    "sdkVersion": "0.1.1",
     "source": {
       "authority": "arcane-os-sdk",
       "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
@@ -32,6 +32,12 @@
           "version": "2.0.0",
           "resolved": "https://registry.npmjs.org/strong-type/-/strong-type-2.0.0.tgz",
           "integrity": "sha512-HHrY9qYC7yn+5mlewiI3k9RQM9gZqGQsqbomZcd10Ks0h4RlX01nnkWbCe4AsVPCI6KaFvpkWm1nHMD+Ykup6g=="
+        },
+        {
+          "name": "@wllama/wllama",
+          "version": "3.6.0",
+          "resolved": "https://registry.npmjs.org/@wllama/wllama/-/wllama-3.6.0.tgz",
+          "integrity": "sha512-NN3ZBXqaaUwGXTQubkNvsCaLPjN2XVa0bVS40OYCE8zquYmRc2W3oHYEgwvuSWWDB8aUqTLyMioySCXNkcnD1w=="
         }
       ]
     }

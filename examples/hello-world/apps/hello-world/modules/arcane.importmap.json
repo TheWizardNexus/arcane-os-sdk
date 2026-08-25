@@ -1,6 +1,7 @@
 {
   "imports": {
     "./node_modules/strong-type/index.js": "./arcane/dependencies/strong-type/index.js",
+    "arcane-os/ai/browser-wasm": "./arcane/sdk/ai/browser-wasm.mjs",
     "arcane-os/event-manager": "./arcane/sdk/event-manager.mjs",
     "arcane/AI": "./arcane/modules/AI.js",
     "arcane/AIPreferenceRuntime": "./arcane/modules/AIPreferenceRuntime.js",

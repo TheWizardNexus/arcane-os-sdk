@@ -7,7 +7,7 @@ body {
 
 .app-shell {
     box-sizing: border-box;
-    width: min(52rem, 100%);
+    width: min(68rem, 100%);
     margin: 0 auto;
     padding: 2rem 1rem;
 }
@@ -43,4 +43,90 @@ body {
 .app-feature code {
     font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
     overflow-wrap: anywhere;
+}
+
+.app-feature--ai {
+    grid-column: 1 / -1;
+}
+
+.app-feature--ai h3 {
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+
+.ai-model-note {
+    padding: 0.85rem 1rem;
+    border-left: 0.25rem solid var(--accent-color, rgb(116, 167, 255));
+    background: var(--surface-raised, rgb(23, 34, 56));
+}
+
+.ai-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin: 1rem 0;
+}
+
+.ai-controls .arcane-button:disabled,
+#ai-send:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.ai-progress-block {
+    min-height: 3rem;
+}
+
+#ai-progress {
+    width: 100%;
+    accent-color: var(--accent-color, rgb(116, 167, 255));
+}
+
+.ai-prompt-label {
+    display: block;
+    margin: 0.75rem 0 0.4rem;
+    font-weight: 700;
+}
+
+#ai-prompt {
+    box-sizing: border-box;
+    width: 100%;
+    margin-bottom: 0.75rem;
+    padding: 0.75rem;
+    resize: vertical;
+    border: 1px solid var(--border-color, rgb(57, 72, 103));
+    border-radius: 0.55rem;
+    background: var(--background, rgb(13, 18, 32));
+    color: var(--text-color, rgb(235, 241, 255));
+    font: inherit;
+}
+
+#ai-prompt:focus-visible {
+    outline: 0.2rem solid var(--accent-color, rgb(116, 167, 255));
+    outline-offset: 0.15rem;
+}
+
+.ai-output {
+    min-height: 2.75rem;
+    margin: 0;
+    padding: 0.85rem;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    border: 1px solid var(--border-color, rgb(57, 72, 103));
+    border-radius: 0.55rem;
+    background: var(--background, rgb(13, 18, 32));
+    color: var(--text-color, rgb(235, 241, 255));
+    font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
+}
+
+@media (max-width: 36rem) {
+    .ai-controls {
+        display: grid;
+    }
+
+    .ai-controls .arcane-button,
+    #ai-send {
+        width: 100%;
+    }
 }

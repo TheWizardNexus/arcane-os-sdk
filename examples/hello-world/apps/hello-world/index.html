@@ -8,6 +8,7 @@
 {
   "imports": {
     "./node_modules/strong-type/index.js": "./arcane/dependencies/strong-type/index.js",
+    "arcane-os/ai/browser-wasm": "./arcane/sdk/ai/browser-wasm.mjs",
     "arcane-os/event-manager": "./arcane/sdk/event-manager.mjs",
     "arcane/AI": "./arcane/modules/AI.js",
     "arcane/AIPreferenceRuntime": "./arcane/modules/AIPreferenceRuntime.js",
@@ -124,6 +125,30 @@
                         <h2 id="parity-feature-title">Same files in dev and dist</h2>
                         <p>The import map resolves the committed <code>arcane/</code> tree during development and the byte-identical packaged tree in <code>dist/hello-world/</code>.</p>
                         <p class="app-environment">Regenerate it at any time with <code>npm run import-map</code>.</p>
+                    </section>
+                    <section class="app-feature app-feature--ai" aria-labelledby="ai-feature-title">
+                        <h2 id="ai-feature-title">Optional browser-local AI</h2>
+                        <p>This example can load the SDK's browser-WASM provider. No model weights ship with Arcane, and no download starts until you choose the online load button.</p>
+                        <p class="ai-model-note"><strong>First-use download:</strong> Granite 4.1 3B Q4_K_S is 1,998,371,424 bytes (1.86 GiB). Arcane verifies its SHA-256 digest before admitting it to this app's DBOPFS cache.</p>
+                        <p id="ai-lifecycle" class="app-environment">Lifecycle: unloaded.</p>
+                        <p id="ai-status" role="status" aria-live="polite">Model not loaded. No model download has started.</p>
+                        <div class="ai-controls" aria-label="Local AI model controls">
+                            <button id="ai-load" class="arcane-button" type="button">Load local AI (downloads 1.86 GiB if needed)</button>
+                            <button id="ai-load-offline" class="arcane-button" type="button">Load verified cache offline</button>
+                            <button id="ai-cancel" class="arcane-button" type="button" hidden disabled>Cancel current operation</button>
+                            <button id="ai-unload" class="arcane-button" type="button" disabled>Unload model</button>
+                        </div>
+                        <div class="ai-progress-block">
+                            <progress id="ai-progress" max="1998371424" value="0" hidden></progress>
+                            <p id="ai-progress-label" class="app-environment"></p>
+                        </div>
+                        <label class="ai-prompt-label" for="ai-prompt">Prompt</label>
+                        <textarea id="ai-prompt" rows="3">Say hello in one short sentence. If useful, propose the show_greeting tool.</textarea>
+                        <button id="ai-send" class="arcane-button" type="button" disabled>Ask local AI</button>
+                        <h3>Response</h3>
+                        <pre id="ai-response" class="ai-output">Load the model to begin.</pre>
+                        <h3>Tool-call receipt</h3>
+                        <pre id="ai-tool-calls" class="ai-output">No tool calls proposed. Arcane never executes tool calls for the application.</pre>
                     </section>
                 </div>
             </div>
