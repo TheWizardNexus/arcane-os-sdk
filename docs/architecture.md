@@ -55,12 +55,32 @@ files into `dist`, or restarting the server. Restarting is not a content
 synchronization step; when a refresh is stale, first verify the command, URL,
 workspace, selected app, and resolved source route.
 
+Development is an intentionally fast feedback loop. Keep each increment small
+and independently understandable so its effect has one clear cause and a
+mistake can be isolated without untangling unrelated work. A development
+operation does not implicitly run tests, checks, packaging, builds, or release
+verification. The developer invokes a focused test or check deliberately at an
+explicit checkpoint; merely refreshing source does not trigger one.
+
+Executable development uses an Arcane-owned native development wrapper around
+the same source-serving browser surface. The wrapper is an escalated browser,
+not a packaged application: it loads current source files and adds only the
+selected application's declared, capability-gated local Arcane Core access.
+It preserves the browser behavior when Core is absent, fails closed for an
+unavailable native-only capability, and never silently substitutes a release
+tree. Starting or refreshing this wrapper does not package, copy to `dist`, or
+run tests automatically. The SDK must not describe native source development as
+available until this wrapper and its explicit capability boundary are actually
+implemented.
+
 Package and release verification use a separate explicit boundary. Run
 `arcane package` to generate and verify `dist/<id>`, then use
-`arcane run --target browser` to serve only that verified release. The browser
-run command does not rebuild or substitute source files. If source changes
-after packaging, the prior `dist` remains intentionally unchanged until the
-next explicit package operation. Never use packaged `dist` as the everyday
+`arcane run --target browser` to serve only that verified release. Distribution
+automatically runs the selected application's required tests before accepting,
+serving, or launching `dist` and fails closed on any test failure. The browser
+run command does not substitute source files. If source changes after
+packaging, the prior `dist` remains intentionally unchanged until the next
+explicit package operation. Never use packaged `dist` as the everyday
 development tree, and never treat source-serving behavior as evidence for the
 release artifact.
 
