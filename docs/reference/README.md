@@ -27,6 +27,7 @@ high-level page links to the relevant deep section instead of repeating it.
 | Call `globalThis.Arcane` | [Arcane Core API](core/arcane-api.md) |
 | Subscribe to native events | [Arcane event reference](core/arcane-events.md) |
 | Use provider-neutral AI | [Arcane AI contracts](core/arcane-ai-contracts.md) |
+| Run a caller-authenticated local LLM in the browser | [Browser-WASM local AI](ai/browser-wasm.md) |
 | Use Arcane Ollama | [Arcane Ollama guide](arcane-ollama.md) |
 | Understand transports and protocol switching | [Protocol and host architecture](protocols.md) |
 | Run contract and behavior tests | [Behavioral testing](behavioral-testing.md) |
@@ -37,7 +38,7 @@ This repository contains two related, explicitly versioned surfaces:
 
 | Surface | Source identity | Meaning |
 | --- | --- | --- |
-| SDK and CLI | `arcane-os` `0.1.0` | The Node.js toolchain and package exports in this checkout. |
+| SDK and CLI | `arcane-os` `0.1.1` | The Node.js toolchain plus the browser-only `arcane-os/ai/browser-wasm` entrypoint in this checkout. |
 | Browser runtime | Arcane OS commit `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, bundle `0.8.12`, protocol `arcane/1` | The exact 155-file runtime snapshot shipped under `runtime/`. |
 | Core reference snapshot | Arcane OS commit `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, protocol `arcane/1` | The application-facing Core contract derived into `docs/reference/core/`. Canonical inventory and focused-member content was verified unchanged at Arcane OS `main` commit `13f3ce0ae34f77a3495331c8b4c30b1bb105f8ed`; SDK-local provenance, link, and package-boundary annotations are added explicitly. |
 
@@ -73,11 +74,13 @@ Public reference entries follow the established Arcane documentation model:
 
 ## Public runtime inventory
 
-The Node package exposes 158 semantic JavaScript records across 11 JavaScript
+The package exposes 163 semantic JavaScript records across 12 JavaScript
 entrypoints, plus eight JSON Schemas, its exact runtime manifest, and package
-metadata. The [machine-readable package inventory](inventory/package-api.json)
-and [SDK member reference](sdk-api.md) are checked bidirectionally against every
-declared JavaScript export.
+metadata. Ten entrypoints are Node.js control-plane surfaces,
+`arcane-os/event-manager` runs in Node and browsers, and
+`arcane-os/ai/browser-wasm` is browser-only. The [machine-readable package
+inventory](inventory/package-api.json) and [SDK member reference](sdk-api.md)
+are checked bidirectionally against every declared JavaScript export.
 
 The seven update-check records are explicit on-demand checks; they do not poll,
 download, install, or self-update.

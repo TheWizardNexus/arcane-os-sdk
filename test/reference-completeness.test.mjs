@@ -110,16 +110,17 @@ function githubHeadingFragments(markdown){
 }
 
 test('the public package API inventory matches every JavaScript export and MDN entry',async t=>{
-    const [packageDocument,inventory,guide,eventGuide]=await Promise.all([
+    const [packageDocument,inventory,guide,eventGuide,browserWasmGuide]=await Promise.all([
         readFile(path.join(repositoryRoot,'package.json'),'utf8').then(JSON.parse),
         jsonFile('inventory','package-api.json'),
         textFile('sdk-api.md'),
-        textFile('event-manager.md')
+        textFile('event-manager.md'),
+        textFile('ai','browser-wasm.md')
     ]);
 
     await t.test('the inventory has stable unique records',()=>{
         assert.equal(inventory.sdkVersion,packageDocument.version);
-        assert.equal(inventory.memberCount,158);
+        assert.equal(inventory.memberCount,163);
         assert.equal(inventory.members.length,inventory.memberCount);
         assert.equal(new Set(inventory.members.map(member=>member.id)).size,inventory.memberCount);
         assert.equal(
@@ -146,6 +147,32 @@ test('the public package API inventory matches every JavaScript export and MDN e
             const record=inventory.members.find(member=>member.name===name);
             assert.ok(record,name);
             assert.deepEqual(record.entrypoints,['arcane-os','arcane-os/toolchain']);
+        }
+
+        const browserWasmSignatures=new Map([
+            ['BROWSER_WASM_RUNTIME_AUTHORITY','const BROWSER_WASM_RUNTIME_AUTHORITY'],
+            ['createArcaneAI',"createArcaneAI({ llm=null, provider=null, loadPolicy='on-demand' }={})"],
+            ['createBrowserModelSource','createBrowserModelSource(descriptor, { fetchImpl=null }={})'],
+            ['createBrowserWasmLlmProvider','createBrowserWasmLlmProvider({ source, store, loadDefaults={}, logger=console }={})'],
+            ['createDbopfsModelStore',"createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models' }={})"]
+        ]);
+        const browserWasmMembers=inventory.members.filter(member=>
+            member.entrypoints.includes('arcane-os/ai/browser-wasm')
+        );
+        assert.deepEqual(
+            sorted(browserWasmMembers.map(member=>member.name)),
+            sorted(browserWasmSignatures.keys())
+        );
+        for(const member of browserWasmMembers){
+            assert.deepEqual(member.entrypoints,['arcane-os/ai/browser-wasm']);
+            assert.equal(member.primaryImport,'arcane-os/ai/browser-wasm');
+            assert.equal(member.signature,browserWasmSignatures.get(member.name));
+            assert.equal(
+                member.kind,
+                member.name==='BROWSER_WASM_RUNTIME_AUTHORITY'?'constant':'function'
+            );
+            assert.match(member.availability,/\bBrowser\b/u);
+            assert.doesNotMatch(member.availability,/\b(?:Node|Native|Cloud)\b/u);
         }
     });
 
@@ -199,6 +226,65 @@ test('the public package API inventory matches every JavaScript export and MDN e
             'utf8'
         ));
         assert.equal(schema.properties.protocol.const,'arcane-event-stack/1');
+    });
+
+    await t.test('the focused browser-WASM guide owns the exact shipped browser contract',()=>{
+        const records=inventory.members.filter(member=>
+            member.entrypoints.includes('arcane-os/ai/browser-wasm')
+        );
+        const focusedSections=sectionsByHeading(browserWasmGuide);
+        const sdkSections=sectionsByHeading(guide);
+        assert.deepEqual([...focusedSections.keys()],[
+            'Lifecycle at a glance',
+            'Model authority and cache admission',
+            'Streaming, cancellation, and tools',
+            'Errors and unavailable states',
+            'BROWSER_WASM_RUNTIME_AUTHORITY',
+            'createArcaneAI()',
+            'createBrowserModelSource()',
+            'createBrowserWasmLlmProvider()',
+            'createDbopfsModelStore()',
+            'Related reference'
+        ]);
+        for(const member of records){
+            const required=member.kind==='constant'
+                ?['Overview','Value and import','Availability and normalization','Example']
+                :['Overview','Signature and result','Availability and normalization','Example'];
+            const focused=requireGuideSection(focusedSections,member.displayName,required);
+            const canonical=requireGuideSection(sdkSections,member.displayName,required);
+            const signature=new RegExp(
+                '```text\\r?\\n'+escapeRegExp(member.signature)+'\\r?\\n```',
+                'u'
+            );
+            assert.match(focused,signature,`${member.displayName} focused signature drifted.`);
+            assert.match(canonical,signature,`${member.displayName} canonical signature drifted.`);
+        }
+        for(const value of [
+            'arcane-os/ai/browser-wasm',
+            'arcane-ai-browser-wasm/1',
+            '@wllama/wllama',
+            '3.6.0',
+            'id',
+            'name',
+            'immutableUrl',
+            'bytes',
+            'sha256',
+            'licenseSpdx',
+            'sourceRevision',
+            'DBOPFS',
+            'arcane.ai.browser-wasm.model.v2',
+            'load({offline:true})',
+            'ARCANE_AI_MODEL_OFFLINE_MISS',
+            'AbortSignal',
+            'ARCANE_AI_REQUEST_ABORTED'
+        ])assert.match(browserWasmGuide,new RegExp(escapeRegExp(value),'u'),value);
+        assert.match(browserWasmGuide,/packages no model weights/u);
+        assert.match(browserWasmGuide,/fully\s+rehashes|rehashes the bytes/u);
+        assert.match(browserWasmGuide,/structural data/u);
+        assert.match(browserWasmGuide,/never (?:invokes a handler or )?executes a tool/u);
+        assert.doesNotMatch(browserWasmGuide,/browser-WASM (?:speech|transcription|native) (?:API|provider) is (?:available|shipped)/iu);
+        assert.doesNotMatch(browserWasmGuide,/model weights (?:are )?(?:bundled|included)/iu);
+        assert.doesNotMatch(browserWasmGuide,/automatically executes? (?:application )?tools?/iu);
     });
 });
 

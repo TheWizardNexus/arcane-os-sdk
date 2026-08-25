@@ -23,7 +23,7 @@ const referenceSourceRoot=path.join(repositoryRoot,'docs','reference');
 const referenceOutputRoot=path.join(repositoryRoot,'site','reference');
 const canonicalRoot='https://thewizardnexus.github.io/arcane-os-sdk/';
 const publishedVersions=Object.freeze({
-    sdk:'0.1.0',
+    sdk:'0.1.1',
     runtime:'0.8.12',
     protocol:'arcane/1'
 });
@@ -52,7 +52,8 @@ const expectedRuntimeContractSummary=Object.freeze({
 });
 
 const referenceCss=String.raw`.reference-prose {
-  overflow-wrap: anywhere;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .reference-prose > :first-child {
@@ -65,6 +66,12 @@ const referenceCss=String.raw`.reference-prose {
 .reference-prose h5,
 .reference-prose h6 {
   scroll-margin-top: calc(var(--header-height) + 24px);
+}
+
+.reference-prose :where(h2, h3, h4, h5, h6):target {
+  border-radius: 8px;
+  outline: 2px solid rgb(179 197 255 / 0.7);
+  outline-offset: 7px;
 }
 
 .reference-prose h2 {
@@ -142,13 +149,25 @@ const referenceCss=String.raw`.reference-prose {
 }
 
 .reference-prose .table-wrap {
+  max-width: 100%;
   margin: 24px 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
 }
 
 .reference-prose .table-wrap table {
-  width: 100%;
-  min-width: 680px;
+  width: max-content;
+  min-width: max(100%, 680px);
   border-collapse: collapse;
+}
+
+.reference-prose .table-wrap[data-columns="4"] table {
+  min-width: max(100%, 66rem);
+}
+
+.reference-prose .table-wrap[data-columns="5"] table {
+  min-width: max(100%, 84rem);
 }
 
 .reference-prose .table-wrap :where(th, td) {
@@ -156,6 +175,17 @@ const referenceCss=String.raw`.reference-prose {
   border-bottom: 1px solid var(--line);
   text-align: left;
   vertical-align: top;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+.reference-prose .table-wrap :where(th, td):first-child {
+  min-width: 10rem;
+}
+
+.reference-prose .table-wrap :where(th, td) code {
+  white-space: nowrap;
 }
 
 .reference-prose .table-wrap th {
@@ -215,6 +245,28 @@ const referenceCss=String.raw`.reference-prose {
   color: var(--muted);
   font-size: 0.7rem;
   line-height: 1.45;
+}
+
+.reference-toc-compact {
+  display: none;
+}
+
+.reference-toc-compact nav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 18px;
+}
+
+.reference-toc-compact .toc-more {
+  margin-bottom: 0;
+  color: var(--muted);
+}
+
+.reference-prose :where(a, summary, .table-wrap):focus-visible,
+.reference-sidebar a:focus-visible {
+  border-radius: 5px;
+  outline: 3px solid rgb(179 197 255 / 0.9);
+  outline-offset: 3px;
 }
 
 .reference-collection-list {
@@ -344,10 +396,73 @@ const referenceCss=String.raw`.reference-prose {
   background: rgb(7 15 34 / 0.52);
 }
 
+@media (max-width: 1280px) {
+  .docs-layout {
+    grid-template-columns: minmax(150px, 180px) minmax(0, 1fr);
+    gap: clamp(24px, 3vw, 42px);
+  }
+
+  .reference-toc {
+    display: none;
+  }
+
+  .reference-toc-compact {
+    display: block;
+    padding: 14px 16px;
+    margin: 0 0 32px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .site-header .nav-toggle {
+    display: block;
+    cursor: pointer;
+  }
+
+  .site-header .primary-navigation {
+    position: absolute;
+    top: calc(100% + 1px);
+    right: 14px;
+    left: 14px;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: rgb(5 12 28 / 0.98);
+    box-shadow: var(--shadow);
+  }
+
+  .site-header .primary-navigation.is-open {
+    display: flex;
+  }
+
+  .site-header .primary-navigation a {
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  .site-header .primary-navigation a:hover {
+    background: rgb(127 142 255 / 0.08);
+  }
+
+  .site-header .primary-navigation .repo-link {
+    margin-top: 5px;
+  }
+}
+
 @media (max-width: 980px) {
   .reference-sidebar {
     max-height: none;
     overflow-y: visible;
+  }
+}
+
+@media (max-width: 900px) {
+  .docs-layout {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -358,6 +473,10 @@ const referenceCss=String.raw`.reference-prose {
 
   .reference-prose .table-wrap table {
     min-width: 620px;
+  }
+
+  .reference-toc-compact nav {
+    grid-template-columns: 1fr;
   }
 
   .module-search,
@@ -478,6 +597,7 @@ const navigationGroups=Object.freeze([
         title:'Runtime',
         items:Object.freeze([
             ['Normalized AI','@reference/ai'],
+            ['Browser-WASM AI','docs/reference/ai/browser-wasm.md'],
             ['Modules','docs/reference/runtime-modules.md'],
             ['Entities','docs/reference/runtime-entities.md'],
             ['Components','docs/reference/runtime-components.md'],
@@ -858,7 +978,8 @@ function createMarkdownRenderer({source,output,targets,metadata}){
 
     const renderTable=renderer.table;
     renderer.table=function table(token){
-        return `<div class="table-wrap" role="region" aria-label="Scrollable reference table" tabindex="0">${renderTable.call(this,token)}</div>\n`;
+        const columns=Array.isArray(token.header)?token.header.length:0;
+        return `<div class="table-wrap" data-columns="${String(columns)}" role="region" aria-label="Scrollable reference table" tabindex="0">${renderTable.call(this,token)}</div>\n`;
     };
 
     renderer.html=function html(token){
@@ -891,7 +1012,7 @@ function publicReferenceMarkdown(markdown,source){
     if(source==='docs/reference/README.md'){
         output=output.replace(
             /\n## Version scope and provenance[\s\S]*?\n## MDN-style page contract/u,
-            '\n## Version scope\n\nThis site documents SDK `0.1.0`, runtime bundle `0.8.12`, and protocol `arcane/1`. Native availability still depends on the selected Core satisfying the current build plan\'s feature, capability, method, provider, and application-identity checks. A matching protocol label alone is not authority or compatibility.\n\n## MDN-style page contract'
+            '\n## Version scope\n\nThis site documents SDK `0.1.1`, runtime bundle `0.8.12`, and protocol `arcane/1`. Native availability still depends on the selected Core satisfying the current build plan\'s feature, capability, method, provider, and application-identity checks. A matching protocol label alone is not authority or compatibility.\n\n## MDN-style page contract'
         );
         output=output.replace(/\n## Source, receipts, and licensing[\s\S]*$/u,'\n');
     }
@@ -985,6 +1106,9 @@ function breadcrumbItems({output,title,source,kind}){
             });
         }
     }
+    if(source?.startsWith('docs/reference/ai/')){
+        items.push({label:'Normalized AI',target:'site/reference/ai/index.html'});
+    }
     if(items.at(-1)?.target===output)items.pop();
     items.push({label:title});
     return items;
@@ -1029,6 +1153,10 @@ function renderPage({
     const testing=relativeOutputHref(output,'site/testing/index.html');
     const architecture=relativeOutputHref(output,'site/architecture/index.html');
     const compatibility=relativeOutputHref(output,'site/compatibility/index.html');
+    const sdkApi=relativeOutputHref(output,'site/reference/sdk-api/index.html');
+    const compactTableOfContents=tableOfContents.length
+        ?`<details class="reference-toc-compact"><summary>On this page</summary>${tableOfContentsHtml(tableOfContents)}</details>`
+        :'';
     return `<!doctype html>
 <html lang="en">
 <head>
@@ -1042,12 +1170,12 @@ function renderPage({
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
-  <header class="site-header" data-site-header><a class="brand" href="${escapeHtml(siteHome)}" aria-label="Arcane OS SDK documentation home"><img src="${escapeHtml(icon)}" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="${escapeHtml(siteHome)}">Overview</a><a href="${escapeHtml(guides)}">Guides</a><a href="${escapeHtml(examples)}">Examples</a><a href="${escapeHtml(playground)}">Playground</a><a href="${escapeHtml(testing)}">Testing</a><a href="${escapeHtml(referenceHome)}" aria-current="page">Reference</a><a class="repo-link" href="${escapeHtml(referenceHome)}">Reference home</a></nav></header>
+  <header class="site-header" data-site-header><a class="brand" href="${escapeHtml(siteHome)}" aria-label="Arcane OS SDK documentation home"><img src="${escapeHtml(icon)}" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="${escapeHtml(siteHome)}">Overview</a><a href="${escapeHtml(guides)}">Guides</a><a href="${escapeHtml(examples)}">Examples</a><a href="${escapeHtml(playground)}">Playground</a><a href="${escapeHtml(testing)}">Testing</a><a href="${escapeHtml(referenceHome)}" aria-current="page">Reference</a><a class="repo-link" href="${escapeHtml(sdkApi)}">API</a></nav></header>
   <main id="main-content">
     <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb">${breadcrumbsHtml({output,title,source,kind})}</nav><p class="eyebrow">Capability first · transport second</p><h1 id="${escapeHtml(titleId)}">${escapeHtml(title)}</h1><p class="doc-lead">${escapeHtml(description)}</p><div class="doc-meta"><span>SDK ${publishedVersions.sdk}</span><span>Runtime ${publishedVersions.runtime}</span><span>Protocol ${publishedVersions.protocol}</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation">${navigationHtml({output,targets})}</aside>
-      <article class="prose reference-prose" data-reference-source="${escapeHtml(source)}">${body}</article>
+      <article class="prose reference-prose" data-reference-source="${escapeHtml(source)}">${compactTableOfContents}${body}</article>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p>${tableOfContentsHtml(tableOfContents)}</aside>
     </div>
   </main>
@@ -1371,7 +1499,7 @@ export function publicContractSyntax(value){
 
 function contractTable(label,headers,rows){
     if(!rows.length)return '';
-    return `<div class="table-wrap" role="region" aria-label="${escapeHtml(label)}" tabindex="0"><table><thead><tr>${headers.map(header=>`<th>${escapeHtml(header)}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+    return `<div class="table-wrap" data-columns="${String(headers.length)}" role="region" aria-label="${escapeHtml(label)}" tabindex="0"><table><thead><tr>${headers.map(header=>`<th>${escapeHtml(header)}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
 }
 
 function contractList(values,emptyText,{code=false}={}){
@@ -1515,12 +1643,12 @@ function renderRuntimeModulePage(record,{
 
 function aiDecisionBody({output,targets}){
     const link=(source,label,fragment='')=>`<a href="${escapeHtml(`${relativeOutputHref(output,targets.get(source))}${fragment}`)}">${escapeHtml(label)}</a>`;
-    return `<aside class="callout callout-info"><strong>Application default.</strong> Start with normalized AI. Provider selection, model admission, protected credentials, and host transport remain behind the application contract.</aside><h2 id="choose-the-normalized-surface">Choose the normalized surface</h2><div class="table-wrap" role="region" aria-label="Normalized AI surface choices" tabindex="0"><table><thead><tr><th>Need</th><th>Use</th><th>Contract</th></tr></thead><tbody><tr><td>Renderer chat, streaming, speech, tools, or structured output</td><td>${link('@reference/module/ai','AI.js')}</td><td>Default import; installs <code>globalThis.ai</code> after user initialization and emits <code>ai-ready</code>.</td></tr><tr><td>Provider-neutral Core chat</td><td>${link('docs/reference/core/reference/arcane-api/ai-and-ollama.md','Arcane.ai.chat()','#arcaneaichat')}</td><td>One normalized result through the admitted provider; no automatic fallback.</td></tr><tr><td>Bounded conversational history</td><td>${link('@reference/module/configured-ai-chat-session','ConfiguredAIChatSession.js')}</td><td>Defaults to <code>Arcane.ai.chat()</code>; owns context limits and atomic turn commit.</td></tr><tr><td>Speech playback</td><td>${link('@reference/module/speech-playback','SpeechPlayback.js')}</td><td>Normalized chunks and playback over admitted native speech or browser media.</td></tr><tr><td>Local readiness and catalog</td><td>${link('@reference/module/local-ai-readiness','LocalAIReadiness.js')}</td><td>Feature-detected readiness; does not grant lifecycle or model-management authority.</td></tr></tbody></table></div><h2 id="runtime-ai-module">Runtime AI module</h2><p><code>AI.js</code> has one export: its default <code>AI</code> class. Import the default binding for explicit use, or load the module for its lifecycle and wait for <code>ai-ready</code> before reading <code>globalThis.ai</code>.</p>${referenceCodeBlock('JavaScript',moduleExample({name:'AI.js'}))}<h2 id="core-ai-chat">Core Arcane.ai</h2><p><code>globalThis.Arcane.ai</code> is a distinct provider-neutral Core surface. Ordinary applications call <code>profile()</code> and <code>chat()</code>; Settings-only provider mutation remains separately admitted.</p>${referenceCodeBlock('JavaScript',`const profile = await globalThis.Arcane.ai.profile();
+    return `<aside class="callout callout-info"><strong>Application default.</strong> Start with normalized AI. Provider selection, model admission, protected credentials, and host transport remain behind the application contract.</aside><h2 id="choose-the-normalized-surface">Choose the normalized surface</h2><div class="table-wrap" data-columns="3" role="region" aria-label="Normalized AI surface choices" tabindex="0"><table><thead><tr><th>Need</th><th>Use</th><th>Contract</th></tr></thead><tbody><tr><td>Renderer chat, streaming, speech, tools, or structured output</td><td>${link('@reference/module/ai','AI.js')}</td><td>Default import; installs <code>globalThis.ai</code> after user initialization and emits <code>ai-ready</code>.</td></tr><tr><td>Provider-neutral Core chat</td><td>${link('docs/reference/core/reference/arcane-api/ai-and-ollama.md','Arcane.ai.chat()','#arcaneaichat')}</td><td>One normalized result through the admitted provider; no automatic fallback.</td></tr><tr><td>Caller-authenticated browser-local text inference</td><td>${link('docs/reference/ai/browser-wasm.md','arcane-os/ai/browser-wasm')}</td><td>Browser-only Wllama lifecycle with exact model URL, byte length, SHA-256, verified DBOPFS cache, and structural tool results.</td></tr><tr><td>Bounded conversational history</td><td>${link('@reference/module/configured-ai-chat-session','ConfiguredAIChatSession.js')}</td><td>Defaults to <code>Arcane.ai.chat()</code>; owns context limits and atomic turn commit.</td></tr><tr><td>Speech playback</td><td>${link('@reference/module/speech-playback','SpeechPlayback.js')}</td><td>Normalized chunks and playback over admitted native speech or browser media.</td></tr><tr><td>Local readiness and catalog</td><td>${link('@reference/module/local-ai-readiness','LocalAIReadiness.js')}</td><td>Feature-detected readiness; does not grant lifecycle or model-management authority.</td></tr></tbody></table></div><h2 id="runtime-ai-module">Runtime AI module</h2><p><code>AI.js</code> has one export: its default <code>AI</code> class. Import the default binding for explicit use, or load the module for its lifecycle and wait for <code>ai-ready</code> before reading <code>globalThis.ai</code>.</p>${referenceCodeBlock('JavaScript',moduleExample({name:'AI.js'}))}<h2 id="core-ai-chat">Core Arcane.ai</h2><p><code>globalThis.Arcane.ai</code> is a distinct provider-neutral Core surface. Ordinary applications call <code>profile()</code> and <code>chat()</code>; Settings-only provider mutation remains separately admitted.</p>${referenceCodeBlock('JavaScript',`const profile = await globalThis.Arcane.ai.profile();
 const result = await globalThis.Arcane.ai.chat({
     expectedProvider: profile.provider,
     messages: [{role: 'user', content: 'Explain the active model in one sentence.'}]
 });
-console.info(result.message.content);`)}<h2 id="advanced-provider-apis">Advanced provider APIs</h2><p>${link('docs/reference/arcane-ollama.md','Arcane Ollama')} is provider-specific and lower-level. Some admitted applications can call Ollama chat, generate, or embed methods; diagnostics and management are more restricted, and some operations intentionally fail. Never send a renderer directly to <code>127.0.0.1:11434</code>.</p><h2 id="availability-errors-and-fallback">Availability, errors, and fallback</h2><p>Feature-detect the selected normalized surface and inspect ${link('@reference/core/capabilities','effective capabilities')} when a native call is unavailable. Local and cloud providers keep their documented availability and error codes. Arcane does not silently switch providers after failure.</p>`;
+console.info(result.message.content);`)}<h2 id="browser-wasm-local-text-inference">Browser-WASM local text inference</h2><p>${link('docs/reference/ai/browser-wasm.md','Browser-WASM local AI')} is an explicit browser-only option for a caller-authenticated GGUF model. It packages the Wllama engine, not model weights. It neither supplies native or speech APIs nor executes returned tools. A normal cache miss can download; <code>load({offline:true})</code> requires a fully rehashed DBOPFS cache.</p><h2 id="advanced-provider-apis">Advanced provider APIs</h2><p>${link('docs/reference/arcane-ollama.md','Arcane Ollama')} is provider-specific and lower-level. Some admitted applications can call Ollama chat, generate, or embed methods; diagnostics and management are more restricted, and some operations intentionally fail. Never send a renderer directly to <code>127.0.0.1:11434</code>.</p><h2 id="availability-errors-and-fallback">Availability, errors, and fallback</h2><p>Feature-detect the selected normalized surface and inspect ${link('@reference/core/capabilities','effective capabilities')} when a native call is unavailable. Local and cloud providers keep their documented availability and error codes. Arcane does not silently switch providers after failure.</p>`;
 }
 
 function capabilityPolicyBody({output,targets}){
@@ -1888,6 +2016,7 @@ export async function createReferenceSite(){
             {id:'choose-the-normalized-surface',label:'Choose the normalized surface'},
             {id:'runtime-ai-module',label:'Runtime AI module'},
             {id:'core-ai-chat',label:'Core Arcane.ai'},
+            {id:'browser-wasm-local-text-inference',label:'Browser-WASM local text inference'},
             {id:'advanced-provider-apis',label:'Advanced provider APIs'},
             {id:'availability-errors-and-fallback',label:'Availability, errors, and fallback'}
         ],

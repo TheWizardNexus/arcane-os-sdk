@@ -37,6 +37,7 @@ release acceptance.
 | EventManager and event stacks | Live pub/sub ordering and payload identity, nested causation, immutable/redacted snapshots, strict import, bounded overflow, seek, all playback modes/lifecycle outcomes, cancellation, and DOM start/stop/privacy behavior. | Real user journeys and browser layout belong in a browser harness; event-stack review never proves that external side effects can be replayed. |
 | CLI | Commands parse, acknowledge, select one scope, produce normalized human/JSON/NDJSON output, propagate cancellation/failure, and reject invalid cardinality. | Native build/run requires the selected real provider and host. |
 | Browser runtime modules | Every shipped ESM module parses and its export inventory matches the catalog; pure helpers run focused success/error cases. | DOM, OPFS, media, and Web Component journeys use a browser harness. |
+| Browser-WASM local AI | The exact five-export namespace, runtime authority, model-source validation, DBOPFS adapter contract, provider/facade lifecycle, lazy/manual policy, abort normalization, and structural-only tool behavior run with bounded deterministic providers. | The publication gate installs the packed SDK into a real Chrome app, loads the authenticated Wllama 3.6.0 JS/WASM assets, performs a cold exact-length/SHA-256 model install, real inference, in-flight cancellation, unload, and a verified offline reload with zero model requests. It is an explicit heavyweight capability gate, not an implicit model download in every local `npm run check`. |
 | Core bridge docs | Canonical namespace/method/event/entity inventories match their one-per-member guides and required sections. | Live Core conformance belongs in Arcane OS because Core implementation is not shipped as SDK source. |
 | Arcane Ollama wrapper | Missing-host error, method forwarding, text/readiness normalization, unload request, and stream-option forwarding run against a deterministic fake `Arcane.ollama`. | Real managed-service, model download/create, GPU/resource admission, and service restart require an admitted Arcane host. |
 | Native providers | Plan/provider protocol, explicit target, receipt authentication, artifact reader, and unavailable-path honesty are tested with bounded fixtures. | Exact Windows, Linux, or Android artifact verification and launch must run on that actual platform/architecture. |
@@ -52,6 +53,13 @@ Behavior tests replace real authority with an explicit fake only for the public
 client contract. They must assert the exact request sent to the fake and the
 normalized result returned to the application. A fake provider never counts as
 native host, artifact, installation, or model-service evidence.
+
+The browser-WASM guide follows the same rule: it shows exact model authority
+and wiring, but leaves the download/load call behind an explicit user action.
+The authoritative browser contract separately proves that admitted bytes are
+hashed before DBOPFS completion metadata is committed, cached bytes are rehashed
+before offline reuse, `AbortSignal` settles as `ARCANE_AI_REQUEST_ABORTED`, and
+tool-call arguments are surfaced without invoking application handlers.
 
 ## Host and normalization cases
 

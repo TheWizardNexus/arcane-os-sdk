@@ -15,6 +15,7 @@
   <!-- generated:reference-routes:start -->
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-wasm/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/arcane-ollama/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/availability-and-normalization/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/behavioral-testing/</loc></url>

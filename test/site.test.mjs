@@ -386,25 +386,112 @@ test('the complete API reference is a first-party generated Pages corpus',async 
     const manifest=await loadReferenceManifest();
     assert.equal(manifest.schema,'arcane-reference-site/1');
     assert.deepEqual(manifest.versions,{
-        sdk:'0.1.0',
+        sdk:'0.1.1',
         runtime:'0.8.12',
         protocol:'arcane/1'
     });
     assert.deepEqual(manifest.counts,{
-        markdownPages:24,
+        markdownPages:25,
         collectionPages:2,
         generatedPages:82,
         runtimeModulePages:80,
-        htmlPages:108,
+        htmlPages:109,
         inventories:4
     });
-    assert.equal(manifest.pages.filter(page=>page.kind==='markdown').length,24);
+    assert.equal(manifest.pages.filter(page=>page.kind==='markdown').length,25);
     assert.equal(manifest.pages.filter(page=>page.kind==='collection').length,2);
     assert.equal(manifest.pages.filter(page=>page.kind==='runtime-module').length,80);
     assert.equal(manifest.pages.filter(page=>page.kind==='generated').length,2);
-    assert.equal(new Set(manifest.pages.map(page=>page.source)).size,108);
-    assert.equal(new Set(manifest.pages.map(page=>page.output)).size,108);
-    assert.equal(new Set(manifest.pages.map(page=>page.route)).size,108);
+    assert.equal(new Set(manifest.pages.map(page=>page.source)).size,109);
+    assert.equal(new Set(manifest.pages.map(page=>page.output)).size,109);
+    assert.equal(new Set(manifest.pages.map(page=>page.route)).size,109);
+    const browserWasmPages=manifest.pages.filter(page=>
+        page.source==='docs/reference/ai/browser-wasm.md'
+    );
+    assert.equal(browserWasmPages.length,1);
+    assert.deepEqual(
+        {
+            source:browserWasmPages[0].source,
+            output:browserWasmPages[0].output,
+            route:browserWasmPages[0].route,
+            kind:browserWasmPages[0].kind
+        },
+        {
+            source:'docs/reference/ai/browser-wasm.md',
+            output:'site/reference/ai/browser-wasm/index.html',
+            route:'reference/ai/browser-wasm/',
+            kind:'markdown'
+        }
+    );
+
+    await t.test('browser-WASM AI is complete, subordinate to normalized AI, and directly discoverable',async()=>{
+        const [landing,guide,normalized,sdk,referenceCss,sitemap]=await Promise.all([
+            readSiteFile('reference/index.html'),
+            readSiteFile('reference/ai/browser-wasm/index.html'),
+            readSiteFile('reference/ai/index.html'),
+            readSiteFile('reference/sdk-api/index.html'),
+            readSiteFile('reference/reference.css'),
+            readSiteFile('sitemap.xml')
+        ]);
+        const decodedGuide=decodeReferenceHtml(guide);
+        const decodedNormalized=decodeReferenceHtml(normalized);
+        const decodedSdk=decodeReferenceHtml(sdk);
+        assert.match(landing,/href="sdk-api\/">API<\/a>/u);
+        assert.match(landing,/href="ai\/browser-wasm\/">Browser-WASM AI<\/a>/u);
+        assert.match(landing,/<strong>163<\/strong>[\s\S]*12 JavaScript package entrypoints/u);
+        assert.match(normalized,/Application default[.][\s\S]*browser-wasm-local-text-inference/u);
+        assert.match(decodedNormalized,/arcane-os\/ai\/browser-wasm/u);
+        assert.match(decodedNormalized,/byte length, SHA-256/u);
+        assert.match(decodedGuide,/arcane-ai-browser-wasm\/1/u);
+        assert.match(decodedGuide,/@wllama\/wllama[\s\S]*3[.]6[.]0/u);
+        assert.match(decodedGuide,/arcane[.]ai[.]browser-wasm[.]model[.]v2/u);
+        assert.match(decodedGuide,/load\(\{offline:true\}\)[\s\S]*ARCANE_AI_MODEL_OFFLINE_MISS/u);
+        assert.match(decodedGuide,/AbortSignal[\s\S]*ARCANE_AI_REQUEST_ABORTED/u);
+        assert.match(decodedGuide,/never invokes a handler or executes a tool/u);
+        assert.match(decodedGuide,/packages no model weights/u);
+        for(const name of [
+            'BROWSER_WASM_RUNTIME_AUTHORITY',
+            'createArcaneAI()',
+            'createBrowserModelSource()',
+            'createBrowserWasmLlmProvider()',
+            'createDbopfsModelStore()'
+        ])assert.match(decodedSdk,new RegExp(escapePattern(name),'u'),name);
+        for(const page of manifest.pages){
+            const html=await readFile(path.join(repositoryRoot,...page.output.split('/')),'utf8');
+            const start=html.indexOf('<aside class="docs-sidebar reference-sidebar"');
+            const end=html.indexOf('</aside>',start);
+            assert.ok(start>=0&&end>start,page.output);
+            assert.equal(
+                (html.slice(start,end).match(/>Browser-WASM AI<\/a>/gu)??[]).length,
+                1,
+                page.output
+            );
+            assert.match(html,/class="repo-link" href="[^"]*">API<\/a>/u,page.output);
+        }
+        assert.equal(
+            (sitemap.match(/<loc>https:\/\/thewizardnexus[.]github[.]io\/arcane-os-sdk\/reference\/ai\/browser-wasm\/<\/loc>/gu)??[]).length,
+            1
+        );
+        assert.match(referenceCss,/@media \(max-width: 1280px\)[\s\S]*[.]reference-toc[\s\S]*display: none/u);
+        assert.match(referenceCss,/@media \(max-width: 1200px\)[\s\S]*[.]site-header [.]nav-toggle[\s\S]*display: block/u);
+        assert.match(referenceCss,/[.]table-wrap\[data-columns="5"\][\s\S]*84rem/u);
+        assert.match(referenceCss,/word-break: normal/u);
+        assert.match(guide,/<details class="reference-toc-compact">/u);
+        assert.match(
+            guide,
+            /aria-label="Breadcrumb"[\s\S]*href="[.][.]\/">Normalized AI<\/a>[\s\S]*aria-current="page">Browser-WASM local AI/u
+        );
+        for(const anchor of [
+            'browserwasmruntimeauthority',
+            'createarcaneai',
+            'createbrowsermodelsource',
+            'createbrowserwasmllmprovider',
+            'createdbopfsmodelstore'
+        ]){
+            assert.match(guide,new RegExp(`<h2 id="${anchor}">`,'u'),anchor);
+            assert.match(sdk,new RegExp(`<h3 id="${anchor}">`,'u'),anchor);
+        }
+    });
 
     await t.test('the landing and rendered documents keep detailed navigation on Pages',async()=>{
         const landing=await readSiteFile('reference/index.html');
@@ -495,7 +582,7 @@ test('the complete API reference is a first-party generated Pages corpus',async 
         assert.match(decodedCli,/arcane import-map \[--workspace <directory>\] \[--app <id>\]/u);
         assert.match(decodedCli,/apps\/<id>\/modules\/arcane[.]importmap[.]json/u);
         assert.match(decodedCli,/data-arcane-import-map/u);
-        assert.match(decodedCli,/entryCount:85/u);
+        assert.match(decodedCli,/entryCount:86/u);
         assert.match(decodedCli,/integrated-legacy/u);
         assert.match(cli,/There is no supported <code>--dry-run<\/code> for <code>import-map<\/code>/u);
         assert.match(decodedCli,/no\s+watcher, polling, scheduled refresh, download, or self-update/u);
@@ -509,15 +596,16 @@ test('the complete API reference is a first-party generated Pages corpus',async 
         assert.match(protocols,/id="sdk-package-and-cli-protocols"/u);
         assert.match(protocols,/id="browser-runtime-delivery"/u);
         assert.match(decodedProtocols,/import ollama from 'arcane\/Ollama';/u);
-        assert.match(decodedProtocols,/exactly 85 entries/u);
+        assert.match(decodedProtocols,/exactly 86 entries/u);
         assert.match(protocols,/73 named\s+<code>arcane\/[*]<\/code> modules/u);
         assert.match(protocols,/nine <code>arcane\/entities\/[*]<\/code> modules/u);
         assert.match(decodedProtocols,/arcane-os\/event-manager[\s\S]*[.]\/arcane\/sdk\/event-manager[.]mjs/u);
+        assert.match(decodedProtocols,/arcane-os\/ai\/browser-wasm[\s\S]*[.]\/arcane\/sdk\/ai\/browser-wasm[.]mjs/u);
         assert.match(decodedProtocols,/event-pubsub[\s\S]*[.]\/arcane\/sdk\/dependencies\/event-pubsub\/index[.]js/u);
         assert.match(decodedProtocols,/[.]\/node_modules\/strong-type\/index[.]js[\s\S]*[.]\/arcane\/dependencies\/strong-type\/index[.]js/u);
-        assert.match(decodedProtocols,/163 files in all/u);
-        assert.match(decodedProtocols,/manifestSha256: 43baaec850291c28795f6c194001deb5febab88ccab1b033bce6597dd6f6f08f/u);
-        assert.match(decodedProtocols,/contentSha256: 0caa302bc07d4a45f5290504ec62ddce98fdf5e3412f916c10aae3d51b1e5f7c/u);
+        assert.match(decodedProtocols,/173 files in all/u);
+        assert.match(decodedProtocols,/manifestSha256: 33396b3d35322b784929270e7ca0a2a8b31d899c6e77bcb227edc95b37d0ae7d/u);
+        assert.match(decodedProtocols,/contentSha256: 5e03f45a732db51cb5a2b2193cc79ecda34501d07a9b2e82e794e5fa37d55d00/u);
         assert.match(decodedProtocols,/sourceIdentities/u);
         assert.match(decodedProtocols,/bounded handled-error transaction/u);
 
@@ -529,8 +617,8 @@ test('the complete API reference is a first-party generated Pages corpus',async 
             sdk,
             /There is no exported\s+<code>importMapApplication\(\)<\/code> or <code>generateImportMap\(\)<\/code> binding/u
         );
-        assert.equal(packageApi.sdkVersion,'0.1.0');
-        assert.equal(packageApi.memberCount,158);
+        assert.equal(packageApi.sdkVersion,'0.1.1');
+        assert.equal(packageApi.memberCount,163);
         assert.equal(packageApi.members.some(member=>[
             'importMapApplication','generateImportMap'
         ].includes(member.name)),false);
@@ -973,7 +1061,7 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
             }
         }
         const renderedJavaScriptBlockCount=examples.length;
-        assert.equal(renderedJavaScriptBlockCount,550);
+        assert.equal(renderedJavaScriptBlockCount,562);
         let javaScriptModuleExamples=0;
         let classicInlineExamples=0;
         for(const record of records){
@@ -1003,7 +1091,7 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
         }
         assert.equal(javaScriptModuleExamples,75);
         assert.equal(classicInlineExamples,3);
-        assert.equal(examples.length,553);
+        assert.equal(examples.length,565);
         assertModuleExamplesParse(examples);
     });
 });
@@ -1050,7 +1138,11 @@ test('documentation describes the consumer source-to-portable-browser-package co
     );
     assert.doesNotMatch(
         hello,
-        /not yet published|after publication|pack:local|[.]tgz|0[.]1[.]0-dev|current development checkout|receipt|exactly 152|CI shape|--arcane-root|source sync|Arcane Ollama|prebuilt Arcane Core/iu
+        /not yet published|after publication|pack:local|[.]tgz|0[.]1[.]0-dev|current development checkout|exactly 152|CI shape|--arcane-root|source sync|Arcane Ollama|prebuilt Arcane Core/iu
+    );
+    assert.match(
+        hello,
+        /Model downloaded, SHA-256 verified, admitted to app-scoped DBOPFS, and loaded locally/u
     );
     assert.match(native,/portable[\s\S]*Not directly runnable[\s\S]*Unsigned local test/u);
     assert.match(native,/Architecture-neutral APK/u);
@@ -1185,7 +1277,7 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         }
         await visit(path.join(exampleRoot,'arcane'));
         physicalPaths.sort();
-        assert.equal(physicalPaths.length,163);
+        assert.equal(physicalPaths.length,173);
         assert.deepEqual(physicalPaths,expectedPaths);
         for(const file of expectedRecords){
             const bytes=await readFile(path.join(exampleRoot,'arcane',...file.path.split('/')));
@@ -1203,14 +1295,14 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         );
         const importMap=JSON.parse(artifact);
         assert.deepEqual(Object.keys(importMap),['imports']);
-        assert.equal(Object.keys(importMap.imports).length,85);
+        assert.equal(Object.keys(importMap.imports).length,86);
         const generated=await buildImportMap({
             files:expectedPaths,
             readFile:relative=>readFile(path.join(
                 exampleRoot,'arcane',...relative.split('/')
             ))
         });
-        assert.equal(generated.entryCount,85);
+        assert.equal(generated.entryCount,86);
         assert.deepEqual(importMap.imports,generated.imports);
         const expectedPathSet=new Set(expectedPaths);
         for(const [specifier,target] of Object.entries(importMap.imports)){
@@ -1279,14 +1371,16 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
             /(?:href|src)="[.]\/(arcane\/[^"?]+)(?:[?][^"]*)?"/gu
         )].map(match=>match[1]).sort();
         const scriptRuntimeImports=[...script.matchAll(
-            /from\s+['"](arcane\/[^'"]+)['"]/gu
+            /from\s+['"](arcane(?:-os)?\/[^'"]+)['"]/gu
         )].map(match=>match[1]).sort();
         assert.deepEqual(htmlRuntimeReferences,[
             'arcane/css/primitives.css',
             'arcane/css/theme.css'
         ]);
         assert.deepEqual(scriptRuntimeImports,[
+            'arcane-os/ai/browser-wasm',
             'arcane/AppDataScope',
+            'arcane/DBOPFS',
             'arcane/ThemeBootstrap'
         ]);
         assert.match(script,/function sayHello\(\)/u);
@@ -1298,11 +1392,16 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         for(const source of [html,style,script]){
             assert.equal(renderedTutorial.includes(source.trim()),true);
         }
-        assert.match(readme,/project-local development\s+dependency/u);
-        assert.match(readme,/Installing the CLI globally is optional/u);
-        assert.match(readme,/Physical runtime and import map/u);
-        assert.match(readme,/arcane\/dependencies\/strong-type/u);
-        assert.match(readme,/163 authenticated[\s\S]*85 import-map entries/u);
+        assert.match(readme,/npx arcane-os@0[.]1[.]1 new[\s\S]*npm install/u);
+        assert.match(readme,/generated project pins `arcane-os` exactly[\s\S]*project-local CLI/u);
+        assert.match(readme,/npm install --global arcane-os@0[.]1[.]1/u);
+        assert.match(readme,/## Source shape[\s\S]*same physical runtime paths[\s\S]*arcane[.]importmap[.]json/u);
+        assert.match(
+            readme,
+            /[.]\/node_modules\/strong-type\/index[.]js[\s\S]*[.]\/arcane\/dependencies\/strong-type\/index[.]js/u
+        );
+        assert.match(readme,/authenticated `arcane\/` projection contains 173 files/u);
+        assert.match(readme,/generated map\s+contains 86 entries/u);
         assert.match(readme,/dist\/hello-world\/[\s\S]*arcane\//u);
         assert.match(readme,/arcane\/AppDataScope/u);
         assert.match(readme,/arcane\/ThemeBootstrap/u);
@@ -1310,7 +1409,7 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         assert.match(readme,/npm run dev/u);
         assert.match(readme,/npm run package/u);
         assert.match(readme,/npm run build/u);
-        assert.match(readme,/does not create a standalone native executable/u);
+        assert.match(readme,/does not create a\s+standalone native executable/u);
         assert.doesNotMatch(readme,/build\/windows-x64\/hello-world\/ArcaneApp-hello-world[.]exe/u);
         assert.doesNotMatch(
             readme,

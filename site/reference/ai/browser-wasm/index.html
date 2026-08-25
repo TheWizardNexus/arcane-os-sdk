@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="Use this browser-only entrypoint when an application deliberately owns a local GGUF model authority and wants provider-neutral LLM lifecycle, chat, streamin…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-wasm/"><link rel="icon" type="image/png" href="../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../styles.css"><link rel="stylesheet" href="../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Browser-WASM local AI · Arcane OS SDK"><meta property="og:description" content="Use this browser-only entrypoint when an application deliberately owns a local GGUF model authority and wants provider-neutral LLM lifecycle, chat, streamin…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-wasm/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Browser-WASM local AI · Arcane OS SDK"><meta name="twitter:description" content="Use this browser-only entrypoint when an application deliberately owns a local GGUF model authority and wants provider-neutral LLM lifecycle, chat, streamin…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Browser-WASM local AI | Arcane OS SDK</title><script src="../../../app.js" defer></script><script src="../../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../">Overview</a><a href="../../../guides/">Guides</a><a href="../../../examples/">Examples</a><a href="../../../playground/">Playground</a><a href="../../../testing/">Testing</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="../../sdk-api/">API</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser-WASM local AI</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-wasm-local-ai">Browser-WASM local AI</h1><p class="doc-lead">Use this browser-only entrypoint when an application deliberately owns a local GGUF model authority and wants provider-neutral LLM lifecycle, chat, streamin…</p><div class="doc-meta"><span>SDK 0.1.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../">Normalized AI</a><a href="./" aria-current="page">Browser-WASM AI</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/ai/browser-wasm.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#lifecycle-at-a-glance">Lifecycle at a glance</a><a href="#model-authority-and-cache-admission">Model authority and cache admission</a><a href="#streaming-cancellation-and-tools">Streaming, cancellation, and tools</a><a href="#errors-and-unavailable-states">Errors and unavailable states</a><a href="#browserwasmruntimeauthority">BROWSERWASMRUNTIMEAUTHORITY</a><a href="#createarcaneai">createArcaneAI()</a><a href="#createbrowsermodelsource">createBrowserModelSource()</a><a href="#createbrowserwasmllmprovider">createBrowserWasmLlmProvider()</a><a href="#createdbopfsmodelstore">createDbopfsModelStore()</a><a href="#related-reference">Related reference</a></nav></details><p>Use this browser-only entrypoint when an application deliberately owns a local
+GGUF model authority and wants provider-neutral LLM lifecycle, chat, streaming,
+cancellation, and structural tool-call results without an Arcane Core host.
+For ordinary hosted applications, start with the <a href="../../core/arcane-ai-contracts/">Arcane AI
+contracts</a> and <code>globalThis.Arcane.ai</code>. This
+page is the focused local-browser path beneath the normalized AI decision
+guide.</p>
+<p>The wiring example assumes a scaffolded or materialized Arcane application
+with SDK <code>0.1.1</code>&#39;s authenticated runtime tree and 86-entry browser import map.
+<code>arcane/DBOPFS</code> is a managed browser-map specifier, not an npm package export.
+See <a href="../../protocols/#browser-runtime-delivery">browser runtime delivery</a> before
+using the example in a custom host or bundler.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import DBOPFS from &#39;arcane/DBOPFS&#39;;
+import {
+    createArcaneAI,
+    createBrowserModelSource,
+    createBrowserWasmLlmProvider,
+    createDbopfsModelStore
+} from &#39;arcane-os/ai/browser-wasm&#39;;
+
+const MODEL = Object.freeze({
+    id:&#39;my-reviewed-model&#39;,
+    name:&#39;model-q4.gguf&#39;,
+    immutableUrl:&#39;https://models.example/revisions/4f7c/model-q4.gguf&#39;,
+    bytes:123456789,
+    sha256:&#39;0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef&#39;,
+    licenseSpdx:&#39;Apache-2.0&#39;,
+    sourceRevision:&#39;4f7c&#39;
+});
+
+const dbopfs = globalThis.dbopfs || new DBOPFS({applicationId:&#39;my-app&#39;});
+await dbopfs.readyPromise;
+const source = createBrowserModelSource(MODEL);
+const store = createDbopfsModelStore({dbopfs});
+const provider = createBrowserWasmLlmProvider({source, store});
+const ai = createArcaneAI({provider, loadPolicy:&#39;manual&#39;});
+
+// Put this behind an explicit user action: it can download MODEL.bytes bytes.
+async function loadReviewedModel() {
+    return ai.load({threads:1, contextTokens:4096, gpuLayers:0});
+}
+</code></pre></div>
+<p>The browser-WASM runtime closure packages the authenticated
+<code>@wllama/wllama</code> <code>3.6.0</code> ESM and WebAssembly runtime plus the Wllama and
+llama.cpp MIT license texts. It
+packages no model weights, model catalog, CDN fallback, native provider, speech
+synthesis, or transcription. Callers supply the exact model authority. <code>bytes</code>
+is the expected positive byte length, not inline model data.</p>
+<h2 id="lifecycle-at-a-glance">Lifecycle at a glance</h2>
+<p><code>createArcaneAI()</code> owns one LLM controller. Its default <code>loadPolicy</code> is
+<code>on-demand</code>; the first request may download and initialize the model. Use
+<code>manual</code> when a user action, resource review, or progress UI must precede load.</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ai.status()</code></td>
+<td>Frozen <code>{llm: status}</code> wrapper.</td>
+</tr>
+<tr>
+<td><code>ai.load(options)</code></td>
+<td>Flat LLM status after load.</td>
+</tr>
+<tr>
+<td><code>ai.llm.chat(request)</code> / <code>ai.fetchRequest(request)</code></td>
+<td>Validated OpenAI-like completion.</td>
+</tr>
+<tr>
+<td><code>ai.llm.stream(request)</code></td>
+<td>Frozen async-iterator handle with <code>result</code> and <code>cancel(reason)</code>.</td>
+</tr>
+<tr>
+<td><code>ai.streamRequest(request)</code></td>
+<td>Consumes the stream and returns text or <code>{toolName: argumentJsonString}</code>.</td>
+</tr>
+<tr>
+<td><code>ai.unload()</code></td>
+<td>Cancels active work, releases the Wllama session, and returns flat unloaded status; verified DBOPFS cache remains.</td>
+</tr>
+<tr>
+<td><code>ai.dispose()</code></td>
+<td>Permanently disposes the controller; explicit <code>store.remove(source)</code> is required to delete cached model bytes.</td>
+</tr>
+</tbody></table>
+</div>
+<p>The controller emits <code>statechange</code> and <code>progress</code> through
+<code>addEventListener()</code>, <code>removeEventListener()</code>, or <code>on()</code>. Event <code>detail</code> is the
+current frozen status. Provider states are <code>unloaded</code>, <code>loading</code>, <code>ready</code>,
+<code>unloading</code>, and <code>error</code>.</p>
+<h2 id="model-authority-and-cache-admission">Model authority and cache admission</h2>
+<p><code>createBrowserModelSource()</code> requires <code>id</code>, <code>name</code>, <code>immutableUrl</code>, <code>bytes</code>,
+<code>sha256</code>, <code>licenseSpdx</code>, and <code>sourceRevision</code>. The URL must be absolute HTTPS
+without credentials or a fragment. Revision-floating <code>main</code>, <code>master</code>, and
+<code>latest</code> path segments are rejected. <code>name</code> is one filename. <code>bytes</code> is a
+positive safe integer and <code>sha256</code> is exactly 64 hexadecimal characters.</p>
+<p><code>licenseSpdx</code> and <code>sourceRevision</code> are required provenance labels supplied by
+the caller; the SDK does not independently prove the license or derive the
+revision from the URL. Redirects are followed and the final URL must remain
+HTTPS. Byte length and SHA-256 remain the actual admission authority.</p>
+<p>The DBOPFS adapter stores model bytes and then commits an
+<code>arcane.ai.browser-wasm.model.v2</code> completion manifest. It reopens and fully
+rehashes the bytes before returning an installed receipt and again before every
+verified cache reuse. Missing, malformed, stale, wrong-length, or wrong-digest
+entries are removed. <code>load({offline:true})</code> never performs a model request; it
+uses a fully rehashed cache or rejects with <code>ARCANE_AI_MODEL_OFFLINE_MISS</code>.</p>
+<p><code>localOnly:true</code> describes inference after load. It does not mean a cache miss
+cannot download. Source downloads use CORS, omit credentials and referrer,
+disable HTTP caching, and honor <code>AbortSignal</code>.</p>
+<h2 id="streaming-cancellation-and-tools">Streaming, cancellation, and tools</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const abort = new AbortController();
+const stream = ai.llm.stream({
+    localOnly:true,
+    signal:abort.signal,
+    messages:[{role:&#39;user&#39;, content:&#39;Summarize this text.&#39;}],
+    maxTokens:128
+});
+
+const cancelButton = document.querySelector(&#39;[data-cancel-local-ai]&#39;);
+const cancel = () =&gt; abort.abort(&#39;user cancelled&#39;);
+cancelButton.addEventListener(&#39;click&#39;, cancel, {once:true});
+try {
+    for await (const chunk of stream) renderChunk(chunk);
+    const completion = await stream.result;
+    renderCompletion(completion);
+} catch (error) {
+    if (error?.code !== &#39;ARCANE_AI_REQUEST_ABORTED&#39;) throw error;
+    renderCancelled();
+} finally {
+    cancelButton.removeEventListener(&#39;click&#39;, cancel);
+}
+</code></pre></div>
+<p>An active cancellation rejects as <code>ARCANE_AI_REQUEST_ABORTED</code>. Requests are
+serialized; provider status exposes <code>busy</code> and <code>queued</code>. Supported request
+generation fields include temperature, top-K, top-P, min-P, repeat penalty,
+maximum tokens, seed, and stop sequences. Load settings separately include
+<code>contextTokens</code>, <code>batchTokens</code>, <code>microBatchTokens</code>, <code>threads</code>, and GPU-layer
+count. WebGPU is optional; cross-origin isolation and hardware fields are
+observations, not readiness promises.</p>
+<p>Tool definitions, tool choice, parallel-tool-call preference, and JSON or JSON
+Schema structured-output requests are passed to Wllama. Returned tool calls are
+validated and surfaced as structural data. Argument payloads remain JSON
+strings. The SDK never invokes a handler or executes a tool; application code
+must review policy, validate arguments, choose whether to execute, and submit a
+later tool result.</p>
+<h2 id="errors-and-unavailable-states">Errors and unavailable states</h2>
+<p>Invalid configuration can throw <code>TypeError</code> or <code>RangeError</code>. Operational
+failures expose a stable <code>.code</code>; the internal error class is not exported.
+Handle the narrow code needed by the current operation and treat other failures
+as unavailable.</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Stable codes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Source and download</td>
+<td><code>ARCANE_AI_MODEL_SOURCE_INVALID</code>, <code>ARCANE_AI_MODEL_SOURCE_UNAVAILABLE</code>, <code>ARCANE_AI_MODEL_DOWNLOAD_FAILED</code>, <code>ARCANE_AI_MODEL_REDIRECT_BLOCKED</code>, <code>ARCANE_AI_MODEL_SIZE_MISMATCH</code>, <code>ARCANE_AI_MODEL_DIGEST_MISMATCH</code></td>
+</tr>
+<tr>
+<td>Cache and storage</td>
+<td><code>ARCANE_AI_MODEL_CACHE_REJECTED</code>, <code>ARCANE_AI_MODEL_OFFLINE_MISS</code>, <code>ARCANE_AI_STORAGE_UNAVAILABLE</code>, <code>ARCANE_AI_STORAGE_READ_FAILED</code>, <code>ARCANE_AI_STORAGE_DELETE_FAILED</code></td>
+</tr>
+<tr>
+<td>Lifecycle</td>
+<td><code>ARCANE_AI_UNAVAILABLE</code>, <code>ARCANE_AI_NOT_READY</code>, <code>ARCANE_AI_LOAD_FAILED</code>, <code>ARCANE_AI_UNLOAD_FAILED</code>, <code>ARCANE_AI_DISPOSE_FAILED</code>, <code>ARCANE_AI_DISPOSED</code>, <code>ARCANE_AI_OPERATION_SUPERSEDED</code></td>
+</tr>
+<tr>
+<td>Requests</td>
+<td><code>ARCANE_AI_REQUEST_ABORTED</code>, <code>ARCANE_AI_REQUEST_FAILED</code>, <code>ARCANE_AI_INVALID_PROVIDER_RESULT</code>, <code>ARCANE_AI_LOCAL_ONLY_UNAVAILABLE</code>, <code>ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH</code></td>
+</tr>
+<tr>
+<td>Diagnostics</td>
+<td><code>ARCANE_AI_PROBE_FAILED</code></td>
+</tr>
+</tbody></table>
+</div>
+<p><code>capabilities()</code> reports browser observations such as WebAssembly, OPFS,
+WebGPU, secure context, cross-origin isolation, and hardware concurrency.
+Feature-detect them. The authoritative Chrome behavior passes without
+cross-origin isolation, so that flag is not a hard gate. <code>probe()</code> exercises
+packaged Wllama backend operations only while unloaded; it neither admits nor
+downloads a model.</p>
+<h2 id="browserwasmruntimeauthority">BROWSER_WASM_RUNTIME_AUTHORITY</h2>
+<h3 id="overview">Overview</h3>
+<p>Deep-frozen identity for the shipped browser runtime. Its protocol is
+<code>arcane-ai-browser-wasm/1</code>; the provider adapter uses
+<code>arcane-ai-adapter/1</code>. It records Wllama <code>3.6.0</code>, the embedded llama.cpp
+revision, authenticated module/WASM byte lengths and SHA-256 values, licenses,
+and the disabled compatibility-runtime and remote-model-helper policy.</p>
+<h3 id="value-and-import">Value and import</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">const BROWSER_WASM_RUNTIME_AUTHORITY
+</code></pre></div>
+<h3 id="availability-and-normalization">Availability and normalization</h3>
+<p><strong>Browser metadata; safely inspectable without loading a model.</strong> The value is
+an immutable receipt, not a provider instance, model catalog, or capability
+grant.</p>
+<h3 id="example">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {BROWSER_WASM_RUNTIME_AUTHORITY} from &#39;arcane-os/ai/browser-wasm&#39;;
+
+console.log(BROWSER_WASM_RUNTIME_AUTHORITY.protocol);
+console.log(BROWSER_WASM_RUNTIME_AUTHORITY.package.version); // 3.6.0
+</code></pre></div>
+<h2 id="createarcaneai">createArcaneAI()</h2>
+<h3 id="overview-1">Overview</h3>
+<p>Creates the application-facing facade around a provider or an existing LLM
+controller. Use this as the primary browser-local API; construct the source,
+store, and Wllama provider beneath it.</p>
+<h3 id="signature-and-result">Signature and result</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createArcaneAI({ llm=null, provider=null, loadPolicy=&#39;on-demand&#39; }={})
+</code></pre></div>
+<p>At least one <code>llm</code> or <code>provider</code> is required; when both are supplied, <code>llm</code>
+takes precedence. <code>loadPolicy</code> is <code>on-demand</code> or <code>manual</code>. The frozen result
+contains <code>llm</code>, <code>runtime</code>, <code>status</code>, <code>load</code>,
+<code>unload</code>, <code>probe</code>, <code>fetchRequest</code>, <code>streamRequest</code>, and <code>dispose</code>.</p>
+<h3 id="availability-and-normalization-1">Availability and normalization</h3>
+<p><strong>Browser.</strong> It normalizes provider lifecycle and request observation without
+selecting a model, changing browser permissions, contacting Arcane Core, or
+creating a fallback provider.</p>
+<h3 id="example-1">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const ai = createArcaneAI({provider, loadPolicy:&#39;manual&#39;});
+const off = ai.llm.on(&#39;statechange&#39;, event =&gt; renderStatus(event.detail));
+await ai.load({offline:true});
+off();
+</code></pre></div>
+<h2 id="createbrowsermodelsource">createBrowserModelSource()</h2>
+<h3 id="overview-2">Overview</h3>
+<p>Validates caller-owned model provenance and creates the one cancellable HTTPS
+download source accepted by this provider.</p>
+<h3 id="signature-and-result-1">Signature and result</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createBrowserModelSource(descriptor, { fetchImpl=null }={})
+</code></pre></div>
+<p>The frozen source includes <code>kind</code>, the seven canonical descriptor fields,
+<code>descriptor</code>, and <code>open({signal})</code>. <code>open()</code> returns a readable response body,
+requested/final URLs, and <code>cancel()</code>; it does not admit bytes to the cache.</p>
+<h3 id="availability-and-normalization-2">Availability and normalization</h3>
+<p><strong>Browser Fetch with CORS.</strong> URL and metadata syntax are normalized; exact
+length and SHA-256 are enforced when the store installs the stream.</p>
+<h3 id="example-2">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const source = createBrowserModelSource(MODEL);
+console.log(source.id, source.bytes, source.sha256);
+</code></pre></div>
+<h2 id="createbrowserwasmllmprovider">createBrowserWasmLlmProvider()</h2>
+<h3 id="overview-3">Overview</h3>
+<p>Creates the local-only Wllama provider from genuine source and store objects
+created by this module. Structural lookalikes are rejected.</p>
+<h3 id="signature-and-result-2">Signature and result</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createBrowserWasmLlmProvider({ source, store, loadDefaults={}, logger=console }={})
+</code></pre></div>
+<p>The frozen result exposes protocol and provider identity, model metadata,
+<code>capabilities</code>, <code>status</code>, <code>load</code>, <code>unload</code>, <code>chat</code>, <code>stream</code>, <code>streamChat</code>,
+<code>use</code>, <code>probe</code>, and <code>dispose</code>. Direct provider <code>load()</code> returns <code>{model,status}</code>;
+the facade <code>ai.load()</code> returns the flat controller status.</p>
+<h3 id="availability-and-normalization-3">Availability and normalization</h3>
+<p><strong>Browser with WebAssembly and verified DBOPFS model bytes.</strong> Inference is local
+after load. WebGPU is optional and defaults to zero GPU layers unless the caller
+selects otherwise.</p>
+<h3 id="example-3">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const provider = createBrowserWasmLlmProvider({
+    source,
+    store,
+    loadDefaults:{threads:1, contextTokens:4096, gpuLayers:0}
+});
+console.log(provider.status().state); // unloaded
+</code></pre></div>
+<h2 id="createdbopfsmodelstore">createDbopfsModelStore()</h2>
+<h3 id="overview-4">Overview</h3>
+<p>Adapts an existing DBOPFS instance without renaming or replacing its public
+methods. The adapter owns verified model-file and completion-manifest behavior.</p>
+<h3 id="signature-and-result-3">Signature and result</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createDbopfsModelStore({ dbopfs, tableName=&#39;arcane_ai_browser_models&#39; }={})
+</code></pre></div>
+<p>The frozen result contains <code>kind</code>, <code>tableName</code>, the original <code>adapter</code>, and
+<code>ready</code>, <code>openVerified</code>, <code>install</code>, <code>ensure</code>, and <code>remove</code>. <code>ensure()</code> returns a
+file, completion manifest, and cache state <code>verified</code> or <code>installed</code>.</p>
+<h3 id="availability-and-normalization-4">Availability and normalization</h3>
+<p><strong>Browser with a ready DBOPFS instance and OPFS.</strong> Cache receipts are local
+integrity evidence. They are not transferable capability tokens and do not
+prove model license rights.</p>
+<h3 id="example-4">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const store = createDbopfsModelStore({dbopfs});
+await store.ready();
+const cached = await store.openVerified(source);
+console.log(cached ? &#39;verified cache&#39; : &#39;cache miss&#39;);
+</code></pre></div>
+<h2 id="related-reference">Related reference</h2>
+<ul>
+<li><a href="../../sdk-api/#createarcaneai">Canonical <code>createArcaneAI()</code> entry</a> and the
+sibling <a href="../../sdk-api/#browserwasmruntimeauthority"><code>BROWSER_WASM_RUNTIME_AUTHORITY</code></a>,
+<a href="../../sdk-api/#createbrowsermodelsource"><code>createBrowserModelSource()</code></a>,
+<a href="../../sdk-api/#createbrowserwasmllmprovider"><code>createBrowserWasmLlmProvider()</code></a>,
+and <a href="../../sdk-api/#createdbopfsmodelstore"><code>createDbopfsModelStore()</code></a> entries</li>
+<li><a href="../../availability-and-normalization/#browser-local-provider-adapter">Browser-local normalization boundary</a></li>
+<li><a href="../../protocols/#browser-runtime-delivery">Authenticated browser runtime delivery</a></li>
+<li><a href="../../behavioral-testing/#behavioral-coverage-model">Browser-WASM behavior evidence</a></li>
+<li><a href="../../runtime-modules/#dbopfsjs">DBOPFS runtime module</a></li>
+</ul>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#lifecycle-at-a-glance">Lifecycle at a glance</a><a href="#model-authority-and-cache-admission">Model authority and cache admission</a><a href="#streaming-cancellation-and-tools">Streaming, cancellation, and tools</a><a href="#errors-and-unavailable-states">Errors and unavailable states</a><a href="#browserwasmruntimeauthority">BROWSERWASMRUNTIMEAUTHORITY</a><a href="#createarcaneai">createArcaneAI()</a><a href="#createbrowsermodelsource">createBrowserModelSource()</a><a href="#createbrowserwasmllmprovider">createBrowserWasmLlmProvider()</a><a href="#createdbopfsmodelstore">createDbopfsModelStore()</a><a href="#related-reference">Related reference</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.1.1, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+</body>
+</html>

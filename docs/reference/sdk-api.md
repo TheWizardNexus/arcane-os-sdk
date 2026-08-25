@@ -1,6 +1,10 @@
 # Arcane OS SDK JavaScript API
 
-The npm package exposes a Node.js ESM control plane. It is not a browser-importable renderer API. Application code uses named modules from the managed browser map, such as `arcane/ThemeBootstrap`, uses the focused `arcane-os/event-manager` browser entry when needed, and calls `globalThis.Arcane` for capability-gated host behavior.
+The npm package exposes a Node.js ESM control plane, the Node-and-browser
+`arcane-os/event-manager` entrypoint, and the browser-only
+`arcane-os/ai/browser-wasm` entrypoint. Application code otherwise uses named
+modules from the managed browser map, such as `arcane/ThemeBootstrap`, and
+calls `globalThis.Arcane` for capability-gated host behavior.
 
 This page is the canonical inventory for every JavaScript name reachable through `package.json#exports`. The same binding can appear at the root and a focused subpath; those entrypoints are listed together. The root workspace `discoverApps` and the low-level packager `discoverApps` are intentionally separate records because they are different functions.
 
@@ -10,7 +14,7 @@ This table is the Node `package.json#exports` map: it defines package
 entrypoints for SDK/tooling code. It is distinct from the generated browser
 import map that resolves application-facing `arcane/*` modules and the focused
 EventManager entry. See [browser runtime delivery](protocols.md#browser-runtime-delivery)
-for that 85-entry physical-runtime contract.
+for that 86-entry physical-runtime contract.
 
 | Specifier | Purpose |
 | --- | --- |
@@ -25,6 +29,7 @@ for that 85-entry physical-runtime contract.
 | `arcane-os/packager` | Low-level browser app packager. |
 | `arcane-os/release-bundle` | Deterministic external release bundles. |
 | `arcane-os/event-manager` | Central synchronous events, bounded time-travel history, playback, and optional DOM instrumentation. |
+| `arcane-os/ai/browser-wasm` | Caller-authenticated browser-local Wllama inference, verified DBOPFS model caching, streaming, cancellation, and structural tool-call results. |
 
 JSON schemas, the runtime manifest, and `package.json` are data-only export subpaths. In Node ESM, import JSON with `with {type: 'json'}`, or resolve and read it explicitly.
 
@@ -74,14 +79,19 @@ Protocol mechanics are intentionally kept in the [deep protocol guide](protocols
 | `authenticateSharedPayloadSnapshot()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `buildApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `buildTarget()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
+| `BROWSER_WASM_RUNTIME_AUTHORITY` | constant | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser metadata; no model or DBOPFS required to inspect |
 | `bumpVersion()` | function | `arcane-os/packager` | Packaging and release bundles | Node |
 | `bundleApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `checkApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `CLI_EVENT_PROTOCOL` | constant | `arcane-os` | Identity and protocol constants | Node |
 | `CLI_NAME` | constant | `arcane-os` | Identity and protocol constants | Node |
 | `createApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
+| `createArcaneAI()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser; compatible LLM provider or controller required |
 | `createAppReleaseBundle()` | function | `arcane-os` | Packaging and release bundles | Node |
+| `createBrowserModelSource()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser Fetch with a readable response body |
+| `createBrowserWasmLlmProvider()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser; WebAssembly and verified DBOPFS model bytes |
 | `createCanonicalUstarHeader()` | function | `arcane-os` | Packaging and release bundles | Node |
+| `createDbopfsModelStore()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser with a ready DBOPFS instance and OPFS |
 | `createNativeBuildPlan()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `createNativeTargetAdapter()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `createReporter()` | function | `arcane-os` | Events, processes, and testing | Node |
@@ -2645,7 +2655,7 @@ The import-map operation also reports the stable operation-specific strings
 `ARCANE_IMPORT_MAP_COLLISION`; package assembly can additionally report
 `ARCANE_IMPORT_MAP_CLEANUP_FAILED`. They are normalized `ArcaneError.code`
 values, but are not properties added to this frozen general registry in SDK
-`0.1.0`.
+`0.1.1`.
 
 ### Value and import
 
@@ -3464,7 +3474,7 @@ const toolchain = createToolchain({
 
 // Only this explicit call refreshes the managed map and HTML entry.
 const result = await toolchain.importMap();
-console.log(result.importMap.entryCount); // 85 in SDK 0.1.0
+console.log(result.importMap.entryCount); // 86 in SDK 0.1.1
 ```
 
 ## describeTargets()
@@ -4923,6 +4933,200 @@ import {parseEventStack} from 'arcane-os/event-manager';
 
 const stack = parseEventStack(serialized);
 console.log(stack.sessionId, stack.events.length);
+```
+
+## BROWSER_WASM_RUNTIME_AUTHORITY
+
+### Overview
+
+Deep-frozen authority for the browser-only runtime behind
+`arcane-os/ai/browser-wasm`. It records protocol
+`arcane-ai-browser-wasm/1`, `@wllama/wllama` `3.6.0`, the embedded llama.cpp
+revision, the exact packaged JavaScript and WebAssembly assets, retained MIT
+licenses, and the disabled compatibility-runtime/remote-model-helper policy.
+It contains no model weights or model catalog.
+
+### Value and import
+
+```text
+const BROWSER_WASM_RUNTIME_AUTHORITY
+```
+
+The value is available from `arcane-os/ai/browser-wasm` only. Importing and
+inspecting it does not initialize Wllama, request storage, or download a model.
+
+### Availability and normalization
+
+**Browser metadata.** This is an immutable component receipt, not a provider,
+model, browser-permission grant, or proof that WebAssembly/OPFS is available.
+
+### Example
+
+```javascript
+import {BROWSER_WASM_RUNTIME_AUTHORITY} from 'arcane-os/ai/browser-wasm';
+
+console.log(BROWSER_WASM_RUNTIME_AUTHORITY.protocol);
+console.log(BROWSER_WASM_RUNTIME_AUTHORITY.package.version);
+```
+
+Complete lifecycle, model authority, cache, cancellation, and tool behavior:
+[Browser-WASM local AI](ai/browser-wasm.md).
+
+## createArcaneAI()
+
+### Overview
+
+Creates the application-facing LLM facade around a compatible provider or
+controller. The default `on-demand` policy loads before first use; `manual`
+requires an explicit successful `load()` before requests. When both `llm` and
+`provider` are supplied, `llm` takes precedence.
+
+### Signature and result
+
+```text
+createArcaneAI({ llm=null, provider=null, loadPolicy='on-demand' }={})
+```
+
+At least one `llm` or `provider` is required. The frozen facade contains
+`llm`, `runtime`, `status`, `load`, `unload`, `probe`, `fetchRequest`,
+`streamRequest`, and `dispose`. `status()` returns `{llm: status}`; lifecycle
+methods return the flat LLM status. `fetchRequest()` returns the completion.
+`streamRequest()` consumes streaming and returns text or a tool-name-to-JSON-
+argument-string record. Use `ai.llm.stream()` for the async iterator.
+
+### Availability and normalization
+
+**Browser.** It normalizes lifecycle, state/progress events, lazy/manual use,
+cancellation, completions, and structural tool-call visibility. It neither
+selects a provider fallback nor executes an application tool.
+
+### Example
+
+```javascript
+const ai = createArcaneAI({provider, loadPolicy:'manual'});
+const stop = ai.llm.on('progress', event => renderProgress(event.detail));
+await ai.load({offline:true});
+stop();
+```
+
+## createBrowserModelSource()
+
+### Overview
+
+Validates a caller-owned model descriptor and creates the cancellable HTTPS
+source accepted by the browser-WASM store/provider. Required fields are `id`,
+`name`, `immutableUrl`, `bytes`, `sha256`, `licenseSpdx`, and
+`sourceRevision`. `bytes` is the expected positive safe-integer byte length,
+not inline data.
+
+### Signature and result
+
+```text
+createBrowserModelSource(descriptor, { fetchImpl=null }={})
+```
+
+The URL must be absolute HTTPS with no credentials or fragment and no
+revision-floating `main`, `master`, or `latest` path. The SHA-256 value is
+exactly 64 hexadecimal characters. The frozen source exposes its canonical
+descriptor and `open({signal})`, which returns `{body, requestedUrl, finalUrl,
+cancel}`. Every direct `open()` performs the configured fetch. The SDK records
+but does not independently prove the supplied license identifier or revision.
+
+### Availability and normalization
+
+**Browser Fetch with CORS and a readable response body.** Downloads omit
+credentials/referrer, disable HTTP caching, follow redirects, require a final
+HTTPS URL, compare `Content-Length` when present, and honor `AbortSignal`.
+Actual length and digest admission belongs to the DBOPFS store.
+
+### Example
+
+```javascript
+const source = createBrowserModelSource({
+    id:'reviewed-model',
+    name:'model-q4.gguf',
+    immutableUrl:'https://models.example/revisions/4f7c/model-q4.gguf',
+    bytes:123456789,
+    sha256:'0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+    licenseSpdx:'Apache-2.0',
+    sourceRevision:'4f7c'
+});
+```
+
+## createBrowserWasmLlmProvider()
+
+### Overview
+
+Creates the packaged Wllama provider from genuine source and store objects
+created by this module. It serializes requests and exposes provider states
+`unloaded`, `loading`, `ready`, `unloading`, and `error`.
+
+### Signature and result
+
+```text
+createBrowserWasmLlmProvider({ source, store, loadDefaults={}, logger=console }={})
+```
+
+The frozen provider exposes `protocol`, `id`, `model`, `capabilities`,
+`status`, `load`, `unload`, `chat`, `stream`, `streamChat`, `use`, `probe`, and
+`dispose`. Load settings include offline mode, `AbortSignal`, progress,
+threads, context/batch/micro-batch tokens, and GPU layers. Chat supports
+OpenAI-like message/generation fields, tools, tool choice, parallel tool-call
+preference, and JSON/JSON-Schema structured output. `stream()` returns a frozen
+async iterator with `result` and `cancel(reason)`.
+
+### Availability and normalization
+
+**Browser with WebAssembly and a verified DBOPFS model.** WebGPU and
+cross-origin isolation are capability observations, not promised gates.
+Returned tools are validated structural data; the SDK never calls a handler.
+Cancellation normalizes to `ARCANE_AI_REQUEST_ABORTED`.
+
+### Example
+
+```javascript
+const provider = createBrowserWasmLlmProvider({
+    source,
+    store,
+    loadDefaults:{threads:1, contextTokens:4096, gpuLayers:0}
+});
+console.log(provider.status().state); // unloaded
+```
+
+## createDbopfsModelStore()
+
+### Overview
+
+Adapts an existing DBOPFS instance into an authenticated model cache without
+renaming its public methods. The adapter commits model bytes before the
+`arcane.ai.browser-wasm.model.v2` completion manifest and then reopens and
+rehashes the stored file.
+
+### Signature and result
+
+```text
+createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models' }={})
+```
+
+The frozen result contains `kind`, `tableName`, the original `adapter`, and
+`ready`, `openVerified`, `install`, `ensure`, and `remove`. `ensure()` returns
+`{file, manifest, cache:'verified'|'installed'}`. Every cache reuse rehashes the
+actual bytes. `offline:true` never downloads and rejects a miss with
+`ARCANE_AI_MODEL_OFFLINE_MISS`. Invalid cache records are removed fail closed.
+
+### Availability and normalization
+
+**Browser with a ready DBOPFS instance and OPFS.** The cache is local integrity
+evidence, not a transferable capability or license proof. Unload/dispose keep
+the cache; `store.remove(source)` explicitly deletes it.
+
+### Example
+
+```javascript
+const store = createDbopfsModelStore({dbopfs});
+await store.ready();
+const cached = await store.openVerified(source);
+console.log(cached ? 'verified cache' : 'cache miss');
 ```
 
 ## Data export subpaths

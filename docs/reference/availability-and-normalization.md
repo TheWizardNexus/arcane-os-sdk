@@ -29,6 +29,7 @@ version; WebKitGTK availability must not be generalized to macOS.
 | Scaffold, inspect, test, package, bundle, build, verify, or run an app | `arcane` CLI or `arcane-os` package functions | **Node**; native targets invoke one explicit provider | CLI events and SDK errors/results are normalized by versioned SDK contracts. Native artifact receipts remain target-specific inside a common receipt lifecycle. |
 | Publish application events or review a bounded event history | `arcane-os/event-manager` | **Node** and **Browser**; optional DOM capture needs a browser DOM or compatible host | Live listeners receive original arguments. Recorded payloads and metadata become bounded, redacted, deeply frozen `arcane-event-stack/1` snapshots. The stack format is local diagnostic data, not a host transport. |
 | Build browser UI and app-local behavior | `/arcane/modules/*.js`, shared entities, and components | **Browser**; many modules also run inside every native renderer | Pure modules own their result contracts. Modules that call `Arcane` inherit the bridge boundary described below. |
+| Run a caller-selected local LLM entirely in a browser renderer | `arcane-os/ai/browser-wasm` through `createArcaneAI()` | **Browser** only; WebAssembly and OPFS/DBOPFS are required, WebGPU is optional, and a cache miss uses the caller's admitted HTTPS model URL unless `offline:true` | The facade normalizes lifecycle, status, streaming, cancellation, and structural tool-call visibility. Model URL, byte length, SHA-256, license identifier, and revision remain explicit caller authority. |
 | Read host identity, capabilities, storage, preferences, appearance, or platform state | `globalThis.Arcane` | **Cross-host** where the method is implemented and admitted | Promise behavior and `Arcane.Error` are normalized. Result fields are normalized unless the method explicitly documents a platform-dependent snapshot. |
 | Use local AI without coupling app code to Ollama HTTP | `Arcane.localAI`, `Arcane.ai`, or `/arcane/modules/Ollama.js` | Primarily **Native**; Android exposes a narrower admitted inference projection | Admission, errors, and managed-operation events are normalized. Direct Ollama response envelopes remain **Provider-native**. |
 | Use OpenAI from the renderer profile | `/arcane/modules/AI.js` | **Cloud** from an allowed browser/native renderer | High-level AI chat/text behavior is normalized by the module; raw provider diagnostics and some response detail remain provider-specific. No automatic cloud fallback is inferred from local failure. |
@@ -76,6 +77,22 @@ separate diagnostic normalization boundary: snapshots are bounded, redacted,
 deeply frozen, and strictly importable as `arcane-event-stack/1`. DOM
 instrumentation adds browser diagnostics only; it does not replay browser
 state. See [EventManager and time-travel review](event-manager.md).
+
+### Browser-local provider adapter
+
+[`arcane-os/ai/browser-wasm`](ai/browser-wasm.md) exposes the same
+`arcane-ai-adapter/1` LLM lifecycle used by `createArcaneAI()`, while its
+packaged Wllama engine and caller-supplied model run inside the browser. This
+surface does not require an Arcane Core method grant because it does not call a
+Core host. Browser Fetch, CORS, storage policy, secure-context behavior, and
+resource limits still apply.
+
+`localOnly:true` describes inference after load; it does not promise that load
+is offline. A normal cache miss downloads from the exact caller-supplied HTTPS
+URL. `load({offline:true})` permits only an existing cache entry whose model
+bytes are fully rehashed, otherwise it rejects with
+`ARCANE_AI_MODEL_OFFLINE_MISS`. Tool calls are result data for application
+review and dispatch; the SDK never executes them.
 
 ### Arcane bridge-normalized
 

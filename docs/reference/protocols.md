@@ -104,8 +104,8 @@ import ollama from 'arcane/Ollama';
 ```
 
 The authenticated physical-v1 tree lives entirely beneath `arcane/`. It
-contains 155 pinned Arcane runtime files plus eight SDK browser-runtime files:
-163 files in all. Runtime `strong-type` 1.1 stays under
+contains 155 pinned Arcane runtime files plus 18 SDK browser-runtime files:
+173 files in all. Runtime `strong-type` 1.1 stays under
 `arcane/dependencies/strong-type/`; the focused SDK event surface lives under
 `arcane/sdk/`, with `event-pubsub` 6.1 and its sibling `strong-type` 2.0 under
 `arcane/sdk/dependencies/`. This URL-key separation prevents the runtime and SDK
@@ -114,13 +114,14 @@ app plus that authenticated tree. Packaging copies the same map, app entry, and
 physical bytes into `dist/<id>`; targets never resolve through the consumer
 workspace's root `node_modules/`.
 
-In SDK `0.1.0`, the generated map has exactly 85 entries: 73 named
-`arcane/*` modules, nine `arcane/entities/*` modules, and these three focused or
+In SDK `0.1.1`, the generated map has exactly 86 entries: 73 named
+`arcane/*` modules, nine `arcane/entities/*` modules, and these four focused or
 compatibility mappings:
 
 | Browser specifier | Physical target |
 | --- | --- |
 | `arcane-os/event-manager` | `./arcane/sdk/event-manager.mjs` |
+| `arcane-os/ai/browser-wasm` | `./arcane/sdk/ai/browser-wasm.mjs` |
 | `event-pubsub` | `./arcane/sdk/dependencies/event-pubsub/index.js` |
 | `./node_modules/strong-type/index.js` | `./arcane/dependencies/strong-type/index.js` |
 
@@ -167,14 +168,14 @@ heartbeat is event telemetry only and never regenerates browser state.
 
 `arcane.lock.json.sdkBrowserRuntime` persists the trusted manifest path,
 `manifestSha256`, `contentSha256`, `builder`, `sdkVersion`, and `source` record.
-For SDK `0.1.0` those identities are:
+For SDK `0.1.1` those identities are:
 
 ```text
 manifest: node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json
-manifestSha256: 43baaec850291c28795f6c194001deb5febab88ccab1b033bce6597dd6f6f08f
-contentSha256: 0caa302bc07d4a45f5290504ec62ddce98fdf5e3412f916c10aae3d51b1e5f7c
+manifestSha256: 33396b3d35322b784929270e7ca0a2a8b31d899c6e77bcb227edc95b37d0ae7d
+contentSha256: 5e03f45a732db51cb5a2b2193cc79ecda34501d07a9b2e82e794e5fa37d55d00
 builder: arcane-sdk-browser-runtime-v1
-sdkVersion: 0.1.0
+sdkVersion: 0.1.1
 source.protocol: arcane-sdk-browser-runtime/1
 source.browserEntry: arcane-os/event-manager
 ```
