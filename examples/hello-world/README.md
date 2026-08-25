@@ -2,7 +2,7 @@
 
 This maintained example is a browser Arcane application written with plain
 HTML, CSS, and JavaScript. The basic greeting runs without a model. An optional
-panel demonstrates the browser-WASM AI surface shipped in `arcane-os@0.1.1`
+panel demonstrates the browser-WASM AI surface shipped in `arcane-os@0.1.2`
 without downloading model weights automatically.
 
 ## Requirements
@@ -13,7 +13,7 @@ without downloading model weights automatically.
 ## Create the same project shape
 
 ```sh
-npx arcane-os@0.1.1 new hello-world --path ./hello-world --display-name "Arcane Hello World" --git
+npx arcane-os@0.1.2 new hello-world --path ./hello-world --display-name "Arcane Hello World" --git
 cd hello-world
 npm install
 ```
@@ -25,7 +25,7 @@ fixture extends that generated app with the optional local-AI panel below.
 A global CLI is supported as a convenience:
 
 ```sh
-npm install --global arcane-os@0.1.1
+npm install --global arcane-os@0.1.2
 arcane new hello-world --path ./hello-world
 ```
 

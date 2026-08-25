@@ -1372,11 +1372,11 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
     ]);
     await t.test('pins the current npm and runtime identities',()=>{
         assert.equal(rootPackage.version,'0.1.2');
-        assert.equal(examplePackage.devDependencies['arcane-os'],'0.1.1');
+        assert.equal(examplePackage.devDependencies['arcane-os'],'0.1.2');
         assert.equal(examplePackage.engines.node,'>=22.23.2');
         assert.equal(packageLock.lockfileVersion,3);
         assert.equal(packageLock.requires,true);
-        assert.equal(packageLock.packages[''].devDependencies['arcane-os'],'0.1.1');
+        assert.equal(packageLock.packages[''].devDependencies['arcane-os'],'0.1.2');
         assert.equal(packageLock.packages[''].engines.node,'>=22.23.2');
         const installedSdk=packageLock.packages['node_modules/arcane-os'];
         assert.deepEqual(
@@ -1389,15 +1389,15 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
                 node:installedSdk.engines.node
             },
             {
-                version:'0.1.1',
-                resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.1.1.tgz',
-                integrity:'sha512-EH4lwSiBqBuzzTA1YWPeat5b9YPO0m5iHfnmLrNN0qEPPmEOQvvsebg6nmUIXVlBKgPLzyVIFo/qQ2qS89MN+A==',
+                version:'0.1.2',
+                resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.1.2.tgz',
+                integrity:'sha512-fzVbd01xwFVCHTN6k8x/xPK8xtPy5yCtSkzFLmr1jNVTUBHzmnubLK8a5pWSGH7IhsWce+/AFHOu/TnWSKwDsQ==',
                 dev:true,
                 license:'AGPL-3.0-only',
                 node:'>=22.23.2'
             }
         );
-        assert.equal(lock.sdk.version,'0.1.1');
+        assert.equal(lock.sdk.version,'0.1.2');
         assert.equal(lock.runtime.contentSha256,runtimeRelease.contentSha256);
         assert.equal(lock.runtime.upstreamCommit,runtimeRelease.source.commit);
         assert.equal(lock.protocols.arcane,runtimeRelease.source.protocol);
@@ -1485,12 +1485,15 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         assert.ok(inline);
         assert.equal(inline[1],artifact);
 
+        const browserManifestBytes=await readFile(
+            path.join(repositoryRoot,'browser-runtime','ARCANE_SDK_BROWSER_RELEASE.json')
+        );
         assert.deepEqual(lock.sdkBrowserRuntime,{
             manifest:'node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json',
-            manifestSha256:'33396b3d35322b784929270e7ca0a2a8b31d899c6e77bcb227edc95b37d0ae7d',
-            contentSha256:'5e03f45a732db51cb5a2b2193cc79ecda34501d07a9b2e82e794e5fa37d55d00',
-            builder:'arcane-sdk-browser-runtime-v1',
-            sdkVersion:'0.1.1',
+            manifestSha256:createHash('sha256').update(browserManifestBytes).digest('hex'),
+            contentSha256:browserRelease.contentSha256,
+            builder:browserRelease.builder,
+            sdkVersion:browserRelease.sdkVersion,
             source:browserRelease.source
         });
     });
@@ -1585,9 +1588,9 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
             assert.equal(renderedTutorial.includes(source.trim()),true);
             assert.equal(renderedAlias.includes(source.trim()),false);
         }
-        assert.match(readme,/npx arcane-os@0[.]1[.]1 new[\s\S]*npm install/u);
+        assert.match(readme,/npx arcane-os@0[.]1[.]2 new[\s\S]*npm install/u);
         assert.match(readme,/generated project pins `arcane-os` exactly[\s\S]*project-local CLI/u);
-        assert.match(readme,/npm install --global arcane-os@0[.]1[.]1/u);
+        assert.match(readme,/npm install --global arcane-os@0[.]1[.]2/u);
         assert.match(readme,/## Source shape[\s\S]*same physical runtime paths[\s\S]*arcane[.]importmap[.]json/u);
         assert.match(
             readme,

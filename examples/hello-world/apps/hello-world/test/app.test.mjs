@@ -455,16 +455,16 @@ test('workspace pins the published SDK and browser release workflow',async funct
         readFile(new URL('arcane-packager.json',workspaceRoot),'utf8').then(JSON.parse),
         readFile(new URL('README.md',workspaceRoot),'utf8')
     ]);
-    assert.equal(packageJson.devDependencies['arcane-os'],'0.1.1');
+    assert.equal(packageJson.devDependencies['arcane-os'],'0.1.2');
     assert.equal(packageJson.engines.node,'>=22.23.2');
-    assert.equal(packageLock.packages[''].devDependencies['arcane-os'],'0.1.1');
-    assert.equal(packageLock.packages['node_modules/arcane-os'].version,'0.1.1');
+    assert.equal(packageLock.packages[''].devDependencies['arcane-os'],'0.1.2');
+    assert.equal(packageLock.packages['node_modules/arcane-os'].version,'0.1.2');
     assert.equal(
         packageLock.packages['node_modules/arcane-os'].integrity,
-        'sha512-EH4lwSiBqBuzzTA1YWPeat5b9YPO0m5iHfnmLrNN0qEPPmEOQvvsebg6nmUIXVlBKgPLzyVIFo/qQ2qS89MN+A=='
+        'sha512-fzVbd01xwFVCHTN6k8x/xPK8xtPy5yCtSkzFLmr1jNVTUBHzmnubLK8a5pWSGH7IhsWce+/AFHOu/TnWSKwDsQ=='
     );
-    assert.equal(lock.sdk.version,'0.1.1');
-    assert.equal(lock.sdkBrowserRuntime.sdkVersion,'0.1.1');
+    assert.equal(lock.sdk.version,'0.1.2');
+    assert.equal(lock.sdkBrowserRuntime.sdkVersion,'0.1.2');
     assert.equal(
         lock.sdkBrowserRuntime.contentSha256,
         '5e03f45a732db51cb5a2b2193cc79ecda34501d07a9b2e82e794e5fa37d55d00'
