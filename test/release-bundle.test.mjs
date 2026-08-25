@@ -27,7 +27,7 @@ import {
 } from '../src/release-bundle.mjs';
 import {temporaryDirectory} from './helpers.mjs';
 
-const GOLDEN_BUNDLE_SHA256='89c85c622bf1f975de8b3a1560643d5321a6c4ff55924e2f95bf31d879ff6c22';
+const GOLDEN_BUNDLE_SHA256='a1f296f6dbb4e27d3a367cc54ccc1e27c1863fcf590381baada9b804c621e0f9';
 
 async function writeJson(filePath,value){
     await mkdir(path.dirname(filePath),{recursive:true});

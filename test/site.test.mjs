@@ -681,7 +681,7 @@ test('the complete API reference is a first-party generated Pages corpus',async 
             sdk,
             /There is no exported\s+<code>importMapApplication\(\)<\/code> or <code>generateImportMap\(\)<\/code> binding/u
         );
-        assert.equal(packageApi.sdkVersion,'0.1.1');
+        assert.equal(packageApi.sdkVersion,'0.1.2');
         assert.equal(packageApi.memberCount,163);
         assert.equal(packageApi.members.some(member=>[
             'importMapApplication','generateImportMap'
@@ -1371,7 +1371,7 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         readJson(path.join(exampleRoot,'arcane-packager.json'))
     ]);
     await t.test('pins the current npm and runtime identities',()=>{
-        assert.equal(rootPackage.version,'0.1.1');
+        assert.equal(rootPackage.version,'0.1.2');
         assert.equal(examplePackage.devDependencies['arcane-os'],'0.1.1');
         assert.equal(examplePackage.engines.node,'>=22.23.2');
         assert.equal(packageLock.lockfileVersion,3);
@@ -1485,15 +1485,12 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         assert.ok(inline);
         assert.equal(inline[1],artifact);
 
-        const browserManifestBytes=await readFile(
-            path.join(repositoryRoot,'browser-runtime','ARCANE_SDK_BROWSER_RELEASE.json')
-        );
         assert.deepEqual(lock.sdkBrowserRuntime,{
             manifest:'node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json',
-            manifestSha256:createHash('sha256').update(browserManifestBytes).digest('hex'),
-            contentSha256:browserRelease.contentSha256,
-            builder:browserRelease.builder,
-            sdkVersion:browserRelease.sdkVersion,
+            manifestSha256:'33396b3d35322b784929270e7ca0a2a8b31d899c6e77bcb227edc95b37d0ae7d',
+            contentSha256:'5e03f45a732db51cb5a2b2193cc79ecda34501d07a9b2e82e794e5fa37d55d00',
+            builder:'arcane-sdk-browser-runtime-v1',
+            sdkVersion:'0.1.1',
             source:browserRelease.source
         });
     });

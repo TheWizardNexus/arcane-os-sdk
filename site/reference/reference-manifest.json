@@ -231,8 +231,8 @@
       "source": "docs/reference/inventory/",
       "output": "site/reference/inventory/index.html",
       "route": "reference/inventory/",
-      "sourceSha256": "ce6e9fe8c5bb6b58da44c107808ecbc9d4b57a327e26d5535a0cfc2a092a5e48",
-      "outputSha256": "95d1506ac9c338a039bec86eac2812d1e77c8d329fb83202e0c710f2d7f41eb2",
+      "sourceSha256": "274178d4a20402f40d1fb6cda3c3765c24455fb77448eb04edc2aaccfa6ec9af",
+      "outputSha256": "ca60023aa65504aa8dbb5227d33baefd2e03418ce004f62db4499ef9481a0b82",
       "kind": "collection"
     },
     {
@@ -1814,8 +1814,8 @@
       "source": "docs/reference/inventory/package-api.json",
       "output": "site/reference/inventory/package-api.json",
       "route": "reference/inventory/package-api.json",
-      "sourceSha256": "e971123abe79771049c085a17ddae4b397a6ea3b466551f517e76ed69267f485",
-      "outputSha256": "e971123abe79771049c085a17ddae4b397a6ea3b466551f517e76ed69267f485"
+      "sourceSha256": "05fe17a2db21eeccfdb236ab7da7f12fa178603812d056eb46285f0e4abbaa34",
+      "outputSha256": "05fe17a2db21eeccfdb236ab7da7f12fa178603812d056eb46285f0e4abbaa34"
     },
     {
       "source": "docs/reference/inventory/runtime-components.json",

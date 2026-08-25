@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "builder": "arcane-sdk-browser-runtime-v1",
-  "sdkVersion": "0.1.1",
+  "sdkVersion": "0.1.2",
   "source": {
     "authority": "arcane-os-sdk",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
