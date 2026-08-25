@@ -95,14 +95,40 @@ jobs:
       - name: Install the caller's exact dependency lock
         working-directory: ${{ inputs.workspace }}
         run: npm ci --ignore-scripts
-      - name: Require the release-bundle SDK generation
+      - name: Require the exact public release-bundle SDK authority
         shell: bash
         working-directory: ${{ inputs.workspace }}
         run: |
           node --input-type=module <<'NODE'
-          import packageDocument from 'arcane-os/package.json' with {type:'json'};
-          if(packageDocument.version !== '0.1.0-dev.5'){
-            throw new Error(`Expected arcane-os@0.1.0-dev.5, received ${packageDocument.version}.`);
+          import {readFile} from 'node:fs/promises';
+
+          const [packageDocument,lockDocument]=await Promise.all([
+            readFile('node_modules/arcane-os/package.json','utf8').then(JSON.parse),
+            readFile('package-lock.json','utf8').then(JSON.parse)
+          ]);
+          const root=lockDocument.packages?.[''];
+          const locked=lockDocument.packages?.['node_modules/arcane-os'];
+          const expected={
+            name:'arcane-os',
+            installedVersion:'0.1.1',
+            requestedSpec:'0.1.1',
+            lockedVersion:'0.1.1',
+            resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.1.1.tgz',
+            integrity:'sha512-EH4lwSiBqBuzzTA1YWPeat5b9YPO0m5iHfnmLrNN0qEPPmEOQvvsebg6nmUIXVlBKgPLzyVIFo/qQ2qS89MN+A=='
+          };
+          const actual={
+            name:packageDocument.name,
+            installedVersion:packageDocument.version,
+            requestedSpec:root?.dependencies?.['arcane-os']??root?.devDependencies?.['arcane-os'],
+            lockedVersion:locked?.version,
+            resolved:locked?.resolved,
+            integrity:locked?.integrity
+          };
+          if(Object.keys(expected).some(key=>actual[key]!==expected[key])){
+            throw new Error(
+              `Expected exact public arcane-os@0.1.1 registry authority ${JSON.stringify(expected)}, `
+                +`received ${JSON.stringify(actual)}.`
+            );
           }
           NODE
       - name: Check and package the selected application

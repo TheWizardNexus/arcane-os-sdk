@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import {execFile} from 'node:child_process';
+import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
+import {promisify} from 'node:util';
 import test from '../src/testing.mjs';
-import {repositoryRoot} from './helpers.mjs';
+import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
 import {normalizeRelativePath,parseSemver} from '../src/packager/core.mjs';
 import {validateAppBundlePath} from '../src/release-bundle.mjs';
 import {listTargets} from '../src/targets/index.mjs';
 import * as sdk from '../src/index.mjs';
+
+const execFileAsync=promisify(execFile);
 
 async function readSchema(fileName){
     return JSON.parse(await readFile(path.join(repositoryRoot,'schemas',fileName),'utf8'));
@@ -467,10 +471,84 @@ test('CI, reusable app release, and trusted publishing workflows retain narrow a
             /npm install --global|npm pack(?:\s|$)|NODE_AUTH_TOKEN|npm dist-tag (?:add|rm)/u
         );
     });
-    await t.test('app release is reusable, single-app, and exact-SDK bound',()=>{
+    await t.test('app release is reusable, single-app, and exact-SDK bound',async child=>{
         assert.match(appReleaseWorkflow,/workflow_call:/u);
         assert.match(appReleaseWorkflow,/app-id:/u);
-        assert.match(appReleaseWorkflow,/Expected arcane-os@0\.1\.0-dev\.5/u);
+        assert.match(appReleaseWorkflow,/Expected exact public arcane-os@0\.1\.1 registry authority/u);
+        assert.match(
+            appReleaseWorkflow,
+            /https:\/\/registry\.npmjs\.org\/arcane-os\/-\/arcane-os-0\.1\.1\.tgz/u
+        );
+        assert.match(
+            appReleaseWorkflow,
+            /sha512-EH4lwSiBqBuzzTA1YWPeat5b9YPO0m5iHfnmLrNN0qEPPmEOQvvsebg6nmUIXVlBKgPLzyVIFo\/qQ2qS89MN\+A==/u
+        );
+        assert.doesNotMatch(appReleaseWorkflow,/arcane-os@0\.1\.0-dev\.5/u);
+        assert.doesNotMatch(buildSection,/npm (?:view|pack)|\bcurl\b|\bwget\b/u);
+
+        const authorityMatch=buildSection.match(
+            /- name: Require the exact public release-bundle SDK authority[\s\S]*?node --input-type=module <<'NODE'\r?\n([\s\S]*?)\r?\n\s+NODE/u
+        );
+        assert.ok(authorityMatch,'release-app.yml must expose one exact SDK authority verifier');
+        const authorityScript=`${authorityMatch[1].replace(/^ {10}/gmu,'')}\n`;
+        const fixtureRoot=await temporaryDirectory(child,{prefix:'arcane-release-app-sdk-'});
+        const installRoot=path.join(fixtureRoot,'node_modules','arcane-os');
+        await mkdir(installRoot,{recursive:true});
+        const runAuthority=async({version,requestedSpec=version,resolved,integrity})=>{
+            await Promise.all([
+                writeFile(
+                    path.join(installRoot,'package.json'),
+                    `${JSON.stringify({name:'arcane-os',version,type:'module'},null,2)}\n`
+                ),
+                writeFile(path.join(fixtureRoot,'package-lock.json'),`${JSON.stringify({
+                    name:'arcane-release-app-fixture',
+                    lockfileVersion:3,
+                    requires:true,
+                    packages:{
+                        '':{dependencies:{'arcane-os':requestedSpec}},
+                        'node_modules/arcane-os':{version,resolved,integrity}
+                    }
+                },null,2)}\n`)
+            ]);
+            return execFileAsync(process.execPath,[
+                '--input-type=module','--eval',authorityScript
+            ],{cwd:fixtureRoot,encoding:'utf8',windowsHide:true});
+        };
+        await runAuthority({
+            version:'0.1.1',
+            resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.1.1.tgz',
+            integrity:'sha512-EH4lwSiBqBuzzTA1YWPeat5b9YPO0m5iHfnmLrNN0qEPPmEOQvvsebg6nmUIXVlBKgPLzyVIFo/qQ2qS89MN+A=='
+        });
+        await assert.rejects(
+            runAuthority({
+                version:'0.1.0-dev.5',
+                resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.1.0-dev.5.tgz',
+                integrity:'sha512-8cUo/Us9PthnPk5c4r9Td7dx6ERKALAUiVL4dprWh5fGf3jGm89uB4fVpXktLErWnw81r7aGmq8LXHLPEMrz7g=='
+            }),
+            error=>{
+                assert.equal(error.code,1);
+                assert.match(
+                    error.stderr,
+                    /Expected exact public arcane-os@0\.1\.1 registry authority/u
+                );
+                return true;
+            }
+        );
+        await assert.rejects(
+            runAuthority({
+                version:'0.1.1',
+                resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.1.1.tgz',
+                integrity:'sha512-forged'
+            }),
+            error=>{
+                assert.equal(error.code,1);
+                assert.match(
+                    error.stderr,
+                    /Expected exact public arcane-os@0\.1\.1 registry authority/u
+                );
+                return true;
+            }
+        );
         assert.match(buildSection,/arcane check[^\n]*--app "\$APP_ID"/u);
         assert.match(buildSection,/arcane package[^\n]*--app "\$APP_ID"/u);
         assert.match(buildSection,/arcane bundle[\s\S]*--app "\$APP_ID"/u);
