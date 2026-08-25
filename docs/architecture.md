@@ -38,6 +38,32 @@ tree; it cannot recursively select Arcane root tests or another app's tests.
 External repositories retain their existing workspace-root plus selected-app
 test layout.
 
+## Development and release serving boundary
+
+Arcane applications keep one browser-first plain HTML, CSS, and JavaScript
+baseline. A native target runs that same application and progressively enhances
+it through capability-gated Arcane Core access. Browser operation must not
+depend on Core being present. A feature that genuinely requires Core fails
+closed and explains its unavailability without breaking unrelated browser
+behavior or claiming that the capability exists.
+
+Rapid development uses `arcane dev`. The development server maps the selected
+application's canonical source tree and the live installed SDK/runtime routes.
+Each request reads the current saved source into the existing bounded response
+snapshot, so a browser refresh shows source changes without packaging, copying
+files into `dist`, or restarting the server. Restarting is not a content
+synchronization step; when a refresh is stale, first verify the command, URL,
+workspace, selected app, and resolved source route.
+
+Package and release verification use a separate explicit boundary. Run
+`arcane package` to generate and verify `dist/<id>`, then use
+`arcane run --target browser` to serve only that verified release. The browser
+run command does not rebuild or substitute source files. If source changes
+after packaging, the prior `dist` remains intentionally unchanged until the
+next explicit package operation. Never use packaged `dist` as the everyday
+development tree, and never treat source-serving behavior as evidence for the
+release artifact.
+
 ## App and release contract
 
 The first SDK version deliberately preserves Arcane's current repository-shaped
