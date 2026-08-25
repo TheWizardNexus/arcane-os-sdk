@@ -181,6 +181,32 @@ async function doctor(workspaceRoot,appId='doctor-app'){
     });
 }
 
+async function withNodeVersion(version,callback){
+    const descriptor=Object.getOwnPropertyDescriptor(process.versions,'node');
+    Object.defineProperty(process.versions,'node',{...descriptor,value:version});
+    try{
+        return await callback();
+    }finally{
+        Object.defineProperty(process.versions,'node',descriptor);
+    }
+}
+
+test('doctor enforces the exact Node.js 22.23.2 minimum',async t=>{
+    const workspaceRoot=await mkdtemp(path.join(os.tmpdir(),'arcane-doctor-node-floor-'));
+    t.after(()=>rm(workspaceRoot,{recursive:true,force:true}));
+    const below=await withNodeVersion('22.23.1',()=>doctor(workspaceRoot));
+    const minimum=await withNodeVersion('22.23.2',()=>doctor(workspaceRoot));
+    const belowCheck=below.checks.find(item=>item.id==='node');
+    const minimumCheck=minimum.checks.find(item=>item.id==='node');
+    assert.equal(below.ok,false);
+    assert.equal(belowCheck.status,'fail');
+    assert.equal(belowCheck.required,true);
+    assert.deepEqual(belowCheck.details,{version:'22.23.1',minimum:'22.23.2'});
+    assert.match(belowCheck.message,/does not satisfy the SDK minimum 22\.23\.2/u);
+    assert.equal(minimumCheck.status,'pass');
+    assert.deepEqual(minimumCheck.details,{version:'22.23.2',minimum:'22.23.2'});
+});
+
 function workspaceChecks(report){
     const selected=report.checks.filter(item=>item.id==='workspace'||item.id==='workspace-runtime');
     assert.deepEqual(selected.map(item=>item.id),['workspace','workspace-runtime']);

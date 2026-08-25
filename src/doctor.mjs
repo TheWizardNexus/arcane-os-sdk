@@ -8,7 +8,7 @@ import {runProcess} from './process.mjs';
 import {ARCANE_PROTOCOL,SDK_VERSION} from './constants.mjs';
 import {ERROR_CODES,ArcaneError,throwIfAborted} from './errors.mjs';
 
-const MINIMUM_NODE=[22,14,0];
+const MINIMUM_NODE=[22,23,2];
 const WINDOWS_SERVICE_NAME='ArcaneOllama';
 const WINDOWS_SERVICE_HOST='C:\\Program Files\\Ollama\\ArcaneOllamaService.exe';
 const WINDOWS_SERVICE_COMMAND=`"${WINDOWS_SERVICE_HOST}"`;
