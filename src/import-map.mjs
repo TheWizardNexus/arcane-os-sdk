@@ -15,7 +15,18 @@ const JAVASCRIPT_EXTENSION=/\.(?:js|mjs)$/u;
 const NODE_ONLY_MODULE='modules/CaseEvidenceIndexer.js';
 const RUNTIME_STRONG_TYPE_IMPORT='../../node_modules/strong-type/index.js';
 const SDK_BROWSER_ENTRY='sdk/event-manager.mjs';
+const SDK_BROWSER_AI_ENTRY='sdk/ai/browser-wasm.mjs';
 const SDK_BROWSER_FILES=Object.freeze([
+    'sdk/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json',
+    'sdk/ai/browser-wasm-llm-provider.mjs',
+    SDK_BROWSER_AI_ENTRY,
+    'sdk/ai/browser-wllama-runtime.mjs',
+    'sdk/ai/internal/sha256.mjs',
+    'sdk/ai/model-controller.mjs',
+    'sdk/ai/wllama/LICENCE',
+    'sdk/ai/wllama/index.mjs',
+    'sdk/ai/wllama/llama.cpp-LICENSE',
+    'sdk/ai/wllama/wllama.wasm',
     SDK_BROWSER_ENTRY,
     'sdk/dom-event-instrumentation.mjs',
     'sdk/dependencies/event-pubsub/index.js',
@@ -954,6 +965,10 @@ export async function buildImportMap({files,readFile,signal}={}){
         roots.push(relative);
     }
     const hasSdkBrowserGraph=inventory.has(SDK_BROWSER_ENTRY);
+    const hasSdkAiGraph=inventory.has(SDK_BROWSER_AI_ENTRY);
+    if(hasSdkAiGraph&&!hasSdkBrowserGraph){
+        unresolved(SDK_BROWSER_AI_ENTRY,'<authenticated SDK browser closure>',SDK_BROWSER_ENTRY);
+    }
     if(hasSdkBrowserGraph){
         for(const required of SDK_BROWSER_FILES){
             if(!inventory.has(required)){
@@ -995,9 +1010,18 @@ export async function buildImportMap({files,readFile,signal}={}){
             'arcane-os/event-manager',
             './arcane/sdk/event-manager.mjs'
         );
+        if(hasSdkAiGraph){
+            registerSpecifier(
+                namedRegistry,
+                'arcane-os/ai/browser-wasm',
+                './arcane/sdk/ai/browser-wasm.mjs'
+            );
+        }
     }
 
-    const queue=[...roots,...(hasSdkBrowserGraph?[SDK_BROWSER_ENTRY]:[])];
+    const sdkRoots=hasSdkBrowserGraph
+        ?[SDK_BROWSER_ENTRY,...(hasSdkAiGraph?[SDK_BROWSER_AI_ENTRY]:[])]:[];
+    const queue=[...roots,...sdkRoots];
     const reached=new Set();
     const entities=new Set();
     let usesRuntimeStrongType=false;

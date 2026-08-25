@@ -74,6 +74,47 @@ async function copyShippedRuntime(workspaceRoot){
 }
 
 async function writeSdkBrowserGraph(workspaceRoot){
+    await writeWorkspaceFile(
+        workspaceRoot,
+        'arcane/sdk/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json',
+        '{"schemaVersion":1}\n'
+    );
+    await writeWorkspaceFile(workspaceRoot,'arcane/sdk/ai/browser-wasm.mjs',[
+        "export * from './browser-wasm-llm-provider.mjs';",
+        "export * from './browser-wllama-runtime.mjs';",
+        ''
+    ].join('\n'));
+    await writeWorkspaceFile(workspaceRoot,'arcane/sdk/ai/browser-wasm-llm-provider.mjs',[
+        "import './model-controller.mjs';",
+        "import './internal/sha256.mjs';",
+        'export const provider=true;',
+        ''
+    ].join('\n'));
+    await writeWorkspaceFile(workspaceRoot,'arcane/sdk/ai/browser-wllama-runtime.mjs',[
+        "import './wllama/index.mjs';",
+        'export const runtime=true;',
+        ''
+    ].join('\n'));
+    await writeWorkspaceFile(
+        workspaceRoot,
+        'arcane/sdk/ai/internal/sha256.mjs',
+        'export const sha256=true;\n'
+    );
+    await writeWorkspaceFile(
+        workspaceRoot,
+        'arcane/sdk/ai/model-controller.mjs',
+        'export const controller=true;\n'
+    );
+    await writeWorkspaceFile(
+        workspaceRoot,
+        'arcane/sdk/ai/wllama/index.mjs',
+        'export const Wllama=true;\n'
+    );
+    for(const relative of [
+        'arcane/sdk/ai/wllama/LICENCE',
+        'arcane/sdk/ai/wllama/llama.cpp-LICENSE',
+        'arcane/sdk/ai/wllama/wllama.wasm'
+    ])await writeWorkspaceFile(workspaceRoot,relative,'fixture\n');
     await writeWorkspaceFile(workspaceRoot,'arcane/sdk/event-manager.mjs',[
         "import EventPubSub from 'event-pubsub';",
         "export {domEvent} from './dom-event-instrumentation.mjs';",
@@ -152,7 +193,7 @@ test('shipped Arcane modules and transitive dependencies produce the exact named
         onEvent:event=>events.push(event)
     });
 
-    assert.equal(receipt.entryCount,85);
+    assert.equal(receipt.entryCount,86);
     assert.deepEqual(receipt.cleanupWarnings,[]);
     assert.deepEqual(receipt.excludedModules,['modules/CaseEvidenceIndexer.js']);
     assert.equal(receipt.artifactPath,path.join(appRoot,'modules','arcane.importmap.json'));
@@ -199,6 +240,10 @@ test('shipped Arcane modules and transitive dependencies produce the exact named
     assert.equal(
         document.imports['arcane-os/event-manager'],
         './arcane/sdk/event-manager.mjs'
+    );
+    assert.equal(
+        document.imports['arcane-os/ai/browser-wasm'],
+        './arcane/sdk/ai/browser-wasm.mjs'
     );
     assert.equal(
         document.imports['event-pubsub'],
@@ -890,6 +935,7 @@ test('regeneration is byte-stable, removes stale entries, and preserves prior fi
         'arcane/Leaf':'./arcane/modules/Leaf.mjs',
         'arcane/Root':'./arcane/modules/Root.js',
         'arcane/entities/Thing':'./arcane/entities/Thing.js',
+        'arcane-os/ai/browser-wasm':'./arcane/sdk/ai/browser-wasm.mjs',
         'arcane-os/event-manager':'./arcane/sdk/event-manager.mjs',
         'event-pubsub':'./arcane/sdk/dependencies/event-pubsub/index.js',
         './node_modules/strong-type/index.js':'./arcane/dependencies/strong-type/index.js'

@@ -165,26 +165,50 @@ jobs:
             'node_modules/strong-type/licence',
             'browser-runtime/dependencies/event-pubsub/licence',
             'browser-runtime/dependencies/strong-type/licence',
+            'browser-runtime/ai/wllama/LICENCE',
+            'browser-runtime/ai/wllama/llama.cpp-LICENSE',
             'runtime/arcane/modules/uPlot.LICENSE.txt',
             'runtime/strong-type/licence'
           ];
           for(const requiredPath of required){
             if(!files.has(requiredPath))throw new Error(`Missing release license: ${requiredPath}.`);
           }
+          const exactBrowserAiProjection=new Set([
+            'browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json',
+            'browser-runtime/ai/browser-wasm-llm-provider.mjs',
+            'browser-runtime/ai/browser-wasm.mjs',
+            'browser-runtime/ai/browser-wllama-runtime.mjs',
+            'browser-runtime/ai/internal/sha256.mjs',
+            'browser-runtime/ai/model-controller.mjs',
+            'browser-runtime/ai/wllama/LICENCE',
+            'browser-runtime/ai/wllama/index.mjs',
+            'browser-runtime/ai/wllama/llama.cpp-LICENSE',
+            'browser-runtime/ai/wllama/wllama.wasm'
+          ]);
+          for(const exactPath of exactBrowserAiProjection){
+            if(!files.has(exactPath))throw new Error(`Missing authenticated browser-AI component: ${exactPath}.`);
+          }
           const forbiddenPrefixes=[
             'native/',
             'src/ai/',
-            'browser-runtime/ai/',
             'licenses/ai/',
+            'models/',
+            'weights/',
+            'speech/',
+            'espeak/',
             'node_modules/kokoro-js/',
             'node_modules/phonemizer/',
             'node_modules/espeak-ng/'
           ];
-          const forbiddenExtension=/\.(?:gguf|wasm|data|exe|dll|so|dylib|node|py|c|cc|cpp|h|sh|ps1|bat|cmd)$/iu;
+          const forbiddenExtension=/\.(?:gguf|ggml|safetensors|onnx|ort|tflite|mlmodel|pb|pt|pth|bin|wasm|data|a|lib|exe|dll|so|dylib|node|wav|flac|mp3|ogg|opus|py|c|cc|cpp|h|sh|ps1|bat|cmd)$/iu;
           for(const file of files){
-            if(forbiddenPrefixes.some(prefix=>file.startsWith(prefix))||forbiddenExtension.test(file)){
+            const browserAi=file.startsWith('browser-runtime/ai/');
+            const allowedWasm=file==='browser-runtime/ai/wllama/wllama.wasm';
+            if((browserAi&&!exactBrowserAiProjection.has(file))
+              ||forbiddenPrefixes.some(prefix=>file.startsWith(prefix))
+              ||(forbiddenExtension.test(file)&&!allowedWasm)){
               throw new Error(`Nonstandard release content requires separate authorization: ${file}.`);
             }
           }
-          console.log(`Verified ${files.size} standard-content files and ${required.length} license boundaries.`);
+          console.log(`Verified ${files.size} release files, ${exactBrowserAiProjection.size} authenticated browser-AI components, and ${required.length} license boundaries.`);
           NODE

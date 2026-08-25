@@ -16,6 +16,16 @@ import {
 } from './helpers.mjs';
 
 const SDK_BROWSER_RUNTIME_FILES=Object.freeze([
+    'ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json',
+    'ai/browser-wasm-llm-provider.mjs',
+    'ai/browser-wasm.mjs',
+    'ai/browser-wllama-runtime.mjs',
+    'ai/internal/sha256.mjs',
+    'ai/model-controller.mjs',
+    'ai/wllama/LICENCE',
+    'ai/wllama/index.mjs',
+    'ai/wllama/llama.cpp-LICENSE',
+    'ai/wllama/wllama.wasm',
     'dependencies/event-pubsub/index.js',
     'dependencies/event-pubsub/licence',
     'dependencies/event-pubsub/package.json',
@@ -29,6 +39,21 @@ const SDK_BROWSER_RUNTIME_PACKAGE_FILES=Object.freeze([
     'ARCANE_SDK_BROWSER_RELEASE.json',
     ...SDK_BROWSER_RUNTIME_FILES
 ].map(file=>`browser-runtime/${file}`).sort());
+const AUTHORITATIVE_BROWSER_AI_CONTRACT=
+    process.env.ARCANE_BROWSER_AI_RUNTIME_CONTRACT==='1';
+const DEBUG_BROWSER_AI_CONTRACT=
+    process.env.ARCANE_BROWSER_AI_DEBUG_CONTRACT==='1';
+const BROWSER_AI_CONTRACT_ENABLED=
+    AUTHORITATIVE_BROWSER_AI_CONTRACT||DEBUG_BROWSER_AI_CONTRACT;
+const DEBUG_MODEL_PATH_PRESENT=Object.hasOwn(
+    process.env,
+    'ARCANE_BROWSER_AI_DEBUG_MODEL_PATH'
+);
+const FORBIDDEN_PACKED_ASSET_EXTENSION=
+    /\.(?:gguf|ggml|safetensors|onnx|ort|tflite|mlmodel|pb|pt|pth|bin|data|exe|dll|so|dylib|node|a|lib|wav|flac|mp3|ogg|opus)$/iu;
+const PACKED_WASM_ALLOWLIST=Object.freeze([
+    'browser-runtime/ai/wllama/wllama.wasm'
+]);
 
 async function realFileInventory(root,relativeRoot=''){
     const files=[];
@@ -60,8 +85,27 @@ function runNpm(arguments_,options){
 }
 
 test('packed npm artifact installs and drives an external repository end to end',{
-    timeout:600_000
+    timeout:BROWSER_AI_CONTRACT_ENABLED?3_600_000:600_000
 },async t=>{
+    assert.equal(
+        AUTHORITATIVE_BROWSER_AI_CONTRACT&&DEBUG_BROWSER_AI_CONTRACT,
+        false,
+        'Authoritative and disposable-debug browser-AI modes are mutually exclusive.'
+    );
+    if(AUTHORITATIVE_BROWSER_AI_CONTRACT){
+        assert.equal(
+            DEBUG_MODEL_PATH_PRESENT,
+            false,
+            'Authoritative Granite validation rejects the disposable debug model environment.'
+        );
+    }
+    if(DEBUG_BROWSER_AI_CONTRACT){
+        assert.equal(
+            DEBUG_MODEL_PATH_PRESENT,
+            true,
+            'Disposable-debug validation requires ARCANE_BROWSER_AI_DEBUG_MODEL_PATH.'
+        );
+    }
     const temporary=await temporaryDirectory(t,{prefix:'arcane-tarball-'});
     const releaseMetadataPath=process.env.ARCANE_SDK_NPM_RELEASE_METADATA;
     let tarballPath;
@@ -147,9 +191,19 @@ test('packed npm artifact installs and drives an external repository end to end'
         assert.ok(packReport.files.some(file=>file.path==='src/release-bundle.mjs'));
         assert.ok(packReport.files.some(file=>file.path==='src/templates/assets/app-icon.png'));
         assert.ok(packReport.files.some(file=>file.path==='NOTICE'));
+        const packedPaths=packReport.files.map(file=>file.path);
         assert.deepEqual(
-            packReport.files
-                .map(file=>file.path)
+            packedPaths.filter(file=>FORBIDDEN_PACKED_ASSET_EXTENSION.test(file)),
+            [],
+            'The npm artifact contains model, native, or speech payload bytes.'
+        );
+        assert.deepEqual(
+            packedPaths.filter(file=>file.toLowerCase().endsWith('.wasm')).sort(),
+            PACKED_WASM_ALLOWLIST,
+            'The npm artifact contains an unadmitted WASM asset.'
+        );
+        assert.deepEqual(
+            packedPaths
                 .filter(file=>file.startsWith('browser-runtime/'))
                 .sort(),
             SDK_BROWSER_RUNTIME_PACKAGE_FILES
@@ -219,14 +273,51 @@ test('packed npm artifact installs and drives an external repository end to end'
                     version:'2.0.0',
                     resolved:'https://registry.npmjs.org/strong-type/-/strong-type-2.0.0.tgz',
                     integrity:'sha512-HHrY9qYC7yn+5mlewiI3k9RQM9gZqGQsqbomZcd10Ks0h4RlX01nnkWbCe4AsVPCI6KaFvpkWm1nHMD+Ykup6g=='
+                },
+                {
+                    name:'@wllama/wllama',
+                    version:'3.6.0',
+                    resolved:'https://registry.npmjs.org/@wllama/wllama/-/wllama-3.6.0.tgz',
+                    integrity:'sha512-NN3ZBXqaaUwGXTQubkNvsCaLPjN2XVa0bVS40OYCE8zquYmRc2W3oHYEgwvuSWWDB8aUqTLyMioySCXNkcnD1w=='
                 }
             ]
         });
+        const aiComponents=JSON.parse(await readFile(
+            path.join(browserRuntimeRoot,'ai','ARCANE_AI_BROWSER_WASM_COMPONENTS.json'),
+            'utf8'
+        ));
+        assert.equal(aiComponents.packageExport,'arcane-os/ai/browser-wasm');
+        assert.equal(aiComponents.runtimePolicy.modelWeightsPacked,false);
+        assert.equal(aiComponents.runtimePolicy.remoteModelHelpers,false);
+        assert.equal(aiComponents.runtimePolicy.toolCalls,'structural-only-never-executed');
+        const aiComponentFiles=new Map(aiComponents.components.flatMap(component=>
+            component.files.map(file=>[file.path,file])
+        ));
+        const packagedOnlySources=new Set([
+            'ai/wllama/LICENCE',
+            'ai/wllama/index.mjs',
+            'ai/wllama/wllama.wasm'
+        ]);
         for(const file of manifest.files){
             const snapshot=await readFile(path.join(browserRuntimeRoot,...file.path.split('/')));
+            assert.equal(snapshot.length,file.bytes,`${file.path} byte length drifted.`);
+            assert.equal(
+                createHash('sha256').update(snapshot).digest('hex'),
+                file.sha256,
+                `${file.path} digest drifted.`
+            );
+            if(packagedOnlySources.has(file.path)){
+                const componentFile=aiComponentFiles.get(file.path);
+                assert.ok(componentFile,`${file.path} lacks component authority.`);
+                assert.equal(componentFile.bytes,file.bytes);
+                assert.equal(componentFile.sha256,file.sha256);
+                continue;
+            }
             const source=await readFile(path.join(installedPackageRoot,...file.sourcePath.split('/')));
             assert.deepEqual(snapshot,source,`${file.path} diverged from ${file.sourcePath}.`);
         }
+        const wasmBytes=await readFile(path.join(browserRuntimeRoot,'ai','wllama','wllama.wasm'));
+        assert.deepEqual([...wasmBytes.subarray(0,4)],[0x00,0x61,0x73,0x6d]);
 
         const browserRuntimeApi=await import(pathToFileURL(path.join(
             installedPackageRoot,'src','sdk-browser-runtime.mjs'
@@ -585,6 +676,36 @@ export default arcaneNativeBuilderProvider;
             await readFile(path.join(workspaceRoot,'apps','external-app','index.html'),'utf8')
         );
     });
+
+    if(BROWSER_AI_CONTRACT_ENABLED){
+        await t.test('executes real browser-WASM inference once from the installed tarball',{
+            timeout:3_600_000
+        },async()=>{
+            const contractSource=path.join(repositoryRoot,'test','browser-ai-runtime.contract.mjs');
+            const contractPath=path.join(workspaceRoot,'browser-ai-runtime.contract.test.mjs');
+            await copyFile(contractSource,contractPath);
+            assert.deepEqual(await readFile(contractPath),await readFile(contractSource));
+            const installedRunner=path.join(
+                workspaceRoot,'node_modules','arcane-os','bin','arcane-test.mjs'
+            );
+            const contractEnvironment={...process.env};
+            delete contractEnvironment.ARCANE_BROWSER_AI_RUNTIME_CONTRACT_INSTALLED;
+            delete contractEnvironment.ARCANE_BROWSER_AI_DEBUG_CONTRACT_INSTALLED;
+            if(AUTHORITATIVE_BROWSER_AI_CONTRACT){
+                contractEnvironment.ARCANE_BROWSER_AI_RUNTIME_CONTRACT_INSTALLED='1';
+            }else{
+                contractEnvironment.ARCANE_BROWSER_AI_DEBUG_CONTRACT_INSTALLED='1';
+            }
+            const browserContract=await runNode([installedRunner,contractPath],{
+                cwd:workspaceRoot,
+                timeout:3_500_000,
+                env:contractEnvironment
+            });
+            assert.equal(browserContract.code,0,browserContract.stderr||browserContract.stdout);
+            assert.match(browserContract.stdout,/Test Total : 1/u);
+            assert.match(browserContract.stdout,/Passed :[^\r\n]*1/u);
+        });
+    }
 
     await t.test('executes the named-import graph in real Chrome through the installed tarball runner',{
         // The installed contract owns 270s, its process owns 300s, and this wrapper owns teardown/reporting.

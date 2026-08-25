@@ -29,10 +29,95 @@ const dependencyIdentities=Object.freeze([
         version:'2.0.0',
         resolved:'https://registry.npmjs.org/strong-type/-/strong-type-2.0.0.tgz',
         integrity:'sha512-HHrY9qYC7yn+5mlewiI3k9RQM9gZqGQsqbomZcd10Ks0h4RlX01nnkWbCe4AsVPCI6KaFvpkWm1nHMD+Ykup6g=='
+    }),
+    Object.freeze({
+        name:'@wllama/wllama',
+        version:'3.6.0',
+        resolved:'https://registry.npmjs.org/@wllama/wllama/-/wllama-3.6.0.tgz',
+        integrity:'sha512-NN3ZBXqaaUwGXTQubkNvsCaLPjN2XVa0bVS40OYCE8zquYmRc2W3oHYEgwvuSWWDB8aUqTLyMioySCXNkcnD1w=='
     })
 ]);
+const expectedAiComponents=Object.freeze({
+    schemaVersion:1,
+    kind:'arcane-ai-browser-wasm-components',
+    protocol:'arcane-ai-browser-wasm/1',
+    packageExport:'arcane-os/ai/browser-wasm',
+    browserEntry:'ai/browser-wasm.mjs',
+    runtimePolicy:{
+        modelAuthorities:'caller-supplied-exact-bytes-and-sha256',
+        modelWeightsPacked:false,
+        remoteModelHelpers:false,
+        compatibilityRuntime:false,
+        toolCalls:'structural-only-never-executed'
+    },
+    components:[
+        {
+            name:'@wllama/wllama',
+            version:'3.6.0',
+            licenseSpdx:'MIT',
+            sourceRepository:'https://github.com/ngxson/wllama.git',
+            sourceRevision:'f16050d8d51a00602c6a2a6b8ac9c09f490eea7f',
+            npm:{
+                resolved:'https://registry.npmjs.org/@wllama/wllama/-/wllama-3.6.0.tgz',
+                integrity:'sha512-NN3ZBXqaaUwGXTQubkNvsCaLPjN2XVa0bVS40OYCE8zquYmRc2W3oHYEgwvuSWWDB8aUqTLyMioySCXNkcnD1w==',
+                tarballBytes:5671369,
+                tarballSha256:'137c35ceccb4911a9b0ce9b427889f75991654ec6a6d1dd8fabd879b14b07a1b'
+            },
+            files:[
+                {
+                    role:'runtime-module',
+                    path:'ai/wllama/index.mjs',
+                    sourcePath:'node_modules/@wllama/wllama/esm/index.js',
+                    bytes:373519,
+                    sha256:'4637e42d636010493a9b274fbbe70bfd8120365da726b1d9e589d85ca84a00d6'
+                },
+                {
+                    role:'runtime-wasm',
+                    path:'ai/wllama/wllama.wasm',
+                    sourcePath:'node_modules/@wllama/wllama/esm/wasm/wllama.wasm',
+                    bytes:8524865,
+                    sha256:'95c6ff9ef2a03ff2c63bc91db132f0126a0bd0456b272cd8ae2e0f592fb059f6'
+                },
+                {
+                    role:'license',
+                    path:'ai/wllama/LICENCE',
+                    sourcePath:'node_modules/@wllama/wllama/LICENCE',
+                    bytes:1071,
+                    sha256:'5866e3bd7e3cbd3f7c8bea6efd8a1e7fa7cc8de68c30f428aff7c6584a0fb720'
+                }
+            ]
+        },
+        {
+            name:'llama.cpp',
+            version:'b10454',
+            licenseSpdx:'MIT',
+            sourceRepository:'https://github.com/ggerganov/llama.cpp.git',
+            sourceRevision:'4df29be4f4c3673f428170fda944a5b19f743bb8',
+            embeddedBy:'@wllama/wllama@3.6.0',
+            files:[
+                {
+                    role:'license',
+                    path:'ai/wllama/llama.cpp-LICENSE',
+                    sourceUrl:'https://raw.githubusercontent.com/ggerganov/llama.cpp/4df29be4f4c3673f428170fda944a5b19f743bb8/LICENSE',
+                    bytes:1078,
+                    sha256:'94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d'
+                }
+            ]
+        }
+    ]
+});
 
 const expectedFiles=Object.freeze([
+    ['ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json','browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json','sdk-source-identity'],
+    ['ai/browser-wasm-llm-provider.mjs','browser-runtime/ai/browser-wasm-llm-provider.mjs','sdk-source-identity'],
+    ['ai/browser-wasm.mjs','browser-runtime/ai/browser-wasm.mjs','sdk-source-identity'],
+    ['ai/browser-wllama-runtime.mjs','browser-runtime/ai/browser-wllama-runtime.mjs','sdk-source-identity'],
+    ['ai/internal/sha256.mjs','browser-runtime/ai/internal/sha256.mjs','sdk-source-identity'],
+    ['ai/model-controller.mjs','browser-runtime/ai/model-controller.mjs','sdk-source-identity'],
+    ['ai/wllama/LICENCE','node_modules/@wllama/wllama/LICENCE','vendor-package-identity'],
+    ['ai/wllama/index.mjs','node_modules/@wllama/wllama/esm/index.js','vendor-package-identity'],
+    ['ai/wllama/llama.cpp-LICENSE','browser-runtime/ai/wllama/llama.cpp-LICENSE','vendor-source-identity'],
+    ['ai/wllama/wllama.wasm','node_modules/@wllama/wllama/esm/wasm/wllama.wasm','vendor-package-identity'],
     ['dependencies/event-pubsub/index.js','node_modules/event-pubsub/index.js','vendor-package-identity'],
     ['dependencies/event-pubsub/licence','node_modules/event-pubsub/licence','vendor-package-identity'],
     ['dependencies/event-pubsub/package.json','node_modules/event-pubsub/package.json','vendor-package-identity'],
@@ -138,6 +223,26 @@ function parseJson(bytes,label){
     catch(error){throw new Error(`${label} is not valid JSON: ${error.message}`);}
 }
 
+function validateAiComponents(sourceBytes){
+    const receipt=parseJson(
+        sourceBytes.get('browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json'),
+        'Arcane AI browser WASM component receipt'
+    );
+    if(JSON.stringify(receipt)!==JSON.stringify(expectedAiComponents)){
+        throw new Error('Arcane AI browser WASM component authority is invalid.');
+    }
+    for(const component of receipt.components){
+        for(const file of component.files){
+            const declared=expectedFiles.find(candidate=>candidate.path===file.path);
+            const bytes=declared&&sourceBytes.get(declared.sourcePath);
+            if(!bytes||bytes.length!==file.bytes
+                ||createHash('sha256').update(bytes).digest('hex')!==file.sha256){
+                throw new Error(`Arcane AI browser WASM component bytes drifted for ${file.path}.`);
+            }
+        }
+    }
+}
+
 async function sourceBytesByPath(){
     const packageDocument=parseJson(
         await readRealFile(path.join(packageRoot,'package.json'),'SDK package manifest'),
@@ -167,8 +272,17 @@ async function sourceBytesByPath(){
         path.join(packageRoot,'node_modules','strong-type'),
         'strong-type@2.0.0 source'
     );
-    if(path.dirname(eventRoot)!==nodeModulesRoot||path.dirname(strongRoot)!==nodeModulesRoot){
-        throw new Error('event-pubsub and strong-type must be physical sibling packages.');
+    const wllamaScopeRoot=await assertRealDirectory(
+        path.join(packageRoot,'node_modules','@wllama'),
+        '@wllama package scope'
+    );
+    const wllamaRoot=await assertRealDirectory(
+        path.join(packageRoot,'node_modules','@wllama','wllama'),
+        '@wllama/wllama@3.6.0 source'
+    );
+    if(path.dirname(eventRoot)!==nodeModulesRoot||path.dirname(strongRoot)!==nodeModulesRoot
+        ||path.dirname(wllamaScopeRoot)!==nodeModulesRoot||path.dirname(wllamaRoot)!==wllamaScopeRoot){
+        throw new Error('SDK browser dependencies must be physical packages beneath node_modules.');
     }
 
     const sourceBytes=new Map();
@@ -186,11 +300,18 @@ async function sourceBytesByPath(){
         sourceBytes.get('node_modules/strong-type/package.json'),
         'strong-type package manifest'
     );
+    const wllamaPackage=parseJson(
+        await readRealFile(path.join(wllamaRoot,'package.json'),'@wllama/wllama package manifest'),
+        '@wllama/wllama package manifest'
+    );
     if(eventPackage.name!=='event-pubsub'||eventPackage.version!=='6.1.0'
         ||eventPackage.dependencies?.['strong-type']!=='2.0.0'
-        ||strongPackage.name!=='strong-type'||strongPackage.version!=='2.0.0'){
-        throw new Error('SDK browser dependency identity must be event-pubsub@6.1.0 with sibling strong-type@2.0.0.');
+        ||strongPackage.name!=='strong-type'||strongPackage.version!=='2.0.0'
+        ||wllamaPackage.name!=='@wllama/wllama'||wllamaPackage.version!=='3.6.0'
+        ||wllamaPackage.license!=='MIT'){
+        throw new Error('SDK browser dependency package identity is invalid.');
     }
+    validateAiComponents(sourceBytes);
     const eventManagerText=sourceBytes.get('src/event-manager.mjs').toString('utf8');
     const eventPubSubText=sourceBytes.get('node_modules/event-pubsub/index.js').toString('utf8');
     if(!eventManagerText.includes("from 'event-pubsub'")

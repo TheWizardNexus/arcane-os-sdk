@@ -63,6 +63,12 @@ export function workspaceTemplate({
             version:'2.0.0',
             resolved:'https://registry.npmjs.org/strong-type/-/strong-type-2.0.0.tgz',
             integrity:'sha512-HHrY9qYC7yn+5mlewiI3k9RQM9gZqGQsqbomZcd10Ks0h4RlX01nnkWbCe4AsVPCI6KaFvpkWm1nHMD+Ykup6g=='
+        },
+        {
+            name:'@wllama/wllama',
+            version:'3.6.0',
+            resolved:'https://registry.npmjs.org/@wllama/wllama/-/wllama-3.6.0.tgz',
+            integrity:'sha512-NN3ZBXqaaUwGXTQubkNvsCaLPjN2XVa0bVS40OYCE8zquYmRc2W3oHYEgwvuSWWDB8aUqTLyMioySCXNkcnD1w=='
         }
     ];
     const packageInclude=[`${appId}.css`,'index.html'];

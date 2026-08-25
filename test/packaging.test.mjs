@@ -432,12 +432,16 @@ test('authenticated external package refreshes maps and preserves both runtime a
     ));
     assert.deepEqual(distMapBytes,sourceMapBytes);
     const sourceMap=JSON.parse(sourceMapBytes.toString('utf8'));
-    assert.equal(Object.keys(sourceMap.imports).length,85);
+    assert.equal(Object.keys(sourceMap.imports).length,86);
     assert.equal(
         sourceMap.imports['./node_modules/strong-type/index.js'],
         './arcane/dependencies/strong-type/index.js'
     );
     assert.equal(sourceMap.imports['arcane-os/event-manager'],'./arcane/sdk/event-manager.mjs');
+    assert.equal(
+        sourceMap.imports['arcane-os/ai/browser-wasm'],
+        './arcane/sdk/ai/browser-wasm.mjs'
+    );
     assert.equal(
         sourceMap.imports['event-pubsub'],
         './arcane/sdk/dependencies/event-pubsub/index.js'

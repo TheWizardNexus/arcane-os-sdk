@@ -1,6 +1,6 @@
 {
   "name": "arcane-os",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Arcane OS JavaScript SDK, project-local CLI, browser runtime, and repository-portable application packager.",
   "type": "module",
   "main": "./src/index.mjs",
@@ -13,6 +13,7 @@
     "./toolchain": "./src/toolchain.mjs",
     "./events": "./src/events.mjs",
     "./event-manager": "./src/event-manager.mjs",
+    "./ai/browser-wasm": "./browser-runtime/ai/browser-wasm.mjs",
     "./testing": "./src/testing.mjs",
     "./targets": "./src/targets/index.mjs",
     "./native": "./src/native-plan.mjs",
@@ -94,5 +95,8 @@
   "bundleDependencies": [
     "event-pubsub",
     "strong-type"
-  ]
+  ],
+  "devDependencies": {
+    "@wllama/wllama": "3.6.0"
+  }
 }

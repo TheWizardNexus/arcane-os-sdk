@@ -47,8 +47,8 @@ const TASKKILL_TIMEOUT_MS=3_000;
 const TASKKILL_DRAIN_TIMEOUT_MS=2_000;
 const CHROME_DRAIN_TIMEOUT_MS=5_000;
 const PROFILE_CLEANUP_TIMEOUT_MS=5_000;
-const EXPECTED_IMPORT_COUNT=85;
-const EXPECTED_ARCANE_FILE_COUNT=163;
+const EXPECTED_IMPORT_COUNT=86;
+const EXPECTED_ARCANE_FILE_COUNT=173;
 const HOSTILE_DEPENDENCY_PATHS=Object.freeze([
     'node_modules/event-pubsub/index.js',
     'node_modules/event-pubsub/package.json',
@@ -162,6 +162,10 @@ async function paritySnapshot(root){
     assert.equal(
         map.imports['arcane-os/event-manager'],
         './arcane/sdk/event-manager.mjs'
+    );
+    assert.equal(
+        map.imports['arcane-os/ai/browser-wasm'],
+        './arcane/sdk/ai/browser-wasm.mjs'
     );
     assert.equal(
         map.imports['event-pubsub'],

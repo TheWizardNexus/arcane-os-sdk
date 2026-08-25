@@ -63,6 +63,11 @@ async function browserRuntimePackageCopy(t,prefix='arcane-sdk-browser-'){
             );
         }
     }
+    await cp(
+        path.join(repositoryRoot,'node_modules','@wllama','wllama'),
+        path.join(packageRoot,'node_modules','@wllama','wllama'),
+        {recursive:true}
+    );
     return {packageRoot,browserRuntimeRoot:path.join(packageRoot,'browser-runtime')};
 }
 
@@ -247,8 +252,8 @@ test('SDK browser receipt authenticates its exact package sources and rejects la
     assert.equal(attributes.at(-1),'runtime/** -text -whitespace');
     const {packageRoot,browserRuntimeRoot}=await browserRuntimePackageCopy(t);
     const receipt=await verifySdkBrowserRuntime({browserRuntimeRoot});
-    assert.equal(receipt.fileCount,8);
-    assert.equal(receipt.sourceIdentities.length,8);
+    assert.equal(receipt.fileCount,18);
+    assert.equal(receipt.sourceIdentities.length,15);
     assert.equal(
         await authenticateSdkBrowserRuntimeReceipt(receipt,{browserRuntimeRoot}),
         receipt
@@ -321,7 +326,7 @@ test('composed workspace receipt rejects tampered projected SDK browser bytes',a
         browserRuntimeRoot:sdkBrowserRuntimeReceipt.canonicalLocation,
         sdkBrowserRuntimeReceipt
     });
-    assert.equal(receipt.fileCount,163);
+    assert.equal(receipt.fileCount,173);
     assert.equal(receipt.sources.arcane.contentSha256,runtimeReceipt.contentSha256);
     assert.equal(
         receipt.sources.sdkBrowser.contentSha256,

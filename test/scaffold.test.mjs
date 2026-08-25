@@ -497,6 +497,7 @@ test('init adds only app-owned files to an integrated Arcane workspace',async t=
     );
     await mkdir(path.join(workspaceRoot,'arcane','sdk'),{recursive:true});
     for(const relative of [
+        'ai',
         'dependencies/event-pubsub',
         'dependencies/strong-type',
         'dom-event-instrumentation.mjs',

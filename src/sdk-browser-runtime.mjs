@@ -9,9 +9,9 @@ const MANIFEST_NAME='ARCANE_SDK_BROWSER_RELEASE.json';
 const BUILDER='arcane-sdk-browser-runtime-v1';
 const PROTOCOL='arcane-sdk-browser-runtime/1';
 export const SDK_BROWSER_RUNTIME_MANIFEST_SHA256=
-    '43baaec850291c28795f6c194001deb5febab88ccab1b033bce6597dd6f6f08f';
+    '33396b3d35322b784929270e7ca0a2a8b31d899c6e77bcb227edc95b37d0ae7d';
 export const SDK_BROWSER_RUNTIME_CONTENT_SHA256=
-    '0caa302bc07d4a45f5290504ec62ddce98fdf5e3412f916c10aae3d51b1e5f7c';
+    '5e03f45a732db51cb5a2b2193cc79ecda34501d07a9b2e82e794e5fa37d55d00';
 const REPOSITORY='https://github.com/TheWizardNexus/arcane-os-sdk.git';
 const SHA256_PATTERN=/^[a-f0-9]{64}$/u;
 const READ_ONLY_NO_FOLLOW=FS_CONSTANTS.O_RDONLY|(FS_CONSTANTS.O_NOFOLLOW??0);
@@ -19,8 +19,87 @@ const MAX_VERIFIED_FILE_BYTES=64*1024*1024;
 const packageRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const defaultRoot=path.join(packageRoot,'browser-runtime');
 const issuedReceipts=new WeakSet();
+const expectedAiComponents=Object.freeze({
+    schemaVersion:1,
+    kind:'arcane-ai-browser-wasm-components',
+    protocol:'arcane-ai-browser-wasm/1',
+    packageExport:'arcane-os/ai/browser-wasm',
+    browserEntry:'ai/browser-wasm.mjs',
+    runtimePolicy:{
+        modelAuthorities:'caller-supplied-exact-bytes-and-sha256',
+        modelWeightsPacked:false,
+        remoteModelHelpers:false,
+        compatibilityRuntime:false,
+        toolCalls:'structural-only-never-executed'
+    },
+    components:[
+        {
+            name:'@wllama/wllama',
+            version:'3.6.0',
+            licenseSpdx:'MIT',
+            sourceRepository:'https://github.com/ngxson/wllama.git',
+            sourceRevision:'f16050d8d51a00602c6a2a6b8ac9c09f490eea7f',
+            npm:{
+                resolved:'https://registry.npmjs.org/@wllama/wllama/-/wllama-3.6.0.tgz',
+                integrity:'sha512-NN3ZBXqaaUwGXTQubkNvsCaLPjN2XVa0bVS40OYCE8zquYmRc2W3oHYEgwvuSWWDB8aUqTLyMioySCXNkcnD1w==',
+                tarballBytes:5671369,
+                tarballSha256:'137c35ceccb4911a9b0ce9b427889f75991654ec6a6d1dd8fabd879b14b07a1b'
+            },
+            files:[
+                {
+                    role:'runtime-module',
+                    path:'ai/wllama/index.mjs',
+                    sourcePath:'node_modules/@wllama/wllama/esm/index.js',
+                    bytes:373519,
+                    sha256:'4637e42d636010493a9b274fbbe70bfd8120365da726b1d9e589d85ca84a00d6'
+                },
+                {
+                    role:'runtime-wasm',
+                    path:'ai/wllama/wllama.wasm',
+                    sourcePath:'node_modules/@wllama/wllama/esm/wasm/wllama.wasm',
+                    bytes:8524865,
+                    sha256:'95c6ff9ef2a03ff2c63bc91db132f0126a0bd0456b272cd8ae2e0f592fb059f6'
+                },
+                {
+                    role:'license',
+                    path:'ai/wllama/LICENCE',
+                    sourcePath:'node_modules/@wllama/wllama/LICENCE',
+                    bytes:1071,
+                    sha256:'5866e3bd7e3cbd3f7c8bea6efd8a1e7fa7cc8de68c30f428aff7c6584a0fb720'
+                }
+            ]
+        },
+        {
+            name:'llama.cpp',
+            version:'b10454',
+            licenseSpdx:'MIT',
+            sourceRepository:'https://github.com/ggerganov/llama.cpp.git',
+            sourceRevision:'4df29be4f4c3673f428170fda944a5b19f743bb8',
+            embeddedBy:'@wllama/wllama@3.6.0',
+            files:[
+                {
+                    role:'license',
+                    path:'ai/wllama/llama.cpp-LICENSE',
+                    sourceUrl:'https://raw.githubusercontent.com/ggerganov/llama.cpp/4df29be4f4c3673f428170fda944a5b19f743bb8/LICENSE',
+                    bytes:1078,
+                    sha256:'94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d'
+                }
+            ]
+        }
+    ]
+});
 
 const expectedFiles=Object.freeze([
+    ['ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json','browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json','sdk-source-identity'],
+    ['ai/browser-wasm-llm-provider.mjs','browser-runtime/ai/browser-wasm-llm-provider.mjs','sdk-source-identity'],
+    ['ai/browser-wasm.mjs','browser-runtime/ai/browser-wasm.mjs','sdk-source-identity'],
+    ['ai/browser-wllama-runtime.mjs','browser-runtime/ai/browser-wllama-runtime.mjs','sdk-source-identity'],
+    ['ai/internal/sha256.mjs','browser-runtime/ai/internal/sha256.mjs','sdk-source-identity'],
+    ['ai/model-controller.mjs','browser-runtime/ai/model-controller.mjs','sdk-source-identity'],
+    ['ai/wllama/LICENCE','node_modules/@wllama/wllama/LICENCE','vendor-package-identity'],
+    ['ai/wllama/index.mjs','node_modules/@wllama/wllama/esm/index.js','vendor-package-identity'],
+    ['ai/wllama/llama.cpp-LICENSE','browser-runtime/ai/wllama/llama.cpp-LICENSE','vendor-source-identity'],
+    ['ai/wllama/wllama.wasm','node_modules/@wllama/wllama/esm/wasm/wllama.wasm','vendor-package-identity'],
     ['dependencies/event-pubsub/index.js','node_modules/event-pubsub/index.js','vendor-package-identity'],
     ['dependencies/event-pubsub/licence','node_modules/event-pubsub/licence','vendor-package-identity'],
     ['dependencies/event-pubsub/package.json','node_modules/event-pubsub/package.json','vendor-package-identity'],
@@ -83,13 +162,35 @@ function immutableInventory(files){
     return Object.freeze(files.map(file=>Object.freeze({...file})));
 }
 
+function validateAiComponents(bytes,releaseFiles){
+    let receipt;
+    try{receipt=JSON.parse(bytes.toString('utf8'));}
+    catch(error){fail(`Arcane AI browser WASM component receipt is invalid JSON: ${error.message}`);}
+    if(JSON.stringify(receipt)!==JSON.stringify(expectedAiComponents)){
+        fail('Arcane AI browser WASM component authority is invalid.');
+    }
+    for(const component of receipt.components){
+        for(const file of component.files){
+            const declared=releaseFiles.find(candidate=>candidate.path===file.path);
+            if(!declared||declared.bytes!==file.bytes||declared.sha256!==file.sha256
+                ||('sourcePath' in file&&declared.sourcePath!==file.sourcePath)){
+                fail(`Arcane AI browser WASM component projection drifted for ${file.path}.`);
+            }
+        }
+    }
+}
+
+function requiresInstalledPackageSource(file){
+    return !file.sourcePath.startsWith('node_modules/@wllama/wllama/');
+}
+
 function validateSource(source){
     if(!source||typeof source!=='object'||Array.isArray(source)
         ||!exactKeys(source,['authority','browserEntry','dependencies','protocol','repository'])
         ||source.authority!=='arcane-os-sdk'||source.browserEntry!=='arcane-os/event-manager'
         ||source.protocol!==PROTOCOL
         ||source.repository!==REPOSITORY||!Array.isArray(source.dependencies)
-        ||source.dependencies.length!==2){
+        ||source.dependencies.length!==3){
         fail('SDK browser runtime manifest source authority is invalid.');
     }
     const expectedDependencies=[
@@ -104,6 +205,12 @@ function validateSource(source){
             version:'2.0.0',
             resolved:'https://registry.npmjs.org/strong-type/-/strong-type-2.0.0.tgz',
             integrity:'sha512-HHrY9qYC7yn+5mlewiI3k9RQM9gZqGQsqbomZcd10Ks0h4RlX01nnkWbCe4AsVPCI6KaFvpkWm1nHMD+Ykup6g=='
+        },
+        {
+            name:'@wllama/wllama',
+            version:'3.6.0',
+            resolved:'https://registry.npmjs.org/@wllama/wllama/-/wllama-3.6.0.tgz',
+            integrity:'sha512-NN3ZBXqaaUwGXTQubkNvsCaLPjN2XVa0bVS40OYCE8zquYmRc2W3oHYEgwvuSWWDB8aUqTLyMioySCXNkcnD1w=='
         }
     ];
     for(const [index,expected] of expectedDependencies.entries()){
@@ -514,6 +621,7 @@ export async function verifySdkBrowserRuntime({
     const identities=[];
     const sourceIdentities=[];
     const sourceRoot=path.dirname(canonical);
+    let aiComponentsBytes;
     let verifiedBytes=0;
     for(const [index,file] of release.files.entries()){
         throwIfAborted(signal);
@@ -527,23 +635,28 @@ export async function verifySdkBrowserRuntime({
         if(createHash('sha256').update(result.bytes).digest('hex')!==file.sha256){
             fail(`SDK browser runtime integrity check failed for ${file.path}.`);
         }
-        const sourceResult=await openVerified(
-            containedPath(sourceRoot,file.sourcePath,'source file'),
-            {
-                expectedBytes:file.bytes,
-                root:sourceRoot,
-                relative:file.sourcePath,
-                signal
-            }
-        );
-        if(!result.bytes.equals(sourceResult.bytes)){
-            fail(
-                `SDK browser runtime file does not match its declared package source: `
-                +`${file.path} (${file.sourcePath}).`
+        if(file.path==='ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json'){
+            aiComponentsBytes=result.bytes;
+        }
+        if(requiresInstalledPackageSource(file)){
+            const sourceResult=await openVerified(
+                containedPath(sourceRoot,file.sourcePath,'source file'),
+                {
+                    expectedBytes:file.bytes,
+                    root:sourceRoot,
+                    relative:file.sourcePath,
+                    signal
+                }
             );
+            if(!result.bytes.equals(sourceResult.bytes)){
+                fail(
+                    `SDK browser runtime file does not match its declared package source: `
+                    +`${file.path} (${file.sourcePath}).`
+                );
+            }
+            sourceIdentities.push(Object.freeze({path:file.sourcePath,...sourceResult.identity}));
         }
         identities.push(Object.freeze({path:file.path,...result.identity}));
-        sourceIdentities.push(Object.freeze({path:file.sourcePath,...sourceResult.identity}));
         verifiedBytes+=file.bytes;
         await emit(onEvent,{
             type:'sdk-browser-runtime.verify.progress',
@@ -554,6 +667,10 @@ export async function verifySdkBrowserRuntime({
             path:file.path
         });
     }
+    if(!aiComponentsBytes){
+        fail('Arcane AI browser WASM component receipt is missing.');
+    }
+    validateAiComponents(aiComponentsBytes,release.files);
     const receipt=Object.freeze({
         schemaVersion:1,
         kind:'arcane-sdk-browser-runtime-verification',

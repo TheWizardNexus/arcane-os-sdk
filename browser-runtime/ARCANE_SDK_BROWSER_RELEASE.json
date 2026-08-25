@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "builder": "arcane-sdk-browser-runtime-v1",
-  "sdkVersion": "0.1.0",
+  "sdkVersion": "0.1.1",
   "source": {
     "authority": "arcane-os-sdk",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
@@ -19,13 +19,89 @@
         "version": "2.0.0",
         "resolved": "https://registry.npmjs.org/strong-type/-/strong-type-2.0.0.tgz",
         "integrity": "sha512-HHrY9qYC7yn+5mlewiI3k9RQM9gZqGQsqbomZcd10Ks0h4RlX01nnkWbCe4AsVPCI6KaFvpkWm1nHMD+Ykup6g=="
+      },
+      {
+        "name": "@wllama/wllama",
+        "version": "3.6.0",
+        "resolved": "https://registry.npmjs.org/@wllama/wllama/-/wllama-3.6.0.tgz",
+        "integrity": "sha512-NN3ZBXqaaUwGXTQubkNvsCaLPjN2XVa0bVS40OYCE8zquYmRc2W3oHYEgwvuSWWDB8aUqTLyMioySCXNkcnD1w=="
       }
     ]
   },
-  "fileCount": 8,
-  "totalBytes": 118385,
-  "contentSha256": "0caa302bc07d4a45f5290504ec62ddce98fdf5e3412f916c10aae3d51b1e5f7c",
+  "fileCount": 18,
+  "totalBytes": 9099015,
+  "contentSha256": "5e03f45a732db51cb5a2b2193cc79ecda34501d07a9b2e82e794e5fa37d55d00",
   "files": [
+    {
+      "path": "ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json",
+      "sourcePath": "browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json",
+      "provenance": "sdk-source-identity",
+      "bytes": 2554,
+      "sha256": "9f6e710f6b6aa8ea42f69823931b2b56a2eec9db242e3c95c6d6f6a6ce77a03b"
+    },
+    {
+      "path": "ai/browser-wasm-llm-provider.mjs",
+      "sourcePath": "browser-runtime/ai/browser-wasm-llm-provider.mjs",
+      "provenance": "sdk-source-identity",
+      "bytes": 37944,
+      "sha256": "c89042b541c64de8b6528ee3a7dce0e2b62be8b5c229875fd8a26a1efded26a2"
+    },
+    {
+      "path": "ai/browser-wasm.mjs",
+      "sourcePath": "browser-runtime/ai/browser-wasm.mjs",
+      "provenance": "sdk-source-identity",
+      "bytes": 1549,
+      "sha256": "b6536f6869a080e6cf167965da1dd8b473c172c6cbce1f5ee6a6142dd06c93f2"
+    },
+    {
+      "path": "ai/browser-wllama-runtime.mjs",
+      "sourcePath": "browser-runtime/ai/browser-wllama-runtime.mjs",
+      "provenance": "sdk-source-identity",
+      "bytes": 13559,
+      "sha256": "946f1814b7374baa6a6e33a4e4f9790c8f1504c65104e05cbe640005687d94f5"
+    },
+    {
+      "path": "ai/internal/sha256.mjs",
+      "sourcePath": "browser-runtime/ai/internal/sha256.mjs",
+      "provenance": "sdk-source-identity",
+      "bytes": 5332,
+      "sha256": "71763e3e38dc96ae3f5e39bee7dbeec16a147b7e464391ee0ffecf81b93e0e35"
+    },
+    {
+      "path": "ai/model-controller.mjs",
+      "sourcePath": "browser-runtime/ai/model-controller.mjs",
+      "provenance": "sdk-source-identity",
+      "bytes": 19159,
+      "sha256": "922a9653f48c19093f02d7307c9600c70a1742c3b7a315df3ab2023db8025905"
+    },
+    {
+      "path": "ai/wllama/LICENCE",
+      "sourcePath": "node_modules/@wllama/wllama/LICENCE",
+      "provenance": "vendor-package-identity",
+      "bytes": 1071,
+      "sha256": "5866e3bd7e3cbd3f7c8bea6efd8a1e7fa7cc8de68c30f428aff7c6584a0fb720"
+    },
+    {
+      "path": "ai/wllama/index.mjs",
+      "sourcePath": "node_modules/@wllama/wllama/esm/index.js",
+      "provenance": "vendor-package-identity",
+      "bytes": 373519,
+      "sha256": "4637e42d636010493a9b274fbbe70bfd8120365da726b1d9e589d85ca84a00d6"
+    },
+    {
+      "path": "ai/wllama/llama.cpp-LICENSE",
+      "sourcePath": "browser-runtime/ai/wllama/llama.cpp-LICENSE",
+      "provenance": "vendor-source-identity",
+      "bytes": 1078,
+      "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d"
+    },
+    {
+      "path": "ai/wllama/wllama.wasm",
+      "sourcePath": "node_modules/@wllama/wllama/esm/wasm/wllama.wasm",
+      "provenance": "vendor-package-identity",
+      "bytes": 8524865,
+      "sha256": "95c6ff9ef2a03ff2c63bc91db132f0126a0bd0456b272cd8ae2e0f592fb059f6"
+    },
     {
       "path": "dependencies/event-pubsub/index.js",
       "sourcePath": "node_modules/event-pubsub/index.js",

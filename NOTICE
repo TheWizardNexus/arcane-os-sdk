@@ -15,8 +15,18 @@ Third-party material retains its own terms:
   `licence` file.
 - bundled strong-type 1.1.0: MIT License; see runtime/strong-type/licence.
 - uPlot: MIT License; see runtime/arcane/modules/uPlot.LICENSE.txt.
+- @wllama/wllama 3.6.0 (source revision
+  f16050d8d51a00602c6a2a6b8ac9c09f490eea7f): MIT License; see
+  browser-runtime/ai/wllama/LICENCE.
+- llama.cpp b10454 (source revision
+  4df29be4f4c3673f428170fda944a5b19f743bb8), embedded in the authenticated
+  Wllama runtime: MIT License; see browser-runtime/ai/wllama/llama.cpp-LICENSE.
 - Marked: MIT License; complete notice and terms reproduced below.
 - QRCode.js: MIT License; complete notice and terms reproduced below.
+
+No model weights are included in this package. Browser-WASM model downloads
+require caller-supplied immutable authorities and exact byte-length and
+SHA-256 verification before cache admission or inference.
 
 Marked
 ------
