@@ -5,4 +5,6 @@
 - Keep `arcane/css/theme.css` before app styles and import `arcane/ThemeBootstrap` before app code runs.
 - Use `rgb(...)` or `rgba(...)` for new CSS colors.
 - Build one named app and one explicit target at a time.
-- Run `npm run check` before committing.
+- Do not run `npm run check` or any other test or check before committing unless
+  the user explicitly requests it or the selected work builds, verifies, or
+  releases a `dist`, package, artifact, or other release output.
