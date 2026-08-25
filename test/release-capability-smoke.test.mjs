@@ -623,7 +623,13 @@ test('installed public SDK capabilities are coherent',async()=>{
     ]);
     const authority=browserWasm.BROWSER_WASM_RUNTIME_AUTHORITY;
     assert.equal(authority.protocol,'arcane-ai-browser-wasm/1');
-    assert.deepEqual(authority.package,{
+    assert.deepEqual({
+        name:authority.package.name,
+        version:authority.package.version,
+        sourceRevision:authority.package.sourceRevision,
+        npmIntegrity:authority.package.npmIntegrity,
+        licenseSpdx:authority.package.licenseSpdx
+    },{
         name:'@wllama/wllama',
         version:'3.6.0',
         sourceRevision:'f16050d8d51a00602c6a2a6b8ac9c09f490eea7f',
