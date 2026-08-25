@@ -128,7 +128,7 @@
                     </section>
                     <section class="app-feature app-feature--ai" aria-labelledby="ai-feature-title">
                         <h2 id="ai-feature-title">Optional browser-local AI</h2>
-                        <p>This example can load the SDK's browser-WASM provider. No model weights ship with Arcane, and no download starts until you choose the online load button.</p>
+                        <p>This example can load the SDK's browser-WASM provider. No model weights ship with Arcane, and no model download starts until you choose the network-permitted load button.</p>
                         <p class="ai-model-note"><strong>First-use download:</strong> Granite 4.1 3B Q4_K_S is 1,998,371,424 bytes (1.86 GiB). Arcane verifies its SHA-256 digest before admitting it to this app's DBOPFS cache.</p>
                         <p id="ai-lifecycle" class="app-environment">Lifecycle: unloaded.</p>
                         <p id="ai-status" role="status" aria-live="polite">Model not loaded. No model download has started.</p>
@@ -147,8 +147,8 @@
                         <button id="ai-send" class="arcane-button" type="button" disabled>Ask local AI</button>
                         <h3>Response</h3>
                         <pre id="ai-response" class="ai-output">Load the model to begin.</pre>
-                        <h3>Tool-call receipt</h3>
-                        <pre id="ai-tool-calls" class="ai-output">No tool calls proposed. Arcane never executes tool calls for the application.</pre>
+                        <h3>Proposed tool calls</h3>
+                        <pre id="ai-tool-calls" class="ai-output">No tool calls proposed. Structural output is displayed only; the application invokes no tool.</pre>
                     </section>
                 </div>
             </div>

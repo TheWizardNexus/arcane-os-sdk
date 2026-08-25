@@ -38,7 +38,7 @@ const SHOW_GREETING_TOOL=Object.freeze({
 });
 
 const ERROR_COPY=Object.freeze({
-    ARCANE_AI_REQUEST_ABORTED:'The operation was cancelled. Any previously verified cache remains; partial bytes were removed.',
+    ARCANE_AI_REQUEST_ABORTED:'The operation was cancelled. Any verified cache remains; an interrupted model download is discarded.',
     ARCANE_AI_MODEL_OFFLINE_MISS:'No verified offline model cache is available. Load once while online first.',
     ARCANE_AI_MODEL_DOWNLOAD_FAILED:'The model download failed. Check the network and try again.',
     ARCANE_AI_MODEL_REDIRECT_BLOCKED:'The model response left HTTPS and was rejected.',
@@ -211,8 +211,8 @@ async function loadModel({offline=false}={}){
     const controller=beginOperation(offline?'offline-load':'load');
     if(!controller)return;
     aiStatus.textContent=offline
-        ?'Checking the verified DBOPFS cache without model network access.'
-        :'Checking the verified cache. A 1.86 GiB download starts only if it is missing.';
+        ?'Checking the verified DBOPFS cache without a model-source request. Packaged same-origin Wllama/WASM assets may still load.'
+        :'Checking the verified cache. A 1.86 GiB model download starts only if it is missing.';
     aiProgress.hidden=true;
     aiProgressLabel.textContent='';
     try{
@@ -226,7 +226,7 @@ async function loadModel({offline=false}={}){
             aiStatus.textContent='Model downloaded, SHA-256 verified, admitted to app-scoped DBOPFS, and loaded locally.';
         }else{
             aiStatus.textContent=offline
-                ?'Verified DBOPFS cache loaded with no model network request.'
+                ?'Verified DBOPFS cache loaded without a model-source request.'
                 :'Verified DBOPFS cache reused and loaded locally.';
         }
         aiProgressLabel.textContent='Browser-local model ready.';
@@ -239,16 +239,16 @@ async function loadModel({offline=false}={}){
 
 function renderToolCalls(result){
     if(!result||typeof result!=='object'||Array.isArray(result)){
-        aiToolCalls.textContent='No tool calls were proposed. Arcane never executes tool calls for the application.';
+        aiToolCalls.textContent='No tool calls were proposed. Structural output is displayed only; the application invokes no tool.';
         return;
     }
     const records=Object.entries(result);
     if(records.length===0){
-        aiToolCalls.textContent='No tool calls were proposed. Arcane never executes tool calls for the application.';
+        aiToolCalls.textContent='No tool calls were proposed. Structural output is displayed only; the application invokes no tool.';
         return;
     }
     aiToolCalls.textContent=[
-        'Model-proposed tool calls (visible, never executed):',
+        'Proposed tool calls (structural output only):',
         ...records.flatMap(([name,argumentsJson])=>[
             `name: ${name}`,
             `arguments: ${String(argumentsJson)}`
@@ -260,7 +260,7 @@ async function askLocalAI(){
     const controller=beginOperation('request');
     if(!controller)return;
     aiResponse.textContent='';
-    aiToolCalls.textContent='Waiting for a response. Tool calls will remain visible and unexecuted.';
+    aiToolCalls.textContent='Waiting for a response. Proposed tool calls remain structural output only.';
     aiStatus.textContent='Running this request locally in the browser.';
     try{
         const local=await localAI();
@@ -280,7 +280,7 @@ async function askLocalAI(){
                 if(!isThinking)aiResponse.textContent+=text;
             },
             onToolCall(name){
-                aiToolCalls.textContent=`Model proposed ${name}; Arcane has not executed it.`;
+                aiToolCalls.textContent=`Model proposed ${name}; the application has not invoked it.`;
             }
         });
         if(typeof result==='string'&&!aiResponse.textContent){

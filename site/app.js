@@ -1,70 +1,3 @@
-const commandExamples = Object.freeze({
-  today: Object.freeze({
-    title: "Local development before npm publication",
-    command: `# From the arcane-os-sdk checkout
-npm ci
-npm run check
-npm run pack:local
-node ./bin/arcane.mjs new local-app --path ../local-app --target portable --git
-
-# From the generated app repository
-cd ../local-app
-npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.4.tgz
-npm run check`,
-    note: "Use a packed tarball today. Local directory dependencies may become links and are intentionally rejected."
-  }),
-  loop: Object.freeze({
-    title: "The focused application loop",
-    command: `npm exec -- arcane doctor
-npm exec -- arcane check
-npm exec -- arcane dev
-npm exec -- arcane package
-npm exec -- arcane verify
-npm exec -- arcane run --target browser
-
-# Integrated shared/Core development selects one focused test or one check
-node ../arcane-os-sdk/bin/arcane.mjs test --workspace "../Arcane OS" --scope shared --test-file test/component-contracts.test.mjs
-node ../arcane-os-sdk/bin/arcane.mjs check --workspace "../Arcane OS" --scope shared
-
-# Pair the portable provider through one explicit Arcane OS checkout
-npm exec -- arcane native-doctor --target portable --arcane-root "../Arcane OS"
-npm exec -- arcane build --target portable --arcane-root "../Arcane OS"
-
-# In apps scaffolded with the matching --target, build, verify, launch,
-# and own cancellation in the same process
-npm exec -- arcane run --target windows-x64 --arcane-root "../Arcane OS"
-npm exec -- arcane run --target linux-x64 --arcane-root "../Arcane OS"
-
-# On a compatible native ARM64 Linux toolchain
-npm exec -- arcane native-doctor --target linux-arm64 --arcane-root "../Arcane OS" --format deb --signing unsigned-local-test
-npm exec -- arcane build --target linux-arm64 --arcane-root "../Arcane OS" --format deb --signing unsigned-local-test
-npm exec -- arcane run --target linux-arm64 --arcane-root "../Arcane OS" --format deb --signing unsigned-local-test
-
-# Android run requires one connected physical/native ARM64 device
-npm exec -- arcane native-doctor --target android-arm64 --arcane-root "../Arcane OS" --format apk --signing development
-npm exec -- arcane build --target android-arm64 --arcane-root "../Arcane OS" --format apk --signing development
-npm exec -- arcane run --target android-arm64 --arcane-root "../Arcane OS" --format apk --signing development`,
-    note: "Every native command requires a compatible --arcane-root and matching scaffold descriptor. Portable is verified but non-runnable; Windows and Linux are unsigned-local-test; Android is a development-signed, architecture-neutral APK with no native ABI."
-  }),
-  registry: Object.freeze({
-    title: "After arcane-os@dev is published",
-    command: `npx arcane-os@dev new my-app --path ./my-app --target portable --git
-cd my-app
-npm install
-npm run check
-npm run dev`,
-    note: "These registry commands are post-publication instructions. arcane-os has not yet been published to npm."
-  }),
-  automation: Object.freeze({
-    title: "Structured output for CI, Codex, and control panels",
-    command: `npm exec -- arcane check --output ndjson
-npm exec -- arcane doctor --output json
-npm exec -- arcane targets --output json
-npm exec -- arcane package --output ndjson`,
-    note: "Machine modes keep stdout structured, acknowledge work before it begins, and return nonzero status on failure."
-  })
-});
-
 async function copyText(text) {
   if (navigator.clipboard && window.isSecureContext) {
     await navigator.clipboard.writeText(text);
@@ -159,72 +92,6 @@ function setupNavigation() {
   wideNavigation.addEventListener("change", (event) => {
     if (event.matches) close();
   });
-}
-
-function setupCommandLab() {
-  const tabs = [...document.querySelectorAll("[data-command-tab]")];
-  const title = document.querySelector("[data-command-title]");
-  const output = document.querySelector("[data-command-output]");
-  const note = document.querySelector("[data-command-note]");
-  const panel = document.querySelector("#command-panel");
-  const copyButton = document.querySelector("[data-copy-command]");
-  const copyStatus = document.querySelector("[data-copy-status]");
-  if (!tabs.length || !title || !output || !note || !panel || !copyButton || !copyStatus) return;
-
-  let activeKey = "today";
-  let statusTimer = 0;
-
-  const select = (key, focus = false) => {
-    const example = commandExamples[key];
-    if (!example) return;
-    activeKey = key;
-    for (const tab of tabs) {
-      const selected = tab.dataset.commandTab === key;
-      tab.setAttribute("aria-selected", String(selected));
-      tab.tabIndex = selected ? 0 : -1;
-      if (selected) {
-        panel.setAttribute("aria-labelledby", tab.id);
-        if (focus) tab.focus();
-      }
-    }
-    title.textContent = example.title;
-    output.textContent = example.command;
-    note.textContent = example.note;
-    copyStatus.textContent = "";
-  };
-
-  const announce = (message) => {
-    window.clearTimeout(statusTimer);
-    copyStatus.textContent = message;
-    statusTimer = window.setTimeout(() => {
-      copyStatus.textContent = "";
-    }, 2600);
-  };
-
-  tabs.forEach((tab, index) => {
-    tab.addEventListener("click", () => select(tab.dataset.commandTab));
-    tab.addEventListener("keydown", (event) => {
-      let next = null;
-      if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
-      if (event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length;
-      if (event.key === "Home") next = 0;
-      if (event.key === "End") next = tabs.length - 1;
-      if (next === null) return;
-      event.preventDefault();
-      select(tabs[next].dataset.commandTab, true);
-    });
-  });
-
-  copyButton.addEventListener("click", async () => {
-    try {
-      await copyText(commandExamples[activeKey].command);
-      announce("Commands copied.");
-    } catch {
-      announce("Copy failed. Select the commands manually.");
-    }
-  });
-
-  select(activeKey);
 }
 
 function setupPlayground() {
@@ -350,6 +217,7 @@ function setupSpaceMotion() {
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const finePointer = window.matchMedia("(pointer: fine)");
+  const wideHero = window.matchMedia("(min-width: 981px)");
   const preferenceKey = "arcane-sdk-motion-paused";
   let stars = [];
   let width = 0;
@@ -447,6 +315,13 @@ function setupSpaceMotion() {
     draw(lastDraw);
   };
 
+  const resetPointerOffset = () => {
+    document.documentElement.style.setProperty("--mouse-x", "0px");
+    document.documentElement.style.setProperty("--mouse-y", "0px");
+    document.documentElement.style.setProperty("--mouse-x-reverse", "0px");
+    document.documentElement.style.setProperty("--mouse-y-reverse", "0px");
+  };
+
   motionButton.addEventListener("click", () => {
     userPaused = !userPaused;
     try {
@@ -454,11 +329,18 @@ function setupSpaceMotion() {
     } catch {
       // The preference remains active for this page even when storage is unavailable.
     }
+    if (userPaused) resetPointerOffset();
     syncLoop();
   });
 
   document.addEventListener("visibilitychange", syncLoop);
-  reducedMotion.addEventListener("change", syncLoop);
+  reducedMotion.addEventListener("change", (event) => {
+    if (event.matches) resetPointerOffset();
+    syncLoop();
+  });
+  wideHero.addEventListener("change", (event) => {
+    if (!event.matches) resetPointerOffset();
+  });
   window.addEventListener("resize", resize, { passive: true });
 
   const heroObserver = new IntersectionObserver((entries) => {
@@ -468,7 +350,7 @@ function setupSpaceMotion() {
   heroObserver.observe(hero);
 
   window.addEventListener("pointermove", (event) => {
-    if (!finePointer.matches || reducedMotion.matches || userPaused || pointerFrame) return;
+    if (!wideHero.matches || !finePointer.matches || reducedMotion.matches || userPaused || pointerFrame) return;
     pointerFrame = window.requestAnimationFrame(() => {
       pointerFrame = 0;
       const x = ((event.clientX / Math.max(window.innerWidth, 1)) - 0.5) * 12;
@@ -486,6 +368,5 @@ function setupSpaceMotion() {
 
 setupNavigation();
 setupCopyButtons();
-setupCommandLab();
 setupPlayground();
 setupSpaceMotion();

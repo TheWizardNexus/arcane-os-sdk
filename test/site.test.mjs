@@ -109,12 +109,30 @@ const staticPageRoutes=new Map([
     ['guides/integrated-workspace/index.html','guides/integrated-workspace/'],
     ['guides/native-builds/index.html','guides/native-builds/'],
     ['examples/index.html','examples/'],
-    ['examples/hello-world/index.html','examples/hello-world/'],
     ['playground/index.html','playground/'],
     ['testing/index.html','testing/'],
     ['reference/index.html','reference/'],
     ['architecture/index.html','architecture/'],
     ['compatibility/index.html','compatibility/']
+]);
+const compatibilityPageRoutes=new Map([
+    ['examples/hello-world/index.html','examples/']
+]);
+const repositoryUrl='https://github.com/TheWizardNexus/arcane-os-sdk';
+const pagesNavigationLabels=['Overview','Hello World','Guides','API','Reference','GitHub'];
+const pagesNavigationHrefs=new Map([
+    ['index.html',['./','examples/','guides/','reference/sdk-api/','reference/',repositoryUrl]],
+    ['quick-start/index.html',['../','../examples/','../guides/','../reference/sdk-api/','../reference/',repositoryUrl]],
+    ['guides/index.html',['../','../examples/','./','../reference/sdk-api/','../reference/',repositoryUrl]],
+    ['guides/external-app/index.html',['../../','../../examples/','../','../../reference/sdk-api/','../../reference/',repositoryUrl]],
+    ['guides/integrated-workspace/index.html',['../../','../../examples/','../','../../reference/sdk-api/','../../reference/',repositoryUrl]],
+    ['guides/native-builds/index.html',['../../','../../examples/','../','../../reference/sdk-api/','../../reference/',repositoryUrl]],
+    ['examples/index.html',['../','./','../guides/','../reference/sdk-api/','../reference/',repositoryUrl]],
+    ['examples/hello-world/index.html',['../../','../','../../guides/','../../reference/sdk-api/','../../reference/',repositoryUrl]],
+    ['playground/index.html',['../','../examples/','../guides/','../reference/sdk-api/','../reference/',repositoryUrl]],
+    ['testing/index.html',['../','../examples/','../guides/','../reference/sdk-api/','../reference/',repositoryUrl]],
+    ['architecture/index.html',['../','../examples/','../guides/','../reference/sdk-api/','../reference/',repositoryUrl]],
+    ['compatibility/index.html',['../','../examples/','../guides/','../reference/sdk-api/','../reference/',repositoryUrl]]
 ]);
 
 async function loadReferenceManifest(){
@@ -228,6 +246,22 @@ function moduleExample(html){
 
 function htmlCellText(value){
     return decodeReferenceHtml(value.replace(/<[^>]*>/gu,''));
+}
+
+function primaryNavigationLinks(html){
+    const navigation=html.match(
+        /<nav id="primary-navigation"(?=[\s>])[^>]*>([\s\S]*?)<\/nav>/u
+    );
+    assert.ok(navigation,'The page must expose primary navigation.');
+    return [...navigation[1].matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gu)].map(anchor=>{
+        const href=anchor[1].match(/\bhref="([^"]+)"/u);
+        assert.ok(href,'Every primary-navigation link must have an href.');
+        return {
+            attributes:anchor[1],
+            href:href[1],
+            label:htmlCellText(anchor[2]).replace('↗','').trim()
+        };
+    });
 }
 
 function contractTableRows(html,label){
@@ -347,18 +381,33 @@ async function listHtmlFiles(directory=siteRoot,prefix=''){
 }
 
 test('Pages routes are semantic, canonical, and project-path safe',async t=>{
-    const pageRoutes=await loadPageRoutes();
+    const canonicalPageRoutes=await loadPageRoutes();
+    const pageRoutes=new Map([...canonicalPageRoutes,...compatibilityPageRoutes]);
     const actualPages=(await listHtmlFiles()).sort();
+    assert.equal(staticPageRoutes.size,12);
+    assert.equal(canonicalPageRoutes.size,121);
+    assert.equal(compatibilityPageRoutes.size,1);
+    assert.equal(pageRoutes.size,122);
+    assert.equal(canonicalPageRoutes.get('examples/index.html'),'examples/');
+    assert.equal(canonicalPageRoutes.has('examples/hello-world/index.html'),false);
+    assert.equal(compatibilityPageRoutes.get('examples/hello-world/index.html'),'examples/');
     assert.deepEqual(actualPages,[...pageRoutes.keys()].sort());
 
     for(const [fileName,route] of pageRoutes){
         await t.test(fileName,async()=>{
             const html=await readSiteFile(fileName);
             const canonical=`${canonicalRoot}${route}`;
+            const compatibility=compatibilityPageRoutes.has(fileName);
             assert.match(html,/^<!doctype html>/u);
             assert.match(html,/<html lang="en">/u);
             assert.match(html,/<meta name="viewport"/u);
             assert.match(html,/<meta name="description"/u);
+            assert.match(
+                html,
+                compatibility
+                    ?/<meta name="robots" content="noindex, follow">/u
+                    :/<meta name="robots" content="index, follow">/u
+            );
             assert.match(html,/Content-Security-Policy/u);
             assert.match(html,/default-src 'self'/u);
             assert.match(html,/connect-src 'none'/u);
@@ -378,6 +427,21 @@ test('Pages routes are semantic, canonical, and project-path safe',async t=>{
             assert.ok(references.length>=5,fileName);
             for(const reference of references)await assertLocalReference(fileName,reference);
         });
+    }
+
+    const alias=await readSiteFile('examples/hello-world/index.html');
+    assert.match(alias,/<a\b[^>]*href="[.][.]\/"[^>]*>/u);
+});
+
+test('Pages-owned primary navigation has one responsive global information architecture',async()=>{
+    for(const [fileName,hrefs] of pagesNavigationHrefs){
+        const links=primaryNavigationLinks(await readSiteFile(fileName));
+        assert.deepEqual(links.map(link=>link.label),pagesNavigationLabels,fileName);
+        assert.deepEqual(links.map(link=>link.href),hrefs,fileName);
+        const repositoryLink=links.at(-1);
+        assert.match(repositoryLink.attributes,/\bclass="repo-link"/u,fileName);
+        assert.match(repositoryLink.attributes,/\btarget="_blank"/u,fileName);
+        assert.match(repositoryLink.attributes,/\brel="noreferrer"/u,fileName);
     }
 });
 
@@ -1097,25 +1161,32 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
 });
 
 test('documentation describes the consumer source-to-portable-browser-package contract truthfully',async()=>{
-    const [home,quickStart,external,hello,native,reference]=await Promise.all([
+    const [home,quickStart,external,hello,alias,native,reference,siteScript]=await Promise.all([
         readSiteFile('index.html'),
         readSiteFile('quick-start/index.html'),
         readSiteFile('guides/external-app/index.html'),
+        readSiteFile('examples/index.html'),
         readSiteFile('examples/hello-world/index.html'),
         readSiteFile('guides/native-builds/index.html'),
-        readSiteFile('reference/index.html')
+        readSiteFile('reference/index.html'),
+        readSiteFile('app.js')
     ]);
-    const combined=[home,quickStart,external,hello,native,reference].join('\n');
+    const pagesOwnedHtml=await Promise.all(
+        [...pagesNavigationHrefs.keys()].map(fileName=>readSiteFile(fileName))
+    );
+    const publishedSurface=[...pagesOwnedHtml,siteScript].join('\n');
+    const combined=[publishedSurface,native,reference].join('\n');
+    const decodedHello=decodeReferenceHtml(hello);
 
-    assert.match(home,/Not yet published to npm/u);
-    assert.match(home,/examples\/hello-world\//u);
-    assert.match(quickStart,/pack:local[^<]*<\/code> deliberately uses <code>npm pack --ignore-scripts<\/code>/u);
-    assert.match(quickStart,/without repeating the complete check/u);
-    assert.match(external,/npm run pack:local[\s\S]*npm install --save-dev --save-exact [^\n]*[.]tgz/u);
+    assert.match(home,/0[.]1[.]1/u);
+    assert.match(home,/published|npm/iu);
+    assert.match(quickStart,/npx arcane-os@0[.]1[.]1 new/u);
+    assert.match(quickStart,/Node[.]js 22[.]23[.]2/u);
+    assert.match(external,/arcane-os@0[.]1[.]1/u);
     assert.match(external,/packaged HTML, CSS, and JavaScript/u);
-    assert.match(hello,/npx arcane-os new hello-world/u);
+    assert.match(hello,/npx arcane-os@0[.]1[.]1 new hello-world/u);
     assert.match(hello,/npm install/u);
-    assert.match(hello,/npm install --global arcane-os/u);
+    assert.match(hello,/npm install --global arcane-os@0[.]1[.]1/u);
     assert.match(hello,/--target browser/u);
     assert.match(hello,/What Arcane adds/u);
     assert.match(hello,/arcane\/[\s\S]*dependencies\/[\s\S]*sdk\//u);
@@ -1130,16 +1201,30 @@ test('documentation describes the consumer source-to-portable-browser-package co
     assert.match(hello,/npm run build/u);
     assert.match(hello,/npm run run/u);
     assert.match(hello,/portable browser package/u);
-    assert.match(hello,/do not create or launch a standalone executable/u);
-    assert.match(hello,/Standalone native execution is provider-supplied and deferred/u);
+    assert.match(hello,/do not create or launch a standalone (?:native )?executable/u);
+    assert.match(hello,/Standalone native execution is provider-supplied/u);
+    assert.match(decodedHello,/No model weights ship[\s\S]*no model download starts/iu);
+    assert.match(decodedHello,/1,998,371,424 bytes \(1[.]86 GiB\)/u);
+    assert.match(decodedHello,/loadPolicy:'manual'/u);
+    assert.match(decodedHello,/localOnly:true/u);
+    assert.match(decodedHello,/Proposed tool calls/u);
+    assert.match(decodedHello,/model-source request/u);
+    assert.match(decodedHello,/same-origin Wllama\/WASM assets may still load/u);
+    assert.match(decodedHello,/Any verified cache remains; an interrupted model download is discarded/u);
+    assert.match(decodedHello,/ARCANE_AI_[\s\S]*APP_DATA_/u);
     assert.doesNotMatch(
-        hello,
-        /globalThis[.]Arcane|filesystem[.]directory[.]select|ArcaneApp-hello-world[.]exe|Build (?:the Windows )?executable|native folder|--target windows-x64|node_modules\/arcane-os\/runtime\/arcane/iu
+        decodedHello,
+        /globalThis[.]Arcane|ArcaneApp-hello-world[.]exe|Build (?:the Windows )?executable|native folder|--target windows-x64|--arcane-root|node_modules\/arcane-os\/runtime\/arcane|source to executable|Windows x64 development build|Tool-call receipt|partial bytes were removed/iu
     );
     assert.doesNotMatch(
-        hello,
-        /not yet published|after publication|pack:local|[.]tgz|0[.]1[.]0-dev|current development checkout|exactly 152|CI shape|--arcane-root|source sync|Arcane Ollama|prebuilt Arcane Core/iu
+        publishedSurface,
+        /not yet published|before (?:the SDK is )?published|after publication|pack:local|npm pack --ignore-scripts|[.]tgz|arcane-os@dev|0[.]1[.]0-dev(?:[.][0-9]+)?|Development SDK|current development checkout|SDK update (?:poll|polling)|repository-internal/iu
     );
+    assert.doesNotMatch(
+        publishedSurface,
+        /href="(?:[.][.]\/)*(?:examples\/)?hello-world\/(?:[#?][^"]*)?"/u
+    );
+    assert.match(alias,/<a\b[^>]*href="[.][.]\/"[^>]*>/u);
     assert.match(
         hello,
         /Model downloaded, SHA-256 verified, admitted to app-scoped DBOPFS, and loaded locally/u
@@ -1166,6 +1251,17 @@ test('site interaction is bounded, copyable, and accessibility-aware',async t=>{
         assert.match(script,/prefers-reduced-motion: reduce/u);
         assert.match(script,/IntersectionObserver/u);
         assert.match(script,/window[.]cancelAnimationFrame/u);
+        assert.match(script,/const wideNavigation = window[.]matchMedia\("\(min-width: 761px\)"\)/u);
+        assert.match(script,/const wideHero = window[.]matchMedia\("\(min-width: 981px\)"\)/u);
+        assert.match(script,/if \(!wideHero[.]matches \|\| !finePointer[.]matches/u);
+        assert.match(
+            script,
+            /const resetPointerOffset = \(\) => \{[\s\S]*--mouse-x", "0px"[\s\S]*--mouse-y", "0px"[\s\S]*--mouse-x-reverse", "0px"[\s\S]*--mouse-y-reverse", "0px"/u
+        );
+        assert.match(
+            script,
+            /wideHero[.]addEventListener\("change", \(event\) => \{\s*if \(!event[.]matches\) resetPointerOffset\(\)/u
+        );
     });
     await t.test('all code blocks use the generic clipboard path',()=>{
         assert.match(script,/function setupCopyButtons\(\)/u);
@@ -1196,6 +1292,44 @@ test('site interaction is bounded, copyable, and accessibility-aware',async t=>{
         assert.match(styles,/@media \(prefers-reduced-motion: reduce\)/u);
         assert.match(styles,/@media \(forced-colors: active\)/u);
         assert.match(styles,/:focus-visible/u);
+        assert.match(
+            styles,
+            /[.]hero-visual\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;[^}]*margin:\s*0;[^}]*justify-self:\s*center;/u
+        );
+        assert.match(
+            styles,
+            /[.]hero-system\s*\{[^}]*width:\s*100%;[^}]*max-width:\s*560px;/u
+        );
+        assert.match(
+            styles,
+            /[.]hero h1\s*\{[^}]*font-size:\s*clamp\(3rem,\s*5vw,\s*5rem\);/u
+        );
+        assert.match(
+            styles,
+            /[.]prose :not\(pre\) > code\s*\{[^}]*overflow-wrap:\s*anywhere;[^}]*word-break:\s*break-word;/u
+        );
+        const tabletStart=styles.indexOf('@media (max-width: 980px)');
+        const mobileStart=styles.indexOf('@media (max-width: 760px)',tabletStart);
+        const narrowStart=styles.indexOf('@media (max-width: 520px)',mobileStart);
+        const documentationStart=styles.indexOf('@media (max-width: 1120px)',narrowStart);
+        assert.ok(
+            tabletStart>=0&&mobileStart>tabletStart&&narrowStart>mobileStart
+            &&documentationStart>narrowStart
+        );
+        assert.match(
+            styles.slice(tabletStart,mobileStart),
+            /[.]hero\s*\{[^}]*grid-template-columns:\s*1fr;[\s\S]*[.]hero-visual\s*\{[^}]*width:\s*min\(560px, 100%\);/u
+        );
+        const mobileCss=styles.slice(mobileStart,narrowStart);
+        const narrowCss=styles.slice(narrowStart,documentationStart);
+        assert.match(mobileCss,/[.]nav-toggle\s*\{[^}]*display:\s*block;/u);
+        assert.match(mobileCss,/[.]primary-navigation\s*\{[^}]*display:\s*none;/u);
+        assert.match(mobileCss,/[.]primary-navigation[.]is-open\s*\{[^}]*display:\s*flex;/u);
+        assert.match(mobileCss,/[.]hero-system\s*\{[^}]*width:\s*100%;/u);
+        assert.match(narrowCss,/[.]hero-actions [.]button\s*\{[^}]*width:\s*100%;/u);
+        assert.match(narrowCss,/[.]hero-visual\s*\{[^}]*overflow-x:\s*clip;/u);
+        assert.match(narrowCss,/[.]hero-system\s*\{[^}]*width:\s*100%;[^}]*transform:\s*none;/u);
+        assert.doesNotMatch(styles,/[.]hero-system\s*\{[^}]*(?:98vw|calc\(100vw - 8px\))/u);
     });
 });
 
@@ -1207,6 +1341,7 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         'AGENTS.md',
         'README.md',
         'package.json',
+        'package-lock.json',
         'arcane-packager.json',
         'arcane.lock.json',
         '.github/workflows/check.yml',
@@ -1224,9 +1359,10 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         assert.equal((await stat(path.join(exampleRoot,...relative.split('/')))).isFile(),true,relative);
     }
 
-    const [rootPackage,examplePackage,lock,runtimeRelease,browserRelease,authoredDescriptor,packageManifest,packager]=await Promise.all([
+    const [rootPackage,examplePackage,packageLock,lock,runtimeRelease,browserRelease,authoredDescriptor,packageManifest,packager]=await Promise.all([
         readJson(path.join(repositoryRoot,'package.json')),
         readJson(path.join(exampleRoot,'package.json')),
+        readJson(path.join(exampleRoot,'package-lock.json')),
         readJson(path.join(exampleRoot,'arcane.lock.json')),
         readJson(path.join(repositoryRoot,'runtime','ARCANE_RUNTIME_RELEASE.json')),
         readJson(path.join(repositoryRoot,'browser-runtime','ARCANE_SDK_BROWSER_RELEASE.json')),
@@ -1235,8 +1371,33 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         readJson(path.join(exampleRoot,'arcane-packager.json'))
     ]);
     await t.test('pins the current npm and runtime identities',()=>{
-        assert.equal(examplePackage.devDependencies['arcane-os'],rootPackage.version);
-        assert.equal(lock.sdk.version,rootPackage.version);
+        assert.equal(rootPackage.version,'0.1.1');
+        assert.equal(examplePackage.devDependencies['arcane-os'],'0.1.1');
+        assert.equal(examplePackage.engines.node,'>=22.23.2');
+        assert.equal(packageLock.lockfileVersion,3);
+        assert.equal(packageLock.requires,true);
+        assert.equal(packageLock.packages[''].devDependencies['arcane-os'],'0.1.1');
+        assert.equal(packageLock.packages[''].engines.node,'>=22.23.2');
+        const installedSdk=packageLock.packages['node_modules/arcane-os'];
+        assert.deepEqual(
+            {
+                version:installedSdk.version,
+                resolved:installedSdk.resolved,
+                integrity:installedSdk.integrity,
+                dev:installedSdk.dev,
+                license:installedSdk.license,
+                node:installedSdk.engines.node
+            },
+            {
+                version:'0.1.1',
+                resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.1.1.tgz',
+                integrity:'sha512-EH4lwSiBqBuzzTA1YWPeat5b9YPO0m5iHfnmLrNN0qEPPmEOQvvsebg6nmUIXVlBKgPLzyVIFo/qQ2qS89MN+A==',
+                dev:true,
+                license:'AGPL-3.0-only',
+                node:'>=22.23.2'
+            }
+        );
+        assert.equal(lock.sdk.version,'0.1.1');
         assert.equal(lock.runtime.contentSha256,runtimeRelease.contentSha256);
         assert.equal(lock.runtime.upstreamCommit,runtimeRelease.source.commit);
         assert.equal(lock.protocols.arcane,runtimeRelease.source.protocol);
@@ -1296,6 +1457,10 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         const importMap=JSON.parse(artifact);
         assert.deepEqual(Object.keys(importMap),['imports']);
         assert.equal(Object.keys(importMap.imports).length,86);
+        assert.equal(
+            importMap.imports['arcane-os/ai/browser-wasm'],
+            './arcane/sdk/ai/browser-wasm.mjs'
+        );
         const generated=await buildImportMap({
             files:expectedPaths,
             readFile:relative=>readFile(path.join(
@@ -1349,12 +1514,13 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         assert.equal(createHash('sha256').update(exampleIcon).digest('hex'),createHash('sha256').update(templateIcon).digest('hex'));
     });
     await t.test('source uses the generated map before named app behavior',async()=>{
-        const [html,style,script,readme,workflow,tutorial]=await Promise.all([
+        const [html,style,script,readme,workflow,tutorial,compatibilityAlias]=await Promise.all([
             readFile(path.join(appRoot,'index.html'),'utf8'),
             readFile(path.join(appRoot,'hello-world.css'),'utf8'),
             readFile(path.join(appRoot,'modules','App.js'),'utf8'),
             readFile(path.join(exampleRoot,'README.md'),'utf8'),
             readFile(path.join(exampleRoot,'.github','workflows','check.yml'),'utf8'),
+            readSiteFile('examples/index.html'),
             readSiteFile('examples/hello-world/index.html')
         ]);
         const base=html.indexOf('<base href="../../">');
@@ -1387,10 +1553,40 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         assert.match(script,/Hello from Arcane OS!/u);
         assert.match(script,/resolveApplicationId\(\)/u);
         assert.match(script,/resolveApplicationLocalStorageKey\('hello-count',\{applicationId:appId\}\)/u);
-        assert.doesNotMatch(script,/(?:[.][.]\/)+arcane\/|DirectoryPicker|globalThis[.]Arcane/u);
+        for(const modelAuthority of [
+            "id:'ibm-granite-4.1-3b-q4-k-s'",
+            "name:'granite-4.1-3b-Q4_K_S.gguf'",
+            "immutableUrl:'https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/ab4701481089b58a082ef63cc1cee738887293ff/granite-4.1-3b-Q4_K_S.gguf'",
+            'bytes:1_998_371_424',
+            "sha256:'ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a'",
+            "licenseSpdx:'Apache-2.0'",
+            "sourceRevision:'ab4701481089b58a082ef63cc1cee738887293ff'"
+        ])assert.equal(script.includes(modelAuthority),true,modelAuthority);
+        assert.match(html,/No model weights ship[\s\S]*no model download starts/iu);
+        assert.match(html,/1,998,371,424 bytes \(1[.]86 GiB\)/u);
+        assert.match(html,/Proposed tool calls/u);
+        assert.match(script,/new DBOPFS\(\{applicationId:appId\}\)/u);
+        assert.match(script,/await dbopfs[.]readyPromise/u);
+        assert.match(script,/dbopfs[.]applicationId!==appId/u);
+        assert.match(script,/createArcaneAI\(\{provider,loadPolicy:'manual'\}\)/u);
+        assert.match(script,/renderProgress\(event[.]detail[?][.]progress\)/u);
+        assert.match(script,/local[.]load\(\{signal:controller[.]signal,offline\}\)/u);
+        assert.match(script,/local[.]streamRequest\(\{[\s\S]*localOnly:true,[\s\S]*signal:controller[.]signal,[\s\S]*tools:\[SHOW_GREETING_TOOL\]/u);
+        assert.match(script,/activeController[?][.]abort\('Cancelled by the application user[.]'\)/u);
+        assert.match(script,/await local[.]unload\(\)/u);
+        assert.match(script,/activeController[?][.]abort\('The page is closing[.]'\)[\s\S]*[.]then\(value=>value[.]dispose\(\)\)/u);
+        assert.match(script,/Any verified cache remains; an interrupted model download is discarded/u);
+        assert.match(script,/without a model-source request/u);
+        assert.match(script,/same-origin Wllama\/WASM assets may still load/u);
+        assert.doesNotMatch(
+            script,
+            /(?:[.][.]\/)+arcane\/|DirectoryPicker|globalThis[.]Arcane|toolHandlers|executeTools|keepCache|Date[.]now|SDK update|partial bytes were removed/iu
+        );
         const renderedTutorial=decodeReferenceHtml(tutorial);
+        const renderedAlias=decodeReferenceHtml(compatibilityAlias);
         for(const source of [html,style,script]){
             assert.equal(renderedTutorial.includes(source.trim()),true);
+            assert.equal(renderedAlias.includes(source.trim()),false);
         }
         assert.match(readme,/npx arcane-os@0[.]1[.]1 new[\s\S]*npm install/u);
         assert.match(readme,/generated project pins `arcane-os` exactly[\s\S]*project-local CLI/u);
@@ -1402,6 +1598,12 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         );
         assert.match(readme,/authenticated `arcane\/` projection contains 173 files/u);
         assert.match(readme,/generated map\s+contains 86 entries/u);
+        assert.match(readme,/`load\(\{offline:true\}\)`\s+makes no model-source request/u);
+        assert.match(readme,/ARCANE_AI_[*][\s\S]*APP_DATA_[*]/u);
+        assert.match(
+            readme,
+            /initial Hugging Face origin[\s\S]*provider-controlled HTTPS redirect[\s\S]*without pinning an unstable[\s\S]*regional CDN hostname/u
+        );
         assert.match(readme,/dist\/hello-world\/[\s\S]*arcane\//u);
         assert.match(readme,/arcane\/AppDataScope/u);
         assert.match(readme,/arcane\/ThemeBootstrap/u);
@@ -1473,7 +1675,16 @@ test('Pages workflow deploys one authenticated main static artifact',async t=>{
         assert.equal(packageDocument.files.some(entry=>entry.startsWith('site')),false);
         assert.match(robots,/Sitemap: https:\/\/thewizardnexus[.]github[.]io\/arcane-os-sdk\/sitemap[.]xml/u);
         const locations=[...sitemap.matchAll(/<loc>([^<]+)<\/loc>/gu)].map(match=>match[1]).sort();
+        assert.equal(locations.length,121);
+        assert.equal(new Set(locations).size,121);
+        assert.equal(locations.filter(url=>url===`${canonicalRoot}examples/`).length,1);
+        assert.equal(locations.includes(`${canonicalRoot}examples/hello-world/`),false);
+        assert.equal(
+            locations.filter(url=>url===`${canonicalRoot}reference/ai/browser-wasm/`).length,
+            1
+        );
         const pageRoutes=await loadPageRoutes();
+        assert.equal(pageRoutes.size,121);
         const expected=[...pageRoutes.values()].map(route=>`${canonicalRoot}${route}`).sort();
         assert.deepEqual(locations,expected);
     });

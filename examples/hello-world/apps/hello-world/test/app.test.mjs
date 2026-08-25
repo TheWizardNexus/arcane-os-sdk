@@ -64,7 +64,7 @@ function browserHarness(){
         ['#ai-progress-label',interactiveElement()],
         ['#ai-response',interactiveElement({textContent:'Load the model to begin.'})],
         ['#ai-tool-calls',interactiveElement({
-            textContent:'No tool calls proposed. Arcane never executes tool calls for the application.'
+            textContent:'No tool calls proposed. Structural output is displayed only; the application invokes no tool.'
         })]
     ]);
     const values=new Map();
@@ -430,7 +430,7 @@ test('application shell installs its managed import map before every module',asy
     assert.doesNotMatch(source,/ThemeBootstrap[.]js[?]/u);
 });
 
-test('application package is browser-only with one explicit model origin',async function verifyPackageIdentity(){
+test('application package is browser-only with one explicit initial model origin',async function verifyPackageIdentity(){
     const [manifest,descriptor]=await Promise.all([
         readFile(new URL('arcane-package.json',appRoot),'utf8').then(JSON.parse),
         readFile(new URL('arcane-app.json',appRoot),'utf8').then(JSON.parse)
@@ -501,6 +501,13 @@ test('workspace pins the published SDK and browser release workflow',async funct
     assert.match(readme,/173 files/u);
     assert.match(readme,/86 entries/u);
     assert.match(readme,/does not create a\s+standalone native executable/u);
+    assert.match(readme,/no model download starts until a load button is chosen/u);
+    assert.match(readme,/`load\(\{offline:true\}\)` makes no model-source request/u);
+    assert.match(readme,/Packaged same-origin Wllama\/WASM\s+runtime assets may still load/u);
+    assert.match(readme,/stable `ARCANE_AI_\*` and\s+`APP_DATA_\*` codes/u);
+    assert.match(readme,/pinned model URL's initial Hugging Face origin/u);
+    assert.match(readme,/provider-controlled HTTPS redirect\s+chain/u);
+    assert.doesNotMatch(readme,/`load\(\{offline:true\}\)` never fetches|regional CDN hostname[^.]*in `security[.]connectOrigins`/iu);
     assert.doesNotMatch(readme,/--arcane-root|source sync|SDK update poll/iu);
 });
 
@@ -513,7 +520,9 @@ test('application demonstrates direct named Arcane and browser-AI imports',async
     assert.match(html,/>Say hello<\/button>/u);
     assert.match(html,/Optional browser-local AI/u);
     assert.match(html,/No model download has started/u);
+    assert.match(html,/no model download starts until you choose the network-permitted load button/u);
     assert.match(html,/1,998,371,424 bytes \(1[.]86 GiB\)/u);
+    assert.match(html,/<h3>Proposed tool calls<\/h3>/u);
     assert.match(script,/from 'arcane\/ThemeBootstrap'/u);
     assert.match(script,/from 'arcane\/AppDataScope'/u);
     assert.match(script,/from 'arcane\/DBOPFS'/u);
@@ -522,6 +531,11 @@ test('application demonstrates direct named Arcane and browser-AI imports',async
     assert.match(script,/localOnly:true/u);
     assert.match(script,/toolChoice:'auto'/u);
     assert.match(script,/ARCANE_AI_MODEL_OFFLINE_MISS/u);
+    assert.match(script,/without a model-source request/u);
+    assert.match(script,/Packaged same-origin Wllama\/WASM assets may still load/u);
+    assert.match(script,/Any verified cache remains; an interrupted model download is discarded/u);
+    assert.match(script,/Proposed tool calls \(structural output only\)/u);
+    assert.doesNotMatch(`${html}\n${script}`,/Tool-call receipt|never executed|executes tool calls/iu);
     assert.doesNotMatch(script,/ThemeBootstrap[.]js|AppDataScope[.]js|DBOPFS[.]js/u);
     assert.doesNotMatch(script,/toolHandlers|executeTools|Date[.]now|SDK update/iu);
 });
@@ -575,19 +589,19 @@ test('online load authenticates the exact model and request stays local',async f
         assert.equal('toolHandlers' in request,false);
         assert.equal('executeTools' in request,false);
         assert.equal(elements.get('#ai-response').textContent,'Hello locally.');
-        assert.match(elements.get('#ai-tool-calls').textContent,/visible, never executed/u);
+        assert.match(elements.get('#ai-tool-calls').textContent,/Proposed tool calls \(structural output only\)/u);
         assert.match(elements.get('#ai-tool-calls').textContent,/show_greeting/u);
         assert.match(elements.get('#ai-tool-calls').textContent,/Hello from Granite/u);
         assert.equal(aiRuntime.calls.storeRemove,0);
     });
 });
 
-test('offline load reuses a verified cache without a model fetch path',async function verifyOfflineLoad(){
+test('offline load reuses a verified cache without a model-source request',async function verifyOfflineLoad(){
     await runApplication(async({elements,aiRuntime})=>{
         await elements.get('#ai-load-offline').trigger('click');
         assert.equal(aiRuntime.calls.load.length,1);
         assert.equal(aiRuntime.calls.load[0].offline,true);
-        assert.match(elements.get('#ai-status').textContent,/no model network request/u);
+        assert.match(elements.get('#ai-status').textContent,/without a model-source request/u);
         assert.equal(aiRuntime.calls.storeRemove,0);
     });
 });
@@ -616,7 +630,9 @@ test('cancel aborts a pending local request with stable copy',async function ver
         assert.equal(signal.aborted,true);
         const rendered=elements.get('#ai-status').textContent;
         assert.match(rendered,/ARCANE_AI_REQUEST_ABORTED/u);
-        assert.match(rendered,/partial bytes were removed/u);
+        assert.match(rendered,/Any verified cache remains/u);
+        assert.match(rendered,/interrupted model download is discarded/u);
+        assert.doesNotMatch(rendered,/partial bytes were removed/u);
         assert.doesNotMatch(rendered,/PRIVATE ABORT PROVIDER DETAIL/u);
     });
 });

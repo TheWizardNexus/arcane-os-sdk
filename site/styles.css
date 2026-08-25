@@ -36,7 +36,6 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
-  overflow-x: hidden;
   background:
     radial-gradient(circle at 18% 10%, rgb(58 77 157 / 0.15), transparent 34rem),
     radial-gradient(circle at 88% 24%, rgb(121 73 191 / 0.13), transparent 36rem),
@@ -325,7 +324,7 @@ code {
 
 .hero h1 {
   max-width: 760px;
-  font-size: clamp(3.4rem, 7vw, 6.6rem);
+  font-size: clamp(3rem, 5vw, 5rem);
 }
 
 .hero h1 span {
@@ -471,8 +470,17 @@ code {
   font-size: 0.79rem;
 }
 
+.hero-visual {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+  justify-self: center;
+}
+
 .hero-system {
   position: relative;
+  width: 100%;
   aspect-ratio: 1;
   max-width: 560px;
   margin-inline: auto;
@@ -867,101 +875,6 @@ code {
 
 .boundary-callout p {
   margin: 0;
-}
-
-.command-lab {
-  overflow: hidden;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  background: rgb(4 9 22 / 0.9);
-  box-shadow: var(--shadow);
-}
-
-.command-tabs {
-  display: flex;
-  gap: 4px;
-  overflow-x: auto;
-  padding: 13px;
-  border-bottom: 1px solid var(--line);
-  scrollbar-width: thin;
-}
-
-.command-tabs button {
-  flex: 0 0 auto;
-  padding: 9px 14px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 0.84rem;
-  font-weight: 700;
-}
-
-.command-tabs button[aria-selected="true"] {
-  border-color: var(--line);
-  background: rgb(121 140 255 / 0.12);
-  color: white;
-}
-
-.terminal-panel {
-  min-height: 400px;
-}
-
-.terminal-bar {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 16px;
-  align-items: center;
-  padding: 14px 18px;
-  border-bottom: 1px solid rgb(143 164 242 / 0.1);
-  color: var(--muted);
-  font-size: 0.78rem;
-}
-
-.terminal-dots {
-  display: flex;
-  gap: 6px;
-}
-
-.terminal-dots i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgb(255 161 145);
-}
-
-.terminal-dots i:nth-child(2) { background: var(--gold); }
-.terminal-dots i:nth-child(3) { background: var(--success); }
-
-.copy-button {
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgb(117 132 231 / 0.08);
-  color: rgb(214 224 255);
-  cursor: pointer;
-  font-size: 0.72rem;
-  font-weight: 750;
-}
-
-.terminal-panel pre {
-  min-height: 225px;
-  padding: 26px;
-  margin: 0;
-  overflow: auto;
-  color: rgb(200 218 255);
-  font-size: clamp(0.76rem, 1.6vw, 0.92rem);
-  line-height: 1.75;
-  white-space: pre-wrap;
-}
-
-.command-note {
-  padding: 18px 26px;
-  margin: 0;
-  border-top: 1px solid rgb(143 164 242 / 0.1);
-  color: var(--muted);
-  font-size: 0.82rem;
 }
 
 .copy-status {
@@ -1558,6 +1471,11 @@ tbody tr:last-child td {
 .prose li {
   font-size: 0.95rem;
   line-height: 1.78;
+}
+
+.prose :not(pre) > code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .prose a:not(.button) {
@@ -2215,8 +2133,12 @@ tbody tr:last-child td {
     margin-inline: auto;
   }
 
+  .hero-visual {
+    width: min(560px, 100%);
+  }
+
   .hero-system {
-    width: min(560px, 88vw);
+    transform: none;
   }
 
   .workflow-grid {
@@ -2304,7 +2226,7 @@ tbody tr:last-child td {
   }
 
   .hero h1 {
-    font-size: clamp(3rem, 15vw, 4.8rem);
+    font-size: clamp(2.75rem, 12vw, 4rem);
   }
 
   .hero-facts {
@@ -2314,7 +2236,7 @@ tbody tr:last-child td {
   }
 
   .hero-system {
-    width: min(500px, 98vw);
+    width: 100%;
   }
 
   .target-node {
@@ -2351,25 +2273,6 @@ tbody tr:last-child td {
     grid-template-columns: 1fr;
   }
 
-  .terminal-panel {
-    min-height: 440px;
-  }
-
-  .terminal-bar {
-    grid-template-columns: auto 1fr;
-  }
-
-  .terminal-bar > span:nth-child(2) {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .copy-button {
-    grid-column: 1 / -1;
-    justify-self: start;
-  }
-
   .architecture-line {
     grid-template-columns: 1fr;
   }
@@ -2402,6 +2305,10 @@ tbody tr:last-child td {
     font-size: 1rem;
   }
 
+  .hero-visual {
+    overflow-x: clip;
+  }
+
   .hero-actions .button {
     width: 100%;
   }
@@ -2413,7 +2320,7 @@ tbody tr:last-child td {
   }
 
   .hero-system {
-    width: min(480px, calc(100vw - 8px));
+    width: 100%;
     transform: none;
   }
 
@@ -2425,14 +2332,6 @@ tbody tr:last-child td {
   .feature-copy h2,
   .final-cta h2 {
     font-size: clamp(2.2rem, 12vw, 3.4rem);
-  }
-
-  .command-tabs {
-    padding: 9px;
-  }
-
-  .terminal-panel pre {
-    padding: 20px 17px;
   }
 
   .license-section {
@@ -2648,7 +2547,6 @@ tbody tr:last-child td {
   .site-header,
   .primary-navigation,
   .workflow-grid li,
-  .terminal-panel,
   .readiness-card,
   .architecture-card,
   .roadmap-grid article,

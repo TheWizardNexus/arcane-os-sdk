@@ -127,7 +127,7 @@ const countKey=resolveApplicationLocalStorageKey(
 
 The named imports resolve the physical installed-package routes directly. The
 DBOPFS module initializes the app-scoped storage singleton, but the AI provider
-does not load and no model network request starts until a load button is chosen:
+does not load and no model download starts until a load button is chosen:
 
 ```js
 import DBOPFS from 'arcane/DBOPFS';
@@ -146,26 +146,31 @@ The tested optional model is caller-supplied IBM Granite 4.1 3B Q4_K_S:
 - immutable source revision: `ab4701481089b58a082ef63cc1cee738887293ff`
 - SHA-256: `ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a`
 
-The online load first checks an app-scoped DBOPFS cache. On a miss, Arcane
-downloads the immutable URL, reports byte progress, verifies the full digest,
-writes a completion manifest, reopens and rehashes the file, and only then
-admits it. `load({offline:true})` never fetches and succeeds only when that
-verified cache already exists. Warm-cache loads still rehash the full model.
+The network-permitted load first checks an app-scoped DBOPFS cache. On a miss,
+Arcane downloads the immutable URL, reports byte progress, verifies the full
+digest, writes a completion manifest, reopens and rehashes the file, and only
+then admits it. `load({offline:true})` makes no model-source request and succeeds
+only when that verified cache already exists. Packaged same-origin Wllama/WASM
+runtime assets may still load. Warm-cache loads still rehash the full model.
 
 Every inference request sets `localOnly:true`. That guarantees inference stays
 inside this browser provider after load; it does not mean the first-use model
-download is offline. Tool calls are returned as visible name/argument records.
-The SDK never executes them, and this example provides no tool dispatcher.
+download is offline. Proposed tool calls are returned as structural
+name/argument records. The SDK does not invoke them, and this example provides
+no tool dispatcher.
 
-Cancel aborts the active load or request. Unload terminates the model worker and
+Cancel aborts the active load or request. Any verified cache remains, while an
+interrupted model download is discarded. Unload terminates the model worker and
 releases model memory while keeping the verified cache. Leaving the page aborts
-active work and disposes the session. The UI reports stable `ARCANE_AI_*` codes
-instead of exposing provider error text.
+active work and disposes the session. The UI reports stable `ARCANE_AI_*` and
+`APP_DATA_*` codes instead of exposing provider error text.
 
-The app descriptors declare the model source in `security.connectOrigins` but
-request no Arcane Core capabilities or methods. This browser-WASM path is not
-`Arcane.ai`, the legacy `arcane/AI` module, ArcaneOllama, speech synthesis, or a
-Node inference provider.
+The app descriptors declare the pinned model URL's initial Hugging Face origin
+in `security.connectOrigins` but request no Arcane Core capabilities or methods.
+Hugging Face can serve the bytes through a provider-controlled HTTPS redirect
+chain; deployments must account for that chain without pinning an unstable
+regional CDN hostname. This browser-WASM path is not `Arcane.ai`, the legacy
+`arcane/AI` module, ArcaneOllama, speech synthesis, or a Node inference provider.
 
 ## Develop and test
 
