@@ -9,7 +9,7 @@ page is the focused local-browser path beneath the normalized AI decision
 guide.
 
 The wiring example assumes a scaffolded or materialized Arcane application
-with SDK `0.1.1`'s authenticated runtime tree and 86-entry browser import map.
+with SDK `0.1.2`'s authenticated runtime tree and 86-entry browser import map.
 `arcane/DBOPFS` is a managed browser-map specifier, not an npm package export.
 See [browser runtime delivery](../protocols.md#browser-runtime-delivery) before
 using the example in a custom host or bundler.

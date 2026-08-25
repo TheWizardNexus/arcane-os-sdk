@@ -2655,7 +2655,7 @@ The import-map operation also reports the stable operation-specific strings
 `ARCANE_IMPORT_MAP_COLLISION`; package assembly can additionally report
 `ARCANE_IMPORT_MAP_CLEANUP_FAILED`. They are normalized `ArcaneError.code`
 values, but are not properties added to this frozen general registry in SDK
-`0.1.1`.
+`0.1.2`.
 
 ### Value and import
 
@@ -3474,7 +3474,7 @@ const toolchain = createToolchain({
 
 // Only this explicit call refreshes the managed map and HTML entry.
 const result = await toolchain.importMap();
-console.log(result.importMap.entryCount); // 86 in SDK 0.1.1
+console.log(result.importMap.entryCount); // 86 in SDK 0.1.2
 ```
 
 ## describeTargets()

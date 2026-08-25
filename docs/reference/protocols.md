@@ -114,7 +114,7 @@ app plus that authenticated tree. Packaging copies the same map, app entry, and
 physical bytes into `dist/<id>`; targets never resolve through the consumer
 workspace's root `node_modules/`.
 
-In SDK `0.1.1`, the generated map has exactly 86 entries: 73 named
+In SDK `0.1.2`, the generated map has exactly 86 entries: 73 named
 `arcane/*` modules, nine `arcane/entities/*` modules, and these four focused or
 compatibility mappings:
 
@@ -168,14 +168,14 @@ heartbeat is event telemetry only and never regenerates browser state.
 
 `arcane.lock.json.sdkBrowserRuntime` persists the trusted manifest path,
 `manifestSha256`, `contentSha256`, `builder`, `sdkVersion`, and `source` record.
-For SDK `0.1.1` those identities are:
+For SDK `0.1.2` those identities are:
 
 ```text
 manifest: node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json
-manifestSha256: 33396b3d35322b784929270e7ca0a2a8b31d899c6e77bcb227edc95b37d0ae7d
+manifestSha256: 88395493b411fd5461fbb2bb065ae2b745f6d1672f796583fd248ec97f71f4f7
 contentSha256: 5e03f45a732db51cb5a2b2193cc79ecda34501d07a9b2e82e794e5fa37d55d00
 builder: arcane-sdk-browser-runtime-v1
-sdkVersion: 0.1.1
+sdkVersion: 0.1.2
 source.protocol: arcane-sdk-browser-runtime/1
 source.browserEntry: arcane-os/event-manager
 ```
