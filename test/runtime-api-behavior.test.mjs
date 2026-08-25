@@ -18,6 +18,21 @@ import {
     isOllamaModelIdentifier,
     normalizeOllamaModelIdentifier
 } from '../runtime/arcane/modules/OllamaModelIdentifier.js';
+import {
+    AI_RUNTIME_INTENT_EVENT,
+    AI_RUNTIME_PROTOCOL,
+    AI_RUNTIME_ROLES,
+    AI_RUNTIME_STARTUP_EVENT,
+    AI_RUNTIME_STATE_EVENT,
+    AI_RUNTIME_STATES,
+    aiRuntimeEvents,
+    getAIRuntimeState,
+    publishAIRuntimeRoleState,
+    requestAIRuntimeIntent,
+    startAIRuntime,
+    subscribeAIRuntimeIntents,
+    subscribeAIRuntimeState
+} from '../runtime/arcane/modules/AIRuntimeState.js';
 
 const readyEvents=[];
 const previousDispatchEvent=globalThis.dispatchEvent;
@@ -35,6 +50,22 @@ else globalThis.dispatchEvent=previousDispatchEvent;
 
 function installOllamaBridge(client){
     globalThis.Arcane={ollama:client};
+}
+
+function runtimeRoleState(role, overrides = {}) {
+    return {
+        role,
+        state: 'unavailable',
+        providerId: null,
+        modelId: null,
+        localOnly: null,
+        loaded: false,
+        busy: false,
+        operationId: null,
+        progress: null,
+        error: null,
+        ...overrides
+    };
 }
 
 test('the Arcane Ollama module publishes one immutable complete browser surface',()=>{
@@ -320,3 +351,472 @@ test('AI response-length helpers normalize one provider-independent prompt contr
     assert.equal(applyAIResponseLength(applied,'high'),applied);
     assert.throws(()=>applyAIResponseLength(null,'medium'),/must be a string/u);
 });
+
+test(
+    'AI runtime state is sticky, immutable, role-independent, and capability-neutral',
+    async function testAIRuntimeStateContract() {
+        assert.equal(AI_RUNTIME_PROTOCOL, 'arcane-ai-runtime-state/1');
+        assert.equal(AI_RUNTIME_STATE_EVENT, 'arcane-ai-runtime-state');
+        assert.equal(AI_RUNTIME_INTENT_EVENT, 'arcane-ai-runtime-intent');
+        assert.equal(
+            AI_RUNTIME_STARTUP_EVENT,
+            'arcane-ai-runtime-startup-settled'
+        );
+        assert.deepEqual(AI_RUNTIME_ROLES, ['llm', 'stt', 'tts']);
+        assert.deepEqual(
+            AI_RUNTIME_STATES,
+            [
+                'unavailable',
+                'unloaded',
+                'loading',
+                'ready',
+                'unloading',
+                'error',
+                'disposed'
+            ]
+        );
+        assert.ok(Object.isFrozen(AI_RUNTIME_ROLES));
+        assert.ok(Object.isFrozen(AI_RUNTIME_STATES));
+
+        const initial = getAIRuntimeState();
+        assert.deepEqual(
+            initial,
+            {
+                protocol: AI_RUNTIME_PROTOCOL,
+                revision: 0,
+                roles: {
+                    llm: runtimeRoleState('llm'),
+                    stt: runtimeRoleState('stt'),
+                    tts: runtimeRoleState('tts')
+                }
+            }
+        );
+        assert.ok(Object.isFrozen(initial));
+        assert.ok(Object.isFrozen(initial.roles));
+        assert.ok(Object.values(initial.roles).every(Object.isFrozen));
+
+        const stateController = new AbortController();
+        const snapshots = [];
+        const intents = [];
+        const stateEvents = [];
+
+        function observeSnapshot(snapshot) {
+            snapshots.push(snapshot);
+        }
+
+        function observeIntent(intent) {
+            intents.push(intent);
+        }
+
+        function observeStateEvent(event) {
+            stateEvents.push(event.detail);
+        }
+
+        aiRuntimeEvents.addEventListener(
+            AI_RUNTIME_STATE_EVENT,
+            observeStateEvent
+        );
+        const unsubscribeState = subscribeAIRuntimeState(
+            observeSnapshot,
+            {
+                signal: stateController.signal
+            }
+        );
+        const unsubscribeIntents = subscribeAIRuntimeIntents(observeIntent);
+
+        try {
+            assert.deepEqual(snapshots, [initial]);
+
+            const loading = publishAIRuntimeRoleState(
+                'tts',
+                runtimeRoleState(
+                    'tts',
+                    {
+                        state: 'loading',
+                        providerId: 'speech-t5',
+                        modelId: 'speech-t5-q8',
+                        localOnly: true,
+                        operationId: 'tts-load-1',
+                        progress: {
+                            phase: 'weights',
+                            completed: 4,
+                            total: 8,
+                            unit: 'bytes',
+                            heartbeat: true
+                        }
+                    }
+                )
+            );
+            assert.equal(snapshots.at(-1), loading);
+            assert.equal(stateEvents.at(-1), loading);
+            assert.equal(loading.roles.llm, initial.roles.llm);
+            assert.equal(loading.roles.stt, initial.roles.stt);
+            assert.ok(Object.isFrozen(loading.roles.tts.progress));
+
+            const beforeMalformed = getAIRuntimeState();
+            assert.throws(
+                function rejectIncompleteRoleRecord() {
+                    publishAIRuntimeRoleState('tts', {role: 'tts'});
+                },
+                /must contain exactly/u
+            );
+            assert.throws(
+                function rejectIncoherentErrorRecord() {
+                    publishAIRuntimeRoleState(
+                        'tts',
+                        runtimeRoleState(
+                            'tts',
+                            {
+                                state: 'error',
+                                providerId: 'speech-t5',
+                                modelId: 'speech-t5-q8',
+                                localOnly: true
+                            }
+                        )
+                    );
+                },
+                /error role state must include error details/u
+            );
+            assert.throws(
+                function rejectLoadedRoleWithoutModel() {
+                    publishAIRuntimeRoleState(
+                        'tts',
+                        runtimeRoleState(
+                            'tts',
+                            {
+                                state: 'ready',
+                                providerId: 'speech-t5',
+                                localOnly: true,
+                                loaded: true
+                            }
+                        )
+                    );
+                },
+                /must identify its provider and model/u
+            );
+            assert.throws(
+                function rejectInvalidProgressRecord() {
+                    publishAIRuntimeRoleState(
+                        'tts',
+                        runtimeRoleState(
+                            'tts',
+                            {
+                                state: 'loading',
+                                progress: {
+                                    phase: 'weights',
+                                    completed: 2,
+                                    total: 1,
+                                    unit: 'bytes',
+                                    heartbeat: false
+                                }
+                            }
+                        )
+                    );
+                },
+                /no smaller than progress.completed/u
+            );
+            assert.equal(getAIRuntimeState(), beforeMalformed);
+
+            const failed = publishAIRuntimeRoleState(
+                'tts',
+                runtimeRoleState(
+                    'tts',
+                    {
+                        state: 'error',
+                        providerId: 'speech-t5',
+                        modelId: 'speech-t5-q8',
+                        localOnly: true,
+                        error: {
+                            code: 'ARCANE_AI_RUNTIME_LOAD_FAILED',
+                            message: 'The selected runtime did not become ready.'
+                        }
+                    }
+                )
+            );
+            assert.ok(Object.isFrozen(failed.roles.tts.error));
+            assert.equal(failed.roles.llm, initial.roles.llm);
+            assert.equal(failed.roles.stt, initial.roles.stt);
+
+            const stateBeforeIntents = getAIRuntimeState();
+            for (const action of ['load', 'unload', 'dispose']) {
+                const intent = requestAIRuntimeIntent(
+                    {
+                        role: 'tts',
+                        action,
+                        reason: action === 'dispose' ? 'teardown' : 'user'
+                    }
+                );
+                assert.ok(Object.isFrozen(intent));
+            }
+            assert.equal(getAIRuntimeState(), stateBeforeIntents);
+            assert.deepEqual(
+                intents.map(function readIntentAction(intent) {
+                    return intent.action;
+                }),
+                ['load', 'unload', 'dispose']
+            );
+            assert.throws(
+                function rejectMalformedIntent() {
+                    requestAIRuntimeIntent(
+                        {
+                            role: 'tts',
+                            action: 'fallback',
+                            reason: 'user'
+                        }
+                    );
+                },
+                /must be load, unload, or dispose/u
+            );
+            assert.equal(getAIRuntimeState(), stateBeforeIntents);
+
+            const snapshotsBeforeAbort = snapshots.length;
+            stateController.abort();
+            const independent = publishAIRuntimeRoleState(
+                'stt',
+                runtimeRoleState(
+                    'stt',
+                    {
+                        state: 'unloaded',
+                        providerId: 'moonshine-tiny',
+                        modelId: 'moonshine-tiny-q8',
+                        localOnly: true
+                    }
+                )
+            );
+            assert.equal(snapshots.length, snapshotsBeforeAbort);
+            assert.equal(independent.roles.tts, failed.roles.tts);
+
+            const intentsBeforeUnsubscribe = intents.length;
+            unsubscribeIntents();
+            requestAIRuntimeIntent(
+                {
+                    role: 'stt',
+                    action: 'load',
+                    reason: 'startup'
+                }
+            );
+            assert.equal(intents.length, intentsBeforeUnsubscribe);
+
+            const startupIntents = [];
+            const startupReports = [];
+
+            function observeStartupIntent(intent) {
+                startupIntents.push(intent);
+            }
+
+            function observeStartupReport(event) {
+                startupReports.push(event.detail);
+            }
+
+            aiRuntimeEvents.addEventListener(
+                AI_RUNTIME_STARTUP_EVENT,
+                observeStartupReport
+            );
+            const unsubscribeStartupIntents = subscribeAIRuntimeIntents(
+                observeStartupIntent
+            );
+            try {
+                publishAIRuntimeRoleState(
+                    'llm',
+                    runtimeRoleState(
+                        'llm',
+                        {
+                            state: 'unloaded',
+                            providerId: 'wllama',
+                            modelId: 'wllama-test-model',
+                            localOnly: true
+                        }
+                    )
+                );
+                publishAIRuntimeRoleState(
+                    'stt',
+                    runtimeRoleState(
+                        'stt',
+                        {
+                            state: 'unloaded',
+                            providerId: 'moonshine-tiny',
+                            modelId: 'moonshine-tiny-q8',
+                            localOnly: true
+                        }
+                    )
+                );
+                publishAIRuntimeRoleState(
+                    'tts',
+                    runtimeRoleState(
+                        'tts',
+                        {
+                            state: 'unloaded',
+                            providerId: 'speech-t5',
+                            modelId: 'speech-t5-q8',
+                            localOnly: true
+                        }
+                    )
+                );
+
+                const startSnapshot = getAIRuntimeState();
+                const standbyTTS = startSnapshot.roles.tts;
+                const mutedStart = startAIRuntime();
+                assert.ok(Object.isFrozen(mutedStart));
+                assert.deepEqual(
+                    startupIntents,
+                    [
+                        {
+                            role: 'llm',
+                            action: 'load',
+                            reason: 'startup'
+                        },
+                        {
+                            role: 'stt',
+                            action: 'load',
+                            reason: 'startup'
+                        }
+                    ]
+                );
+
+                let settledReport = null;
+                const observeMutedSettlement = mutedStart.settled.then(
+                    function captureMutedSettlement(report) {
+                        settledReport = report;
+                        return report;
+                    }
+                );
+                publishAIRuntimeRoleState(
+                    'stt',
+                    runtimeRoleState(
+                        'stt',
+                        {
+                            state: 'loading',
+                            providerId: 'moonshine-tiny',
+                            modelId: 'moonshine-tiny-q8',
+                            localOnly: true,
+                            operationId: 'stt-load-1'
+                        }
+                    )
+                );
+                publishAIRuntimeRoleState(
+                    'llm',
+                    runtimeRoleState(
+                        'llm',
+                        {
+                            state: 'ready',
+                            providerId: 'wllama',
+                            modelId: 'wllama-test-model',
+                            localOnly: true,
+                            loaded: true
+                        }
+                    )
+                );
+                const barrierReport = await mutedStart.barrier;
+                assert.equal(barrierReport.startRevision, startSnapshot.revision);
+                assert.equal(barrierReport.startMuted, true);
+                assert.equal(barrierReport.chatReady, true);
+                assert.equal(barrierReport.roles.llm.requested, true);
+                assert.equal(barrierReport.roles.stt.requested, true);
+                assert.equal(barrierReport.roles.tts.requested, false);
+                assert.equal(
+                    barrierReport.roles.llm.state.modelId,
+                    'wllama-test-model'
+                );
+                assert.equal(barrierReport.roles.stt.state.state, 'loading');
+                assert.equal(barrierReport.roles.tts.state, standbyTTS);
+                assert.equal(startupReports.at(-1), barrierReport);
+                assert.ok(Object.isFrozen(barrierReport));
+                assert.equal(settledReport, null);
+
+                publishAIRuntimeRoleState(
+                    'stt',
+                    runtimeRoleState(
+                        'stt',
+                        {
+                            state: 'ready',
+                            providerId: 'moonshine-tiny',
+                            modelId: 'moonshine-tiny-q8',
+                            localOnly: true,
+                            loaded: true
+                        }
+                    )
+                );
+                const completeReport = await observeMutedSettlement;
+                assert.equal(completeReport.roles.stt.state.state, 'ready');
+                assert.equal(completeReport.roles.tts.state, standbyTTS);
+
+                publishAIRuntimeRoleState(
+                    'llm',
+                    runtimeRoleState(
+                        'llm',
+                        {
+                            state: 'loading',
+                            providerId: 'wllama',
+                            modelId: 'wllama-test-model',
+                            localOnly: true,
+                            operationId: 'llm-load-2'
+                        }
+                    )
+                );
+                startupIntents.length = 0;
+                const startupEventCount = startupReports.length;
+                const startupController = new AbortController();
+                const unmutedStart = startAIRuntime(
+                    {
+                        startMuted: false,
+                        signal: startupController.signal
+                    }
+                );
+                assert.deepEqual(
+                    startupIntents,
+                    [
+                        {
+                            role: 'tts',
+                            action: 'load',
+                            reason: 'startup'
+                        }
+                    ]
+                );
+
+                const cancelledWaits = Promise.allSettled(
+                    [unmutedStart.barrier, unmutedStart.settled]
+                );
+                startupController.abort();
+                const cancellation = await cancelledWaits;
+                assert.equal(cancellation[0].status, 'rejected');
+                assert.equal(cancellation[1].status, 'rejected');
+                assert.equal(cancellation[0].reason, cancellation[1].reason);
+                assert.equal(cancellation[0].reason.name, 'AbortError');
+                assert.equal(cancellation[0].reason.code, 'AI_REQUEST_ABORTED');
+                assert.deepEqual(
+                    startupIntents,
+                    [
+                        {
+                            role: 'tts',
+                            action: 'load',
+                            reason: 'startup'
+                        },
+                        {
+                            role: 'llm',
+                            action: 'unload',
+                            reason: 'startup'
+                        }
+                    ]
+                );
+                assert.equal(startupReports.length, startupEventCount);
+                unmutedStart.cancel();
+            } finally {
+                unsubscribeStartupIntents();
+                aiRuntimeEvents.removeEventListener(
+                    AI_RUNTIME_STARTUP_EVENT,
+                    observeStartupReport
+                );
+            }
+        } finally {
+            stateController.abort();
+            unsubscribeState();
+            unsubscribeState();
+            unsubscribeIntents();
+            unsubscribeIntents();
+            aiRuntimeEvents.removeEventListener(
+                AI_RUNTIME_STATE_EVENT,
+                observeStateEvent
+            );
+        }
+    }
+);

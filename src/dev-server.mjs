@@ -17,6 +17,7 @@ import {verifyRuntime} from './runtime.mjs';
 import {verifySdkBrowserRuntime} from './sdk-browser-runtime.mjs';
 import {resolveWorkspace} from './workspace.mjs';
 import {createEventQueue} from './event-queue.mjs';
+import {SDK_NAME,SDK_VERSION} from './constants.mjs';
 
 const MIME_TYPES=new Map([
     ['.css','text/css; charset=utf-8'],
@@ -43,6 +44,17 @@ const MAX_PENDING_FILE_RESPONSES=256;
 const SESSION_COOKIE='Arcane-Dev-Session';
 const PRIVATE_SOURCE_SEGMENTS=new Set([
     'arcane-app.json','arcane-package.json','test','tests','scripts','node_modules','dist','local'
+]);
+const SDK_RUNTIME_SOURCE_PROTOCOL='arcane-sdk-runtime-source/1';
+const SDK_RUNTIME_SOURCE_ARCANE_ROOTS=new Set([
+    'components','css','entities','img','modules','security'
+]);
+const SDK_RUNTIME_SOURCE_PRIVATE_SEGMENTS=new Set([
+    'node_modules','.git','.hg','.svn','cvs'
+]);
+const SDK_RUNTIME_SOURCE_PRIVATE_MANIFESTS=new Set([
+    'arcane-app.json','arcane-package.json','arcane.lock.json',
+    'arcane_app_release.json','arcane_runtime_release.json','arcane_sdk_browser_release.json'
 ]);
 
 // This server is a loopback-only development host, not a production policy
@@ -137,6 +149,173 @@ function identityMatches(info,identity){
 
 function inventoryKey(value){
     return process.platform==='win32'?value.toLowerCase():value;
+}
+
+function canonicalLocationKey(value){
+    return inventoryKey(path.resolve(value));
+}
+
+function pathIsWithin(root,candidate){
+    const relative=path.relative(root,candidate);
+    return relative===''||(!path.isAbsolute(relative)&&relative!=='..'
+        &&!relative.startsWith(`..${path.sep}`));
+}
+
+function pathsOverlap(left,right){
+    return pathIsWithin(left,right)||pathIsWithin(right,left);
+}
+
+async function canonicalRealDirectory(requested,label){
+    let info;
+    try{
+        info=await lstat(requested);
+    }catch{
+        fail(`${label} must be an existing real directory.`,'ARCANE_DEV_RUNTIME_SOURCE_INVALID');
+    }
+    if(info.isSymbolicLink()||!info.isDirectory()){
+        fail(`${label} must be an existing real directory.`,'ARCANE_DEV_RUNTIME_SOURCE_INVALID');
+    }
+    let canonical;
+    try{
+        canonical=await realpath(requested);
+    }catch{
+        fail(`${label} could not be resolved as a real directory.`,'ARCANE_DEV_RUNTIME_SOURCE_INVALID');
+    }
+    if(canonicalLocationKey(canonical)!==canonicalLocationKey(requested)){
+        fail(`${label} must not contain a symlink or reparse-point escape.`,'ARCANE_DEV_RUNTIME_SOURCE_INVALID');
+    }
+    return canonical;
+}
+
+function sdkRuntimeSourcePathAllowed(relative,{arcaneRoot=false}={}){
+    if(relative.length===0)return false;
+    const normalized=relative.map(function normalizeRuntimeSourceSegment(segment){
+        return segment.normalize('NFC').toLowerCase();
+    });
+    if(normalized.some(function runtimeSourceSegmentIsPrivate(segment){
+        return segment.startsWith('.')||SDK_RUNTIME_SOURCE_PRIVATE_SEGMENTS.has(segment)
+            ||SDK_RUNTIME_SOURCE_PRIVATE_MANIFESTS.has(segment);
+    }))return false;
+    return !arcaneRoot||SDK_RUNTIME_SOURCE_ARCANE_ROOTS.has(normalized[0]);
+}
+
+function sdkArcaneSourcePathAllowed(relative){
+    return sdkRuntimeSourcePathAllowed(relative,{arcaneRoot:true});
+}
+
+function sdkDependencySourcePathAllowed(relative){
+    return sdkRuntimeSourcePathAllowed(relative);
+}
+
+function sdkBrowserSourcePathAllowed(relative){
+    return sdkRuntimeSourcePathAllowed(relative);
+}
+
+async function emitRuntimeSourceEvent(onEvent,event){
+    if(typeof onEvent==='function')await onEvent(event);
+}
+
+async function verifySdkRuntimeSourceRoot(sourceRoot,workspaceRoot,appId,{signal,onEvent}={}){
+    throwIfAborted(signal);
+    if(typeof sourceRoot!=='string'||!sourceRoot.trim()){
+        fail('sdkRuntimeSourceRoot must name an Arcane SDK directory.',
+            'ARCANE_DEV_RUNTIME_SOURCE_INVALID');
+    }
+    const requestedRoot=path.resolve(sourceRoot);
+    await emitRuntimeSourceEvent(onEvent,{
+        type:'runtime.source.mount.started',
+        appId,
+        requestedRoot,
+        target:'browser'
+    });
+    const canonicalRoot=await canonicalRealDirectory(requestedRoot,'SDK runtime source root');
+    const canonicalWorkspaceRoot=await realpath(workspaceRoot);
+    if(pathsOverlap(canonicalRoot,canonicalWorkspaceRoot)){
+        fail('SDK runtime source root must not overlap the application workspace.',
+            'ARCANE_DEV_RUNTIME_SOURCE_INVALID');
+    }
+
+    let packageFile;
+    try{
+        packageFile=await openSafeFile(canonicalRoot,['package.json']);
+    }catch{
+        fail('SDK runtime source package.json must be a readable bounded real file.',
+            'ARCANE_DEV_RUNTIME_SOURCE_INVALID');
+    }
+    if(!packageFile){
+        fail('SDK runtime source root must contain a real package.json.',
+            'ARCANE_DEV_RUNTIME_SOURCE_INVALID');
+    }
+    let packageDocument;
+    try{
+        packageDocument=JSON.parse(packageFile.bytes.toString('utf8'));
+    }catch{
+        fail('SDK runtime source package.json must be valid JSON.',
+            'ARCANE_DEV_RUNTIME_SOURCE_INVALID');
+    }
+    if(!packageDocument||Array.isArray(packageDocument)||packageDocument.name!==SDK_NAME){
+        fail(`SDK runtime source package name must be exactly ${SDK_NAME}.`,
+            'ARCANE_DEV_RUNTIME_SOURCE_INVALID');
+    }
+    if(packageDocument.version!==SDK_VERSION){
+        fail(
+            `SDK runtime source version must exactly match the executing SDK (${SDK_VERSION}).`,
+            'ARCANE_DEV_RUNTIME_VERSION_MISMATCH'
+        );
+    }
+
+    const roots=[
+        {
+            path:'runtime/arcane',
+            prefix:['arcane'],
+            allow:sdkArcaneSourcePathAllowed
+        },
+        {
+            path:'runtime/strong-type',
+            prefix:['arcane','dependencies','strong-type'],
+            allow:sdkDependencySourcePathAllowed
+        },
+        {
+            path:'browser-runtime',
+            prefix:['arcane','sdk'],
+            allow:sdkBrowserSourcePathAllowed
+        }
+    ];
+    const mappings=[];
+    for(let index=0;index<roots.length;index+=1){
+        throwIfAborted(signal);
+        const root=roots[index];
+        const requested=path.join(canonicalRoot,...root.path.split('/'));
+        const canonical=await canonicalRealDirectory(requested,`SDK runtime source ${root.path}`);
+        if(!pathIsWithin(canonicalRoot,canonical)){
+            fail(`SDK runtime source ${root.path} must remain inside the SDK root.`,
+                'ARCANE_DEV_RUNTIME_SOURCE_INVALID');
+        }
+        mappings.push({prefix:root.prefix,root:canonical,allow:root.allow});
+        await emitRuntimeSourceEvent(onEvent,{
+            type:'runtime.source.mount.progress',
+            current:index+1,
+            total:roots.length,
+            path:root.path
+        });
+    }
+    const runtime=Object.freeze({
+        mode:'sdk-source',
+        protocol:SDK_RUNTIME_SOURCE_PROTOCOL,
+        sdkVersion:SDK_VERSION,
+        mutable:true,
+        distributionAuthority:false,
+        sourceRoot:canonicalRoot
+    });
+    await emitRuntimeSourceEvent(onEvent,{
+        type:'runtime.source.mount.ready',
+        appId,
+        canonicalRoot,
+        sdkVersion:SDK_VERSION,
+        protocol:SDK_RUNTIME_SOURCE_PROTOCOL,
+        routeCount:mappings.length
+    });
+    return {mappings,runtime};
 }
 
 function identityMap(identities,prefix=''){
@@ -346,8 +525,34 @@ function sharedPathAllowed(relative,route){
     });
 }
 
-async function sourceRoutes(workspaceRoot,appId,{workspaceRuntimeReceipt,signal}){
+async function sourceRoutes(workspaceRoot,appId,{
+    workspaceRuntimeReceipt,
+    sdkRuntimeSourceRoot,
+    signal,
+    onEvent
+}){
     const resolved=await resolveWorkspace({workspaceRoot,appId});
+    const appMapping={
+        prefix:['apps',resolved.appId],
+        root:resolved.appRoot,
+        allow:relative=>sourcePathAllowed(relative,resolved.app.manifest)
+    };
+    if(sdkRuntimeSourceRoot!==undefined){
+        const sdkSource=await verifySdkRuntimeSourceRoot(
+            sdkRuntimeSourceRoot,
+            resolved.workspaceRoot,
+            resolved.appId,
+            {signal,onEvent}
+        );
+        return {
+            workspaceRoot:resolved.workspaceRoot,
+            workspaceMode:resolved.config.workspaceMode,
+            appId:resolved.appId,
+            startPath:`/apps/${resolved.appId}/${resolved.app.manifest.entry}`,
+            runtime:sdkSource.runtime,
+            mappings:[appMapping,...sdkSource.mappings]
+        };
+    }
     if(resolved.config.workspaceMode==='integrated'){
         return {
             workspaceRoot:resolved.workspaceRoot,
@@ -355,11 +560,7 @@ async function sourceRoutes(workspaceRoot,appId,{workspaceRuntimeReceipt,signal}
             appId:resolved.appId,
             startPath:`/apps/${resolved.appId}/${resolved.app.manifest.entry}`,
             mappings:[
-                {
-                    prefix:['apps',resolved.appId],
-                    root:resolved.appRoot,
-                    allow:relative=>sourcePathAllowed(relative,resolved.app.manifest)
-                },
+                appMapping,
                 ...resolved.config.sharedPayloads['browser-runtime'].map(route=>({
                     prefix:route.destination.split('/'),
                     root:path.join(resolved.workspaceRoot,...route.source.split('/')),
@@ -411,11 +612,7 @@ async function sourceRoutes(workspaceRoot,appId,{workspaceRuntimeReceipt,signal}
         appId:resolved.appId,
         startPath:`/apps/${resolved.appId}/${resolved.app.manifest.entry}`,
         mappings:[
-            {
-                prefix:['apps',resolved.appId],
-                root:resolved.appRoot,
-                allow:relative=>sourcePathAllowed(relative,resolved.app.manifest)
-            },
+            appMapping,
             {
                 prefix:['arcane'],
                 root:runtimeRoot,
@@ -506,18 +703,33 @@ async function startOwnedDevServer({
     port=0,
     signal,
     workspaceRuntimeReceipt,
+    sdkRuntimeSourceRoot,
     releaseReceipt
 }={},events,releaseSignal){
     throwIfAborted(signal);
     if(mode!=='source'&&mode!=='packaged')fail(`Unsupported server mode: ${String(mode)}.`,'ARCANE_USAGE');
+    if(sdkRuntimeSourceRoot!==undefined&&mode!=='source'){
+        fail('sdkRuntimeSourceRoot is supported only in source development mode.','ARCANE_USAGE');
+    }
     if(host!=='127.0.0.1'&&host!=='::1'){
         fail('Development server host must be a numeric loopback address (127.0.0.1 or ::1).','ARCANE_POLICY_DENIED');
     }
     if(!Number.isInteger(port)||port<0||port>65535)fail('port must be an integer from 0 through 65535.','ARCANE_USAGE');
-    await events.send({type:'server.starting',mode,host,port,appId});
+    const requestedRuntimeMode=mode==='source'&&sdkRuntimeSourceRoot!==undefined
+        ?'sdk-source'
+        :null;
+    await events.send({
+        type:'server.starting',
+        mode,
+        host,
+        port,
+        appId,
+        ...(requestedRuntimeMode?{runtimeMode:requestedRuntimeMode}:{})
+    });
     const routeSet=mode==='source'
         ?await sourceRoutes(workspaceRoot,appId,{
             workspaceRuntimeReceipt,
+            sdkRuntimeSourceRoot,
             signal,
             onEvent:event=>events.send(event)
         })
@@ -647,6 +859,17 @@ async function startOwnedDevServer({
             while(requestTasks.size>0){
                 await Promise.allSettled([...requestTasks]);
             }
+            if(routeSet.runtime?.mode==='sdk-source'){
+                await events.send({
+                    type:'runtime.source.mount.stopped',
+                    appId:routeSet.appId,
+                    reason:events.error||operationalError
+                        ?'failed'
+                        :signal?.aborted
+                            ?'cancelled'
+                            :'closed'
+                });
+            }
             await events.send({
                 type:'server.stopped',
                 host:address.address,
@@ -695,6 +918,10 @@ async function startOwnedDevServer({
         mode,
         workspaceRoot:routeSet.workspaceRoot,
         appId:routeSet.appId,
+        ...(routeSet.runtime?{
+            runtimeMode:routeSet.runtime.mode,
+            runtime:routeSet.runtime
+        }:{}),
         host:address.address,
         port:address.port,
         origin,
@@ -711,7 +938,11 @@ async function startOwnedDevServer({
             host:result.host,
             port:result.port,
             url,
-            appId:result.appId
+            appId:result.appId,
+            ...(routeSet.runtime?{
+                runtimeMode:routeSet.runtime.mode,
+                runtime:routeSet.runtime
+            }:{})
         });
         throwIfAborted(signal);
     }catch(error){

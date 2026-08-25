@@ -791,6 +791,9 @@ export async function developApplication(options={}){
         mode:'source',
         workspaceRuntimeReceipt:prepared.workspaceRuntimeReceipt,
         workspaceMode:prepared.workspaceMode,
+        ...(options.sdkRuntimeSourceRoot===undefined?{}:{
+            sdkRuntimeSourceRoot:options.sdkRuntimeSourceRoot
+        }),
         host:options.host,
         port:options.port,
         signal:options.signal,

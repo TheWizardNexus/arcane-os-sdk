@@ -11,6 +11,7 @@ const VALUE_OPTIONS=new Set([
     'display-name',
     'workspace',
     'app',
+    'sdk-runtime-source',
     'arcane-root',
     'host',
     'port',
@@ -40,7 +41,7 @@ Usage:
   ${CLI_NAME} init [id] [--workspace <directory>] [--display-name <name>] [--target <target>]
   ${CLI_NAME} doctor [--workspace <directory>] [--arcane-root <directory>]
   ${CLI_NAME} import-map [--workspace <directory>] [--app <id>]
-  ${CLI_NAME} dev [--app <id>] [--host 127.0.0.1] [--port 8000]
+  ${CLI_NAME} dev [--app <id>] [--host 127.0.0.1] [--port 8000] [--sdk-runtime-source <sdk-root>]
   ${CLI_NAME} test [--app <id>] [--scope app]
   ${CLI_NAME} test --scope shared --test-file <repo-relative.test.mjs>
   ${CLI_NAME} check [--app <id>] [--scope app] [--skip-tests]
@@ -56,6 +57,9 @@ Usage:
   ${CLI_NAME} update-check
   ${CLI_NAME} targets
   ${CLI_NAME} repo status|pull|push
+
+Development:
+  --sdk-runtime-source <sdk-root>  Dev-only live SDK checkout; omitted preserves the workspace runtime mode.
 
 Global:
   --workspace <directory>       Select an external or integrated Arcane workspace.
@@ -188,6 +192,9 @@ function operationOptions(command,parsed,cwd){
     if(values.artifact!==undefined&&!['bundle','verify-bundle'].includes(command)){
         usage('--artifact is supported only by bundle and verify-bundle.');
     }
+    if(values['sdk-runtime-source']!==undefined&&command!=='dev'){
+        usage('--sdk-runtime-source is supported only by dev.');
+    }
     if(flags.has('overwrite')&&command!=='bundle'){
         usage('--overwrite is supported only by bundle.');
     }
@@ -230,7 +237,10 @@ function operationOptions(command,parsed,cwd){
         return {
             ...common,
             host:values.host??'127.0.0.1',
-            port:readPort(values.port,8000)
+            port:readPort(values.port,8000),
+            ...(values['sdk-runtime-source']===undefined?{}:{
+                sdkRuntimeSourceRoot:path.resolve(cwd,values['sdk-runtime-source'])
+            })
         };
     }
     if(command==='test'){
@@ -458,6 +468,8 @@ function serverSummary(result){
         host:result.host,
         port:result.port,
         url:result.url,
+        ...(result.runtimeMode?{runtimeMode:result.runtimeMode}:{}),
+        ...(result.runtime?{runtime:result.runtime}:{}),
         ...(result.verified?{verified:result.verified}:{})
     };
 }

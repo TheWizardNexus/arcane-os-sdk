@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {cp,mkdir,readFile,writeFile} from 'node:fs/promises';
+import {cp,mkdir,readFile,realpath,symlink,writeFile} from 'node:fs/promises';
 import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
@@ -8,6 +8,7 @@ import {createWorkspace} from '../src/scaffold.mjs';
 import {startDevServer} from '../src/dev-server.mjs';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';
 import {packageApp} from '../src/packager/core.mjs';
+import {SDK_NAME,SDK_VERSION} from '../src/constants.mjs';
 import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
 
 const BROWSER_RUNTIME_CSP=[
@@ -99,6 +100,52 @@ async function installRuntime(workspaceRoot){
     }
 }
 
+async function createSdkRuntimeSource(parent,{
+    directory='sdk-source',
+    packageName=SDK_NAME,
+    version=SDK_VERSION
+}={}){
+    const sourceRoot=path.join(parent,directory);
+    for(const relative of [
+        'runtime/arcane/components',
+        'runtime/arcane/css',
+        'runtime/arcane/entities',
+        'runtime/arcane/img',
+        'runtime/arcane/modules',
+        'runtime/arcane/security',
+        'runtime/arcane/dependencies',
+        'runtime/arcane/outside',
+        'runtime/strong-type',
+        'browser-runtime/ai',
+        'browser-runtime/.git',
+        'browser-runtime/node_modules'
+    ]){
+        await mkdir(path.join(sourceRoot,...relative.split('/')),{recursive:true});
+    }
+    const files=new Map([
+        ['package.json',`${JSON.stringify({name:packageName,version},null,2)}\n`],
+        ['runtime/arcane/components/chat.html','<section>live chat component</section>\n'],
+        ['runtime/arcane/css/theme.css',':root{--live-source:initial;}\n'],
+        ['runtime/arcane/entities/Record.js','export default class Record {}\n'],
+        ['runtime/arcane/img/icon.svg','<svg xmlns="http://www.w3.org/2000/svg"></svg>\n'],
+        ['runtime/arcane/modules/AI.js','export const liveSource=true;\n'],
+        ['runtime/arcane/security/policy.json','{"allowed":true}\n'],
+        ['runtime/arcane/dependencies/private.js','export const leaked=true;\n'],
+        ['runtime/arcane/outside/private.js','export const leaked=true;\n'],
+        ['runtime/strong-type/index.js','export default function strongType(){}\n'],
+        ['runtime/strong-type/package.json','{"name":"strong-type","version":"2.0.0"}\n'],
+        ['browser-runtime/event-manager.mjs','export const liveBrowserRuntime=true;\n'],
+        ['browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json','{"schemaVersion":1}\n'],
+        ['browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json','{"private":true}\n'],
+        ['browser-runtime/.git/config','private vcs bytes\n'],
+        ['browser-runtime/node_modules/private.js','private dependency bytes\n']
+    ]);
+    for(const [relative,contents] of files){
+        await writeFile(path.join(sourceRoot,...relative.split('/')),contents);
+    }
+    return sourceRoot;
+}
+
 async function availablePort(){
     const server=net.createServer();
     await new Promise((resolve,reject)=>{
@@ -150,6 +197,10 @@ test('source server exposes only the selected app and SDK browser routes',async 
 
     assert.ok(events.find(event=>event.type==='server.starting'));
     assert.equal(events.at(-1).type,'server.started');
+    assert.equal(Object.hasOwn(instance,'runtimeMode'),false);
+    assert.equal(Object.hasOwn(instance,'runtime'),false);
+    assert.equal(Object.hasOwn(events[0],'runtimeMode'),false);
+    assert.equal(Object.hasOwn(events.at(-1),'runtimeMode'),false);
     const unauthorized=await request(origin,'/apps/served-app/index.html');
     assert.equal(unauthorized.status,403);
     assert.equal(
@@ -245,6 +296,176 @@ test('source server exposes only the selected app and SDK browser routes',async 
     const changedRuntime=await request(origin,'/arcane/css/theme.css',{cookie});
     assert.equal(changedRuntime.status,500);
     assert.doesNotMatch(await changedRuntime.text(),/tampered workspace runtime bytes/);
+});
+
+test('explicit SDK runtime source mount is live, narrow, and observable',async t=>{
+    const parent=await temporaryDirectory(t,{prefix:'arcane-sdk-source-server-'});
+    const workspaceRoot=path.join(parent,'workspace');
+    await createWorkspace({targetPath:workspaceRoot,appId:'source-mounted-app'});
+    await installRuntime(workspaceRoot);
+    const sourceRoot=await createSdkRuntimeSource(parent);
+    const canonicalSourceRoot=await realpath(sourceRoot);
+    const events=[];
+    const instance=await startDevServer({
+        workspaceRoot,
+        appId:'source-mounted-app',
+        sdkRuntimeSourceRoot:sourceRoot,
+        host:'127.0.0.1',
+        port:0,
+        onEvent:function captureEvent(event){
+            events.push(event);
+        }
+    });
+    t.after(function closeSourceServer(){
+        return instance.close();
+    });
+
+    assert.equal(instance.runtimeMode,'sdk-source');
+    assert.deepEqual(instance.runtime,{
+        mode:'sdk-source',
+        protocol:'arcane-sdk-runtime-source/1',
+        sdkVersion:SDK_VERSION,
+        mutable:true,
+        distributionAuthority:false,
+        sourceRoot:canonicalSourceRoot
+    });
+    assert.deepEqual(events.map(function eventType(event){return event.type;}),[
+        'server.starting',
+        'runtime.source.mount.started',
+        'runtime.source.mount.progress',
+        'runtime.source.mount.progress',
+        'runtime.source.mount.progress',
+        'runtime.source.mount.ready',
+        'server.started'
+    ]);
+    assert.equal(events[0].runtimeMode,'sdk-source');
+    assert.deepEqual(
+        events.filter(function isMountProgress(event){
+            return event.type==='runtime.source.mount.progress';
+        }).map(function progressPath(event){return event.path;}),
+        ['runtime/arcane','runtime/strong-type','browser-runtime']
+    );
+    assert.equal(events.at(-2).routeCount,3);
+    assert.equal(events.at(-2).canonicalRoot,canonicalSourceRoot);
+    assert.equal(events.at(-1).runtimeMode,'sdk-source');
+
+    const {origin,cookie}=await authorize(instance);
+    for(const allowedPath of [
+        '/arcane/components/chat.html',
+        '/arcane/css/theme.css',
+        '/arcane/entities/Record.js',
+        '/arcane/img/icon.svg',
+        '/arcane/modules/AI.js',
+        '/arcane/security/policy.json',
+        '/arcane/dependencies/strong-type/index.js',
+        '/arcane/dependencies/strong-type/package.json',
+        '/arcane/sdk/event-manager.mjs',
+        '/arcane/sdk/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json'
+    ]){
+        const response=await request(origin,allowedPath,{cookie});
+        assert.equal(response.status,200,allowedPath);
+        await response.arrayBuffer();
+    }
+    for(const deniedPath of [
+        '/arcane/dependencies/private.js',
+        '/arcane/outside/private.js',
+        '/arcane/sdk/ARCANE_SDK_BROWSER_RELEASE.json',
+        '/arcane/sdk/.git/config',
+        '/arcane/sdk/node_modules/private.js'
+    ]){
+        const response=await request(origin,deniedPath,{cookie});
+        assert.equal(response.status,404,deniedPath);
+        await response.text();
+    }
+
+    const themePath=path.join(sourceRoot,'runtime','arcane','css','theme.css');
+    const initialTheme=await request(origin,'/arcane/css/theme.css',{cookie});
+    assert.match(await initialTheme.text(),/live-source:initial/u);
+    await writeFile(themePath,':root{--live-source:refreshed;}\n');
+    const refreshedTheme=await request(origin,'/arcane/css/theme.css',{cookie});
+    assert.equal(refreshedTheme.status,200);
+    assert.match(await refreshedTheme.text(),/live-source:refreshed/u);
+
+    await instance.close();
+    assert.equal(events.at(-2).type,'runtime.source.mount.stopped');
+    assert.equal(events.at(-2).reason,'closed');
+    assert.equal(events.at(-1).type,'server.stopped');
+});
+
+test('explicit SDK runtime source mount rejects drift, overlap, and linked roots',async t=>{
+    const parent=await temporaryDirectory(t,{prefix:'arcane-sdk-source-policy-'});
+    const workspaceRoot=path.join(parent,'workspace');
+    await createWorkspace({targetPath:workspaceRoot,appId:'source-policy-app'});
+    await installRuntime(workspaceRoot);
+
+    const mismatchRoot=await createSdkRuntimeSource(parent,{
+        directory:'version-mismatch',
+        version:'999.0.0'
+    });
+    await assert.rejects(
+        startDevServer({
+            workspaceRoot,
+            appId:'source-policy-app',
+            sdkRuntimeSourceRoot:mismatchRoot,
+            host:'127.0.0.1',
+            port:0
+        }),
+        function isVersionMismatch(error){
+            return error?.code==='ARCANE_DEV_RUNTIME_VERSION_MISMATCH';
+        }
+    );
+
+    const wrongPackageRoot=await createSdkRuntimeSource(parent,{
+        directory:'wrong-package',
+        packageName:'not-arcane-os'
+    });
+    await assert.rejects(
+        startDevServer({
+            workspaceRoot,
+            appId:'source-policy-app',
+            sdkRuntimeSourceRoot:wrongPackageRoot,
+            host:'127.0.0.1',
+            port:0
+        }),
+        function isInvalidPackage(error){
+            return error?.code==='ARCANE_DEV_RUNTIME_SOURCE_INVALID';
+        }
+    );
+
+    await assert.rejects(
+        startDevServer({
+            workspaceRoot,
+            appId:'source-policy-app',
+            sdkRuntimeSourceRoot:workspaceRoot,
+            host:'127.0.0.1',
+            port:0
+        }),
+        function isWorkspaceOverlap(error){
+            return error?.code==='ARCANE_DEV_RUNTIME_SOURCE_INVALID';
+        }
+    );
+
+    const sourceRoot=await createSdkRuntimeSource(parent,{directory:'canonical-source'});
+    await assert.rejects(
+        startDevServer({mode:'packaged',sdkRuntimeSourceRoot:sourceRoot}),
+        function isPackagedModeUsageError(error){
+            return error?.code==='ARCANE_USAGE';
+        }
+    );
+    const linkedRoot=path.join(parent,'linked-source');
+    await symlink(sourceRoot,linkedRoot,process.platform==='win32'?'junction':'dir');
+    await assert.rejects(
+        startDevServer({
+            workspaceRoot,
+            appId:'source-policy-app',
+            sdkRuntimeSourceRoot:linkedRoot,
+            host:'127.0.0.1',
+            port:0
+        }),
+        function isLinkedRoot(error){
+            return error?.code==='ARCANE_DEV_RUNTIME_SOURCE_INVALID';
+        }
+    );
 });
 
 test('packaged server redirects to index and withholds its integrity receipt',async t=>{

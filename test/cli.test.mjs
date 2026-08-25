@@ -29,11 +29,90 @@ test('CLI help and version succeed through the shipped executable',async()=>{
     assert.match(help.stdout,/arcane-os executables/);
     assert.match(help.stdout,/test --scope shared --test-file/);
     assert.match(help.stdout,/import-map \[--workspace <directory>\] \[--app <id>\]/u);
+    assert.match(help.stdout,/dev .*--sdk-runtime-source <sdk-root>/u);
     assert.match(help.stdout,/verify-bundle <file[.]arcane-app[.]tar[.]gz>/);
 
     const version=await runCli(['--version']);
     assert.equal(version.code,0);
     assert.equal(version.stdout.trim(),SDK_VERSION);
+});
+
+test('CLI maps the SDK runtime source only for explicit development',async()=>{
+    const cwd=path.join('C:\\','sdk-cli-fixture');
+    const stdout=memoryStream();
+    const stderr=memoryStream();
+    const invocations=[];
+    const runtime=Object.freeze({
+        mode:'sdk-source',
+        protocol:'arcane-sdk-runtime-source/1',
+        sdkVersion:SDK_VERSION,
+        mutable:true,
+        distributionAuthority:false,
+        sourceRoot:path.resolve(cwd,'canonical-sdk')
+    });
+    const exitCode=await runCliInProcess([
+        'dev',
+        '--workspace','external-app',
+        '--sdk-runtime-source','canonical-sdk',
+        '--output','ndjson'
+    ],{
+        cwd,
+        stdout:stdout.stream,
+        stderr:stderr.stream,
+        execute:async function executeDevelopment(command,options){
+            invocations.push({command,options});
+            return {
+                mode:'source',
+                runtimeMode:'sdk-source',
+                runtime,
+                appId:'fixture-app',
+                host:'127.0.0.1',
+                port:8000,
+                url:'http://127.0.0.1:8000/apps/fixture-app/index.html',
+                lifecycle:Promise.resolve(),
+                close:async function closeDevelopmentServer(){}
+            };
+        }
+    });
+    assert.equal(exitCode,0,stderr.read());
+    assert.equal(invocations.length,1);
+    assert.equal(invocations[0].command,'dev');
+    assert.equal(invocations[0].options.workspaceRoot,path.resolve(cwd,'external-app'));
+    assert.equal(invocations[0].options.sdkRuntimeSourceRoot,path.resolve(cwd,'canonical-sdk'));
+    const events=parseNdjson(stdout.read());
+    const ready=events.find(function isServerReady(event){
+        return event.type==='server.ready';
+    });
+    assert.equal(ready.data.runtimeMode,'sdk-source');
+    assert.deepEqual(ready.data.runtime,runtime);
+    assert.deepEqual(events.at(-1).data.result.runtime,runtime);
+
+    for(const arguments_ of [
+        ['package'],
+        ['build','--target','browser'],
+        ['run'],
+        ['check']
+    ]){
+        let executed=false;
+        const rejectedOutput=memoryStream();
+        const rejectedCode=await runCliInProcess([
+            ...arguments_,
+            '--sdk-runtime-source','canonical-sdk',
+            '--output','ndjson'
+        ],{
+            cwd,
+            stdout:rejectedOutput.stream,
+            stderr:memoryStream().stream,
+            execute:async function rejectUnexpectedExecution(){
+                executed=true;
+            }
+        });
+        assert.equal(rejectedCode,1);
+        assert.equal(executed,false);
+        const rejectedEvents=parseNdjson(rejectedOutput.read());
+        assert.equal(rejectedEvents.at(-1).data.error.code,'ARCANE_USAGE');
+        assert.match(rejectedEvents.at(-1).data.error.message,/supported only by dev/u);
+    }
 });
 
 test('CLI import-map command follows workspace and app option grammar',async()=>{

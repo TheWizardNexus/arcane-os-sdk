@@ -1,365 +1,1213 @@
-<link rel="stylesheet" href="./arcane/css/layout.css?v=3" />
+<link rel="stylesheet" href="./arcane/css/layout.css?v=3">
 <style>
-    button{
-        width:16em;
-        -webkit-touch-callout: none;
-        -webkit-user-select: none;
-        -khtml-user-select: none;
-        -moz-user-select: none;
-        -ms-user-select: none;
+    :host {
+        --arcane-speech-padding-block-end: .85rem;
+        --arcane-speech-padding-block-start: .65rem;
+        --arcane-speech-padding-inline: .75rem;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) max-content max-content;
+        align-items: center;
+        gap: var(--arcane-space-3, .75rem);
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+        padding:
+            var(--arcane-speech-padding-block-start)
+            var(--arcane-speech-padding-inline)
+            var(--arcane-speech-padding-block-end);
+        border: 1px solid var(--arcane-border, var(--border-color));
+        border-radius: var(--arcane-radius-large, 1rem);
+        background: var(--arcane-surface-raised, var(--modal-background));
+        box-shadow: var(--arcane-shadow-small, 0 .25rem .8rem var(--shadow-color));
+    }
+
+    button {
+        width: auto;
+        min-height: 2.65rem;
+        margin: 0;
+        padding: .6rem .9rem;
+        border: 1px solid var(--arcane-border, var(--border-color));
+        border-radius: var(--arcane-radius-medium, .8rem);
+        font: inherit;
+        font-weight: 700;
+        touch-action: none;
         user-select: none;
     }
 
-    button:active{
-        opacity:.5;
-    } 
-
-    button.pressed{
-        opacity:.6;
-        border:.2em;
-        border-color:var(--border-color);
+    button:focus-visible {
+        outline: .2rem solid var(--arcane-focus, var(--focus-color));
+        outline-offset: .18rem;
     }
 
-    .end{
-        background-color:var(--danger-color);
-        margin-left:1em;
+    button:disabled {
+        cursor: not-allowed;
+        opacity: .55;
     }
 
-    .mute{
-        float:right;
+    #recordButton {
+        grid-column: 1;
+        width: 5rem;
+        height: 5rem;
+        min-height: 5rem;
+        padding: .45rem .45rem .65rem;
+        border: .28rem solid var(--arcane-border, var(--border-color));
+        border-radius: 50%;
+        background: var(--arcane-action, var(--primary-color));
+        color: var(--arcane-action-text, var(--button-text-color, var(--text-color)));
+        box-shadow:
+            0 0 0 .22rem var(--arcane-surface-raised, var(--modal-background)),
+            0 0 0 .34rem var(--arcane-border, var(--border-color)),
+            var(--arcane-shadow-small, 0 .35rem .9rem var(--shadow-color));
+        font-size: .82rem;
+        line-height: 1.05;
+        text-align: center;
     }
-    
-    @media (max-width: 48em) {
-        body {
-            grid-template-columns: 2.2em 1fr;
+
+    #recordButton:active,
+    #recordButton.pressed {
+        opacity: .82;
+        transform: scale(.94);
+    }
+
+    #stopButton {
+        display: none;
+    }
+
+    .speech_status {
+        grid-column: 2;
+        min-width: 0;
+        margin: 0;
+        color: var(--arcane-muted, var(--text-color));
+        font-size: .86rem;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+
+    .speech_status[data-tone="error"] {
+        color: var(--arcane-danger, var(--danger-color));
+    }
+
+    #endButton {
+        grid-column: 3;
+        justify-self: end;
+        background: var(--arcane-danger, var(--danger-color));
+        border-color: var(--arcane-danger, var(--danger-color));
+        color: var(--arcane-action-text, var(--button-text-color, var(--text-color)));
+    }
+
+    #muteButton {
+        grid-column: 4;
+        justify-self: end;
+        float: none;
+        background: var(--arcane-secondary, var(--secondary-color));
+        color: var(--arcane-secondary-text, var(--text-color));
+    }
+
+    @media (max-width: 44rem) {
+        :host {
+            grid-template-columns: auto minmax(0, 1fr) auto;
         }
-        
-        button {
-            width:100%;
+
+        #recordButton {
+            grid-row: 1 / span 2;
         }
-        
-        .end{
-            margin:0;
+
+        .speech_status {
+            grid-row: 2;
+            grid-column: 2 / span 2;
+        }
+
+        #endButton {
+            grid-row: 1;
+            grid-column: 2;
+        }
+
+        #muteButton {
+            grid-row: 1;
+            grid-column: 3;
         }
     }
-    
-    
 </style>
 
 <p class="hidden">Will auto send after X seconds of silence set in code.</p>
-<button id="recordButton" type="button">Push To Talk</button>
-<button id="stopButton" type="button" class='hidden' disabled>Send</button>
-<button id="endButton" type="button" class="end">Complete</button>
-<button id="muteButton" type="button" class="mute" aria-pressed="true" aria-label="Unmute AI voice">Unmute</button>
+<button id="recordButton" type="button" aria-label="Transcription unavailable" disabled>Hold to talk</button>
+<button id="stopButton" type="button" class="hidden" disabled>Send</button>
+<p id="speechStatus" class="speech_status" role="status" aria-live="polite"></p>
+<button id="endButton" type="button" class="end">End</button>
+<button id="muteButton" type="button" class="mute" aria-pressed="true" aria-label="Voice unavailable" disabled>Voice unavailable</button>
 
 <script type="module">
-    import('../modules/DBLS.js');
-    import('../modules/AI.js?v=7');
+    void import('../modules/DBLS.js').catch(
+        function reportDBLSImportFailure(error) {
+            console.error('The shared database runtime could not load.', error);
+        }
+    );
+    const aiModuleImport = import('../modules/AI.js?v=7');
+    const {
+        requestAIRuntimeIntent,
+        subscribeAIRuntimeState
+    } = await import('../modules/AIRuntimeState.js');
 
-    const audioElement = new Audio();
-    const host=this;
-    const shadowRoot=host.shadowRoot;
+    const host = this;
+    const shadowRoot = host.shadowRoot;
     const recordButton = shadowRoot.querySelector('#recordButton');
     const stopButton = shadowRoot.querySelector('#stopButton');
+    const endButton = shadowRoot.querySelector('#endButton');
     const muteButton = shadowRoot.querySelector('#muteButton');
-    const sourceNodes = [];
-    const audioRecordingChunks=[];
-    const silenceDuration=0;//2000;
-    
-    let mediaRecorder=null;
-    let activeStream=null;
-    let audioMessageChunks = '';
-    let isSpeaking = false;
-    let silenceTimer;
-    
-    /**
-     * Configure the initial AI speech state. The default remains muted for
-     * compatibility with existing consumers. Apps own preference persistence.
-     */
-    host.initialMuted=typeof host.initialMuted==='boolean'?host.initialMuted:true;
-    host.muted=host.initialMuted;
-    host.configure=configure;
-    host.setAvailability=setAvailability;
-    host.setMuted=setMuted;
-    host.availability={
-        microphone:Boolean(navigator.mediaDevices?.getUserMedia&&globalThis.MediaRecorder),
-        stt:true,
-        tts:true
+    const speechStatus = shadowRoot.querySelector('#speechStatus');
+    const silenceDuration = 0;
+    const runtimeStateAbortController = new AbortController();
+
+    let sttRole = unavailableRole('stt');
+    let ttsRole = unavailableRole('tts');
+    let microphonePermissionStatus = null;
+    let microphonePermissionListener = null;
+    let captureSession = null;
+    let recordingRequested = false;
+    let recordingGeneration = 0;
+    let transcriptionGeneration = 0;
+    let transcriptionActive = false;
+    let silenceTimer = null;
+    let activePointerId = null;
+    let keyboardRecording = false;
+    let localStatus = null;
+    let pendingTTSIntent = null;
+    let destroyed = false;
+
+    const initialMutedWasHydrated = typeof host.initialMuted === 'boolean';
+    host.initialMuted = initialMutedWasHydrated ? host.initialMuted : true;
+    host.muted = host.initialMuted;
+    host.configure = configure;
+    host.destroy = destroy;
+    host.reportTTSError = reportTTSError;
+    host.setAvailability = setAvailability;
+    host.setMuted = setMuted;
+    host.availability = {
+        microphone: Boolean(
+            navigator.mediaDevices?.getUserMedia
+            && globalThis.MediaRecorder
+        ),
+        stt: false,
+        tts: false
     };
-    setAvailability({});
-    setMuted(host.initialMuted);
+
+    recordButton.addEventListener('pointerdown', handleRecordPointerDown);
+    recordButton.addEventListener('pointerup', handleRecordPointerUp);
+    recordButton.addEventListener('pointercancel', handleRecordPointerCancel);
+    recordButton.addEventListener('lostpointercapture', handleLostPointerCapture);
+    recordButton.addEventListener('keydown', handleRecordKeyDown);
+    recordButton.addEventListener('keyup', handleRecordKeyUp);
+    recordButton.addEventListener('blur', handleRecordBlur);
+    muteButton.addEventListener('click', muteToggle);
+    endButton.addEventListener('click', submitCompletionCommand);
+    window.addEventListener('pagehide', destroy, { once: true });
+
+    subscribeAIRuntimeState(
+        synchronizeAIRuntimeState,
+        {
+            signal: runtimeStateAbortController.signal
+        }
+    );
+    synchronizeAIMutedState();
+    renderControls();
+    renderStatus();
     void observeMicrophonePermission();
-    host.componentReady=true;
-    host.dispatchEvent(new CustomEvent('speech-ready',{
-        bubbles:true,
-        composed:true,
-        detail:{speech:host}
-    }));
-
-    recordButton.addEventListener(
-        'mousedown', 
-        record
-    );
-
-    recordButton.addEventListener(
-        'touchstart', 
-        record
-    );
-
-    recordButton.addEventListener(
-        'mouseup', 
-        stop
-    );
-
-    recordButton.addEventListener(
-        'touchend', 
-        stop
-    );
-
-    // recordButton.addEventListener(
-    //     'click', 
-    //     record
-    // );
-
-    // stopButton.addEventListener(
-    //     'click', 
-    //     stop
-    // );
-
-    muteButton.addEventListener(
-        'click', 
-        muteToggle
-    );
-
-    shadowRoot.querySelector('#endButton').addEventListener(
-        'click',
-        function submitCompletionCommand(event){
-            event.target.disabled=true;
-            transcribe('End now, run all tool functions.');
+    void aiModuleImport.then(
+        synchronizeAIMutedState,
+        function reportAIModuleImportFailure(error) {
+            console.error('The shared AI runtime could not load.', error);
         }
     );
 
-    window.addEventListener(
-        'ai-ready',
-        function aiReadyHandler(){
-            setMuted(host.muted);
-        }
+    host.componentReady = true;
+    host.dispatchEvent(
+        new CustomEvent(
+            'speech-ready',
+            {
+                bubbles: true,
+                composed: true,
+                detail: { speech: host }
+            }
+        )
     );
 
-    if(window.ai?.ready){
-        setMuted(host.muted);
+    function unavailableRole(role) {
+        return Object.freeze(
+            {
+                role,
+                state: 'unavailable',
+                providerId: null,
+                modelId: null,
+                localOnly: null,
+                loaded: false,
+                busy: false,
+                operationId: null,
+                progress: null,
+                error: null
+            }
+        );
     }
 
-    function configure(options={}){
-        if(Object.prototype.hasOwnProperty.call(options,'initialMuted')){
-            if(typeof options.initialMuted!=='boolean'){
-                throw new TypeError('initialMuted must be boolean');
+    function compatibilityRole(role, ready) {
+        return Object.freeze(
+            {
+                ...unavailableRole(role),
+                state: ready ? 'ready' : 'unavailable',
+                loaded: ready
             }
+        );
+    }
 
-            host.initialMuted=options.initialMuted;
-            setMuted(host.initialMuted);
+    function configure(options = {}) {
+        if (Object.prototype.hasOwnProperty.call(options, 'initialMuted')) {
+            const configuredMuted = typeof options.initialMuted === 'boolean'
+                ? options.initialMuted
+                : true;
+            host.initialMuted = configuredMuted;
+            applyConfiguredMutedState(configuredMuted);
         }
 
-        if(
-            Object.prototype.hasOwnProperty.call(options,'stt')
-            ||Object.prototype.hasOwnProperty.call(options,'tts')
-            ||Object.prototype.hasOwnProperty.call(options,'microphone')
-        ){
+        if (
+            Object.prototype.hasOwnProperty.call(options, 'stt')
+            || Object.prototype.hasOwnProperty.call(options, 'tts')
+            || Object.prototype.hasOwnProperty.call(options, 'microphone')
+        ) {
             setAvailability(options);
         }
 
         return host;
     }
 
-    function setAvailability(input={}){
-        const availability={
-            microphone:Object.prototype.hasOwnProperty.call(input,'microphone')
-                ?Boolean(input.microphone)
-                :host.availability.microphone,
-            stt:Object.prototype.hasOwnProperty.call(input,'stt')
-                ?Boolean(input.stt)
-                :host.availability.stt,
-            tts:Object.prototype.hasOwnProperty.call(input,'tts')
-                ?Boolean(input.tts)
-                :host.availability.tts
-        };
+    function setAvailability(input = {}) {
+        // Compatibility-only explicit adapter report. Canonical consumers use
+        // the sticky AIRuntimeState role records instead of this wrapper.
+        const previousSTTRole = sttRole;
+        const previousTTSRole = ttsRole;
+        const microphoneWasAvailable = host.availability.microphone;
 
-        host.availability=availability;
-        recordButton.disabled=!availability.stt||!availability.microphone;
-        stopButton.disabled=recordButton.disabled;
-        recordButton.title=!availability.stt
-            ?'The selected transcription service is unavailable.'
-            :!availability.microphone
-                ?'Microphone access is unavailable. Text chat is still available.'
-                :'Push to talk';
-        recordButton.setAttribute('aria-label',recordButton.title);
-        muteButton.disabled=!availability.tts;
-
-        if(!availability.tts){
-            muteButton.textContent='Voice unavailable';
-            muteButton.setAttribute('aria-label','Selected speech service unavailable');
-            if(window.ai){
-                window.ai.muted=true;
-                window.ai.stopAudio?.();
-            }
-        }else{
-            setMuted(host.muted);
+        if (Object.prototype.hasOwnProperty.call(input, 'microphone')) {
+            host.availability.microphone = Boolean(input.microphone);
+        }
+        if (Object.prototype.hasOwnProperty.call(input, 'stt')) {
+            sttRole = compatibilityRole('stt', Boolean(input.stt));
+        }
+        if (Object.prototype.hasOwnProperty.call(input, 'tts')) {
+            ttsRole = compatibilityRole('tts', Boolean(input.tts));
         }
 
-        return {...availability};
+        if (microphoneWasAvailable && !host.availability.microphone) {
+            cancelSTTOperation('microphone-unavailable');
+        }
+        applyRoleTransitions(previousSTTRole, previousTTSRole);
+        return { ...host.availability };
     }
 
-    async function observeMicrophonePermission(){
-        if(!navigator.permissions?.query||!navigator.mediaDevices?.getUserMedia){
-            return;
-        }
-
-        try{
-            const permission=await navigator.permissions.query({name:'microphone'});
-            const synchronize=()=>setAvailability({
-                microphone:permission.state!=='denied'
-            });
-            permission.addEventListener?.('change',synchronize);
-            synchronize();
-        }catch{
-            // Some supported browsers do not expose microphone through the
-            // Permissions API. getUserMedia remains the authoritative check.
-        }
-    }
-
-    function setMuted(muted){
-        if(typeof muted!=='boolean'){
+    function setMuted(muted) {
+        if (typeof muted !== 'boolean') {
             throw new TypeError('muted must be boolean');
         }
 
-        host.muted=muted;
-        if(host.availability.tts){
-            muteButton.textContent=muted?'Unmute':'Mute';
-            muteButton.setAttribute('aria-pressed',String(muted));
-            muteButton.setAttribute('aria-label',muted?'Unmute AI voice':'Mute AI voice');
+        if (muted) {
+            requestUserMute();
+        } else {
+            requestUserUnmute();
         }
-
-        if(window.ai){
-            window.ai.muted=host.availability.tts?muted:true;
-
-            if(muted&&typeof window.ai.stopAudio==='function'){
-                window.ai.stopAudio();
-            }
-        }
-
         return host;
     }
 
-    function muteToggle(){
-        const muted=!host.muted;
-        setMuted(muted);
+    function applyConfiguredMutedState(muted) {
+        host.muted = muted;
+        pendingTTSIntent = null;
+        if (muted) {
+            stopTTSPlayback();
+        } else {
+            synchronizeAIMutedState();
+        }
+        renderControls();
+        renderStatus();
+    }
 
-        if(!muted){
-            window.ai?.resumeAudio?.();
+    function synchronizeAIRuntimeState(snapshot) {
+        const previousSTTRole = sttRole;
+        const previousTTSRole = ttsRole;
+        sttRole = snapshot.roles.stt;
+        ttsRole = snapshot.roles.tts;
+        clearSettledTTSIntent();
+        applyRoleTransitions(previousSTTRole, previousTTSRole);
+    }
+
+    function applyRoleTransitions(previousSTTRole, previousTTSRole) {
+        const sttBecameUnready = previousSTTRole.state === 'ready'
+            && sttRole.state !== 'ready';
+        const ttsBecameUnready = previousTTSRole.state === 'ready'
+            && ttsRole.state !== 'ready';
+
+        host.availability.stt = sttRole.state === 'ready';
+        host.availability.tts = ttsRole.state === 'ready';
+
+        if (sttBecameUnready) {
+            cancelSTTOperation('runtime-unready');
+        }
+        if (ttsBecameUnready) {
+            host.muted = true;
+            stopTTSPlayback();
+        }
+        if (ttsRole.state === 'error' && !host.muted) {
+            host.muted = true;
+            stopTTSPlayback();
+        }
+
+        synchronizeAIMutedState();
+        renderControls();
+        renderStatus();
+    }
+
+    function clearSettledTTSIntent() {
+        if (!pendingTTSIntent) {
+            return;
+        }
+
+        if (
+            pendingTTSIntent === 'load'
+            && ['loading', 'ready', 'error'].includes(ttsRole.state)
+        ) {
+            pendingTTSIntent = null;
+        } else if (
+            pendingTTSIntent === 'unload'
+            && ['unloading', 'unloaded', 'unavailable', 'error', 'disposed'].includes(ttsRole.state)
+        ) {
+            pendingTTSIntent = null;
         }
     }
 
-    async function transcribe(transcription=''){
-        const transcriptionEvent = new CustomEvent(
-            'speech-transcription-complete', 
+    function renderControls() {
+        const transcriptionReady = sttRole.state === 'ready';
+        const microphoneReady = host.availability.microphone;
+        recordButton.disabled = !transcriptionReady
+            || !microphoneReady
+            || sttRole.busy
+            || transcriptionActive
+            || destroyed;
+        stopButton.disabled = recordButton.disabled;
+        recordButton.title = transcriptionButtonTitle();
+        recordButton.setAttribute('aria-label', recordButton.title);
+        recordButton.setAttribute(
+            'aria-pressed',
+            String(recordingRequested || Boolean(captureSession))
+        );
+        renderTTSControl();
+    }
+
+    function transcriptionButtonTitle() {
+        if (destroyed || sttRole.state === 'disposed') {
+            return 'Transcription is unavailable.';
+        }
+        if (sttRole.state === 'loading') {
+            return 'The selected transcription service is loading.';
+        }
+        if (sttRole.state === 'error') {
+            return visibleErrorMessage(
+                sttRole.error,
+                'The selected transcription service reported an error.'
+            );
+        }
+        if (sttRole.state !== 'ready') {
+            return 'The selected transcription service is unavailable.';
+        }
+        if (!host.availability.microphone) {
+            return 'Microphone access is unavailable. Text chat is still available.';
+        }
+        if (sttRole.busy || transcriptionActive) {
+            return 'The selected transcription service is busy.';
+        }
+        return 'Hold to talk';
+    }
+
+    function renderTTSControl() {
+        const providerSelected = typeof ttsRole.providerId === 'string'
+            && ttsRole.providerId.length > 0
+            && typeof ttsRole.modelId === 'string'
+            && ttsRole.modelId.length > 0;
+        let disabled = destroyed;
+        let label = host.muted ? 'Unmute' : 'Mute';
+        let description = label === 'Unmute' ? 'Unmute AI voice' : 'Mute AI voice';
+
+        if (pendingTTSIntent === 'unload') {
+            disabled = true;
+            label = 'Releasing voice…';
+            description = 'The selected voice is being released.';
+        } else if (ttsRole.state === 'unavailable' || ttsRole.state === 'disposed') {
+            disabled = true;
+            label = 'Voice unavailable';
+            description = 'The selected speech service is unavailable.';
+        } else if (ttsRole.state === 'unloading') {
+            disabled = true;
+            label = 'Releasing voice…';
+            description = 'The selected voice is being released.';
+        } else if (ttsRole.state === 'loading') {
+            disabled = !providerSelected;
+            label = providerSelected ? 'Cancel voice load' : 'Voice unavailable';
+            description = providerSelected
+                ? 'Cancel loading the selected voice.'
+                : 'The selected speech service is unavailable.';
+        } else if (ttsRole.state === 'unloaded') {
+            disabled = !providerSelected;
+            if (pendingTTSIntent === 'load') {
+                label = 'Cancel voice load';
+                description = 'Cancel loading the selected voice.';
+            }
+        } else if (ttsRole.state === 'error') {
+            disabled = !providerSelected;
+            label = providerSelected ? 'Retry voice' : 'Voice unavailable';
+            description = providerSelected
+                ? 'Retry loading the selected voice.'
+                : 'The selected speech service is unavailable.';
+        }
+
+        muteButton.disabled = disabled;
+        muteButton.textContent = label;
+        muteButton.title = description;
+        muteButton.setAttribute('aria-label', description);
+        muteButton.setAttribute('aria-pressed', String(host.muted));
+    }
+
+    function renderStatus() {
+        const messages = [];
+        let tone = '';
+
+        if (localStatus?.message) {
+            messages.push(localStatus.message);
+            tone = localStatus.tone;
+        } else {
+            messages.push(describeSTTRole());
+        }
+        messages.push(describeTTSRole());
+        if (sttRole.state === 'error' || ttsRole.state === 'error') {
+            tone = 'error';
+        }
+
+        speechStatus.textContent = messages.filter(Boolean).join(' ');
+        speechStatus.dataset.tone = tone;
+        speechStatus.setAttribute(
+            'aria-busy',
+            String(
+                sttRole.state === 'loading'
+                || ttsRole.state === 'loading'
+                || sttRole.busy
+                || ttsRole.busy
+                || transcriptionActive
+            )
+        );
+    }
+
+    function describeSTTRole() {
+        if (sttRole.state === 'ready') {
+            if (!host.availability.microphone) {
+                return 'Microphone unavailable.';
+            }
+            return sttRole.busy ? 'Transcription busy.' : 'Transcription ready.';
+        }
+        if (sttRole.state === 'loading') {
+            return `Transcription ${formatRoleProgress(sttRole.progress, 'loading')}.`;
+        }
+        if (sttRole.state === 'error') {
+            return `Transcription error: ${visibleErrorMessage(sttRole.error, 'Unknown error')}.`;
+        }
+        if (sttRole.state === 'disposed') {
+            return 'Transcription disposed.';
+        }
+        return 'Transcription unavailable.';
+    }
+
+    function describeTTSRole() {
+        if (pendingTTSIntent === 'load' && ttsRole.state === 'unloaded') {
+            return 'Voice load requested; Cancel is available.';
+        }
+        if (pendingTTSIntent === 'unload') {
+            return 'Voice release requested.';
+        }
+        if (ttsRole.state === 'loading') {
+            return `Voice ${formatRoleProgress(ttsRole.progress, 'loading')}; Cancel is available.`;
+        }
+        if (ttsRole.state === 'unloading') {
+            return `Voice ${formatRoleProgress(ttsRole.progress, 'releasing')}.`;
+        }
+        if (ttsRole.state === 'ready') {
+            if (host.muted) {
+                return 'Voice ready and muted.';
+            }
+            return ttsRole.busy ? 'Voice speaking.' : 'Voice ready.';
+        }
+        if (ttsRole.state === 'unloaded') {
+            return host.muted ? 'Voice unloaded.' : 'Voice selected and waiting to load.';
+        }
+        if (ttsRole.state === 'error') {
+            return `Voice error: ${visibleErrorMessage(ttsRole.error, 'Unknown error')}.`;
+        }
+        if (ttsRole.state === 'disposed') {
+            return 'Voice disposed.';
+        }
+        return 'Voice unavailable.';
+    }
+
+    function formatRoleProgress(progress, fallback) {
+        if (!progress) {
+            return fallback;
+        }
+
+        const amount = progress.total === null
+            ? `${progress.completed} ${progress.unit}`
+            : `${progress.completed} of ${progress.total} ${progress.unit}`;
+        const heartbeat = progress.heartbeat ? ', active heartbeat' : '';
+        return `${progress.phase}, ${amount}${heartbeat}`;
+    }
+
+    function visibleErrorMessage(error, fallback) {
+        const message = typeof error?.message === 'string'
+            ? error.message.trim()
+            : '';
+        return (message || fallback).slice(0, 240);
+    }
+
+    async function observeMicrophonePermission() {
+        if (!navigator.permissions?.query || !navigator.mediaDevices?.getUserMedia) {
+            return;
+        }
+
+        try {
+            microphonePermissionStatus = await navigator.permissions.query(
+                { name: 'microphone' }
+            );
+            microphonePermissionListener = synchronizeMicrophonePermission;
+            microphonePermissionStatus.addEventListener?.(
+                'change',
+                microphonePermissionListener
+            );
+            synchronizeMicrophonePermission();
+        } catch (error) {
+            // Some supported browsers do not expose microphone permission
+            // state. getUserMedia remains the authoritative admission check.
+        }
+    }
+
+    function synchronizeMicrophonePermission() {
+        setAvailability(
             {
-                detail: { text: transcription }
+                microphone: microphonePermissionStatus?.state !== 'denied'
             }
         );
+    }
 
-        host.dispatchEvent(transcriptionEvent);
+    function handleRecordPointerDown(event) {
+        if (recordButton.disabled || event.button !== 0 || activePointerId !== null) {
+            return;
+        }
+
+        event.preventDefault();
+        activePointerId = event.pointerId;
+        recordButton.setPointerCapture?.(event.pointerId);
+        recordButton.classList.add('pressed');
+        void record();
+    }
+
+    function handleRecordPointerUp(event) {
+        if (event.pointerId !== activePointerId) {
+            return;
+        }
+
+        event.preventDefault();
+        releaseActivePointer(event.pointerId);
+        stop();
+    }
+
+    function handleRecordPointerCancel(event) {
+        if (event.pointerId !== activePointerId) {
+            return;
+        }
+
+        releaseActivePointer(event.pointerId);
+        stop();
+    }
+
+    function handleLostPointerCapture(event) {
+        if (event.pointerId !== activePointerId) {
+            return;
+        }
+
+        activePointerId = null;
+        recordButton.classList.remove('pressed');
+        stop();
+    }
+
+    function releaseActivePointer(pointerId) {
+        activePointerId = null;
+        if (recordButton.hasPointerCapture?.(pointerId)) {
+            recordButton.releasePointerCapture(pointerId);
+        }
+        recordButton.classList.remove('pressed');
+    }
+
+    function handleRecordKeyDown(event) {
+        if (
+            recordButton.disabled
+            || event.repeat
+            || keyboardRecording
+            || ![' ', 'Enter'].includes(event.key)
+        ) {
+            return;
+        }
+
+        event.preventDefault();
+        keyboardRecording = true;
+        recordButton.classList.add('pressed');
+        void record();
+    }
+
+    function handleRecordKeyUp(event) {
+        if (!keyboardRecording || ![' ', 'Enter'].includes(event.key)) {
+            return;
+        }
+
+        event.preventDefault();
+        keyboardRecording = false;
+        recordButton.classList.remove('pressed');
+        stop();
+    }
+
+    function handleRecordBlur() {
+        if (!keyboardRecording) {
+            return;
+        }
+
+        keyboardRecording = false;
+        recordButton.classList.remove('pressed');
+        stop();
+    }
+
+    function submitCompletionCommand(event) {
+        event.target.disabled = true;
+        void transcribe('End now, run all tool functions.');
+    }
+
+    function muteToggle() {
+        if (pendingTTSIntent === 'load' || ttsRole.state === 'loading') {
+            requestUserMute();
+            return;
+        }
+
+        if (host.muted) {
+            requestUserUnmute();
+        } else {
+            requestUserMute();
+        }
+    }
+
+    function requestUserMute() {
+        const wasMuted = host.muted;
+        const shouldUnload = !wasMuted
+            || pendingTTSIntent === 'load'
+            || ['loading', 'ready', 'error'].includes(ttsRole.state);
+        host.muted = true;
+        stopTTSPlayback();
+        if (shouldUnload) {
+            requestTTSIntent('unload', 'user');
+        }
+        renderControls();
+        renderStatus();
+    }
+
+    function requestUserUnmute() {
+        const providerSelected = typeof ttsRole.providerId === 'string'
+            && ttsRole.providerId.length > 0
+            && typeof ttsRole.modelId === 'string'
+            && ttsRole.modelId.length > 0;
+        const canRequestLoad = ttsRole.state === 'ready'
+            || (
+                providerSelected
+                && ['unloaded', 'loading', 'error'].includes(ttsRole.state)
+            );
+        if (!canRequestLoad) {
+            host.muted = true;
+            stopTTSPlayback();
+            reportTTSLifecycleError(
+                new Error('No selected speech provider is available to load.'),
+                'load'
+            );
+            return false;
+        }
+
+        host.muted = false;
+        synchronizeAIMutedState();
+        requestTTSIntent('load', 'user');
+        if (ttsRole.state === 'ready') {
+            resumeTTSPlayback();
+        }
+        renderControls();
+        renderStatus();
+        return true;
+    }
+
+    function requestTTSIntent(action, reason) {
+        pendingTTSIntent = action === 'load' && ttsRole.state === 'ready'
+            ? null
+            : action;
+        try {
+            requestAIRuntimeIntent(
+                {
+                    role: 'tts',
+                    action,
+                    reason
+                }
+            );
+        } catch (error) {
+            pendingTTSIntent = null;
+            reportTTSLifecycleError(error, action);
+        }
+    }
+
+    function reportTTSLifecycleError(error, action) {
+        const message = visibleErrorMessage(
+            error,
+            `The voice ${action} request failed.`
+        );
+        localStatus = {
+            message,
+            tone: 'error'
+        };
+        host.dispatchEvent(
+            new CustomEvent(
+                'speech-tts-lifecycle-error',
+                {
+                    bubbles: true,
+                    composed: true,
+                    detail: {
+                        action,
+                        error,
+                        message
+                    }
+                }
+            )
+        );
+        renderControls();
+        renderStatus();
+    }
+
+    function reportTTSError(error) {
+        const message = visibleErrorMessage(
+            error,
+            'Speech synthesis failed.'
+        );
+        host.muted = true;
+        stopTTSPlayback();
+        localStatus = {
+            message: `Speech synthesis failed: ${message}`,
+            tone: 'error'
+        };
+        host.dispatchEvent(
+            new CustomEvent(
+                'speech-synthesis-error',
+                {
+                    bubbles: true,
+                    composed: true,
+                    detail: {
+                        error,
+                        message
+                    }
+                }
+            )
+        );
+        renderControls();
+        renderStatus();
+        return false;
+    }
+
+    function stopTTSPlayback() {
+        const aiRuntime = globalThis.ai;
+        if (!aiRuntime) {
+            return;
+        }
+
+        aiRuntime.muted = true;
+        aiRuntime.stopAudio?.();
+    }
+
+    function synchronizeAIMutedState() {
+        const aiRuntime = globalThis.ai;
+        if (!aiRuntime) {
+            return;
+        }
+
+        aiRuntime.muted = host.muted || ttsRole.state !== 'ready';
+    }
+
+    function resumeTTSPlayback() {
+        const aiRuntime = globalThis.ai;
+        if (!aiRuntime || typeof aiRuntime.resumeAudio !== 'function') {
+            return;
+        }
+
+        void Promise.resolve(aiRuntime.resumeAudio()).catch(
+            function reportTTSResumeFailure(error) {
+                reportTTSError(error);
+            }
+        );
+    }
+
+    async function transcribe(transcription = '') {
+        host.dispatchEvent(
+            new CustomEvent(
+                'speech-transcription-complete',
+                {
+                    detail: { text: transcription }
+                }
+            )
+        );
     }
 
     async function record() {
-        if(!host.availability.stt||!host.availability.microphone){
+        if (
+            destroyed
+            || sttRole.state !== 'ready'
+            || sttRole.busy
+            || !host.availability.microphone
+            || recordingRequested
+            || captureSession
+            || transcriptionActive
+        ) {
+            resetRecordPress();
             return false;
         }
-        ai.stopAudio();
-        audioRecordingChunks.splice(0);
-        try{
-            activeStream=await navigator.mediaDevices.getUserMedia({audio:true});
-        }catch(error){
-            if(['NotAllowedError','NotFoundError','NotReadableError','SecurityError'].includes(error?.name)){
-                setAvailability({microphone:false});
-                host.dispatchEvent(new CustomEvent('speech-microphone-unavailable',{
-                    bubbles:true,
-                    composed:true,
-                    detail:{reason:error.name}
-                }));
-                return false;
-            }
-            throw error;
-        }
-        mediaRecorder=new MediaRecorder(activeStream);
-        
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const source = audioContext.createMediaStreamSource(activeStream);
-        const processor = audioContext.createScriptProcessor(4096, 1, 1);
-        
-        source.connect(processor);
-        processor.connect(audioContext.destination);
 
-        processor.onaudioprocess = function(event) {
-            const input = event.inputBuffer.getChannelData(0);
-            const isSilent = input.every(sample => Math.abs(sample) < 0.05); // Threshold for silence
-            
-            if (isSilent&&silenceDuration) {
-                console.log('silent');
-                if(!silenceTimer){
-                    silenceTimer = setTimeout(() => {
-                        
-                        //console.log('TIMER SAYS STOPPING');
-                        stop();
-                        clearTimeout(silenceTimer);
-                    }, silenceDuration); // wait for specified milliseconds of silence
+        const generation = ++recordingGeneration;
+        recordingRequested = true;
+        localStatus = {
+            message: 'Recording. Release to transcribe.',
+            tone: ''
+        };
+        renderControls();
+        renderStatus();
+
+        let stream;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (error) {
+            recordingRequested = false;
+            resetRecordPress();
+            if (
+                ['NotAllowedError', 'NotFoundError', 'NotReadableError', 'SecurityError']
+                    .includes(error?.name)
+            ) {
+                setAvailability({ microphone: false });
+                localStatus = {
+                    message: 'Microphone access is unavailable. Text chat is still available.',
+                    tone: 'error'
+                };
+                host.dispatchEvent(
+                    new CustomEvent(
+                        'speech-microphone-unavailable',
+                        {
+                            bubbles: true,
+                            composed: true,
+                            detail: { reason: error.name }
+                        }
+                    )
+                );
+            } else {
+                reportTranscriptionError(error);
+            }
+            renderControls();
+            renderStatus();
+            return false;
+        }
+
+        if (
+            !recordingRequested
+            || generation !== recordingGeneration
+            || sttRole.state !== 'ready'
+            || destroyed
+        ) {
+            stopMediaStream(stream);
+            resetRecordPress();
+            return false;
+        }
+
+        let session = null;
+        try {
+            const recorder = new MediaRecorder(stream);
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            const audioContext = new AudioContext();
+            const source = audioContext.createMediaStreamSource(stream);
+
+            // ScriptProcessor remains the visible compatibility capture path
+            // in this increment. AudioWorklet needs its own reviewed protocol.
+            const processor = audioContext.createScriptProcessor(4096, 1, 1);
+            session = {
+                generation,
+                recorder,
+                stream,
+                audioContext,
+                source,
+                processor,
+                chunks: [],
+                cancelled: false,
+                released: false
+            };
+
+            captureSession = session;
+            source.connect(processor);
+            processor.connect(audioContext.destination);
+            processor.onaudioprocess = function handleAudioProcess(event) {
+                const input = event.inputBuffer.getChannelData(0);
+                const isSilent = input.every(
+                    function isSilentSample(sample) {
+                        return Math.abs(sample) < .05;
+                    }
+                );
+
+                if (isSilent && silenceDuration) {
+                    if (!silenceTimer) {
+                        silenceTimer = setTimeout(stopAfterSilence, silenceDuration);
+                    }
+                } else {
+                    clearSilenceTimer();
+                }
+            };
+            recorder.ondataavailable = function collectAudioChunk(event) {
+                session.chunks.push(event.data);
+            };
+            recorder.onstop = function handleRecorderStop() {
+                void finalizeCapture(session);
+            };
+            recorder.start();
+            return true;
+        } catch (error) {
+            recordingRequested = false;
+            if (session) {
+                session.cancelled = true;
+                releaseCaptureSession(session);
+                if (captureSession === session) {
+                    captureSession = null;
                 }
             } else {
-                clearTimeout(silenceTimer);
-                silenceTimer=false;
+                stopMediaStream(stream);
             }
-        };
-
-        mediaRecorder.ondataavailable = event => {
-            audioRecordingChunks.push(event.data);
-        };
-        
-        mediaRecorder.onstop = async () => {
-            processor.disconnect();
-            source.disconnect();
-            activeStream?.getTracks().forEach(track=>track.stop());
-            activeStream=null;
-            
-            const audioBlob = new Blob(audioRecordingChunks, { type: 'audio/webm; codecs=opus' });
-            const audioFile = new File([audioBlob], 'audio.webm', { type: 'audio/webm' });
-            //console.log(audioFile)
-
-            //playBackAudio(audioBlob);
-
-            const transcription = await ai.fetchSTT(audioFile);
-
-            transcribe(transcription);
-
-            console.log(transcription);
-        };
-        
-        mediaRecorder.start();
-        // recordButton.disabled = true;
-        // stopButton.disabled = false;
-    }
-
-    async function stop() {
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-            mediaRecorder.stop();
+            resetRecordPress();
+            reportTranscriptionError(error);
+            return false;
         }
-        // recordButton.disabled = false;
-        // stopButton.disabled = true;
     }
 
-    async function playBackAudio(audioBlob) {
-        const audioUrl = URL.createObjectURL(audioBlob);
-        audioElement.src = audioUrl;
-        audioElement.play();
+    function stopAfterSilence() {
+        clearSilenceTimer();
+        stop();
     }
 
-    
+    function clearSilenceTimer() {
+        if (silenceTimer !== null) {
+            clearTimeout(silenceTimer);
+            silenceTimer = null;
+        }
+    }
+
+    function stop() {
+        recordingRequested = false;
+        clearSilenceTimer();
+        if (captureSession?.recorder.state !== 'inactive') {
+            captureSession.recorder.stop();
+        }
+        return true;
+    }
+
+    async function finalizeCapture(session) {
+        releaseCaptureSession(session);
+        if (captureSession === session) {
+            captureSession = null;
+        }
+        recordingRequested = false;
+        resetRecordPress();
+
+        if (
+            session.cancelled
+            || session.generation !== recordingGeneration
+            || sttRole.state !== 'ready'
+            || destroyed
+        ) {
+            renderControls();
+            renderStatus();
+            return false;
+        }
+
+        const audioBlob = new Blob(
+            session.chunks,
+            { type: 'audio/webm; codecs=opus' }
+        );
+        const audioFile = new File(
+            [audioBlob],
+            'audio.webm',
+            { type: 'audio/webm' }
+        );
+        return transcribeAudio(audioFile);
+    }
+
+    async function transcribeAudio(audioFile) {
+        const generation = ++transcriptionGeneration;
+        transcriptionActive = true;
+        localStatus = {
+            message: 'Transcribing speech.',
+            tone: ''
+        };
+        renderControls();
+        renderStatus();
+
+        try {
+            const aiRuntime = globalThis.ai;
+            if (sttRole.state !== 'ready' || typeof aiRuntime?.fetchSTT !== 'function') {
+                throw new Error('The selected transcription service is unavailable.');
+            }
+
+            const transcription = await aiRuntime.fetchSTT(audioFile);
+            if (
+                generation !== transcriptionGeneration
+                || sttRole.state !== 'ready'
+                || destroyed
+            ) {
+                return false;
+            }
+            if (typeof transcription !== 'string') {
+                throw new TypeError('The selected transcription service returned invalid text.');
+            }
+
+            localStatus = null;
+            await transcribe(transcription);
+            return true;
+        } catch (error) {
+            if (generation === transcriptionGeneration && !destroyed) {
+                reportTranscriptionError(error);
+            }
+            return false;
+        } finally {
+            if (generation === transcriptionGeneration) {
+                transcriptionActive = false;
+                renderControls();
+                renderStatus();
+            }
+        }
+    }
+
+    function reportTranscriptionError(error) {
+        const message = visibleErrorMessage(
+            error,
+            'Speech transcription failed.'
+        );
+        localStatus = {
+            message: `Transcription failed: ${message}`,
+            tone: 'error'
+        };
+        host.dispatchEvent(
+            new CustomEvent(
+                'speech-transcription-error',
+                {
+                    bubbles: true,
+                    composed: true,
+                    detail: {
+                        error,
+                        message
+                    }
+                }
+            )
+        );
+        renderControls();
+        renderStatus();
+    }
+
+    function cancelSTTOperation(reason) {
+        const hadActiveOperation = recordingRequested
+            || Boolean(captureSession)
+            || transcriptionActive;
+        recordingGeneration += 1;
+        transcriptionGeneration += 1;
+        recordingRequested = false;
+        transcriptionActive = false;
+        clearSilenceTimer();
+        resetRecordPress();
+
+        if (captureSession) {
+            captureSession.cancelled = true;
+            if (captureSession.recorder.state !== 'inactive') {
+                captureSession.recorder.stop();
+            } else {
+                releaseCaptureSession(captureSession);
+                captureSession = null;
+            }
+        }
+
+        if (hadActiveOperation) {
+            localStatus = {
+                message: 'Transcription stopped because the selected service became unavailable.',
+                tone: 'error'
+            };
+            host.dispatchEvent(
+                new CustomEvent(
+                    'speech-transcription-cancelled',
+                    {
+                        bubbles: true,
+                        composed: true,
+                        detail: { reason }
+                    }
+                )
+            );
+        }
+    }
+
+    function releaseCaptureSession(session) {
+        if (session.released) {
+            return;
+        }
+
+        session.released = true;
+        session.processor.onaudioprocess = null;
+        session.processor.disconnect?.();
+        session.source.disconnect?.();
+        stopMediaStream(session.stream);
+        if (session.audioContext.state !== 'closed') {
+            void session.audioContext.close().catch(
+                function reportAudioContextCloseFailure(error) {
+                    console.warn('The microphone audio context could not close.', error);
+                }
+            );
+        }
+    }
+
+    function stopMediaStream(stream) {
+        stream?.getTracks().forEach(
+            function stopMediaTrack(track) {
+                track.stop();
+            }
+        );
+    }
+
+    function resetRecordPress() {
+        recordButton.classList.remove('pressed');
+        activePointerId = null;
+        keyboardRecording = false;
+    }
+
+    function destroy() {
+        if (destroyed) {
+            return;
+        }
+
+        destroyed = true;
+        runtimeStateAbortController.abort();
+        window.removeEventListener('pagehide', destroy);
+        microphonePermissionStatus?.removeEventListener?.(
+            'change',
+            microphonePermissionListener
+        );
+        cancelSTTOperation('component-destroyed');
+        stopTTSPlayback();
+        host.componentReady = false;
+        renderControls();
+        renderStatus();
+    }
 </script>

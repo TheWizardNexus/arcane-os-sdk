@@ -1,11 +1,25 @@
 <link rel="stylesheet" href="./arcane/css/layout.css?v=3" />
 <style>
+    :host {
+        display: block;
+        height: 100%;
+        min-width: 0;
+        min-height: 0;
+        --arcane-chat-gap: var(--arcane-space-3, .75rem);
+        --arcane-chat-radius: var(--arcane-radius-large, 1rem);
+    }
+
     .chat_area {
         display: flex;
         flex-direction: column;
         justify-content: flex-end;
-        padding: 1em;
-        height: calc(100% - 2em);
+        box-sizing: border-box;
+        width: min(100%, 72rem);
+        height: 100%;
+        min-height: 0;
+        margin-inline: auto;
+        padding: clamp(.65rem, 1.5vw, 1.25rem);
+        gap: var(--arcane-chat-gap);
         overflow: hidden;
     }
 
@@ -114,80 +128,128 @@
         border:0;
     }
 
-    .chat_area ul {
+    .chat_output {
         flex:1 1 auto;
+        box-sizing: border-box;
+        width: 100%;
         min-height:0;
+        margin: 0;
+        padding: clamp(1rem, 2vw, 1.5rem);
         list-style: none;
         overflow-y: auto;
-        padding: 0 1em;
+        scrollbar-gutter: stable;
+        border: 1px solid var(--arcane-border, var(--border-color));
+        border-radius: var(--arcane-chat-radius);
+        background: var(--arcane-surface-raised, var(--modal-background));
+        box-shadow: var(--arcane-shadow-medium, 0 .65rem 1.8rem var(--shadow-color));
     }
 
-    .chat_area li {
-        padding: 0.5em;
-        margin: 0 0 1em;
+    .chat_output > li {
+        box-sizing: border-box;
         width: auto;
-        max-width: 95%;
+        max-width: min(92%, 48rem);
+        margin: 0 0 .85rem;
+        padding: .85rem 1rem;
         clear: both;
+        border: 1px solid var(--arcane-border, var(--border-color));
+        border-radius: calc(var(--arcane-chat-radius) - .1rem);
+        overflow-wrap: anywhere;
     }
 
-    .chat_area li.ai {
-        width: 90%;
+    .chat_output > li.ai {
+        width: auto;
         float: left;
-        padding: 10px; /* Ensures padding around the content */
+        background: var(--arcane-surface, var(--background));
+        border-start-start-radius: var(--arcane-radius-small, .3rem);
     }
 
-
-    .chat_area li.user {
-        text-align: right;
+    .chat_output > li.user {
         float: right;
+        background: var(--arcane-action, var(--primary-color));
+        color: var(--arcane-action-text, var(--button-text-color, var(--text-color)));
+        border-color: var(--arcane-action, var(--primary-color));
+        border-start-end-radius: var(--arcane-radius-small, .3rem);
+        text-align: right;
+    }
+
+    .chat_output li ul,
+    .chat_output li ol {
+        display: block;
+        min-height: auto;
+        margin: .55rem 0 .55rem 1.35rem;
+        padding: 0;
+        overflow: visible;
+        list-style: revert;
+    }
+
+    .chat_output li li {
+        float: none;
+        width: auto;
+        max-width: none;
+        margin: .28rem 0;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: inherit;
+        text-align: start;
     }
 
     .chat_input_area {
         display: grid;
-        padding-bottom: 2em;
-        grid-template-columns: 1fr auto auto;
-        column-gap: 0.5em;
+        box-sizing: border-box;
+        width: 100%;
+        padding: var(--arcane-space-3, .7rem);
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        align-items: center;
+        gap: var(--arcane-space-2, .6rem);
+        border: 1px solid var(--arcane-border, var(--border-color));
+        border-radius: var(--arcane-chat-radius);
+        background: var(--arcane-surface-raised, var(--modal-background));
+        box-shadow: var(--arcane-shadow-small, 0 .35rem 1rem var(--shadow-color));
     }
 
     .chat_input {
-        width: calc(100% - 1em);
-        min-height: 48px;
-        max-height: 160px; 
-        padding: 1.1em 1em;
-        margin: 0;
-        border:2px solid var(--border-color);
-        border-radius: 0.5em;
-        font-family: Arial, sans-serif;
-        font-size: 16px;
-        line-height: 20px; 
         box-sizing: border-box;
+        width: 100%;
+        min-height: 3rem;
+        max-height: 10rem;
+        margin: 0;
+        padding: .82rem .9rem;
+        border: 1px solid var(--arcane-border, var(--border-color));
+        border-radius: var(--arcane-radius-medium, .7rem);
+        background: var(--arcane-surface, var(--background));
+        color: var(--text-color);
+        font: inherit;
+        font-size: 1rem;
+        line-height: 1.35;
         resize: none;
         overflow-y: auto;
     }
 
-    .chat_input:focus {
-        outline:.18em solid var(--focus-color);
-        outline-offset:.12em;
-        border-color:var(--focus-color);
+    .chat_input:focus-visible {
+        outline: .18em solid var(--arcane-focus, var(--focus-color));
+        outline-offset: .12em;
+        border-color: var(--arcane-focus, var(--focus-color));
     }
 
     .chat_submit,
     button.chat_upload {
         display:grid;
         place-items:center;
-        width:3.75em;
-        height:3.75em;
+        width:3rem;
+        height:3rem;
         padding:0;
         margin:0;
-        background-color:var(--primary-color);
-        border:.2em solid var(--primary-color);
-        border-radius:.8em;
+        background-color:var(--arcane-action, var(--primary-color));
+        border:.2em solid var(--arcane-action, var(--primary-color));
+        border-radius:var(--arcane-radius-medium, .7rem);
         cursor: pointer;
         outline: none;
-        box-shadow:0 .18em .45em var(--shadow-color);
-        align-self: end;
+        box-shadow:var(--arcane-shadow-small, 0 .18em .45em var(--shadow-color));
+        align-self:center;
         transition:background-color 180ms,border-color 180ms,box-shadow 180ms,transform 120ms;
-        color:var(--button-text-color,var(--text-color));
+        color:var(--arcane-action-text, var(--button-text-color,var(--text-color)));
     }
 
     .chat_submit::before,
@@ -221,10 +283,57 @@
 
     .chat_submit:hover,
     button.chat_upload:hover {
-        background-color:var(--secondary-color);
-        border-color:var(--secondary-color);
-        color:var(--text-color);
+        background-color:var(--arcane-secondary, var(--secondary-color));
+        border-color:var(--arcane-secondary, var(--secondary-color));
+        color:var(--arcane-secondary-text, var(--text-color));
         box-shadow:0 .25em .6em var(--shadow-color);
+    }
+
+    .chat_submit:focus-visible,
+    button.chat_upload:focus-visible {
+        outline: .2rem solid var(--arcane-focus, var(--focus-color));
+        outline-offset: .18rem;
+    }
+
+    #speech {
+        display: grid;
+        flex: 0 0 auto;
+        min-width: 0;
+    }
+
+    .controls {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .controls select {
+        width: min(100%, 18rem);
+        min-height: 2.65rem;
+        padding: .55rem .75rem;
+        border: 1px solid var(--arcane-border, var(--border-color));
+        border-radius: var(--arcane-radius-medium, .7rem);
+        background: var(--arcane-surface-raised, var(--modal-background));
+        color: var(--text-color);
+        font: inherit;
+    }
+
+    .controls select:focus-visible {
+        outline: .2rem solid var(--arcane-focus, var(--focus-color));
+        outline-offset: .18rem;
+    }
+
+    @media (max-width: 44rem) {
+        .chat_area {
+            padding: var(--arcane-space-2, .5rem);
+        }
+
+        .chat_output > li {
+            max-width: 96%;
+        }
+
+        .controls select {
+            width: 100%;
+        }
     }
 
 
@@ -518,11 +627,13 @@
     const [
         {default:MD},
         {default:FileEntity},
-        {ConversationSubmissionBarrier,requireConversationTimeboxDelivery}
+        {ConversationSubmissionBarrier,requireConversationTimeboxDelivery},
+        {subscribeAIRuntimeState}
     ]=await Promise.all([
         import('../modules/MD.js'),
         import('../entities/File.js'),
-        import('../modules/ConversationTimebox.js')
+        import('../modules/ConversationTimebox.js'),
+        import('../modules/AIRuntimeState.js')
     ]);
 
     host.language=host.language||'English';
@@ -532,7 +643,10 @@
         ?speech.initialMuted
         :true;
     let initialSpeechMuteListenerInstalled=false;
+    let pendingSpeechAvailability=null;
+    let speechAvailabilityListenerInstalled=false;
     const hostSubmissionBarrier=new ConversationSubmissionBarrier();
+    const aiRuntimeStateAbortController=new AbortController();
     let programmaticSubmissionQueue=Promise.resolve(true);
     let conversationTimeboxController=null;
     let conversationTimeboxUnsubscribe=null;
@@ -556,8 +670,17 @@
     host.setConversationComplete=setConversationComplete;
     host.bindConversationTimebox=bindConversationTimebox;
     host.submitMessage=submitMessage;
-    host.aiAvailability={llm:true,stt:true,tts:true};
+    host.destroy=destroy;
+    host.aiAvailability={llm:false,stt:false,tts:false};
     host.conversationComplete=false;
+    applyAIAvailability(host.aiAvailability);
+    subscribeAIRuntimeState(
+        synchronizeAIRuntimeState,
+        {
+            signal:aiRuntimeStateAbortController.signal
+        }
+    );
+    window.addEventListener('pagehide',destroy,{once:true});
 
     function setConversationComplete(complete=true){
         if(typeof complete!=='boolean'){
@@ -699,6 +822,7 @@
     }
 
     function setAIAvailability(input={}){
+        const explicitSpeechAvailability={};
         const availability={
             llm:Object.prototype.hasOwnProperty.call(input,'llm')
                 ?Boolean(input.llm)
@@ -711,25 +835,69 @@
                 :host.aiAvailability.tts
         };
 
-        host.aiAvailability=availability;
+        if(Object.prototype.hasOwnProperty.call(input,'stt')){
+            explicitSpeechAvailability.stt=availability.stt;
+        }
+        if(Object.prototype.hasOwnProperty.call(input,'tts')){
+            explicitSpeechAvailability.tts=availability.tts;
+        }
+        applyAIAvailability(availability);
+        if(Object.keys(explicitSpeechAvailability).length){
+            pendingSpeechAvailability={
+                ...(pendingSpeechAvailability||{}),
+                ...explicitSpeechAvailability
+            };
+            synchronizeSpeechCompatibilityAvailability();
+        }
+        return {...availability};
+    }
+
+    function applyAIAvailability(availability){
+        host.aiAvailability={...availability};
         send.disabled=host.conversationComplete||!availability.llm;
         send.title=availability.llm
             ?'Send message'
             :'The selected language model service is unavailable.';
         send.setAttribute('aria-label',send.title);
+    }
 
-        const configureSpeech=()=>speech.setAvailability?.({
-            stt:availability.stt,
-            tts:availability.tts
+    function synchronizeAIRuntimeState(snapshot){
+        applyAIAvailability({
+            llm:snapshot.roles.llm.state==='ready',
+            stt:snapshot.roles.stt.state==='ready',
+            tts:snapshot.roles.tts.state==='ready'
         });
+    }
 
+    function synchronizeSpeechCompatibilityAvailability(){
+        if(!pendingSpeechAvailability){
+            return;
+        }
         if(speech.componentReady){
-            configureSpeech();
-        }else{
-            speech.addEventListener('speech-ready',configureSpeech,{once:true});
+            const availability=pendingSpeechAvailability;
+            pendingSpeechAvailability=null;
+            speech.setAvailability?.({...availability});
+            return;
+        }
+        if(speechAvailabilityListenerInstalled){
+            return;
         }
 
-        return {...availability};
+        speechAvailabilityListenerInstalled=true;
+        speech.addEventListener(
+            'speech-ready',
+            applyPendingSpeechAvailability,
+            {once:true}
+        );
+    }
+
+    function applyPendingSpeechAvailability(){
+        speechAvailabilityListenerInstalled=false;
+        if(pendingSpeechAvailability){
+            const availability=pendingSpeechAvailability;
+            pendingSpeechAvailability=null;
+            speech.setAvailability?.({...availability});
+        }
     }
 
     function formatConversationTime(milliseconds=0){
@@ -997,10 +1165,22 @@
         const clearThinking=thinkingHTML;
         
         //console.table(arguments);
-        if(!isThinking&&text&&host.aiAvailability.tts){
-            ai.streamTTS(
-                text
-            )
+        if(
+            !isThinking
+            &&text
+            &&host.aiAvailability.tts
+            &&speech.muted===false
+        ){
+            const aiRuntime=globalThis.ai;
+            if(typeof aiRuntime?.streamTTS==='function'){
+                void Promise.resolve(aiRuntime.streamTTS(text)).catch(
+                    reportTTSError
+                );
+            }else{
+                reportTTSError(
+                    new Error('The ready speech provider has no synthesis adapter.')
+                );
+            }
         }
         
         if(clearThinking){
@@ -1143,6 +1323,9 @@
         if(host.conversationComplete){
             return false;
         }
+        if(!host.aiAvailability.llm){
+            return false;
+        }
         const submissionContext=Object.freeze({
             source:'user',
             preserveDraft:false,
@@ -1189,8 +1372,15 @@
             }
         );
 
-        ai.stopAudio();
-        ai.resumeAudio?.();
+        if(host.aiAvailability.tts&&speech.muted===false){
+            const aiRuntime=globalThis.ai;
+            aiRuntime?.stopAudio?.();
+            if(typeof aiRuntime?.resumeAudio==='function'){
+                void Promise.resolve(aiRuntime.resumeAudio()).catch(
+                    reportTTSError
+                );
+            }
+        }
 
         host.dispatchEvent(chatEvent);
 
@@ -1217,6 +1407,35 @@
             </li>
         `;
         chatOutput.scrollTop = chatOutput.scrollHeight;
+    }
+
+    function reportTTSError(error){
+        if(typeof speech.reportTTSError==='function'){
+            speech.reportTTSError(error);
+            return;
+        }
+
+        const message=typeof error?.message==='string'&&error.message.trim()
+            ?error.message.trim().slice(0,240)
+            :'Speech synthesis failed.';
+        host.dispatchEvent(
+            new CustomEvent(
+                'chat-speech-synthesis-error',
+                {
+                    bubbles:true,
+                    composed:true,
+                    detail:{error,message}
+                }
+            )
+        );
+        console.error(message,error);
+    }
+
+    function destroy(){
+        aiRuntimeStateAbortController.abort();
+        window.removeEventListener('pagehide',destroy);
+        speech.destroy?.();
+        host.ready=false;
     }
 
     // Initialize and adjust on input
