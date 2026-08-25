@@ -116,11 +116,11 @@ jobs:
           const locked=lockDocument.packages?.['node_modules/arcane-os'];
           const expected={
             name:'arcane-os',
-            installedVersion:'0.1.1',
-            requestedSpec:'0.1.1',
-            lockedVersion:'0.1.1',
-            resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.1.1.tgz',
-            integrity:'sha512-EH4lwSiBqBuzzTA1YWPeat5b9YPO0m5iHfnmLrNN0qEPPmEOQvvsebg6nmUIXVlBKgPLzyVIFo/qQ2qS89MN+A=='
+            installedVersion:'0.1.2',
+            requestedSpec:'0.1.2',
+            lockedVersion:'0.1.2',
+            resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.1.2.tgz',
+            integrity:'sha512-fzVbd01xwFVCHTN6k8x/xPK8xtPy5yCtSkzFLmr1jNVTUBHzmnubLK8a5pWSGH7IhsWce+/AFHOu/TnWSKwDsQ=='
           };
           const actual={
             name:packageDocument.name,
@@ -132,7 +132,7 @@ jobs:
           };
           if(Object.keys(expected).some(key=>actual[key]!==expected[key])){
             throw new Error(
-              `Expected exact public arcane-os@0.1.1 registry authority ${JSON.stringify(expected)}, `
+              `Expected exact public arcane-os@0.1.2 registry authority ${JSON.stringify(expected)}, `
                 +`received ${JSON.stringify(actual)}.`
             );
           }

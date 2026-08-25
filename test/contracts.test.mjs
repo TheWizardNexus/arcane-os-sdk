@@ -471,14 +471,14 @@ test('CI, reusable app release, and trusted publishing workflows retain narrow a
     await t.test('app release is reusable, single-app, and exact-SDK bound',async child=>{
         assert.match(appReleaseWorkflow,/workflow_call:/u);
         assert.match(appReleaseWorkflow,/app-id:/u);
-        assert.match(appReleaseWorkflow,/Expected exact public arcane-os@0\.1\.1 registry authority/u);
+        assert.match(appReleaseWorkflow,/Expected exact public arcane-os@0\.1\.2 registry authority/u);
         assert.match(
             appReleaseWorkflow,
-            /https:\/\/registry\.npmjs\.org\/arcane-os\/-\/arcane-os-0\.1\.1\.tgz/u
+            /https:\/\/registry\.npmjs\.org\/arcane-os\/-\/arcane-os-0\.1\.2\.tgz/u
         );
         assert.match(
             appReleaseWorkflow,
-            /sha512-EH4lwSiBqBuzzTA1YWPeat5b9YPO0m5iHfnmLrNN0qEPPmEOQvvsebg6nmUIXVlBKgPLzyVIFo\/qQ2qS89MN\+A==/u
+            /sha512-fzVbd01xwFVCHTN6k8x\/xPK8xtPy5yCtSkzFLmr1jNVTUBHzmnubLK8a5pWSGH7IhsWce\+\/AFHOu\/TnWSKwDsQ==/u
         );
         assert.doesNotMatch(appReleaseWorkflow,/arcane-os@0\.1\.0-dev\.5/u);
         assert.doesNotMatch(buildSection,/npm (?:view|pack)|\bcurl\b|\bwget\b/u);
@@ -512,9 +512,9 @@ test('CI, reusable app release, and trusted publishing workflows retain narrow a
             ],{cwd:fixtureRoot,encoding:'utf8',windowsHide:true});
         };
         await runAuthority({
-            version:'0.1.1',
-            resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.1.1.tgz',
-            integrity:'sha512-EH4lwSiBqBuzzTA1YWPeat5b9YPO0m5iHfnmLrNN0qEPPmEOQvvsebg6nmUIXVlBKgPLzyVIFo/qQ2qS89MN+A=='
+            version:'0.1.2',
+            resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.1.2.tgz',
+            integrity:'sha512-fzVbd01xwFVCHTN6k8x/xPK8xtPy5yCtSkzFLmr1jNVTUBHzmnubLK8a5pWSGH7IhsWce+/AFHOu/TnWSKwDsQ=='
         });
         await assert.rejects(
             runAuthority({
@@ -526,22 +526,22 @@ test('CI, reusable app release, and trusted publishing workflows retain narrow a
                 assert.equal(error.code,1);
                 assert.match(
                     error.stderr,
-                    /Expected exact public arcane-os@0\.1\.1 registry authority/u
+                    /Expected exact public arcane-os@0\.1\.2 registry authority/u
                 );
                 return true;
             }
         );
         await assert.rejects(
             runAuthority({
-                version:'0.1.1',
-                resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.1.1.tgz',
+                version:'0.1.2',
+                resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.1.2.tgz',
                 integrity:'sha512-forged'
             }),
             error=>{
                 assert.equal(error.code,1);
                 assert.match(
                     error.stderr,
-                    /Expected exact public arcane-os@0\.1\.1 registry authority/u
+                    /Expected exact public arcane-os@0\.1\.2 registry authority/u
                 );
                 return true;
             }
