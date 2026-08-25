@@ -75,7 +75,10 @@ hello-world/
 ```
 
 The authenticated `arcane/` projection contains 173 files. The generated map
-contains 86 entries, including the browser-AI subpath:
+contains 86 entries, including the browser-AI subpath. Its internal
+`./node_modules/strong-type/index.js` request resolves to the authenticated
+`./arcane/dependencies/strong-type/index.js` snapshot, so development and the
+packaged release use the same physical dependency bytes.
 
 ```json
 {
