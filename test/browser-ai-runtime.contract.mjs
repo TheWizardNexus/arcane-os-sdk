@@ -35,11 +35,23 @@ if(FINAL_WARM_PRESENT.length!==0&&FINAL_WARM_PRESENT.length!==FINAL_WARM_KEYS.le
     throw new Error('The final warm browser-AI environment must provide all four exact keys.');
 }
 const FINAL_WARM_ONLY=FINAL_WARM_PRESENT.length===FINAL_WARM_KEYS.length;
+const FINAL_WARM_BROWSER_MODE_KEY='ARCANE_BROWSER_AI_FINAL_WARM_BROWSER_MODE';
+const FINAL_WARM_BROWSER_MODE=FINAL_WARM_ONLY
+    ?process.env[FINAL_WARM_BROWSER_MODE_KEY]?.trim()
+    :null;
 if(FINAL_WARM_ONLY&&!AUTHORITATIVE_ENABLED){
     throw new Error('The final warm browser-AI environment requires the authoritative installed-artifact gate.');
 }
 if(FINAL_WARM_ONLY&&FINAL_WARM_KEYS.some(key=>!process.env[key]?.trim())){
     throw new Error('The final warm browser-AI environment rejects empty values.');
+}
+if(FINAL_WARM_ONLY&&!['existing','managed'].includes(FINAL_WARM_BROWSER_MODE)){
+    throw new Error(
+        `${FINAL_WARM_BROWSER_MODE_KEY} must explicitly select existing or managed.`
+    );
+}
+if(!FINAL_WARM_ONLY&&Object.hasOwn(process.env,FINAL_WARM_BROWSER_MODE_KEY)){
+    throw new Error(`${FINAL_WARM_BROWSER_MODE_KEY} is valid only for the final warm proof.`);
 }
 const FINAL_WARM_PORT=FINAL_WARM_ONLY
     ?Number(process.env.ARCANE_BROWSER_AI_FINAL_WARM_PORT)
@@ -1052,12 +1064,14 @@ if(!ENABLED){
         const selectedProfileInfo=await lstat(path.join(profile,FINAL_WARM_PROFILE_DIRECTORY));
         assert.equal(selectedProfileInfo.isSymbolicLink(),false,'The selected warm profile must not be a link.');
         assert.equal(selectedProfileInfo.isDirectory(),true,'The selected warm profile must be a directory.');
-        const owners=await activeWindowsChromeProfileOwners(profile);
-        assert.deepEqual(
-            owners,
-            [],
-            `The external warm Chrome profile is already owned by process IDs: ${owners.join(', ')}.`
-        );
+        if(FINAL_WARM_BROWSER_MODE==='managed'){
+            const owners=await activeWindowsChromeProfileOwners(profile);
+            assert.deepEqual(
+                owners,
+                [],
+                `Managed Chrome requires the selected profile to be free; owner PIDs: ${owners.join(', ')}.`
+            );
+        }
     }else{
         profile=await mkdtemp(path.join(os.tmpdir(),'arcane-browser-ai-chrome-'));
         profileOwned=true;
@@ -1097,41 +1111,46 @@ if(!ENABLED){
         }
     });
 
-    const executable=await chromePath();
-    const args=[
-        '--headless=new',
-        '--disable-background-networking',
-        '--disable-component-update',
-        '--disable-default-apps',
-        '--disable-extensions',
-        '--disable-features=MediaRouter,DialMediaRouteProvider,OptimizationHints',
-        '--disable-sync',
-        '--metrics-recording-only',
-        '--no-default-browser-check',
-        '--no-first-run',
-        '--password-store=basic',
-        `--user-data-dir=${profile}`,
-        ...(FINAL_WARM_ONLY?[`--profile-directory=${FINAL_WARM_PROFILE_DIRECTORY}`]:[]),
-        ...(process.platform==='darwin'?['--use-mock-keychain']:[]),
-        ...(typeof process.getuid==='function'&&process.getuid()===0?['--no-sandbox']:[]),
-        contractServer.url
-    ];
-    chrome=spawn(executable,args,{
-        detached:process.platform!=='win32',
-        stdio:['ignore','pipe','pipe'],
-        windowsHide:true
-    });
-    let stdout=Buffer.alloc(0);
-    let stderr=Buffer.alloc(0);
-    chrome.stdout.on('data',chunk=>{stdout=appendTail(stdout,chunk);});
-    chrome.stderr.on('data',chunk=>{stderr=appendTail(stderr,chunk);});
-    const exited=waitForExit(chrome).then(result=>{
-        throw new Error(
-            `Chrome exited before the browser-AI report (code ${String(result.code)}, `+
-            `signal ${String(result.signal)}): ${stderr.toString('utf8')||stdout.toString('utf8')}`
-        );
-    });
-    void exited.catch(()=>{});
+    let exited=null;
+    if(FINAL_WARM_BROWSER_MODE==='existing'){
+        console.log(`ARCANE_BROWSER_AI_FINAL_WARM_URL=${contractServer.url}`);
+    }else{
+        const executable=await chromePath();
+        const args=[
+            '--headless=new',
+            '--disable-background-networking',
+            '--disable-component-update',
+            '--disable-default-apps',
+            '--disable-extensions',
+            '--disable-features=MediaRouter,DialMediaRouteProvider,OptimizationHints',
+            '--disable-sync',
+            '--metrics-recording-only',
+            '--no-default-browser-check',
+            '--no-first-run',
+            '--password-store=basic',
+            `--user-data-dir=${profile}`,
+            ...(FINAL_WARM_ONLY?[`--profile-directory=${FINAL_WARM_PROFILE_DIRECTORY}`]:[]),
+            ...(process.platform==='darwin'?['--use-mock-keychain']:[]),
+            ...(typeof process.getuid==='function'&&process.getuid()===0?['--no-sandbox']:[]),
+            contractServer.url
+        ];
+        chrome=spawn(executable,args,{
+            detached:process.platform!=='win32',
+            stdio:['ignore','pipe','pipe'],
+            windowsHide:true
+        });
+        let stdout=Buffer.alloc(0);
+        let stderr=Buffer.alloc(0);
+        chrome.stdout.on('data',chunk=>{stdout=appendTail(stdout,chunk);});
+        chrome.stderr.on('data',chunk=>{stderr=appendTail(stderr,chunk);});
+        exited=waitForExit(chrome).then(result=>{
+            throw new Error(
+                `Chrome exited before the browser-AI report (code ${String(result.code)}, `+
+                `signal ${String(result.signal)}): ${stderr.toString('utf8')||stdout.toString('utf8')}`
+            );
+        });
+        void exited.catch(()=>{});
+    }
     void contractServer.report.catch(()=>{});
     let operationTimer=null;
     const timeout=new Promise((_,reject)=>{
@@ -1144,21 +1163,19 @@ if(!ENABLED){
     void timeout.catch(()=>{});
     let report;
     try{
-        report=await Promise.race([contractServer.report,exited,timeout]);
+        report=await Promise.race([
+            contractServer.report,
+            ...(exited?[exited]:[]),
+            timeout
+        ]);
     }finally{
         if(operationTimer!==null)clearTimeout(operationTimer);
     }
-    await new Promise(resolve=>setTimeout(resolve,2_000));
-    assert.equal(
-        chrome.exitCode,
-        null,
-        'The proof-owned Chrome process exited; refusing a report that may have been delegated to an existing profile owner.'
-    );
-    assert.equal(
-        chrome.signalCode,
-        null,
-        'The proof-owned Chrome process was signalled before report acceptance.'
-    );
+    if(chrome){
+        await new Promise(resolve=>setTimeout(resolve,2_000));
+        assert.equal(chrome.exitCode,null,'The proof-owned Chrome process exited before report acceptance.');
+        assert.equal(chrome.signalCode,null,'The proof-owned Chrome process was signalled before report acceptance.');
+    }
     assert.equal(report.ok,true,report.error?.message??'Browser-AI contract failed.');
     assert.deepEqual(report.result.exports,EXACT_EXPORTS);
     assert.equal(report.result.runtime.protocol,'arcane-ai-browser-wasm/2');
