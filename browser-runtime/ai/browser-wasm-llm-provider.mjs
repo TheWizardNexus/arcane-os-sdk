@@ -542,7 +542,6 @@ export function createDbopfsModelStore({
       let completion = manifest;
       if (kind === "legacy") {
         completion = manifestFor(source, manifest.finalUrl ?? source.url, observedBytes);
-        await writeManifest(names.manifest, completion, signal);
       }
       return Object.freeze({
         file: modelFile,

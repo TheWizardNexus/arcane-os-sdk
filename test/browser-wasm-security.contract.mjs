@@ -297,7 +297,7 @@ test('enabled checks require and enforce only their corresponding descriptor fie
     );
 });
 
-test('disabled byte-length checking migrates legacy caches from their actual size',async()=>{
+test('disabled byte-length checking reuses legacy caches without rewriting them',async()=>{
     const directory=observedDirectory();
     const actual=Uint8Array.of(7,8,9);
     const url='https://example.invalid/models/0123456789abcdef/legacy.gguf';
@@ -329,7 +329,8 @@ test('disabled byte-length checking migrates legacy caches from their actual siz
     assert.equal(cached.integrity.state,'unchecked');
     assert.equal(directory.modelReadPasses(),0);
     const completion=await directory.completion();
-    assert.equal(completion.schema,'arcane.ai.browser-wasm.model.v3');
-    assert.equal(completion.observedBytes,actual.byteLength);
-    assert.deepEqual(completion.model,{id:'legacy-unchecked',url});
+    assert.equal(completion.schema,'arcane.ai.browser-wasm.model.v2');
+    assert.equal(completion.observedBytes,undefined);
+    assert.equal(completion.model.id,'legacy-unchecked');
+    assert.equal(completion.model.immutableUrl,url);
 });

@@ -496,11 +496,19 @@ async function cacheSnapshot(table){
     const manifestText=await manifestFile.text();
     const manifest=JSON.parse(manifestText);
     equal(modelFile.size,MODEL.bytes,'DBOPFS model bytes drifted');
-    equal(manifest.schema,'arcane.ai.browser-wasm.model.v3','DBOPFS completion schema drifted');
     equal(manifest.complete,true,'DBOPFS completion marker drifted');
-    equal(manifest.observedBytes,MODEL.bytes,'DBOPFS observed byte metadata drifted');
-    for(const field of ['id','url']){
-        equal(manifest.model?.[field],MODEL[field],'DBOPFS completion authority drifted for '+field);
+    if(manifest.schema==='arcane.ai.browser-wasm.model.v3'){
+        equal(manifest.observedBytes,MODEL.bytes,'DBOPFS observed byte metadata drifted');
+        for(const field of ['id','url']){
+            equal(manifest.model?.[field],MODEL[field],'DBOPFS completion authority drifted for '+field);
+        }
+    }else{
+        equal(manifest.schema,'arcane.ai.browser-wasm.model.v2','DBOPFS completion schema drifted');
+        equal(manifest.model?.id,MODEL.id,'DBOPFS legacy model ID drifted');
+        equal(manifest.model?.name,MODEL_FILE_NAME,'DBOPFS legacy model filename drifted');
+        equal(manifest.model?.immutableUrl,MODEL.url,'DBOPFS legacy model URL drifted');
+        equal(manifest.model?.bytes,MODEL.bytes,'DBOPFS legacy model bytes drifted');
+        equal(manifest.model?.sha256,MODEL.sha256,'DBOPFS legacy model SHA-256 drifted');
     }
     return {modelFile,manifestFile,manifestText,manifest};
 }
