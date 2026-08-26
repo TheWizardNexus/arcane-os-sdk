@@ -592,6 +592,30 @@ test('scanner recognizes only JavaScript module imports and rejects nonliteral d
     );
 });
 
+test('scanner admits only the authenticated speech worker runtime module authority',()=>{
+    assert.deepEqual(
+        scanModuleImports(
+            'const namespace=await import(entry.moduleUrl);',
+            {importer:'sdk/ai/speech-worker-runtime.mjs'}
+        ).imports,
+        []
+    );
+    assert.throws(
+        ()=>scanModuleImports(
+            'const namespace=await import(entry.moduleUrl);',
+            {importer:'sdk/ai/other-worker.mjs'}
+        ),
+        error=>error?.code==='ARCANE_IMPORT_MAP_UNRESOLVED'
+    );
+    assert.throws(
+        ()=>scanModuleImports(
+            'const namespace=await import(configuration.runtime.entry);',
+            {importer:'sdk/ai/speech-worker-runtime.mjs'}
+        ),
+        error=>error?.code==='ARCANE_IMPORT_MAP_UNRESOLVED'
+    );
+});
+
 test('browser remap edges reject query and fragment suffixes that cannot match exact keys',async()=>{
     for(const [specifier,target] of [
         ['event-pubsub?cache=1','sdk/dependencies/event-pubsub/index.js'],

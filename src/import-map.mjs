@@ -19,6 +19,7 @@ const PERSISTENT_CHAT_MODULE='modules/PersistentAIChatSession.js';
 const SDK_BROWSER_ENTRY='sdk/event-manager.mjs';
 const SDK_BROWSER_AI_ENTRY='sdk/ai/browser-wasm.mjs';
 const SDK_BROWSER_SPEECH_ENTRY='sdk/ai/browser-speech.mjs';
+const SDK_BROWSER_SPEECH_WORKER_RUNTIME='sdk/ai/speech-worker-runtime.mjs';
 const SDK_BROWSER_FILES=Object.freeze([
     'sdk/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json',
     'sdk/ai/browser-kokoro-worker.mjs',
@@ -32,7 +33,7 @@ const SDK_BROWSER_FILES=Object.freeze([
     'sdk/ai/internal/sha256.mjs',
     'sdk/ai/model-controller.mjs',
     'sdk/ai/speech-worker-client.mjs',
-    'sdk/ai/speech-worker-runtime.mjs',
+    SDK_BROWSER_SPEECH_WORKER_RUNTIME,
     'sdk/ai/wllama/LICENCE',
     'sdk/ai/wllama/index.mjs',
     'sdk/ai/wllama/llama.cpp-LICENSE',
@@ -729,6 +730,14 @@ function nonliteralDynamic(importer,offset){
     );
 }
 
+function isAuthorizedSpeechRuntimeImport(tokens,index,close,importer){
+    if(importer!==SDK_BROWSER_SPEECH_WORKER_RUNTIME||close!==index+5)return false;
+    const [entry,dot,moduleUrl]=tokens.slice(index+2,close);
+    return entry?.type==='identifier'&&entry.value==='entry'
+        &&dot?.value==='.'
+        &&moduleUrl?.type==='identifier'&&moduleUrl.value==='moduleUrl';
+}
+
 export function scanModuleImports(source,{importer='<module>'}={}){
     if(typeof source!=='string')throw new TypeError('scanModuleImports source must be a string.');
     const tokens=tokenize(source);
@@ -755,6 +764,11 @@ export function scanModuleImports(source,{importer='<module>'}={}){
                     ||commas.length>2
                     ||(commas.length===2
                         &&(commas[1]!==close-1||commas[1]===commas[0]+1))){
+                    if(isAuthorizedSpeechRuntimeImport(tokens,index,close,importer)){
+                        hasModuleSyntax=true;
+                        index=close;
+                        continue;
+                    }
                     nonliteralDynamic(importer,current.start);
                 }
                 hasModuleSyntax=true;
