@@ -22,6 +22,10 @@ const AI_PROVIDER_PROTOCOL = "arcane-ai-provider/2";
 const AI_MODEL_AUTHORITY_PROTOCOL = "arcane-ai-model-authority/1";
 const WEBGPU_ADAPTER_SELECTED_EVENT = "arcane.ai.browser-wasm.webgpu.adapter.selected";
 const WEBGPU_ADAPTER_SELECTION_PROTOCOL = "arcane-ai-webgpu-adapter-selection/1";
+const CHROME_HIGH_PERFORMANCE_GPU_FLAG_URL =
+  "chrome://flags/#force-high-performance-gpu";
+const INTEL_VENDOR_ID = 0x8086;
+let highPerformanceGpuNoticeShown = false;
 
 function fail(code, message, cause) {
   return new ArcaneAIError(code, message, {
@@ -117,23 +121,67 @@ function publicDescriptor(source) {
   return Object.freeze(descriptor);
 }
 
+function isChromeBrowser() {
+  const userAgent = String(globalThis.navigator?.userAgent ?? "");
+  return /\b(?:Chrome|Chromium)\//u.test(userAgent)
+    && !/\b(?:Edg|OPR)\//u.test(userAgent);
+}
+
+function isLowerPowerIntelAdapter(adapter) {
+  if (adapter?.vendorId !== INTEL_VENDOR_ID) return false;
+  const identity = [
+    adapter.vendor,
+    adapter.architecture,
+    adapter.name,
+    adapter.description,
+  ].filter(Boolean).join(" ");
+  return /(?:intel|integrated|xe-lp)/iu.test(identity);
+}
+
+function notifyChromeHighPerformanceGpu(adapter) {
+  if (
+    highPerformanceGpuNoticeShown
+    || !isChromeBrowser()
+    || !isLowerPowerIntelAdapter(adapter)
+  ) return;
+  highPerformanceGpuNoticeShown = true;
+  try {
+    globalThis.open?.(CHROME_HIGH_PERFORMANCE_GPU_FLAG_URL, "_blank", "noopener,noreferrer");
+  } catch {
+    // Chrome may reject internal-page navigation from web content.
+  }
+  const adapterName = adapter.description || adapter.name
+    || [adapter.vendor, adapter.architecture].filter(Boolean).join(" ")
+    || "a lower-power Intel adapter";
+  globalThis.alert?.(
+    `Arcane selected the lower-power WebGPU adapter: ${adapterName}.\n\n`
+    + "Enable “Force High Performance GPU” in the Chrome flags window. "
+    + "Then completely close every Chrome window and reopen Chrome before loading the model again.\n\n"
+    + `If the flags window did not open, paste ${CHROME_HIGH_PERFORMANCE_GPU_FLAG_URL} into Chrome.`,
+  );
+}
+
 function emitWebgpuAdapterSelection(source, runtime) {
   const evidence = runtime.evidence();
   const webgpu = evidence?.webgpu;
   if (webgpu?.observed !== true || !webgpu.adapter) return;
-  arcaneEvents.instrument(WEBGPU_ADAPTER_SELECTED_EVENT, Object.freeze({
-    protocol: WEBGPU_ADAPTER_SELECTION_PROTOCOL,
-    providerId: "arcane-browser-wasm-wllama",
-    modelId: source.id,
-    runtimeEvidenceProtocol: evidence.protocol,
-    adapter: webgpu.adapter,
-    offload: webgpu.offload ?? null,
-    buffers: webgpu.buffers ?? null,
-    queue: webgpu.queue ?? null,
-  }), Object.freeze({
-    source: "sdk:ai/browser-wasm",
-    category: "capability",
-  }));
+  try {
+    arcaneEvents.instrument(WEBGPU_ADAPTER_SELECTED_EVENT, Object.freeze({
+      protocol: WEBGPU_ADAPTER_SELECTION_PROTOCOL,
+      providerId: "arcane-browser-wasm-wllama",
+      modelId: source.id,
+      runtimeEvidenceProtocol: evidence.protocol,
+      adapter: webgpu.adapter,
+      offload: webgpu.offload ?? null,
+      buffers: webgpu.buffers ?? null,
+      queue: webgpu.queue ?? null,
+    }), Object.freeze({
+      source: "sdk:ai/browser-wasm",
+      category: "capability",
+    }));
+  } finally {
+    notifyChromeHighPerformanceGpu(webgpu.adapter);
+  }
 }
 
 function manifestModelIdentity(source) {

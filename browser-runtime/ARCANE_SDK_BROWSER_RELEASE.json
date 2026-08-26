@@ -29,8 +29,8 @@
     ]
   },
   "fileCount": 18,
-  "totalBytes": 9150382,
-  "contentSha256": "d28cc23ae39d9e5da46fedf85367b01da6d318193901ea302333b72c70cda150",
+  "totalBytes": 9152106,
+  "contentSha256": "e0fac48d935b5b6ef64293ee200d6d1e6eeb51f20135999de2e3585d6dbee753",
   "files": [
     {
       "path": "ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json",
@@ -43,8 +43,8 @@
       "path": "ai/browser-wasm-llm-provider.mjs",
       "sourcePath": "browser-runtime/ai/browser-wasm-llm-provider.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 55984,
-      "sha256": "fa34271ae3acf72e80b9ab4de39261dce13017dbaaf1d49d84fea96ec8e804ef"
+      "bytes": 57708,
+      "sha256": "ce92ed09f94a541d6bda17f925f187096a3bb3d936c7e79713e5d679ef2d53e9"
     },
     {
       "path": "ai/browser-wasm.mjs",
