@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "builder": "arcane-sdk-runtime-v1",
-  "sdkVersion": "0.2.0",
+  "sdkVersion": "0.2.1",
   "source": {
     "authority": "sdk-canonical",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
@@ -14,8 +14,8 @@
     }
   },
   "fileCount": 160,
-  "totalBytes": 3549207,
-  "contentSha256": "fa3bcddb5479817971a400049dbeff8431c6499d708e9a8b714176715c5a015a",
+  "totalBytes": 3605154,
+  "contentSha256": "5b921d50b6a0cf36a13f7a7dedf96cd3a68104a322e5139136fd4197aa1ca7cb",
   "files": [
     {
       "path": "arcane/components/app-bar.html",
@@ -39,8 +39,8 @@
     },
     {
       "path": "arcane/components/chat.html",
-      "bytes": 52132,
-      "sha256": "42d4769a074e70b5c2768e850eaf29a25c93ee9e8734724b72b2ad585e19b2ca"
+      "bytes": 61650,
+      "sha256": "d644848fbc3ccc85d491db7ada75231f393a371dd3a0ccd92f223c172571e47b"
     },
     {
       "path": "arcane/components/conversation-view.html",
@@ -374,8 +374,8 @@
     },
     {
       "path": "arcane/modules/AI.js",
-      "bytes": 81061,
-      "sha256": "8e34445ad394064dae970583147b635de81d878a6caebb8a60d64b34dbc9e658"
+      "bytes": 103733,
+      "sha256": "3a051d67b1e895b7c6f14af36a34daf1d92fe70e02c95c1c4ffd80cc7c622561"
     },
     {
       "path": "arcane/modules/AIPreferenceRuntime.js",
@@ -499,8 +499,8 @@
     },
     {
       "path": "arcane/modules/ConfiguredAIChatSession.js",
-      "bytes": 21462,
-      "sha256": "12e02b169be6867d82ef8be75bcb1c2b367e778609e8d065389ed109d896c4c8"
+      "bytes": 24501,
+      "sha256": "f95c3421bf07397e987f77fc3d02166cf780059dd3d6de90ceaded990752f51b"
     },
     {
       "path": "arcane/modules/ConversationActionItems.js",
@@ -534,8 +534,8 @@
     },
     {
       "path": "arcane/modules/DBOPFSDocumentLibrary.js",
-      "bytes": 29977,
-      "sha256": "4c551b5917d1577b8b46b08457cf762d7ab7548222abd6f4a72c7c7ab5c697b7"
+      "bytes": 50695,
+      "sha256": "2831470ce54c3393595bf068d60c2e774804cbd51dba7491ad734bbfbea7f32f"
     },
     {
       "path": "arcane/modules/DBOPFSWorker.js",

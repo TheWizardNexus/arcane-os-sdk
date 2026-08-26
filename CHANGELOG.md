@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.1
+
+- Added explicit selected-unloaded chat activation, truthful legacy Cloud/Core
+  route readiness, and provider-native chat-response normalization without
+  startup downloads, hidden provider selection, or application policy.
+- Normalized shared STT/TTS requests at the browser-speech provider boundary
+  while retaining caller-supplied immutable runtime, model, and voice
+  authorities and fail-closed format, lifecycle, error, and cancellation rules.
+- Applied authenticated dependency import maps to every packaged browser
+  document and published a deterministic browser-readable runtime projection
+  inventory derived from the verified package receipt.
+- Added caller-budgeted complete DBOPFS source evaluation with deterministic
+  zero-score fallback, independent scoring/excerpt/output bounds, and opt-in
+  preserve-readable bootstrap/evaluation read coverage.
+- Bound external workspace validation, packaging, scaffolding, doctor,
+  toolchain, and development serving to one authenticated installed package,
+  including the exact `arcane-sdk@npm:arcane-os@0.2.1` alias form.
+
 ## 0.2.0
 
 - Made the SDK the canonical owner of the portable Arcane runtime and retired

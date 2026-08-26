@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "builder": "arcane-sdk-browser-runtime-v1",
-  "sdkVersion": "0.2.0",
+  "sdkVersion": "0.2.1",
   "source": {
     "authority": "arcane-os-sdk",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
@@ -29,8 +29,8 @@
     ]
   },
   "fileCount": 25,
-  "totalBytes": 9269048,
-  "contentSha256": "d965eaf3ccf12593ae2628e7549794f4efbf1aa4cf56a39f51cc3869f0852671",
+  "totalBytes": 9279974,
+  "contentSha256": "a9715c4b3aef70ec4042e4738089568d6588877b29582e0f758ed83897b6814f",
   "files": [
     {
       "path": "ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json",
@@ -57,8 +57,8 @@
       "path": "ai/browser-speech-providers.mjs",
       "sourcePath": "browser-runtime/ai/browser-speech-providers.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 15056,
-      "sha256": "1eac35e1ca895e8862853a63def2cbf275fbbfe9ee6b1d36573a8dfa5f8924c6"
+      "bytes": 25982,
+      "sha256": "65e0a8da2bcd46b11c3ea2ca496105875977decc53d4e4c94ca56949dbb569b1"
     },
     {
       "path": "ai/browser-speech.mjs",
