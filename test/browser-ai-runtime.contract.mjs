@@ -217,7 +217,7 @@ async function activeWindowsChromeProfileOwners(profile){
     assert.equal(process.platform,'win32','Chrome profile ownership inspection is Windows-only.');
     const script=[
         "$ErrorActionPreference='Stop'",
-        '$target=[IO.Path]::GetFullPath($args[0]).ToLowerInvariant()',
+        '$target=[IO.Path]::GetFullPath($env:ARCANE_BROWSER_AI_PROFILE_INSPECTION_TARGET).ToLowerInvariant()',
         "$owners=@(Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | "+
             'Where-Object { $_.CommandLine -and $_.CommandLine.ToLowerInvariant().Contains($target) } | '+
             'Select-Object -ExpandProperty ProcessId)',
@@ -228,9 +228,12 @@ async function activeWindowsChromeProfileOwners(profile){
         '-NoProfile',
         '-NonInteractive',
         '-Command',
-        script,
-        profile
+        script
     ],{
+        env:{
+            ...process.env,
+            ARCANE_BROWSER_AI_PROFILE_INSPECTION_TARGET:profile
+        },
         stdio:['ignore','pipe','pipe'],
         windowsHide:true
     });
