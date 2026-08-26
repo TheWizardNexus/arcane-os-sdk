@@ -61,8 +61,8 @@ export const BROWSER_WASM_RUNTIME_AUTHORITY = deepFreeze({
     module: {
       path: "ai/wllama/index.mjs",
       url: MODULE_URL,
-      bytes: 389_765,
-      sha256: "ae9a6ba2aa8687785ed651e28ef92573b409d5e6d3470bfd53340225287908b8",
+      bytes: 392_852,
+      sha256: "b119a7cdffabc8541dce283381d18ada4027c0560728aac1fe45bdd30cdac8e2",
       mediaType: "text/javascript",
       projection: {
         protocol: WEBGPU_EVIDENCE_PROTOCOL,

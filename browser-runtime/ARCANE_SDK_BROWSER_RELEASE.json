@@ -30,7 +30,7 @@
   },
   "fileCount": 25,
   "totalBytes": 9269048,
-  "contentSha256": "ba1392154996348e2beb9ffa82c04f2ae1cafeef9781fe33d9e3774510932206",
+  "contentSha256": "d965eaf3ccf12593ae2628e7549794f4efbf1aa4cf56a39f51cc3869f0852671",
   "files": [
     {
       "path": "ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json",
@@ -93,7 +93,7 @@
       "sourcePath": "browser-runtime/ai/browser-wllama-runtime.mjs",
       "provenance": "sdk-source-identity",
       "bytes": 32364,
-      "sha256": "6acc35060af4f519b34ba2eb8ee16abaf38dbe2ad0d003256b61311713984851"
+      "sha256": "f1d1ad5e3dce70fdefba4f112e7f48029f257f65b98b7adce34cd60f5517908a"
     },
     {
       "path": "ai/internal/sha256.mjs",

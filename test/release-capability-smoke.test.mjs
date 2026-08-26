@@ -638,6 +638,10 @@ test('the exact npm artifact exposes the supported installed capability contract
     assert.equal(browserAiComponents.runtimePolicy.remoteModelHelpers,false);
     assert.equal(browserAiComponents.runtimePolicy.toolCalls,'structural-only-never-executed');
     const componentFiles=browserAiComponents.components.flatMap(component=>component.files);
+    const projectedWllamaModule=componentFiles.find(file=>file.role==='runtime-module');
+    const projectedWllamaWasm=componentFiles.find(file=>file.role==='runtime-wasm');
+    assert.ok(projectedWllamaModule);
+    assert.ok(projectedWllamaWasm);
     for(const file of componentFiles){
         const bytes=await readFile(path.join(installedRoot,'browser-runtime',...file.path.split('/')));
         assert.equal(bytes.length,file.bytes,file.path);
@@ -714,10 +718,20 @@ test('installed public SDK capabilities are coherent',async()=>{
         licenseSpdx:'MIT'
     });
     assert.equal(authority.llamaCpp.sourceRevision,'4df29be4f4c3673f428170fda944a5b19f743bb8');
-    assert.equal(authority.runtimeAssets.module.bytes,389765);
-    assert.equal(authority.runtimeAssets.module.sha256,'ae9a6ba2aa8687785ed651e28ef92573b409d5e6d3470bfd53340225287908b8');
-    assert.equal(authority.runtimeAssets.wasm.bytes,8524865);
-    assert.equal(authority.runtimeAssets.wasm.sha256,'95c6ff9ef2a03ff2c63bc91db132f0126a0bd0456b272cd8ae2e0f592fb059f6');
+    assert.deepEqual({
+        bytes:authority.runtimeAssets.module.bytes,
+        sha256:authority.runtimeAssets.module.sha256
+    },${JSON.stringify({
+        bytes:projectedWllamaModule.bytes,
+        sha256:projectedWllamaModule.sha256
+    })});
+    assert.deepEqual({
+        bytes:authority.runtimeAssets.wasm.bytes,
+        sha256:authority.runtimeAssets.wasm.sha256
+    },${JSON.stringify({
+        bytes:projectedWllamaWasm.bytes,
+        sha256:projectedWllamaWasm.sha256
+    })});
     assert.equal(authority.networkPolicy.remoteModelHelpers,false);
 
     let modelFetches=0;

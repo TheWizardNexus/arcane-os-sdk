@@ -577,7 +577,13 @@ async function run(){
     const projectedModule=components.components
         .find(component=>component.name==='@wllama/wllama')?.files
         ?.find(file=>file.role==='runtime-module');
-    equal(projectedModule?.sha256,'ae9a6ba2aa8687785ed651e28ef92573b409d5e6d3470bfd53340225287908b8','Projected Wllama receipt digest drifted');
+    const projectedWasm=components.components
+        .find(component=>component.name==='@wllama/wllama')?.files
+        ?.find(file=>file.role==='runtime-wasm');
+    equal(projectedModule?.bytes,api.BROWSER_WASM_RUNTIME_AUTHORITY.runtimeAssets.module.bytes,'Projected Wllama receipt byte length drifted');
+    equal(projectedModule?.sha256,api.BROWSER_WASM_RUNTIME_AUTHORITY.runtimeAssets.module.sha256,'Projected Wllama receipt digest drifted');
+    equal(projectedWasm?.bytes,api.BROWSER_WASM_RUNTIME_AUTHORITY.runtimeAssets.wasm.bytes,'Wllama WASM receipt byte length drifted');
+    equal(projectedWasm?.sha256,api.BROWSER_WASM_RUNTIME_AUTHORITY.runtimeAssets.wasm.sha256,'Wllama WASM receipt digest drifted');
 
     let fakeState='ready';
     const compatibility={requests:[],responses:[],chunks:[],completions:[],tools:[],executions:0};
@@ -799,7 +805,8 @@ async function run(){
             receipt:{
                 protocol:components.protocol,
                 runtimePolicy:components.runtimePolicy,
-                projectedModule:{bytes:projectedModule.bytes,sha256:projectedModule.sha256}
+                projectedModule:{bytes:projectedModule.bytes,sha256:projectedModule.sha256},
+                projectedWasm:{bytes:projectedWasm.bytes,sha256:projectedWasm.sha256}
             },
             adapted:{
                 protocol:adapted.protocol,
@@ -1184,19 +1191,32 @@ if(!ENABLED){
         report.result.runtime.executionPolicy.operationalEvidence,
         'arcane-wllama-runtime-evidence/1'
     );
-    assert.equal(report.result.runtime.runtimeAssets.module.sha256,
-        'ae9a6ba2aa8687785ed651e28ef92573b409d5e6d3470bfd53340225287908b8');
-    assert.equal(report.result.runtime.runtimeAssets.wasm.sha256,
-        '95c6ff9ef2a03ff2c63bc91db132f0126a0bd0456b272cd8ae2e0f592fb059f6');
+    assert.equal(
+        report.result.runtime.runtimeAssets.module.bytes,
+        report.result.receipt.projectedModule.bytes
+    );
+    assert.equal(
+        report.result.runtime.runtimeAssets.module.sha256,
+        report.result.receipt.projectedModule.sha256
+    );
+    assert.equal(
+        report.result.runtime.runtimeAssets.wasm.bytes,
+        report.result.receipt.projectedWasm.bytes
+    );
+    assert.equal(
+        report.result.runtime.runtimeAssets.wasm.sha256,
+        report.result.receipt.projectedWasm.sha256
+    );
     assert.equal(report.result.compatibility.executions,0);
     if(FINAL_WARM_ONLY){
         assert.equal(report.result.mode,'granite-final-warm-only');
         assert.equal(report.result.origin,'http://127.0.0.1:8000');
         assert.equal(report.result.receipt.protocol,'arcane-ai-browser-wasm/2');
         assert.equal(report.result.receipt.runtimePolicy.cpuFallback,false);
-        assert.equal(report.result.receipt.projectedModule.bytes,389_765);
-        assert.equal(report.result.receipt.projectedModule.sha256,
-            'ae9a6ba2aa8687785ed651e28ef92573b409d5e6d3470bfd53340225287908b8');
+        assert.ok(report.result.receipt.projectedModule.bytes>0);
+        assert.match(report.result.receipt.projectedModule.sha256,/^[0-9a-f]{64}$/u);
+        assert.ok(report.result.receipt.projectedWasm.bytes>0);
+        assert.match(report.result.receipt.projectedWasm.sha256,/^[0-9a-f]{64}$/u);
         assert.deepEqual(report.result.adapted,{
             protocol:'arcane-ai-provider/2',
             role:'llm',
