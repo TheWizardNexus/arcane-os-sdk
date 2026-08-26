@@ -218,8 +218,15 @@ async function activeWindowsChromeProfileOwners(profile){
     const script=[
         "$ErrorActionPreference='Stop'",
         '$target=[IO.Path]::GetFullPath($env:ARCANE_BROWSER_AI_PROFILE_INSPECTION_TARGET).ToLowerInvariant()',
+        "$default=[IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Google\\Chrome\\User Data')).ToLowerInvariant()",
         "$owners=@(Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | "+
-            'Where-Object { $_.CommandLine -and $_.CommandLine.ToLowerInvariant().Contains($target) } | '+
+            'Where-Object { $_.CommandLine -and (& { '+
+                '$command=$_.CommandLine.ToLowerInvariant(); '+
+                '$browserRoot=$command -notmatch "(?i)(?:^|\\s)--type="; '+
+                '$explicitProfile=$command.Contains("--user-data-dir="); '+
+                '$browserRoot -and (($explicitProfile -and $command.Contains($target)) -or '+
+                    '(-not $explicitProfile -and $target -eq $default)) '+
+            '}) } | '+
             'Select-Object -ExpandProperty ProcessId)',
         "[Console]::Out.Write(($owners -join ','))"
     ].join(';');
