@@ -3,14 +3,19 @@
   "builder": "arcane-sdk-runtime-v1",
   "sdkVersion": "0.2.0",
   "source": {
-    "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
-    "commit": "c540014afe69f14cf5ae60493b7295f36dbcec64",
-    "bundleVersion": "0.8.12",
-    "protocol": "arcane/1"
+    "authority": "sdk-canonical",
+    "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
+    "path": "runtime/arcane",
+    "protocol": "arcane/1",
+    "legacyProjection": {
+      "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
+      "commit": "c540014afe69f14cf5ae60493b7295f36dbcec64",
+      "bundleVersion": "0.8.12"
+    }
   },
-  "fileCount": 157,
-  "totalBytes": 3484203,
-  "contentSha256": "3d850ad9c089128ca56ae55e9a9625abe24d7ef67fc7b3d789f0a6464cc11d9d",
+  "fileCount": 160,
+  "totalBytes": 3549207,
+  "contentSha256": "fa3bcddb5479817971a400049dbeff8431c6499d708e9a8b714176715c5a015a",
   "files": [
     {
       "path": "arcane/components/app-bar.html",
@@ -254,8 +259,8 @@
     },
     {
       "path": "arcane/entities/Chat.js",
-      "bytes": 16273,
-      "sha256": "6353af820d4912c8945681effdc9f9787b790a69700b2724be5649639743a90f"
+      "bytes": 25366,
+      "sha256": "20ece4ea4537693c49580dda723e392af152792c25006686ce2f75c7c906984d"
     },
     {
       "path": "arcane/entities/CommunicationMessage.js",
@@ -494,8 +499,8 @@
     },
     {
       "path": "arcane/modules/ConfiguredAIChatSession.js",
-      "bytes": 10582,
-      "sha256": "378559117479eaae4977a127b3dbc02002fcff1768f817a4a5a878b79a04eee3"
+      "bytes": 21462,
+      "sha256": "12e02b169be6867d82ef8be75bcb1c2b367e778609e8d065389ed109d896c4c8"
     },
     {
       "path": "arcane/modules/ConversationActionItems.js",
@@ -528,6 +533,11 @@
       "sha256": "eef077c318032626cf3c455e0619dfd6a729e916c367fd4fffac72c6dcb50745"
     },
     {
+      "path": "arcane/modules/DBOPFSDocumentLibrary.js",
+      "bytes": 29977,
+      "sha256": "4c551b5917d1577b8b46b08457cf762d7ab7548222abd6f4a72c7c7ab5c697b7"
+    },
+    {
       "path": "arcane/modules/DBOPFSWorker.js",
       "bytes": 3928,
       "sha256": "7b3f1b5176431a104a0faa80063577362cc57eef0800212abafc209f7912d14e"
@@ -546,6 +556,11 @@
       "path": "arcane/modules/DirectoryPicker.js",
       "bytes": 3799,
       "sha256": "da1eaab03aa5d5ee64d236b5d6bd11a792c811110a1d57fa43d43e26ff97d169"
+    },
+    {
+      "path": "arcane/modules/DocumentLexicalSearch.js",
+      "bytes": 12977,
+      "sha256": "f83a8428e5080cd61bbecac39104a768457d4c7b4825acaf9add9286c6b84b09"
     },
     {
       "path": "arcane/modules/DocumentNavigation.js",
@@ -643,6 +658,11 @@
       "sha256": "2e3f8b07c6e0acb1ebf8e1327b208242dff9c55abdd6bedc288abf6692caf43d"
     },
     {
+      "path": "arcane/modules/PersistentAIChatSession.js",
+      "bytes": 10890,
+      "sha256": "4bb4980e09f3cfcf20ca7c5130e1e133042554b8e1fae4fd613e0e2a9acdbee0"
+    },
+    {
       "path": "arcane/modules/PreferenceStore.js",
       "bytes": 3794,
       "sha256": "17367ac985d23badd8f374fc47741c0ab5b9abb8431b4c853c14e3f69cd5771e"
@@ -704,8 +724,8 @@
     },
     {
       "path": "arcane/modules/StaticDocumentCatalog.js",
-      "bytes": 56002,
-      "sha256": "ec512ec054d2fdc1d7ced29d1038257bb6f9872920f442376b906783f12bb6e1"
+      "bytes": 47189,
+      "sha256": "002ab228c2ec80006c6365eb5bbdde33e5951c7424ca15aa16b4d9663bcc77f8"
     },
     {
       "path": "arcane/modules/SystemAppearance.js",

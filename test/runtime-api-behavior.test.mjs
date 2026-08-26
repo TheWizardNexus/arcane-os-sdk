@@ -40,6 +40,7 @@ import {
     AIProviderRuntime,
     getAIProviderRuntime
 } from '../runtime/arcane/modules/AIProviderRuntime.js';
+import ConfiguredAIChatSession from '../runtime/arcane/modules/ConfiguredAIChatSession.js';
 
 const readyEvents=[];
 const previousDispatchEvent=globalThis.dispatchEvent;
@@ -74,6 +75,99 @@ function runtimeRoleState(role, overrides = {}) {
         ...overrides
     };
 }
+
+test('configured chat accepts bounded initial history and keeps request context transient',async()=>{
+    const requests=[];
+    const controller=new AbortController();
+    const session=new ConfiguredAIChatSession({
+        chat:async request=>{
+            requests.push(request);
+            return {message:{role:'assistant',content:'current response'}};
+        },
+        contextBuilder:async({signal})=>{
+            assert.equal(signal,controller.signal);
+            return 'request-only context';
+        },
+        initialMessages:[
+            {role:'user',content:'prior request'},
+            {role:'assistant',content:'prior response'},
+        ],
+    });
+    await session.send('current request',{signal:controller.signal});
+    assert.ok(requests[0].messages.some(message=>message.content==='prior request'));
+    assert.ok(requests[0].messages.some(message=>String(message.content).includes('request-only context')));
+    assert.ok(!session.history().some(message=>String(message.content).includes('request-only context')));
+
+    const aborted=new AbortController();
+    aborted.abort();
+    await assert.rejects(
+        session.send('never sent',{signal:aborted.signal}),
+        error=>error?.code==='AI_CHAT_ABORTED',
+    );
+});
+
+test('configured chat round-trips structural tool context and keeps prepared turns rollback-safe',async()=>{
+    const requests=[];
+    const session=new ConfiguredAIChatSession({
+        chat:async request=>{
+            requests.push(structuredClone(request));
+            return {message:{role:'assistant',content:'tool result accepted'}};
+        },
+        initialMessages:[
+            {role:'user',content:'lookup alpha'},
+            {
+                role:'assistant',
+                content:'',
+                tool_calls:[{
+                    id:'lookup-1',
+                    type:'function',
+                    function:{name:'lookup',arguments:'{"id":"alpha"}'},
+                }],
+            },
+        ],
+        maxMessageCharacters:256,
+    });
+    const prepared=await session.prepare({
+        role:'tool',
+        content:'{"title":"Alpha"}',
+        tool_call_id:'lookup-1',
+    });
+    assert.equal(requests[0].messages.at(-2).tool_calls[0].id,'lookup-1');
+    assert.equal(requests[0].messages.at(-1).role,'tool');
+    prepared.rollback();
+    assert.ok(!session.history().some(message=>message.role==='tool'));
+    await assert.rejects(
+        session.send('skip the pending tool'),
+        error=>error?.code==='AI_CHAT_TOOL_RESULT_REQUIRED',
+    );
+
+    assert.throws(
+        ()=>new ConfiguredAIChatSession({
+            initialMessages:[
+                {role:'user',content:'invoke tools'},
+                {
+                    role:'assistant',
+                    content:'',
+                    tool_calls:[
+                        {id:'one',type:'function',function:{name:'lookup',arguments:'{}'}},
+                        {id:'two',type:'function',function:{name:'lookup',arguments:'{}'}},
+                    ],
+                },
+            ],
+        }),
+        /exactly one structural tool call/u,
+    );
+
+    const prefixed=new ConfiguredAIChatSession({
+        chat:async()=>({message:{role:'assistant',content:'unused'}}),
+        contextBuilder:async()=>'.'.repeat(256),
+        maxMessageCharacters:256,
+    });
+    await assert.rejects(
+        prefixed.send('context overflow'),
+        error=>error?.code==='AI_CHAT_CONTEXT_LIMIT',
+    );
+});
 
 test('the Arcane Ollama module publishes one immutable complete browser surface',()=>{
     assert.equal(ollama,exportedOllama);

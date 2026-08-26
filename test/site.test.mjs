@@ -1401,7 +1401,7 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         );
         assert.equal(lock.sdk.version,'0.1.2');
         assert.equal(lock.runtime.contentSha256,runtimeRelease.contentSha256);
-        assert.equal(lock.runtime.upstreamCommit,runtimeRelease.source.commit);
+        assert.equal(lock.runtime.upstreamCommit,runtimeRelease.source.legacyProjection.commit);
         assert.equal(lock.protocols.arcane,runtimeRelease.source.protocol);
     });
     await t.test('maps and inventories the documented Arcane runtime exactly',async()=>{
@@ -1440,7 +1440,7 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         }
         await visit(path.join(exampleRoot,'arcane'));
         physicalPaths.sort();
-        assert.equal(physicalPaths.length,173);
+        assert.equal(physicalPaths.length,185);
         assert.deepEqual(physicalPaths,expectedPaths);
         for(const file of expectedRecords){
             const bytes=await readFile(path.join(exampleRoot,'arcane',...file.path.split('/')));
@@ -1458,10 +1458,14 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         );
         const importMap=JSON.parse(artifact);
         assert.deepEqual(Object.keys(importMap),['imports']);
-        assert.equal(Object.keys(importMap.imports).length,86);
+        assert.equal(Object.keys(importMap.imports).length,91);
         assert.equal(
             importMap.imports['arcane-os/ai/browser-wasm'],
             './arcane/sdk/ai/browser-wasm.mjs'
+        );
+        assert.equal(
+            importMap.imports['arcane-os/ai/browser-speech'],
+            './arcane/sdk/ai/browser-speech.mjs'
         );
         const generated=await buildImportMap({
             files:expectedPaths,
@@ -1469,7 +1473,7 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
                 exampleRoot,'arcane',...relative.split('/')
             ))
         });
-        assert.equal(generated.entryCount,86);
+        assert.equal(generated.entryCount,91);
         assert.deepEqual(importMap.imports,generated.imports);
         const expectedPathSet=new Set(expectedPaths);
         for(const [specifier,target] of Object.entries(importMap.imports)){

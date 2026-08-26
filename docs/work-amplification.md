@@ -50,15 +50,14 @@ format, or signing loop and does not produce app output.
 
 - Scaffold: approximately 15-25 files, less than 100 KiB, target under one
   second before an optional dependency installation.
-- Shared browser payload: 166 files / 3,478,345 bytes, comprising the exact
-  155-file / 3,320,994-byte transitional compatibility-runtime receipt, the
-  separate 8-file / 118,385-byte SDK browser-runtime receipt, and three SDK
-  licensing files / 38,966 bytes, verified once per exact SDK installation
+- Shared browser payload: 188 files / 12,854,565 bytes, comprising the exact
+  160-file / 3,549,207-byte SDK-canonical runtime receipt, the separate
+  25-file / 9,265,304-byte SDK browser-runtime receipt, and three SDK licensing
+  files / 40,054 canonical LF bytes, verified once per exact SDK installation
   state.
-  The SDK is the canonical owner of portable shared runtime. Any Arcane OS
-  source identity still carried by the compatibility receipt is migration
-  provenance, not enduring source authority; the SDK-owned projection cutover
-  replaces that direction without multiplying payload verification.
+  The SDK is the canonical owner of portable shared runtime. The receipt keeps
+  the prior Arcane OS identity only as migration provenance and binds the
+  SDK-owned inventory once without multiplying payload verification.
 - Small browser package: app bytes plus the shared runtime, copied and inventoried
   once into an atomic staging directory.
 - Portable build: one explicitly selected app and one host platform request. In

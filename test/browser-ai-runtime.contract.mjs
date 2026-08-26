@@ -620,6 +620,24 @@ async function run(){
         onResponse:(response,id)=>compatibility.responses.push({id,responseId:response.id})
     });
     equal(fetched.id,'boss-fetch-request','fetchRequest did not preserve its request ID');
+    const persistentChat=await compatibilityAi.createChatSession({
+        memory:false,
+        systemPrompt:'Use the same configured Arcane AI controller.'
+    });
+    const persistentResult=await persistentChat.send({
+        message:{content:'session-only compatibility',persist:false},
+        response:{persist:false}
+    });
+    equal(
+        persistentResult.message.content,
+        'compatibility response',
+        'createChatSession did not use the owning Arcane AI controller'
+    );
+    equal(
+        persistentChat.chatEntity.messages.some(message=>message.content==='session-only compatibility'),
+        true,
+        'Session-only chat input did not remain in recurring context'
+    );
     const toolResult=await compatibilityAi.streamRequest({
         id:'boss-stream-request',
         localOnly:true,

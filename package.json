@@ -14,6 +14,7 @@
     "./events": "./src/events.mjs",
     "./event-manager": "./src/event-manager.mjs",
     "./ai/browser-wasm": "./browser-runtime/ai/browser-wasm.mjs",
+    "./ai/browser-speech": "./browser-runtime/ai/browser-speech.mjs",
     "./testing": "./src/testing.mjs",
     "./targets": "./src/targets/index.mjs",
     "./native": "./src/native-plan.mjs",
@@ -32,6 +33,9 @@
     "./schemas/target-adapter.json": "./schemas/target-adapter.schema.json",
     "./package.json": "./package.json"
   },
+  "imports": {
+    "#arcane/persistent-ai-chat-session": "./runtime/arcane/modules/PersistentAIChatSession.js"
+  },
   "files": [
     "bin/",
     "browser-runtime/",
@@ -49,7 +53,7 @@
     "test": "npm run test:unit && npm run test:functional && npm run test:integration && npm run test:regression",
     "test:release": "node ./bin/arcane-test.mjs test/npm-release.test.mjs",
     "test:unit": "node ./bin/arcane-test.mjs test/app-descriptor.test.mjs test/app-schema.test.mjs test/contracts.test.mjs test/doctor.test.mjs test/targets.test.mjs test/workspace-operation-lock.test.mjs",
-    "test:functional": "node ./bin/arcane-test.mjs test/cli.test.mjs test/dev-server.test.mjs test/dom-event-instrumentation.test.mjs test/event-manager.test.mjs test/events.test.mjs test/import-map.test.mjs test/packaging.test.mjs test/reference-completeness.test.mjs test/runtime-api-behavior.test.mjs test/runtime-sync.test.mjs test/runtime.test.mjs test/scaffold.test.mjs test/site.test.mjs test/update-check.test.mjs",
+    "test:functional": "node ./bin/arcane-test.mjs test/browser-speech-providers.test.mjs test/cli.test.mjs test/dbopfs-document-library.test.mjs test/dev-server.test.mjs test/dom-event-instrumentation.test.mjs test/event-manager.test.mjs test/events.test.mjs test/import-map.test.mjs test/packaging.test.mjs test/persistent-ai-chat-session.test.mjs test/reference-completeness.test.mjs test/runtime-api-behavior.test.mjs test/runtime-sync.test.mjs test/runtime.test.mjs test/scaffold.test.mjs test/site.test.mjs test/update-check.test.mjs",
     "test:integration": "node ./bin/arcane-test.mjs test/integrated-shared.test.mjs test/integrated-workspace.test.mjs test/native-plan.test.mjs test/native-provider-loader.test.mjs test/npm-release.test.mjs test/release-bundle.test.mjs test/release-capability-smoke.test.mjs test/shared-payload-batch.test.mjs test/tarball.test.mjs test/wllama-webgpu-runtime.test.mjs",
     "test:regression": "node ./bin/arcane-test.mjs test/channel-workflows.test.mjs test/native-provider-generation.test.mjs test/testing.test.mjs test/test-sets.test.mjs",
     "check": "node tools/check-source.mjs && node tools/runtime-manifest.mjs --verify && node tools/sdk-browser-runtime-manifest.mjs --verify && npm test",

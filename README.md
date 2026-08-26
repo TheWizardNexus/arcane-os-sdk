@@ -19,11 +19,9 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This is development software. Version `0.1.0-dev.5` synchronizes the Arcane
-`0.8.12` runtime, but it is not a production or release-candidate claim. It has
-only the `dev` channel contract; query `npm view arcane-os@dev version` for
-current registry availability. Registry state is deliberately not baked into
-the immutable package documentation.
+This checkout defines the `0.2.0` SDK contract. Applications pin one exact npm
+version and lockfile; registry state is deliberately not baked into immutable
+application artifacts.
 
 That registry query is a maintainer action, not an application behavior. Apps
 never poll npm for SDK updates or replace their own SDK or synchronized runtime.
@@ -61,42 +59,80 @@ before enabling DOM values, node content, event details, source stacks, or live
 event redispatch. Password targets, text-entry details, clipboard data, URL
 attributes, and common credential keys are excluded or redacted by default.
 
-## Runtime source ownership and transitional synchronization
+## Runtime source ownership
 
 The SDK repository is the canonical source for portable shared runtime modules,
 entities, components, themes, browser providers and workers, public contracts,
-and their packaged byte receipts. Arcane OS and every other application consume
-those SDK-owned paths; a portable application never reads an Arcane OS install
-or source checkout at runtime.
+and their packaged byte receipts. Portable applications consume those
+SDK-owned paths and never read an Arcane OS install or source checkout at
+runtime. Arcane OS is a consumer of this contract; its repository-side cutover
+is coordinated separately and cannot become a second source authority.
 
-The current OS-to-SDK synchronization command remains a transitional provenance
-path for compatibility bytes that have not completed the SDK-owned projection
-cutover. It validates the selected Arcane checkout, its exact machine-bundle
-version, the dependency lock, and the fixed shared-payload selection before
-replacing those transitional bytes:
+The source-authority cutover is complete. `runtime/arcane/` is authored here,
+and its generated manifest authenticates the complete portable inventory. The
+old Arcane OS-to-SDK synchronization direction is retired and fails closed; it
+cannot overwrite SDK-canonical source. Regenerate the receipt only after an
+authorized SDK source change:
 
 ```bash
-npm run runtime:sync -- --arcane-root /path/to/canonical/ARCANE-OS
 node tools/runtime-manifest.mjs --write
 npm run check
 ```
 
-`tools/runtime-source.json` records the reviewed provenance of that existing
-snapshot; it is not durable source ownership for reusable portable code. Do not
-use the transitional sync to overwrite SDK-canonical shared AI startup/runtime
-contracts or shared chat/speech components. The separately leased source
-cutover replaces this direction with an authenticated SDK-owned source and
-projection model, after which Arcane OS consumes the same locked SDK bytes as
-other applications. The generated runtime manifest remains the published byte
-receipt throughout the migration.
+`tools/runtime-source.json` declares the SDK authority and retains the prior
+Arcane OS commit only as legacy provenance for migrated compatibility bytes.
+Arcane OS must consume the same locked SDK projection as other applications;
+any remaining OS-side duplicate is legacy consumer migration state, not source
+authority. The generated runtime manifest is the published content-addressed
+byte receipt.
+
+## Browser-local AI
+
+`arcane-os/ai/browser-wasm` provides the shared Wllama LLM provider. The app
+supplies its model catalog; the SDK does not hard-code Granite or any other app
+profile. Each descriptor uses one ordered `files` array, so monolithic and
+split GGUF models share the same contract:
+
+```js
+const source=createBrowserModelSource({
+    id:'app-model',
+    files:[
+        {name:'model-00001-of-00002.gguf',url:'https://models.example/one.gguf'},
+        {name:'model-00002-of-00002.gguf',url:'https://models.example/two.gguf'}
+    ]
+});
+```
+
+Expected `bytes` and `sha256` values are optional while the inherited app
+security policy leaves those checks disabled. Enabling either check requires
+that field on every member. The DBOPFS store admits all members in order and
+commits its completion manifest last. Capability reports evaluate each
+app-supplied model as `compatible`, `incompatible`, or `unknown`; the app can
+render that result without the SDK inventing or filtering its catalog.
+
+`arcane-os/ai/browser-speech` exposes independent Whisper STT and Kokoro TTS
+provider factories. The package contains the plain-JavaScript provider and
+Worker machinery, not speech runtimes, models, voices, or a CDN default. An app
+must supply each immutable runtime/model authority explicitly. Speech roles
+load, cancel, unload, fail, and recover independently, so speech failure never
+silently falls back or prevents text chat.
+
+The SDK runtime also owns `DBOPFSDocumentLibrary`,
+`DocumentLexicalSearch`, and `PersistentAIChatSession`. Document bootstrap is
+schema-driven and explicit; chat never searches a corpus unless the app wires
+that library into the request context builder. Persistent chat automatically
+maintains recurring model context and `ChatEntity` history/memory. A turn may
+set `persist:false` to remain in the current session context without entering
+durable chat or memory. `createArcaneAI(...).createChatSession(options)` wires
+that session to the same selected LLM controller, creates its `ChatEntity`, and
+uses the same controller for automatic memory extraction.
 
 ## Install
 
-After the development package is published under the npm `dev` tag, create a
-new repository-shaped Arcane application:
+Create a new repository-shaped Arcane application with the exact stable SDK:
 
 ```bash
-npx arcane-os@dev new my-app --path ./my-app --target portable --git
+npx arcane-os@0.2.0 new my-app --path ./my-app --target portable --git
 cd my-app
 npm install
 npm run check
@@ -107,7 +143,7 @@ To enroll an existing repository, install the exact SDK and initialize only
 missing Arcane files:
 
 ```bash
-npm install --save-dev --save-exact arcane-os@dev
+npm install --save-dev --save-exact arcane-os@0.2.0
 npm exec -- arcane init my-app --target portable
 ```
 
@@ -123,7 +159,7 @@ npm exec -- arcane-os targets
 No global SDK install or standalone Arcane CLI is required. The application
 repository's exact npm dependency and lockfile own the CLI and toolchain version.
 
-Use `npx arcane-os@dev` for the initial bootstrap because it names this npm
+Use `npx arcane-os@0.2.0` for the initial bootstrap because it names this npm
 package explicitly; bare `npx arcane` outside an installed project could resolve
 a different package. Both installed commands invoke the same headless toolchain.
 Project-local npm scripts use the SDK pinned by that app's `package-lock.json`,
@@ -144,7 +180,7 @@ node ./bin/arcane.mjs new local-app --path ../local-app --target portable --git
 
 # From the generated app repository
 cd ../local-app
-npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.1.0-dev.5.tgz
+npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.2.0.tgz
 npm run check
 npm ci
 ```
@@ -154,9 +190,9 @@ same location. npm records its integrity in `package-lock.json`, while Arcane
 still verifies the installed package name and exact version, the locked runtime
 identity, and the runtime bytes. Local directory `file:` dependencies are not
 accepted because npm may install them as links; use a packed `.tgz`. A GitHub
-runner also needs that tarball at the locked path. When the registry exposes
-`arcane-os@dev`, replace the local declaration with the exact registry package
-and commit the regenerated lock.
+runner also needs that tarball at the locked path. After publication, replace
+the local declaration with the exact `arcane-os@0.2.0` registry package and
+commit the regenerated lock.
 
 Generated repositories use `npm ci --ignore-scripts` in CI. Run dependency
 installation once and commit `package-lock.json` before enabling that workflow.
@@ -268,7 +304,7 @@ recorded length through a final identity check; an appended byte, concurrent
 growth, path replacement, or hard link fails closed. NFC paths use defined
 UTF-8 byte ordering, covered by one pinned golden bundle digest on every
 supported Node/runner combination. This SDK accepts only the explicitly listed
-`0.1.0-dev.5` bundle generation; structural validity does not imply cross-SDK
+`0.2.0` bundle generation; structural validity does not imply cross-SDK
 compatibility, and a release with zero payload bytes cannot be created. Portable
 path validation rejects file/directory prefix conflicts, case-colliding prefix
 spellings, and Windows device aliases including superscript COM/LPT digits.
@@ -314,7 +350,7 @@ package installation, or assertions.
 
 ## Current target support
 
-Version `0.1.0-dev.5` exposes one browser target and five explicitly paired
+Version `0.2.0` exposes one browser target and five explicitly paired
 native development targets: a verified non-runnable portable directory, a
 Windows x64 unsigned-local-test EXE bundle, Linux x64 and Linux ARM64
 unsigned-local-test DEBs, and an Android development-signed APK. The

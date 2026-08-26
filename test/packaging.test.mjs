@@ -432,7 +432,7 @@ test('authenticated external package refreshes maps and preserves both runtime a
     ));
     assert.deepEqual(distMapBytes,sourceMapBytes);
     const sourceMap=JSON.parse(sourceMapBytes.toString('utf8'));
-    assert.equal(Object.keys(sourceMap.imports).length,86);
+    assert.equal(Object.keys(sourceMap.imports).length,91);
     assert.equal(
         sourceMap.imports['./node_modules/strong-type/index.js'],
         './arcane/dependencies/strong-type/index.js'
@@ -441,6 +441,14 @@ test('authenticated external package refreshes maps and preserves both runtime a
     assert.equal(
         sourceMap.imports['arcane-os/ai/browser-wasm'],
         './arcane/sdk/ai/browser-wasm.mjs'
+    );
+    assert.equal(
+        sourceMap.imports['arcane-os/ai/browser-speech'],
+        './arcane/sdk/ai/browser-speech.mjs'
+    );
+    assert.equal(
+        sourceMap.imports['#arcane/persistent-ai-chat-session'],
+        './arcane/modules/PersistentAIChatSession.js'
     );
     assert.equal(
         sourceMap.imports['event-pubsub'],

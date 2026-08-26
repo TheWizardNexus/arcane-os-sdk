@@ -47,8 +47,8 @@ const TASKKILL_TIMEOUT_MS=3_000;
 const TASKKILL_DRAIN_TIMEOUT_MS=2_000;
 const CHROME_DRAIN_TIMEOUT_MS=5_000;
 const PROFILE_CLEANUP_TIMEOUT_MS=5_000;
-const EXPECTED_IMPORT_COUNT=86;
-const EXPECTED_ARCANE_FILE_COUNT=173;
+const EXPECTED_IMPORT_COUNT=91;
+const EXPECTED_ARCANE_FILE_COUNT=185;
 const HOSTILE_DEPENDENCY_PATHS=Object.freeze([
     'node_modules/event-pubsub/index.js',
     'node_modules/event-pubsub/package.json',
@@ -169,6 +169,14 @@ async function paritySnapshot(root){
         './arcane/sdk/ai/browser-wasm.mjs'
     );
     assert.equal(
+        map.imports['arcane-os/ai/browser-speech'],
+        './arcane/sdk/ai/browser-speech.mjs'
+    );
+    assert.equal(
+        map.imports['#arcane/persistent-ai-chat-session'],
+        './arcane/modules/PersistentAIChatSession.js'
+    );
+    assert.equal(
         map.imports['event-pubsub'],
         './arcane/sdk/dependencies/event-pubsub/index.js'
     );
@@ -279,7 +287,8 @@ try{
         fileModule,
         chatModule,
         userModule,
-        browserAiModule
+        browserAiModule,
+        browserSpeechModule
     ]=await Promise.all([
         import('arcane-os/event-manager'),
         import('arcane/DBOPFS'),
@@ -288,7 +297,8 @@ try{
         import('../../../arcane/entities/File.js'),
         import('../../../arcane/entities/Chat.js'),
         import('arcane/entities/User'),
-        import('arcane-os/ai/browser-wasm')
+        import('arcane-os/ai/browser-wasm'),
+        import('arcane-os/ai/browser-speech')
     ]);
     const {ARCANE_EVENT_STACK_PROTOCOL,createEventManager}=eventManagerModule;
     const {default:DBOPFS}=dbopfsModule;
@@ -298,6 +308,11 @@ try{
     const {default:ChatEntity}=chatModule;
     const {default:UserEntity}=userModule;
     const {BROWSER_WASM_RUNTIME_AUTHORITY}=browserAiModule;
+    requireCondition(
+        typeof browserSpeechModule.createBrowserWhisperProvider==='function'
+            &&typeof browserSpeechModule.createBrowserKokoroProvider==='function',
+        'The authenticated browser-speech entry did not expose both provider factories.'
+    );
     const constructors={
         DBOPFS:typeof DBOPFS,
         MD:typeof MD,

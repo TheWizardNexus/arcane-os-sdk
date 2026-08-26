@@ -1,0 +1,332 @@
+import assert from 'node:assert/strict';
+
+import test from '../src/testing.mjs';
+
+function chatDB(){
+    const tables=new Map();
+    let nextFailure=null;
+    const table=name=>{
+        if(!tables.has(name)) tables.set(name,new Map());
+        return tables.get(name);
+    };
+    return {
+        async delete(tableName,key){table(tableName).delete(key);return true;},
+        async get(tableName,key){
+            const value=table(tableName).get(key)??null;
+            if(value===null||!key.endsWith('.jsonl')) return value;
+            return String(value).split('\n').filter(Boolean).map(row=>JSON.parse(row));
+        },
+        async getAllKeys(tableName){return [...table(tableName).keys()];},
+        failNext(error=new Error('synthetic persistence failure')){nextFailure=error;},
+        raw(tableName,key){return table(tableName).get(key)??null;},
+        async set(tableName,key,value,append=false){
+            if(nextFailure){const error=nextFailure;nextFailure=null;throw error;}
+            const serialized=typeof value==='string'?value:JSON.stringify(value);
+            table(tableName).set(key,append?String(table(tableName).get(key)??'')+serialized:serialized);
+            return value;
+        },
+    };
+}
+
+const db=chatDB();
+const windowTarget=new EventTarget();
+windowTarget.dbopfs=db;
+windowTarget.ai={ready:false};
+globalThis.window=windowTarget;
+globalThis.dbopfs=db;
+let memoryFetchCount=0;
+globalThis.ai={fetch:async()=>{
+    memoryFetchCount++;
+    return {choices:[{message:{content:''}}]};
+}};
+
+const {default:PersistentAIChatSession}=await import(
+    '../runtime/arcane/modules/PersistentAIChatSession.js?persistent-session-contract'
+);
+const {createArcaneAI}=await import(
+    '../browser-runtime/ai/browser-wasm.mjs?persistent-session-contract'
+);
+
+test('persistent chat retains transient turns in recurring context without writing them',async()=>{
+    const requests=[];
+    const session=await PersistentAIChatSession.create({
+        chat:async request=>{
+            requests.push(structuredClone(request));
+            return {message:{role:'assistant',content:`reply-${requests.length}`}};
+        },
+        contextBuilder:async({input})=>`retrieved only for ${input}`,
+        memory:false,
+        systemPrompt:'system',
+    });
+
+    await session.send({
+        message:{content:'transient analysis',persist:false},
+        response:{persist:false},
+    });
+    assert.equal(db.raw('chats',session.fileName),null);
+
+    await session.send({message:{content:'durable question'}});
+    const secondMessages=requests[1].messages;
+    assert.ok(secondMessages.some(message=>message.content==='transient analysis'));
+    assert.ok(secondMessages.some(message=>message.content==='reply-1'));
+    assert.equal(
+        secondMessages.filter(message=>String(message.content).includes('retrieved only for')).length,
+        1,
+    );
+    const durable=String(db.raw('chats',session.fileName));
+    assert.doesNotMatch(durable,/transient analysis/u);
+    assert.doesNotMatch(durable,/reply-1/u);
+    assert.match(durable,/durable question/u);
+    assert.match(durable,/reply-2/u);
+
+    const history=await session.history();
+    assert.ok(history.some(message=>message.content==='transient analysis'));
+    assert.ok(!history.some(message=>String(message.content).includes('retrieved only for')));
+});
+
+test('response persistence inherits message persistence and rejects incoherent mixed turns',async()=>{
+    const session=await PersistentAIChatSession.create({
+        chat:async()=>({message:{role:'assistant',content:'independent response'}}),
+        memory:false,
+    });
+    await session.send({message:{content:'not durable',persist:false}});
+    assert.equal(db.raw('chats',session.fileName),null);
+
+    await assert.rejects(
+        session.send({
+            message:{content:'transient request',persist:false},
+            response:{persist:true},
+        }),
+        error=>error?.code==='AI_CHAT_INCOHERENT_PERSISTENCE',
+    );
+    assert.throws(
+        ()=>session.chatEntity.addTurn({
+            assistantMessage:{role:'assistant',content:'orphan response'},
+            messagePersist:false,
+            requestMessage:{role:'user',content:'transient request'},
+            responsePersist:true,
+        }),
+        /must match/u,
+    );
+    assert.throws(
+        ()=>session.chatEntity.addTurn({
+            assistantMessage:{
+                role:'assistant',
+                content:'',
+                tool_calls:[
+                    {id:'one',type:'function',function:{name:'lookup',arguments:'{}'}},
+                    {id:'two',type:'function',function:{name:'lookup',arguments:'{}'}},
+                ],
+            },
+            requestMessage:{role:'user',content:'invoke tools'},
+        }),
+        /exactly one structural tool call/u,
+    );
+});
+
+test('disabled ChatEntity persistence suppresses automatic memory extraction',async()=>{
+    const before=memoryFetchCount;
+    const session=await PersistentAIChatSession.create({
+        chat:async()=>({message:{role:'assistant',content:'session-only response'}}),
+        memory:true,
+    });
+    session.chatEntity.persist=false;
+    await session.send({message:{content:'session-only request'}});
+    await Promise.resolve();
+    assert.equal(memoryFetchCount,before);
+    assert.equal(db.raw('chats',session.fileName),null);
+    assert.deepEqual(await db.getAllKeys('memories'),[]);
+});
+
+test('persistent chat uses its configured provider for automatic memory',async()=>{
+    const requests=[];
+    const session=await PersistentAIChatSession.create({
+        chat:async request=>{
+            requests.push(structuredClone(request));
+            if(String(request.messages?.[0]?.content).startsWith('Create a concise memory note')){
+                return {message:{role:'assistant',content:'The user prefers persistent local chats.'}};
+            }
+            return {message:{role:'assistant',content:'provider response'}};
+        },
+        memory:true,
+    });
+    await session.send({message:{content:'Remember that I prefer persistent local chats.'}});
+    await session.settleMemory();
+    assert.equal(requests.length,2);
+    assert.match(requests[1].messages[0].content,/memory note/u);
+    const memory=JSON.parse(String(db.raw('memories',`memory-${session.fileName}`)));
+    assert.equal(memory.memory,'The user prefers persistent local chats.');
+});
+
+test('createArcaneAI adapts controller completions and owns serial automatic memory',async()=>{
+    const operations=[];
+    const provider={
+        protocol:'arcane-ai-adapter/1',
+        capabilities:()=>Object.freeze({localOnly:true}),
+        status:()=>Object.freeze({state:'ready',loaded:true}),
+        async load(){},
+        async unload(){},
+        async chat(request){
+            const memory=String(request.messages?.[0]?.content).startsWith(
+                'Create a concise memory note'
+            );
+            operations.push(memory?'memory':`chat:${request.messages.at(-1).content}`);
+            await Promise.resolve();
+            return {
+                choices:[{
+                    index:0,
+                    finish_reason:'stop',
+                    message:{
+                        role:'assistant',
+                        content:memory
+                            ?'The user uses the SDK-owned persistent chat factory.'
+                            :'factory response',
+                    },
+                }],
+                usage:{prompt_tokens:4,completion_tokens:2},
+            };
+        },
+    };
+    const ai=createArcaneAI({provider,loadPolicy:'manual'});
+    const session=await ai.createChatSession({memory:true});
+    const first=await session.send({message:{content:'remember the SDK chat factory'}});
+    assert.equal(first.message.content,'factory response');
+    await session.send({message:{content:'second turn'}});
+    await session.settleMemory();
+    assert.deepEqual(operations,[
+        'chat:remember the SDK chat factory',
+        'memory',
+        'chat:second turn',
+        'memory',
+    ]);
+});
+
+test('fresh named chat preserves and persists its configured system prompt',async()=>{
+    const chatFileName='fresh-named-chat.jsonl';
+    const session=await PersistentAIChatSession.create({
+        chat:async()=>({message:{role:'assistant',content:'named response'}}),
+        chatFileName,
+        memory:false,
+        systemPrompt:'Persist this named chat system prompt.',
+    });
+    await session.send({message:{content:'first named turn'}});
+    const durable=String(db.raw('chats',chatFileName));
+    assert.match(durable,/Persist this named chat system prompt\./u);
+    assert.match(durable,/first named turn/u);
+});
+
+test('automatic memory waits for a structural tool result and final response',async()=>{
+    const requests=[];
+    const session=await PersistentAIChatSession.create({
+        chat:async request=>{
+            requests.push(structuredClone(request));
+            if(String(request.messages?.[0]?.content).startsWith('Create a concise memory note')){
+                return {message:{role:'assistant',content:'The user completed a tool-backed turn.'}};
+            }
+            if(requests.length===1){
+                return {message:{
+                    role:'assistant',
+                    content:'',
+                    tool_calls:[{
+                        id:'memory-tool-1',
+                        type:'function',
+                        function:{name:'lookup',arguments:'{}'},
+                    }],
+                }};
+            }
+            return {message:{role:'assistant',content:'final tool-backed response'}};
+        },
+        memory:true,
+    });
+    await session.send({message:{content:'use a tool before remembering'}});
+    await session.settleMemory();
+    assert.equal(requests.length,1);
+    await session.send({message:{
+        content:'{"value":true}',
+        role:'tool',
+        tool_call_id:'memory-tool-1',
+    }});
+    await session.settleMemory();
+    assert.equal(requests.length,3);
+    assert.match(requests[2].messages[0].content,/memory note/u);
+});
+
+test('persistent chat rolls back recurring context on durable failure and retains structural tool messages',async()=>{
+    const requests=[];
+    let response=0;
+    const session=await PersistentAIChatSession.create({
+        chat:async request=>{
+            requests.push(structuredClone(request));
+            response++;
+            if(response===1){
+                return {message:{
+                    role:'assistant',
+                    content:'',
+                    tool_calls:[{
+                        id:'lookup-1',
+                        type:'function',
+                        function:{name:'lookup',arguments:'{"id":"alpha"}'},
+                    }],
+                }};
+            }
+            return {message:{role:'assistant',content:`reply-${response}`}};
+        },
+        memory:false,
+    });
+
+    await session.send({message:{content:'find alpha'}});
+    const publicToolCall=session.chatEntity.messages.at(-1).tool_calls[0];
+    assert.ok(Object.isFrozen(publicToolCall));
+    assert.ok(Object.isFrozen(publicToolCall.function));
+    await assert.rejects(
+        session.send({message:{content:'skip the pending tool'}}),
+        error=>error?.code==='AI_CHAT_TOOL_RESULT_REQUIRED',
+    );
+    assert.throws(
+        ()=>session.chatEntity.addTurn({
+            assistantMessage:{role:'assistant',content:'must not append'},
+            requestMessage:{role:'user',content:'skip the pending tool'},
+        }),
+        /pending structural tool result/u,
+    );
+    assert.throws(
+        ()=>session.chatEntity.addUserMessage('skip the pending tool'),
+        /pending structural tool result/u,
+    );
+    await assert.rejects(
+        session.send({
+            message:{
+                content:'{"title":"Alpha"}',
+                persist:false,
+                role:'tool',
+                tool_call_id:'lookup-1',
+            },
+            response:{persist:false},
+        }),
+        error=>error?.code==='AI_CHAT_INCOHERENT_PERSISTENCE',
+    );
+    await session.send({message:{
+        content:'{"title":"Alpha"}',
+        role:'tool',
+        tool_call_id:'lookup-1',
+    }});
+    assert.deepEqual(requests[1].messages.at(-2).tool_calls[0],{
+        id:'lookup-1',
+        type:'function',
+        function:{name:'lookup',arguments:'{"id":"alpha"}'},
+    });
+    assert.equal(requests[1].messages.at(-1).role,'tool');
+
+    await assert.rejects(
+        session.send({
+            message:{content:'orphan',persist:false},
+            response:{persist:true},
+        }),
+        error=>error?.code==='AI_CHAT_INCOHERENT_PERSISTENCE',
+    );
+
+    db.failNext();
+    await assert.rejects(session.send({message:{content:'must roll back'}}));
+    await session.send({message:{content:'after failure',persist:false}});
+    assert.ok(!requests.at(-1).messages.some(message=>message.content==='must roll back'));
+});

@@ -543,7 +543,7 @@ export async function verifyWorkspaceRuntime({
         sdkVersion:runtimeReceipt.sdkVersion,
         sources:Object.freeze({
             arcane:Object.freeze({
-                authority:'arcane-os-upstream',
+                authority:'arcane-os-sdk',
                 location:runtimeReceipt.canonicalLocation,
                 manifestSha256:runtimeReceipt.manifestSha256,
                 contentSha256:runtimeReceipt.contentSha256,

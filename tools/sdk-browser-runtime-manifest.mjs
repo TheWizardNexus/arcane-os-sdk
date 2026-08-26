@@ -127,11 +127,18 @@ const expectedAiComponents=Object.freeze({
 
 const expectedFiles=Object.freeze([
     ['ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json','browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json','sdk-source-identity'],
+    ['ai/browser-kokoro-worker.mjs','browser-runtime/ai/browser-kokoro-worker.mjs','sdk-source-identity'],
+    ['ai/browser-speech-artifacts.mjs','browser-runtime/ai/browser-speech-artifacts.mjs','sdk-source-identity'],
+    ['ai/browser-speech-providers.mjs','browser-runtime/ai/browser-speech-providers.mjs','sdk-source-identity'],
+    ['ai/browser-speech.mjs','browser-runtime/ai/browser-speech.mjs','sdk-source-identity'],
     ['ai/browser-wasm-llm-provider.mjs','browser-runtime/ai/browser-wasm-llm-provider.mjs','sdk-source-identity'],
     ['ai/browser-wasm.mjs','browser-runtime/ai/browser-wasm.mjs','sdk-source-identity'],
+    ['ai/browser-whisper-worker.mjs','browser-runtime/ai/browser-whisper-worker.mjs','sdk-source-identity'],
     ['ai/browser-wllama-runtime.mjs','browser-runtime/ai/browser-wllama-runtime.mjs','sdk-source-identity'],
     ['ai/internal/sha256.mjs','browser-runtime/ai/internal/sha256.mjs','sdk-source-identity'],
     ['ai/model-controller.mjs','browser-runtime/ai/model-controller.mjs','sdk-source-identity'],
+    ['ai/speech-worker-client.mjs','browser-runtime/ai/speech-worker-client.mjs','sdk-source-identity'],
+    ['ai/speech-worker-runtime.mjs','browser-runtime/ai/speech-worker-runtime.mjs','sdk-source-identity'],
     ['ai/wllama/LICENCE','node_modules/@wllama/wllama/LICENCE','vendor-package-identity'],
     ['ai/wllama/index.mjs','browser-runtime/ai/wllama/index.mjs','deterministic-derived-vendor'],
     ['ai/wllama/llama.cpp-LICENSE','browser-runtime/ai/wllama/llama.cpp-LICENSE','vendor-source-identity'],

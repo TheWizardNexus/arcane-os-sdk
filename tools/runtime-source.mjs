@@ -1,6 +1,7 @@
 import {readFile} from 'node:fs/promises';
 
-export const ARCANE_REPOSITORY='https://github.com/TheWizardNexus/ARCANE-OS.git';
+export const SDK_RUNTIME_REPOSITORY='https://github.com/TheWizardNexus/arcane-os-sdk.git';
+export const LEGACY_ARCANE_REPOSITORY='https://github.com/TheWizardNexus/ARCANE-OS.git';
 export const EXPECTED_RUNTIME_DIRECTORIES=Object.freeze([
     'components','css','entities','img','modules','security'
 ]);
@@ -9,9 +10,10 @@ export const EXPECTED_STRONG_TYPE_FILES=Object.freeze(['index.js','licence','pac
 const SHA256_PATTERN=/^[a-f0-9]{64}$/u;
 const SEMANTIC_VERSION_PATTERN=/^[0-9]+\.[0-9]+\.[0-9]+$/u;
 const SOURCE_KEYS=Object.freeze([
-    'bundleVersion','commit','protocol','repository','runtimeDirectories',
-    'schemaVersion','strongType','strongTypeFiles'
+    'authority','legacyProjection','runtimeDirectories','schemaVersion','strongType','strongTypeFiles'
 ].sort());
+const AUTHORITY_KEYS=Object.freeze(['kind','path','protocol','repository']);
+const LEGACY_KEYS=Object.freeze(['bundleVersion','commit','repository']);
 const STRONG_TYPE_KEYS=Object.freeze(['files','integrity','resolved','version']);
 const STRONG_TYPE_FILE_KEYS=Object.freeze(['path','sha256']);
 
@@ -24,11 +26,18 @@ function exactKeys(value,expected){
 
 export function validateRuntimeSource(value){
     if(!exactKeys(value,SOURCE_KEYS)
-        ||value.schemaVersion!==1
-        ||value.repository!==ARCANE_REPOSITORY
-        ||typeof value.commit!=='string'||!/^[a-f0-9]{40}$/u.test(value.commit)
-        ||typeof value.bundleVersion!=='string'||!SEMANTIC_VERSION_PATTERN.test(value.bundleVersion)
-        ||value.protocol!=='arcane/1'
+        ||value.schemaVersion!==2
+        ||!exactKeys(value.authority,AUTHORITY_KEYS)
+        ||value.authority.kind!=='sdk-canonical'
+        ||value.authority.repository!==SDK_RUNTIME_REPOSITORY
+        ||value.authority.path!=='runtime/arcane'
+        ||value.authority.protocol!=='arcane/1'
+        ||!exactKeys(value.legacyProjection,LEGACY_KEYS)
+        ||value.legacyProjection.repository!==LEGACY_ARCANE_REPOSITORY
+        ||typeof value.legacyProjection.commit!=='string'
+        ||!/^[a-f0-9]{40}$/u.test(value.legacyProjection.commit)
+        ||typeof value.legacyProjection.bundleVersion!=='string'
+        ||!SEMANTIC_VERSION_PATTERN.test(value.legacyProjection.bundleVersion)
         ||JSON.stringify(value.runtimeDirectories)!==JSON.stringify(EXPECTED_RUNTIME_DIRECTORIES)
         ||JSON.stringify(value.strongTypeFiles)!==JSON.stringify(EXPECTED_STRONG_TYPE_FILES)
         ||!exactKeys(value.strongType,STRONG_TYPE_KEYS)

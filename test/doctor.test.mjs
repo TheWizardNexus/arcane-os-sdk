@@ -319,7 +319,7 @@ test('doctor authenticates both external runtime authorities and their physical 
     assert.equal(workspace.status,'pass');
     assert.equal(workspace.details.workspaceMode,'external');
     assert.equal(runtime.status,'pass');
-    assert.equal(runtime.details.fileCount,173);
+    assert.equal(runtime.details.fileCount,160);
     assert.match(runtime.details.runtimeManifestSha256,/^[a-f0-9]{64}$/u);
     assert.match(runtime.details.runtimeContentSha256,/^[a-f0-9]{64}$/u);
     assert.match(runtime.details.browserManifestSha256,/^[a-f0-9]{64}$/u);

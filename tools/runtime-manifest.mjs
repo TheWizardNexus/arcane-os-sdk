@@ -90,10 +90,11 @@ async function buildManifest(){
         builder:'arcane-sdk-runtime-v1',
         sdkVersion:packageJson.version,
         source:{
-            repository:upstream.repository,
-            commit:upstream.commit,
-            bundleVersion:upstream.bundleVersion,
-            protocol:upstream.protocol
+            authority:upstream.authority.kind,
+            repository:upstream.authority.repository,
+            path:upstream.authority.path,
+            protocol:upstream.authority.protocol,
+            legacyProjection:upstream.legacyProjection
         },
         fileCount:files.length,
         totalBytes:files.reduce((total,file)=>total+file.bytes,0),

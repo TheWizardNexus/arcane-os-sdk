@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.0
+
+- Made the SDK the canonical owner of the portable Arcane runtime and retired
+  the Arcane OS-to-SDK overwrite direction while retaining legacy provenance in
+  the authenticated runtime receipt.
+- Added app-supplied monolithic or ordered multi-file GGUF catalogs, DBOPFS
+  manifest-last admission, inherited per-check security policy, and measured
+  per-model capability reports for the browser-WASM Wllama provider.
+- Added independent browser Whisper STT and Kokoro TTS provider/Worker
+  machinery with caller-supplied runtime/model authorities, explicit lifecycle,
+  progress, cancellation, unload, and no fallback or packaged model bytes.
+- Added schema-driven DBOPFS document bootstrap, minimal lexical retrieval and
+  explicit request-context composition without automatic corpus searches.
+- Added automatic persistent chat/history/memory composition, recurring model
+  context, structural tool-call continuity, and session-only turns through
+  `persist:false`.
+
 ## 0.1.0-dev.4
 
 - Added the central `event-pubsub`-backed `EventManager` as the preferred SDK

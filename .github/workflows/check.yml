@@ -175,11 +175,18 @@ jobs:
           }
           const exactBrowserAiProjection=new Set([
             'browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json',
+            'browser-runtime/ai/browser-kokoro-worker.mjs',
+            'browser-runtime/ai/browser-speech-artifacts.mjs',
+            'browser-runtime/ai/browser-speech-providers.mjs',
+            'browser-runtime/ai/browser-speech.mjs',
             'browser-runtime/ai/browser-wasm-llm-provider.mjs',
             'browser-runtime/ai/browser-wasm.mjs',
+            'browser-runtime/ai/browser-whisper-worker.mjs',
             'browser-runtime/ai/browser-wllama-runtime.mjs',
             'browser-runtime/ai/internal/sha256.mjs',
             'browser-runtime/ai/model-controller.mjs',
+            'browser-runtime/ai/speech-worker-client.mjs',
+            'browser-runtime/ai/speech-worker-runtime.mjs',
             'browser-runtime/ai/wllama/LICENCE',
             'browser-runtime/ai/wllama/index.mjs',
             'browser-runtime/ai/wllama/llama.cpp-LICENSE',

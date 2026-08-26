@@ -14,15 +14,25 @@ export const MANAGED_IMPORT_MAP_ATTRIBUTE='data-arcane-import-map';
 const JAVASCRIPT_EXTENSION=/\.(?:js|mjs)$/u;
 const NODE_ONLY_MODULE='modules/CaseEvidenceIndexer.js';
 const RUNTIME_STRONG_TYPE_IMPORT='../../node_modules/strong-type/index.js';
+const PERSISTENT_CHAT_IMPORT='#arcane/persistent-ai-chat-session';
+const PERSISTENT_CHAT_MODULE='modules/PersistentAIChatSession.js';
 const SDK_BROWSER_ENTRY='sdk/event-manager.mjs';
 const SDK_BROWSER_AI_ENTRY='sdk/ai/browser-wasm.mjs';
+const SDK_BROWSER_SPEECH_ENTRY='sdk/ai/browser-speech.mjs';
 const SDK_BROWSER_FILES=Object.freeze([
     'sdk/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json',
+    'sdk/ai/browser-kokoro-worker.mjs',
+    'sdk/ai/browser-speech-artifacts.mjs',
+    'sdk/ai/browser-speech-providers.mjs',
+    SDK_BROWSER_SPEECH_ENTRY,
     'sdk/ai/browser-wasm-llm-provider.mjs',
     SDK_BROWSER_AI_ENTRY,
+    'sdk/ai/browser-whisper-worker.mjs',
     'sdk/ai/browser-wllama-runtime.mjs',
     'sdk/ai/internal/sha256.mjs',
     'sdk/ai/model-controller.mjs',
+    'sdk/ai/speech-worker-client.mjs',
+    'sdk/ai/speech-worker-runtime.mjs',
     'sdk/ai/wllama/LICENCE',
     'sdk/ai/wllama/index.mjs',
     'sdk/ai/wllama/llama.cpp-LICENSE',
@@ -811,6 +821,20 @@ function unresolved(importer,specifier,normalizedTarget,reason='is not in the sh
 }
 
 function resolveImport(importer,specifier,files){
+    if(specifier===PERSISTENT_CHAT_IMPORT){
+        if(!files.has(PERSISTENT_CHAT_MODULE)){
+            unresolved(importer,specifier,PERSISTENT_CHAT_MODULE);
+        }
+        return {target:PERSISTENT_CHAT_MODULE,persistentChat:true};
+    }
+    if(specifier.startsWith(PERSISTENT_CHAT_IMPORT)){
+        unresolved(
+            importer,
+            specifier,
+            PERSISTENT_CHAT_MODULE,
+            'does not match the exact browser import-map key'
+        );
+    }
     const reachableSpecifier=stripQueryAndHash(specifier);
     if(!reachableSpecifier)unresolved(importer,specifier,'<empty>');
     if(reachableSpecifier.includes('%')){
@@ -966,8 +990,12 @@ export async function buildImportMap({files,readFile,signal}={}){
     }
     const hasSdkBrowserGraph=inventory.has(SDK_BROWSER_ENTRY);
     const hasSdkAiGraph=inventory.has(SDK_BROWSER_AI_ENTRY);
+    const hasSdkSpeechGraph=inventory.has(SDK_BROWSER_SPEECH_ENTRY);
     if(hasSdkAiGraph&&!hasSdkBrowserGraph){
         unresolved(SDK_BROWSER_AI_ENTRY,'<authenticated SDK browser closure>',SDK_BROWSER_ENTRY);
+    }
+    if(hasSdkSpeechGraph&&!hasSdkAiGraph){
+        unresolved(SDK_BROWSER_SPEECH_ENTRY,'<authenticated SDK browser closure>',SDK_BROWSER_AI_ENTRY);
     }
     if(hasSdkBrowserGraph){
         for(const required of SDK_BROWSER_FILES){
@@ -1016,11 +1044,20 @@ export async function buildImportMap({files,readFile,signal}={}){
                 'arcane-os/ai/browser-wasm',
                 './arcane/sdk/ai/browser-wasm.mjs'
             );
+            registerSpecifier(
+                namedRegistry,
+                'arcane-os/ai/browser-speech',
+                './arcane/sdk/ai/browser-speech.mjs'
+            );
         }
     }
 
     const sdkRoots=hasSdkBrowserGraph
-        ?[SDK_BROWSER_ENTRY,...(hasSdkAiGraph?[SDK_BROWSER_AI_ENTRY]:[])]:[];
+        ?[
+            SDK_BROWSER_ENTRY,
+            ...(hasSdkAiGraph?[SDK_BROWSER_AI_ENTRY]:[]),
+            ...(hasSdkSpeechGraph?[SDK_BROWSER_SPEECH_ENTRY]:[]),
+        ]:[];
     const queue=[...roots,...sdkRoots];
     const reached=new Set();
     const entities=new Set();
@@ -1036,6 +1073,13 @@ export async function buildImportMap({files,readFile,signal}={}){
             const resolution=resolveImport(importer,imported.specifier,inventory);
             if(resolution.runtimeStrongType)usesRuntimeStrongType=true;
             if(resolution.eventPubSub)usesEventPubSub=true;
+            if(resolution.persistentChat){
+                registerSpecifier(
+                    namedRegistry,
+                    PERSISTENT_CHAT_IMPORT,
+                    './arcane/modules/PersistentAIChatSession.js'
+                );
+            }
             if(resolution.target.startsWith('entities/'))entities.add(resolution.target);
             if(!reached.has(resolution.target))queue.push(resolution.target);
         }

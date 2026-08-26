@@ -84,6 +84,30 @@ async function writeSdkBrowserGraph(workspaceRoot){
         "export * from './browser-wllama-runtime.mjs';",
         ''
     ].join('\n'));
+    await writeWorkspaceFile(workspaceRoot,'arcane/sdk/ai/browser-speech.mjs',[
+        "export * from './browser-speech-artifacts.mjs';",
+        "export * from './browser-speech-providers.mjs';",
+        ''
+    ].join('\n'));
+    await writeWorkspaceFile(workspaceRoot,'arcane/sdk/ai/browser-speech-providers.mjs',[
+        "import './browser-speech-artifacts.mjs';",
+        "import './speech-worker-client.mjs';",
+        'export const speech=true;',
+        ''
+    ].join('\n'));
+    for(const relative of [
+        'browser-kokoro-worker.mjs',
+        'browser-speech-artifacts.mjs',
+        'browser-whisper-worker.mjs',
+        'speech-worker-client.mjs',
+        'speech-worker-runtime.mjs'
+    ]){
+        await writeWorkspaceFile(
+            workspaceRoot,
+            `arcane/sdk/ai/${relative}`,
+            'export const fixture=true;\n'
+        );
+    }
     await writeWorkspaceFile(workspaceRoot,'arcane/sdk/ai/browser-wasm-llm-provider.mjs',[
         "import './model-controller.mjs';",
         "import './internal/sha256.mjs';",
@@ -193,7 +217,7 @@ test('shipped Arcane modules and transitive dependencies produce the exact named
         onEvent:event=>events.push(event)
     });
 
-    assert.equal(receipt.entryCount,86);
+    assert.equal(receipt.entryCount,91);
     assert.deepEqual(receipt.cleanupWarnings,[]);
     assert.deepEqual(receipt.excludedModules,['modules/CaseEvidenceIndexer.js']);
     assert.equal(receipt.artifactPath,path.join(appRoot,'modules','arcane.importmap.json'));
@@ -244,6 +268,14 @@ test('shipped Arcane modules and transitive dependencies produce the exact named
     assert.equal(
         document.imports['arcane-os/ai/browser-wasm'],
         './arcane/sdk/ai/browser-wasm.mjs'
+    );
+    assert.equal(
+        document.imports['arcane-os/ai/browser-speech'],
+        './arcane/sdk/ai/browser-speech.mjs'
+    );
+    assert.equal(
+        document.imports['#arcane/persistent-ai-chat-session'],
+        './arcane/modules/PersistentAIChatSession.js'
     );
     assert.equal(
         document.imports['event-pubsub'],
@@ -580,9 +612,23 @@ test('browser remap edges reject query and fragment suffixes that cannot match e
             error=>error?.code==='ARCANE_IMPORT_MAP_UNRESOLVED'
                 &&error.message.includes(specifier)
                 &&error.message.includes(target)
-                &&/query or fragment.*exact browser import-map key/u.test(error.message)
+            &&/query or fragment.*exact browser import-map key/u.test(error.message)
         );
     }
+    const privateSpecifier='#arcane/persistent-ai-chat-session?cache=1';
+    const privateSources=new Map([
+        ['modules/Root.js',`import '${privateSpecifier}';\n`],
+        ['modules/PersistentAIChatSession.js','export default true;\n']
+    ]);
+    await assert.rejects(
+        buildImportMap({
+            files:[...privateSources.keys()],
+            readFile:async relative=>privateSources.get(relative)
+        }),
+        error=>error?.code==='ARCANE_IMPORT_MAP_UNRESOLVED'
+            &&error.message.includes(privateSpecifier)
+            &&/exact browser import-map key/u.test(error.message)
+    );
     for(const encodedParent of ['%2e%2e','%2E%2E','%2e%2E','%2E%2e']){
         const specifier=`./${encodedParent}/${encodedParent}/apps/victim/modules/Evil.js`;
         const sources=new Map([
@@ -935,6 +981,7 @@ test('regeneration is byte-stable, removes stale entries, and preserves prior fi
         'arcane/Leaf':'./arcane/modules/Leaf.mjs',
         'arcane/Root':'./arcane/modules/Root.js',
         'arcane/entities/Thing':'./arcane/entities/Thing.js',
+        'arcane-os/ai/browser-speech':'./arcane/sdk/ai/browser-speech.mjs',
         'arcane-os/ai/browser-wasm':'./arcane/sdk/ai/browser-wasm.mjs',
         'arcane-os/event-manager':'./arcane/sdk/event-manager.mjs',
         'event-pubsub':'./arcane/sdk/dependencies/event-pubsub/index.js',

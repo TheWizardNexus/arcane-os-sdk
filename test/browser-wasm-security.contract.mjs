@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 
 import test from '../src/testing.mjs';
 import {
@@ -8,7 +9,9 @@ import {
     sameModelSecurity
 } from '../browser-runtime/ai/model-controller.mjs';
 import {
+    adaptV1LlmProvider,
     createBrowserModelSource,
+    createBrowserWasmLlmProvider,
     createDbopfsModelStore
 } from '../browser-runtime/ai/browser-wasm-llm-provider.mjs';
 
@@ -18,6 +21,7 @@ function missingEntry(name){
 
 function observedDirectory(){
     const entries=new Map();
+    const writes=[];
     let modelReadPasses=0;
     const table=Object.freeze({
         async getFileHandle(name,{create=false}={}){
@@ -65,6 +69,7 @@ function observedDirectory(){
                                 offset+=chunk.byteLength;
                             }
                             entries.set(name,bytes);
+                            writes.push(name);
                         },
                         async abort(){}
                     });
@@ -78,6 +83,8 @@ function observedDirectory(){
     return Object.freeze({
         table,
         modelReadPasses:()=>modelReadPasses,
+        names:()=>[...entries.keys()],
+        writes:()=>writes.slice(),
         seed(name,value){
             entries.set(name,value instanceof Uint8Array
                 ?value.slice()
@@ -90,12 +97,13 @@ function observedDirectory(){
     });
 }
 
-function storeFor(directory){
+function storeFor(directory,options={}){
     return createDbopfsModelStore({
         dbopfs:{
             readyPromise:Promise.resolve(),
             async getTableHandle(){return directory.table;}
-        }
+        },
+        ...options
     });
 }
 
@@ -333,4 +341,314 @@ test('disabled byte-length checking reuses legacy caches without rewriting them'
     assert.equal(completion.observedBytes,undefined);
     assert.equal(completion.model.id,'legacy-unchecked');
     assert.equal(completion.model.immutableUrl,url);
+});
+
+test('ordered model files preserve legacy descriptors and reject ambiguous members',()=>{
+    const files=[
+        {
+            name:'model-00001-of-00002.gguf',
+            url:'https://example.invalid/models/0123456789abcdef/model-00001-of-00002.gguf',
+            bytes:2,
+            sha256:'1'.repeat(64)
+        },
+        {
+            name:'model-00002-of-00002.gguf',
+            url:'https://example.invalid/models/0123456789abcdef/model-00002-of-00002.gguf',
+            bytes:3,
+            sha256:'2'.repeat(64)
+        }
+    ];
+    const split=createBrowserModelSource({id:'split-model',files});
+    assert.deepEqual(split.descriptor,{id:'split-model',files});
+
+    const legacy=createBrowserModelSource({
+        id:'legacy-model',
+        url:'https://example.invalid/models/0123456789abcdef/legacy.gguf',
+        bytes:7,
+        sha256:'3'.repeat(64)
+    });
+    assert.deepEqual(legacy.descriptor,{
+        id:'legacy-model',
+        url:'https://example.invalid/models/0123456789abcdef/legacy.gguf',
+        bytes:7,
+        sha256:'3'.repeat(64)
+    });
+    assert.throws(()=>createBrowserModelSource({
+        id:'ambiguous-model',
+        url:'https://example.invalid/models/0123456789abcdef/model.gguf',
+        files
+    }),/mutually exclusive/u);
+    assert.throws(()=>createBrowserModelSource({
+        id:'duplicate-name',
+        files:[files[0],{...files[1],name:'MODEL-00001-OF-00002.GGUF'}]
+    }),/names must be unique/u);
+    assert.throws(()=>createBrowserModelSource({
+        id:'duplicate-url',
+        files:[files[0],{...files[1],url:files[0].url}]
+    }),/URLs must be unique/u);
+    assert.throws(()=>createBrowserModelSource({
+        id:'unsafe-name',
+        files:[{...files[0],name:'../model.gguf'}]
+    }),/safe single filenames/u);
+    assert.throws(()=>createBrowserModelSource({
+        id:'lone-high-\ud800',
+        files:[files[0]]
+    }),/Unicode scalar values/u);
+    assert.throws(()=>createBrowserModelSource({
+        id:'lone-high-\ud801',
+        files:[files[0]]
+    }),/Unicode scalar values/u);
+    assert.throws(()=>createBrowserModelSource({
+        id:'non-nfc-e\u0301',
+        files:[files[0]]
+    }),/Unicode NFC normalization/u);
+});
+
+test('ordered model files admit serially and commit their complete set manifest last',async()=>{
+    const directory=observedDirectory();
+    const downloads=[];
+    let estimates=0;
+    const bodies=new Map([
+        ['model-00001-of-00002.gguf',Uint8Array.of(1,2)],
+        ['model-00002-of-00002.gguf',Uint8Array.of(3,4,5)]
+    ]);
+    const source=createBrowserModelSource({
+        id:'split-admission',
+        files:[...bodies].map(([name,body])=>({
+            name,
+            url:`https://example.invalid/models/0123456789abcdef/${name}`,
+            bytes:body.byteLength
+        }))
+    },{
+        fetchImpl:async url=>{
+            const name=new URL(url).pathname.split('/').pop();
+            downloads.push(name);
+            const body=bodies.get(name);
+            return new Response(body,{
+                status:200,
+                headers:{'content-length':String(body.byteLength)}
+            });
+        }
+    });
+    const store=storeFor(directory,{
+        estimateStorage:async()=>{
+            estimates+=1;
+            return {quota:10_000,usage:10};
+        }
+    });
+
+    await assert.rejects(
+        store.ensure(source,{security:{secure:true}}),
+        /sha256 is required/u
+    );
+    assert.deepEqual(downloads,[]);
+    const installed=await store.ensure(source,{
+        security:{secure:true,checks:{sha256:false}}
+    });
+    assert.deepEqual(downloads,[...bodies.keys()]);
+    assert.equal(installed.files.length,2);
+    assert.equal(installed.file,null);
+    assert.equal(installed.observedBytes,5);
+    assert.equal(installed.integrity.byteLength.state,'verified');
+    assert.equal(installed.integrity.sha256.state,'unchecked');
+    assert.equal(estimates,1);
+    assert.match(directory.writes().at(-1),/^id-[a-f0-9]+\.complete\.json$/u);
+    const completion=await directory.completion();
+    assert.equal(completion.schema,'arcane.ai.browser-wasm.model.v4');
+    assert.deepEqual(
+        completion.files.map(file=>file.name),
+        [...bodies.keys()]
+    );
+
+    const cached=await store.ensure(source,{
+        offline:true,
+        security:{secure:true,checks:{sha256:false}}
+    });
+    assert.equal(cached.cache,'cached');
+    assert.equal(cached.files.length,2);
+    assert.deepEqual(downloads,[...bodies.keys()]);
+    assert.equal(estimates,1);
+});
+
+test('catalog compatibility records measured storage failure before model download',async()=>{
+    const directory=observedDirectory();
+    let downloads=0;
+    const source=createBrowserModelSource({
+        id:'storage-limited-model',
+        files:[
+            {
+                name:'model-00001-of-00002.gguf',
+                url:'https://example.invalid/models/0123456789abcdef/model-00001-of-00002.gguf',
+                bytes:2
+            },
+            {
+                name:'model-00002-of-00002.gguf',
+                url:'https://example.invalid/models/0123456789abcdef/model-00002-of-00002.gguf',
+                bytes:3
+            }
+        ]
+    },{
+        fetchImpl:async()=>{
+            downloads+=1;
+            return new Response(Uint8Array.of(1));
+        }
+    });
+    const store=storeFor(directory,{
+        estimateStorage:async()=>({quota:5,usage:0})
+    });
+    const provider=createBrowserWasmLlmProvider({source,store});
+    await assert.rejects(
+        provider.load({security:{checks:{byteLength:true}}}),
+        error=>error?.code==='ARCANE_AI_STORAGE_CAPACITY_INSUFFICIENT'
+    );
+    assert.equal(downloads,0);
+    const [model]=provider.catalog();
+    assert.equal(model.id,'storage-limited-model');
+    assert.equal(model.compatibility,'incompatible');
+    assert.equal(model.compatibilityDetails.protocol,'arcane-ai-browser-capability-policy/1');
+    assert.equal(model.compatibilityDetails.model.fileCount,2);
+    assert.equal(model.compatibilityDetails.model.declaredBytes,5);
+    assert.equal(model.compatibilityDetails.storage.payloadBytes,5);
+    assert.equal(model.compatibilityDetails.storage.requiredBytes>5,true);
+    assert.equal(Object.isFrozen(model.compatibilityDetails),true);
+    assert.equal(model.compatibilityDetails.reasons.some(
+        reason=>reason.code==='ARCANE_AI_STORAGE_CAPACITY_INSUFFICIENT'
+    ),true);
+});
+
+test('secure download hashes each member while writing and rejects tamper without rereading',async()=>{
+    const actual=Uint8Array.of(9,8,7,6);
+    const digest=new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256',actual));
+    const sha256=Array.from(digest,value=>value.toString(16).padStart(2,'0')).join('');
+    const admittedDirectory=observedDirectory();
+    const admittedSource=createBrowserModelSource({
+        id:'streaming-digest',
+        files:[{
+            name:'streaming.gguf',
+            url:'https://example.invalid/models/0123456789abcdef/streaming.gguf',
+            bytes:actual.byteLength,
+            sha256
+        }]
+    },{fetchImpl:async()=>new Response(actual)});
+    const admitted=await storeFor(admittedDirectory).ensure(admittedSource,{
+        security:{secure:true}
+    });
+    assert.equal(admitted.integrity.state,'verified');
+    assert.equal(admitted.integrity.files[0].sha256.actual,sha256);
+    assert.equal(admittedDirectory.modelReadPasses(),0);
+
+    const tamperedDirectory=observedDirectory();
+    const tamperedSource=createBrowserModelSource({
+        id:'streaming-tamper',
+        files:[{
+            name:'tampered.gguf',
+            url:'https://example.invalid/models/0123456789abcdef/tampered.gguf',
+            bytes:actual.byteLength,
+            sha256:'0'.repeat(64)
+        }]
+    },{fetchImpl:async()=>new Response(actual)});
+    await assert.rejects(
+        storeFor(tamperedDirectory).ensure(tamperedSource,{security:{secure:true}}),
+        error=>error?.code==='ARCANE_AI_MODEL_DIGEST_MISMATCH'
+    );
+    assert.equal(tamperedDirectory.modelReadPasses(),0);
+    assert.equal(await tamperedDirectory.completion(),null);
+});
+
+test('injective model storage ids cannot collide after lossy filename normalization',async()=>{
+    const directory=observedDirectory();
+    const descriptors=[
+        {id:'model/a',name:'first.gguf'},
+        {id:'model_a',name:'second.gguf'}
+    ];
+    for(const descriptor of descriptors){
+        const source=createBrowserModelSource({
+            id:descriptor.id,
+            url:`https://example.invalid/models/0123456789abcdef/${descriptor.name}`
+        },{fetchImpl:async()=>new Response(Uint8Array.of(1))});
+        await storeFor(directory).ensure(source);
+    }
+    const manifests=directory.names().filter(name=>name.endsWith('.complete.json'));
+    assert.equal(manifests.length,2);
+    assert.notEqual(manifests[0],manifests[1]);
+    assert.equal(manifests.every(name=>/^id-[a-f0-9]+\.complete\.json$/u.test(name)),true);
+});
+
+test('unchecked declared bytes stay unknown until observed bytes and manifest are admitted',async()=>{
+    const directory=observedDirectory();
+    const policies=[];
+    let estimates=0;
+    const source=createBrowserModelSource({
+        id:'unchecked-storage',
+        url:'https://example.invalid/models/0123456789abcdef/unchecked-storage.gguf',
+        bytes:1
+    },{fetchImpl:async()=>new Response(Uint8Array.of(1,2,3))});
+    const installed=await storeFor(directory,{
+        estimateStorage:async()=>{
+            estimates+=1;
+            return {quota:1,usage:0};
+        }
+    }).ensure(source,{onCapabilityPolicy:policy=>policies.push(policy)});
+    assert.equal(estimates,0);
+    assert.equal(policies[0].compatibility,'unknown');
+    assert.equal(policies[0].code,'ARCANE_AI_MODEL_STORAGE_REQUIREMENT_UNBOUNDED');
+    assert.equal(policies[0].requiredBytes,null);
+    assert.equal(policies[1].compatibility,'compatible');
+    assert.equal(policies[1].code,'ARCANE_AI_MODEL_CACHE_COMPLETE');
+    assert.equal(policies[1].payloadBytes,3);
+    assert.equal(policies[1].requiredBytes>policies[1].payloadBytes,true);
+    assert.equal(installed.storage,policies[1]);
+});
+
+test('one provider catalogs caller models and v2 selection fails closed for oversized shards',async()=>{
+    const directory=observedDirectory();
+    const primary=createBrowserModelSource({
+        id:'catalog-primary',
+        url:'https://example.invalid/models/0123456789abcdef/primary.gguf',
+        bytes:1
+    });
+    const oversized=createBrowserModelSource({
+        id:'catalog-oversized',
+        files:[{
+            name:'oversized.gguf',
+            url:'https://example.invalid/models/0123456789abcdef/oversized.gguf',
+            bytes:2_000_000_001
+        }]
+    });
+    const provider=createBrowserWasmLlmProvider({
+        source:primary,
+        sources:[primary,oversized],
+        store:storeFor(directory)
+    });
+    const catalog=provider.catalog();
+    assert.deepEqual(catalog.map(model=>model.id),['catalog-primary','catalog-oversized']);
+    assert.equal(catalog[1].compatibility,'incompatible');
+    assert.equal(catalog[1].compatibilityDetails.reasons.some(
+        reason=>reason.code==='ARCANE_AI_MODEL_SHARD_TOO_LARGE'
+    ),true);
+    const runtimeProvider=adaptV1LlmProvider(provider);
+    await assert.rejects(runtimeProvider.load({
+        selection:{
+            providerId:'arcane-browser-wasm-wllama',
+            modelId:'catalog-oversized',
+            localOnly:true
+        }
+    }),error=>error?.code==='ARCANE_AI_MODEL_SHARD_TOO_LARGE');
+    await assert.rejects(runtimeProvider.load({
+        selection:{
+            providerId:'arcane-browser-wasm-wllama',
+            modelId:'not-in-catalog',
+            localOnly:true
+        }
+    }),error=>error?.code==='ARCANE_AI_MODEL_AUTHORITY_REQUIRED');
+});
+
+test('provider source preserves ordered File handoff and exact load-plan reuse checks',async()=>{
+    const providerSource=await readFile(new URL(
+        '../browser-runtime/ai/browser-wasm-llm-provider.mjs',
+        import.meta.url
+    ),'utf8');
+    assert.match(providerSource,/const modelFiles = admitted\.files\.map/u);
+    assert.match(providerSource,/await runtime\.load\(modelFiles,/u);
+    assert.match(providerSource,/sameLoadPlan\(activeLoadPlan, requestedLoadPlan\)/u);
 });

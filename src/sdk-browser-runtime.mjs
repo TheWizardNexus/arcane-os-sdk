@@ -9,9 +9,9 @@ const MANIFEST_NAME='ARCANE_SDK_BROWSER_RELEASE.json';
 const BUILDER='arcane-sdk-browser-runtime-v1';
 const PROTOCOL='arcane-sdk-browser-runtime/1';
 export const SDK_BROWSER_RUNTIME_MANIFEST_SHA256=
-    'a71a13b7ead9dc6d1118a5cdfaac0ca87b94828e19182ad6c187d0813d975ea4';
+    'ebdf1a1c25c38450e2b9eb2ef179c825e66bba9eab42938bf1cc1d82a132aed0';
 export const SDK_BROWSER_RUNTIME_CONTENT_SHA256=
-    'e4faae772f313bdecc699845924e851bd606d62ed06203152d8e6c13a57b5fe7';
+    '9084b13b822b8191e9426f3690ca9bdf01f2c1110f6ba7ee236f50542421330e';
 const REPOSITORY='https://github.com/TheWizardNexus/arcane-os-sdk.git';
 const SHA256_PATTERN=/^[a-f0-9]{64}$/u;
 const READ_ONLY_NO_FOLLOW=FS_CONSTANTS.O_RDONLY|(FS_CONSTANTS.O_NOFOLLOW??0);
@@ -102,11 +102,18 @@ const expectedAiComponents=Object.freeze({
 
 const expectedFiles=Object.freeze([
     ['ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json','browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json','sdk-source-identity'],
+    ['ai/browser-kokoro-worker.mjs','browser-runtime/ai/browser-kokoro-worker.mjs','sdk-source-identity'],
+    ['ai/browser-speech-artifacts.mjs','browser-runtime/ai/browser-speech-artifacts.mjs','sdk-source-identity'],
+    ['ai/browser-speech-providers.mjs','browser-runtime/ai/browser-speech-providers.mjs','sdk-source-identity'],
+    ['ai/browser-speech.mjs','browser-runtime/ai/browser-speech.mjs','sdk-source-identity'],
     ['ai/browser-wasm-llm-provider.mjs','browser-runtime/ai/browser-wasm-llm-provider.mjs','sdk-source-identity'],
     ['ai/browser-wasm.mjs','browser-runtime/ai/browser-wasm.mjs','sdk-source-identity'],
+    ['ai/browser-whisper-worker.mjs','browser-runtime/ai/browser-whisper-worker.mjs','sdk-source-identity'],
     ['ai/browser-wllama-runtime.mjs','browser-runtime/ai/browser-wllama-runtime.mjs','sdk-source-identity'],
     ['ai/internal/sha256.mjs','browser-runtime/ai/internal/sha256.mjs','sdk-source-identity'],
     ['ai/model-controller.mjs','browser-runtime/ai/model-controller.mjs','sdk-source-identity'],
+    ['ai/speech-worker-client.mjs','browser-runtime/ai/speech-worker-client.mjs','sdk-source-identity'],
+    ['ai/speech-worker-runtime.mjs','browser-runtime/ai/speech-worker-runtime.mjs','sdk-source-identity'],
     ['ai/wllama/LICENCE','node_modules/@wllama/wllama/LICENCE','vendor-package-identity'],
     ['ai/wllama/index.mjs','browser-runtime/ai/wllama/index.mjs','deterministic-derived-vendor'],
     ['ai/wllama/llama.cpp-LICENSE','browser-runtime/ai/wllama/llama.cpp-LICENSE','vendor-source-identity'],

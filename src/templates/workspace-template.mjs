@@ -47,7 +47,7 @@ export function workspaceTemplate({
     const name=displayName||`Arcane ${titleCase(appId)}`;
     const packageName=`arcane-${appId}`;
     const runtimeContentSha256=runtimeRelease?.contentSha256;
-    const upstreamCommit=runtimeRelease?.source?.commit;
+    const upstreamCommit=runtimeRelease?.source?.legacyProjection?.commit;
     const browserManifestSha256=sdkBrowserRuntimeRelease?.manifestSha256;
     const browserContentSha256=sdkBrowserRuntimeRelease?.contentSha256;
     const browserSource=sdkBrowserRuntimeRelease?.source;
@@ -153,15 +153,15 @@ appropriate.
     files.set('AGENTS.md',`# ${name} development instructions
 
 - Use plain JavaScript, HTML, and CSS; do not introduce TypeScript or TSX.
-- Keep reusable mechanisms in Arcane OS and app-specific behavior under \`apps/${appId}/\`.
+- Keep reusable portable mechanisms in the Arcane SDK and app-specific behavior under \`apps/${appId}/\`.
 - Keep \`arcane/css/theme.css\` before app styles and import \`arcane/ThemeBootstrap\` before app code runs.
 - Use \`rgb(...)\` or \`rgba(...)\` for new CSS colors.
 - Build one named app and one explicit target at a time. Native targets may be unavailable until their adapters are installed.
-- Run \`npm run check\` before committing.
+- Run tests and checks only when the user explicitly selects verification or a distribution artifact requires it.
 `);
     files.set('README.md',`# ${name}
 
-This repository contains the Arcane OS application \`${appId}\`. Its source stays outside the Arcane OS repository and uses the \`${SDK_NAME}\` toolchain.
+This repository contains the portable Arcane application \`${appId}\`. It embeds immutable SDK runtime bytes for distribution and has no runtime dependency on an Arcane OS source checkout.
 
 ## Start
 

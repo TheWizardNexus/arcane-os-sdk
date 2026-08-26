@@ -633,7 +633,7 @@ export async function validateWorkspace({
                 'installed SDK runtime manifest'
             );
             if(installed.contentSha256!==lock.runtime.contentSha256
-                ||installed.source?.commit!==lock.runtime.upstreamCommit){
+                ||installed.source?.legacyProjection?.commit!==lock.runtime.upstreamCommit){
                 fail('Installed SDK runtime does not match arcane.lock.json.');
             }
             const browserManifestPath=path.join(

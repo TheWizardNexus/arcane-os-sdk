@@ -115,16 +115,26 @@ test('runtime provenance and shared network-policy closure are complete',async()
     ));
     assert.equal(manifest.sdkVersion,SDK_VERSION);
     assert.deepEqual(manifest.source,{
-        repository:ARCANE_UPSTREAM_REPOSITORY,
-        commit:ARCANE_UPSTREAM_COMMIT,
-        bundleVersion:ARCANE_MACHINE_BUNDLE_VERSION,
-        protocol:'arcane/1'
+        authority:'sdk-canonical',
+        repository:'https://github.com/TheWizardNexus/arcane-os-sdk.git',
+        path:'runtime/arcane',
+        protocol:'arcane/1',
+        legacyProjection:{
+            repository:ARCANE_UPSTREAM_REPOSITORY,
+            commit:ARCANE_UPSTREAM_COMMIT,
+            bundleVersion:ARCANE_MACHINE_BUNDLE_VERSION
+        }
     });
     assert.deepEqual(sourceConfig.runtimeDirectories,[
         'components','css','entities','img','modules','security'
     ]);
-    assert.equal(sourceConfig.commit,manifest.source.commit);
-    assert.equal(sourceConfig.bundleVersion,manifest.source.bundleVersion);
+    assert.deepEqual(sourceConfig.authority,{
+        kind:manifest.source.authority,
+        repository:manifest.source.repository,
+        path:manifest.source.path,
+        protocol:manifest.source.protocol
+    });
+    assert.deepEqual(sourceConfig.legacyProjection,manifest.source.legacyProjection);
     const paths=new Set(manifest.files.map(file=>file.path));
     assert.ok(paths.has('arcane/modules/ArcaneNetworkPolicy.js'));
     assert.ok(paths.has('arcane/modules/ScamRiskPolicy.js'));
@@ -252,8 +262,8 @@ test('SDK browser receipt authenticates its exact package sources and rejects la
     assert.equal(attributes.at(-1),'runtime/** -text -whitespace');
     const {packageRoot,browserRuntimeRoot}=await browserRuntimePackageCopy(t);
     const receipt=await verifySdkBrowserRuntime({browserRuntimeRoot});
-    assert.equal(receipt.fileCount,18);
-    assert.equal(receipt.sourceIdentities.length,15);
+    assert.equal(receipt.fileCount,25);
+    assert.equal(receipt.sourceIdentities.length,22);
     assert.equal(
         await authenticateSdkBrowserRuntimeReceipt(receipt,{browserRuntimeRoot}),
         receipt
@@ -326,7 +336,8 @@ test('composed workspace receipt rejects tampered projected SDK browser bytes',a
         browserRuntimeRoot:sdkBrowserRuntimeReceipt.canonicalLocation,
         sdkBrowserRuntimeReceipt
     });
-    assert.equal(receipt.fileCount,173);
+    assert.equal(receipt.fileCount,185);
+    assert.equal(receipt.sources.arcane.authority,'arcane-os-sdk');
     assert.equal(receipt.sources.arcane.contentSha256,runtimeReceipt.contentSha256);
     assert.equal(
         receipt.sources.sdkBrowser.contentSha256,

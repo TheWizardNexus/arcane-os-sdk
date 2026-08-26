@@ -17,11 +17,18 @@ import {
 
 const SDK_BROWSER_RUNTIME_FILES=Object.freeze([
     'ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json',
+    'ai/browser-kokoro-worker.mjs',
+    'ai/browser-speech-artifacts.mjs',
+    'ai/browser-speech-providers.mjs',
+    'ai/browser-speech.mjs',
     'ai/browser-wasm-llm-provider.mjs',
     'ai/browser-wasm.mjs',
+    'ai/browser-whisper-worker.mjs',
     'ai/browser-wllama-runtime.mjs',
     'ai/internal/sha256.mjs',
     'ai/model-controller.mjs',
+    'ai/speech-worker-client.mjs',
+    'ai/speech-worker-runtime.mjs',
     'ai/wllama/LICENCE',
     'ai/wllama/index.mjs',
     'ai/wllama/llama.cpp-LICENSE',

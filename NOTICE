@@ -24,9 +24,11 @@ Third-party material retains its own terms:
 - Marked: MIT License; complete notice and terms reproduced below.
 - QRCode.js: MIT License; complete notice and terms reproduced below.
 
-No model weights are included in this package. Browser-WASM model downloads
-require caller-supplied immutable authorities and exact byte-length and
-SHA-256 verification before cache admission or inference.
+No model weights, speech runtimes, or speech model/voice bytes are included in
+this package. Browser model and speech downloads require caller-supplied
+authorities. Byte-length and SHA-256 checks inherit the app security policy,
+default to disabled, and may be enabled or overridden for one provider/load;
+an enabled check requires its expected value before cache admission.
 
 Marked
 ------

@@ -7,6 +7,8 @@ import {SDK_VERSION} from './constants.mjs';
 
 export const RUNTIME_MANIFEST_NAME='ARCANE_RUNTIME_RELEASE.json';
 const SHA256_PATTERN=/^[a-f0-9]{64}$/;
+const SDK_RUNTIME_REPOSITORY='https://github.com/TheWizardNexus/arcane-os-sdk.git';
+const LEGACY_ARCANE_REPOSITORY='https://github.com/TheWizardNexus/ARCANE-OS.git';
 const READ_ONLY_NO_FOLLOW=FS_CONSTANTS.O_RDONLY|(FS_CONSTANTS.O_NOFOLLOW??0);
 const MAX_VERIFIED_RUNTIME_FILE_BYTES=64*1024*1024;
 const sdkRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
@@ -59,10 +61,18 @@ function validateRelease(value){
     }
     if(value.sdkVersion!==SDK_VERSION)fail('Runtime manifest sdkVersion is incompatible with this SDK.');
     if(!value.source||typeof value.source!=='object'
-        ||Object.keys(value.source).sort(compareText).join('\0')!=='bundleVersion\0commit\0protocol\0repository'
-        ||value.source.repository!=='https://github.com/TheWizardNexus/ARCANE-OS.git'
-        ||typeof value.source.commit!=='string'||!/^[a-f0-9]{40}$/.test(value.source.commit)
-        ||value.source.bundleVersion!=='0.8.12'||value.source.protocol!=='arcane/1'){
+        ||Object.keys(value.source).sort(compareText).join('\0')!=='authority\0legacyProjection\0path\0protocol\0repository'
+        ||value.source.authority!=='sdk-canonical'
+        ||value.source.repository!==SDK_RUNTIME_REPOSITORY
+        ||value.source.path!=='runtime/arcane'
+        ||value.source.protocol!=='arcane/1'
+        ||!value.source.legacyProjection
+        ||typeof value.source.legacyProjection!=='object'
+        ||Object.keys(value.source.legacyProjection).sort(compareText).join('\0')!=='bundleVersion\0commit\0repository'
+        ||value.source.legacyProjection.repository!==LEGACY_ARCANE_REPOSITORY
+        ||typeof value.source.legacyProjection.commit!=='string'
+        ||!/^[a-f0-9]{40}$/.test(value.source.legacyProjection.commit)
+        ||value.source.legacyProjection.bundleVersion!=='0.8.12'){
         fail('Runtime manifest source identity is invalid.');
     }
     if(!Array.isArray(value.files)||!Number.isSafeInteger(value.fileCount)

@@ -61,13 +61,13 @@ lets a refresh read the saved SDK source without copying it into the app.
 Distribution never follows that mount. It embeds and verifies the application's
 locked immutable SDK projection.
 
-The existing `tools/runtime-source.json` Arcane OS commit pin and
-OS-to-SDK synchronization command record provenance for already published
-compatibility bytes during migration; they do not define durable canonical
-ownership. A separately leased source/projection cutover must replace that
-direction before the ownership migration is called complete. Until then, do
-not use the transitional synchronization path to overwrite SDK-canonical
-shared AI runtime or shared component sources.
+`tools/runtime-source.json` declares SDK-canonical authority for
+`runtime/arcane/` and retains the prior Arcane OS source only as legacy
+provenance for migrated compatibility bytes. The old OS-to-SDK synchronization
+direction is retired and fails closed. Arcane OS must consume a locked SDK
+projection through the same package/source-mount boundary as other apps; its
+repository-side consumer cutover is coordinated separately and does not create
+a co-equal source.
 
 ## Workspace profiles
 
@@ -200,7 +200,7 @@ length with an EOF growth probe, and rechecked by handle and pathname identity.
 Every cumulative path prefix has one case-folded spelling and one file/directory
 kind; prefix topology conflicts and the complete portable Windows device-name
 set fail before creation or admission.
-The current SDK admits only the explicitly compatible `0.1.0-dev.5` bundle
+The current SDK admits only the explicitly compatible `0.2.0` bundle
 generation and rejects zero-byte payload releases.
 
 Promotion retains any prior output as an identity-bound backup until the new
@@ -320,7 +320,7 @@ through SDK-bound verified readers rather than accepting a mutable source path
 as authority. Build completion requires provider verification, and later
 verify/run calls receive the exact artifact receipt.
 
-The SDK `0.1.0-dev.5` runtime requires Arcane `0.8.12` or newer. Compatibility
+The SDK `0.2.0` runtime requires Arcane `0.8.12` or newer. Compatibility
 is contractual rather than exact-version pinning: the prepared Core must meet
 the highest minimum declared by the runtime, selected app, and bundled app
 dependencies; keep each app's Arcane protocol generation; and provide every

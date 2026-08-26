@@ -1036,7 +1036,7 @@ function packagedRuntimeAuthorities(receipt){
         ||!Number.isSafeInteger(receipt.fileCount)||receipt.fileCount<1
         ||!Number.isSafeInteger(receipt.totalBytes)||receipt.totalBytes<1
         ||!SHA256_PATTERN.test(receipt.contentSha256??'')
-        ||!isPlainObject(arcane)||arcane.authority!=='arcane-os-upstream'
+        ||!isPlainObject(arcane)||arcane.authority!=='arcane-os-sdk'
         ||!SHA256_PATTERN.test(arcane.manifestSha256??'')
         ||!SHA256_PATTERN.test(arcane.contentSha256??'')
         ||!isPlainObject(arcane.source)
@@ -1158,7 +1158,7 @@ async function authenticatePackageRuntimeVerificationState(context,state,{signal
     });
     const workspaceReceipt=snapshot.workspaceRuntimeReceipt;
     const expectedArcaneSource={
-        authority:'arcane-os-upstream',
+        authority:'arcane-os-sdk',
         location:snapshot.runtimeReceipt.canonicalLocation,
         manifestSha256:snapshot.runtimeReceipt.manifestSha256,
         contentSha256:snapshot.runtimeReceipt.contentSha256,

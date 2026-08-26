@@ -658,6 +658,7 @@ import {
 } from 'arcane-os';
 import runtimeRelease from 'arcane-os/runtime/manifest' with {type:'json'};
 import test from 'arcane-os/testing';
+import * as browserSpeech from 'arcane-os/ai/browser-speech';
 import * as browserWasm from 'arcane-os/ai/browser-wasm';
 
 test('installed public SDK capabilities are coherent',async()=>{
@@ -676,6 +677,18 @@ test('installed public SDK capabilities are coherent',async()=>{
     manager.emit('release.smoke',42);
     assert.equal(observed,42);
     assert.equal(manager.history[0]?.protocol,ARCANE_EVENT_STACK_PROTOCOL);
+
+    assert.deepEqual(Object.keys(browserSpeech).sort(),[
+        'BROWSER_SPEECH_ARTIFACT_PROTOCOL',
+        'createBrowserKokoroProvider',
+        'createBrowserSpeechAuthority',
+        'createBrowserWhisperProvider',
+        'createDbopfsSpeechArtifactStore'
+    ]);
+    assert.equal(
+        browserSpeech.BROWSER_SPEECH_ARTIFACT_PROTOCOL,
+        'arcane-ai-browser-speech-artifacts/1'
+    );
 
     assert.deepEqual(Object.keys(browserWasm).sort(),[
         'BROWSER_WASM_RUNTIME_AUTHORITY',
@@ -733,6 +746,7 @@ test('installed public SDK capabilities are coherent',async()=>{
     assert.equal(provider2.status().integrity.state,'unchecked');
     assert.deepEqual(provider2.catalog().map(model=>model.id),['installed-smoke-model']);
     const ai=browserWasm.createArcaneAI({provider,loadPolicy:'manual'});
+    assert.equal(typeof ai.createChatSession,'function');
     assert.equal(ai.status().llm.state,'unloaded');
     assert.equal(ai.status().llm.capabilities.localOnly,true);
     assert.equal(ai.status().llm.runtime,authority);
