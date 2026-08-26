@@ -142,6 +142,41 @@ test("AbortSignal delivery suppression remains distinct from upstream cancellati
   assert.match(upstreamWllama, /await this\.cancelRequest\(reqId\)/u);
 });
 
+test("complete peg-native final output is recovered only from the matching Wllama bridge failure", async () => {
+  const runtime = await readFile(
+    repoPath("browser-runtime", "ai", "browser-wllama-runtime.mjs"),
+    "utf8",
+  );
+  assert.match(runtime, /common_chat_peg_parse: unparsed peg-native output:/u);
+  assert.match(runtime, /<\|channel\|>final <\|constrain\|>content<\|message\|>/u);
+  assert.match(runtime, /The model produced output that does not match the expected peg-native format/u);
+  assert.match(runtime, /MAX_RECOVERED_COMPLETION_CHARACTERS/u);
+  assert.match(runtime, /MAX_RECOVERED_COMPLETION_LINES/u);
+  assert.match(runtime, /error\?\.name !== "Error"/u);
+  assert.match(runtime, /error\?\.message !== "Invalid magic number"/u);
+  assert.match(runtime, /stack\.includes\("glueDeserialize"\)/u);
+  assert.match(runtime, /stack\.includes\("ProxyToWorker"\)/u);
+  assert.match(runtime, /level !== "warn"/u);
+  assert.match(runtime, /level === "error" && line\.trim\(\) === PEG_NATIVE_FAILURE/u);
+  assert.match(runtime, /level !== "log"/u);
+  assert.match(runtime, /content\.includes\("<\|"\)/u);
+  assert.match(runtime, /const locallySuppressed = operation\?\.locallySuppressed\(\) === true/u);
+  assert.match(runtime, /const recoveredContent = locallySuppressed\s+\? null/su);
+  assert.match(runtime, /streamCapture\.matches\(recoveredContent\)/u);
+  assert.match(runtime, /choice\.finish_reason !== undefined && choice\.finish_reason !== null/u);
+  assert.match(runtime, /delta\.tool_calls !== undefined/u);
+  assert.match(runtime, /delta\.reasoning_content !== undefined/u);
+  assert.doesNotMatch(runtime, /sawAssistant/u);
+  assert.match(runtime, /requireCancellationAcknowledgement: true/u);
+  assert.match(runtime, /cancellation\?\.sequence > previousSequence/u);
+  assert.match(runtime, /cancellation\.responseName === "cncl_res"/u);
+  assert.match(runtime, /cancellation\.acknowledged === true/u);
+  assert.match(runtime, /cancellation\.failed === false/u);
+  assert.match(runtime, /ARCANE_AI_COMPLETION_RECOVERY_UNCONFIRMED/u);
+  assert.match(runtime, /recovery: "peg-native-final-output"/u);
+  assert.doesNotMatch(runtime, /finish_reason: "stop"/u);
+});
+
 test("component authority records the projection without changing Wllama WASM", async () => {
   const receipt = JSON.parse(await readFile(
     repoPath("browser-runtime", "ai", "ARCANE_AI_BROWSER_WASM_COMPONENTS.json"),

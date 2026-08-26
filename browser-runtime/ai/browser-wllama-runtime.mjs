@@ -7,6 +7,11 @@ const RUNTIME_EVIDENCE_PROTOCOL = "arcane-wllama-runtime-evidence/1";
 const FULL_GPU_LAYERS = 99_999;
 const WEBGPU_ADAPTER_PATTERN = /^ggml_webgpu: adapter_info: vendor_id: (\d+) \| vendor: (.*?) \| architecture: (.*?) \| device_id: (\d+) \| name: (.*?) \| device_desc: (.*)$/u;
 const GPU_OFFLOAD_PATTERN = /^[^:]+: offloaded (\d+)\/(\d+) layers to GPU$/u;
+const PEG_NATIVE_OUTPUT_PREFIX = "common_chat_peg_parse: unparsed peg-native output: ";
+const PEG_NATIVE_FINAL_PREFIX = "<|channel|>final <|constrain|>content<|message|>";
+const PEG_NATIVE_FAILURE = "The model produced output that does not match the expected peg-native format";
+const MAX_RECOVERED_COMPLETION_CHARACTERS = 1_048_576;
+const MAX_RECOVERED_COMPLETION_LINES = 16_384;
 
 function deepFreeze(value) {
   if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
@@ -121,12 +126,38 @@ function createEvidenceLogger(logger) {
   let adapter = null;
   let offload = null;
   let invalid = false;
+  let completionCapture = null;
 
   function same(left, right) {
     return JSON.stringify(left) === JSON.stringify(right);
   }
 
-  function observeLine(value) {
+  function observeCompletionLine(level, value) {
+    if (!completionCapture) return;
+    const line = String(value).replace(/\r$/u, "");
+    if (!completionCapture.started) {
+      if (level !== "warn" || !line.startsWith(PEG_NATIVE_OUTPUT_PREFIX)) return;
+      completionCapture.started = true;
+      completionCapture.lines.push(line.slice(PEG_NATIVE_OUTPUT_PREFIX.length));
+    } else if (level === "error" && line.trim() === PEG_NATIVE_FAILURE) {
+      completionCapture.complete = true;
+      return;
+    } else if (!completionCapture.complete) {
+      if (level !== "log") completionCapture.invalid = true;
+      completionCapture.lines.push(line);
+    }
+    completionCapture.characters += line.length + 1;
+    if (
+      completionCapture.characters > MAX_RECOVERED_COMPLETION_CHARACTERS
+      || completionCapture.lines.length > MAX_RECOVERED_COMPLETION_LINES
+    ) {
+      completionCapture.invalid = true;
+      completionCapture.lines.length = 0;
+    }
+  }
+
+  function observeLine(level, value) {
+    observeCompletionLine(level, value);
     const line = String(value).trim();
     if (!line) return;
     const adapterMatch = line.match(WEBGPU_ADAPTER_PATTERN);
@@ -153,25 +184,123 @@ function createEvidenceLogger(logger) {
     }
   }
 
-  function observe(args) {
+  function observe(level, args) {
     for (const value of args) {
       if (typeof value !== "string") continue;
-      for (const line of value.split(/\r?\n/u)) observeLine(line);
+      for (const line of value.split(/\r?\n/u)) observeLine(level, line);
     }
   }
 
   const wrapped = {};
   for (const level of ["debug", "log", "warn", "error"]) {
     wrapped[level] = (...args) => {
-      observe(args);
+      observe(level, args);
       if (typeof logger?.[level] === "function") logger[level](...args);
     };
   }
 
   return Object.freeze({
     logger: Object.freeze(wrapped),
+    beginCompletionCapture() {
+      if (completionCapture) {
+        throw runtimeFailure(
+          "ARCANE_AI_RUNTIME_BUSY",
+          "A Wllama completion capture is already active.",
+        );
+      }
+      const capture = {
+        started: false,
+        complete: false,
+        invalid: false,
+        characters: 0,
+        lines: [],
+      };
+      completionCapture = capture;
+
+      function release() {
+        if (completionCapture === capture) completionCapture = null;
+      }
+
+      return Object.freeze({
+        recover(error, { aborted = false } = {}) {
+          release();
+          const stack = String(error?.stack ?? "");
+          if (
+            aborted
+            || error?.name !== "Error"
+            || error?.message !== "Invalid magic number"
+            || !stack.includes("glueDeserialize")
+            || !stack.includes("ProxyToWorker")
+            || !capture.started
+            || !capture.complete
+            || capture.invalid
+          ) return null;
+
+          const raw = capture.lines.join("\n");
+          if (!raw.startsWith(PEG_NATIVE_FINAL_PREFIX)) return null;
+          const content = raw.slice(PEG_NATIVE_FINAL_PREFIX.length);
+          if (!content.trim() || content.includes("<|")) return null;
+          return content;
+        },
+        release,
+      });
+    },
     snapshot() {
       return deepFreeze({ adapter, offload, invalid });
+    },
+  });
+}
+
+function createStructuredStreamCapture() {
+  let content = "";
+  let invalid = false;
+  let sawContent = false;
+  let chunks = 0;
+
+  function observe(value) {
+    chunks += 1;
+    if (!value || typeof value !== "object" || !Array.isArray(value.choices)) {
+      invalid = true;
+      return;
+    }
+    if (value.choices.length !== 1) {
+      invalid = true;
+      return;
+    }
+    const choice = value.choices[0];
+    const delta = choice?.delta;
+    if (
+      choice?.index !== 0
+      || !delta
+      || typeof delta !== "object"
+      || Array.isArray(delta)
+      || (delta.role !== undefined && delta.role !== "assistant")
+      || (choice.finish_reason !== undefined && choice.finish_reason !== null)
+      || delta.tool_calls !== undefined
+      || delta.function_call !== undefined
+      || delta.reasoning_content !== undefined
+    ) {
+      invalid = true;
+      return;
+    }
+    if (delta.content === undefined || delta.content === null) return;
+    if (typeof delta.content !== "string") {
+      invalid = true;
+      return;
+    }
+    content += delta.content;
+    sawContent = true;
+    if (content.length > MAX_RECOVERED_COMPLETION_CHARACTERS) invalid = true;
+  }
+
+  return Object.freeze({
+    observe,
+    matches(value) {
+      return chunks > 0
+        && !invalid
+        && sawContent
+        && content.length > 0
+        && content === value;
     },
   });
 }
@@ -528,24 +657,34 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
     });
   }
 
-  async function recordInference(session, before, { aborted }) {
+  async function recordInference(
+    session,
+    before,
+    { aborted, requireCancellationAcknowledgement = false },
+  ) {
     let after;
     try {
       after = verifyProjectedTelemetry(await session.arcaneTelemetry());
     } catch (error) {
-      if (!aborted) throw error;
+      if (!aborted && !requireCancellationAcknowledgement) throw error;
       await terminateUnacknowledgedCancellation(session, error);
+      if (requireCancellationAcknowledgement) {
+        throw runtimeFailure(
+          "ARCANE_AI_COMPLETION_RECOVERY_UNCONFIRMED",
+          "Wllama completion recovery could not prove request settlement.",
+          error,
+        );
+      }
       return;
     }
+    const previousSequence = before?.cancellation?.sequence ?? 0;
+    const cancellation = after.cancellation;
+    const cancellationAcknowledged = cancellation?.sequence > previousSequence
+      && cancellation.responseName === "cncl_res"
+      && cancellation.acknowledged === true
+      && cancellation.failed === false;
     if (aborted) {
-      const previousSequence = before?.cancellation?.sequence ?? 0;
-      const cancellation = after.cancellation;
-      if (
-        cancellation?.sequence > previousSequence
-        && cancellation.responseName === "cncl_res"
-        && cancellation.acknowledged === true
-        && cancellation.failed === false
-      ) {
+      if (cancellationAcknowledged) {
         publishEvidence({
           cancellation: deepFreeze({
             deliverySuppressed: true,
@@ -567,6 +706,16 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
         "Wllama cancellation was not acknowledged.",
       );
       return;
+    }
+    if (requireCancellationAcknowledgement && !cancellationAcknowledged) {
+      await terminateUnacknowledgedCancellation(
+        session,
+        "Wllama completion recovery could not prove cancellation acknowledgement.",
+      );
+      throw runtimeFailure(
+        "ARCANE_AI_COMPLETION_RECOVERY_UNCONFIRMED",
+        "Wllama completion recovery could not prove request settlement.",
+      );
     }
 
     const submissions = after.worker.queueSubmissions - before.worker.queueSubmissions;
@@ -597,7 +746,21 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
         },
         lastInference: { submissions, commandBuffers, fenceRequests, fenceCompletions },
       }),
-      cancellation: null,
+      cancellation: requireCancellationAcknowledgement
+        ? deepFreeze({
+          deliverySuppressed: false,
+          recovery: "peg-native-final-output",
+          upstream: {
+            kind: "llama-request-cancel-acknowledged",
+            sequence: cancellation.sequence,
+            requestId: cancellation.requestId,
+            responseName: cancellation.responseName,
+            acknowledged: true,
+            failed: false,
+          },
+          immediateGpuKernelPreemptionClaimed: false,
+        })
+        : null,
     });
   }
 
@@ -643,32 +806,58 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
     inferenceActive = true;
     try {
       const session = assertLoaded();
+      const observer = sessionObservers.get(session);
+      const streamCapture = createStructuredStreamCapture();
+      let capture = null;
       let operation = null;
       let before = null;
       try {
         before = verifyProjectedTelemetry(await session.arcaneTelemetry());
         const abortSignal = options.abortSignal ?? null;
+        capture = observer.beginCompletionCapture();
+        const deliver = onData
+          ? (chunk) => {
+            streamCapture.observe(chunk);
+            onData(chunk);
+          }
+          : null;
         operation = trackOperation(Promise.resolve().then(() => session.createChatCompletion({
           ...options,
           stream: Boolean(onData),
-          ...(onData ? { onData } : {}),
+          ...(deliver ? { onData: deliver } : {}),
           abortSignal,
         })));
         const result = await operation.result;
+        capture.release();
         await recordInference(session, before, { aborted: false });
         return result;
       } catch (error) {
         const abortSignal = options.abortSignal ?? null;
+        const locallySuppressed = operation?.locallySuppressed() === true;
         const aborted = operation !== null
-          && !operation.locallySuppressed()
+          && !locallySuppressed
           && (abortSignal?.aborted || error?.name === "AbortError");
+        const recoveredContent = locallySuppressed
+          ? null
+          : capture?.recover(error, { aborted }) ?? null;
+        if (onData && recoveredContent !== null && streamCapture.matches(recoveredContent)) {
+          // Wllama has already awaited cancelRequest() before rejecting here.
+          // The streamed text is exact, but the native stop reason is unknown.
+          await recordInference(session, before, {
+            aborted: false,
+            requireCancellationAcknowledgement: true,
+          });
+          return null;
+        }
         if (aborted) {
           await operation.raw.catch(() => undefined);
           await recordInference(session, before, { aborted: true });
-        } else if (operation === null || !operation.locallySuppressed()) {
+        } else if (operation === null || !locallySuppressed) {
           await invalidateFatalSession(session, error);
         }
         throw error;
+      } finally {
+        capture?.release();
       }
     } finally {
       inferenceActive = false;
