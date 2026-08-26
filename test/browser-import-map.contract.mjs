@@ -47,7 +47,7 @@ const TASKKILL_TIMEOUT_MS=3_000;
 const TASKKILL_DRAIN_TIMEOUT_MS=2_000;
 const CHROME_DRAIN_TIMEOUT_MS=5_000;
 const PROFILE_CLEANUP_TIMEOUT_MS=5_000;
-const EXPECTED_IMPORT_COUNT=91;
+const EXPECTED_IMPORT_COUNT=94;
 const EXPECTED_ARCANE_FILE_COUNT=185;
 const HOSTILE_DEPENDENCY_PATHS=Object.freeze([
     'node_modules/event-pubsub/index.js',
@@ -175,6 +175,18 @@ async function paritySnapshot(root){
     assert.equal(
         map.imports['#arcane/persistent-ai-chat-session'],
         './arcane/modules/PersistentAIChatSession.js'
+    );
+    assert.equal(
+        map.imports['arcane/DBOPFSDocumentLibrary'],
+        './arcane/modules/DBOPFSDocumentLibrary.js'
+    );
+    assert.equal(
+        map.imports['arcane/DocumentLexicalSearch'],
+        './arcane/modules/DocumentLexicalSearch.js'
+    );
+    assert.equal(
+        map.imports['arcane/entities/Chat'],
+        './arcane/entities/Chat.js'
     );
     assert.equal(
         map.imports['event-pubsub'],
