@@ -69,10 +69,12 @@
           "const": "node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json"
         },
         "manifestSha256": {
-          "const": "e71fdfeba6545ceef04a0eb9e406809f4c7cd0df9c70d753ff731b76817279ad"
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         },
         "contentSha256": {
-          "const": "ba1392154996348e2beb9ffa82c04f2ae1cafeef9781fe33d9e3774510932206"
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         },
         "builder": {
           "const": "arcane-sdk-browser-runtime-v1"

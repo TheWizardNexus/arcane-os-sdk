@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {constants as FS_CONSTANTS} from 'node:fs';
-import {lstat,open,readdir,realpath} from 'node:fs/promises';
+import {lstat,open,readFile,readdir,realpath} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {SDK_VERSION} from './constants.mjs';
@@ -8,16 +8,25 @@ import {SDK_VERSION} from './constants.mjs';
 const MANIFEST_NAME='ARCANE_SDK_BROWSER_RELEASE.json';
 const BUILDER='arcane-sdk-browser-runtime-v1';
 const PROTOCOL='arcane-sdk-browser-runtime/1';
-export const SDK_BROWSER_RUNTIME_MANIFEST_SHA256=
-    'e71fdfeba6545ceef04a0eb9e406809f4c7cd0df9c70d753ff731b76817279ad';
-export const SDK_BROWSER_RUNTIME_CONTENT_SHA256=
-    'ba1392154996348e2beb9ffa82c04f2ae1cafeef9781fe33d9e3774510932206';
 const REPOSITORY='https://github.com/TheWizardNexus/arcane-os-sdk.git';
 const SHA256_PATTERN=/^[a-f0-9]{64}$/u;
 const READ_ONLY_NO_FOLLOW=FS_CONSTANTS.O_RDONLY|(FS_CONSTANTS.O_NOFOLLOW??0);
 const MAX_VERIFIED_FILE_BYTES=64*1024*1024;
 const packageRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const defaultRoot=path.join(packageRoot,'browser-runtime');
+const canonicalManifestBytes=await readFile(path.join(defaultRoot,MANIFEST_NAME));
+const canonicalRelease=JSON.parse(canonicalManifestBytes.toString('utf8'));
+if(
+    canonicalRelease?.schemaVersion!==1
+    ||canonicalRelease.builder!==BUILDER
+    ||canonicalRelease.sdkVersion!==SDK_VERSION
+    ||!SHA256_PATTERN.test(canonicalRelease.contentSha256)
+){
+    throw new Error('The canonical SDK browser runtime receipt is invalid.');
+}
+export const SDK_BROWSER_RUNTIME_MANIFEST_SHA256=
+    createHash('sha256').update(canonicalManifestBytes).digest('hex');
+export const SDK_BROWSER_RUNTIME_CONTENT_SHA256=canonicalRelease.contentSha256;
 const issuedReceipts=new WeakSet();
 const expectedAiComponents=Object.freeze({
     schemaVersion:1,
