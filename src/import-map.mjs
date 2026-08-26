@@ -86,6 +86,35 @@ function safeRelativePath(value,label='path'){
     return value;
 }
 
+function normalizedDocumentPaths(entry,documents){
+    if(documents===undefined)return Object.freeze([entry]);
+    if(!Array.isArray(documents)||documents.length===0){
+        fail('Import-map documents must be a non-empty array of application-relative paths.');
+    }
+    const normalized=[];
+    const identities=new Map();
+    for(const [index,value] of documents.entries()){
+        const relative=safeRelativePath(value,`documents[${String(index)}]`);
+        const key=collisionKey(relative);
+        const prior=identities.get(key);
+        if(prior!==undefined){
+            fail(
+                `Import-map documents contain a duplicate or portable path collision: `
+                +`${prior} and ${relative}.`
+            );
+        }
+        identities.set(key,relative);
+        normalized.push(relative);
+    }
+    if(!normalized.includes(entry)){
+        fail(`Import-map documents must include the configured application entry: ${entry}.`);
+    }
+    return Object.freeze([
+        entry,
+        ...normalized.filter(relative=>relative!==entry).sort(compareUtf8)
+    ]);
+}
+
 function decodedEscape(source,index){
     const character=source[index];
     if(/[1-9]/u.test(character)||(character==='0'&&/[0-9]/u.test(source[index+1]??''))){
@@ -1760,14 +1789,20 @@ export function inspectImportMapHtml(html){
     });
 }
 
-function renderManagedHtml(html,json){
+function documentBaseHref(relative){
+    const directory=path.posix.dirname(relative);
+    const depth=directory==='.'?0:directory.split('/').length;
+    return '../'.repeat(depth+2);
+}
+
+function renderManagedHtml(html,json,baseHref='../../'){
     const structure=scanHtmlStructure(html);
     const activeBases=structure.bases.map(base=>({
         ...base,
         href:structuralAttribute(parseTagAttributes(base.open),'href','base')
     }));
-    if(activeBases.length!==1||activeBases[0].href!=='../../'){
-        fail('Application HTML must contain exactly one active <base href="../../"> element.');
+    if(activeBases.length!==1||activeBases[0].href!==baseHref){
+        fail(`Application HTML must contain exactly one active <base href="${baseHref}"> element.`);
     }
     const complete=[];
     for(const script of structure.scripts){
@@ -1796,8 +1831,8 @@ function renderManagedHtml(html,json){
         ...base,
         href:structuralAttribute(parseTagAttributes(base.open),'href','base')
     }));
-    if(cleanedBases.length!==1||cleanedBases[0].href!=='../../'){
-        fail('Application HTML must retain exactly one active <base href="../../"> element.');
+    if(cleanedBases.length!==1||cleanedBases[0].href!==baseHref){
+        fail(`Application HTML must retain exactly one active <base href="${baseHref}"> element.`);
     }
     const firstBlocking=firstBlockingLoadPosition(withoutManaged);
     if(firstBlocking>=0&&cleanedBases[0].start>firstBlocking){
@@ -2155,73 +2190,53 @@ async function installStagedFile(state,staged,label){
     };
 }
 
-async function commitGeneratedPair({
-    artifactState,
-    entryState,
-    artifactBytes,
-    entryBytes,
+async function commitGeneratedFiles({
+    files,
     signal,
     onEvent
 }){
-    const artifactStage=await stageSibling(
-        artifactState.filePath,
-        artifactBytes,
-        artifactState.directoryState
-    );
-    let entryStage;
-    let artifactInstall;
-    let entryInstall;
+    const staged=[];
+    const installed=[];
     let failure;
     try{
-        entryStage=await stageSibling(
-            entryState.filePath,
-            entryBytes,
-            entryState.directoryState
-        );
+        for(const file of files){
+            throwIfAborted(signal);
+            staged.push(await stageSibling(
+                file.state.filePath,
+                file.bytes,
+                file.state.directoryState
+            ));
+        }
         await emit(onEvent,{type:'import-map.commit.staged'});
         throwIfAborted(signal);
-        artifactInstall=await installStagedFile(
-            artifactState,
-            artifactStage,
-            'Import-map artifact'
-        );
-        entryInstall=await installStagedFile(entryState,entryStage,'Import-map application entry');
-        await artifactInstall.verify();
-        await entryInstall.verify();
+        for(const [index,file] of files.entries()){
+            installed.push(await installStagedFile(file.state,staged[index],file.label));
+            throwIfAborted(signal);
+        }
+        for(const transaction of installed)await transaction.verify();
         await emit(onEvent,{
             type:'import-map.commit.progress',
-            paths:Object.freeze([artifactState.filePath,entryState.filePath])
+            paths:Object.freeze(files.map(file=>file.state.filePath))
         });
         throwIfAborted(signal);
-        await artifactInstall.verify();
-        await entryInstall.verify();
+        for(const transaction of installed)await transaction.verify();
     }catch(error){
-        if(entryInstall)await entryInstall.rollback().catch(rollback=>{error.rollbackError??=rollback;});
-        if(artifactInstall){
-            await artifactInstall.rollback().catch(rollback=>{error.rollbackError??=rollback;});
+        for(const transaction of [...installed].reverse()){
+            await transaction.rollback().catch(rollback=>{error.rollbackError??=rollback;});
         }
         failure=error;
     }
     const cleanupErrors=[];
-    if(!artifactInstall){
+    for(const [index,stage] of staged.entries()){
+        if(index<installed.length)continue;
         try{
             const removed=await removeOwnedPath(
-                artifactStage.path,
-                artifactStage.identity,
-                artifactStage.directoryState
-            );
-            if(!removed)fail(`Import-map artifact stage could not be safely cleaned: ${artifactStage.path}.`);
-        }catch(error){cleanupErrors.push(error);}
-    }
-    if(entryStage&&!entryInstall){
-        try{
-            const removed=await removeOwnedPath(
-                entryStage.path,
-                entryStage.identity,
-                entryStage.directoryState
+                stage.path,
+                stage.identity,
+                stage.directoryState
             );
             if(!removed){
-                fail(`Import-map application-entry stage could not be safely cleaned: ${entryStage.path}.`);
+                fail(`${files[index].label} stage could not be safely cleaned: ${stage.path}.`);
             }
         }catch(error){cleanupErrors.push(error);}
     }
@@ -2238,12 +2253,11 @@ async function commitGeneratedPair({
     }
 
     const cleanupWarnings=[];
-    for(const installed of [entryInstall,artifactInstall]){
-        try{await installed.commit();}
+    for(const transaction of [...installed].reverse()){
+        try{await transaction.commit();}
         catch(error){cleanupWarnings.push(error);}
     }
-    await artifactInstall.verify();
-    await entryInstall.verify();
+    for(const transaction of installed)await transaction.verify();
     if(cleanupWarnings.length>0){
         return Object.freeze(cleanupWarnings.map(error=>String(error?.message??error)));
     }
@@ -2264,6 +2278,7 @@ async function generateImportMapUnlocked({
     appId,
     appRoot,
     entry='index.html',
+    documents,
     workspaceRuntimeReceipt,
     signal,
     onEvent
@@ -2275,21 +2290,45 @@ async function generateImportMapUnlocked({
     const resolvedWorkspace=path.resolve(workspaceRoot);
     const resolvedApp=resolvedAppRoot(resolvedWorkspace,appId,appRoot);
     const safeEntry=safeRelativePath(entry,'application entry');
-    const entryPath=path.resolve(resolvedApp,...safeEntry.split('/'));
-    if(!pathInside(resolvedApp,entryPath))fail('Import-map application entry escapes its app root.');
+    const safeDocuments=normalizedDocumentPaths(safeEntry,documents);
+    const documentPaths=Object.freeze(safeDocuments.map(relative=>{
+        const documentPath=path.resolve(resolvedApp,...relative.split('/'));
+        if(!pathInside(resolvedApp,documentPath)){
+            fail(`Import-map application document escapes its app root: ${relative}.`);
+        }
+        return documentPath;
+    }));
+    const entryPath=documentPaths[0];
     const artifactPath=path.join(resolvedApp,...IMPORT_MAP_RELATIVE_PATH.split('/'));
-    await emit(onEvent,{type:'import-map.started',appId,artifactPath,entryPath});
+    await emit(onEvent,{
+        type:'import-map.started',
+        appId,
+        artifactPath,
+        entryPath,
+        documentPaths,
+        documentCount:documentPaths.length
+    });
 
-    const entryDirectoryState=await captureDirectoryState(
-        resolvedWorkspace,
-        path.dirname(entryPath)
-    );
-    const entryState=await readRealFileState(entryPath,'Import-map application entry');
-    entryState.directoryState=entryDirectoryState;
-    const html=entryState.bytes.toString('utf8');
-    // Reject malformed application structure before traversing the substantially larger runtime
-    // graph. The real generated map is rendered and revalidated again before commit.
-    renderManagedHtml(html,'{"imports":{}}\n');
+    const documentStates=[];
+    for(const [index,documentPath] of documentPaths.entries()){
+        throwIfAborted(signal);
+        const label=index===0
+            ?'Import-map application entry'
+            :`Import-map application document ${safeDocuments[index]}`;
+        const directoryState=await captureDirectoryState(
+            resolvedWorkspace,
+            path.dirname(documentPath)
+        );
+        const state=await readRealFileState(documentPath,label);
+        throwIfAborted(signal);
+        state.directoryState=directoryState;
+        const html=state.bytes.toString('utf8');
+        // Reject malformed application structure before traversing the substantially larger
+        // runtime graph. The real generated map is rendered and revalidated before commit.
+        const baseHref=documentBaseHref(safeDocuments[index]);
+        renderManagedHtml(html,'{"imports":{}}\n',baseHref);
+        documentStates.push({state,html,label,baseHref});
+    }
     let runtime;
     if(workspaceRuntimeReceipt){
         await authenticateWorkspaceRuntimeReceipt(workspaceRuntimeReceipt,{
@@ -2319,7 +2358,10 @@ async function generateImportMapUnlocked({
     const built=await buildImportMap({files:runtime.files,readFile:runtime.readFile,signal});
     const document={imports:built.imports};
     const json=`${JSON.stringify(document,null,2).replaceAll('<','\\u003c')}\n`;
-    const renderedHtml=renderManagedHtml(html,json);
+    const renderedDocuments=documentStates.map(item=>Object.freeze({
+        ...item,
+        bytes:Buffer.from(renderManagedHtml(item.html,json,item.baseHref),'utf8')
+    }));
 
     throwIfAborted(signal);
     const artifactDirectoryState=await captureDirectoryState(
@@ -2333,11 +2375,16 @@ async function generateImportMapUnlocked({
         {optional:true}
     );
     artifactState.directoryState=artifactDirectoryState;
-    const cleanupWarnings=await commitGeneratedPair({
-        artifactState,
-        entryState,
-        artifactBytes:Buffer.from(json,'utf8'),
-        entryBytes:Buffer.from(renderedHtml,'utf8'),
+    const artifactBytes=Buffer.from(json,'utf8');
+    const cleanupWarnings=await commitGeneratedFiles({
+        files:[
+            {state:artifactState,bytes:artifactBytes,label:'Import-map artifact'},
+            ...renderedDocuments.map(item=>({
+                state:item.state,
+                bytes:item.bytes,
+                label:item.label
+            }))
+        ],
         signal,
         onEvent
     });
@@ -2345,21 +2392,23 @@ async function generateImportMapUnlocked({
         Object.freeze({
             role:'artifact',
             path:path.relative(resolvedWorkspace,artifactPath).split(path.sep).join('/'),
-            bytes:Buffer.byteLength(json,'utf8'),
-            sha256:sha256(Buffer.from(json,'utf8'))
+            bytes:artifactBytes.length,
+            sha256:sha256(artifactBytes)
         }),
-        Object.freeze({
-            role:'entry',
-            path:path.relative(resolvedWorkspace,entryPath).split(path.sep).join('/'),
-            bytes:Buffer.byteLength(renderedHtml,'utf8'),
-            sha256:sha256(Buffer.from(renderedHtml,'utf8'))
-        })
+        ...renderedDocuments.map((item,index)=>Object.freeze({
+            role:index===0?'entry':'document',
+            path:path.relative(resolvedWorkspace,item.state.filePath).split(path.sep).join('/'),
+            bytes:item.bytes.length,
+            sha256:sha256(item.bytes)
+        }))
     ]);
     const receipt=Object.freeze({
         appId,
         artifactPath,
         artifactRelativePath:path.relative(resolvedWorkspace,artifactPath).split(path.sep).join('/'),
         entryPath,
+        documentPaths,
+        documentCount:documentPaths.length,
         imports:built.imports,
         entryCount:built.entryCount,
         excludedModules:built.excludedModules,
@@ -2373,6 +2422,8 @@ async function generateImportMapUnlocked({
             appId,
             artifactPath,
             entryPath,
+            documentPaths,
+            documentCount:receipt.documentCount,
             entryCount:receipt.entryCount,
             cleanupWarnings:receipt.cleanupWarnings,
             committed:true

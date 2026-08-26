@@ -34,6 +34,14 @@ export const RELEASE_MANIFEST_NAME='ARCANE_APP_RELEASE.json';
 export const PACKAGER_VERSION='arcane-app-packager-v1';
 
 const RUNTIME_AUTHORITIES_NAME='ARCANE_RUNTIME_AUTHORITIES.json';
+const RUNTIME_PROJECTION_NAME='ARCANE_RUNTIME_PROJECTION.json';
+const RUNTIME_PROJECTION_ERROR='ARCANE_RUNTIME_PROJECTION_INVALID';
+const GENERATED_PACKAGE_ROOT_PATH_KEYS=new Set([
+    RELEASE_MANIFEST_NAME,
+    RUNTIME_AUTHORITIES_NAME,
+    RUNTIME_PROJECTION_NAME,
+    'index.html'
+].map(pathKey));
 
 const RENAME_RETRY_CODES=new Set(['EACCES','EBUSY','EPERM']);
 const RENAME_RETRY_LIMIT=20;
@@ -513,7 +521,7 @@ function validateSharedRoute(route,label){
     }
 
     if(destination==='apps'||destination.startsWith('apps/')
-        ||destination===RELEASE_MANIFEST_NAME){
+        ||GENERATED_PACKAGE_ROOT_PATH_KEYS.has(pathKey(destination))){
         fail(`${label}.destination overlaps a reserved package path: ${destination}`);
     }
 
@@ -1073,6 +1081,63 @@ function packagedRuntimeAuthorities(receipt){
     });
 }
 
+function packagedRuntimeProjection(receipt){
+    const authorities=packagedRuntimeAuthorities(receipt);
+    if(!Array.isArray(receipt.files)){
+        fail('The composed workspace runtime receipt is missing its file inventory.',RUNTIME_PROJECTION_ERROR);
+    }
+    const files=[];
+    let previous=null;
+    let totalBytes=0;
+    for(const [index,file] of receipt.files.entries()){
+        if(!isPlainObject(file)){
+            fail(`Workspace runtime projection files[${index}] is invalid.`,RUNTIME_PROJECTION_ERROR);
+        }
+        let relative;
+        try{
+            relative=normalizeRelativePath(file.path,`workspace runtime projection files[${index}].path`);
+        }catch{
+            fail(`Workspace runtime projection files[${index}].path is invalid.`,RUNTIME_PROJECTION_ERROR);
+        }
+        if(relative!==file.path
+            ||!Number.isSafeInteger(file.bytes)||file.bytes<0
+            ||!SHA256_PATTERN.test(file.sha256??'')
+            ||previous!==null&&compareText(previous,relative)>=0){
+            fail(`Workspace runtime projection files[${index}] is invalid.`,RUNTIME_PROJECTION_ERROR);
+        }
+        totalBytes+=file.bytes;
+        if(!Number.isSafeInteger(totalBytes)){
+            fail('Workspace runtime projection byte total is invalid.',RUNTIME_PROJECTION_ERROR);
+        }
+        previous=relative;
+        files.push({path:relative,bytes:file.bytes,sha256:file.sha256});
+    }
+    const contentSha256=createHash('sha256')
+        .update(JSON.stringify(files))
+        .digest('hex');
+    if(files.length!==receipt.fileCount
+        ||totalBytes!==receipt.totalBytes
+        ||contentSha256!==receipt.contentSha256
+        ||files.length!==authorities.projection.fileCount
+        ||totalBytes!==authorities.projection.totalBytes
+        ||contentSha256!==authorities.projection.contentSha256){
+        fail(
+            'The workspace runtime file inventory does not match its admitted projection authority.',
+            RUNTIME_PROJECTION_ERROR
+        );
+    }
+    return immutableJsonCopy({
+        schemaVersion:1,
+        kind:'arcane-app-runtime-projection',
+        sdkVersion:receipt.sdkVersion,
+        pathPrefix:'arcane/',
+        fileCount:files.length,
+        totalBytes,
+        contentSha256,
+        files
+    });
+}
+
 async function hasExternalRuntimeAdmission(context){
     const lockPath=path.join(context.workspaceRoot,'arcane.lock.json');
     try{
@@ -1207,6 +1272,54 @@ async function issuePackageRuntimeVerificationState(context,{signal,onEvent}={})
     return Object.freeze({runtimeReceipt,sdkBrowserRuntimeReceipt,workspaceRuntimeReceipt});
 }
 
+function orderedBrowserDocumentPaths(entry,paths,label){
+    const selected=new Map();
+    for(const relative of paths){
+        const normalized=normalizeRelativePath(relative,label);
+        const key=pathKey(normalized);
+        const prior=selected.get(key);
+        if(prior!==undefined){
+            fail(`Package destination collision: ${prior} and ${normalized}.`);
+        }
+        selected.set(key,normalized);
+    }
+    const selectedEntry=selected.get(pathKey(entry));
+    if(selectedEntry!==entry){
+        fail(`The configured entry file was not found in the package payload: ${entry}`);
+    }
+    return Object.freeze([
+        entry,
+        ...[...selected.values()]
+            .filter(relative=>relative!==entry
+                &&isHtmlDocument(relative))
+            .sort(compareText)
+    ]);
+}
+
+function isHtmlDocument(relative){
+    const extension=path.posix.extname(relative).toLowerCase();
+    return extension==='.html'||extension==='.htm';
+}
+
+async function packageImportMapDocuments(context,{signal}={}){
+    const {workspaceRoot,appRoot,config}=context;
+    const files=await enumerateRoute({
+        workspaceRoot,
+        sourceRoot:appRoot,
+        destinationRoot:`apps/${config.id}`,
+        include:config.include,
+        exclude:config.exclude,
+        label:`apps.${config.id}`,
+        appPayload:true,
+        signal
+    });
+    return orderedBrowserDocumentPaths(
+        config.entry,
+        files.map(file=>file.sourceRelative),
+        `apps.${config.id} browser document`
+    );
+}
+
 async function refreshPackageImportMap(context,{
     runtimeVerificationState,
     workspaceOperationLease,
@@ -1251,11 +1364,13 @@ async function refreshPackageImportMap(context,{
             );
         workspaceRuntimeReceipt=authenticatedRuntimeState.workspaceRuntimeReceipt;
     }
+    const documents=await packageImportMapDocuments(context,{signal});
     const importMapReceipt=await generateImportMap({
         workspaceRoot:context.workspaceRoot,
         appId:context.config.id,
         appRoot:context.appRoot,
         entry:context.config.entry,
+        documents,
         workspaceRuntimeReceipt,
         workspaceOperationLease,
         signal,
@@ -1283,27 +1398,74 @@ function authenticatedImportMapReceipt(receipt){
 
 function importMapReceiptFiles(context,receipt){
     if(receipt==null||receipt.skipped===true)return Object.freeze([]);
-    if(!Array.isArray(receipt.files)||receipt.files.length!==2){
-        fail('The generated import-map receipt does not bind its committed artifact and entry files.');
+    if(!Array.isArray(receipt.files)||receipt.files.length<2
+        ||!Number.isSafeInteger(receipt.documentCount)||receipt.documentCount<1
+        ||!Array.isArray(receipt.documentPaths)
+        ||receipt.documentPaths.length!==receipt.documentCount
+        ||receipt.files.length!==receipt.documentCount+1){
+        fail('The generated import-map receipt does not bind its committed artifact and browser documents.');
     }
-    const expected=Object.freeze([
-        Object.freeze({
-            role:'artifact',
-            path:`apps/${context.config.id}/modules/arcane.importmap.json`
-        }),
-        Object.freeze({
-            role:'entry',
-            path:`apps/${context.config.id}/${context.config.entry}`
-        })
-    ]);
     const records=[];
-    for(const [index,record] of receipt.files.entries()){
+    const artifact=receipt.files[0];
+    assertOnlyKeys(
+        artifact,
+        new Set(['role','path','bytes','sha256']),
+        'import-map receipt files[0]'
+    );
+    const artifactPath=`apps/${context.config.id}/modules/arcane.importmap.json`;
+    if(artifact.role!=='artifact'
+        ||normalizeRelativePath(artifact.path,'import-map receipt files[0].path')!==artifactPath
+        ||!Number.isSafeInteger(artifact.bytes)||artifact.bytes<1
+        ||!SHA256_PATTERN.test(artifact.sha256??'')){
+        fail('The generated import-map receipt artifact record is invalid.');
+    }
+    records.push(Object.freeze({...artifact}));
+
+    const seen=new Set();
+    let previousDocument=null;
+    for(const [documentIndex,documentPath] of receipt.documentPaths.entries()){
+        const index=documentIndex+1;
+        if(typeof documentPath!=='string'||!path.isAbsolute(documentPath)){
+            fail(
+                `The generated import-map receipt documentPaths[${documentIndex}] is invalid.`
+            );
+        }
+        const resolved=path.resolve(documentPath);
+        if(!isInside(context.appRoot,resolved)){
+            fail(
+                `The generated import-map receipt documentPaths[${documentIndex}] leaves its `
+                +'application root.'
+            );
+        }
+        const relative=normalizeRelativePath(
+            path.relative(context.appRoot,resolved).replaceAll('\\','/'),
+            `import-map receipt documentPaths[${documentIndex}]`
+        );
+        const key=pathKey(relative);
+        if(seen.has(key)){
+            fail(`The generated import-map receipt repeats a browser document: ${relative}.`);
+        }
+        seen.add(key);
+        if(documentIndex===0&&relative!==context.config.entry){
+            fail('The generated import-map receipt does not preserve its configured entry document.');
+        }
+        if(documentIndex>0){
+            if(!isHtmlDocument(relative)
+                ||previousDocument!==null&&compareText(previousDocument,relative)>=0){
+                fail(`The generated import-map receipt browser document order is invalid: ${relative}.`);
+            }
+            previousDocument=relative;
+        }
+        const record=receipt.files[index];
         assertOnlyKeys(
             record,
             new Set(['role','path','bytes','sha256']),
             `import-map receipt files[${index}]`
         );
-        const wanted=expected[index];
+        const wanted={
+            role:documentIndex===0?'entry':'document',
+            path:`apps/${context.config.id}/${relative}`
+        };
         if(record.role!==wanted.role
             ||normalizeRelativePath(record.path,`import-map receipt files[${index}].path`)
                 !==wanted.path
@@ -1316,7 +1478,7 @@ function importMapReceiptFiles(context,receipt){
     return Object.freeze(records);
 }
 
-async function authenticateImportMapPair(context,receipt,{signal}={}){
+async function authenticateImportMapFiles(context,receipt,{signal}={}){
     const records=importMapReceiptFiles(context,receipt);
     for(const record of records){
         const filePath=resolveInside(
@@ -1342,7 +1504,21 @@ async function authenticateImportMapPair(context,receipt,{signal}={}){
     return records;
 }
 
-async function authenticateCollectedImportMapPair(files,records,{signal}={}){
+async function authenticateCollectedImportMapFiles(context,files,records,{signal}={}){
+    if(records.length>0){
+        const appPrefix=`apps/${context.config.id}/`;
+        const expectedDocuments=orderedBrowserDocumentPaths(
+            context.config.entry,
+            files
+                .filter(file=>file.destination.startsWith(appPrefix))
+                .map(file=>file.destination.slice(appPrefix.length)),
+            `apps.${context.config.id} collected browser document`
+        ).map(relative=>`${appPrefix}${relative}`);
+        const committedDocuments=records.slice(1).map(record=>record.path);
+        if(!isDeepStrictEqual(committedDocuments,expectedDocuments)){
+            fail('The generated import-map receipt does not bind every packaged browser document.');
+        }
+    }
     for(const record of records){
         const collected=files.find(file=>file.destination===record.path);
         if(!collected||collected.bytes!==record.bytes){
@@ -1359,7 +1535,7 @@ async function authenticateCollectedImportMapPair(files,records,{signal}={}){
     }
 }
 
-function authenticatePackagedImportMapPair(release,records){
+function authenticatePackagedImportMapFiles(release,records){
     for(const record of records){
         const packaged=release.files.find(file=>file.path===record.path);
         if(!packaged||packaged.bytes!==record.bytes||packaged.sha256!==record.sha256){
@@ -1404,6 +1580,7 @@ async function prepareRuntimeAuthorityState(context,{
     return Object.freeze({
         receipt,
         document:packagedRuntimeAuthorities(receipt),
+        projectionDocument:packagedRuntimeProjection(receipt),
         verificationState
     });
 }
@@ -1433,6 +1610,12 @@ async function authenticateRuntimeAuthorityState(context,state,{signal,onEvent}=
     }
     if(!isDeepStrictEqual(packagedRuntimeAuthorities(state.receipt),state.document)){
         fail('External runtime source authorities changed during package verification.');
+    }
+    if(!isDeepStrictEqual(packagedRuntimeProjection(state.receipt),state.projectionDocument)){
+        fail(
+            'External runtime projection inventory changed during package verification.',
+            RUNTIME_PROJECTION_ERROR
+        );
     }
 }
 
@@ -1873,7 +2056,7 @@ async function collectPackageFiles(context,{signal,sharedPayloadState}={}){
 
     for(const file of files){
         throwIfAborted(signal);
-        if(file.destination===RELEASE_MANIFEST_NAME||file.destination==='index.html'){
+        if(GENERATED_PACKAGE_ROOT_PATH_KEYS.has(pathKey(file.destination))){
             fail(`${file.label} collides with generated package path: ${file.destination}`);
         }
 
@@ -2424,6 +2607,18 @@ async function writeRuntimeAuthorities(root,state){
     await authority.handle.close();
 }
 
+async function writeRuntimeProjection(root,state){
+    if(state==null)return;
+    const projectionPath=path.join(root,RUNTIME_PROJECTION_NAME);
+    await writeFile(
+        projectionPath,
+        `${JSON.stringify(state.projectionDocument,null,2)}\n`,
+        {encoding:'utf8',flag:'wx'}
+    );
+    const projection=await openStableRegularFile(projectionPath,RUNTIME_PROJECTION_NAME);
+    await projection.handle.close();
+}
+
 async function verifyRuntimeAuthorities(root,state){
     const authorityPath=path.join(root,RUNTIME_AUTHORITIES_NAME);
     if(state==null){
@@ -2438,6 +2633,57 @@ async function verifyRuntimeAuthorities(root,state){
     const document=await readJsonDocument(authorityPath,RUNTIME_AUTHORITIES_NAME);
     if(!isDeepStrictEqual(document.value,state.document)){
         fail(`${RUNTIME_AUTHORITIES_NAME} does not match the admitted workspace runtime authorities.`);
+    }
+}
+
+async function verifyRuntimeProjection(root,state,release){
+    const projectionPath=path.join(root,RUNTIME_PROJECTION_NAME);
+    const releaseRecords=release.files.filter(file=>file.path===RUNTIME_PROJECTION_NAME);
+    if(state==null){
+        if(releaseRecords.length!==0){
+            fail(
+                `${RUNTIME_PROJECTION_NAME} is not allowed without an external runtime authority.`,
+                RUNTIME_PROJECTION_ERROR
+            );
+        }
+        try{
+            await lstat(projectionPath);
+            fail(
+                `${RUNTIME_PROJECTION_NAME} is not allowed without an external runtime authority.`,
+                RUNTIME_PROJECTION_ERROR
+            );
+        }catch(error){
+            if(error?.code!=='ENOENT')throw error;
+        }
+        return;
+    }
+
+    let document;
+    try{
+        document=await readJsonDocument(projectionPath,RUNTIME_PROJECTION_NAME);
+    }catch(error){
+        fail(
+            `${RUNTIME_PROJECTION_NAME} could not be authenticated: ${error.message}`,
+            RUNTIME_PROJECTION_ERROR
+        );
+    }
+    const expectedBytes=Buffer.from(`${JSON.stringify(state.projectionDocument,null,2)}\n`,'utf8');
+    if(!document.bytes.equals(expectedBytes)
+        ||!isDeepStrictEqual(document.value,state.projectionDocument)){
+        fail(
+            `${RUNTIME_PROJECTION_NAME} does not match the admitted workspace runtime inventory.`,
+            RUNTIME_PROJECTION_ERROR
+        );
+    }
+    const expectedSha256=createHash('sha256').update(expectedBytes).digest('hex');
+    const record=releaseRecords[0];
+    if(releaseRecords.length!==1
+        ||record.bytes!==expectedBytes.length
+        ||record.sha256!==expectedSha256){
+        fail(
+            `${RUNTIME_PROJECTION_NAME} is not authenticated by the packaged release inventory.`,
+            RUNTIME_PROJECTION_ERROR
+        );
     }
 }
 
@@ -2509,6 +2755,7 @@ async function verifyFreshStaticRelease(root,context,version,releaseState,{
     }
 
     await verifyRuntimeAuthorities(root,runtimeAuthorityState);
+    await verifyRuntimeProjection(root,runtimeAuthorityState,release);
     verifyRuntimeProjectionAuthority(release,runtimeAuthorityState);
 
     return releaseState;
@@ -2558,6 +2805,7 @@ async function verifyGenericRelease(root,context,version,{
     }
 
     await verifyRuntimeAuthorities(root,runtimeAuthorityState);
+    await verifyRuntimeProjection(root,runtimeAuthorityState,release);
     verifyRuntimeProjectionAuthority(release,runtimeAuthorityState);
 
     return {
@@ -2888,13 +3136,13 @@ async function packageAppUnlocked({
     const version=resolveTargetVersion(currentVersion,{bump,exactVersion,preid});
     const importMapFiles=dryRun
         ?Object.freeze([])
-        :await authenticateImportMapPair(context,importMapReceipt,{signal});
+        :await authenticateImportMapFiles(context,importMapReceipt,{signal});
     const files=await collectPackageFiles(context,{
         signal,
         sharedPayloadState:authenticatedSharedPayloadState
     });
     if(!dryRun){
-        await authenticateCollectedImportMapPair(files,importMapFiles,{signal});
+        await authenticateCollectedImportMapFiles(context,files,importMapFiles,{signal});
     }
     const preview={
         app:appId,
@@ -2984,6 +3232,7 @@ async function packageAppUnlocked({
             onEvent
         });
         await writeRuntimeAuthorities(staging,runtimeAuthorityState);
+        await writeRuntimeProjection(staging,runtimeAuthorityState);
         const releaseState=await writeReleaseManifest(staging,context,version,{signal,onEvent});
         const verifiedRelease=adapter
             ?await verifyBuiltPackage(context,staging,version,adapter,{
@@ -3013,8 +3262,8 @@ async function packageAppUnlocked({
                 signal
             });
         }
-        await authenticateImportMapPair(context,importMapReceipt,{signal});
-        authenticatePackagedImportMapPair(verifiedRelease.release,importMapFiles);
+        await authenticateImportMapFiles(context,importMapReceipt,{signal});
+        authenticatePackagedImportMapFiles(verifiedRelease.release,importMapFiles);
         await assertArtifactState(staging,verifiedRelease.identities,{signal});
         throwIfAborted(signal);
 

@@ -222,6 +222,9 @@ test('shipped Arcane modules and transitive dependencies produce the exact named
     assert.deepEqual(receipt.excludedModules,['modules/CaseEvidenceIndexer.js']);
     assert.equal(receipt.artifactPath,path.join(appRoot,'modules','arcane.importmap.json'));
     assert.equal(receipt.artifactRelativePath,'apps/named-runtime/modules/arcane.importmap.json');
+    assert.equal(receipt.documentCount,1);
+    assert.deepEqual(receipt.documentPaths,[path.join(appRoot,'index.html')]);
+    assert.equal(Object.isFrozen(receipt.documentPaths),true);
     assert.deepEqual(events.map(event=>event.type),[
         'workspace.operation.locked',
         'import-map.started',
@@ -320,6 +323,101 @@ test('shipped Arcane modules and transitive dependencies produce the exact named
     assert.ok(
         html.indexOf('data-arcane-import-map')<html.indexOf('type="module"'),
         'the import map must precede the first module load'
+    );
+});
+
+test('generator commits one deterministic authenticated map across explicit browser documents',async t=>{
+    const workspaceRoot=await temporaryDirectory(t);
+    await copyShippedRuntime(workspaceRoot);
+    const appRoot=await createApplication(workspaceRoot,'multi-document-map');
+    const entryPath=path.join(appRoot,'index.html');
+    const reviewPath=await writeWorkspaceFile(
+        workspaceRoot,
+        'apps/multi-document-map/pages/review.html',
+        [
+            '<!doctype html>',
+            '<html>',
+            '<head>',
+            '    <base href="../../../">',
+            '</head>',
+            '<body>',
+            '    <script type="module" src="./apps/multi-document-map/modules/App.js"></script>',
+            '</body>',
+            '</html>',
+            ''
+        ].join('\n')
+    );
+    const events=[];
+    const receipt=await generateImportMap({
+        workspaceRoot,
+        appId:'multi-document-map',
+        documents:['pages/review.html','index.html'],
+        onEvent:event=>events.push(event)
+    });
+    const artifact=await readFile(receipt.artifactPath,'utf8');
+
+    assert.equal(receipt.documentCount,2);
+    assert.deepEqual(receipt.documentPaths,[entryPath,reviewPath]);
+    assert.deepEqual(receipt.files.map(file=>[file.role,file.path]),[
+        ['artifact','apps/multi-document-map/modules/arcane.importmap.json'],
+        ['entry','apps/multi-document-map/index.html'],
+        ['document','apps/multi-document-map/pages/review.html']
+    ]);
+    assert.equal(Object.isFrozen(receipt.documentPaths),true);
+    assert.equal(Object.isFrozen(receipt.files),true);
+    assert.equal(receipt.files.every(Object.isFrozen),true);
+    for(const committed of receipt.files){
+        const bytes=await readFile(path.join(workspaceRoot,...committed.path.split('/')));
+        assert.equal(committed.bytes,bytes.length);
+        assert.equal(committed.sha256,createHash('sha256').update(bytes).digest('hex'));
+    }
+    for(const documentPath of receipt.documentPaths){
+        const html=await readFile(documentPath,'utf8');
+        const managed=html.match(
+            /<script type="importmap" data-arcane-import-map>\n([\s\S]*?)<\/script>/u
+        );
+        assert.ok(managed);
+        assert.equal(managed[1],artifact);
+        assert.ok(html.indexOf('data-arcane-import-map')<html.indexOf('type="module"'));
+    }
+    const started=events.find(event=>event.type==='import-map.started');
+    const progress=events.find(event=>event.type==='import-map.commit.progress');
+    const completed=events.find(event=>event.type==='import-map.completed');
+    assert.equal(started.documentCount,2);
+    assert.deepEqual(started.documentPaths,[entryPath,reviewPath]);
+    assert.deepEqual(progress.paths,[receipt.artifactPath,entryPath,reviewPath]);
+    assert.equal(completed.documentCount,2);
+    assert.deepEqual(completed.documentPaths,[entryPath,reviewPath]);
+
+    const committedArtifact=await readFile(receipt.artifactPath,'utf8');
+    const committedEntry=await readFile(entryPath,'utf8');
+    const authoredReview=`${await readFile(reviewPath,'utf8')}<!-- retained on rollback -->\n`;
+    await writeFile(reviewPath,authoredReview,'utf8');
+    await assert.rejects(
+        generateImportMap({
+            workspaceRoot,
+            appId:'multi-document-map',
+            documents:['index.html','pages/review.html'],
+            onEvent(event){
+                if(event.type==='import-map.commit.progress'){
+                    throw new Error('reject multi-document commit');
+                }
+            }
+        }),
+        /reject multi-document commit/u
+    );
+    assert.equal(await readFile(receipt.artifactPath,'utf8'),committedArtifact);
+    assert.equal(await readFile(entryPath,'utf8'),committedEntry);
+    assert.equal(await readFile(reviewPath,'utf8'),authoredReview);
+    assert.deepEqual(await transactionFiles(appRoot),[]);
+    await assert.rejects(
+        generateImportMap({
+            workspaceRoot,
+            appId:'multi-document-map',
+            documents:['pages/review.html']
+        }),
+        error=>error?.code==='ARCANE_IMPORT_MAP_INVALID'
+            &&/must include the configured application entry/u.test(error.message)
     );
 });
 

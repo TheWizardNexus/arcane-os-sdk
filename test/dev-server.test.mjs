@@ -496,6 +496,45 @@ test('packaged server redirects to index and withholds its integrity receipt',as
     assert.equal(entry.status,200);
     assertBrowserRuntimeCsp(entry);
     assert.match(await entry.text(),/Packaged App/);
+    const runtimeAuthoritiesResponse=await request(
+        origin,
+        '/ARCANE_RUNTIME_AUTHORITIES.json',
+        {cookie}
+    );
+    assert.equal(runtimeAuthoritiesResponse.status,200);
+    assert.equal(
+        runtimeAuthoritiesResponse.headers.get('content-type'),
+        'application/json; charset=utf-8'
+    );
+    const runtimeAuthorities=await runtimeAuthoritiesResponse.json();
+    const runtimeProjectionResponse=await request(
+        origin,
+        '/ARCANE_RUNTIME_PROJECTION.json',
+        {cookie}
+    );
+    assert.equal(runtimeProjectionResponse.status,200);
+    assert.equal(
+        runtimeProjectionResponse.headers.get('content-type'),
+        'application/json; charset=utf-8'
+    );
+    const runtimeProjection=await runtimeProjectionResponse.json();
+    assert.equal(runtimeProjection.schemaVersion,1);
+    assert.equal(runtimeProjection.kind,'arcane-app-runtime-projection');
+    assert.equal(runtimeProjection.pathPrefix,'arcane/');
+    assert.equal(runtimeProjection.fileCount,runtimeProjection.files.length);
+    assert.deepEqual(
+        {
+            fileCount:runtimeProjection.fileCount,
+            totalBytes:runtimeProjection.totalBytes,
+            contentSha256:runtimeProjection.contentSha256
+        },
+        runtimeAuthorities.projection
+    );
+    assert.equal(runtimeProjection.files.every(file=>{
+        return typeof file.path==='string'
+            &&Number.isSafeInteger(file.bytes)
+            &&/^[a-f0-9]{64}$/u.test(file.sha256);
+    }),true);
     const receipt=await request(origin,'/ARCANE_APP_RELEASE.json',{cookie});
     assert.equal(receipt.status,404);
     const receiptCaseVariant=await request(origin,'/arcane_app_release.JSON',{cookie});

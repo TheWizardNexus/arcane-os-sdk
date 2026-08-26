@@ -26,6 +26,7 @@ import {
 import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
 
 const RUNTIME_AUTHORITIES_NAME='ARCANE_RUNTIME_AUTHORITIES.json';
+const RUNTIME_PROJECTION_NAME='ARCANE_RUNTIME_PROJECTION.json';
 
 async function writeJson(filePath,value){
     await mkdir(path.dirname(filePath),{recursive:true});
@@ -493,17 +494,112 @@ test('authenticated external package refreshes maps and preserves both runtime a
         }),
         authorityBytes
     );
+    const projectionBytes=await readFile(path.join(releaseRoot,RUNTIME_PROJECTION_NAME));
+    const projection=JSON.parse(projectionBytes.toString('utf8'));
+    const projectionFiles=workspaceRuntimeReceipt.files.map(file=>({
+        path:file.path,
+        bytes:file.bytes,
+        sha256:file.sha256
+    }));
+    assert.deepEqual(projection,{
+        schemaVersion:1,
+        kind:'arcane-app-runtime-projection',
+        sdkVersion:workspaceRuntimeReceipt.sdkVersion,
+        pathPrefix:'arcane/',
+        fileCount:projectionFiles.length,
+        totalBytes:projectionFiles.reduce((total,file)=>total+file.bytes,0),
+        contentSha256:createHash('sha256')
+            .update(JSON.stringify(projectionFiles))
+            .digest('hex'),
+        files:projectionFiles
+    });
+    assert.deepEqual(
+        {
+            fileCount:projection.fileCount,
+            totalBytes:projection.totalBytes,
+            contentSha256:projection.contentSha256
+        },
+        authorities.projection
+    );
+    assert.deepEqual(
+        await readVerifiedAppReleaseFile(packaged.receipt,{
+            releaseRoot,
+            relativePath:RUNTIME_PROJECTION_NAME
+        }),
+        projectionBytes
+    );
     const release=JSON.parse(await readFile(path.join(releaseRoot,'ARCANE_APP_RELEASE.json'),'utf8'));
     assert.ok(release.files.some(file=>file.path===RUNTIME_AUTHORITIES_NAME));
+    assert.ok(release.files.some(file=>file.path===RUNTIME_PROJECTION_NAME));
     const distProjection=release.files
         .filter(file=>file.path.startsWith('arcane/'))
         .map(file=>({path:file.path.slice('arcane/'.length),bytes:file.bytes,sha256:file.sha256}));
+    assert.deepEqual(distProjection,projection.files);
     assert.equal(distProjection.length,workspaceRuntimeReceipt.fileCount);
     assert.equal(
         createHash('sha256').update(JSON.stringify(distProjection)).digest('hex'),
         workspaceRuntimeReceipt.contentSha256
     );
     assert.equal((await verifyApp({workspaceRoot,appId})).verified,true);
+});
+
+test('packager authenticates the same managed dependency map across its dynamic browser-document inventory',async t=>{
+    const appId='multi-page-package';
+    const workspaceRoot=await authenticatedWorkspace(t,{
+        prefix:'arcane-multi-page-package-',
+        appId
+    });
+    const appRoot=path.join(workspaceRoot,'apps',appId);
+    const entryPath=path.join(appRoot,'index.html');
+    const reviewPath=path.join(appRoot,'review.html');
+    const ignoredPath=path.join(appRoot,'ignored.html');
+    const packageConfigPath=path.join(appRoot,'arcane-package.json');
+    const descriptorPath=path.join(appRoot,'arcane-app.json');
+    const packageConfig=JSON.parse(await readFile(packageConfigPath,'utf8'));
+    const descriptor=JSON.parse(await readFile(descriptorPath,'utf8'));
+    packageConfig.include.push('review.html','ignored.html');
+    packageConfig.exclude.push('ignored.html');
+    descriptor.package.include.push('review.html','ignored.html');
+    descriptor.package.exclude.push('ignored.html');
+    await writeJson(packageConfigPath,packageConfig);
+    await writeJson(descriptorPath,descriptor);
+    await writeFile(reviewPath,await readFile(entryPath));
+    const ignoredBytes=Buffer.from('excluded application document remains untouched\n');
+    await writeFile(ignoredPath,ignoredBytes);
+
+    const packaged=await packageApp({workspaceRoot,appId});
+    const mapPath=path.join(appRoot,'modules','arcane.importmap.json');
+    const map=JSON.parse(await readFile(mapPath,'utf8'));
+    const releaseRoot=path.join(workspaceRoot,'dist',appId);
+    const release=JSON.parse(await readFile(path.join(releaseRoot,'ARCANE_APP_RELEASE.json'),'utf8'));
+
+    assert.equal(packaged.importMapReceipt.documentCount,2);
+    assert.deepEqual(packaged.importMapReceipt.documentPaths,[entryPath,reviewPath]);
+    assert.deepEqual(packaged.importMapReceipt.files.map(file=>[file.role,file.path]),[
+        ['artifact',`apps/${appId}/modules/arcane.importmap.json`],
+        ['entry',`apps/${appId}/index.html`],
+        ['document',`apps/${appId}/review.html`]
+    ]);
+    for(const documentPath of [entryPath,reviewPath]){
+        assert.deepEqual(managedInlineMap(await readFile(documentPath,'utf8')),map);
+        assert.deepEqual(
+            managedInlineMap(await readFile(path.join(
+                releaseRoot,
+                'apps',
+                appId,
+                path.basename(documentPath)
+            ),'utf8')),
+            map
+        );
+    }
+    assert.deepEqual(await readFile(ignoredPath),ignoredBytes);
+    assert.equal(release.files.some(file=>file.path===`apps/${appId}/ignored.html`),false);
+    for(const committed of packaged.importMapReceipt.files){
+        const released=release.files.find(file=>file.path===committed.path);
+        assert.ok(released);
+        assert.equal(released.bytes,committed.bytes);
+        assert.equal(released.sha256,committed.sha256);
+    }
 });
 
 test('browser toolchain operations verify each exact runtime state once',async t=>{
@@ -665,7 +761,7 @@ test('package rejects terminal import-map listener removal, truncation, and mism
     }
 });
 
-test('release verification rejects removed or coherently rehashed runtime authority metadata',async t=>{
+test('release verification rejects removed or coherently rehashed runtime authority and projection metadata',async t=>{
     const appId='authority-tamper';
     const workspaceRoot=await authenticatedWorkspace(t,{
         prefix:'arcane-runtime-authority-tamper-',
@@ -673,6 +769,7 @@ test('release verification rejects removed or coherently rehashed runtime author
     });
     const releaseRoot=path.join(workspaceRoot,'dist',appId);
     const authorityPath=path.join(releaseRoot,RUNTIME_AUTHORITIES_NAME);
+    const projectionPath=path.join(releaseRoot,RUNTIME_PROJECTION_NAME);
 
     await packageApp({workspaceRoot,appId});
     await unlink(authorityPath);
@@ -698,6 +795,37 @@ test('release verification rejects removed or coherently rehashed runtime author
     await assert.rejects(
         verifyApp({workspaceRoot,appId}),
         /ARCANE_RUNTIME_AUTHORITIES|runtime authorit/iu
+    );
+
+    await packageApp({workspaceRoot,appId});
+    await unlink(projectionPath);
+    await rewriteReleaseInventory(releaseRoot,release=>{
+        release.files=release.files.filter(file=>file.path!==RUNTIME_PROJECTION_NAME);
+    });
+    await assert.rejects(
+        verifyApp({workspaceRoot,appId}),
+        error=>error?.code==='ARCANE_RUNTIME_PROJECTION_INVALID'
+            &&/ARCANE_RUNTIME_PROJECTION\.json/u.test(error.message)
+    );
+
+    await packageApp({workspaceRoot,appId});
+    const tamperedProjection=JSON.parse(await readFile(projectionPath,'utf8'));
+    tamperedProjection.files[0].sha256='0'.repeat(64);
+    tamperedProjection.contentSha256=createHash('sha256')
+        .update(JSON.stringify(tamperedProjection.files))
+        .digest('hex');
+    const tamperedProjectionBytes=Buffer.from(`${JSON.stringify(tamperedProjection,null,2)}\n`);
+    await writeFile(projectionPath,tamperedProjectionBytes);
+    await rewriteReleaseInventory(releaseRoot,release=>{
+        const record=release.files.find(file=>file.path===RUNTIME_PROJECTION_NAME);
+        assert.ok(record);
+        record.bytes=tamperedProjectionBytes.length;
+        record.sha256=createHash('sha256').update(tamperedProjectionBytes).digest('hex');
+    });
+    await assert.rejects(
+        verifyApp({workspaceRoot,appId}),
+        error=>error?.code==='ARCANE_RUNTIME_PROJECTION_INVALID'
+            &&/ARCANE_RUNTIME_PROJECTION\.json/u.test(error.message)
     );
 
     await packageApp({workspaceRoot,appId});
@@ -810,8 +938,13 @@ test('integrated legacy packages retain their physical two-route contract withou
     const packaged=await packageApp({workspaceRoot,appId});
     const releaseRoot=path.join(workspaceRoot,'dist',appId);
     await assert.rejects(readFile(path.join(releaseRoot,RUNTIME_AUTHORITIES_NAME)),{code:'ENOENT'});
+    await assert.rejects(readFile(path.join(releaseRoot,RUNTIME_PROJECTION_NAME)),{code:'ENOENT'});
     assert.equal(
         packaged.receipt.files.some(file=>file.path===RUNTIME_AUTHORITIES_NAME),
+        false
+    );
+    assert.equal(
+        packaged.receipt.files.some(file=>file.path===RUNTIME_PROJECTION_NAME),
         false
     );
     assert.ok(packaged.receipt.files.some(file=>{
