@@ -28,86 +28,12 @@ export const SDK_BROWSER_RUNTIME_MANIFEST_SHA256=
     createHash('sha256').update(canonicalManifestBytes).digest('hex');
 export const SDK_BROWSER_RUNTIME_CONTENT_SHA256=canonicalRelease.contentSha256;
 const issuedReceipts=new WeakSet();
-const expectedAiComponents=Object.freeze({
-    schemaVersion:1,
-    kind:'arcane-ai-browser-wasm-components',
-    protocol:'arcane-ai-browser-wasm/2',
-    packageExport:'arcane-os/ai/browser-wasm',
-    browserEntry:'ai/browser-wasm.mjs',
-    runtimePolicy:{
-        modelAuthorities:'fieldwise-security-default-false-with-optional-byteLength-and-sha256-checks',
-        modelWeightsPacked:false,
-        remoteModelHelpers:false,
-        compatibilityRuntime:false,
-        webgpuAdmission:'adapter-plus-full-offload-plus-buffer-queue-and-settled-fence-evidence',
-        cpuFallback:false,
-        cancellation:'abortSignal-plus-llama-cancel-acknowledgement',
-        cleanup:'worker-termination-only-no-native-unload-claim',
-        toolCalls:'structural-only-never-executed'
-    },
-    components:[
-        {
-            name:'@wllama/wllama',
-            version:'3.6.0',
-            licenseSpdx:'MIT',
-            sourceRepository:'https://github.com/ngxson/wllama.git',
-            sourceRevision:'f16050d8d51a00602c6a2a6b8ac9c09f490eea7f',
-            npm:{
-                resolved:'https://registry.npmjs.org/@wllama/wllama/-/wllama-3.6.0.tgz',
-                integrity:'sha512-NN3ZBXqaaUwGXTQubkNvsCaLPjN2XVa0bVS40OYCE8zquYmRc2W3oHYEgwvuSWWDB8aUqTLyMioySCXNkcnD1w==',
-                tarballBytes:5671369,
-                tarballSha256:'137c35ceccb4911a9b0ce9b427889f75991654ec6a6d1dd8fabd879b14b07a1b'
-            },
-            files:[
-                {
-                    role:'runtime-module',
-                    path:'ai/wllama/index.mjs',
-                    sourcePath:'browser-runtime/ai/wllama/index.mjs',
-                    bytes:389765,
-                    sha256:'ae9a6ba2aa8687785ed651e28ef92573b409d5e6d3470bfd53340225287908b8',
-                    projection:{
-                        protocol:'arcane-wllama-webgpu-evidence/1',
-                        inputPath:'node_modules/@wllama/wllama/esm/index.js',
-                        inputBytes:373519,
-                        inputSha256:'4637e42d636010493a9b274fbbe70bfd8120365da726b1d9e589d85ca84a00d6',
-                        wasmModified:false
-                    }
-                },
-                {
-                    role:'runtime-wasm',
-                    path:'ai/wllama/wllama.wasm',
-                    sourcePath:'node_modules/@wllama/wllama/esm/wasm/wllama.wasm',
-                    bytes:8524865,
-                    sha256:'95c6ff9ef2a03ff2c63bc91db132f0126a0bd0456b272cd8ae2e0f592fb059f6'
-                },
-                {
-                    role:'license',
-                    path:'ai/wllama/LICENCE',
-                    sourcePath:'node_modules/@wllama/wllama/LICENCE',
-                    bytes:1071,
-                    sha256:'5866e3bd7e3cbd3f7c8bea6efd8a1e7fa7cc8de68c30f428aff7c6584a0fb720'
-                }
-            ]
-        },
-        {
-            name:'llama.cpp',
-            version:'b10454',
-            licenseSpdx:'MIT',
-            sourceRepository:'https://github.com/ggerganov/llama.cpp.git',
-            sourceRevision:'4df29be4f4c3673f428170fda944a5b19f743bb8',
-            embeddedBy:'@wllama/wllama@3.6.0',
-            files:[
-                {
-                    role:'license',
-                    path:'ai/wllama/llama.cpp-LICENSE',
-                    sourceUrl:'https://raw.githubusercontent.com/ggerganov/llama.cpp/4df29be4f4c3673f428170fda944a5b19f743bb8/LICENSE',
-                    bytes:1078,
-                    sha256:'94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d'
-                }
-            ]
-        }
-    ]
-});
+const canonicalAiComponentsBytes=await readFile(
+    path.join(defaultRoot,'ai','ARCANE_AI_BROWSER_WASM_COMPONENTS.json')
+);
+const expectedAiComponents=Object.freeze(
+    JSON.parse(canonicalAiComponentsBytes.toString('utf8'))
+);
 
 const expectedFiles=Object.freeze([
     ['ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json','browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json','sdk-source-identity'],
