@@ -26,7 +26,7 @@ const expectedAiComponents=Object.freeze({
     packageExport:'arcane-os/ai/browser-wasm',
     browserEntry:'ai/browser-wasm.mjs',
     runtimePolicy:{
-        modelAuthorities:'caller-supplied-exact-bytes-and-sha256',
+        modelAuthorities:'fieldwise-security-default-false-with-optional-byteLength-and-sha256-checks',
         modelWeightsPacked:false,
         remoteModelHelpers:false,
         compatibilityRuntime:false,
