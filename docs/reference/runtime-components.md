@@ -29,7 +29,7 @@ A component file does not register its own custom element. The `<html-import>` h
 | [`assistant-panel.html`](#assistant-panelhtml) | Reusable assistant drawer, message area, composer, pending/streaming/empty/error state, and actions. | `open()`<br>`close()`<br>`toggle()`<br>`send()`<br>`clear()`<br>`setState()`<br>`focusComposer()`<br>`scrollToEnd()` | `assistant-ready`<br>`assistant-send`<br>`assistant-clear` | DOM-normalized; caller/provider results remain external |
 | [`calculator.html`](#calculatorhtml) | Calculator keypad and result/error event surface backed by CalculatorEngine. | `calculate()` | `calculator-ready`<br>`calculation-complete`<br>`calculation-error` | Normalized Calculation/error events |
 | [`chart.html`](#charthtml) | Accessible uPlot line, area, or point chart with normalized options and rows. | `configure()`<br>`populate()`<br>`setData()`<br>`addData()`<br>`update()`<br>`destroy()` | `chart-ready`<br>`chart-remove` | Options/rows normalized; uPlot rendering is vendor-native |
-| [`chat.html`](#chathtml) | Shared chat, file upload, streaming, speech, language, availability, and conversation-timebox surface. | `streamMessage()`<br>`setMessageProgress()`<br>`setAIAvailability()`<br>`setInitialSpeechMuted()`<br>`setConversationComplete()`<br>`bindConversationTimebox()`<br>`submitMessage()`<br>`sendMessage()`<br>`languageChanged()` | `chat-ready`<br>`chat-send-message`<br>`chat-send-error`<br>`chat-file-uploaded`<br>`chat-language-changed`<br>`conversation-timebox-error` | UI state normalized; AI/storage/media behavior mixed |
+| [`chat.html`](#chathtml) | Shared chat, visible selected-model activation request, file upload, streaming, speech, language, availability, and conversation-timebox surface. | `streamMessage()`<br>`setMessageProgress()`<br>`setAIAvailability()`<br>`setInitialSpeechMuted()`<br>`setConversationComplete()`<br>`bindConversationTimebox()`<br>`submitMessage()`<br>`sendMessage()`<br>`languageChanged()`<br>`requestAIActivation()`<br>`destroy()` | `chat-ready`<br>`chat-send-message`<br>`chat-send-error`<br>`chat-file-uploaded`<br>`chat-language-changed`<br>`chat-ai-activation-request`<br>`chat-ai-activation-error`<br>`conversation-timebox-error` | UI/runtime state and explicit user activation intent normalized; AI/storage/media behavior mixed |
 | [`conversation-view.html`](#conversation-viewhtml) | Provider-neutral conversation display, advisory actions, composer, busy state, and status. | `setConversation()`<br>`setBusy()`<br>`setStatus()`<br>`clearComposer()` | `conversation-view-ready`<br>`communication-send`<br>`communication-advisory-action` | DOM-normalized |
 | [`dashboard-config.html`](#dashboard-confightml) | Selects which normalized chart definitions are visible on a dashboard. | `configure()`<br>`setDefinitions()`<br>`setVisibility()`<br>`getChartOptions()`<br>`getEffectiveVisibility()`<br>`open()`<br>`close()` | `dashboard-config-ready`<br>`dashboard-config-opened`<br>`dashboard-config-closed`<br>`dashboard-config-change` | Fully normalized definitions and visibility |
 | [`data-maintenance.html`](#data-maintenancehtml) | Runs destructive cleanup of empty chats and memories inside the current app data scope. | `open()` | `data-maintenance-ready`<br>`data-maintenance-complete` | Normalized counts; DBOPFS failures mixed |
@@ -177,24 +177,57 @@ Shared dependencies: [`ChartLibrary.js`](runtime-modules.md#chartlibraryjs), [`C
 
 ### Overview
 
-Shared chat, file upload, streaming, speech, language, availability, and conversation-timebox surface.
+Shared chat, visible selected-model activation request, file upload, streaming,
+speech, language, availability, and conversation-timebox surface.
 
 ### Public surface
 
-Methods/properties: `streamMessage()`, `setMessageProgress()`, `setAIAvailability()`, `setInitialSpeechMuted()`, `setConversationComplete()`, `bindConversationTimebox()`, `submitMessage()`, `sendMessage()`, `languageChanged()`.
+Methods/properties: `streamMessage()`, `setMessageProgress()`,
+`setAIAvailability()`, `setInitialSpeechMuted()`,
+`setConversationComplete()`, `bindConversationTimebox()`, `submitMessage()`,
+`sendMessage()`, `languageChanged()`, `requestAIActivation()`, and `destroy()`.
 
 `sendMessage(text)` and `languageChanged(text)` are host-overridable async
 extension callbacks. The component installs warning-only defaults when the host
 does not supply them; applications may instead consume the corresponding
 `chat-send-message` and `chat-language-changed` events.
 
-Events: `chat-ready`, `chat-send-message`, `chat-send-error`, `chat-file-uploaded`, `chat-language-changed`, `conversation-timebox-error`.
+When a selected LLM route is `unloaded` or in `error`, the component exposes a
+keyboard-operable Start/Try again control while Send stays disabled. During
+`loading`, the control becomes Cancel loading and reflects sticky progress.
+The default `requestAIActivation(intent)` forwards frozen
+`{role:'llm',action:'load'|'unload',reason:'user'}` to
+`requestAIRuntimeIntent()`. A host may replace that callback.
 
-Shared dependencies: [`MD.js`](runtime-modules.md#mdjs), [`File.js`](runtime-entities.md#filejs), [`ConversationTimebox.js`](runtime-modules.md#conversationtimeboxjs).
+Before the callback, the component dispatches the bubbles/composed/cancelable
+`chat-ai-activation-request` event with frozen `{intent,state}` detail.
+`preventDefault()` suppresses the callback. A callback failure dispatches the
+bubbles/composed, noncancelable `chat-ai-activation-error` event with frozen
+`{request,error,message}`. A recognized canceled load whose current route is
+`unloaded` or `unloading` is not reported as an activation error.
+
+`destroy()` aborts the component's AI-runtime-state subscription, destroys the
+activation controller, removes its `pagehide` listener, calls the optional
+speech controller's `destroy()`, sets `ready` to `false`, and returns
+`undefined`. It does not initiate a provider load or unload.
+
+Events: `chat-ready`, `chat-send-message`, `chat-send-error`,
+`chat-file-uploaded`, `chat-language-changed`,
+`chat-ai-activation-request`, `chat-ai-activation-error`, and
+`conversation-timebox-error`.
+
+Shared dependencies: [`MD.js`](runtime-modules.md#mdjs), [`File.js`](runtime-entities.md#filejs), [`ConversationTimebox.js`](runtime-modules.md#conversationtimeboxjs), [`AIRuntimeState.js`](runtime-modules.md#airuntimestatejs).
 
 ### Availability and normalization
 
-**Browser and supported native WebViews.** UI state normalized; AI/storage/media behavior mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app's capabilities. [Deep protocol details](protocols.md).
+**Browser and supported native WebViews.** UI and provider-runtime state are
+normalized; AI/storage/media behavior remains mixed. The component emits no
+activation request on import or startup. After the user operates the visible
+control and the component event is not canceled, it publishes a
+capability-neutral user intent; a provider/runtime owner decides whether and
+how to execute the requested load or unload. HTMLImport + DOM; injected
+Arcane/provider modules where listed. Native methods remain subject to the
+bound app's capabilities. [Deep protocol details](protocols.md).
 
 ### Example
 

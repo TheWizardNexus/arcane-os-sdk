@@ -11,7 +11,7 @@ it runs; the [protocol guide](protocols.md) contains the implementation detail.
 | **Browser** | Uses standard browser APIs and can run without a native host when its own dependencies are available. |
 | **Native** | Requires an admitted `globalThis.Arcane` host method or a native target provider. |
 | **Cloud** | Calls a remote provider over HTTPS and needs provider configuration and network policy. |
-| **Cross-host** | Keeps one application API while Arcane selects WebView2, WebKitGTK, Android WebView, or development HTTP transport. |
+| **Cross-host** | Keeps one application contract usable across supported hosts. Execution may stay in-process, use a registered provider, or cross a documented Arcane WebView2, WebKitGTK, Android WebView, or development HTTP transport. |
 | **Provider-native** | Intentionally returns the underlying provider's bounded envelope instead of an Arcane-normalized entity. |
 
 “Available” never means “authorized.” App grants, method allowlists, host
@@ -29,7 +29,11 @@ version; WebKitGTK availability must not be generalized to macOS.
 | Scaffold, inspect, test, package, bundle, build, verify, or run an app | `arcane` CLI or `arcane-os` package functions | **Node**; native targets invoke one explicit provider | CLI events and SDK errors/results are normalized by versioned SDK contracts. Native artifact receipts remain target-specific inside a common receipt lifecycle. |
 | Publish application events or review a bounded event history | `arcane-os/event-manager` | **Node** and **Browser**; optional DOM capture needs a browser DOM or compatible host | Live listeners receive original arguments. Recorded payloads and metadata become bounded, redacted, deeply frozen `arcane-event-stack/1` snapshots. The stack format is local diagnostic data, not a host transport. |
 | Build browser UI and app-local behavior | `/arcane/modules/*.js`, shared entities, and components | **Browser**; many modules also run inside every native renderer | Pure modules own their result contracts. Modules that call `Arcane` inherit the bridge boundary described below. |
-| Run a caller-selected local LLM entirely in a browser renderer | `arcane-os/ai/browser-wasm` through `createArcaneAI()` | **Browser** only; WebAssembly and OPFS/DBOPFS are required, WebGPU is optional, and a cache miss uses the caller's HTTPS model URL unless `offline:true` | The facade normalizes lifecycle, status, security precedence, effective-check disclosure, streaming, cancellation, and structural tool-call visibility. The canonical model descriptor is `{id, url, bytes?, sha256?}`; license is application provenance policy, not a runtime admission check. |
+| Select and observe independent LLM/STT/TTS roles | `/arcane/modules/AIProviderRuntime.js` and `AIRuntimeState.js` | **Cross-host** controller/state; registered providers retain their own host requirements | Required/projected provider members, closed route/configuration records, and validated authority/status fields; per-role lifecycle, cancellation, stream cleanup, sticky state, and startup barriers are normalized. `localOnly` fails closed and creates no fallback. |
+| Run a caller-selected local LLM entirely in a browser renderer | `arcane-os/ai/browser-wasm` through `createArcaneAI()` | **Browser** only; secure context, WebAssembly, OPFS/DBOPFS, WebGPU, requested full offload, and admitted adapter/buffer/queue/fence evidence are required; no CPU fallback | The facade normalizes multi-model lifecycle, status, security precedence, effective-check disclosure, streaming, cancellation, and structural tool-call visibility. Model sources are canonical ordered file descriptors; licenses and model choice remain application policy. |
+| Run caller-selected Whisper or Kokoro in a browser renderer | `arcane-os/ai/browser-speech` registered with `AIProviderRuntime` | **Browser** only; DBOPFS, Web Locks, Workers, Fetch/object URLs, and a caller-supplied self-contained runtime/model closure are required | STT/TTS use independent provider/2 lifecycle and status. Immutable artifact authority, manifest-last cache, strict offline admission, cancellation, Worker teardown, and request/result shapes are normalized. No runtime/model bytes or cloud fallback are supplied. |
+| Preserve bounded chat history and memory | `/arcane/modules/PersistentAIChatSession.js` | **Browser / native WebView** with ChatEntity/DBOPFS and a configured chat function | Existing DBOPFS names and memory semantics are preserved. Live-context commit is atomic; durable persistence is explicit and coherent across user/assistant/tool turns. |
+| Search an app-owned document corpus for explicit chat context | `/arcane/modules/DBOPFSDocumentLibrary.js` | **Browser** or compatible injected DBOPFS adapter | Generation/manifest completion, bounded lexical search, partial read failures, and untrusted context labels are normalized. Construction does not search; an explicitly wired context builder performs bounded retrieval for each prepared chat send. |
 | Read host identity, capabilities, storage, preferences, appearance, or platform state | `globalThis.Arcane` | **Cross-host** where the method is implemented and admitted | Promise behavior and `Arcane.Error` are normalized. Result fields are normalized unless the method explicitly documents a platform-dependent snapshot. |
 | Use local AI without coupling app code to Ollama HTTP | `Arcane.localAI`, `Arcane.ai`, or `/arcane/modules/Ollama.js` | Primarily **Native**; Android exposes a narrower admitted inference projection | Admission, errors, and managed-operation events are normalized. Direct Ollama response envelopes remain **Provider-native**. |
 | Use OpenAI from the renderer profile | `/arcane/modules/AI.js` | **Cloud** from an allowed browser/native renderer | High-level AI chat/text behavior is normalized by the module; raw provider diagnostics and some response detail remain provider-specific. No automatic cloud fallback is inferred from local failure. |
@@ -81,11 +85,18 @@ state. See [EventManager and time-travel review](event-manager.md).
 ### Browser-local provider adapter
 
 [`arcane-os/ai/browser-wasm`](ai/browser-wasm.md) exposes the same
-`arcane-ai-adapter/1` LLM lifecycle used by `createArcaneAI()`, while its
-packaged Wllama engine and caller-supplied model run inside the browser. This
+provider-neutral lifecycle used by `createArcaneAI()`, while its packaged
+Wllama engine and caller-supplied model run inside the browser. This
 surface does not require an Arcane Core method grant because it does not call a
 Core host. Browser Fetch, CORS, storage policy, secure-context behavior, and
 resource limits still apply.
+
+The shipped `0.2.1` runtime requires WebGPU and has no CPU fallback. A successful
+load requests full GPU offload (`gpuLayers: 99999`) and admits actual adapter,
+full-offload, buffer, queue, and settled-fence evidence. `navigator.gpu`
+presence by itself is not readiness. The provider emits the instrumented
+`arcane.ai.browser-wasm.webgpu.adapter.selected` capability event only after
+admitted adapter selection evidence.
 
 `localOnly:true` describes inference after load; it does not promise that load
 is offline. A normal cache miss downloads from the exact caller-supplied HTTPS
@@ -107,6 +118,21 @@ successful Wllama model loading remains mandatory. `load({offline:true})` permit
 cache entry and otherwise rejects with `ARCANE_AI_MODEL_OFFLINE_MISS`. Tool
 calls are result data for application review and dispatch; the SDK never
 executes them.
+
+[`arcane-os/ai/browser-speech`](ai/browser-speech.md) implements the sibling
+`stt` and `tts` provider/2 roles. Each caller-authenticated Whisper or Kokoro
+provider has its own load, use, cancellation, unload, dispose, cache, Worker,
+status, and error state. The SDK supplies neither speech adapter runtime bytes
+nor model/voice bytes; every immutable file is application-owned and admitted
+through an SDK-created authority and DBOPFS artifact store.
+
+The projected [`AIProviderRuntime`](runtime-modules.md#aiproviderruntimejs)
+normalizes those browser providers and can admit an externally supplied native
+or cloud provider/2 adapter. SDK `0.2.1` does not publish a native, Core, or
+cloud provider/2 adapter. The sticky
+[`AIRuntimeState`](runtime-modules.md#airuntimestatejs) surface keeps
+application UI independent of transport. A selected route remains explicit:
+browser failure is not permission to invoke Core or cloud.
 
 ### Arcane bridge-normalized
 

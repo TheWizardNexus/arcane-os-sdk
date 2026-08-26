@@ -1,27 +1,27 @@
 # Protocol and host architecture
 
 This is the deep reference behind the compact availability notes elsewhere.
-Application developers normally call one documented API and do not choose a
-wire protocol directly.
+Application developers should start with the
+[availability and normalization guide](availability-and-normalization.md), call
+one documented API, and treat the protocols below as implementation detail.
 
 ## Layer map
 
 ```text
 application code
-  |-- Node SDK API ---------------- arcane-cli-events/1 + SDK receipts
-  |-- EventManager ---------------- synchronous bus + arcane-event-stack/1
-  |
-  `-- renderer ESM / globalThis.Arcane
-        |-- standalone browser ----- standard Web APIs / allowed HTTPS
-        |-- development host ------- development HTTP bridge
-        |-- Microsoft NT native ---- WebView2 host bridge
-        |-- Linux native ----------- WebKitGTK host bridge
-        `-- Android native --------- Android WebView message bridge
-                                      |
-                                      `-- Arcane Core/provider boundary
-                                            |-- platform services
-                                            |-- ArcaneOllama loopback service
-                                            `-- explicitly selected cloud APIs
+  |-- Node SDK API ----------------- arcane-cli-events/1 + SDK receipts
+  |-- EventManager ----------------- synchronous bus + arcane-event-stack/1
+  |-- browser-local AI ------------- WebGPU/WASM/Workers/DBOPFS; no Core grant
+  `-- globalThis.Arcane
+        |-- development host -------- development HTTP bridge
+        |-- Microsoft NT native ----- WebView2 host bridge
+        |-- Linux native ------------ WebKitGTK host bridge
+        `-- Android native ---------- Android WebView message bridge
+                                       |
+                                       `-- Arcane Core/provider boundary
+                                             |-- platform services
+                                             |-- ArcaneOllama loopback service
+                                             `-- explicitly selected cloud APIs
 ```
 
 Each downward boundary can add authority and platform capability. None can be
@@ -103,25 +103,43 @@ imports such as:
 import ollama from 'arcane/Ollama';
 ```
 
-The authenticated physical-v1 tree lives entirely beneath `arcane/`. It
-contains 155 pinned Arcane runtime files plus 18 SDK browser-runtime files:
-173 files in all. Runtime `strong-type` 1.1 stays under
-`arcane/dependencies/strong-type/`; the focused SDK event surface lives under
-`arcane/sdk/`, with `event-pubsub` 6.1 and its sibling `strong-type` 2.0 under
-`arcane/sdk/dependencies/`. This URL-key separation prevents the runtime and SDK
-dependency versions from aliasing one another. Development serves the selected
-app plus that authenticated tree. Packaging copies the same map, app entry, and
-physical bytes into `dist/<id>`; targets never resolve through the consumer
-workspace's root `node_modules/`.
+The authenticated physical-v1 tree lives entirely beneath `arcane/`. SDK
+`0.2.1` projects it from two canonical release receipts:
 
-In SDK `0.1.2`, the generated map has exactly 86 entries: 73 named
-`arcane/*` modules, nine `arcane/entities/*` modules, and these four focused or
-compatibility mappings:
+| Canonical receipt | Source authority and protocol | Receipt inventory |
+| --- | --- | --- |
+| `runtime/ARCANE_RUNTIME_RELEASE.json` | `sdk-canonical`; `arcane/1`; builder `arcane-sdk-runtime-v1` | 160 files; 3,605,154 bytes; content SHA-256 `5b921d50b6a0cf36a13f7a7dedf96cd3a68104a322e5139136fd4197aa1ca7cb` |
+| `browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json` | `arcane-os-sdk`; `arcane-sdk-browser-runtime/1`; builder `arcane-sdk-browser-runtime-v1` | 25 files; 9,279,974 bytes; content SHA-256 `a9715c4b3aef70ec4042e4738089568d6588877b29582e0f758ed83897b6814f` |
+
+The runtime receipt is the current byte authority. Its Arcane OS
+`c540014afe69f14cf5ae60493b7295f36dbcec64` / bundle `0.8.12` record is
+`legacyProjection` provenance, not a second or newer runtime authority. The
+browser receipt binds `event-pubsub` `6.1.0`, `strong-type` `2.0.0`, and
+`@wllama/wllama` `3.6.0`, as well as the browser entry
+`arcane-os/event-manager`. Runtime dependencies stay under
+`arcane/dependencies/`; the SDK event and browser-AI closure stays under
+`arcane/sdk/`. This URL-key separation prevents runtime and SDK dependency
+versions from aliasing one another.
+
+Those two receipt inventories contain 185 entries in total. That sum is a
+release-inventory fact, not an import-map entry count and not an assertion about
+one maintained example. The `0.2.1` map deterministically roots every admitted
+top-level runtime ESM plus the authenticated SDK browser roots, then follows
+those roots for runtime entities and dependency compatibility. Application
+source imports do not select the 91 entries. Its public operation receipt is the
+authority for the exact `imports`, `entryCount`, and `excludedModules`;
+reached-file traversal is internal and is not exposed in that receipt. The
+managed graph exposes `arcane-os/event-manager`, `arcane-os/ai/browser-wasm`,
+and `arcane-os/ai/browser-speech`; dependency compatibility mappings are added
+only when authenticated runtime or SDK root traversal observes them.
+
+The focused physical targets remain stable when their bindings are reached:
 
 | Browser specifier | Physical target |
 | --- | --- |
 | `arcane-os/event-manager` | `./arcane/sdk/event-manager.mjs` |
 | `arcane-os/ai/browser-wasm` | `./arcane/sdk/ai/browser-wasm.mjs` |
+| `arcane-os/ai/browser-speech` | `./arcane/sdk/ai/browser-speech.mjs` |
 | `event-pubsub` | `./arcane/sdk/dependencies/event-pubsub/index.js` |
 | `./node_modules/strong-type/index.js` | `./arcane/dependencies/strong-type/index.js` |
 
@@ -129,7 +147,50 @@ There is no `arcane-os` package-root mapping, bare `strong-type` mapping, or
 catch-all `arcane/` prefix. Host-internal `CaseEvidenceIndexer.js` is explicitly
 excluded; classic scripts, workers, stylesheets, and other non-ESM assets use
 their documented URL or host loading contract rather than invented package
-bindings.
+bindings. Development serves the selected app plus the authenticated tree.
+Packaging copies the same map, app entry, and physical bytes into `dist/<id>`;
+targets never resolve through the consumer workspace's root `node_modules/`.
+
+`generateImportMap()` is an internal toolchain operation, not a package export.
+Its package path accepts the configured entry plus the deterministic included
+`.html`/`.htm` document inventory. One transaction writes the artifact and the
+same managed JSON into every admitted document. The receipt binds
+`documentPaths`, `documentCount`, and `files`: artifact first, configured entry
+second, then additional documents as `role:"document"`. The public CLI keeps
+its existing two-option command and supplies only the selected entry; packaging
+owns multi-page discovery.
+
+An external package and development server expose the authenticated runtime
+inventory at `/ARCANE_RUNTIME_PROJECTION.json`:
+
+```javascript
+{
+  schemaVersion: 1,
+  kind: 'arcane-app-runtime-projection',
+  sdkVersion,
+  pathPrefix: 'arcane/',
+  fileCount,
+  totalBytes,
+  contentSha256,
+  files: [{path, bytes, sha256}]
+}
+```
+
+The projection contains public paths relative to its declared
+`pathPrefix:'arcane/'` (for example, `modules/...` and `sdk/...`), byte lengths,
+and SHA-256 values and is itself bound by the packaged release inventory. It does
+not expose the private `/ARCANE_APP_RELEASE.json` or replace the underlying
+runtime/browser receipts. Missing, changed, forged, duplicated, or internally
+inconsistent projection data fails `ARCANE_RUNTIME_PROJECTION_INVALID`.
+
+External `validateWorkspace()` results also expose a frozen `sdkInstallation`
+authority with exactly `dependencyName`, `packageSource`,
+`canonicalPackageRoot`, `packageName`, `packageVersion`, `runtimeRoot`,
+`browserRuntimeRoot`, `runtimeManifest`, and `browserRuntimeManifest`. A
+workspace may use the canonical dependency name or one exact npm alias such as
+`npm:arcane-os@0.2.1`; the physical package manifest must still identify
+exactly as `arcane-os@0.2.1`. Canonical-plus-alias duplicates, multiple aliases,
+links/junctions, indirect package roots, or version drift fail closed.
 
 The imported module can be pure browser logic, standard-Web-API logic, or a
 client of `globalThis.Arcane`. Import-map resolution is not a new Arcane wire
@@ -164,24 +225,28 @@ heartbeat is event telemetry only and never regenerates browser state.
 </details>
 
 <details>
-<summary>SDK browser-runtime admission and exact receipt fields</summary>
+<summary>SDK 0.2.1 browser-runtime admission and exact receipt fields</summary>
 
 `arcane.lock.json.sdkBrowserRuntime` persists the trusted manifest path,
 `manifestSha256`, `contentSha256`, `builder`, `sdkVersion`, and `source` record.
-For SDK `0.1.2` those identities are:
+For SDK `0.2.1`, the manifest itself records:
 
 ```text
 manifest: node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json
-manifestSha256: 88395493b411fd5461fbb2bb065ae2b745f6d1672f796583fd248ec97f71f4f7
-contentSha256: 5e03f45a732db51cb5a2b2193cc79ecda34501d07a9b2e82e794e5fa37d55d00
+fileCount: 25
+totalBytes: 9279974
+contentSha256: a9715c4b3aef70ec4042e4738089568d6588877b29582e0f758ed83897b6814f
 builder: arcane-sdk-browser-runtime-v1
-sdkVersion: 0.1.2
+sdkVersion: 0.2.1
 source.protocol: arcane-sdk-browser-runtime/1
 source.browserEntry: arcane-os/event-manager
 ```
 
-The `source` record also binds the `arcane-os-sdk` authority/repository and the
-exact `event-pubsub` 6.1.0 and `strong-type` 2.0.0 package identities. Before a
+The verifier computes `manifestSha256` over the exact installed manifest and
+binds that value in its process-local receipt and the workspace lock; it must
+not be substituted with `contentSha256`. The `source` record also binds the
+`arcane-os-sdk` authority/repository and the exact `event-pubsub` 6.1.0,
+`strong-type` 2.0.0, and `@wllama/wllama` 3.6.0 package identities. Before a
 workspace tree is admitted, the same-process verifier returns
 `schemaVersion`, `kind`, `canonicalLocation`, `rootIdentity`, `manifestPath`,
 `manifestSha256`, `manifestIdentity`, `builder`, `sdkVersion`, `source`,
@@ -189,6 +254,131 @@ workspace tree is admitted, the same-process verifier returns
 `sourceIdentities`, and `directories`. Those object-identity-bound verifier
 receipts are authority inside the issuing process; reconstructing the same JSON
 does not recreate authority.
+
+</details>
+
+## Portable AI provider runtime
+
+Application code should select a normalized role, not an internal protocol.
+The exported
+[`getAIProviderRuntime()` singleton](runtime-modules.md#aiproviderruntimejs)
+comes from authenticated runtime bytes and owns independent `llm`, `stt`, and
+`tts` selections. SDK `0.2.1` ships browser-WASM LLM and browser speech
+provider/2 adapters; native, Core, or cloud routes require an externally
+supplied compatible adapter. The singleton itself is not an authentication or
+capability token. It normalizes inspection, model authority,
+load/unload/dispose, cancellation, stream cleanup, status, and startup
+barriers. Each selected provider retains its real execution requirements.
+`localOnly` fails closed, and failure in one role never authorizes a Core,
+cloud, or different-provider fallback.
+
+For a browser-only LLM,
+[`arcane-os/ai/browser-wasm`](ai/browser-wasm.md) exposes `createArcaneAI()`
+and an adapter into the same provider-neutral lifecycle. For browser speech,
+[`arcane-os/ai/browser-speech`](ai/browser-speech.md) creates independent
+Whisper STT and Kokoro TTS providers that register directly with the normalized
+runtime. The SDK supplies mechanism; applications retain model/runtime choice,
+provenance, licenses, prompts, tools, voices, and disclosure policy.
+
+### Browser-WASM LLM lifecycle
+
+The shipped browser receipt contains the authenticated Wllama JavaScript/WASM
+engine and its provider/cache/controller mechanism. It contains no model
+weights, default model catalog, CDN fallback, native provider, speech model, or
+application profile. The caller supplies each model as a source authority with
+a nonempty ordered file list, so monolithic and split GGUF models use the same
+contract. HTTPS redirects are followed and the final HTTPS URL is recorded.
+Exact bytes are bound only by the optional expected byte lengths and SHA-256
+values whose matching fieldwise security checks are enabled.
+
+On load, the DBOPFS store admits all ordered members and commits the completion
+manifest last. A normal cache miss may fetch only the caller-supplied immutable
+HTTPS sources; `offline:true` performs no model request and admits only a
+compatible completed cache, otherwise it rejects with
+`ARCANE_AI_MODEL_OFFLINE_MISS`. Unload releases the active Wllama session but
+does not silently delete the app-owned cache.
+
+SDK `0.2.1` requires WebGPU. Load requests full offload with exactly 99,999 GPU
+layers and admits the model only after observing an adapter, full layer offload,
+buffer and queue work, and a settled fence. `navigator.gpu` presence alone is
+not readiness. There is no CPU fallback, partial-offload success mode, or
+silent switch to native/Core/cloud inference.
+
+### Browser speech lifecycle
+
+The browser-speech package contains plain-JavaScript authority, DBOPFS store,
+provider, client, and Worker machinery. It supplies no Whisper or Kokoro
+runtime adapter bytes, model weights, voice bytes, download URL, catalog, or
+cloud fallback. The caller must provide a closed immutable runtime/model
+declaration for each role. Construction validates and freezes its declared
+identity; preparation validates the actual downloaded or cached closed runtime
+graph. The SDK downloads only declared files when permitted, commits its
+completion manifest last, and removes incomplete stored state after a
+cache/install failure. `offline:true` never uses the
+network and rejects a cache miss with `ARCANE_AI_ARTIFACT_OFFLINE_MISS`.
+
+Whisper `stt` and Kokoro `tts` each own catalog, inspect, status, load, request,
+unload, and dispose state. They load, cancel, unload, fail, and recover
+independently from the LLM and from one another. Cancellation after Worker use
+begins terminates that role's Worker slot and returns the provider to unloaded;
+a later use must load it again. If shared STT `Blob` decoding is cancelled
+before Worker use, the request rejects while the loaded provider remains ready.
+Speech failure neither disables text chat nor retries through another local,
+native, or cloud provider.
+
+### Persistent chat and document context
+
+The SDK runtime owns
+[`DBOPFSDocumentLibrary`](runtime-modules.md#dbopfsdocumentlibraryjs),
+[`DocumentLexicalSearch`](runtime-modules.md#documentlexicalsearchjs), and
+[`PersistentAIChatSession`](runtime-modules.md#persistentaichatsessionjs).
+Document bootstrap is explicit and schema-driven, commits a completed
+generation last, and returns bounded search results with partial read failures
+disclosed. `evaluate()` can instead score a caller-owned source set without
+persisting its bodies, under separate corpus/scoring/output/document budgets.
+A chat session never searches the corpus unless the application
+deliberately wires a document context builder into the request; generated
+document context remains labeled untrusted.
+
+Persistent chat maintains bounded live model context plus `ChatEntity`
+history/memory according to the caller's persistence choice. A turn with
+`persist:false` remains coherent in the live session without entering durable
+history or memory. `createArcaneAI(...).createChatSession(options)` binds the
+session and automatic memory work to that same selected LLM controller; it does
+not select a second provider or storage fallback.
+
+### Cancellation and structural tools
+
+Cancellation is part of the provider lifecycle, not just a UI decision.
+`AbortSignal`, the normalized role cancel operation, and stream-handle
+`cancel(reason)` propagate to the selected provider. Browser-WASM inference
+requires positive llama cancellation acknowledgement when cancellation is
+required. Browser speech cancellation terminates a Worker only after Worker use
+has begun; cancellation during shared browser decoding leaves the loaded Worker
+ready. Unload always cancels active role work before releasing that role's
+execution state, and superseded late results are rejected rather than committed
+or retried through another provider.
+
+LLM tool calls are structural result data only. The SDK never executes a
+handler. The application owns schema validation, authorization, side-effect
+policy, dispatch, and the matching tool-result turn.
+
+<details>
+<summary>Portable AI protocol disclosure</summary>
+
+The normalized runtime protocol is `arcane-ai-runtime/2`; registered adapters
+implement `arcane-ai-provider/2` and must prove matching
+`arcane-ai-model-authority/1` inspection before load. The browser-WASM component
+receipt is `arcane-ai-browser-wasm/2`; its direct controller adapter uses
+`arcane-ai-adapter/1`, and `adaptV1LlmProvider()` projects that surface into the
+provider/2 LLM role. Browser speech stores identify themselves as
+`arcane-ai-browser-speech-artifacts/1`; that identifier describes the store
+contract, not a model authority, capability grant, or complete-cache receipt.
+
+These identifiers normalize lifecycle records. They do not erase provider
+availability: browser providers still require their browser capabilities,
+native providers still require an admitted host and Core method, and cloud
+providers still require explicit selection, network policy, and credentials.
 
 </details>
 

@@ -15,7 +15,8 @@ import {
 import {extractRuntimeReferenceContracts} from '../tools/reference-contract-extractor.mjs';
 import {
     behaviorExampleEvidence,
-    createReferenceModuleContractMap
+    createReferenceModuleContractMap,
+    referenceGuideBehaviorEvidence
 } from '../tools/reference-module-contracts.mjs';
 import {
     filterModuleSearchRecords,
@@ -29,37 +30,116 @@ const siteRoot=path.join(repositoryRoot,'site');
 const exampleRoot=path.join(repositoryRoot,'examples','hello-world');
 const canonicalRoot='https://thewizardnexus.github.io/arcane-os-sdk/';
 const runtimeContractSummary=Object.freeze({
-    artifactCount:80,
-    esmModuleCount:74,
-    esmExportCount:282,
+    artifactCount:85,
+    esmModuleCount:79,
+    esmExportCount:318,
     exportForms:Object.freeze({
-        function:148,
-        variable:54,
-        class:10,
-        alias:25,
+        function:164,
+        variable:65,
+        class:15,
+        alias:26,
         're-export':4,
-        default:41
+        default:44
     }),
-    reviewedCallableCount:124,
-    reviewedModuleCount:51,
+    reviewedCallableCount:183,
+    reviewedModuleCount:56,
     literalCustomEventCount:11,
-    directCodedFailureCount:34,
+    directCodedFailureCount:37,
     exportedErrorSubclassCount:3,
-    publicMemberCount:407
+    publicMemberCount:456
 });
 const behaviorEvidenceCommit='567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e';
+const upstreamBehaviorEvidence=(name,sourceBlob,testPath,testBlob)=>Object.freeze({
+    repository:'TheWizardNexus/ARCANE-OS',
+    commit:behaviorEvidenceCommit,
+    sourcePath:`arcane/modules/${name}`,
+    sourceBlob,
+    testPath,
+    testBlob
+});
+const sdkBehaviorEvidence=(commit,sourcePath,sourceBlob,testPath,testBlob)=>Object.freeze({
+    repository:'TheWizardNexus/arcane-os-sdk',
+    commit,
+    sourcePath,
+    sourceBlob,
+    testPath,
+    testBlob
+});
 const expectedBehaviorEvidence=Object.freeze({
-    'AI.js':['6090c5a563c66f972267fec30184c85fbf3ec7de','test/ai.test.mjs','7593bb20967881622d5634829f2e6f05511659cc'],
-    'AnsiText.js':['097512451032ffbbceecdc3b02e3af6453e89e90','test/terminal.test.mjs','26fec62b4819635a279922c2e297130748400c4c'],
-    'AppDataScope.js':['9943961bd8c4cf93655eece17f14b29ea817357a','test/dbls-app-isolation.test.mjs','583d396c16c5209c8fdaaea3744931816b814e99'],
-    'CalculatorEngine.js':['4434d5ad287f94136c054e4cc1b2423387331c06','test/utility-apps.test.mjs','2ddee94c58e751b0e6bec58955431d7994628757'],
-    'ConfiguredAIChatSession.js':['21d48eb2af74494b9ee14fca889e571d184d535a','test/configured-ai-chat-session.test.mjs','28f29b2ca5e62aa76952d61adf570155f31a906c'],
-    'DirectoryPicker.js':['506e54471d775404de55b3166b79a466af64d646','test/directory-picker.test.mjs','27230080a0d589212de442a17849233cdb80eb0c'],
-    'IsolatedModelQuestionRunner.js':['94c6df9e7661b507a495223facb31cd0d3ac7ede','test/isolated-model-question-runner.test.mjs','e94dd4b80b492ce5ff12ae83818915c5c44c298d'],
-    'Ollama.js':['fcfd7942e9c706088b23be44180427774763d92a','test/ollama.test.mjs','35187394154e95c883432c203bc79aa8c2a13367'],
-    'SpeechPlayback.js':['20d4935deeb97d1be4221f5859897fafd6bb6449','test/speech-playback.test.mjs','6f7307973f35b50ffbc6d5109ab3f558a202a45f'],
-    'TerminalClient.js':['35d9c6502979331538d69c63f96b73b792ce014c','test/terminal.test.mjs','26fec62b4819635a279922c2e297130748400c4c'],
-    'ThemeBootstrap.js':['9a0fb2d9729141175b835f7c95a208a650c66d2e','test/theme-manager-system-appearance.test.mjs','53a5cc666c6c6db4f5e11b77e5975723946e10c7']
+    'AI.js':sdkBehaviorEvidence(
+        '36fbe1418af3d5c343d105ee7c9456360c57785d',
+        'runtime/arcane/modules/AI.js',
+        '5abab7283e36e4433780ffde933f954d178c97bb',
+        'test/runtime-api-behavior.test.mjs','d355359f207d88fce94c34a4c6940e859ebb9c18'
+    ),
+    'AnsiText.js':upstreamBehaviorEvidence('AnsiText.js','097512451032ffbbceecdc3b02e3af6453e89e90','test/terminal.test.mjs','26fec62b4819635a279922c2e297130748400c4c'),
+    'AppDataScope.js':upstreamBehaviorEvidence('AppDataScope.js','9943961bd8c4cf93655eece17f14b29ea817357a','test/dbls-app-isolation.test.mjs','583d396c16c5209c8fdaaea3744931816b814e99'),
+    'CalculatorEngine.js':upstreamBehaviorEvidence('CalculatorEngine.js','4434d5ad287f94136c054e4cc1b2423387331c06','test/utility-apps.test.mjs','2ddee94c58e751b0e6bec58955431d7994628757'),
+    'ConfiguredAIChatSession.js':sdkBehaviorEvidence(
+        '36fbe1418af3d5c343d105ee7c9456360c57785d',
+        'runtime/arcane/modules/ConfiguredAIChatSession.js',
+        'b6a6a084f911b125bbebb63cb5d667a7db570a88',
+        'test/runtime-api-behavior.test.mjs','d355359f207d88fce94c34a4c6940e859ebb9c18'
+    ),
+    'DBOPFSDocumentLibrary.js':sdkBehaviorEvidence(
+        '36fbe1418af3d5c343d105ee7c9456360c57785d',
+        'runtime/arcane/modules/DBOPFSDocumentLibrary.js',
+        '04818f4cc0fa1256e19a02dea6b55eb5c818e195',
+        'test/dbopfs-document-library.test.mjs','7afd086688bf52d4fe50b4d896b292f7ace4f3c4'
+    ),
+    'DirectoryPicker.js':upstreamBehaviorEvidence('DirectoryPicker.js','506e54471d775404de55b3166b79a466af64d646','test/directory-picker.test.mjs','27230080a0d589212de442a17849233cdb80eb0c'),
+    'IsolatedModelQuestionRunner.js':upstreamBehaviorEvidence('IsolatedModelQuestionRunner.js','94c6df9e7661b507a495223facb31cd0d3ac7ede','test/isolated-model-question-runner.test.mjs','e94dd4b80b492ce5ff12ae83818915c5c44c298d'),
+    'Ollama.js':upstreamBehaviorEvidence('Ollama.js','fcfd7942e9c706088b23be44180427774763d92a','test/ollama.test.mjs','35187394154e95c883432c203bc79aa8c2a13367'),
+    'SpeechPlayback.js':upstreamBehaviorEvidence('SpeechPlayback.js','20d4935deeb97d1be4221f5859897fafd6bb6449','test/speech-playback.test.mjs','6f7307973f35b50ffbc6d5109ab3f558a202a45f'),
+    'TerminalClient.js':upstreamBehaviorEvidence('TerminalClient.js','35d9c6502979331538d69c63f96b73b792ce014c','test/terminal.test.mjs','26fec62b4819635a279922c2e297130748400c4c'),
+    'ThemeBootstrap.js':upstreamBehaviorEvidence('ThemeBootstrap.js','9a0fb2d9729141175b835f7c95a208a650c66d2e','test/theme-manager-system-appearance.test.mjs','53a5cc666c6c6db4f5e11b77e5975723946e10c7')
+});
+const expectedReferenceGuideBehaviorEvidence=Object.freeze({
+    'docs/reference/ai/browser-speech.md':Object.freeze({
+        scope:Object.freeze(['browser speech provider lifecycle, request normalization, and cancellation']),
+        repository:'TheWizardNexus/arcane-os-sdk',
+        commit:'36fbe1418af3d5c343d105ee7c9456360c57785d',
+        sources:Object.freeze([Object.freeze({
+            path:'browser-runtime/ai/browser-speech-providers.mjs',
+            blob:'36e016305f48c8285a702a0ade11a0a64b0c66ea'
+        })]),
+        tests:Object.freeze([Object.freeze({
+            path:'test/browser-speech-providers.test.mjs',
+            blob:'6c8b7f51730359b13e41515e794b5076185ccd2f'
+        })])
+    }),
+    'docs/reference/cli.md':Object.freeze({
+        scope:Object.freeze(['import-map generation and multi-document targeting']),
+        repository:'TheWizardNexus/arcane-os-sdk',
+        commit:'36fbe1418af3d5c343d105ee7c9456360c57785d',
+        sources:Object.freeze([Object.freeze({
+            path:'src/import-map.mjs',
+            blob:'87bc41b65c1499c38907fbe151e17d247d2fc3c1'
+        })]),
+        tests:Object.freeze([Object.freeze({
+            path:'test/import-map.test.mjs',
+            blob:'a70de7b52087d9f8c05e8ece48d32a7a75b0152b'
+        }),Object.freeze({
+            path:'test/packaging.test.mjs',
+            blob:'a23516858f12e4d2a0d1d7d91fad3b91cfb08165'
+        }),Object.freeze({
+            path:'test/dev-server.test.mjs',
+            blob:'279f1ca202383b6c6547693d43e06610019bc169'
+        })])
+    }),
+    'docs/reference/runtime-components.md':Object.freeze({
+        scope:Object.freeze(['chat.html selected-unloaded AI activation control, callbacks, and public events']),
+        repository:'TheWizardNexus/arcane-os-sdk',
+        commit:'36fbe1418af3d5c343d105ee7c9456360c57785d',
+        sources:Object.freeze([Object.freeze({
+            path:'runtime/arcane/components/chat.html',
+            blob:'f4402222fb0185df8a5fb721a54febbb0db54c0d'
+        })]),
+        tests:Object.freeze([Object.freeze({
+            path:'test/runtime-api-behavior.test.mjs',
+            blob:'d355359f207d88fce94c34a4c6940e859ebb9c18'
+        })])
+    })
 });
 const expectedCapabilityStrings=Object.freeze([
     'ai.inference',
@@ -385,9 +465,9 @@ test('Pages routes are semantic, canonical, and project-path safe',async t=>{
     const pageRoutes=new Map([...canonicalPageRoutes,...compatibilityPageRoutes]);
     const actualPages=(await listHtmlFiles()).sort();
     assert.equal(staticPageRoutes.size,12);
-    assert.equal(canonicalPageRoutes.size,121);
+    assert.equal(canonicalPageRoutes.size,127);
     assert.equal(compatibilityPageRoutes.size,1);
-    assert.equal(pageRoutes.size,122);
+    assert.equal(pageRoutes.size,128);
     assert.equal(canonicalPageRoutes.get('examples/index.html'),'examples/');
     assert.equal(canonicalPageRoutes.has('examples/hello-world/index.html'),false);
     assert.equal(compatibilityPageRoutes.get('examples/hello-world/index.html'),'examples/');
@@ -450,25 +530,25 @@ test('the complete API reference is a first-party generated Pages corpus',async 
     const manifest=await loadReferenceManifest();
     assert.equal(manifest.schema,'arcane-reference-site/1');
     assert.deepEqual(manifest.versions,{
-        sdk:'0.1.1',
+        sdk:'0.2.1',
         runtime:'0.8.12',
         protocol:'arcane/1'
     });
     assert.deepEqual(manifest.counts,{
-        markdownPages:25,
+        markdownPages:26,
         collectionPages:2,
-        generatedPages:82,
-        runtimeModulePages:80,
-        htmlPages:109,
+        generatedPages:87,
+        runtimeModulePages:85,
+        htmlPages:115,
         inventories:4
     });
-    assert.equal(manifest.pages.filter(page=>page.kind==='markdown').length,25);
+    assert.equal(manifest.pages.filter(page=>page.kind==='markdown').length,26);
     assert.equal(manifest.pages.filter(page=>page.kind==='collection').length,2);
-    assert.equal(manifest.pages.filter(page=>page.kind==='runtime-module').length,80);
+    assert.equal(manifest.pages.filter(page=>page.kind==='runtime-module').length,85);
     assert.equal(manifest.pages.filter(page=>page.kind==='generated').length,2);
-    assert.equal(new Set(manifest.pages.map(page=>page.source)).size,109);
-    assert.equal(new Set(manifest.pages.map(page=>page.output)).size,109);
-    assert.equal(new Set(manifest.pages.map(page=>page.route)).size,109);
+    assert.equal(new Set(manifest.pages.map(page=>page.source)).size,115);
+    assert.equal(new Set(manifest.pages.map(page=>page.output)).size,115);
+    assert.equal(new Set(manifest.pages.map(page=>page.route)).size,115);
     const browserWasmPages=manifest.pages.filter(page=>
         page.source==='docs/reference/ai/browser-wasm.md'
     );
@@ -487,34 +567,95 @@ test('the complete API reference is a first-party generated Pages corpus',async 
             kind:'markdown'
         }
     );
+    const browserSpeechPages=manifest.pages.filter(page=>
+        page.source==='docs/reference/ai/browser-speech.md'
+    );
+    assert.equal(browserSpeechPages.length,1);
+    assert.deepEqual(
+        {
+            source:browserSpeechPages[0].source,
+            output:browserSpeechPages[0].output,
+            route:browserSpeechPages[0].route,
+            kind:browserSpeechPages[0].kind
+        },
+        {
+            source:'docs/reference/ai/browser-speech.md',
+            output:'site/reference/ai/browser-speech/index.html',
+            route:'reference/ai/browser-speech/',
+            kind:'markdown'
+        }
+    );
 
-    await t.test('browser-WASM AI is complete, subordinate to normalized AI, and directly discoverable',async()=>{
-        const [landing,guide,normalized,sdk,referenceCss,sitemap]=await Promise.all([
+    await t.test('browser-local AI guides are complete, subordinate to normalized AI, and directly discoverable',async()=>{
+        const [landing,overview,guide,speechGuide,normalized,sdk,referenceCss,sitemap]=await Promise.all([
             readSiteFile('reference/index.html'),
+            readSiteFile('reference/overview/index.html'),
             readSiteFile('reference/ai/browser-wasm/index.html'),
+            readSiteFile('reference/ai/browser-speech/index.html'),
             readSiteFile('reference/ai/index.html'),
             readSiteFile('reference/sdk-api/index.html'),
             readSiteFile('reference/reference.css'),
             readSiteFile('sitemap.xml')
         ]);
         const decodedGuide=decodeReferenceHtml(guide);
+        const decodedSpeechGuide=decodeReferenceHtml(speechGuide);
         const decodedNormalized=decodeReferenceHtml(normalized);
+        const decodedOverview=decodeReferenceHtml(overview);
         const decodedSdk=decodeReferenceHtml(sdk);
         assert.match(landing,/href="sdk-api\/">API<\/a>/u);
         assert.match(landing,/href="ai\/browser-wasm\/">Browser-WASM AI<\/a>/u);
-        assert.match(landing,/<strong>163<\/strong>[\s\S]*12 JavaScript package entrypoints/u);
+        assert.match(landing,/<strong>169<\/strong>[\s\S]*13 JavaScript package entrypoints/u);
         assert.match(normalized,/Application default[.][\s\S]*browser-wasm-local-text-inference/u);
         assert.match(decodedNormalized,/arcane-os\/ai\/browser-wasm/u);
-        assert.match(decodedNormalized,/\{id, url, bytes\?, sha256\?\}/u);
+        assert.match(decodedNormalized,/AIProviderRuntime[.]js[\s\S]*AIRuntimeState[.]js/u);
+        assert.match(decodedNormalized,/arcane-os\/ai\/browser-speech/u);
+        assert.match(decodedNormalized,/PersistentAIChatSession[.]js[\s\S]*DBOPFSDocumentLibrary[.]js/u);
+        assert.match(decodedNormalized,/\{id, files:\[\{name\?,url,bytes\?,sha256\?\},[.][.][.]\]\}/u);
+        for(const value of [
+            'arcane-os@0.2.1',
+            '36fbe1418af3d5c343d105ee7c9456360c57785d',
+            'sha512-FJ7zCFvQVZEMLQ8kn9IqddnFkfw397S87tENfLULwt0bN5hYn22wmN2zU50BqYC4zDKI/fdf4Rcl5G6A6KwlCg==',
+            '9b21aea206582e367b8220ad45475ce69af5365a',
+            'c9ebe6d5c0f8f808707a00ca055ef1fe142a3a51715df43f7da427be31c95808',
+            '.github/workflows/publish-dev.yml'
+        ])assert.ok(decodedOverview.includes(value),value);
+        for(const target of [
+            'https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.2.1',
+            'https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33013624030',
+            'https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33013804158'
+        ])assert.match(overview,new RegExp(`href="${escapePattern(target)}"`,'u'),target);
         assert.match(decodedGuide,/arcane-ai-browser-wasm\/2/u);
         assert.match(decodedGuide,/@wllama\/wllama[\s\S]*3[.]6[.]0/u);
-        assert.match(decodedGuide,/arcane[.]ai[.]browser-wasm[.]model[.]v3/u);
+        assert.match(decodedGuide,/arcane[.]ai[.]browser-wasm[.]model[.]v4/u);
         assert.match(decodedGuide,/SDK default is secure:false/u);
         assert.match(decodedGuide,/observed byte length/u);
         assert.match(decodedGuide,/load\(\{offline:true\}\)[\s\S]*ARCANE_AI_MODEL_OFFLINE_MISS/u);
         assert.match(decodedGuide,/AbortSignal[\s\S]*ARCANE_AI_REQUEST_ABORTED/u);
         assert.match(decodedGuide,/never invokes a handler or executes a tool/u);
         assert.match(decodedGuide,/packages no model weights/u);
+        for(const value of [
+            'ARCANE_AI_MODEL_AUTHORITY_REQUIRED',
+            'ARCANE_AI_STORAGE_CAPACITY_INSUFFICIENT',
+            'ARCANE_AI_PROVIDER_ROLE_MISMATCH',
+            'ARCANE_AI_PROVIDER_PROGRESS_INVALID',
+            'ARCANE_AI_MODEL_NOT_READY',
+            'ARCANE_AI_PROVIDER_STATUS_INVALID',
+            'ARCANE_AI_PROVIDER_OPERATION_UNAVAILABLE',
+            'ARCANE_AI_COMPLETION_RECOVERY_UNCONFIRMED',
+            'ARCANE_AI_WEBASSEMBLY_UNAVAILABLE',
+            'ARCANE_AI_MODEL_STORAGE_REQUIREMENT_UNKNOWN',
+            'ARCANE_AI_STORAGE_ESTIMATE_INVALID',
+            'ARCANE_AI_WEBGPU_EXECUTION_UNOBSERVED'
+        ])assert.ok(decodedGuide.includes(value),value);
+        assert.match(decodedGuide,/existing ModelController[\s\S]*does not reapply its loadPolicy[\s\S]*supplying security[\s\S]*throws TypeError/u);
+        assert.match(decodedSpeechGuide,/arcane-os\/ai\/browser-speech/u);
+        assert.match(decodedSpeechGuide,/Whisper speech-to-text[\s\S]*Kokoro text-to-speech/u);
+        assert.match(decodedSpeechGuide,/arcane-ai-provider\/2/u);
+        assert.match(decodedSpeechGuide,/does not ship model weights[\s\S]*cloud fallback/u);
+        assert.match(decodedSpeechGuide,/0[.]2[.]1 publishes no Node speech storage, Worker, audio-decoder, or execution adapter/u);
+        assert.match(decodedSpeechGuide,/secure:false[\s\S]*appSecurity[\s\S]*provider security[\s\S]*load\(\{security\}\)/u);
+        assert.match(decodedSpeechGuide,/checks[.]byteLength[\s\S]*checks[.]sha256/u);
+        assert.match(decodedSpeechGuide,/before Worker use[\s\S]*provider stays ready/u);
         for(const name of [
             'BROWSER_WASM_RUNTIME_AUTHORITY',
             'createArcaneAI()',
@@ -532,10 +673,19 @@ test('the complete API reference is a first-party generated Pages corpus',async 
                 1,
                 page.output
             );
+            assert.equal(
+                (html.slice(start,end).match(/>Browser speech<\/a>/gu)??[]).length,
+                1,
+                page.output
+            );
             assert.match(html,/class="repo-link" href="[^"]*">API<\/a>/u,page.output);
         }
         assert.equal(
             (sitemap.match(/<loc>https:\/\/thewizardnexus[.]github[.]io\/arcane-os-sdk\/reference\/ai\/browser-wasm\/<\/loc>/gu)??[]).length,
+            1
+        );
+        assert.equal(
+            (sitemap.match(/<loc>https:\/\/thewizardnexus[.]github[.]io\/arcane-os-sdk\/reference\/ai\/browser-speech\/<\/loc>/gu)??[]).length,
             1
         );
         assert.match(referenceCss,/@media \(max-width: 1280px\)[\s\S]*[.]reference-toc[\s\S]*display: none/u);
@@ -546,6 +696,10 @@ test('the complete API reference is a first-party generated Pages corpus',async 
         assert.match(
             guide,
             /aria-label="Breadcrumb"[\s\S]*href="[.][.]\/">Normalized AI<\/a>[\s\S]*aria-current="page">Browser-WASM local AI/u
+        );
+        assert.match(
+            speechGuide,
+            /aria-label="Breadcrumb"[\s\S]*href="[.][.]\/">Normalized AI<\/a>[\s\S]*aria-current="page">Browser speech providers/u
         );
         for(const anchor of [
             'browserwasmruntimeauthority',
@@ -571,7 +725,11 @@ test('the complete API reference is a first-party generated Pages corpus',async 
             assert.doesNotMatch(html,/href="javascript:/iu,page.output);
             assert.doesNotMatch(html,/<script(?![^>]*\bsrc=)[^>]*>/iu,page.output);
             assert.doesNotMatch(html,/reference-source-link/u,page.output);
-            assert.doesNotMatch(html,/github[.]com\/TheWizardNexus\/(?:arcane-os-sdk|ARCANE-OS)/iu,page.output);
+            assert.doesNotMatch(
+                html,
+                /github[.]com\/TheWizardNexus\/(?:ARCANE-OS\/|arcane-os-sdk\/(?!(?:releases\/tag\/[0-9]+[.][0-9]+[.][0-9]+|actions\/runs\/[0-9]+)(?:["?#])))/iu,
+                page.output
+            );
             assert.doesNotMatch(html,/Developer Reference Maintenance SOP|repository-only|npm run model:ensure/iu,page.output);
             const ids=[...html.matchAll(/\bid="([^"]+)"/gu)].map(match=>match[1]);
             assert.equal(new Set(ids).size,ids.length,`${page.output} contains duplicate element ids.`);
@@ -648,7 +806,13 @@ test('the complete API reference is a first-party generated Pages corpus',async 
         assert.match(decodedCli,/arcane import-map \[--workspace <directory>\] \[--app <id>\]/u);
         assert.match(decodedCli,/apps\/<id>\/modules\/arcane[.]importmap[.]json/u);
         assert.match(decodedCli,/data-arcane-import-map/u);
-        assert.match(decodedCli,/entryCount:86/u);
+        assert.match(decodedCli,/entryCount:91/u);
+        assert.match(decodedCli,/documentPaths/u);
+        assert.match(decodedCli,/documentCount:1/u);
+        assert.match(decodedCli,/role:'document'/u);
+        assert.match(decodedCli,/ARCANE_RUNTIME_PROJECTION[.]json/u);
+        assert.match(decodedCli,/ARCANE_RUNTIME_PROJECTION_INVALID/u);
+        assert.match(decodedCli,/private \/ARCANE_APP_RELEASE[.]json/u);
         assert.match(decodedCli,/integrated-legacy/u);
         assert.match(cli,/There is no supported <code>--dry-run<\/code> for <code>import-map<\/code>/u);
         assert.match(decodedCli,/no\s+watcher, polling, scheduled refresh, download, or self-update/u);
@@ -661,17 +825,26 @@ test('the complete API reference is a first-party generated Pages corpus',async 
 
         assert.match(protocols,/id="sdk-package-and-cli-protocols"/u);
         assert.match(protocols,/id="browser-runtime-delivery"/u);
+        assert.match(protocols,/id="portable-ai-provider-runtime"/u);
         assert.match(decodedProtocols,/import ollama from 'arcane\/Ollama';/u);
-        assert.match(decodedProtocols,/exactly 86 entries/u);
-        assert.match(protocols,/73 named\s+<code>arcane\/[*]<\/code> modules/u);
-        assert.match(protocols,/nine <code>arcane\/entities\/[*]<\/code> modules/u);
+        assert.match(decodedProtocols,/160 files[;]\s+3,605,154 bytes[;]\s+content SHA-256\s+5b921d50b6a0cf36a13f7a7dedf96cd3a68104a322e5139136fd4197aa1ca7cb/u);
+        assert.match(decodedProtocols,/25 files[;]\s+9,279,974 bytes[;]\s+content SHA-256\s+a9715c4b3aef70ec4042e4738089568d6588877b29582e0f758ed83897b6814f/u);
+        assert.match(decodedProtocols,/185 entries in total[\s\S]*not an import-map entry count/u);
         assert.match(decodedProtocols,/arcane-os\/event-manager[\s\S]*[.]\/arcane\/sdk\/event-manager[.]mjs/u);
         assert.match(decodedProtocols,/arcane-os\/ai\/browser-wasm[\s\S]*[.]\/arcane\/sdk\/ai\/browser-wasm[.]mjs/u);
+        assert.match(decodedProtocols,/arcane-os\/ai\/browser-speech[\s\S]*[.]\/arcane\/sdk\/ai\/browser-speech[.]mjs/u);
         assert.match(decodedProtocols,/event-pubsub[\s\S]*[.]\/arcane\/sdk\/dependencies\/event-pubsub\/index[.]js/u);
         assert.match(decodedProtocols,/[.]\/node_modules\/strong-type\/index[.]js[\s\S]*[.]\/arcane\/dependencies\/strong-type\/index[.]js/u);
-        assert.match(decodedProtocols,/173 files in all/u);
-        assert.match(decodedProtocols,/manifestSha256: 33396b3d35322b784929270e7ca0a2a8b31d899c6e77bcb227edc95b37d0ae7d/u);
-        assert.match(decodedProtocols,/contentSha256: 5e03f45a732db51cb5a2b2193cc79ecda34501d07a9b2e82e794e5fa37d55d00/u);
+        assert.match(decodedProtocols,/documentPaths[\s\S]*documentCount[\s\S]*role:"document"/u);
+        assert.match(decodedProtocols,/ARCANE_RUNTIME_PROJECTION[.]json[\s\S]*arcane-app-runtime-projection/u);
+        assert.match(decodedProtocols,/private \/ARCANE_APP_RELEASE[.]json/u);
+        assert.match(decodedProtocols,/sdkInstallation[\s\S]*dependencyName[\s\S]*browserRuntimeManifest/u);
+        assert.match(decodedProtocols,/npm:arcane-os@0[.]2[.]1/u);
+        assert.match(decodedProtocols,/sdkVersion: 0[.]2[.]1/u);
+        assert.match(decodedProtocols,/contentSha256: a9715c4b3aef70ec4042e4738089568d6588877b29582e0f758ed83897b6814f/u);
+        assert.match(decodedProtocols,/WebGPU[\s\S]*99,999 GPU layers[\s\S]*no CPU fallback/u);
+        assert.match(decodedProtocols,/PersistentAIChatSession[\s\S]*persist:false/u);
+        assert.match(decodedProtocols,/tool calls are structural result data only[\s\S]*never executes a handler/iu);
         assert.match(decodedProtocols,/sourceIdentities/u);
         assert.match(decodedProtocols,/bounded handled-error transaction/u);
 
@@ -679,12 +852,32 @@ test('the complete API reference is a first-party generated Pages corpus',async 
         assert.match(decodedEvents,/arcane\/sdk\/dependencies\/event-pubsub\/index[.]js/u);
         assert.match(decodedSdk,/toolchain[.]importMap\(/u);
         assert.match(decodedSdk,/executeOperation\('import-map'/u);
+        assert.match(decodedSdk,/validateWorkspace[\s\S]*allowMissingManagedImportMap=false/u);
+        assert.match(decodedSdk,/sdkInstallation[\s\S]*canonicalPackageRoot[\s\S]*browserRuntimeManifest/u);
+        assert.match(decodedSdk,/ARCANE_RUNTIME_PROJECTION[.]json[\s\S]*ARCANE_RUNTIME_PROJECTION_INVALID/u);
+        assert.match(decodedSdk,/documentPaths[\s\S]*documentCount/u);
         assert.match(
             sdk,
             /There is no exported\s+<code>importMapApplication\(\)<\/code> or <code>generateImportMap\(\)<\/code> binding/u
         );
-        assert.equal(packageApi.sdkVersion,'0.2.0');
-        assert.equal(packageApi.memberCount,163);
+        assert.equal(packageApi.sdkVersion,'0.2.1');
+        assert.equal(packageApi.memberCount,169);
+        assert.deepEqual(
+            packageApi.members
+                .filter(member=>member.primaryImport==='arcane-os/ai/browser-speech')
+                .map(member=>member.name),
+            [
+                'BROWSER_SPEECH_ARTIFACT_PROTOCOL',
+                'createBrowserKokoroProvider',
+                'createBrowserSpeechAuthority',
+                'createBrowserWhisperProvider',
+                'createDbopfsSpeechArtifactStore'
+            ]
+        );
+        assert.equal(packageApi.members.filter(member=>
+            member.primaryImport==='arcane-os/ai/browser-wasm'
+            &&member.name==='adaptV1LlmProvider'
+        ).length,1);
         assert.equal(packageApi.members.some(member=>[
             'importMapApplication','generateImportMap'
         ].includes(member.name)),false);
@@ -737,13 +930,14 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
         assert.deepEqual(firstPlan.manifest.runtimeContracts.summary,runtimeContractSummary);
         assert.equal(firstPlan.manifest.runtimeContracts.hash,sourceContracts.hash);
         assert.match(sourceContracts.hash,/^[0-9a-f]{64}$/u);
-        assert.equal(sourceContracts.modules.length,80);
+        assert.equal(sourceContracts.modules.length,85);
         assert.deepEqual(sourceContracts.modules.map(module=>module.name),records.map(record=>record.name));
+        assert.equal(records.filter(record=>['esm','worker','classic-script'].includes(record.kind)).length,83);
         assert.deepEqual(records.reduce((counts,record)=>{
             counts[record.kind]=(counts[record.kind]??0)+1;
             return counts;
         },{}),{
-            esm:74,
+            esm:79,
             worker:1,
             'classic-script':3,
             license:1,
@@ -752,9 +946,9 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
     });
 
     await t.test('curated overlays and behavior evidence have exact inventory parity',async()=>{
-        assert.equal(overlays.size,80);
+        assert.equal(overlays.size,85);
         assert.deepEqual([...overlays.keys()],records.map(record=>record.name));
-        assert.equal([...overlays.values()].filter(record=>record.classification==='public-first-party').length,73);
+        assert.equal([...overlays.values()].filter(record=>record.classification==='public-first-party').length,78);
         assert.equal([...overlays.values()].filter(record=>record.classification==='vendor').length,5);
         assert.equal([...overlays.values()].filter(record=>record.classification==='host-internal').length,1);
         assert.equal([...overlays.values()].filter(record=>record.classification==='internal-worker').length,1);
@@ -762,26 +956,41 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
             Object.keys(behaviorExampleEvidence).sort(),
             Object.keys(expectedBehaviorEvidence).sort()
         );
-        for(const [name,[sourceBlob,testPath,testBlob]] of Object.entries(expectedBehaviorEvidence)){
-            assert.deepEqual(behaviorExampleEvidence[name],{
-                repository:'TheWizardNexus/ARCANE-OS',
-                commit:behaviorEvidenceCommit,
-                sourceBlob,
-                testPath,
-                testBlob
-            });
+        for(const [name,evidence] of Object.entries(expectedBehaviorEvidence)){
+            assert.deepEqual(behaviorExampleEvidence[name],evidence);
             assert.equal(
                 gitBlobOid(await readFile(path.join(repositoryRoot,'runtime','arcane','modules',name))),
-                sourceBlob,
+                evidence.sourceBlob,
                 `${name}: pinned source blob`
             );
+            if(evidence.repository==='TheWizardNexus/arcane-os-sdk'){
+                assert.equal(
+                    gitBlobOid(await readFile(path.join(repositoryRoot,...evidence.testPath.split('/')))),
+                    evidence.testBlob,
+                    `${name}: pinned test blob`
+                );
+            }
+        }
+        assert.deepEqual(referenceGuideBehaviorEvidence,expectedReferenceGuideBehaviorEvidence);
+        const manifestPagesBySource=new Map(
+            firstPlan.manifest.pages.map(page=>[page.source,page])
+        );
+        for(const [source,evidence] of Object.entries(expectedReferenceGuideBehaviorEvidence)){
+            assert.deepEqual(manifestPagesBySource.get(source)?.behaviorEvidence,evidence);
+            for(const record of [...evidence.sources,...evidence.tests]){
+                assert.equal(
+                    gitBlobOid(await readFile(path.join(repositoryRoot,...record.path.split('/')))),
+                    record.blob,
+                    `${record.path}: pinned behavior blob`
+                );
+            }
         }
     });
 
     await t.test('every runtime artifact owns one complete local contract page',()=>{
-        assert.equal(modulePages.length,80);
-        assert.equal(pagesBySource.size,80);
-        assert.equal(modulePages.filter(page=>Object.hasOwn(page,'behaviorEvidence')).length,11);
+        assert.equal(modulePages.length,85);
+        assert.equal(pagesBySource.size,85);
+        assert.equal(modulePages.filter(page=>Object.hasOwn(page,'behaviorEvidence')).length,12);
         const totals={
             exports:0,
             reviewedCallables:0,
@@ -938,17 +1147,17 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
                 renderedBehaviorExamples+=1;
                 assert.deepEqual(page.behaviorEvidence,{
                     source:{
-                        repository:'TheWizardNexus/ARCANE-OS',
-                        commit:behaviorEvidenceCommit,
-                        path:record.file.replace(/^runtime\//u,''),
-                        blob:expectedEvidence[0],
+                        repository:expectedEvidence.repository,
+                        commit:expectedEvidence.commit,
+                        path:expectedEvidence.sourcePath,
+                        blob:expectedEvidence.sourceBlob,
                         sha256:page.sourceSha256
                     },
                     test:{
-                        repository:'TheWizardNexus/ARCANE-OS',
-                        commit:behaviorEvidenceCommit,
-                        path:expectedEvidence[1],
-                        blob:expectedEvidence[2]
+                        repository:expectedEvidence.repository,
+                        commit:expectedEvidence.commit,
+                        path:expectedEvidence.testPath,
+                        blob:expectedEvidence.testBlob
                     }
                 });
                 assert.match(html,/<h2 id="example">Behavior example<\/h2>/u,record.name);
@@ -957,15 +1166,30 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
                 assert.doesNotMatch(html,/<h2 id="example">Behavior example<\/h2>/u,record.name);
             }
         }
+        const moduleHtml=name=>decodeReferenceHtml(
+            firstPlan.expectedFiles.get(
+                `site/reference/runtime-modules/${runtimeModuleSlug(name)}/index.html`
+            ).toString('utf8')
+        );
+        const aiHtml=moduleHtml('AI.js');
+        assert.match(aiHtml,/transitionAI\(\)[\s\S]*stops queued audio[\s\S]*unloads all three current roles[\s\S]*aggregate runtime status/u);
+        assert.doesNotMatch(aiHtml,/logs exact outbound and inbound inference payloads/u);
+        const providerRuntimeHtml=moduleHtml('AIProviderRuntime.js');
+        assert.match(providerRuntimeHtml,/start\(\{startMuted=true,signal=null\}=\{\}\)[\s\S]*\{barrier,settled,cancel\}/u);
+        const configuredHtml=moduleHtml('ConfiguredAIChatSession.js');
+        assert.match(configuredHtml,/initialMessages[\s\S]*contextBuilder\(\{input,history,signal\}\)[\s\S]*tool_calls[\s\S]*exactly one/u);
+        const documentLibraryHtml=moduleHtml('DBOPFSDocumentLibrary.js');
+        assert.match(documentLibraryHtml,/preserve-readable[\s\S]*partial failures and coverage/u);
+        assert.match(documentLibraryHtml,/DBOPFS_DOCUMENT_INVALID[\s\S]*DBOPFS_DOCUMENT_INVALID_LIMIT[\s\S]*DBOPFS_DOCUMENT_ERROR/u);
         assert.deepEqual(totals,{
-            exports:282,
-            reviewedCallables:124,
-            publicMembers:407,
+            exports:318,
+            reviewedCallables:183,
+            publicMembers:456,
             literalCustomEvents:11,
-            directCodedFailures:34,
+            directCodedFailures:37,
             exportedErrorSubclasses:3
         });
-        assert.equal(renderedBehaviorExamples,11);
+        assert.equal(renderedBehaviorExamples,12);
     });
 
     await t.test('reader navigation contains no source detours or private signatures',()=>{
@@ -973,7 +1197,11 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
         for(const output of outputs){
             const html=firstPlan.expectedFiles.get(output).toString('utf8');
             assert.doesNotMatch(html,/href="[^"]*[.]md(?:[?#][^"]*)?"/iu,output);
-            assert.doesNotMatch(html,/github[.]com\/TheWizardNexus\/(?:arcane-os-sdk|ARCANE-OS)/iu,output);
+            assert.doesNotMatch(
+                html,
+                /github[.]com\/TheWizardNexus\/(?:ARCANE-OS\/|arcane-os-sdk\/(?!(?:releases\/tag\/[0-9]+[.][0-9]+[.][0-9]+|actions\/runs\/[0-9]+)(?:["?#])))/iu,
+                output
+            );
             assert.doesNotMatch(html,/reference-source-link|Canonical source|exact source path/iu,output);
             assert.doesNotMatch(
                 html,
@@ -1012,7 +1240,7 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
         assert.deepEqual(normalizeModuleSearch('  AI.js / Speech  '),['ai','js','speech']);
         assert.deepEqual(filterModuleSearchRecords(records),records);
         for(const [kind,count] of [
-            ['esm',74],
+            ['esm',79],
             ['classic-script',3],
             ['worker',1],
             ['stylesheet',1],
@@ -1373,7 +1601,7 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         readJson(path.join(exampleRoot,'arcane-packager.json'))
     ]);
     await t.test('pins the current npm and runtime identities',()=>{
-        assert.equal(rootPackage.version,'0.1.2');
+        assert.equal(rootPackage.version,'0.2.1');
         assert.equal(examplePackage.devDependencies['arcane-os'],'0.1.2');
         assert.equal(examplePackage.engines.node,'>=22.23.2');
         assert.equal(packageLock.lockfileVersion,3);
@@ -1678,16 +1906,20 @@ test('Pages workflow deploys one authenticated main static artifact',async t=>{
         assert.equal(packageDocument.files.some(entry=>entry.startsWith('site')),false);
         assert.match(robots,/Sitemap: https:\/\/thewizardnexus[.]github[.]io\/arcane-os-sdk\/sitemap[.]xml/u);
         const locations=[...sitemap.matchAll(/<loc>([^<]+)<\/loc>/gu)].map(match=>match[1]).sort();
-        assert.equal(locations.length,121);
-        assert.equal(new Set(locations).size,121);
+        assert.equal(locations.length,127);
+        assert.equal(new Set(locations).size,127);
         assert.equal(locations.filter(url=>url===`${canonicalRoot}examples/`).length,1);
         assert.equal(locations.includes(`${canonicalRoot}examples/hello-world/`),false);
         assert.equal(
             locations.filter(url=>url===`${canonicalRoot}reference/ai/browser-wasm/`).length,
             1
         );
+        assert.equal(
+            locations.filter(url=>url===`${canonicalRoot}reference/ai/browser-speech/`).length,
+            1
+        );
         const pageRoutes=await loadPageRoutes();
-        assert.equal(pageRoutes.size,121);
+        assert.equal(pageRoutes.size,127);
         const expected=[...pageRoutes.values()].map(route=>`${canonicalRoot}${route}`).sort();
         assert.deepEqual(locations,expected);
     });

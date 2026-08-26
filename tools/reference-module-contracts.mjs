@@ -30,58 +30,121 @@ const expectedSpecialClassifications=Object.freeze({
 
 const behaviorEvidenceRepository='TheWizardNexus/ARCANE-OS';
 const behaviorEvidenceCommit='567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e';
-const upstreamBehaviorEvidence=(sourceBlob,testPath,testBlob)=>Object.freeze({
+const upstreamBehaviorEvidence=(name,sourceBlob,testPath,testBlob)=>Object.freeze({
     repository:behaviorEvidenceRepository,
     commit:behaviorEvidenceCommit,
+    sourcePath:`arcane/modules/${name}`,
+    sourceBlob,
+    testPath,
+    testBlob
+});
+const sdkBehaviorEvidence=(commit,sourcePath,sourceBlob,testPath,testBlob)=>Object.freeze({
+    repository:'TheWizardNexus/arcane-os-sdk',
+    commit,
+    sourcePath,
     sourceBlob,
     testPath,
     testBlob
 });
 
 export const behaviorExampleEvidence=Object.freeze({
-    'AI.js':upstreamBehaviorEvidence(
-        '6090c5a563c66f972267fec30184c85fbf3ec7de',
-        'test/ai.test.mjs','7593bb20967881622d5634829f2e6f05511659cc'
+    'AI.js':sdkBehaviorEvidence(
+        '36fbe1418af3d5c343d105ee7c9456360c57785d',
+        'runtime/arcane/modules/AI.js',
+        '5abab7283e36e4433780ffde933f954d178c97bb',
+        'test/runtime-api-behavior.test.mjs','d355359f207d88fce94c34a4c6940e859ebb9c18'
     ),
-    'AnsiText.js':upstreamBehaviorEvidence(
+    'AnsiText.js':upstreamBehaviorEvidence('AnsiText.js',
         '097512451032ffbbceecdc3b02e3af6453e89e90',
         'test/terminal.test.mjs','26fec62b4819635a279922c2e297130748400c4c'
     ),
-    'AppDataScope.js':upstreamBehaviorEvidence(
+    'AppDataScope.js':upstreamBehaviorEvidence('AppDataScope.js',
         '9943961bd8c4cf93655eece17f14b29ea817357a',
         'test/dbls-app-isolation.test.mjs','583d396c16c5209c8fdaaea3744931816b814e99'
     ),
-    'CalculatorEngine.js':upstreamBehaviorEvidence(
+    'CalculatorEngine.js':upstreamBehaviorEvidence('CalculatorEngine.js',
         '4434d5ad287f94136c054e4cc1b2423387331c06',
         'test/utility-apps.test.mjs','2ddee94c58e751b0e6bec58955431d7994628757'
     ),
-    'ConfiguredAIChatSession.js':upstreamBehaviorEvidence(
-        '21d48eb2af74494b9ee14fca889e571d184d535a',
-        'test/configured-ai-chat-session.test.mjs','28f29b2ca5e62aa76952d61adf570155f31a906c'
+    'ConfiguredAIChatSession.js':sdkBehaviorEvidence(
+        '36fbe1418af3d5c343d105ee7c9456360c57785d',
+        'runtime/arcane/modules/ConfiguredAIChatSession.js',
+        'b6a6a084f911b125bbebb63cb5d667a7db570a88',
+        'test/runtime-api-behavior.test.mjs','d355359f207d88fce94c34a4c6940e859ebb9c18'
     ),
-    'DirectoryPicker.js':upstreamBehaviorEvidence(
+    'DBOPFSDocumentLibrary.js':sdkBehaviorEvidence(
+        '36fbe1418af3d5c343d105ee7c9456360c57785d',
+        'runtime/arcane/modules/DBOPFSDocumentLibrary.js',
+        '04818f4cc0fa1256e19a02dea6b55eb5c818e195',
+        'test/dbopfs-document-library.test.mjs','7afd086688bf52d4fe50b4d896b292f7ace4f3c4'
+    ),
+    'DirectoryPicker.js':upstreamBehaviorEvidence('DirectoryPicker.js',
         '506e54471d775404de55b3166b79a466af64d646',
         'test/directory-picker.test.mjs','27230080a0d589212de442a17849233cdb80eb0c'
     ),
-    'IsolatedModelQuestionRunner.js':upstreamBehaviorEvidence(
+    'IsolatedModelQuestionRunner.js':upstreamBehaviorEvidence('IsolatedModelQuestionRunner.js',
         '94c6df9e7661b507a495223facb31cd0d3ac7ede',
         'test/isolated-model-question-runner.test.mjs','e94dd4b80b492ce5ff12ae83818915c5c44c298d'
     ),
-    'Ollama.js':upstreamBehaviorEvidence(
+    'Ollama.js':upstreamBehaviorEvidence('Ollama.js',
         'fcfd7942e9c706088b23be44180427774763d92a',
         'test/ollama.test.mjs','35187394154e95c883432c203bc79aa8c2a13367'
     ),
-    'SpeechPlayback.js':upstreamBehaviorEvidence(
+    'SpeechPlayback.js':upstreamBehaviorEvidence('SpeechPlayback.js',
         '20d4935deeb97d1be4221f5859897fafd6bb6449',
         'test/speech-playback.test.mjs','6f7307973f35b50ffbc6d5109ab3f558a202a45f'
     ),
-    'TerminalClient.js':upstreamBehaviorEvidence(
+    'TerminalClient.js':upstreamBehaviorEvidence('TerminalClient.js',
         '35d9c6502979331538d69c63f96b73b792ce014c',
         'test/terminal.test.mjs','26fec62b4819635a279922c2e297130748400c4c'
     ),
-    'ThemeBootstrap.js':upstreamBehaviorEvidence(
+    'ThemeBootstrap.js':upstreamBehaviorEvidence('ThemeBootstrap.js',
         '9a0fb2d9729141175b835f7c95a208a650c66d2e',
         'test/theme-manager-system-appearance.test.mjs','53a5cc666c6c6db4f5e11b77e5975723946e10c7'
+    )
+});
+
+const sdkReferenceBehaviorEvidence=(scope,sourcePath,sourceBlob,tests)=>Object.freeze({
+    scope:Object.freeze([...scope]),
+    repository:'TheWizardNexus/arcane-os-sdk',
+    commit:'36fbe1418af3d5c343d105ee7c9456360c57785d',
+    sources:Object.freeze([Object.freeze({path:sourcePath,blob:sourceBlob})]),
+    tests:Object.freeze(tests.map(record=>Object.freeze({...record})))
+});
+
+export const referenceGuideBehaviorEvidence=Object.freeze({
+    'docs/reference/ai/browser-speech.md':sdkReferenceBehaviorEvidence(
+        ['browser speech provider lifecycle, request normalization, and cancellation'],
+        'browser-runtime/ai/browser-speech-providers.mjs',
+        '36e016305f48c8285a702a0ade11a0a64b0c66ea',
+        [{
+            path:'test/browser-speech-providers.test.mjs',
+            blob:'6c8b7f51730359b13e41515e794b5076185ccd2f'
+        }]
+    ),
+    'docs/reference/cli.md':sdkReferenceBehaviorEvidence(
+        ['import-map generation and multi-document targeting'],
+        'src/import-map.mjs',
+        '87bc41b65c1499c38907fbe151e17d247d2fc3c1',
+        [{
+            path:'test/import-map.test.mjs',
+            blob:'a70de7b52087d9f8c05e8ece48d32a7a75b0152b'
+        },{
+            path:'test/packaging.test.mjs',
+            blob:'a23516858f12e4d2a0d1d7d91fad3b91cfb08165'
+        },{
+            path:'test/dev-server.test.mjs',
+            blob:'279f1ca202383b6c6547693d43e06610019bc169'
+        }]
+    ),
+    'docs/reference/runtime-components.md':sdkReferenceBehaviorEvidence(
+        ['chat.html selected-unloaded AI activation control, callbacks, and public events'],
+        'runtime/arcane/components/chat.html',
+        'f4402222fb0185df8a5fb721a54febbb0db54c0d',
+        [{
+            path:'test/runtime-api-behavior.test.mjs',
+            blob:'d355359f207d88fce94c34a4c6940e859ebb9c18'
+        }]
     )
 });
 
@@ -96,12 +159,12 @@ function validateString(contract,key){
 }
 
 export function createReferenceModuleContractMap(records){
-    if(!Array.isArray(records)||records.length!==80){
-        contractError('exactly 80 inventory records are required.');
+    if(!Array.isArray(records)||records.length!==85){
+        contractError('exactly 85 inventory records are required.');
     }
     const contracts=[...referenceModuleContractsA,...referenceModuleContractsB];
-    if(contracts.length!==80){
-        contractError(`expected 80 curated overlays, received ${contracts.length}.`);
+    if(contracts.length!==85){
+        contractError(`expected 85 curated overlays, received ${contracts.length}.`);
     }
     const map=new Map();
     for(const contract of contracts){
@@ -147,17 +210,45 @@ export function createReferenceModuleContractMap(records){
             contractError(`${record.name} must be classified ${expected}, received ${actual}.`);
         }
     }
-    if(Object.keys(behaviorExampleEvidence).length!==11){
-        contractError('exactly 11 reviewed behavior examples are required.');
+    if(Object.keys(behaviorExampleEvidence).length!==12){
+        contractError('exactly 12 reviewed behavior examples are required.');
     }
     for(const [name,evidence] of Object.entries(behaviorExampleEvidence)){
         if(!map.has(name)
-            ||evidence.repository!==behaviorEvidenceRepository
-            ||evidence.commit!==behaviorEvidenceCommit
+            ||!new Set(['TheWizardNexus/ARCANE-OS','TheWizardNexus/arcane-os-sdk']).has(evidence.repository)
+            ||!/^[0-9a-f]{40}$/u.test(evidence.commit)
+            ||typeof evidence.sourcePath!=='string'
+            ||evidence.sourcePath===''||evidence.sourcePath.startsWith('/')
+            ||evidence.sourcePath.includes('..')
             ||!/^[0-9a-f]{40}$/u.test(evidence.sourceBlob)
             ||!/^test\/[a-z0-9-]+[.]test[.]mjs$/u.test(evidence.testPath)
             ||!/^[0-9a-f]{40}$/u.test(evidence.testBlob)){
             contractError(`invalid behavior evidence for ${name}.`);
+        }
+    }
+    if(JSON.stringify(Object.keys(referenceGuideBehaviorEvidence))!==JSON.stringify([
+        'docs/reference/ai/browser-speech.md',
+        'docs/reference/cli.md',
+        'docs/reference/runtime-components.md'
+    ])){
+        contractError('focused reference behavior evidence paths drifted.');
+    }
+    for(const [source,evidence] of Object.entries(referenceGuideBehaviorEvidence)){
+        if(!source.startsWith('docs/reference/')
+            ||evidence.repository!=='TheWizardNexus/arcane-os-sdk'
+            ||!/^[0-9a-f]{40}$/u.test(evidence.commit)
+            ||!Array.isArray(evidence.scope)||evidence.scope.length!==1
+            ||!evidence.scope.every(value=>typeof value==='string'&&value.trim()!=='')
+            ||!Array.isArray(evidence.sources)||evidence.sources.length!==1
+            ||!Array.isArray(evidence.tests)||evidence.tests.length<1
+            ||![...evidence.sources,...evidence.tests].every(record=>
+                typeof record.path==='string'
+                &&record.path!==''
+                &&!record.path.startsWith('/')
+                &&!record.path.includes('..')
+                &&/^[0-9a-f]{40}$/u.test(record.blob)
+            )){
+            contractError(`invalid focused reference behavior evidence for ${source}.`);
         }
     }
     return map;

@@ -1,8 +1,16 @@
 {
   "schemaVersion": 1,
   "source": {
-    "commit": "567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e",
-    "bundleVersion": "0.8.12"
+    "authority": "sdk-canonical",
+    "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
+    "commit": "36fbe1418af3d5c343d105ee7c9456360c57785d",
+    "path": "runtime/arcane/components",
+    "sdkVersion": "0.2.1",
+    "legacyProjection": {
+      "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
+      "commit": "c540014afe69f14cf5ae60493b7295f36dbcec64",
+      "bundleVersion": "0.8.12"
+    }
   },
   "componentCount": 39,
   "loader": "/arcane/modules/HTMLImport.js",
@@ -117,7 +125,7 @@
     {
       "file": "runtime/arcane/components/chat.html",
       "name": "chat.html",
-      "purpose": "Shared chat, file upload, streaming, speech, language, availability, and conversation-timebox surface.",
+      "purpose": "Shared chat, visible selected-model activation request, file upload, streaming, speech, language, availability, and conversation-timebox surface.",
       "methods": [
         "streamMessage()",
         "setMessageProgress()",
@@ -127,7 +135,9 @@
         "bindConversationTimebox()",
         "submitMessage()",
         "sendMessage()",
-        "languageChanged()"
+        "languageChanged()",
+        "requestAIActivation()",
+        "destroy()"
       ],
       "events": [
         "chat-ready",
@@ -135,17 +145,20 @@
         "chat-send-error",
         "chat-file-uploaded",
         "chat-language-changed",
+        "chat-ai-activation-request",
+        "chat-ai-activation-error",
         "conversation-timebox-error"
       ],
       "slots": [],
       "dependencies": [
         "MD.js",
         "File.js",
-        "ConversationTimebox.js"
+        "ConversationTimebox.js",
+        "AIRuntimeState.js"
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "UI state normalized; AI/storage/media behavior mixed"
+      "normalization": "UI/runtime state and explicit user activation intent/request normalized; destroy aborts state/activation observation, releases page/speech listeners, clears ready, returns undefined, and does not initiate provider lifecycle; the provider/runtime owner executes any load; AI/storage/media behavior mixed"
     },
     {
       "file": "runtime/arcane/components/conversation-view.html",

@@ -20,8 +20,10 @@ Apps import renderer ESM from `/arcane/modules/<file>`. Classic scripts, the OPF
 | [`AI.js`](#aijs) | esm | Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structured output, streaming, and queued audio playback. | Browser + native bridge + cloud | High-level chat/speech behavior is normalized; provider diagnostics and media errors remain mixed. |
 | [`AIPreferenceRuntime.js`](#aipreferenceruntimejs) | esm | Applies and reads non-persistent per-user AI preference overrides. | Cross-host | Normalized six-slot preference state. |
 | [`AIPreferenceTuple.js`](#aipreferencetuplejs) | esm | Normalizes and compares the six provider/model preference slots. | Cross-host | Fully normalized frozen tuple. |
+| [`AIProviderRuntime.js`](#aiproviderruntimejs) | esm | Owns provider-neutral selection, lifecycle, routing, startup, requests, streaming, cancellation, and independent LLM/STT/TTS state. | Cross-host runtime; provider-specific availability | Normalized required provider members plus closed route/status contracts, with fail-closed local-only selection and no implicit fallback. |
 | [`AIResponseLength.js`](#airesponselengthjs) | esm | Normalizes concise/short/medium/long response preferences and applies the matching system instruction. | Cross-host | Fully normalized string/instruction contract. |
 | [`AIResponseURLPolicy.js`](#airesponseurlpolicyjs) | esm | Extracts and audits links from AI Markdown, rendered HTML, CSS, srcset, bare URLs, and email text. | Cross-host | Normalized frozen allowlist audit. |
+| [`AIRuntimeState.js`](#airuntimestatejs) | esm | Publishes sticky immutable role snapshots, lifecycle intents, and startup-settlement barriers. | Cross-host state contract | Closed monotonic state records; events report state but grant no authority. |
 | [`AnsiText.js`](#ansitextjs) | esm | Parses terminal ANSI sequences into display spans or strips them to plain text. | Cross-host | Normalized text/span output. |
 | [`ApiModelDatabase.js`](#apimodeldatabasejs) | esm | Fetches an injectable HTTP JSON model with parser, cache, redacted public endpoint records, and request lifecycle events. | Browser / native WebView / server with fetch | Request records are normalized; fetch/provider failures remain mixed. |
 | [`AppDataScope.js`](#appdatascopejs) | esm | Reconciles declared and native application identity and scopes OPFS/localStorage ownership fail-closed. | Browser / native WebView hybrid | Strict normalized identifiers and coded mismatch failures. |
@@ -48,9 +50,11 @@ Apps import renderer ESM from `/arcane/modules/<file>`. Classic scripts, the OPF
 | [`DataMaintenance.js`](#datamaintenancejs) | esm | Deletes empty chats and associated/empty memory records inside the current app data scope. | Browser / native WebView | Normalized counts; destructive storage failures preserved. |
 | [`DBLS.js`](#dblsjs) | esm | Provides app-scoped localStorage tables, batch reads/writes, filtering, deletion, and counts. | Browser / native WebView | Scoped keys and values normalized; storage failures mixed. |
 | [`DBOPFS.js`](#dbopfsjs) | esm | Provides app-scoped OPFS tables, worker I/O, backup/restore, compression, and CRUD/batch APIs. | Browser / native WebView | App scope normalized; DOM/storage errors preserved. |
+| [`DBOPFSDocumentLibrary.js`](#dbopfsdocumentlibraryjs) | esm | Bootstraps and searches an app-defined DBOPFS corpus and builds explicitly untrusted chat context. | Browser or compatible DBOPFS host | Existing DBOPFS semantics; manifest-last generations and bounded search only after the app calls it or wires its context builder. |
 | [`DBOPFSWorker.js`](#dbopfsworkerjs) | worker | Serializes OPFS sync-handle read/write requests from a MessagePort. | Dedicated worker | Responses normalize to `{success,fileData?}` or `{error:{name,message}}`. |
 | [`DevelopmentWorkspace.js`](#developmentworkspacejs) | esm | Provides bounded workspace inspection, context, setup task, and Node installer clients without arbitrary command execution. | Native bridge | Inputs normalized; provider result/error preserved. |
 | [`DirectoryPicker.js`](#directorypickerjs) | esm | Wraps the provider-owned native directory chooser and normalizes selected/cancelled/error results. | Native bridge | Strict normalized selection and coded errors. |
+| [`DocumentLexicalSearch.js`](#documentlexicalsearchjs) | esm | Provides dependency-free deterministic metadata/body ranking and bounded excerpts. | Cross-host | Frozen stable results with no storage, provider, or network side effects. |
 | [`DocumentNavigation.js`](#documentnavigationjs) | esm | Binds document navigation, filtering, history, current-item reveal, and load initialization. | Browser / native WebView | Normalized filter/navigation state; DOM effects preserved. |
 | [`Errors.js`](#errorsjs) | esm | Normalizes global errors/rejections, fingerprints and deduplicates incidents, persists a ledger, and performs bounded delivery. | Browser / native WebView hybrid | Incident records normalized; storage/mail failures isolated. |
 | [`GifEncoder.js`](#gifencoderjs) | esm | Encodes indexed frames into a bounded animated GIF using palette mapping and LZW. | Cross-host | Normalized byte output and bounds. |
@@ -70,6 +74,7 @@ Apps import renderer ESM from `/arcane/modules/<file>`. Classic scripts, the OPF
 | [`OllamaModelIdentifier.js`](#ollamamodelidentifierjs) | esm | Validates and canonicalizes the syntax of Ollama model identifiers without granting model admission. | Cross-host | Fully normalized string/boolean result. |
 | [`OllamaSettings.js`](#ollamasettingsjs) | esm | Defines bounded runtime/service preference schemas and deterministic Arcane brain alias names. | Cross-host | Fully normalized settings/name contract. |
 | [`OpenMeteoWeatherProvider.js`](#openmeteoweatherproviderjs) | esm | Searches and loads Open-Meteo data into frozen Arcane weather entities. | Browser / native WebView / server with fetch + cloud | Provider data normalized to entities; transport errors mixed. |
+| [`PersistentAIChatSession.js`](#persistentaichatsessionjs) | esm | Adds explicit durable history/memory policy to bounded configured chat without changing DBOPFS or ChatEntity semantics. | Browser / native WebView with DBOPFS and configured chat | Live context commits atomically; persistence stays coherent across user/assistant/tool turns. |
 | [`PreferenceStore.js`](#preferencestorejs) | esm | Loads and updates schema-defined app preferences through native storage with a narrow browser fallback. | Browser/native hybrid | Values normalized; only exact unsupported capability falls back. |
 | [`QRCode.min.js`](#qrcodeminjs) | classic-script | Vendored QRCode generator for DOM, canvas, SVG, and image output. | Browser vendor script | Vendor-native. |
 | [`Questionnaire.js`](#questionnairejs) | esm | Evaluates whether a one-time questionnaire prompt is due without performing the prompt. | Cross-host | Normalized fail-closed boolean. |
@@ -106,13 +111,35 @@ Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structur
 
 ### Public surface
 
-default `AI`; `setAI()`, `streamRequest()`, `streamMessage()`, `fetchRequest()`, `fetch()`, `streamTTS()`, `finishTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`, `playAudio()`; installs `window.ai` and emits `ai-ready`.
+default `AI`; read-only `providerRuntime`; `setAI()`, `configureProviders()`, `transitionAI()`,
+`transitionProviders()`, `startProviders()`, `setSpeechMuted()`,
+`streamRequest()`, `streamMessage()`, `fetchRequest()`, `fetch()`,
+`streamTTS()`, `finishTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`,
+`playAudio()`; consumes `user-entity-loaded` and `arcane-ollama-ready`,
+installs `window.ai`, and emits `ai-ready`.
+
+The provider-runtime methods keep LLM, STT, and TTS selection explicit. They do
+not reinterpret one provider's failure as permission to select another
+provider. `transitionAI()` and `transitionProviders()` are deliberate
+cross-role transitions: each stops queued audio, unloads the current LLM, STT,
+and TTS roles, then applies the replacement configuration. `transitionAI()`
+returns aggregate runtime status; `transitionProviders()` returns the admitted
+three-role route configuration. Selected `OPENAI` and `OLLAMA` legacy routes
+expose truthful capability-only readiness through internal provider/2 adapters
+without probing, downloading, or hiding a load. `fetchRequest()` keeps the
+selected provider's public response shape. Browser speech routes translate the
+existing AI.js STT `{audio:Blob|File,mimeType,model}` and TTS
+`{model,input,responseFormat,voice?,speed?}` requests at the provider boundary;
+only WAV is accepted for the shared TTS result.
 
 Exact exports: `default`.
 
 ### Availability and normalization
 
-**Browser + native bridge + cloud.** High-level chat/speech behavior is normalized; provider diagnostics and media errors remain mixed. Transport: OpenAI HTTPS, Arcane.ollama, Arcane.speech, Android WebView bridge. [Deep protocol details](protocols.md).
+**Browser + native bridge + cloud.** High-level chat/speech behavior is
+normalized; provider diagnostics and media errors remain mixed. Transport:
+AIProviderRuntime `arcane-ai-provider/2` routes, OpenAI HTTPS, Arcane.ollama,
+Arcane.speech, and the Android WebView bridge. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -170,6 +197,56 @@ import * as module from '/arcane/modules/AIPreferenceTuple.js';
 console.log(Object.keys(module));
 ```
 
+## AIProviderRuntime.js
+
+### Overview
+
+Owns the portable provider-neutral runtime for independently selected LLM,
+speech-to-text, and text-to-speech providers. The exported class documents the
+shape, but application code uses the exported singleton returned by
+`getAIProviderRuntime()`; direct construction fails with
+`ARCANE_AI_RUNTIME_SINGLETON_REQUIRED`.
+
+### Public surface
+
+Exact exports: `AI_PROVIDER_PROTOCOL`, `AI_PROVIDER_RUNTIME_PROTOCOL`,
+`AI_MODEL_AUTHORITY_PROTOCOL`, `AIProviderRuntime`, `aiProviderRuntime`, and
+`getAIProviderRuntime`.
+
+The singleton exposes provider registration, closed three-role configuration,
+catalog and status inspection, `start()`, independent `load()`, `unload()`,
+`dispose()`, and `cancel()` operations, plus `chat()`, `stream()`,
+`transcribe()`, `synthesize()`, and `setSpeechMuted()`. Provider payloads must
+be data-only; callbacks, accessors, symbols, cycles, and excessive nesting are
+rejected at the provider boundary.
+
+`start({startMuted=true,signal=null}={})` waits for prior speech-state and role
+unload work, applies the requested initial mute state, and returns the
+`startAIRuntime()` control handle `{barrier,settled,cancel}`. The barrier and
+settled promises describe provider-startup readiness; cancellation remains
+cooperative through the supplied signal and returned control.
+
+### Availability and normalization
+
+**Cross-host runtime with provider-specific execution.** SDK `0.2.1` ships the
+browser-WASM LLM and browser Whisper/Kokoro adapters. A native, Core, or cloud
+adapter may be supplied externally only when it implements the same
+`arcane-ai-provider/2` boundary; the SDK does not publish such an adapter. A
+provider must prove a matching `arcane-ai-model-authority/1` inspection before load.
+`localOnly` routing fails closed; it never selects a cloud or non-local route as
+a fallback. Role lifecycle and stream cleanup are normalized, while the
+selected provider retains its own capability, permission, download, and model
+requirements. [Deep protocol details](protocols.md#portable-ai-provider-runtime).
+
+### Example
+
+```javascript
+import {getAIProviderRuntime} from '/arcane/modules/AIProviderRuntime.js';
+
+const runtime = getAIProviderRuntime();
+console.log(runtime.protocol, runtime.status());
+```
+
 ## AIResponseLength.js
 
 ### Overview
@@ -216,6 +293,54 @@ Exact exports: `auditAIResponseLinks`, `decodeHTMLCharacterReferences`, `extract
 import * as module from '/arcane/modules/AIResponseURLPolicy.js';
 
 console.log(Object.keys(module));
+```
+
+## AIRuntimeState.js
+
+### Overview
+
+Publishes one sticky immutable state tree for `llm`, `stt`, and `tts`, transient
+load/unload/dispose intents, and a startup-settlement report. It makes lifecycle
+observable without exposing provider transports in application code.
+
+### Public surface
+
+Exact exports: `AI_RUNTIME_PROTOCOL`, `AI_RUNTIME_STATE_EVENT`,
+`AI_RUNTIME_INTENT_EVENT`, `AI_RUNTIME_STARTUP_EVENT`, `AI_RUNTIME_ROLES`,
+`AI_RUNTIME_STATES`, `aiRuntimeEvents`, `getAIRuntimeState()`,
+`subscribeAIRuntimeState()`, `publishAIRuntimeRoleState()`,
+`publishAIRuntimeRolesState()`, `requestAIRuntimeIntent()`,
+`subscribeAIRuntimeIntents()`, and `startAIRuntime()`.
+
+Each role record is exactly `{role,state,providerId,modelId,localOnly,loaded,
+busy,operationId,progress,error}`. `startAIRuntime({startMuted=true,signal})`
+returns `{barrier,settled,cancel}`: `barrier` settles for text chat, while
+`settled` covers every requested role; muted startup does not request TTS.
+
+### Availability and normalization
+
+**Cross-host state contract.** States are `unavailable`, `unloaded`, `loading`,
+`ready`, `unloading`, `error`, and `disposed`. Revisions increase monotonically.
+The events `arcane-ai-runtime-state`, `arcane-ai-runtime-intent`, and
+`arcane-ai-runtime-startup-settled` normalize observation only: receiving one
+does not grant a native capability, prove browser support, or load a provider.
+`arcane-ai-runtime-startup-settled` reports the LLM/text-chat `barrier`.
+Await the returned `handle.settled` promise for every role requested by that
+startup; the all-role settlement has no separate public event.
+
+### Example
+
+```javascript
+import {
+  getAIRuntimeState,
+  subscribeAIRuntimeState
+} from '/arcane/modules/AIRuntimeState.js';
+
+const unsubscribe = subscribeAIRuntimeState(snapshot => {
+  console.log(snapshot.roles.llm.state);
+});
+console.log(getAIRuntimeState().protocol);
+unsubscribe();
 ```
 
 ## AnsiText.js
@@ -659,7 +784,40 @@ Owns bounded in-memory AI turns, context construction, response-length instructi
 
 ### Public surface
 
-default `ConfiguredAIChatSession`; `history()`, `clear()`, `send()`.
+default `ConfiguredAIChatSession`; `history()`, `clear()`, `prepare()`, `send()`.
+
+`new ConfiguredAIChatSession(options={})` admits exactly `chat`,
+`contextBuilder`, `initialMessages`, `maxContextCharacters`,
+`maxMessageCharacters`, `maxMessages`, `request`, `responseLength`, and
+`systemPrompt`. `initialMessages` is an array of closed `user`, `assistant`, or
+`tool` messages under the same message/context bounds. It excludes `system`,
+allows exactly one structural assistant tool call, and requires a matching tool
+result before another user turn or tool-call sequence; `systemPrompt` owns the
+separate system message.
+
+`prepare(input,{signal})` performs the complete bounded request but does not
+commit history immediately. It returns frozen `{response,commit,rollback}`;
+exactly one terminal settlement is permitted. `send()` is the convenience path
+that prepares and then commits the turn.
+
+An optional async `contextBuilder({input,history,signal})` receives a frozen
+request snapshot and the same cancellation signal. Its returned context is
+framed as untrusted data for only the current request and is never committed to
+history.
+
+An injected `chat(request)` may return the prior normalized session result or
+exactly one non-stream OpenAI-compatible choice. The prior form preserves its
+explicit `done` boolean; OpenAI-compatible choice normalization sets
+`done:true`. Both return frozen
+`{provider,model,message:{role:'assistant',content,tool_calls?},done,
+doneReason,promptEvalCount,evalCount}`. Tool calls remain structural data and
+are never executed. When `tool_calls` is present it must contain exactly one
+valid structural call. A malformed response fails `AI_CHAT_INVALID_RESPONSE`;
+caller cancellation is `AbortError` with code `AI_CHAT_ABORTED`. A new user
+turn cannot bypass a pending structural tool call
+(`AI_CHAT_TOOL_RESULT_REQUIRED`), a mismatched tool result fails
+`AI_CHAT_INVALID_TOOL_MESSAGE`, and a second terminal settlement of one
+prepared transaction fails `AI_CHAT_TRANSACTION_SETTLED`.
 
 Exact exports: `default`.
 
@@ -670,9 +828,19 @@ Exact exports: `default`.
 ### Example
 
 ```javascript
-import * as module from '/arcane/modules/ConfiguredAIChatSession.js';
+import ConfiguredAIChatSession from '/arcane/modules/ConfiguredAIChatSession.js';
 
-console.log(Object.keys(module));
+const session = new ConfiguredAIChatSession({
+  chat: async request => ({
+    provider: 'demo',
+    model: 'echo',
+    message: {
+      role: 'assistant',
+      content: `Received ${request.messages.length} messages.`
+    }
+  })
+});
+console.log(await session.send('Hello'));
 ```
 
 ## ConversationActionItems.js
@@ -843,6 +1011,96 @@ import * as module from '/arcane/modules/DBOPFS.js';
 console.log(Object.keys(module));
 ```
 
+## DBOPFSDocumentLibrary.js
+
+### Overview
+
+Stores one application-defined document corpus through an existing DBOPFS-style
+adapter, searches only a completed generation, and builds bounded context that
+is explicitly labeled untrusted. Construction performs no read, write, fetch,
+or search; applications call `bootstrap()` deliberately.
+
+### Public surface
+
+Exact exports: default and named `DBOPFSDocumentLibrary`,
+`createDBOPFSDocumentLibrary()`, and `normalizeDBOPFSDocumentSchema()`.
+
+`new DBOPFSDocumentLibrary({concurrency,db,maxCorpusCharacters,
+maxDocumentCharacters,maxSearchCharacters,schema})` exposes `schema`,
+`bootstrap({files,onProgress,read,readFailurePolicy,signal})`,
+`search(query,{kinds,limit,signal,tags})`,
+`evaluate(query,{sources,read,maxCharacters,maxCorpusCharacters,
+maxScoringCharacters,maxDocumentCharacters?,kinds?,tags?,readFailurePolicy?,
+onProgress?,signal?})`,
+`buildContext(query,{limit,maxCharacters,maxDocumentCharacters,signal})`, and
+`createContextBuilder({limit,maxCharacters,maxDocumentCharacters})`.
+
+`evaluate()` requires `sources`, `read`, `maxCharacters`,
+`maxCorpusCharacters`, and `maxScoringCharacters`. It filters source metadata
+before calling
+`read(source,{maxCharacters,maxCorpusCharacters,ordinal,signal})`, never accepts a
+source body as implicit authority, and never persists a caller-owned body.
+`maxDocumentCharacters` defaults to the smaller instance/output bound.
+
+### Availability and normalization
+
+**Browser or compatible host with an injected DBOPFS adapter.** The adapter
+keeps the existing `get`, `set`, `getAllKeys`, and `delete` method names; Node
+can use the same class only through an explicitly imported runtime module and a
+compatible storage adapter; SDK `0.2.1` publishes no Node package subpath or
+Node storage implementation for it. Bootstrap uses a bounded concurrent
+generation, commits its manifest last, cleans partial data on failure, and
+rejects case-colliding IDs. Search
+returns `{failures,matches,total}` so one corrupt record does not become a false
+complete result. `bootstrap()` defaults to rejecting read failure; the explicit
+`readFailurePolicy:'preserve-readable'` mode returns partial-success
+`readCoverage`. `evaluate()` also defaults to rejecting a source-read failure;
+its explicit `preserve-readable` mode instead ranks the readable records and
+returns partial `failures` plus `coverage` in the evaluation result (not
+bootstrap's `readCoverage`). It reads a caller-owned source list without
+persisting its bodies and returns frozen `{authority:'sources',characters,
+coverage,documents,failures,limits,query,scoringTruncated,text,truncated}`.
+Read failure remains `DBOPFS_DOCUMENT_READ_FAILED`; invalid public input uses
+`DBOPFS_DOCUMENT_INVALID`, invalid integer budgets use
+`DBOPFS_DOCUMENT_INVALID_LIMIT`, and a preserved read failure without a usable
+source code is reported as `failures[].code:'DBOPFS_DOCUMENT_ERROR'`.
+Cancellation is `AbortError` with code `DBOPFS_DOCUMENT_ABORTED`. Construction
+does not search.
+When an application explicitly supplies the library's context builder, each
+prepared chat send performs that bounded retrieval.
+
+### Example
+
+```javascript
+import {
+  createDBOPFSDocumentLibrary
+} from '/arcane/modules/DBOPFSDocumentLibrary.js';
+
+const documents = createDBOPFSDocumentLibrary({
+  db: globalThis.dbopfs,
+  schema: {id: 'help', version: '1', table: 'help_documents'}
+});
+async function replaceHelpCorpusAfterUserChoice() {
+  await documents.bootstrap({files: [{
+    id: 'welcome',
+    path: 'welcome.md',
+    title: 'Welcome',
+    body: 'Arcane applications are portable.'
+  }]});
+  console.log(await documents.search('portable'));
+
+  const preview = await documents.evaluate('portable', {
+    sources: [{id:'draft', path:'draft.md', title:'Draft'}],
+    read: async source => source.id === 'draft' ? 'Portable app notes.' : '',
+    maxCharacters: 2048,
+    maxCorpusCharacters: 4096,
+    maxDocumentCharacters: 512,
+    maxScoringCharacters: 512
+  });
+  console.log(preview.coverage, preview.text);
+}
+```
+
 ## DBOPFSWorker.js
 
 ### Overview
@@ -911,6 +1169,48 @@ Exact exports: `default`, `normalizeDirectoryPickerOptions`, `normalizeDirectory
 import * as module from '/arcane/modules/DirectoryPicker.js';
 
 console.log(Object.keys(module));
+```
+
+## DocumentLexicalSearch.js
+
+### Overview
+
+Provides deterministic, dependency-free metadata/body ranking and bounded
+context excerpts for caller-owned document records.
+
+### Public surface
+
+Exact exports: `DOCUMENT_SEARCH_FIELD_ORDER`, default and named
+`DocumentLexicalSearch`, `createDocumentLexicalIndex()`,
+`documentContextExcerpt()`, `documentSearchTokens()`,
+`normalizedDocumentSearchText()`, `scoreDocumentBody()`, and
+`scoreDocumentLexicalIndex()`.
+
+`new DocumentLexicalSearch(records,{maxResults=20})` exposes
+`rank(query,{kinds,tags})` and `search(query,{kinds,limit,tags})`.
+
+### Availability and normalization
+
+**Cross-host.** Indexing and search are in-process only. Text, tags, kinds,
+scores, field ordering, truncation, and tie-breaking are normalized into frozen
+records. This module performs no storage, network, model, Core, or DOM action.
+The caller decides whether a result is merely displayed or explicitly injected
+as untrusted AI context.
+
+### Example
+
+```javascript
+import DocumentLexicalSearch from '/arcane/modules/DocumentLexicalSearch.js';
+
+const search = new DocumentLexicalSearch([{
+  id: 'welcome',
+  path: 'welcome.md',
+  title: 'Welcome',
+  body: 'Arcane applications are portable.',
+  kind: 'guide',
+  tags: ['intro']
+}]);
+console.log(search.search('portable', {limit: 5}));
 ```
 
 ## DocumentNavigation.js
@@ -1369,6 +1669,64 @@ import * as module from '/arcane/modules/OpenMeteoWeatherProvider.js';
 console.log(Object.keys(module));
 ```
 
+## PersistentAIChatSession.js
+
+### Overview
+
+Composes `ConfiguredAIChatSession` with one `ChatEntity` so every user,
+assistant, and structural tool-result turn has an explicit durable-persistence
+choice. It preserves the existing DBOPFS method names and ChatEntity memory
+semantics; it does not define a new storage protocol.
+
+### Public surface
+
+Exact exports: default and named `PersistentAIChatSession` plus
+`createPersistentAIChatSession()`.
+
+Constructor and factory options are `{chat,chatEntity,chatFileName,
+contextBuilder,loadExisting,maxContextCharacters,maxMessageCharacters,
+maxMessages,memory,request,responseLength,systemPrompt}`. Public members are
+static `create()`, getters `chatEntity` and `fileName`, and `ready()`,
+`history()`, `settleMemory()`, and `send(input)`.
+`ready()` waits for initialization and resolves the same session instance.
+
+`send()` accepts `{message:{content,role:'user'|'tool',tool_call_id?,persist},
+response:{persist},signal?}`. Message and response persistence must match.
+`persist:false` still commits the coherent turn to live bounded model context,
+but not to durable ChatEntity history or memory. A structural tool result must
+use the persistence choice captured by its matching assistant tool call.
+
+### Availability and normalization
+
+**Browser or native WebView with ChatEntity/DBOPFS and a configured chat
+function.** The default chat calls normalized `Arcane.ai.chat()`; callers can
+inject the browser-WASM controller, another provider-neutral adapter, or a
+cloud chat function. There is no automatic provider or storage fallback.
+Context builders are request-only, and document context remains explicitly
+untrusted. Errors include `AI_CHAT_BUSY`, `AI_CHAT_TOOL_RESULT_REQUIRED`,
+`AI_CHAT_INVALID_TOOL_MESSAGE`, and `AI_CHAT_INCOHERENT_PERSISTENCE`.
+
+### Example
+
+```javascript
+import {
+  createPersistentAIChatSession
+} from '/arcane/modules/PersistentAIChatSession.js';
+
+async function sendPersistentSupportTurnAfterUserChoice(documents) {
+  const session = await createPersistentAIChatSession({
+    chatFileName: 'support.jsonl',
+    loadExisting: true,
+    contextBuilder: documents.createContextBuilder()
+  });
+  const response = await session.send({
+    message: {role: 'user', content: 'Summarize the documents.', persist: true},
+    response: {persist: true}
+  });
+  console.log(response.message.content);
+}
+```
+
 ## PreferenceStore.js
 
 ### Overview
@@ -1650,9 +2008,21 @@ Exact exports: `MAX_SPEECH_CHARACTERS`, `MAX_SPEECH_CHUNKS`, `MAX_SPEECH_INPUT`,
 ### Example
 
 ```javascript
-import * as module from '/arcane/modules/SpeechPlayback.js';
+import SpeechPlayback from '/arcane/modules/SpeechPlayback.js';
 
-console.log(Object.keys(module));
+const audio = document.body.appendChild(document.createElement('audio'));
+audio.controls = true;
+const speech = new SpeechPlayback({audio});
+const speakButton = document.body.appendChild(document.createElement('button'));
+speakButton.type = 'button';
+speakButton.textContent = 'Speak';
+speakButton.addEventListener('click', async () => {
+  await speech.prepare({
+    key: 'ready',
+    parts: ['Arcane is ready.'],
+    autoplay: true
+  });
+});
 ```
 
 ## StaticDocumentCatalog.js

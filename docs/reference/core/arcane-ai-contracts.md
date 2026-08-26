@@ -7,6 +7,30 @@ APIs. Start with the method index in the [Arcane API Reference](arcane-api.md).
 The type names below are documentation notation for plain JavaScript values.
 They are not TypeScript declarations.
 
+## Portable SDK AI and Core AI
+
+The SDK `0.2.1` has two related but separate normalized boundaries:
+
+| Boundary | Use | Host |
+|---|---|---|
+| [`AIProviderRuntime.js`](../runtime-modules.md#aiproviderruntimejs) plus [`AIRuntimeState.js`](../runtime-modules.md#airuntimestatejs) | Register and control independent LLM, STT, and TTS providers through `arcane-ai-provider/2`; observe sticky state and startup barriers. | Cross-host controller/state; each provider retains its own browser, native, or cloud requirements. |
+| `globalThis.Arcane.ai` and `globalThis.Arcane.speech` | Call an admitted Core-normalized AI or native speech method. | Native/Core only when the current app, method, capability, provider, and host are admitted. |
+
+The browser-only [`arcane-os/ai/browser-wasm`](../ai/browser-wasm.md)
+entrypoint provides a caller-authenticated local LLM adapter, and
+[`arcane-os/ai/browser-speech`](../ai/browser-speech.md) provides
+caller-authenticated Whisper/Kokoro provider mechanisms. Neither browser
+entrypoint grants Core authority or silently falls back to native/cloud.
+
+[`PersistentAIChatSession.js`](../runtime-modules.md#persistentaichatsessionjs)
+can bind the same chat API to existing ChatEntity/DBOPFS history and memory.
+[`DBOPFSDocumentLibrary.js`](../runtime-modules.md#dbopfsdocumentlibraryjs)
+provides explicit bounded retrieval context. Those mechanisms preserve the
+existing storage semantics. Construction alone performs no search. When an
+application explicitly supplies the document library's context builder, each
+prepared send performs its bounded lexical retrieval automatically; neither
+mechanism executes a tool.
+
 ## Contract conventions
 
 | Input style | Unknown keys | Object rules |
@@ -57,15 +81,17 @@ For a provider-portable request, send only `messages`, optional
 `expectedProvider`, and optional `format`.
 
 ```js
-const profile = await Arcane.ai.profile();
+async function askAvailableModelsAfterUserChoice() {
+  const profile = await Arcane.ai.profile();
 
-const result = await Arcane.ai.chat({
-  expectedProvider: profile.provider,
-  messages: [
-    { role: "system", content: "Answer briefly and accurately." },
-    { role: "user", content: "What models are available?" }
-  ]
-});
+  return Arcane.ai.chat({
+    expectedProvider: profile.provider,
+    messages: [
+      { role: "system", content: "Answer briefly and accurately." },
+      { role: "user", content: "What models are available?" }
+    ]
+  });
+}
 ```
 
 ### AI chat message
@@ -489,6 +515,14 @@ Successful mutating AI methods include `ArcaneOperation`.
 | `error` | `object \| null` | Yes | `null` on success | Normalized operation error. |
 
 ## Speech
+
+This section documents admitted, capability-gated Core/native speech calls.
+For caller-owned browser-local STT/TTS providers, use the separate
+[browser speech package](../ai/browser-speech.md). Those browser providers
+directly implement the provider-neutral runtime contract. `Arcane.speech`
+remains a separate Core/native API unless an application explicitly supplies
+an adapter; their transport, artifact authority, capability, and error
+boundaries are not interchangeable.
 
 ### Speech status
 

@@ -110,17 +110,26 @@ function githubHeadingFragments(markdown){
 }
 
 test('the public package API inventory matches every JavaScript export and MDN entry',async t=>{
-    const [packageDocument,inventory,guide,eventGuide,browserWasmGuide]=await Promise.all([
+    const [
+        packageDocument,
+        inventory,
+        guide,
+        eventGuide,
+        browserWasmGuide,
+        browserSpeechGuide
+    ]=await Promise.all([
         readFile(path.join(repositoryRoot,'package.json'),'utf8').then(JSON.parse),
         jsonFile('inventory','package-api.json'),
         textFile('sdk-api.md'),
         textFile('event-manager.md'),
-        textFile('ai','browser-wasm.md')
+        textFile('ai','browser-wasm.md'),
+        textFile('ai','browser-speech.md')
     ]);
 
     await t.test('the inventory has stable unique records',()=>{
+        assert.equal(packageDocument.version,'0.2.1');
         assert.equal(inventory.sdkVersion,packageDocument.version);
-        assert.equal(inventory.memberCount,163);
+        assert.equal(inventory.memberCount,169);
         assert.equal(inventory.members.length,inventory.memberCount);
         assert.equal(new Set(inventory.members.map(member=>member.id)).size,inventory.memberCount);
         assert.equal(
@@ -151,10 +160,11 @@ test('the public package API inventory matches every JavaScript export and MDN e
 
         const browserWasmSignatures=new Map([
             ['BROWSER_WASM_RUNTIME_AUTHORITY','const BROWSER_WASM_RUNTIME_AUTHORITY'],
+            ['adaptV1LlmProvider','adaptV1LlmProvider(provider)'],
             ['createArcaneAI',"createArcaneAI({ llm=null, provider=null, loadPolicy='on-demand', security }={})"],
             ['createBrowserModelSource','createBrowserModelSource(descriptor, { fetchImpl=null }={})'],
-            ['createBrowserWasmLlmProvider','createBrowserWasmLlmProvider({ source, store, loadDefaults={}, security, logger=console }={})'],
-            ['createDbopfsModelStore',"createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models' }={})"]
+            ['createBrowserWasmLlmProvider','createBrowserWasmLlmProvider({ source, sources, store, loadDefaults={}, security, logger=console }={})'],
+            ['createDbopfsModelStore',"createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models', estimateStorage=null }={})"]
         ]);
         const browserWasmMembers=inventory.members.filter(member=>
             member.entrypoints.includes('arcane-os/ai/browser-wasm')
@@ -173,6 +183,36 @@ test('the public package API inventory matches every JavaScript export and MDN e
             );
             assert.match(member.availability,/\bBrowser\b/u);
             assert.doesNotMatch(member.availability,/\b(?:Node|Native|Cloud)\b/u);
+        }
+
+        assert.equal(
+            packageDocument.exports['./ai/browser-speech'],
+            './browser-runtime/ai/browser-speech.mjs'
+        );
+        const browserSpeechSignatures=new Map([
+            ['BROWSER_SPEECH_ARTIFACT_PROTOCOL','const BROWSER_SPEECH_ARTIFACT_PROTOCOL'],
+            ['createBrowserKokoroProvider','createBrowserKokoroProvider(options={})'],
+            ['createBrowserSpeechAuthority','createBrowserSpeechAuthority({ providerId, role, model, runtime, security }={})'],
+            ['createBrowserWhisperProvider','createBrowserWhisperProvider(options={})'],
+            ['createDbopfsSpeechArtifactStore',"createDbopfsSpeechArtifactStore({ dbopfs, tableName='arcane_ai_browser_speech', fetchImpl=null, objectUrlFactory=null }={})"]
+        ]);
+        const browserSpeechMembers=inventory.members.filter(member=>
+            member.entrypoints.includes('arcane-os/ai/browser-speech')
+        );
+        assert.deepEqual(
+            sorted(browserSpeechMembers.map(member=>member.name)),
+            sorted(browserSpeechSignatures.keys())
+        );
+        for(const member of browserSpeechMembers){
+            assert.deepEqual(member.entrypoints,['arcane-os/ai/browser-speech']);
+            assert.equal(member.primaryImport,'arcane-os/ai/browser-speech');
+            assert.equal(member.signature,browserSpeechSignatures.get(member.name));
+            assert.equal(
+                member.kind,
+                member.name==='BROWSER_SPEECH_ARTIFACT_PROTOCOL'?'constant':'function'
+            );
+            assert.match(member.availability,/\bBrowser\b/u);
+            assert.doesNotMatch(member.availability,/\b(?:Node|Cloud)\b/u);
         }
     });
 
@@ -244,6 +284,7 @@ test('the public package API inventory matches every JavaScript export and MDN e
             'createBrowserModelSource()',
             'createBrowserWasmLlmProvider()',
             'createDbopfsModelStore()',
+            'adaptV1LlmProvider()',
             'Related reference'
         ]);
         for(const member of records){
@@ -268,27 +309,121 @@ test('the public package API inventory matches every JavaScript export and MDN e
             'url',
             'bytes',
             'sha256',
+            'files',
+            'sources',
             'security',
             'secure:false',
             'checks.byteLength',
             'checks.sha256',
             'observed byte length',
             'DBOPFS',
-            'arcane.ai.browser-wasm.model.v3',
+            'arcane.ai.browser-wasm.model.v4',
             'load({offline:true})',
             'ARCANE_AI_MODEL_OFFLINE_MISS',
             'AbortSignal',
-            'ARCANE_AI_REQUEST_ABORTED'
+            'ARCANE_AI_REQUEST_ABORTED',
+            'ARCANE_AI_MODEL_AUTHORITY_REQUIRED',
+            'ARCANE_AI_STORAGE_CAPACITY_INSUFFICIENT',
+            'ARCANE_AI_PROVIDER_ROLE_MISMATCH',
+            'ARCANE_AI_PROVIDER_PROGRESS_INVALID',
+            'ARCANE_AI_MODEL_NOT_READY',
+            'ARCANE_AI_PROVIDER_STATUS_INVALID',
+            'ARCANE_AI_PROVIDER_OPERATION_UNAVAILABLE',
+            'ARCANE_AI_COMPLETION_RECOVERY_UNCONFIRMED',
+            'ARCANE_AI_PROVIDER_UNAVAILABLE',
+            'ARCANE_AI_RUNTIME_BUSY',
+            'ARCANE_AI_RUNTIME_FAILED',
+            'ARCANE_AI_WEBASSEMBLY_UNAVAILABLE',
+            'ARCANE_AI_MODEL_STORAGE_REQUIREMENT_UNKNOWN',
+            'ARCANE_AI_STORAGE_ESTIMATE_INVALID',
+            'ARCANE_AI_WEBGPU_EXECUTION_UNOBSERVED',
+            'existing `ModelController`',
+            'does not reapply its `loadPolicy`',
+            'PersistentAIChatSession',
+            'gpuLayers: 99999',
+            'no CPU fallback'
         ])assert.match(browserWasmGuide,new RegExp(escapeRegExp(value),'u'),value);
         assert.match(browserWasmGuide,/packages no model weights/u);
         assert.match(browserWasmGuide,/does not hash or reread a multi-gigabyte model/u);
         assert.match(browserWasmGuide,/Wllama reports that the model is loaded/u);
         assert.match(browserWasmGuide,/licenseSpdx[\s\S]*not canonical descriptor fields or runtime admission checks/u);
+        assert.match(browserWasmGuide,/WebGPU and proved\s+full offload are mandatory/u);
         assert.match(browserWasmGuide,/structural data/u);
         assert.match(browserWasmGuide,/never (?:invokes a handler or )?executes a tool/u);
         assert.doesNotMatch(browserWasmGuide,/browser-WASM (?:speech|transcription|native) (?:API|provider) is (?:available|shipped)/iu);
         assert.doesNotMatch(browserWasmGuide,/model weights (?:are )?(?:bundled|included)/iu);
         assert.doesNotMatch(browserWasmGuide,/automatically executes? (?:application )?tools?/iu);
+        assert.match(guide,/arcane\.ai\.browser-wasm\.webgpu\.adapter\.selected/u);
+    });
+
+    await t.test('the focused browser-speech guide owns the exact shipped browser contract',()=>{
+        const records=inventory.members.filter(member=>
+            member.entrypoints.includes('arcane-os/ai/browser-speech')
+        );
+        const focusedSections=sectionsByHeading(browserSpeechGuide.replace(
+            /^## `([^`]+)`\r?$/gmu,
+            '## $1'
+        ));
+        const sdkSections=sectionsByHeading(guide);
+        assert.deepEqual([...focusedSections.keys()],[
+            'Availability',
+            'Import',
+            'BROWSER_SPEECH_ARTIFACT_PROTOCOL',
+            'createBrowserSpeechAuthority()',
+            'createDbopfsSpeechArtifactStore()',
+            'createBrowserWhisperProvider()',
+            'createBrowserKokoroProvider()',
+            'Lifecycle and status',
+            'Errors',
+            'Security and ownership',
+            'Related'
+        ]);
+        for(const member of records){
+            assert.ok(focusedSections.has(member.displayName),member.displayName);
+            const required=member.kind==='constant'
+                ?['Overview','Value and import','Availability and normalization','Example']
+                :['Overview','Signature and result','Availability and normalization','Example'];
+            const canonical=requireGuideSection(sdkSections,member.displayName,required);
+            const signature=new RegExp(
+                '```text\\r?\\n'+escapeRegExp(member.signature)+'\\r?\\n```',
+                'u'
+            );
+            assert.match(canonical,signature,`${member.displayName} canonical signature drifted.`);
+        }
+        for(const value of [
+            'arcane-os/ai/browser-speech',
+            'arcane-ai-browser-speech-artifacts/1',
+            'arcane.ai.browser-speech.assets.v1',
+            'arcane-ai-provider/2',
+            'transformers-whisper',
+            'kokoro-js',
+            'transcribe',
+            'synthesize',
+            'Float32Array',
+            '16,000',
+            '24000',
+            'mimeType',
+            'responseFormat',
+            'audio/wav',
+            'DBOPFS',
+            'Web Locks',
+            'ARCANE_AI_ARTIFACT_OFFLINE_MISS',
+            'ARCANE_AI_AUDIO_DECODE_UNAVAILABLE',
+            'ARCANE_AI_AUDIO_DECODE_FAILED',
+            'ARCANE_AI_UNSUPPORTED_RESPONSE_FORMAT',
+            'ARCANE_AI_INVALID_PROVIDER_RESULT',
+            'secure:false',
+            'appSecurity',
+            'load({security})',
+            'checks.byteLength',
+            'checks.sha256',
+            'AIProviderRuntime',
+            'AIRuntimeState'
+        ])assert.match(browserSpeechGuide,new RegExp(escapeRegExp(value),'u'),value);
+        assert.match(browserSpeechGuide,/before Worker use[\s\S]*provider stays `ready`/u);
+        assert.match(browserSpeechGuide,/does not ship model weights, runtime adapter bytes/u);
+        assert.match(browserSpeechGuide,/never selects one/u);
+        assert.doesNotMatch(browserSpeechGuide,/automatically (?:downloads|selects) (?:a )?(?:model|voice|provider)/iu);
     });
 });
 
@@ -314,9 +449,9 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
         const actualPaths=sorted((await filesUnder(
             path.join(repositoryRoot,'runtime','arcane','modules')
         )).map(file=>path.relative(repositoryRoot,file).split(path.sep).join('/')));
-        assert.equal(moduleInventory.artifactCount,80);
-        assert.equal(moduleInventory.javascriptArtifactCount,78);
-        assert.equal(moduleInventory.esmExportCount,282);
+        assert.equal(moduleInventory.artifactCount,85);
+        assert.equal(moduleInventory.javascriptArtifactCount,83);
+        assert.equal(moduleInventory.esmExportCount,318);
         assert.deepEqual(
             sorted(moduleInventory.artifacts.map(artifact=>artifact.file)),
             actualPaths
@@ -440,8 +575,30 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
         }
     });
 
+    await t.test('chat documents explicit selected-model activation intent without hidden startup',async()=>{
+        const chat=componentInventory.artifacts.find(component=>component.name==='chat.html');
+        assert.ok(chat);
+        assert.ok(chat.methods.includes('requestAIActivation()'));
+        assert.ok(chat.events.includes('chat-ai-activation-request'));
+        assert.ok(chat.events.includes('chat-ai-activation-error'));
+        const source=await readFile(path.join(repositoryRoot,chat.file),'utf8');
+        for(const value of [
+            "Object.freeze({role:'llm',action,reason:'user'})",
+            "'chat-ai-activation-request'",
+            "'chat-ai-activation-error'"
+        ])assert.match(source,new RegExp(escapeRegExp(value),'u'),value);
+        assert.match(source,/action==='load'[\s\S]*\['unloaded','error'\][\s\S]*action==='unload'[\s\S]*role[.]state==='loading'/u);
+        assert.match(source,/cancelable:true[\s\S]*if\(!host[.]dispatchEvent\(activationEvent\)\)/u);
+        assert.match(componentGuide,/keyboard-operable Start\/Try again[\s\S]*Cancel loading/u);
+        assert.match(componentGuide,/preventDefault\(\) suppresses the callback/u);
+        assert.match(componentGuide,/emits no\s+activation request on import or startup/u);
+        assert.match(componentGuide,/provider\/runtime owner decides whether and\s+how to execute/u);
+        assert.match(componentGuide,/destroy\(\)[\s\S]*aborts the component's AI-runtime-state subscription[\s\S]*sets `ready` to `false`[\s\S]*returns\s+`undefined`/u);
+        assert.match(chat.normalization,/destroy aborts state\/activation observation[\s\S]*returns undefined/u);
+    });
+
     await t.test('all synchronized JavaScript and inline component scripts parse',()=>{
-        assert.equal(live.parsedJavascriptCount,94);
+        assert.equal(live.parsedJavascriptCount,99);
         assert.equal(live.support.length,1);
         assert.deepEqual(live.support[0].exports,['Is','default']);
     });
@@ -467,6 +624,57 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
                 'Overview','Public surface','Availability and normalization','Example'
             ]);
         }
+
+        const documentLibrary=requireGuideSection(
+            moduleSections,
+            'DBOPFSDocumentLibrary.js',
+            ['Overview','Public surface','Availability and normalization','Example']
+        );
+        for(const value of [
+            'evaluate(query,{sources,read,maxCharacters,maxCorpusCharacters',
+            'maxScoringCharacters,maxDocumentCharacters?',
+            'never persists a caller-owned body',
+            "authority:'sources'",
+            'DBOPFS_DOCUMENT_READ_FAILED',
+            'DBOPFS_DOCUMENT_ABORTED'
+        ])assert.match(documentLibrary,new RegExp(escapeRegExp(value),'u'),value);
+        for(const value of [
+            "readFailurePolicy:'preserve-readable'",
+            'returns partial `failures` plus `coverage`',
+            'DBOPFS_DOCUMENT_INVALID',
+            'DBOPFS_DOCUMENT_INVALID_LIMIT',
+            'DBOPFS_DOCUMENT_ERROR'
+        ])assert.match(documentLibrary,new RegExp(escapeRegExp(value),'u'),value);
+
+        const aiModule=requireGuideSection(
+            moduleSections,
+            'AI.js',
+            ['Overview','Public surface','Availability and normalization','Example']
+        );
+        assert.match(aiModule,/transitionAI\(\)[\s\S]*stops queued audio[\s\S]*unloads the current LLM, STT,[\s\S]*returns aggregate runtime status/u);
+        assert.match(aiModule,/transitionProviders\(\)[\s\S]*returns the admitted[\s\S]*three-role route configuration/u);
+
+        const providerRuntime=requireGuideSection(
+            moduleSections,
+            'AIProviderRuntime.js',
+            ['Overview','Public surface','Availability and normalization','Example']
+        );
+        assert.match(providerRuntime,/start\(\{startMuted=true,signal=null\}=\{\}\)[\s\S]*\{barrier,settled,cancel\}/u);
+        assert.match(providerRuntime,/AI_LOCAL_MODEL_REQUIRED/u);
+
+        const configuredSession=requireGuideSection(
+            moduleSections,
+            'ConfiguredAIChatSession.js',
+            ['Overview','Public surface','Availability and normalization','Example']
+        );
+        for(const value of [
+            'initialMessages',
+            'contextBuilder({input,history,signal})',
+            'must contain exactly one',
+            'AI_CHAT_INVALID_TOOL_MESSAGE',
+            'AI_CHAT_TOOL_RESULT_REQUIRED',
+            'AI_CHAT_TRANSACTION_SETTLED'
+        ])assert.match(configuredSession,new RegExp(escapeRegExp(value),'u'),value);
     });
 });
 

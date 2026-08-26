@@ -182,14 +182,16 @@ console.log(definition.system);`
         capabilitiesCore:'ai.inference covers chat/embed/generate and Kempo suppresses raw calls; ai.models.read covers diagnostics/reads with app restrictions; ai.models.manage covers admitted lifecycle/selection writes, but never makes application pull() or copy() available; ai.settings.manage covers Settings-only settings APIs.',
         example:String.raw`import ollama from '/arcane/modules/Ollama.js';
 
-const status = await Arcane.localAI.status();
-const model = status.models.ollama.find(item => item.runnable === true);
-if (!model) throw new Error('No admitted runnable model.');
-const response = await ollama.chat({
-    model:model.id,
-    messages:[{role:'user',content:'Reply with one word.'}]
-});
-console.log(response.message?.content);`
+async function chatWithAdmittedOllamaAfterUserChoice(){
+    const status = await Arcane.localAI.status();
+    const model = status.models.ollama.find(item => item.runnable === true);
+    if (!model) throw new Error('No admitted runnable model.');
+    const response = await ollama.chat({
+        model:model.id,
+        messages:[{role:'user',content:'Reply with one word.'}]
+    });
+    console.log(response.message?.content);
+}`
     }),
     Object.freeze({
         name:'OllamaModelIdentifier.js',
@@ -228,6 +230,31 @@ console.log(arcaneBrainModelName('My Research Brain'));`
 const weather = new Weather();
 const [place] = await weather.search('Chicago');
 if (place) console.log(await weather.load(place));`
+    }),
+    Object.freeze({
+        name:'PersistentAIChatSession.js',
+        classification:'public-first-party',
+        lifecycleSideEffects:'Construction creates or binds one ChatEntity and asynchronously loads existing JSONL history only when requested. send settles pending memory, runs one configured chat transaction, persists the coherent user/tool and assistant turn according to explicit per-turn flags, optionally extracts memory, then commits live session history atomically.',
+        paramsResults:'new PersistentAIChatSession({chat,chatEntity,chatFileName,contextBuilder,loadExisting,maxContextCharacters,maxMessageCharacters,maxMessages,memory=true,request,responseLength,systemPrompt}); static create() and createPersistentAIChatSession() await readiness. ready() waits for initialization and resolves the same session. send({message:{content,role:user|tool,tool_call_id?,persist=true},response:{persist=message.persist},signal?}) resolves the configured response; history() returns live bounded history and settleMemory() waits for ChatEntity memory work.',
+        events:Object.freeze([]),
+        errors:Object.freeze(['AI_CHAT_UNAVAILABLE','AI_CHAT_ABORTED','AI_CHAT_BUSY','AI_CHAT_INVALID_TOOL_MESSAGE','AI_CHAT_TOOL_RESULT_REQUIRED','AI_CHAT_INCOHERENT_PERSISTENCE','configured chat, ChatEntity, DBOPFS, and memory errors propagate']),
+        capabilitiesCore:'Portable persistent chat composition. The default chat calls normalized Arcane.ai.chat; an injected browser or cloud chat function can replace it. DBOPFS method names and ChatEntity semantics remain unchanged, and no provider or storage fallback is invented.',
+        example:String.raw`import {
+    createPersistentAIChatSession
+} from '/arcane/modules/PersistentAIChatSession.js';
+
+async function sendPersistentSupportTurnAfterUserChoice(documents){
+    const session=await createPersistentAIChatSession({
+        chatFileName:'support.jsonl',
+        loadExisting:true,
+        contextBuilder:documents.createContextBuilder()
+    });
+    const response=await session.send({
+        message:{role:'user',content:'Summarize the selected documents.',persist:true},
+        response:{persist:true}
+    });
+    console.log(response.message.content);
+}`
     }),
     Object.freeze({
         name:'PreferenceStore.js',
@@ -432,7 +459,12 @@ document.querySelector('button').addEventListener('click', async () => {
 const audio = document.body.appendChild(document.createElement('audio'));
 audio.controls = true;
 const speech = new SpeechPlayback({audio});
-await speech.prepare({key:'ready',parts:['Arcane is ready.'],autoplay:true});`
+const speakButton = document.body.appendChild(document.createElement('button'));
+speakButton.type = 'button';
+speakButton.textContent = 'Speak';
+speakButton.addEventListener('click', async () => {
+    await speech.prepare({key:'ready',parts:['Arcane is ready.'],autoplay:true});
+});`
     }),
     Object.freeze({
         name:'StaticDocumentCatalog.js',

@@ -14,6 +14,7 @@
   <!-- generated:reference-routes:start -->
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-speech/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-wasm/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/arcane-ollama/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/availability-and-normalization/</loc></url>
@@ -43,8 +44,10 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai-preference-runtime/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai-preference-tuple/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai-provider-runtime/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai-response-length/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai-response-url-policy/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai-runtime-state/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ansi-text/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/api-model-database/</loc></url>
@@ -71,10 +74,12 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/core-local-model-catalog/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/data-maintenance/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/dbls/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/dbopfs-document-library/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/dbopfs-worker/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/dbopfs/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/development-workspace/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/directory-picker/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/document-lexical-search/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/document-navigation/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/errors/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/gif-encoder/</loc></url>
@@ -94,6 +99,7 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ollama-settings/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ollama/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/open-meteo-weather-provider/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/persistent-ai-chat-session/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/preference-store/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/qr-code-min/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/questionnaire/</loc></url>

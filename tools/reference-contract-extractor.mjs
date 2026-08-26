@@ -11,7 +11,8 @@ export const REFERENCE_CONTRACT_SCHEMA_VERSION=1;
 // rendering.
 export const RUNTIME_CALLABLE_MEMBER_ALLOWLIST=Object.freeze({
     'AI.js':Object.freeze([
-        'setAI','streamRequest','streamMessage','fetchRequest','fetch',
+        'setAI','configureProviders','transitionAI','transitionProviders',
+        'startProviders','setSpeechMuted','streamRequest','streamMessage','fetchRequest','fetch',
         'streamTTS','finishTTS','fetchSTT','stopAudio','resumeAudio','playAudio'
     ]),
     'AIPreferenceRuntime.js':Object.freeze([
@@ -20,6 +21,13 @@ export const RUNTIME_CALLABLE_MEMBER_ALLOWLIST=Object.freeze({
     'AIPreferenceTuple.js':Object.freeze([
         'normalizeAIPreferenceTuple','aiPreferenceTuplesEqual'
     ]),
+    'AIProviderRuntime.js':Object.freeze([
+        'getAIProviderRuntime','register','unregister','hasProvider',
+        'providerIdentity','selection','ownsSelection','validateConfiguration',
+        'configure','configureFromTuple','status','catalog','inspect','start',
+        'load','unload','dispose','disposeAll','request','chat','stream',
+        'transcribe','synthesize','cancel','setSpeechMuted'
+    ]),
     'AIResponseLength.js':Object.freeze([
         'normalizeAIResponseLength','aiResponseLengthInstruction',
         'applyAIResponseLength'
@@ -27,6 +35,11 @@ export const RUNTIME_CALLABLE_MEMBER_ALLOWLIST=Object.freeze({
     'AIResponseURLPolicy.js':Object.freeze([
         'auditAIResponseLinks','extractAIResponseLinks',
         'normalizeAIResponseLink','decodeHTMLCharacterReferences'
+    ]),
+    'AIRuntimeState.js':Object.freeze([
+        'getAIRuntimeState','subscribeAIRuntimeState',
+        'publishAIRuntimeRoleState','publishAIRuntimeRolesState',
+        'requestAIRuntimeIntent','subscribeAIRuntimeIntents','startAIRuntime'
     ]),
     'AnsiText.js':Object.freeze(['parseAnsi','stripAnsi']),
     'ApiModelDatabase.js':Object.freeze(['setEndpoint','fetch','cached']),
@@ -55,13 +68,22 @@ export const RUNTIME_CALLABLE_MEMBER_ALLOWLIST=Object.freeze({
     'CommunicationProviderRegistry.js':Object.freeze([
         'register','get','has','list'
     ]),
-    'ConfiguredAIChatSession.js':Object.freeze(['history','clear','send']),
+    'ConfiguredAIChatSession.js':Object.freeze(['history','clear','prepare','send']),
     'DataMaintenance.js':Object.freeze(['clearEmptyChatsAndMemories']),
+    'DBOPFSDocumentLibrary.js':Object.freeze([
+        'createDBOPFSDocumentLibrary','normalizeDBOPFSDocumentSchema',
+        'bootstrap','search','evaluate','buildContext','createContextBuilder'
+    ]),
     'DevelopmentWorkspace.js':Object.freeze([
         'inspect','context','setup','installNode'
     ]),
     'DirectoryPicker.js':Object.freeze([
         'normalizeDirectoryPickerOptions','normalizeDirectorySelection'
+    ]),
+    'DocumentLexicalSearch.js':Object.freeze([
+        'createDocumentLexicalIndex','documentContextExcerpt',
+        'documentSearchTokens','normalizedDocumentSearchText',
+        'scoreDocumentBody','scoreDocumentLexicalIndex','rank','search'
     ]),
     'GifEncoder.js':Object.freeze(['indexPixels','lzw']),
     'HTMLImport.js':Object.freeze(['connectedCallback']),
@@ -86,6 +108,10 @@ export const RUNTIME_CALLABLE_MEMBER_ALLOWLIST=Object.freeze({
     ]),
     'OllamaSettings.js':Object.freeze(['arcaneBrainModelName']),
     'OpenMeteoWeatherProvider.js':Object.freeze(['mapForecast']),
+    'PersistentAIChatSession.js':Object.freeze([
+        'createPersistentAIChatSession','create','ready','history',
+        'settleMemory','send'
+    ]),
     'RecordLinkIndex.js':Object.freeze(['parseRecordLinks','buildRecordLinkIndex']),
     'RecordReviewStore.js':Object.freeze(['load','get','set','snapshot']),
     'RiskSignalAnalyzer.js':Object.freeze(['analyzeRiskSignals']),
@@ -1764,29 +1790,30 @@ function contractSummary(modules){
 }
 
 const EXPECTED_RUNTIME_SUMMARY=Object.freeze({
-    artifactCount:80,
-    esmModuleCount:74,
-    esmExportCount:282,
+    artifactCount:85,
+    esmModuleCount:79,
+    esmExportCount:318,
     exportForms:Object.freeze({
-        function:148,
-        variable:54,
-        class:10,
-        alias:25,
+        function:164,
+        variable:65,
+        class:15,
+        alias:26,
         're-export':4,
-        default:41
+        default:44
     }),
-    reviewedCallableCount:124,
-    reviewedModuleCount:51,
+    reviewedCallableCount:183,
+    reviewedModuleCount:56,
     literalCustomEventCount:11,
-    directCodedFailureCount:34,
-    exportedErrorSubclassCount:3
+    directCodedFailureCount:37,
+    exportedErrorSubclassCount:3,
+    publicMemberCount:456
 });
 
 function assertExpectedSummary(summary){
     for(const key of [
         'artifactCount','esmModuleCount','esmExportCount','reviewedCallableCount',
         'reviewedModuleCount','literalCustomEventCount',
-        'directCodedFailureCount','exportedErrorSubclassCount'
+        'directCodedFailureCount','exportedErrorSubclassCount','publicMemberCount'
     ]){
         if(summary[key]!==EXPECTED_RUNTIME_SUMMARY[key]){
             throw new Error(

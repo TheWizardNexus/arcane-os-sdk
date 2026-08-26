@@ -168,8 +168,10 @@ npm exec -- arcane doctor --workspace . --arcane-root "../Arcane OS"
 ### Overview
 
 Authenticates one selected application's physical browser runtime, generates
-its standard browser import map, and commits the map artifact and matching
-managed HTML entry as one bounded refresh.
+its standard browser import map, and commits the map artifact and configured
+managed HTML entry as one bounded refresh. Packaging uses the same operation
+with the complete included `.html`/`.htm` document inventory so every packaged
+browser page receives byte-identical managed import-map JSON.
 
 ```text
 arcane import-map [--workspace <directory>] [--app <id>]
@@ -183,8 +185,10 @@ identical executable alias.
 The generated artifact is
 `apps/<id>/modules/arcane.importmap.json`. Its exact JSON is also installed in
 the app entry as `<script type="importmap" data-arcane-import-map>` before
-module loading. In SDK `0.1.2`, the authenticated physical-v1 runtime produces
-86 entries and intentionally has no package-root mapping.
+module loading. In SDK `0.2.1`, the complete authenticated physical-v1 runtime
+produces 91 entries and intentionally has no package-root mapping. That count
+describes the shipped SDK closure; the command receipt remains authoritative
+for the exact map written to the selected application.
 
 ### Result and safety
 
@@ -200,8 +204,10 @@ Success returns the normal selected-workspace wrapper:
         artifactPath,
         artifactRelativePath,
         entryPath,
+        documentPaths,
+        documentCount:1,
         imports,
-        entryCount:86,
+        entryCount:91,
         excludedModules:['modules/CaseEvidenceIndexer.js'],
         files:[
             {role:'artifact',path,bytes,sha256},
@@ -213,11 +219,24 @@ Success returns the normal selected-workspace wrapper:
 }
 ```
 
-The two file records bind the committed byte length and SHA-256 for the artifact
-and HTML entry. A post-commit observer failure preserves delivery as a successful
-receipt with `eventDelivery.status === 'degraded'` and
+For the direct CLI command, `documentPaths` contains the configured entry and
+`documentCount` is one. The `files` array always places the artifact first, the
+configured entry second, and any additional packaging documents afterward as
+`{role:'document',path,bytes,sha256}` in deterministic order. Every record binds
+the committed byte length and SHA-256. A post-commit observer failure preserves
+delivery as a successful receipt with `eventDelivery.status === 'degraded'` and
 `ARCANE_EVENT_DELIVERY_FAILED`; it does not roll back valid application bytes.
 Packaging refuses a committed refresh that reports cleanup warnings.
+
+An authenticated external package also publishes
+`/ARCANE_RUNTIME_PROJECTION.json`. The immutable JSON is
+`{schemaVersion:1,kind:'arcane-app-runtime-projection',sdkVersion,
+pathPrefix:'arcane/',fileCount,totalBytes,contentSha256,
+files:[{path,bytes,sha256}]}` and is bound by the packaged release inventory.
+The development server exposes the same public route from its authenticated
+workspace projection. The private `/ARCANE_APP_RELEASE.json` authority is not
+served to application code. Invalid or forged projection data fails
+`ARCANE_RUNTIME_PROJECTION_INVALID`.
 
 The canonical integrated-legacy workspace has a deliberate compatibility
 result instead of an artifact: `importMap.skipped` is `true`,
@@ -554,8 +573,8 @@ Success returns:
 ```javascript
 {
     packageName:'arcane-os',
-    currentVersion:'0.1.0',
-    registryVersion:'0.1.2',
+    currentVersion:'0.2.0',
+    registryVersion:'0.2.1',
     tag:'latest',
     status:'update-available', // or 'current' or 'ahead'
     updateAvailable:true,

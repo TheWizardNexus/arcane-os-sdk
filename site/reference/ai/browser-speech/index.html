@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="arcane-os/ai/browser-speech is the shipped browser-only provider package for caller-supplied Whisper speech-to-text and Kokoro text-to-speech runtimes. It i…">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-speech/"><link rel="icon" type="image/png" href="../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../styles.css"><link rel="stylesheet" href="../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Browser speech providers · Arcane OS SDK"><meta property="og:description" content="arcane-os/ai/browser-speech is the shipped browser-only provider package for caller-supplied Whisper speech-to-text and Kokoro text-to-speech runtimes. It i…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-speech/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Browser speech providers · Arcane OS SDK"><meta name="twitter:description" content="arcane-os/ai/browser-speech is the shipped browser-only provider package for caller-supplied Whisper speech-to-text and Kokoro text-to-speech runtimes. It i…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Browser speech providers | Arcane OS SDK</title><script src="../../../app.js" defer></script><script src="../../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../">Overview</a><a href="../../../guides/">Guides</a><a href="../../../examples/">Examples</a><a href="../../../playground/">Playground</a><a href="../../../testing/">Testing</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="../../sdk-api/">API</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser speech providers</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-speech-providers">Browser speech providers</h1><p class="doc-lead">arcane-os/ai/browser-speech is the shipped browser-only provider package for caller-supplied Whisper speech-to-text and Kokoro text-to-speech runtimes. It i…</p><div class="doc-meta"><span>SDK 0.2.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../">Normalized AI</a><a href="../browser-wasm/">Browser-WASM AI</a><a href="./" aria-current="page">Browser speech</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/ai/browser-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#availability">Availability</a><a href="#import">Import</a><a href="#browserspeechartifactprotocol">BROWSERSPEECHARTIFACTPROTOCOL</a><a href="#createbrowserspeechauthority">createBrowserSpeechAuthority()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#createbrowserwhisperprovider">createBrowserWhisperProvider()</a><a href="#createbrowserkokoroprovider">createBrowserKokoroProvider()</a><a href="#lifecycle-and-status">Lifecycle and status</a><a href="#errors">Errors</a><a href="#security-and-ownership">Security and ownership</a><a href="#related">Related</a></nav></details><p><code>arcane-os/ai/browser-speech</code> is the shipped browser-only provider package for
+caller-supplied Whisper speech-to-text and Kokoro text-to-speech runtimes. It
+implements the same provider-neutral role contract used by
+<code>AIProviderRuntime.js</code>; it does not ship model weights, runtime adapter bytes,
+voices, download URLs, a catalog, or a cloud fallback.</p>
+<p>Use this page when an application deliberately owns browser-local speech model
+and runtime selection. For ordinary application AI lifecycle and status, start
+with the <a href="../../overview/#normalized-ai">normalized AI guide</a> and
+<a href="../../runtime-modules/#aiproviderruntimejs"><code>AIProviderRuntime.js</code></a>.</p>
+<h2 id="availability">Availability</h2>
+<div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Host</th>
+<th>Availability</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Browser</td>
+<td>Shipped</td>
+<td>Requires DBOPFS/OPFS, Web Locks, Workers, Fetch or an injected fetch function, Blob/File, and object URLs.</td>
+</tr>
+<tr>
+<td>Native WebView</td>
+<td>Conditional</td>
+<td>Works only when the WebView exposes the same browser APIs and the application admits every artifact. This does not invoke Core speech.</td>
+</tr>
+<tr>
+<td>Node</td>
+<td>Importable, execution unavailable</td>
+<td>The ESM subpath is exported, but <code>0.2.1</code> publishes no Node speech storage, Worker, audio-decoder, or execution adapter.</td>
+</tr>
+<tr>
+<td>Cloud</td>
+<td>Not provided</td>
+<td>A cloud speech provider can implement <code>arcane-ai-provider/2</code>, but this package never selects one.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Browser speech is independent from <code>arcane-os/ai/browser-wasm</code>: the Wllama
+entrypoint owns the LLM role, while this entrypoint owns optional STT and TTS
+providers. Each role loads, unloads, reports status, cancels, and recovers
+independently.</p>
+<h2 id="import">Import</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {
+  BROWSER_SPEECH_ARTIFACT_PROTOCOL,
+  createBrowserKokoroProvider,
+  createBrowserSpeechAuthority,
+  createBrowserWhisperProvider,
+  createDbopfsSpeechArtifactStore
+} from &#39;arcane-os/ai/browser-speech&#39;;
+</code></pre></div>
+<p>The entrypoint exports exactly those five names. Importing it downloads no
+model and starts no Worker.</p>
+<h2 id="browserspeechartifactprotocol"><code>BROWSER_SPEECH_ARTIFACT_PROTOCOL</code></h2>
+<p>The constant is exactly <code>&quot;arcane-ai-browser-speech-artifacts/1&quot;</code>. It identifies
+an SDK-created artifact store; it is not model authority, a capability grant,
+or evidence that a cache is complete.</p>
+<h2 id="createbrowserspeechauthority"><code>createBrowserSpeechAuthority()</code></h2>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createBrowserSpeechAuthority({
+  providerId,
+  role,
+  model,
+  runtime,
+  security
+} = {})
+</code></pre></div>
+<p>Validates and freezes one caller-owned model/runtime declaration. Construction
+binds the declared identities and descriptor rules; actual downloaded or cached
+runtime-graph closure is validated by <code>store.prepare()</code> before a Worker starts.</p>
+<h3 id="authority-input">Authority input</h3>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>providerId</code></td>
+<td>Trimmed 1–128 character provider identity.</td>
+</tr>
+<tr>
+<td><code>role</code></td>
+<td>Exactly <code>&quot;stt&quot;</code> or <code>&quot;tts&quot;</code>.</td>
+</tr>
+<tr>
+<td><code>model.id</code></td>
+<td>Caller-owned model identity.</td>
+</tr>
+<tr>
+<td><code>model.repository</code></td>
+<td>Immutable logical repository identity; the SDK does not resolve it.</td>
+</tr>
+<tr>
+<td><code>model.revision</code></td>
+<td>Caller-pinned revision. Every model URL must contain this revision or its supplied SHA-256.</td>
+</tr>
+<tr>
+<td><code>model.files</code></td>
+<td>Nonempty unique <code>{path,url,bytes?,sha256?,mediaType?}[]</code>. Paths are normalized relative paths; URLs are immutable HTTPS or same-origin URLs without credentials/fragments.</td>
+</tr>
+<tr>
+<td><code>model.defaultVoice</code></td>
+<td>Required only for TTS.</td>
+</tr>
+<tr>
+<td><code>runtime.adapter</code></td>
+<td>Exactly <code>&quot;transformers-whisper&quot;</code> for STT or <code>&quot;kokoro-js&quot;</code> for TTS.</td>
+</tr>
+<tr>
+<td><code>runtime.version</code> / <code>runtime.revision</code></td>
+<td>Caller-pinned runtime identity.</td>
+</tr>
+<tr>
+<td><code>runtime.entry</code></td>
+<td>Path of one JavaScript module in <code>runtime.files</code>.</td>
+</tr>
+<tr>
+<td><code>runtime.files</code></td>
+<td>Nonempty immutable runtime closure. The entry module must be self-contained: undeclared imports, re-exports, executable strings, alternate transports, and child workers are rejected.</td>
+</tr>
+<tr>
+<td><code>security</code></td>
+<td>Closed <code>{secure?,checks?:{byteLength?,sha256?}}</code> artifact policy. Disabled checks are disclosed rather than silently claimed.</td>
+</tr>
+</tbody></table>
+</div>
+<p>The result is a frozen <code>arcane-ai-model-authority/1</code> record. The SDK owns the
+validation rules; the application owns every model/runtime choice, license,
+revision, URL, hash, voice, and business policy.</p>
+<p>Provider security resolves each field independently in this order: SDK default,
+<code>appSecurity</code>, provider <code>security</code>, then <code>load({security})</code>. The SDK default is
+<code>secure:false</code>. After resolution, each omitted check defaults to the effective
+<code>secure</code> value; an explicit <code>checks.byteLength</code> or <code>checks.sha256</code> boolean
+overrides that default. An enabled check requires the corresponding <code>bytes</code> or
+<code>sha256</code> field on every admitted artifact and fails closed when evidence is
+missing or mismatched. A disabled check never becomes a claim that bytes were
+verified. Direct <code>store.prepare()</code> has only its supplied security scope above
+the SDK default because it is not bound to a provider.</p>
+<h2 id="createdbopfsspeechartifactstore"><code>createDbopfsSpeechArtifactStore()</code></h2>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createDbopfsSpeechArtifactStore({
+  dbopfs,
+  tableName = &#39;arcane_ai_browser_speech&#39;,
+  fetchImpl = null,
+  objectUrlFactory = null
+} = {})
+</code></pre></div>
+<p>Adapts an existing DBOPFS instance into an authority-scoped store. The returned
+frozen object exposes <code>{protocol,tableName,prepare,remove}</code>.</p>
+<p><code>prepare(authority,{signal,onProgress,offline=false,security})</code>:</p>
+<ol>
+<li>obtains an exclusive Web Lock for the exact authority;</li>
+<li>admits a complete cached manifest when every record still matches;</li>
+<li>otherwise, unless <code>offline:true</code>, downloads every declared file without
+credentials;</li>
+<li>enforces enabled byte-length and SHA-256 checks;</li>
+<li>validates the closed runtime module graph;</li>
+<li>commits <code>arcane.ai.browser-speech.assets.v1</code> only after every file succeeds;</li>
+<li>returns materialized object URLs plus a <code>release()</code> callback.</li>
+</ol>
+<p>An installation or cache-validation failure removes incomplete stored state for
+that authority. A request or provider-use failure does not imply cache removal.
+<code>offline:true</code> never falls back to network and rejects with
+<code>ARCANE_AI_ARTIFACT_OFFLINE_MISS</code> when no admitted cache exists.</p>
+<h2 id="createbrowserwhisperprovider"><code>createBrowserWhisperProvider()</code></h2>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createBrowserWhisperProvider({
+  id = &#39;arcane-browser-whisper&#39;,
+  localOnly = true,
+  model,
+  runtime,
+  appSecurity,
+  security,
+  store,
+  offline = false
+} = {})
+</code></pre></div>
+<p>Returns a frozen <code>arcane-ai-provider/2</code> object for role <code>stt</code>. The provider
+surface is <code>{protocol,role,id,localOnly,catalog,inspect,status,load,request, unload,dispose}</code>.</p>
+<p>The only request operation is <code>transcribe</code>:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function transcribeAfterUserChoice(provider, pcmFloat32, signal) {
+  // The admitted Whisper provider must already be ready.
+  const result = await provider.request({
+    role: &#39;stt&#39;,
+    operation: &#39;transcribe&#39;,
+    signal,
+    payload: {
+      audio: pcmFloat32,
+      sampleRate: 16_000
+    }
+  });
+
+  console.log(result.text);
+}
+</code></pre></div>
+<p><code>audio</code> must be a <code>Float32Array</code> sampled at exactly 16,000 Hz. The provider-native
+provider result is a structured <code>{text}</code> record transferred by Worker
+<code>postMessage</code>; the client does not re-freeze that cloned record. The same
+provider also accepts the shared AI.js STT
+payload <code>{audio:Blob|File,mimeType,model}</code>. It verifies <code>model</code>, decodes the
+browser audio to authoritative 16 kHz mono PCM, and then enters the same provider-native
+provider operation. Decode support and failure remain explicit.</p>
+<h2 id="createbrowserkokoroprovider"><code>createBrowserKokoroProvider()</code></h2>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createBrowserKokoroProvider({
+  id = &#39;arcane-browser-kokoro&#39;,
+  localOnly = true,
+  model,
+  runtime,
+  appSecurity,
+  security,
+  store,
+  offline = false
+} = {})
+</code></pre></div>
+<p>Returns the same provider/2 lifecycle for role <code>tts</code>. The only request
+operation is <code>synthesize</code>:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function synthesizeAfterUserChoice(provider, signal) {
+  // The admitted Kokoro provider must already be ready.
+  const result = await provider.request({
+    role: &#39;tts&#39;,
+    operation: &#39;synthesize&#39;,
+    signal,
+    payload: {
+      text: &#39;Hello from Arcane.&#39;,
+      voice: &#39;caller-owned-voice-id&#39;,
+      speed: 1
+    }
+  });
+
+  console.log(result.audio, result.sampleRate, result.voice);
+}
+</code></pre></div>
+<p><code>speed</code> must be greater than zero and at most four. Omitted <code>voice</code> selects the
+caller-supplied <code>model.defaultVoice</code>. The provider-native result is the structured
+<code>{audio:Float32Array,sampleRate:24000,voice}</code> record transferred by Worker
+<code>postMessage</code>; the client does not re-freeze that cloned record. The shared
+AI.js TTS payload is
+<code>{model,input,responseFormat,voice?,speed?}</code>. Only <code>responseFormat:&quot;wav&quot;</code> is
+admitted; the provider maps it to <code>{text,voice,speed}</code> and returns frozen
+<code>{audio:Uint8Array,contentType:&quot;audio/wav&quot;}</code> containing 24 kHz mono PCM.</p>
+<h2 id="lifecycle-and-status">Lifecycle and status</h2>
+<p>Whisper and Kokoro use the same independent state machine:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>catalog()</code></td>
+<td>Returns the single caller-admitted model descriptor.</td>
+</tr>
+<tr>
+<td><code>inspect(selection,{signal})</code></td>
+<td>Returns <code>{available:true,authority}</code> only for the exact provider/model/local selection; mismatch returns an unavailable record.</td>
+</tr>
+<tr>
+<td><code>status()</code></td>
+<td>Returns <code>{role,providerId,modelId,state,loaded,busy,generation,errorCode,cache}</code>.</td>
+</tr>
+<tr>
+<td><code>load(context)</code></td>
+<td>Requires <code>{role,selection,progress,signal?,security?}</code>, admits/cache-materializes artifacts, creates one role Worker, and loads the adapter. Compatible repeated loads coalesce.</td>
+</tr>
+<tr>
+<td><code>request(context)</code></td>
+<td>Runs exactly one STT or TTS operation. A provider rejects concurrent use with <code>ARCANE_AI_PROVIDER_BUSY</code>.</td>
+</tr>
+<tr>
+<td><code>unload()</code></td>
+<td>Aborts active load/use, terminates the Worker, releases object URLs, and returns <code>unloaded</code>.</td>
+</tr>
+<tr>
+<td><code>dispose()</code></td>
+<td>Completes unload and permanently returns <code>disposed</code>.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Cancellation after a Worker request begins terminates that Worker slot and
+returns the provider to <code>unloaded</code>; a later request requires a fresh load. A
+shared STT request can instead be aborted while the browser is still decoding
+its <code>Blob</code> or <code>File</code>, before Worker use begins. That request rejects with
+<code>ARCANE_AI_REQUEST_ABORTED</code>, but the loaded Worker remains intact and the
+provider stays <code>ready</code>. Worker crash/message failures become explicit error
+state. No result is retried through another provider.</p>
+<p>Register the providers with the projected
+<a href="../../runtime-modules/#aiproviderruntimejs"><code>AIProviderRuntime</code></a> to normalize
+selection, startup, application calls, and
+<a href="../../runtime-modules/#airuntimestatejs"><code>AIRuntimeState</code></a> observation. The
+provider objects themselves do not expose an event target.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function loadSpeechProviderAfterUserChoice(provider) {
+  const selection = {
+    providerId: provider.id,
+    modelId: provider.catalog()[0].id,
+    localOnly: true
+  };
+  return provider.load({
+    role: provider.role,
+    selection,
+    progress(update) {
+      console.info(update.phase, update.completed, update.total);
+    }
+  });
+}
+</code></pre></div>
+<p>The example only defines the operation; invoke it from an explicit user action
+after showing the admitted runtime/model and download policy. Requests are
+valid only after that load resolves successfully. Applications
+register and configure browser-speech providers on the shared runtime. <code>AI.js</code>
+obtains that singleton and translates its existing browser speech request shapes
+at this one provider boundary; it does not register providers, choose
+authorities, or trigger a hidden model download.</p>
+<h2 id="errors">Errors</h2>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ARCANE_AI_MODEL_AUTHORITY_REQUIRED</code></td>
+<td>Selection or authority does not match the provider.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_INVALID_REQUEST</code></td>
+<td>Role, operation, audio, text, voice, or speed is invalid.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_NOT_READY</code></td>
+<td>Use was requested before a successful load.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_PROVIDER_BUSY</code></td>
+<td>The role already has an active request.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_PROVIDER_DISPOSED</code></td>
+<td>Load/use was requested after disposal.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_REQUEST_ABORTED</code></td>
+<td>The caller&#39;s AbortSignal cancelled work.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_OPERATION_SUPERSEDED</code></td>
+<td>A newer unload/load/dispose generation replaced the operation.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_ARTIFACT_SOURCE_INVALID</code></td>
+<td>Artifact bytes or body shape are not readable.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_ARTIFACT_SOURCE_UNAVAILABLE</code></td>
+<td>Fetch is unavailable.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_ARTIFACT_DOWNLOAD_FAILED</code></td>
+<td>Network or HTTP download failed.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_ARTIFACT_SOURCE_CHANGED</code></td>
+<td>Redirect/final URL differs from the admitted immutable URL.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_ARTIFACT_SIZE_MISMATCH</code></td>
+<td>Enabled byte-length evidence differs.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_ARTIFACT_DIGEST_MISMATCH</code></td>
+<td>Enabled SHA-256 evidence differs.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_ARTIFACT_CACHE_REJECTED</code></td>
+<td>DBOPFS did not preserve the completed file.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_ARTIFACT_OFFLINE_MISS</code></td>
+<td>Strict offline use has no admitted complete cache.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_STORAGE_BUSY</code></td>
+<td>Another context owns the same authority lock.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_STORAGE_UNAVAILABLE</code> / <code>ARCANE_AI_STORAGE_READ_FAILED</code> / <code>ARCANE_AI_STORAGE_DELETE_FAILED</code></td>
+<td>The selected DBOPFS store is unavailable or could not read/delete the authority.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_RUNTIME_MODULE_GRAPH_UNDECLARED</code></td>
+<td>Runtime code leaves the closed self-contained module grammar.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_WORKER_CRASHED</code> / <code>ARCANE_AI_WORKER_MESSAGE_ERROR</code></td>
+<td>The isolated adapter Worker failed.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH</code></td>
+<td>The Worker/client/provider protocol is not the SDK-owned contract.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_PROVIDER_LOAD_FAILED</code> / <code>ARCANE_AI_PROVIDER_REQUEST_FAILED</code> / <code>ARCANE_AI_PROVIDER_UNAVAILABLE</code></td>
+<td>Adapter load/request failed or the admitted runtime did not expose the requested provider.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_INVALID_PROVIDER_RESULT</code></td>
+<td>Whisper/Kokoro returned a result outside the normalized contract.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_UNDECLARED_ARTIFACT</code></td>
+<td>The runtime requested a file outside its admitted closure.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_AUDIO_DECODE_UNAVAILABLE</code> / <code>ARCANE_AI_AUDIO_DECODE_FAILED</code></td>
+<td>Shared Blob/File STT cannot obtain a browser decoder or cannot produce nonempty 16 kHz mono PCM.</td>
+</tr>
+<tr>
+<td><code>ARCANE_AI_UNSUPPORTED_RESPONSE_FORMAT</code></td>
+<td>Shared TTS requested a format other than <code>wav</code>.</td>
+</tr>
+</tbody></table>
+</div>
+<h2 id="security-and-ownership">Security and ownership</h2>
+<ul>
+<li>The SDK contains no speech model or adapter runtime bytes in this entrypoint.</li>
+<li>The application must verify the license and authority for every supplied byte.</li>
+<li>URLs never carry credentials; fetch uses <code>credentials: &quot;omit&quot;</code>.</li>
+<li>Mutable <code>main</code>, <code>master</code>, and <code>latest</code> paths are rejected.</li>
+<li>The completion manifest is consistency evidence for the admitted DBOPFS
+bytes. It is not publisher authenticity by itself.</li>
+<li>The runtime entry is isolated in a Worker and limited to its declared
+artifact closure.</li>
+<li>Tool calls are an LLM concern; speech providers execute no application tool.</li>
+<li>A native <code>Arcane.speech</code> service is a different privileged host path. This
+browser package neither calls it nor inherits its capability admission.</li>
+</ul>
+<details><summary>Protocol details</summary>
+<p>The artifact store identifies itself as
+<code>arcane-ai-browser-speech-artifacts/1</code>. Authorities use
+<code>arcane-ai-model-authority/1</code>. Providers implement <code>arcane-ai-provider/2</code> with
+roles <code>stt</code> and <code>tts</code>; their only operations are <code>transcribe</code> and <code>synthesize</code>.
+The Worker client additionally binds exact role, operation, request IDs, and
+generation so stale or cross-role messages cannot settle current work.</p>
+</details>
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="../../overview/#normalized-ai">Normalized AI</a></li>
+<li><a href="../browser-wasm/">Browser-WASM LLM</a></li>
+<li><a href="../../runtime-modules/#aiproviderruntimejs">AIProviderRuntime.js</a></li>
+<li><a href="../../runtime-modules/#airuntimestatejs">AIRuntimeState.js</a></li>
+<li><a href="../../runtime-modules/#persistentaichatsessionjs">PersistentAIChatSession.js</a></li>
+<li><a href="../../availability-and-normalization/">Availability and normalization</a></li>
+<li><a href="../../protocols/#portable-ai-provider-runtime">Protocol architecture</a></li>
+</ul>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#availability">Availability</a><a href="#import">Import</a><a href="#browserspeechartifactprotocol">BROWSERSPEECHARTIFACTPROTOCOL</a><a href="#createbrowserspeechauthority">createBrowserSpeechAuthority()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#createbrowserwhisperprovider">createBrowserWhisperProvider()</a><a href="#createbrowserkokoroprovider">createBrowserKokoroProvider()</a><a href="#lifecycle-and-status">Lifecycle and status</a><a href="#errors">Errors</a><a href="#security-and-ownership">Security and ownership</a><a href="#related">Related</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.2.1, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+</body>
+</html>

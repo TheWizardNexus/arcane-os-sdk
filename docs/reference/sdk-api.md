@@ -2,9 +2,12 @@
 
 The npm package exposes a Node.js ESM control plane, the Node-and-browser
 `arcane-os/event-manager` entrypoint, and the browser-only
-`arcane-os/ai/browser-wasm` entrypoint. Application code otherwise uses named
-modules from the managed browser map, such as `arcane/ThemeBootstrap`, and
-calls `globalThis.Arcane` for capability-gated host behavior.
+`arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints.
+Those package subpaths are distinct from application-facing projection modules
+in the managed browser map, such as `arcane/AIProviderRuntime`,
+`arcane/AIRuntimeState`, and `arcane/ThemeBootstrap`. Applications use those
+mapped runtime modules and call `globalThis.Arcane` for capability-gated host
+behavior; they are not additional `package.json#exports` entrypoints.
 
 This page is the canonical inventory for every JavaScript name reachable through `package.json#exports`. The same binding can appear at the root and a focused subpath; those entrypoints are listed together. The root workspace `discoverApps` and the low-level packager `discoverApps` are intentionally separate records because they are different functions.
 
@@ -14,7 +17,7 @@ This table is the Node `package.json#exports` map: it defines package
 entrypoints for SDK/tooling code. It is distinct from the generated browser
 import map that resolves application-facing `arcane/*` modules and the focused
 EventManager entry. See [browser runtime delivery](protocols.md#browser-runtime-delivery)
-for that 86-entry physical-runtime contract.
+for that 91-entry physical-runtime contract in SDK `0.2.1`.
 
 | Specifier | Purpose |
 | --- | --- |
@@ -30,6 +33,7 @@ for that 86-entry physical-runtime contract.
 | `arcane-os/release-bundle` | Deterministic external release bundles. |
 | `arcane-os/event-manager` | Central synchronous events, bounded time-travel history, playback, and optional DOM instrumentation. |
 | `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, configurable DBOPFS model checks, streaming, cancellation, and structural tool-call results. |
+| `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS provider mechanisms, authenticated DBOPFS artifacts, Workers, and cancellation; no model or adapter bytes. |
 
 JSON schemas, the runtime manifest, and `package.json` are data-only export subpaths. In Node ESM, import JSON with `with {type: 'json'}`, or resolve and read it explicitly.
 
@@ -42,6 +46,12 @@ One invocation selects one workspace, app, operation, target, architecture, form
 Protocol mechanics are intentionally kept in the [deep protocol guide](protocols.md). The compact availability and normalization sentence beneath each member is the normal application-facing view.
 
 ## Canonical member inventory
+
+SDK `0.2.1` exports exactly 169 distinct JavaScript members across 13
+JavaScript entrypoints. The complete export map has 23 subpaths: the other 10
+are the runtime manifest, eight JSON Schemas, and package metadata. Runtime
+projection modules in the managed browser map are cataloged separately in
+[Runtime modules](runtime-modules.md).
 
 | Member | Kind | Import | Group | Availability |
 | --- | --- | --- | --- | --- |
@@ -66,6 +76,7 @@ Protocol mechanics are intentionally kept in the [deep protocol guide](protocols
 | `ARCANE_UPSTREAM_COMMIT` | constant | `arcane-os` | Identity and protocol constants | Node |
 | `ARCANE_UPSTREAM_REPOSITORY` | constant | `arcane-os` | Identity and protocol constants | Node |
 | `ArcaneError` | class | `arcane-os` | Errors | Node |
+| `adaptV1LlmProvider()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser; the wrapped provider retains its own WebGPU, storage, model, and lifecycle requirements |
 | `assertIntegratedNativeToolchain()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `assertIntegratedPortableToolchain()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `assertNativeApplicationToolchainCompatibility()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
@@ -79,6 +90,7 @@ Protocol mechanics are intentionally kept in the [deep protocol guide](protocols
 | `authenticateSharedPayloadSnapshot()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `buildApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `buildTarget()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
+| `BROWSER_SPEECH_ARTIFACT_PROTOCOL` | constant | `arcane-os/ai/browser-speech` | Browser speech providers | Browser metadata; model/runtime use requires DBOPFS, Web Locks, Workers, and caller-supplied immutable artifacts |
 | `BROWSER_WASM_RUNTIME_AUTHORITY` | constant | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser metadata; no model or DBOPFS required to inspect |
 | `bumpVersion()` | function | `arcane-os/packager` | Packaging and release bundles | Node |
 | `bundleApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
@@ -88,10 +100,14 @@ Protocol mechanics are intentionally kept in the [deep protocol guide](protocols
 | `createApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `createArcaneAI()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser; compatible LLM provider or controller required |
 | `createAppReleaseBundle()` | function | `arcane-os` | Packaging and release bundles | Node |
+| `createBrowserKokoroProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with DBOPFS, Web Locks, Workers, object URLs, and caller-admitted Kokoro runtime/model artifacts |
 | `createBrowserModelSource()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser Fetch with a readable response body |
-| `createBrowserWasmLlmProvider()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser; WebAssembly and DBOPFS model bytes |
+| `createBrowserSpeechAuthority()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser descriptor construction; use requires the selected storage and provider Web APIs |
+| `createBrowserWasmLlmProvider()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser secure context with WebAssembly, OPFS/DBOPFS, WebGPU, and admitted full-offload evidence; no CPU fallback |
+| `createBrowserWhisperProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with DBOPFS, Web Locks, Workers, object URLs, and caller-admitted Whisper runtime/model artifacts |
 | `createCanonicalUstarHeader()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `createDbopfsModelStore()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser with a ready DBOPFS instance and OPFS |
+| `createDbopfsSpeechArtifactStore()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with ready DBOPFS, Web Locks, Fetch, File/Blob, and object URLs |
 | `createNativeBuildPlan()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `createNativeTargetAdapter()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `createReporter()` | function | `arcane-os` | Events, processes, and testing | Node |
@@ -787,7 +803,30 @@ Builds and authenticates one browser application release through the low-level p
 async packageApp(options)
 ```
 
-Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/packager`. For a non-dry-run external
+package, the result includes `importMapReceipt`. That frozen receipt binds the
+artifact, configured entry, every additional included `.html`/`.htm` document,
+and their exact committed bytes/hashes. Each admitted document receives the
+same deterministic map. The package root also contains the public
+`ARCANE_RUNTIME_PROJECTION.json` inventory:
+
+```javascript
+{
+  schemaVersion: 1,
+  kind: 'arcane-app-runtime-projection',
+  sdkVersion: '0.2.1',
+  pathPrefix: 'arcane/',
+  fileCount,
+  totalBytes,
+  contentSha256,
+  files: [{path, bytes, sha256}]
+}
+```
+
+That projection is authenticated by the private application release inventory
+and the admitted runtime authorities. It is not a replacement for either
+receipt. Incomplete, changed, forged, or internally inconsistent projection
+data rejects with `ARCANE_RUNTIME_PROJECTION_INVALID`.
 
 ### Availability and normalization
 
@@ -798,9 +837,13 @@ Import it from `arcane-os` or `arcane-os/packager`. The signature above states w
 ```javascript
 import {packageApp} from 'arcane-os';
 
-async function usepackageApp(...arguments_) {
-    return packageApp(...arguments_);
-}
+const packaged = await packageApp({
+    workspaceRoot: process.cwd(),
+    appId: 'hello-world'
+});
+
+console.log(packaged.importMapReceipt.documentPaths);
+console.log(packaged.importMapReceipt.documentCount);
 ```
 
 ## PACKAGER_VERSION
@@ -2655,7 +2698,7 @@ The import-map operation also reports the stable operation-specific strings
 `ARCANE_IMPORT_MAP_COLLISION`; package assembly can additionally report
 `ARCANE_IMPORT_MAP_CLEANUP_FAILED`. They are normalized `ArcaneError.code`
 values, but are not properties added to this frozen general registry in SDK
-`0.1.2`.
+`0.2.1`.
 
 ### Value and import
 
@@ -3300,10 +3343,42 @@ Runs canonical workspace, runtime, descriptor, and selected-app validation with 
 ### Signature and result
 
 ```text
-async validateWorkspace({workspaceRoot=process.cwd(), appId, signal, onEvent}={})
+async validateWorkspace({
+    workspaceRoot=process.cwd(),
+    appId,
+    allowMissingManagedImportMap=false,
+    signal,
+    onEvent
+}={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. It resolves to a frozen validation receipt with
+`valid`, `workspaceMode`, `workspaceRoot`, `appId`, `appRoot`, the selected
+configuration/application, lock data, and completed checks. For an external
+workspace it additionally returns the exact installed package authority:
+
+```javascript
+{
+  sdkInstallation: {
+    dependencyName,
+    packageSource,
+    canonicalPackageRoot,
+    packageName: 'arcane-os',
+    packageVersion: '0.2.1',
+    runtimeRoot,
+    browserRuntimeRoot,
+    runtimeManifest,
+    browserRuntimeManifest
+  }
+}
+```
+
+The dependency can be named `arcane-os` or be one exact npm alias for
+`npm:arcane-os@0.2.1`. The selected installation must still be one direct,
+physical, non-link package directory whose manifest identifies exactly as
+`arcane-os@0.2.1`; duplicate canonical/alias declarations fail closed.
+`allowMissingManagedImportMap` is an internal packaging/development seam. An
+ordinary caller should leave it `false`.
 
 ### Availability and normalization
 
@@ -3314,9 +3389,13 @@ Import it from `arcane-os`. The signature above states whether settlement is syn
 ```javascript
 import {validateWorkspace} from 'arcane-os';
 
-async function usevalidateWorkspace(...arguments_) {
-    return validateWorkspace(...arguments_);
-}
+const validation = await validateWorkspace({
+    workspaceRoot: process.cwd(),
+    appId: 'hello-world'
+});
+
+console.log(validation.sdkInstallation?.dependencyName);
+console.log(validation.sdkInstallation?.packageVersion);
 ```
 
 
@@ -3472,9 +3551,10 @@ const toolchain = createToolchain({
     }
 });
 
-// Only this explicit call refreshes the managed map and HTML entry.
+// Only this explicit call refreshes the managed map and configured HTML entry.
 const result = await toolchain.importMap();
-console.log(result.importMap.entryCount); // 86 in SDK 0.1.2
+console.log(result.importMap.entryCount); // 91 in SDK 0.2.1
+console.log(result.importMap.documentPaths, result.importMap.documentCount);
 ```
 
 ## describeTargets()
@@ -3542,7 +3622,10 @@ Dispatches one named headless SDK operation with normalized acceptance, events, 
 The exact command `'import-map'` dispatches one app-scoped authenticated refresh
 and returns `{workspaceRoot, workspaceMode, appId, importMap}`. A normal
 `importMap` value binds the generated imports and the committed map/HTML file
-hashes; the canonical integrated-legacy layout returns its documented skip
+hashes through `documentPaths`, `documentCount`, and the ordered `files`
+records. The direct operation supplies the configured entry only; packaging
+owns discovery of additional included browser documents. The canonical
+integrated-legacy layout returns its documented skip
 record instead. This route mutates the two managed application files and has no
 supported dry-run.
 
@@ -3574,13 +3657,20 @@ const result = await executeOperation('import-map', {
     appId:'hello-world'
 });
 console.log(result.importMap.committed, result.importMap.entryCount);
+console.log(result.importMap.documentPaths, result.importMap.documentCount);
 ```
 
 ## packageApplication()
 
 ### Overview
 
-Runs the high-level package operation for one selected application.
+Runs the high-level package operation for one selected application. It
+authenticates the installed SDK/runtime authorities, injects one deterministic
+managed import map into every included `.html`/`.htm` browser document, and
+returns the low-level package result with its `importMapReceipt`. External
+packages publish `ARCANE_RUNTIME_PROJECTION.json`; private
+`ARCANE_APP_RELEASE.json` remains an internal verification authority rather
+than an application route.
 
 ### Signature and result
 
@@ -3599,9 +3689,12 @@ Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states 
 ```javascript
 import {packageApplication} from 'arcane-os';
 
-async function usepackageApplication(...arguments_) {
-    return packageApplication(...arguments_);
-}
+const result = await packageApplication({
+    workspaceRoot: process.cwd(),
+    appId: 'hello-world'
+});
+
+console.log(result.release.importMapReceipt.documentCount);
 ```
 
 ## planApplication()
@@ -4944,7 +5037,8 @@ Deep-frozen authority for the browser-only runtime behind
 `arcane-ai-browser-wasm/2`, `@wllama/wllama` `3.6.0`, the embedded llama.cpp
 revision, the exact packaged JavaScript and WebAssembly assets, retained MIT
 licenses, and the disabled compatibility-runtime/remote-model-helper policy.
-It contains no model weights or model catalog.
+Its execution policy requires WebGPU, proves full model offload, and declares
+`cpuFallback:false`. It contains no model weights or default model catalog.
 
 ### Value and import
 
@@ -4958,7 +5052,8 @@ inspecting it does not initialize Wllama, request storage, or download a model.
 ### Availability and normalization
 
 **Browser metadata.** This is an immutable component receipt, not a provider,
-model, browser-permission grant, or proof that WebAssembly/OPFS is available.
+model, browser-permission grant, or proof that WebAssembly, OPFS, a secure
+context, or WebGPU is available.
 
 ### Example
 
@@ -4988,11 +5083,28 @@ createArcaneAI({ llm=null, provider=null, loadPolicy='on-demand', security }={})
 ```
 
 At least one `llm` or `provider` is required. The frozen facade contains
-`llm`, `runtime`, `status`, `load`, `unload`, `probe`, `fetchRequest`,
-`streamRequest`, and `dispose`. `status()` returns `{llm: status}`; lifecycle
-methods return the flat LLM status. `fetchRequest()` returns the completion.
-`streamRequest()` consumes streaming and returns text or a tool-name-to-JSON-
-argument-string record. Use `ai.llm.stream()` for the async iterator.
+`llm`, `runtime`, `createChatSession`, `status`, `load`, `unload`, `probe`,
+`fetchRequest`, `streamRequest`, and `dispose`. `status()` returns
+`{llm: status}`; lifecycle methods return the flat LLM status.
+`fetchRequest()` returns the completion. `streamRequest()` consumes streaming
+and returns text or a tool-name-to-JSON-argument-string record. Use
+`ai.llm.stream()` for the async iterator.
+
+When `llm` is an existing `ModelController`, it retains the security and load
+policy chosen when that controller was created. `createArcaneAI()` does not
+reapply its `loadPolicy` argument in that case, and supplying `security` with an
+existing controller throws `TypeError`. Provider input creates a new controller
+and applies the supplied `loadPolicy` and app-level `security` normally.
+
+`createChatSession(options)` asynchronously imports the private managed
+`#arcane/persistent-ai-chat-session` specifier, resolves a
+`Promise<PersistentAIChatSession>`, and binds its `chat` function to this exact
+controller. Applications continue to use this public controller method rather
+than importing that private specifier. `options` must be a plain object and cannot contain
+`chat`. The resulting session preserves coherent live bounded context while
+letting each user/assistant/tool turn choose matching durable ChatEntity/DBOPFS
+persistence; `persist:false` does not write that turn to durable history or
+memory. There is no storage or provider fallback.
 
 App and load-operation security use
 `{security:{secure?:boolean, checks?:{byteLength?:boolean, sha256?:boolean}}}`.
@@ -5002,27 +5114,42 @@ binding scope, documented below, sits between those scopes.
 
 ### Availability and normalization
 
-**Browser.** It normalizes lifecycle, state/progress events, lazy/manual use,
-cancellation, completions, and structural tool-call visibility. It neither
-selects a provider fallback nor executes an application tool.
+**Browser.** It normalizes lifecycle, `statechange` and `progress` observation,
+lazy/manual use, cancellation, completions, and structural tool-call
+visibility. It neither selects a provider fallback nor executes an application
+tool. Persistent sessions additionally require ChatEntity/DBOPFS in the
+managed browser runtime.
 
 ### Example
 
 ```javascript
 const ai = createArcaneAI({provider, loadPolicy:'manual'});
-const stop = ai.llm.on('progress', event => renderProgress(event.detail));
-await ai.load({offline:true});
-stop();
+async function openLocalReviewAfterUserChoice() {
+    const stop = ai.llm.on('progress', event => renderProgress(event.detail));
+    try {
+        await ai.load({offline:true});
+    } finally {
+        stop();
+    }
+    return ai.createChatSession({
+        chatFileName:'local-review.jsonl',
+        loadExisting:true
+    });
+}
 ```
 
 ## createBrowserModelSource()
 
 ### Overview
 
-Validates a caller-owned model descriptor and creates the cancellable HTTPS
-source accepted by the browser-WASM store/provider. The canonical descriptor is
-`{id, url, bytes?, sha256?}`. `id` and `url` are required. `bytes`, when
-present, is the expected positive safe-integer byte length, not inline data.
+Validates a caller-owned ordered model-file descriptor and creates the
+cancellable HTTPS source accepted by the browser-WASM store/provider. The
+canonical descriptor is
+`{id,files:[{name?,url|immutableUrl,bytes?,sha256?},...]}`. The nonempty file
+array has unique normalized names and URLs. `bytes`, when present, is an
+expected positive safe-integer byte length, not inline data. The legacy
+one-file `{id,url|immutableUrl,name?,bytes?,sha256?}` shape remains accepted
+and normalizes to one ordered member.
 
 ### Signature and result
 
@@ -5030,17 +5157,18 @@ present, is the expected positive safe-integer byte length, not inline data.
 createBrowserModelSource(descriptor, { fetchImpl=null }={})
 ```
 
-The URL must be absolute HTTPS with no credentials or fragment and no
+Every URL must be absolute HTTPS with no credentials or fragment and no
 revision-floating `main`, `master`, or `latest` path. A supplied SHA-256 value
-is exactly 64 hexadecimal characters. The frozen source exposes its canonical
-descriptor and `open({signal})`, which returns `{body, requestedUrl, finalUrl,
-reportedBytes, cancel}`. `reportedBytes` is the nullable valid nonnegative
-`Content-Length` observation; it is not an unconditional admission check. Every
-direct `open()` performs the configured fetch.
+is exactly 64 hexadecimal characters. The frozen source exposes `kind`, the
+canonical descriptor fields, `descriptor`, and `open(memberIndex,{signal})`.
+For a one-file source, `open({signal})` remains accepted. The result is
+`{body,requestedUrl,finalUrl,reportedBytes,cancel}`. `reportedBytes` is the
+nullable valid nonnegative `Content-Length` observation; it is not an
+unconditional admission check. Every direct `open()` performs the configured
+fetch and does not admit bytes to the cache.
 
-For compatibility, `immutableUrl` remains an alias for `url` and `name` can
-remain a cache-filename hint; `url` and `immutableUrl` must match when both are
-present. Legacy `licenseSpdx` and `sourceRevision` properties are not canonical
+`immutableUrl` is an alias for `url`; both must match when supplied together.
+Legacy `licenseSpdx` and `sourceRevision` properties are not canonical
 descriptor fields, runtime admission checks, or proof of license rights.
 
 ### Availability and normalization
@@ -5056,9 +5184,17 @@ corresponding effective check is enabled.
 ```javascript
 const source = createBrowserModelSource({
     id:'reviewed-model',
-    url:'https://models.example/revisions/4f7c/model-q4.gguf',
-    bytes:123456789,
-    sha256:'0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+    files:[{
+        name:'model-q4-00001-of-00002.gguf',
+        url:'https://models.example/revisions/4f7c/model-q4-00001-of-00002.gguf',
+        bytes:123456789,
+        sha256:'0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+    },{
+        name:'model-q4-00002-of-00002.gguf',
+        url:'https://models.example/revisions/4f7c/model-q4-00002-of-00002.gguf',
+        bytes:98765432,
+        sha256:'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789'
+    }]
 });
 ```
 
@@ -5067,22 +5203,32 @@ const source = createBrowserModelSource({
 ### Overview
 
 Creates the packaged Wllama provider from genuine source and store objects
-created by this module. It serializes requests and exposes provider states
-`unloaded`, `loading`, `ready`, `unloading`, and `error`.
+created by this module. Structural lookalikes are rejected. It serializes
+requests and exposes provider states `unloaded`, `loading`, `ready`,
+`unloading`, and `error`.
 
 ### Signature and result
 
 ```text
-createBrowserWasmLlmProvider({ source, store, loadDefaults={}, security, logger=console }={})
+createBrowserWasmLlmProvider({ source, sources, store, loadDefaults={}, security, logger=console }={})
 ```
 
-The frozen provider exposes `protocol`, `id`, `model`, `capabilities`,
-`status`, `load`, `unload`, `chat`, `stream`, `streamChat`, `use`, `probe`, and
-`dispose`. Load settings include offline mode, `AbortSignal`, progress,
-threads, context/batch/micro-batch tokens, and GPU layers. Chat supports
-OpenAI-like message/generation fields, tools, tool choice, parallel tool-call
-preference, and JSON/JSON-Schema structured output. `stream()` returns a frozen
-async iterator with `result` and `cancel(reason)`.
+`sources` is a nonempty array of unique SDK-created sources. Optional legacy
+`source` names the default and must be one member of `sources`; when `sources`
+is omitted, `source` supplies the one-model catalog. The frozen provider
+exposes `protocol`, `id`, default `model`, `catalog`, `capabilities`, `status`,
+`load`, `unload`, `chat`, `stream`, `streamChat`, `use`, `probe`, and `dispose`.
+Direct `load()` selects a catalog model and returns `{model,status}`; the
+facade `ai.load()` returns the flat controller status. Load settings include
+offline mode, `AbortSignal`, progress, threads, and context/batch/micro-batch
+tokens. The runtime always forces `gpuLayers:99999`; callers cannot request CPU
+or partial offload.
+
+Chat supports OpenAI-like message/generation fields, tools, tool choice,
+parallel tool-call preference, and JSON/JSON-Schema structured output.
+`stream()` returns a frozen async iterator with `result` and `cancel(reason)`.
+Returned tool calls are validated structural data with JSON-string arguments;
+the SDK never invokes a handler or executes a tool.
 
 Provider `security` is the provider/model-binding scope. Security fields resolve
 independently by precedence: load operation, provider/model binding, app SDK
@@ -5096,21 +5242,30 @@ requires unload and reload.
 
 ### Availability and normalization
 
-**Browser with WebAssembly and a DBOPFS model.** A load succeeds only after
-Wllama confirms the model is loaded. WebGPU and cross-origin isolation are
-capability observations, not promised gates. Status discloses effective
-`security` and per-check `integrity`; unchecked bytes are never labeled SHA-256
-verified. Returned tools are validated structural data; the SDK never calls a
-handler. Cancellation normalizes to `ARCANE_AI_REQUEST_ABORTED`.
+**Browser secure context with WebAssembly, OPFS/DBOPFS, WebGPU, and admitted
+full-offload/buffer/queue/fence evidence.** A load succeeds only after Wllama
+confirms the model is loaded and the full GPU execution evidence settles. There
+is no CPU fallback. Cross-origin isolation and coarse hardware fields remain
+observations rather than hard gates. Status discloses effective `security`,
+per-check `integrity`, catalog compatibility, storage evidence, and lifecycle
+state; unchecked bytes are never labeled SHA-256 verified. Adapter selection
+is instrumented as `arcane.ai.browser-wasm.webgpu.adapter.selected`.
+Cancellation normalizes to `ARCANE_AI_REQUEST_ABORTED`; load/admission failures
+surface stable `ARCANE_AI_*` codes such as `ARCANE_AI_WEBGPU_REQUIRED`,
+`ARCANE_AI_MODEL_FULL_OFFLOAD_UNPROVEN`, and
+`ARCANE_AI_MODEL_GPU_MEMORY_INSUFFICIENT`. Concurrent runtime inference can fail
+`ARCANE_AI_RUNTIME_BUSY`; inspection and status can report
+`ARCANE_AI_PROVIDER_UNAVAILABLE` or fallback `ARCANE_AI_RUNTIME_FAILED` without
+misrepresenting those observations as a successful load.
 
 ### Example
 
 ```javascript
 const provider = createBrowserWasmLlmProvider({
-    source,
+    sources:[source],
     store,
     security:{secure:true},
-    loadDefaults:{threads:1, contextTokens:4096, gpuLayers:0}
+    loadDefaults:{threads:1, contextTokens:4096}
 });
 console.log(provider.status().state); // unloaded
 ```
@@ -5119,26 +5274,31 @@ console.log(provider.status().state); // unloaded
 
 ### Overview
 
-Adapts an existing DBOPFS instance into a model cache without renaming its
-public methods. The adapter commits model bytes before the
-`arcane.ai.browser-wasm.model.v3` completion manifest and always records the
-observed downloaded or cached byte length.
+Adapts an existing DBOPFS instance into a multi-model, ordered multi-file cache
+without renaming its public methods. The adapter commits every model file
+before the `arcane.ai.browser-wasm.model.v4` completion manifest and always
+records observed downloaded or cached byte lengths. A partial file set is not
+a cache hit.
 
 ### Signature and result
 
 ```text
-createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models' }={})
+createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models', estimateStorage=null }={})
 ```
 
 The frozen result contains `kind`, `tableName`, the original `adapter`, and
 `ready`, `openVerified`, `install`, `ensure`, and `remove`. `ensure()` returns
-the file, manifest, `observedBytes`, integrity detail, and
-`cache:'cached'|'installed'`. `openVerified()` is a compatibility helper that
+`files`, the one-file compatibility `file` or `null`, the manifest,
+`observedBytes`, integrity detail, storage evidence, and
+`cache:'cached'|'installed'`. Optional `estimateStorage()` supplies bounded
+quota evidence when the browser estimator is unavailable or the application
+owns a more precise view. `openVerified()` is a compatibility helper that
 forces both checks on. Ordinary install/reuse compares expected length only
 when effective `checks.byteLength` is true and hashes only when effective
 `checks.sha256` is true. `offline:true` never downloads and rejects a miss with
-`ARCANE_AI_MODEL_OFFLINE_MISS`. Version-2 manifests with matching model identity
-can migrate to version 3 without fabricating verification.
+`ARCANE_AI_MODEL_OFFLINE_MISS`. Version-2/3 compatibility is internal; every
+new successful completion is recorded as version 4 without fabricating an
+integrity result.
 
 ### Availability and normalization
 
@@ -5146,17 +5306,398 @@ can migrate to version 3 without fabricating verification.
 actually performed. Disabled byte-length checks do not compare descriptor
 `bytes`, disabled SHA-256 checks do not hash or reread solely for a digest, and
 overall integrity is `verified` when every enabled check succeeds or
-`unchecked` when neither check is enabled. Cache
-metadata is not a transferable capability or license proof. Unload/dispose keep
-the cache; `store.remove(source)` explicitly deletes it.
+`unchecked` when neither check is enabled. Cache metadata is not a transferable
+capability or license proof. Provider unload/dispose keeps all cached files;
+`store.remove(source)` explicitly deletes that source's files and manifest.
 
 ### Example
 
 ```javascript
 const store = createDbopfsModelStore({dbopfs});
-await store.ready();
-const cached = await store.openVerified(source);
-console.log(cached ? 'verified cache' : 'cache miss');
+async function verifyCachedModelAfterUserChoice() {
+    await store.ready();
+    const cached = await store.openVerified(source);
+    console.log(cached ? 'verified cache' : 'cache miss');
+}
+```
+
+## adaptV1LlmProvider()
+
+### Overview
+
+Projects one compatible admitted v1 browser-WASM provider into the provider-neutral
+LLM role consumed by the managed `arcane/AIProviderRuntime` projection. The
+runtime checks the v1 protocol, required identity/methods, and local-only
+capability; it does not establish SDK provenance for an arbitrary compatible
+object. The adapter does not
+change the wrapped provider, download a model, create a fallback, or execute a
+tool.
+
+### Signature and result
+
+```text
+adaptV1LlmProvider(provider)
+```
+
+The frozen result is
+`{protocol:'arcane-ai-provider/2',role:'llm',id,localOnly:true,catalog,inspect,
+status,load,request,unload,dispose}`. `inspect()` returns an
+`arcane-ai-model-authority/1` record only for an exact catalog selection.
+`request()` accepts only the `chat` and `stream` operations, preserves
+structural tool calls, and never invokes application handlers. Re-adapting the
+same provider returns the same adapter object.
+
+### Availability and normalization
+
+**Browser; the wrapped provider retains its own secure-context, WebAssembly,
+OPFS/DBOPFS, WebGPU, model, and lifecycle requirements.** The adapter normalizes
+provider/2 selection and lifecycle without adding Node, native, cloud, network,
+or CPU fallback behavior.
+
+### Example
+
+```javascript
+import {adaptV1LlmProvider} from 'arcane-os/ai/browser-wasm';
+import {getAIProviderRuntime} from 'arcane/AIProviderRuntime';
+
+const runtime = getAIProviderRuntime();
+const releaseProvider = runtime.register(adaptV1LlmProvider(provider));
+// Configure an exact llm route before load/use.
+releaseProvider();
+```
+
+# Browser speech providers
+
+`arcane-os/ai/browser-speech` exports exactly the five package members below.
+It ships provider, authority, artifact-store, and Worker mechanisms but no
+Whisper/Kokoro model weights, adapter runtime bytes, voices, download URLs,
+default catalog, CDN loader, native bridge, or cloud fallback. The providers
+implement `arcane-ai-provider/2`; the managed `arcane/AIProviderRuntime` and
+`arcane/AIRuntimeState` projection modules can normalize their independent
+role lifecycle and observation, but are not exports of this package subpath.
+
+## BROWSER_SPEECH_ARTIFACT_PROTOCOL
+
+### Overview
+
+Stable protocol identifier for an SDK-created authenticated browser speech
+artifact store. It identifies the store contract, not a model authority,
+capability grant, or complete-cache receipt.
+
+### Value and import
+
+```text
+const BROWSER_SPEECH_ARTIFACT_PROTOCOL
+```
+
+Its exact value is `arcane-ai-browser-speech-artifacts/1`, and it is exported
+only by `arcane-os/ai/browser-speech`.
+
+### Availability and normalization
+
+**Browser metadata.** Importing or reading the constant starts no Worker and
+downloads no model or runtime artifact. Store use additionally requires
+DBOPFS/OPFS, Web Locks, and the browser APIs described below.
+
+### Example
+
+```javascript
+import {
+    BROWSER_SPEECH_ARTIFACT_PROTOCOL
+} from 'arcane-os/ai/browser-speech';
+
+console.log(BROWSER_SPEECH_ARTIFACT_PROTOCOL);
+```
+
+## createBrowserSpeechAuthority()
+
+### Overview
+
+Validates and freezes one caller-owned Whisper STT or Kokoro TTS model/runtime
+closure. The application owns every model, runtime, revision, URL, hash, voice,
+license, and business-policy choice; the SDK supplies no artifact selection.
+
+### Signature and result
+
+```text
+createBrowserSpeechAuthority({ providerId, role, model, runtime, security }={})
+```
+
+`role` is exactly `stt` or `tts`. `model` supplies
+`{id,repository,revision,files}` and, for TTS, `defaultVoice`. `runtime`
+supplies `{adapter,version,revision,entry,files}`; the adapter is exactly
+`transformers-whisper` for STT or `kokoro-js` for TTS. File records use unique
+relative `path` and immutable HTTPS or same-origin `url` identities plus
+optional `bytes`, `sha256`, and `mediaType`. The runtime entry names one
+self-contained JavaScript module in the declared runtime closure.
+
+The result is a frozen `arcane-ai-model-authority/1` record containing the
+provider/model/role identity, admitted local authority, normalized runtime and
+model file declarations, optional default voice, and normalized security policy.
+Construction binds declared identities; `store.prepare()` validates the actual
+downloaded or cached self-contained runtime graph before execution.
+
+Security is the closed record
+`{secure?:boolean,checks?:{byteLength?:boolean,sha256?:boolean}}`. A provider
+resolves each field from SDK default `secure:false`, then `appSecurity`, provider
+`security`, and finally `load({security})`. Omitted checks default to the
+effective `secure` value, while explicit per-check booleans override it. Every
+enabled check requires matching `bytes` or `sha256` evidence on every runtime
+and model artifact and fails closed when evidence is absent or mismatched.
+Disabled checks are disclosed and are never reported as verification.
+
+### Availability and normalization
+
+**Browser descriptor construction; actual use requires the chosen artifact
+store and provider Web APIs.** Mutable `main`, `master`, and `latest` paths,
+credentials, fragments, duplicate identities, mismatched adapters, and runtime
+graphs outside the declared closure fail closed. This function grants no
+publisher authenticity or license rights.
+
+### Example
+
+```javascript
+import {createBrowserSpeechAuthority} from 'arcane-os/ai/browser-speech';
+
+const authority = createBrowserSpeechAuthority({
+    providerId:'review-whisper',
+    role:'stt',
+    model:{
+        id:'review-whisper-model',
+        repository:'caller-models',
+        revision:'model-r1',
+        files:[{
+            path:'model.onnx',
+            url:'https://models.example/model-r1/model.onnx'
+        }]
+    },
+    runtime:{
+        adapter:'transformers-whisper',
+        version:'1.0.0',
+        revision:'runtime-r1',
+        entry:'adapter.mjs',
+        files:[{
+            path:'adapter.mjs',
+            url:'https://runtime.example/runtime-r1/adapter.mjs',
+            mediaType:'text/javascript'
+        }]
+    }
+});
+```
+
+## createDbopfsSpeechArtifactStore()
+
+### Overview
+
+Adapts an existing DBOPFS instance into an authority-scoped speech
+runtime/model store. It serializes each exact authority with an exclusive Web
+Lock, removes partial state after failure, and commits the
+`arcane.ai.browser-speech.assets.v1` completion manifest only after every
+declared file succeeds.
+
+### Signature and result
+
+```text
+createDbopfsSpeechArtifactStore({ dbopfs, tableName='arcane_ai_browser_speech', fetchImpl=null, objectUrlFactory=null }={})
+```
+
+The frozen result is `{protocol,tableName,prepare,remove}`.
+`prepare(authority,{signal,onProgress,offline=false,security})` admits a
+compatible complete cache or downloads every declared file with omitted
+credentials, enforces only enabled byte-length/SHA-256 checks, validates the
+closed runtime graph, materializes object URLs, and returns
+`{cache,runtime,model,release}`. Call `release()` when the Worker no longer
+needs those URLs. `offline:true` never fetches and rejects a miss with
+`ARCANE_AI_ARTIFACT_OFFLINE_MISS`. `remove(authority)` deletes that exact
+authority's files and manifest.
+
+### Availability and normalization
+
+**Browser with a ready DBOPFS instance, OPFS, Web Locks, Fetch or an injected
+fetch function, File/Blob, and object URLs.** An unavailable authority lock
+fails as `ARCANE_AI_STORAGE_BUSY`; download, integrity, cache, graph, and
+storage failures remain observable `ARCANE_AI_*` errors. Completion metadata
+is cache-consistency evidence, not transferable authority or publisher proof.
+
+### Example
+
+```javascript
+import {
+    createDbopfsSpeechArtifactStore
+} from 'arcane-os/ai/browser-speech';
+
+const speechStore = createDbopfsSpeechArtifactStore({dbopfs});
+async function inspectCachedSpeechAfterUserChoice() {
+    // This strict offline call assumes this exact authority was admitted earlier.
+    const prepared = await speechStore.prepare(authority, {offline:true});
+    try {
+        console.log(prepared.cache, prepared.runtime.entry);
+    } finally {
+        prepared.release();
+    }
+}
+```
+
+## createBrowserWhisperProvider()
+
+### Overview
+
+Creates a local-only Whisper speech-to-text provider for the provider-neutral
+AI runtime. It owns one independent STT load/use/unload/dispose lifecycle and
+never selects a cloud, native, or LLM fallback.
+
+### Signature and result
+
+```text
+createBrowserWhisperProvider(options={})
+```
+
+The recognized options are
+`{id='arcane-browser-whisper',localOnly=true,model,runtime,appSecurity,
+security,store,offline=false}`. The frozen result is
+`{protocol:'arcane-ai-provider/2',role:'stt',id,localOnly:true,catalog,inspect,
+status,load,request,unload,dispose}`. The only request operation is
+`transcribe`; its payload is `{audio:Float32Array,sampleRate:16000}`. The
+Worker-transferred result is a structured `{text}` record; the client does not
+re-freeze the cloned record.
+
+`status()` returns
+`{role,providerId,modelId,state,loaded,busy,generation,errorCode,cache}`.
+States are `unloaded`, `loading`, `ready`, `unloading`, `error`, and
+`disposed`. Compatible concurrent loads coalesce; concurrent requests fail as
+`ARCANE_AI_PROVIDER_BUSY`. Cancellation after the Worker request begins
+terminates that Worker slot, returns the provider to `unloaded`, and rejects as
+`ARCANE_AI_REQUEST_ABORTED`. Cancellation while shared Blob/File audio is still
+being decoded occurs before Worker use; it rejects with the same code while the
+loaded Worker remains intact and the provider stays `ready`.
+
+The provider also accepts the shared AI speech payload
+`{audio:Blob|File,mimeType,model}`. It requires an exact model match, validates
+the MIME essence against `Blob.type`, decodes through browser audio APIs, and
+copies authoritative 16 kHz mono `Float32Array` PCM into the same native
+provider operation. Missing decode support fails
+`ARCANE_AI_AUDIO_DECODE_UNAVAILABLE`; invalid or failed decoding fails
+`ARCANE_AI_INVALID_REQUEST` or `ARCANE_AI_AUDIO_DECODE_FAILED`. Unknown fields
+and accessors are rejected before Worker use.
+
+### Availability and normalization
+
+**Browser with DBOPFS, Web Locks, Workers, object URLs, and a caller-admitted
+self-contained `transformers-whisper` runtime/model closure.** The subpath is
+importable in Node, but no Node storage, Worker, audio-decoder, or speech
+execution adapter is published. No Core speech call, model/runtime download
+authority, or automatic provider fallback is added. Provider objects are not event targets; register them with
+the managed AI provider runtime when normalized `AIRuntimeState` observation is
+needed.
+
+### Example
+
+```javascript
+import {createBrowserWhisperProvider} from 'arcane-os/ai/browser-speech';
+
+const whisper = createBrowserWhisperProvider({model, runtime, store:speechStore});
+async function transcribeAfterUserChoice(audioBlob) {
+    await whisper.load({
+        role:'stt',
+        selection:{
+            providerId:whisper.id,
+            modelId:whisper.catalog()[0].id,
+            localOnly:true
+        },
+        progress() {}
+    });
+    const transcript = await whisper.request({
+        role:'stt',
+        operation:'transcribe',
+        payload:{
+            audio:audioBlob,
+            mimeType:audioBlob.type,
+            model:whisper.catalog()[0].id
+        }
+    });
+    console.log(transcript.text);
+}
+```
+
+## createBrowserKokoroProvider()
+
+### Overview
+
+Creates a local-only Kokoro text-to-speech provider for the provider-neutral AI
+runtime. It owns one independent TTS lifecycle and never selects a cloud,
+native, or LLM fallback.
+
+### Signature and result
+
+```text
+createBrowserKokoroProvider(options={})
+```
+
+The recognized options are
+`{id='arcane-browser-kokoro',localOnly=true,model,runtime,appSecurity,security,
+store,offline=false}`. The frozen result is
+`{protocol:'arcane-ai-provider/2',role:'tts',id,localOnly:true,catalog,inspect,
+status,load,request,unload,dispose}`. The only request operation is
+`synthesize`; its payload is `{text,voice?,speed=1}`. Omitted `voice` uses the
+caller-supplied `model.defaultVoice`; `speed` is greater than zero and at most
+four. The Worker-transferred result is a structured
+`{audio:Float32Array,sampleRate:24000,voice}` record; the client does not
+re-freeze the cloned record.
+
+The shared AI request form is
+`{model,input,responseFormat,voice?,speed?}`. It requires the exact model,
+admits only `responseFormat:'wav'`, maps `input` to provider-native text, and
+returns frozen `{audio:Uint8Array,contentType:'audio/wav'}` containing 24 kHz
+mono 16-bit PCM. Unsupported formats fail
+`ARCANE_AI_UNSUPPORTED_RESPONSE_FORMAT`; malformed adapter audio fails
+`ARCANE_AI_INVALID_PROVIDER_RESULT`. Unknown fields and accessors fail closed.
+
+Lifecycle/status, coalesced load, busy-request, unload, Worker-failure, and
+disposal behavior matches the Whisper provider. Cancellation after Worker use
+begins unloads that Worker; cancellation before Worker use rejects while the
+provider stays ready. Stable failures include
+`ARCANE_AI_INVALID_REQUEST`, `ARCANE_AI_NOT_READY`,
+`ARCANE_AI_PROVIDER_DISPOSED`, `ARCANE_AI_OPERATION_SUPERSEDED`,
+`ARCANE_AI_WORKER_CRASHED`, `ARCANE_AI_WORKER_MESSAGE_ERROR`, and
+`ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH`.
+
+### Availability and normalization
+
+**Browser with DBOPFS, Web Locks, Workers, object URLs, and a caller-admitted
+self-contained `kokoro-js` runtime/model/voice closure.** The subpath is
+importable in Node, but no Node storage, Worker, or speech execution adapter is
+published. No Core speech call, model/runtime/voice authority, or automatic provider fallback is
+added. Provider objects are not event targets; managed `AIProviderRuntime` and
+`AIRuntimeState` projections own normalized cross-role observation.
+
+### Example
+
+```javascript
+import {createBrowserKokoroProvider} from 'arcane-os/ai/browser-speech';
+
+const kokoro = createBrowserKokoroProvider({model, runtime, store:speechStore});
+async function synthesizeAfterUserChoice() {
+    await kokoro.load({
+        role:'tts',
+        selection:{
+            providerId:kokoro.id,
+            modelId:kokoro.catalog()[0].id,
+            localOnly:true
+        },
+        progress() {}
+    });
+    const speech = await kokoro.request({
+        role:'tts',
+        operation:'synthesize',
+        payload:{
+            model:kokoro.catalog()[0].id,
+            input:'Hello from Arcane.',
+            responseFormat:'wav',
+            speed:1
+        }
+    });
+    console.log(speech.audio, speech.contentType);
+}
 ```
 
 ## Data export subpaths

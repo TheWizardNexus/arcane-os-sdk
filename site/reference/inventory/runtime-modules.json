@@ -1,13 +1,21 @@
 {
   "schemaVersion": 1,
   "source": {
-    "commit": "567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e",
-    "bundleVersion": "0.8.12",
+    "authority": "sdk-canonical",
+    "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
+    "commit": "36fbe1418af3d5c343d105ee7c9456360c57785d",
+    "path": "runtime/arcane",
+    "sdkVersion": "0.2.1",
+    "legacyProjection": {
+      "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
+      "commit": "c540014afe69f14cf5ae60493b7295f36dbcec64",
+      "bundleVersion": "0.8.12"
+    },
     "protocol": "arcane/1"
   },
-  "artifactCount": 80,
-  "javascriptArtifactCount": 78,
-  "esmExportCount": 282,
+  "artifactCount": 85,
+  "javascriptArtifactCount": 83,
+  "esmExportCount": 318,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -18,9 +26,9 @@
       ],
       "summary": "Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structured output, streaming, and queued audio playback.",
       "availability": "Browser + native bridge + cloud",
-      "protocol": "OpenAI HTTPS, Arcane.ollama, Arcane.speech, Android WebView bridge",
-      "normalization": "High-level chat/speech behavior is normalized; provider diagnostics and media errors remain mixed.",
-      "surface": "default `AI`; `setAI()`, `streamRequest()`, `streamMessage()`, `fetchRequest()`, `fetch()`, `streamTTS()`, `finishTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`, `playAudio()`; installs `window.ai` and emits `ai-ready`."
+      "protocol": "AIProviderRuntime arcane-ai-provider/2 routes, OpenAI HTTPS, Arcane.ollama, Arcane.speech, Android WebView bridge",
+      "normalization": "High-level chat/speech behavior, truthful legacy-route readiness, and shared browser speech request/result conversion are normalized; provider diagnostics and media errors remain mixed.",
+      "surface": "default `AI`; `providerRuntime`; `setAI()`, `configureProviders()`, `transitionAI()`, `transitionProviders()`, `startProviders()`, `setSpeechMuted()`, `streamRequest()`, `streamMessage()`, `fetchRequest()`, `fetch()`, `streamTTS()`, `finishTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`, `playAudio()`; consumes `user-entity-loaded` and `arcane-ollama-ready`, installs `window.ai`, and emits `ai-ready`."
     },
     {
       "file": "runtime/arcane/modules/AIPreferenceRuntime.js",
@@ -50,6 +58,24 @@
       "protocol": "In-process only",
       "normalization": "Fully normalized frozen tuple.",
       "surface": "`AI_PREFERENCE_SLOT_KEYS`, `normalizeAIPreferenceTuple()`, `aiPreferenceTuplesEqual()`."
+    },
+    {
+      "file": "runtime/arcane/modules/AIProviderRuntime.js",
+      "name": "AIProviderRuntime.js",
+      "kind": "esm",
+      "exports": [
+        "AI_MODEL_AUTHORITY_PROTOCOL",
+        "AI_PROVIDER_PROTOCOL",
+        "AI_PROVIDER_RUNTIME_PROTOCOL",
+        "AIProviderRuntime",
+        "aiProviderRuntime",
+        "getAIProviderRuntime"
+      ],
+      "summary": "Provider-neutral selection, lifecycle, routing, startup, request, streaming, cancellation, and independent LLM/STT/TTS state.",
+      "availability": "Cross-host in-process runtime; registered providers remain browser, native, or cloud specific",
+      "protocol": "arcane-ai-runtime/2, arcane-ai-provider/2, arcane-ai-model-authority/1",
+      "normalization": "Normalizes immutable per-role routes, lifecycle/status, cancellation, streaming cleanup, and local-only selection without creating a fallback.",
+      "surface": "Protocol constants; singleton-only `AIProviderRuntime`; `aiProviderRuntime`; `getAIProviderRuntime()`; provider registration/configuration, lifecycle, request, stream, speech, cancellation, and mute controls."
     },
     {
       "file": "runtime/arcane/modules/AIResponseLength.js",
@@ -83,6 +109,32 @@
       "protocol": "In-process; bundled Marked parser",
       "normalization": "Normalized frozen allowlist audit.",
       "surface": "`auditAIResponseLinks()`, `extractAIResponseLinks()`, `normalizeAIResponseLink()`, `decodeHTMLCharacterReferences()`."
+    },
+    {
+      "file": "runtime/arcane/modules/AIRuntimeState.js",
+      "name": "AIRuntimeState.js",
+      "kind": "esm",
+      "exports": [
+        "AI_RUNTIME_INTENT_EVENT",
+        "AI_RUNTIME_PROTOCOL",
+        "AI_RUNTIME_ROLES",
+        "AI_RUNTIME_STARTUP_EVENT",
+        "AI_RUNTIME_STATES",
+        "AI_RUNTIME_STATE_EVENT",
+        "aiRuntimeEvents",
+        "getAIRuntimeState",
+        "publishAIRuntimeRoleState",
+        "publishAIRuntimeRolesState",
+        "requestAIRuntimeIntent",
+        "startAIRuntime",
+        "subscribeAIRuntimeIntents",
+        "subscribeAIRuntimeState"
+      ],
+      "summary": "Sticky immutable LLM, speech-to-text, and text-to-speech lifecycle snapshots, intents, subscriptions, and startup-settlement barriers.",
+      "availability": "Cross-host in-process state contract; actual role readiness remains provider specific",
+      "protocol": "arcane-ai-runtime-state/1 over EventTarget",
+      "normalization": "Closed role records and monotonic revisions normalize state across providers; subscriptions never grant authority or load a provider.",
+      "surface": "Protocol/event/state constants; `aiRuntimeEvents`; snapshot, subscribe, publish, intent, and `startAIRuntime()` functions."
     },
     {
       "file": "runtime/arcane/modules/AnsiText.js",
@@ -382,7 +434,7 @@
       "availability": "Native bridge by default; cross-host with injected chat",
       "protocol": "Arcane.ai.chat or injected provider",
       "normalization": "Normalized session/result; provider rejection preserved.",
-      "surface": "default `ConfiguredAIChatSession`; `history()`, `clear()`, `send()`."
+      "surface": "default `ConfiguredAIChatSession`; constructor accepts bounded coherent `initialMessages` plus configuration; `history()`, `clear()`, `prepare()`, `send()`; prior normalized and exactly-one-choice OpenAI-compatible responses normalize to one frozen session result."
     },
     {
       "file": "runtime/arcane/modules/ConversationActionItems.js",
@@ -516,6 +568,22 @@
       "surface": "default `DBOPFS`; installs `window.dbopfs`, emits `dbopfs-ready`; table/file/backup APIs."
     },
     {
+      "file": "runtime/arcane/modules/DBOPFSDocumentLibrary.js",
+      "name": "DBOPFSDocumentLibrary.js",
+      "kind": "esm",
+      "exports": [
+        "DBOPFSDocumentLibrary",
+        "createDBOPFSDocumentLibrary",
+        "default",
+        "normalizeDBOPFSDocumentSchema"
+      ],
+      "summary": "Application-defined document corpus bootstrap, caller-source evaluation, atomic DBOPFS generations, bounded lexical search, and untrusted request-context construction.",
+      "availability": "Browser or compatible host with an existing DBOPFS-style database adapter",
+      "protocol": "Existing DBOPFS get/set/getAllKeys/delete methods; no new storage protocol",
+      "normalization": "Preserves DBOPFS method semantics, commits a completion manifest last, validates every stored generation, exposes explicit reject or preserve-readable read-failure policy, and labels retrieved context as untrusted data.",
+      "surface": "`DBOPFSDocumentLibrary`, `createDBOPFSDocumentLibrary()`, `normalizeDBOPFSDocumentSchema()`; `schema`, `bootstrap()`, `search()`, `evaluate()`, `buildContext()`, and `createContextBuilder()`."
+    },
+    {
       "file": "runtime/arcane/modules/DBOPFSWorker.js",
       "name": "DBOPFSWorker.js",
       "kind": "worker",
@@ -556,6 +624,27 @@
       "protocol": "Arcane.filesystem.selectDirectory",
       "normalization": "Strict normalized selection and coded errors.",
       "surface": "default `DirectoryPicker`, `normalizeDirectoryPickerOptions()`, `normalizeDirectorySelection()`."
+    },
+    {
+      "file": "runtime/arcane/modules/DocumentLexicalSearch.js",
+      "name": "DocumentLexicalSearch.js",
+      "kind": "esm",
+      "exports": [
+        "DOCUMENT_SEARCH_FIELD_ORDER",
+        "DocumentLexicalSearch",
+        "createDocumentLexicalIndex",
+        "default",
+        "documentContextExcerpt",
+        "documentSearchTokens",
+        "normalizedDocumentSearchText",
+        "scoreDocumentBody",
+        "scoreDocumentLexicalIndex"
+      ],
+      "summary": "Dependency-free deterministic document indexing, ranked metadata/body search, bounded excerpts, and stable tie-breaking.",
+      "availability": "Cross-host in-process only",
+      "protocol": "In-process immutable record contract",
+      "normalization": "Normalizes text and filters, preserves deterministic field priority, and returns frozen results without network, storage, or provider side effects.",
+      "surface": "Search-field constant; `DocumentLexicalSearch`; index/token/score/excerpt helpers; `rank()` and bounded `search()`."
     },
     {
       "file": "runtime/arcane/modules/DocumentNavigation.js",
@@ -850,6 +939,21 @@
       "protocol": "Open-Meteo HTTPS",
       "normalization": "Provider data normalized to entities; transport errors mixed.",
       "surface": "Endpoint constants, default provider, `mapForecast()`; search/load methods and lifecycle events."
+    },
+    {
+      "file": "runtime/arcane/modules/PersistentAIChatSession.js",
+      "name": "PersistentAIChatSession.js",
+      "kind": "esm",
+      "exports": [
+        "PersistentAIChatSession",
+        "createPersistentAIChatSession",
+        "default"
+      ],
+      "summary": "Composes bounded configured chat with an existing ChatEntity so each user, assistant, and structural tool turn has an explicit persistence policy.",
+      "availability": "Browser or native WebView with the projected ChatEntity, DBOPFS, and a configured chat function or normalized Arcane.ai surface",
+      "protocol": "Existing ChatEntity/DBOPFS methods plus provider-neutral chat request/result records",
+      "normalization": "Preserves existing chat/history/memory semantics, commits live context atomically, and keeps durable persistence coherent across structural tool-call/result pairs.",
+      "surface": "Default/named `PersistentAIChatSession`, `createPersistentAIChatSession()`; `create()`, `chatEntity`, `fileName`, `ready()`, `history()`, `settleMemory()`, and `send()`."
     },
     {
       "file": "runtime/arcane/modules/PreferenceStore.js",

@@ -14,7 +14,8 @@ import {Marked,Renderer,marked} from '../runtime/arcane/modules/Marked.min.js';
 import {verifyRuntimeReferenceContracts} from './reference-contract-extractor.mjs';
 import {
     behaviorExampleEvidence,
-    createReferenceModuleContractMap
+    createReferenceModuleContractMap,
+    referenceGuideBehaviorEvidence
 } from './reference-module-contracts.mjs';
 
 const scriptPath=fileURLToPath(import.meta.url);
@@ -23,7 +24,7 @@ const referenceSourceRoot=path.join(repositoryRoot,'docs','reference');
 const referenceOutputRoot=path.join(repositoryRoot,'site','reference');
 const canonicalRoot='https://thewizardnexus.github.io/arcane-os-sdk/';
 const publishedVersions=Object.freeze({
-    sdk:'0.1.2',
+    sdk:'0.2.1',
     runtime:'0.8.12',
     protocol:'arcane/1'
 });
@@ -32,24 +33,40 @@ const referenceCssOutput='site/reference/reference.css';
 const referenceScriptOutput='site/reference/reference.js';
 const maximumTableOfContentsEntries=40;
 const expectedRuntimeContractSummary=Object.freeze({
-    artifactCount:80,
-    esmModuleCount:74,
-    esmExportCount:282,
+    artifactCount:85,
+    esmModuleCount:79,
+    esmExportCount:318,
     exportForms:Object.freeze({
-        function:148,
-        variable:54,
-        class:10,
-        alias:25,
+        function:164,
+        variable:65,
+        class:15,
+        alias:26,
         're-export':4,
-        default:41
+        default:44
     }),
-    reviewedCallableCount:124,
-    reviewedModuleCount:51,
+    reviewedCallableCount:183,
+    reviewedModuleCount:56,
     literalCustomEventCount:11,
-    directCodedFailureCount:34,
+    directCodedFailureCount:37,
     exportedErrorSubclassCount:3,
-    publicMemberCount:407
+    publicMemberCount:456
 });
+const publishedReleaseMarkdown=[
+    '## Published 0.2.1',
+    '',
+    'The published package is exactly `arcane-os@0.2.1` from source commit `36fbe1418af3d5c343d105ee7c9456360c57785d`. The npm `latest` dist-tag resolves to `0.2.1`; the separate `dev` dist-tag remains `0.1.0-dev.5`.',
+    '',
+    '| Evidence | Exact value |',
+    '| --- | --- |',
+    '| npm integrity | `sha512-FJ7zCFvQVZEMLQ8kn9IqddnFkfw397S87tENfLULwt0bN5hYn22wmN2zU50BqYC4zDKI/fdf4Rcl5G6A6KwlCg==` |',
+    '| npm shasum | `9b21aea206582e367b8220ad45475ce69af5365a` |',
+    '| Immutable release tarball | `arcane-os-0.2.1.manifest.json`; artifact `9623565709`; 6,951,752 bytes; SHA-256 `c9ebe6d5c0f8f808707a00ca055ef1fe142a3a51715df43f7da427be31c95808` |',
+    '| GitHub release | [`0.2.1`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.2.1) (tag and title are both exactly `0.2.1`) |',
+    '| Hosted source/artifact gate | [Check run 33013624030](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33013624030) |',
+    '| Trusted publication | [Run 33013804158](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33013804158) |',
+    '',
+    'The npm SLSA provenance binds the published package to that exact source commit and `.github/workflows/publish-dev.yml`. Hashes prove byte identity or consistency; provenance establishes the recorded source/workflow relationship. Neither claim alone proves browser hardware support, native admission, or a particular application\'s provider/model policy.'
+].join('\n');
 
 const referenceCss=String.raw`.reference-prose {
   min-width: 0;
@@ -598,6 +615,7 @@ const navigationGroups=Object.freeze([
         items:Object.freeze([
             ['Normalized AI','@reference/ai'],
             ['Browser-WASM AI','docs/reference/ai/browser-wasm.md'],
+            ['Browser speech','docs/reference/ai/browser-speech.md'],
             ['Modules','docs/reference/runtime-modules.md'],
             ['Entities','docs/reference/runtime-entities.md'],
             ['Components','docs/reference/runtime-components.md'],
@@ -863,6 +881,9 @@ function mappedPrivateRepositoryLink(value,{output,targets}){
     if(!/^https:\/\/github[.]com\/TheWizardNexus\/(?:ARCANE-OS|arcane-os-sdk)\//iu.test(value)){
         return null;
     }
+    if(/^https:\/\/github[.]com\/TheWizardNexus\/arcane-os-sdk\/(?:releases\/tag\/[0-9]+[.][0-9]+[.][0-9]+|actions\/runs\/[0-9]+)(?:[?#].*)?$/iu.test(value)){
+        return null;
+    }
     const mappings=[
         [/\/docs\/application-data-isolation[.]md(?:#.*)?$/iu,'@reference/module/app-data-scope',''],
         [/\/docs\/intent-envelope[.]md#(?:errors|creation-authority-boundary|public-api)$/iu,'docs/reference/runtime-entities.md','#intentenvelopejs'],
@@ -1012,7 +1033,9 @@ function publicReferenceMarkdown(markdown,source){
     if(source==='docs/reference/README.md'){
         output=output.replace(
             /\n## Version scope and provenance[\s\S]*?\n## MDN-style page contract/u,
-            '\n## Version scope\n\nThis site documents SDK `0.1.2`, runtime bundle `0.8.12`, and protocol `arcane/1`. Native availability still depends on the selected Core satisfying the current build plan\'s feature, capability, method, provider, and application-identity checks. A matching protocol label alone is not authority or compatibility.\n\n## MDN-style page contract'
+            '\n## Version scope\n\nThis site documents SDK `0.2.1`, runtime bundle `0.8.12`, and protocol `arcane/1`. Native availability still depends on the selected Core satisfying the current build plan\'s feature, capability, method, provider, and application-identity checks. A matching protocol label alone is not authority or compatibility.\n\n'
+                +publishedReleaseMarkdown
+                +'\n\n## MDN-style page contract'
         );
         output=output.replace(/\n## Source, receipts, and licensing[\s\S]*$/u,'\n');
     }
@@ -1250,25 +1273,34 @@ function moduleExample(record){
     const examples={
         'AI.js':`import AI from '/arcane/modules/AI.js';
 
-const ai = globalThis.ai?.ready
-    ? globalThis.ai
-    : await new Promise(resolve => {
-        globalThis.addEventListener('ai-ready', event => resolve(event.detail.db), {once: true});
-    });
+async function summarizeScreenAfterUserChoice() {
+    const ai = globalThis.ai?.ready
+        ? globalThis.ai
+        : await new Promise(resolve => {
+            globalThis.addEventListener('ai-ready', event => resolve(event.detail.db), {once: true});
+        });
 
-if (!(ai instanceof AI)) throw new TypeError('The AI runtime did not initialize.');
-const answer = await ai.fetchRequest({
-    messages: [{role: 'user', content: 'Summarize this screen in one sentence.'}]
-});
-console.info(answer);`,
+    if (!(ai instanceof AI)) throw new TypeError('The AI runtime did not initialize.');
+    const answer = await ai.fetchRequest({
+        messages: [{role: 'user', content: 'Summarize this screen in one sentence.'}]
+    });
+    console.info(answer);
+}`,
         'ConfiguredAIChatSession.js':`import ConfiguredAIChatSession from '/arcane/modules/ConfiguredAIChatSession.js';
 
-const session = new ConfiguredAIChatSession({
-    systemPrompt: 'Answer accurately and briefly.',
-    responseLength: 'low'
-});
-const result = await session.send('What can this application do?');
-console.info(result.message.content);`,
+async function askConfiguredSessionAfterUserChoice() {
+    const session = new ConfiguredAIChatSession({
+        systemPrompt: 'Answer accurately and briefly.',
+        responseLength: 'low',
+        chat: async request => ({
+            provider: 'demo',
+            model: 'echo',
+            message: {role: 'assistant', content: String(request.messages.length)}
+        })
+    });
+    const result = await session.send('What can this application do?');
+    console.info(result.message.content);
+}`,
         'AppDataScope.js':`import {
     resolveApplicationId,
     resolveApplicationLocalStorageKey
@@ -1355,10 +1387,23 @@ async function askVerifiedModel({model, expectedModel, prompt, onPhase}) {
 
 function reviewedModuleDetails(record){
     if(record.name==='AI.js'){
-        return `<h2 id="reviewed-member-contract">Reviewed member contract</h2><p><strong>Constructor:</strong> <code>new AI(llmService='', sttService='', ttsService='', model='', modelTTS='', modelSTT='')</code>. Object request forms <code>streamRequest(options)</code> and <code>fetchRequest(options)</code> are preferred; positional <code>streamMessage(...)</code> and <code>fetch(...)</code> remain compatibility APIs.</p><p><strong>Primary methods:</strong> <code>setAI(llmService, sttService, ttsService, model, modelTTS, modelSTT)</code>, <code>streamRequest(options={})</code>, <code>streamMessage(...)</code>, <code>fetchRequest(options={})</code>, <code>fetch(...)</code>, <code>streamTTS(text='', end=false)</code>, <code>finishTTS()</code>, <code>fetchSTT(audioFile, responseHandler)</code>, <code>stopAudio()</code>, <code>resumeAudio(audioContext=null, fromUserGesture=true)</code>, and <code>playAudio(audioChunks=[], audioContext, sourceNode=null, audioType=this.audioType, speechJob=null)</code>.</p><p><strong>Properties and compatibility members:</strong> getters <code>url</code>, <code>urlTTS</code>, and <code>urlSTT</code> expose selected endpoints; their setters intentionally return <code>false</code> without changing the endpoint. <code>license</code> is a runtime credential getter/setter. <code>configured</code> reports chat readiness only, not speech readiness. Public state includes <code>ready</code>, <code>muted</code>, provider/model/reasoning selections, audio format/type/speed, and speech queue state. The misspelled <code>nextSentance(job=this.currentSpeechJob)</code> and selector <code>LOCAL_SPEACH</code> are retained compatibility spellings.</p><p>Streaming resolves text or a tool-name-to-argument-string record. Fetch resolves an OpenAI-compatible response; native Ollama results are adapted to that shape. STT resolves text. TTS and playback controls resolve booleans. <code>structuredOutput</code> accepts false/null/undefined, true or <code>json</code>, or a plain JSON Schema. <code>localOnly</code> fails closed and never selects cloud fallback. Stream chunk callbacks run synchronously; response and stream-completion callbacks are awaited and can reject, while diagnostic request-callback failures are contained.</p><p><strong>Lifecycle:</strong> importing this module imports DBOPFS and User, can initialize their singletons, consumes <code>user-entity-loaded</code>, installs <code>globalThis.ai</code>, and emits <code>ai-ready</code>. The pinned runtime logs exact outbound and inbound inference payloads to the developer console; those payloads can contain private conversation or document content. There is no automatic local-to-cloud fallback.</p><p><strong>Stable errors:</strong> <code>AI_NATIVE_LOCAL_REQUIRED</code>, <code>AI_PROVIDER_NOT_CONFIGURED</code>, <code>AI_MODEL_INVALID</code>, <code>AI_LOCAL_MODEL_REQUIRED</code>, <code>AI_STRUCTURED_OUTPUT_INVALID</code>, <code>AI_REQUIRED_TOOL_UNAVAILABLE</code>, <code>AI_REQUIRED_TOOL_CALL_MISSING</code>, <code>AI_SERVICE_UNREACHABLE</code>, <code>AI_REQUEST_FAILED</code>, <code>AI_REQUEST_ABORTED</code>, and <code>AI_ANDROID_NATIVE_SPEECH_UNAVAILABLE</code>.</p>`;
+        return [
+            `<h2 id="reviewed-member-contract">Reviewed member contract</h2><p><strong>Constructor:</strong> <code>new AI(llmService='', sttService='', ttsService='', model='', modelTTS='', modelSTT='')</code>. Object request forms <code>streamRequest(options)</code> and <code>fetchRequest(options)</code> are preferred; positional <code>streamMessage(...)</code> and <code>fetch(...)</code> remain compatibility APIs.</p>`,
+            `<p><strong>Provider lifecycle:</strong> the read-only <code>providerRuntime</code> plus <code>configureProviders(config)</code>, <code>transitionAI(llmService, sttService, ttsService, model, modelTTS, modelSTT)</code>, <code>transitionProviders(selections)</code>, <code>startProviders(options)</code>, and <code>setSpeechMuted(muted)</code> keep LLM, STT, and TTS selection explicit. Each transition stops queued audio, unloads all three current roles, and then applies replacement routes; <code>transitionAI()</code> returns aggregate runtime status and <code>transitionProviders()</code> returns the admitted route configuration. Selected <code>OPENAI</code> and <code>OLLAMA</code> compatibility routes expose truthful capability-only readiness through internal provider/2 adapters; they do not probe, download, or fake a loaded local model.</p>`,
+            `<p><strong>Primary methods:</strong> <code>setAI(llmService, sttService, ttsService, model, modelTTS, modelSTT)</code>, <code>streamRequest(options={})</code>, <code>streamMessage(...)</code>, <code>fetchRequest(options={})</code>, <code>fetch(...)</code>, <code>streamTTS(text='', end=false)</code>, <code>finishTTS()</code>, <code>fetchSTT(audioFile, responseHandler=(text='')=&gt;{}, signal=null)</code>, <code>stopAudio()</code>, <code>resumeAudio(audioContext=null, fromUserGesture=true)</code>, and <code>playAudio(audioChunks=[], audioContext, sourceNode=null, audioType=this.audioType, speechJob=null)</code>.</p>`,
+            `<p><strong>Properties and compatibility members:</strong> getters <code>url</code>, <code>urlTTS</code>, and <code>urlSTT</code> expose selected endpoints; their setters intentionally return <code>false</code> without changing the endpoint. <code>license</code> is a runtime credential getter/setter. <code>configured</code> reports chat readiness only, not speech readiness. Public state includes <code>ready</code>, <code>muted</code>, provider/model/reasoning selections, audio format/type/speed, and speech queue state. The misspelled <code>nextSentance(job=this.currentSpeechJob)</code> and selector <code>LOCAL_SPEACH</code> are retained compatibility spellings.</p>`,
+            `<p>Streaming resolves text or a tool-name-to-argument-string record. <code>fetchRequest()</code> preserves the selected provider-native response. STT resolves text. Browser speech normalizes the existing Blob/File request to authoritative 16 kHz mono PCM; TTS accepts only WAV on the shared route and returns a WAV byte result. TTS and playback controls resolve booleans. <code>structuredOutput</code> accepts false/null/undefined, true or <code>json</code>, or a plain JSON Schema. <code>localOnly</code> fails closed and never selects cloud fallback. Stream chunk callbacks run synchronously; response and stream-completion callbacks are awaited and can reject, while diagnostic request-callback failures are contained.</p>`,
+            `<p><strong>Lifecycle:</strong> importing this module imports DBOPFS and User, can initialize their singletons, consumes <code>user-entity-loaded</code> and <code>arcane-ollama-ready</code>, installs <code>globalThis.ai</code>, and emits <code>ai-ready</code>. Operational warnings and failures may be written to the developer console, but the payload logging statements in this runtime are inactive. There is no automatic local-to-cloud fallback.</p>`,
+            `<p><strong>Stable errors:</strong> <code>AI_NATIVE_LOCAL_REQUIRED</code>, <code>AI_PROVIDER_NOT_CONFIGURED</code>, <code>AI_MODEL_INVALID</code>, <code>AI_LOCAL_MODEL_REQUIRED</code>, <code>AI_STRUCTURED_OUTPUT_INVALID</code>, <code>AI_REQUIRED_TOOL_UNAVAILABLE</code>, <code>AI_REQUIRED_TOOL_CALL_MISSING</code>, <code>AI_SERVICE_UNREACHABLE</code>, <code>AI_REQUEST_FAILED</code>, <code>AI_REQUEST_ABORTED</code>, and <code>AI_ANDROID_NATIVE_SPEECH_UNAVAILABLE</code>. Provider-runtime and shared-speech paths also surface <code>ARCANE_AI_MODEL_AUTHORITY_REQUIRED</code>, <code>ARCANE_AI_PROVIDER_DISPOSED</code>, <code>ARCANE_AI_PROVIDER_RUNTIME_INVALID</code>, <code>ARCANE_AI_PROVIDER_UNAVAILABLE</code>, <code>ARCANE_AI_REQUEST_ABORTED</code>, <code>ARCANE_AI_ROLE_BUSY</code>, <code>ARCANE_AI_ROLE_NOT_READY</code>, <code>ARCANE_AI_INVALID_REQUEST</code>, <code>ARCANE_AI_AUDIO_DECODE_UNAVAILABLE</code>, <code>ARCANE_AI_AUDIO_DECODE_FAILED</code>, <code>ARCANE_AI_INVALID_PROVIDER_RESULT</code>, and <code>ARCANE_AI_UNSUPPORTED_RESPONSE_FORMAT</code>.</p>`
+        ].join('');
     }
     if(record.name==='ConfiguredAIChatSession.js'){
-        return `<h2 id="reviewed-member-contract">Reviewed member contract</h2><p><code>new ConfiguredAIChatSession(options={})</code> accepts exactly <code>chat</code>, <code>contextBuilder</code>, <code>maxContextCharacters</code>, <code>maxMessageCharacters</code>, <code>maxMessages</code>, <code>request</code>, <code>responseLength</code>, and <code>systemPrompt</code>. Message count defaults to 65 and accepts 3–128; per-message characters default to 131,072 and accept 1–131,072; context characters default to 131,072 and accept 1–524,288. Response length is <code>low</code>, <code>medium</code>, or <code>high</code>, with invalid values normalized to medium. The request cannot own <code>messages</code>, <code>stream</code>, <code>tools</code>, or <code>tool_choice</code>.</p><p><code>history()</code> returns a new deeply frozen snapshot. <code>clear()</code> preserves the system prompt and throws <code>AI_CHAT_BUSY</code> during a send. <code>send(input)</code> accepts one nonblank bounded string, permits one in-flight request, evicts oldest user/assistant pairs to fit, and commits atomically only after a valid response. An optional async <code>contextBuilder({input,history})</code> receives a frozen input, is framed as untrusted user data for the current request, and is never committed.</p><p>The default provider resolves <code>globalThis.Arcane.ai.chat</code> at send time, so construction can precede bridge readiness; injection makes the class cross-host. It performs no persistence, streaming, tool execution, rendering, provider selection, or events.</p><p>The normalized deeply frozen result is <code>{provider:string|null, model:string|null, message:{role:'assistant',content}, done:boolean, doneReason:string|null, promptEvalCount:nonnegativeInteger|null, evalCount:nonnegativeInteger|null}</code>. Stable failures include <code>AI_CHAT_UNAVAILABLE</code>, <code>AI_CHAT_BUSY</code>, <code>AI_CHAT_CONTEXT_LIMIT</code>, and <code>AI_CHAT_INVALID_RESPONSE</code>; an injected provider rejection is preserved and failed/malformed turns do not modify history.</p>`;
+        return [
+            `<h2 id="reviewed-member-contract">Reviewed member contract</h2><p><code>new ConfiguredAIChatSession(options={})</code> accepts exactly <code>chat</code>, <code>contextBuilder</code>, <code>initialMessages</code>, <code>maxContextCharacters</code>, <code>maxMessageCharacters</code>, <code>maxMessages</code>, <code>request</code>, <code>responseLength</code>, and <code>systemPrompt</code>. <code>initialMessages</code> is an array of closed bounded <code>user</code>, <code>assistant</code>, or <code>tool</code> messages with no system role; any <code>tool_calls</code> array contains exactly one structural assistant tool call, which must receive its matching tool result before another user turn or tool-call sequence. Message count defaults to 65 and accepts 3–128; per-message characters default to 131,072 and accepts 1–131,072; context characters default to 131,072 and accepts 1–524,288. Response length is <code>low</code>, <code>medium</code>, or <code>high</code>, with invalid values normalized to medium. The request cannot own <code>messages</code>, <code>stream</code>, <code>tools</code>, or <code>tool_choice</code>.</p>`,
+            `<p><code>history()</code> returns a new deeply frozen snapshot. <code>clear()</code> preserves the system prompt and throws <code>AI_CHAT_BUSY</code> during a send. <code>prepare(input,options={})</code> performs the bounded request and returns one frozen <code>{response,commit,rollback}</code> transaction. <code>send(input,options={})</code> accepts user or tool input, prepares the request, and commits atomically. Each accepts <code>signal</code>; cancellation is <code>AbortError</code> with code <code>AI_CHAT_ABORTED</code>. An optional async <code>contextBuilder({input,history,signal})</code> receives a frozen input/history snapshot and the same cancellation signal, is framed as untrusted user data for the current request, and is never committed.</p>`,
+            `<p>The default provider resolves <code>globalThis.Arcane.ai.chat</code> at send time, so construction can precede bridge readiness; injection makes the class cross-host. It performs no persistence, streaming, tool execution, rendering, provider selection, or events.</p>`,
+            `<p>The injected <code>chat(request)</code> callback may return the prior normalized result or exactly one non-stream OpenAI-compatible choice. The prior form preserves its explicit <code>done</code> boolean; OpenAI-compatible choice normalization sets <code>done:true</code>. Both produce a deeply frozen <code>{provider:string|null, model:string|null, message:{role:'assistant',content,tool_calls?}, done:boolean, doneReason:string|null, promptEvalCount:nonnegativeInteger|null, evalCount:nonnegativeInteger|null}</code>. Tool calls remain structural data and are not executed. Stable failures include <code>AI_CHAT_UNAVAILABLE</code>, <code>AI_CHAT_BUSY</code>, <code>AI_CHAT_CONTEXT_LIMIT</code>, <code>AI_CHAT_INVALID_RESPONSE</code>, and <code>AI_CHAT_ABORTED</code>; an injected provider rejection is preserved and failed/malformed turns do not modify history.</p>`
+        ].join('');
     }
     return '';
 }
@@ -1641,14 +1686,37 @@ function renderRuntimeModulePage(record,{
     return `${advanced}<h2 id="overview">Overview</h2><p>${escapeHtml(record.summary)}</p><ul class="module-contract-summary"><li><strong>Artifact</strong><br><code>${escapeHtml(record.name)}</code> · ${escapeHtml(record.kind)}</li><li><strong>Classification</strong><br>${escapeHtml(classification)}</li><li><strong>Availability</strong><br>${escapeHtml(record.availability)}</li><li><strong>Normalization</strong><br>${escapeHtml(record.normalization)}</li></ul><h2 id="import-and-lifecycle">Import and lifecycle</h2>${loadBody}<p>${escapeHtml(semanticContract.lifecycleSideEffects)}</p><p><strong>Application-facing behavior:</strong> ${escapeHtml(plainMarkdown(record.surface))}</p><details><summary>Protocol and host implementation</summary><p>${escapeHtml(record.protocol)} This detail does not widen the application-facing API or grant authority.</p></details><h2 id="exports-signatures-parameters-results">Exports, signatures, parameters, and results</h2>${bindingBody}${callableBody}${memberBody}<h3 id="parameters-and-results">Parameter meanings and results</h3><p>${escapeHtml(semanticContract.paramsResults)}</p><h2 id="events-side-effects-and-errors">Events, side effects, and errors</h2><h3 id="literal-custom-events">Source-literal <code>CustomEvent</code> dispatches</h3>${contractList(eventNames,'No source-literal CustomEvent dispatch is part of this artifact.',{code:true})}<h3 id="lifecycle-event-flow">Lifecycle and event flow</h3>${contractList(semanticContract.events,'This artifact has no additional documented lifecycle event flow.')}<h3 id="direct-coded-failures">Direct coded failures</h3>${contractList(codedFailures,'This artifact directly assigns no stable coded failure.',{code:true})}<h3 id="exported-error-subclasses">Exported Error subclasses</h3>${contractList(errorClasses,'This artifact exports no Error subclass.',{code:true})}<h3 id="documented-failure-behavior">Documented failure behavior</h3>${contractList(semanticContract.errors,'No additional module-specific rejection behavior is documented.')}<h2 id="availability-and-capabilities">Availability and capabilities</h2><p><strong>${escapeHtml(record.availability)}.</strong> ${escapeHtml(record.normalization)}</p><p>${escapeHtml(semanticContract.capabilitiesCore)}</p><h2 id="example">${exampleLabel}</h2>${exampleBody}<h2 id="related">Related reference</h2>${moduleRelatedLinks(record,{output,targets})}`;
 }
 
+function baseAIDecisionBody({output,targets}){
+    const link=(source,label,fragment='')=>`<a href="${escapeHtml(`${relativeOutputHref(output,targets.get(source))}${fragment}`)}">${escapeHtml(label)}</a>`;
+    return `<aside class="callout callout-info"><strong>Application default.</strong> Start with normalized AI. Provider selection, model admission, protected credentials, and host transport remain behind the application contract.</aside><h2 id="choose-the-normalized-surface">Choose the normalized surface</h2><div class="table-wrap" data-columns="3" role="region" aria-label="Normalized AI surface choices" tabindex="0"><table><thead><tr><th>Need</th><th>Use</th><th>Contract</th></tr></thead><tbody><tr><td>Renderer chat, streaming, speech, tools, or structured output</td><td>${link('@reference/module/ai','AI.js')}</td><td>Default import; installs <code>globalThis.ai</code> after user initialization and emits <code>ai-ready</code>.</td></tr><tr><td>Provider-neutral Core chat</td><td>${link('docs/reference/core/reference/arcane-api/ai-and-ollama.md','Arcane.ai.chat()','#arcaneaichat')}</td><td>One normalized result through the admitted provider; no automatic fallback.</td></tr><tr><td>Caller-configured browser-local text inference</td><td>${link('docs/reference/ai/browser-wasm.md','arcane-os/ai/browser-wasm')}</td><td>Browser-only Wllama lifecycle with a canonical model URL, inherited optional byte-length and SHA-256 checks, observed-byte metadata, honest integrity status, and structural tool results.</td></tr><tr><td>Bounded conversational history</td><td>${link('@reference/module/configured-ai-chat-session','ConfiguredAIChatSession.js')}</td><td>Defaults to <code>Arcane.ai.chat()</code>; owns context limits and atomic turn commit.</td></tr><tr><td>Speech playback</td><td>${link('@reference/module/speech-playback','SpeechPlayback.js')}</td><td>Normalized chunks and playback over admitted native speech or browser media.</td></tr><tr><td>Local readiness and catalog</td><td>${link('@reference/module/local-ai-readiness','LocalAIReadiness.js')}</td><td>Feature-detected readiness; does not grant lifecycle or model-management authority.</td></tr></tbody></table></div><h2 id="runtime-ai-module">Runtime AI module</h2><p><code>AI.js</code> has one export: its default <code>AI</code> class. Import the default binding for explicit use, or load the module for its lifecycle and wait for <code>ai-ready</code> before reading <code>globalThis.ai</code>.</p>${referenceCodeBlock('JavaScript',moduleExample({name:'AI.js'}))}<h2 id="core-ai-chat">Core Arcane.ai</h2><p><code>globalThis.Arcane.ai</code> is a distinct provider-neutral Core surface. Ordinary applications call <code>profile()</code> and <code>chat()</code>; Settings-only provider mutation remains separately admitted.</p>${referenceCodeBlock('JavaScript',`async function explainActiveModelAfterUserChoice() {
+    const profile = await globalThis.Arcane.ai.profile();
+    const result = await globalThis.Arcane.ai.chat({
+        expectedProvider: profile.provider,
+        messages: [{role: 'user', content: 'Explain the active model in one sentence.'}]
+    });
+    console.info(result.message.content);
+}`)}<h2 id="browser-wasm-local-text-inference">Browser-WASM local text inference</h2><p>${link('docs/reference/ai/browser-wasm.md','Browser-WASM local AI')} is an explicit browser-only option for a caller-configured GGUF model. It packages the Wllama engine, not model weights. It neither supplies native or speech APIs nor executes returned tools. A normal cache miss can download; <code>load({offline:true})</code> requires a compatible DBOPFS cache, applies only enabled checks, and still requires successful Wllama loading.</p><h2 id="advanced-provider-apis">Advanced provider APIs</h2><p>${link('docs/reference/arcane-ollama.md','Arcane Ollama')} is provider-specific and lower-level. Some admitted applications can call Ollama chat, generate, or embed methods; diagnostics and management are more restricted, and some operations intentionally fail. Never send a renderer directly to <code>127.0.0.1:11434</code>.</p><h2 id="availability-errors-and-fallback">Availability, errors, and fallback</h2><p>Feature-detect the selected normalized surface and inspect ${link('@reference/core/capabilities','effective capabilities')} when a native call is unavailable. Local and cloud providers keep their documented availability and error codes. Arcane does not silently switch providers after failure.</p>`;
+}
+
 function aiDecisionBody({output,targets}){
     const link=(source,label,fragment='')=>`<a href="${escapeHtml(`${relativeOutputHref(output,targets.get(source))}${fragment}`)}">${escapeHtml(label)}</a>`;
-    return `<aside class="callout callout-info"><strong>Application default.</strong> Start with normalized AI. Provider selection, model admission, protected credentials, and host transport remain behind the application contract.</aside><h2 id="choose-the-normalized-surface">Choose the normalized surface</h2><div class="table-wrap" data-columns="3" role="region" aria-label="Normalized AI surface choices" tabindex="0"><table><thead><tr><th>Need</th><th>Use</th><th>Contract</th></tr></thead><tbody><tr><td>Renderer chat, streaming, speech, tools, or structured output</td><td>${link('@reference/module/ai','AI.js')}</td><td>Default import; installs <code>globalThis.ai</code> after user initialization and emits <code>ai-ready</code>.</td></tr><tr><td>Provider-neutral Core chat</td><td>${link('docs/reference/core/reference/arcane-api/ai-and-ollama.md','Arcane.ai.chat()','#arcaneaichat')}</td><td>One normalized result through the admitted provider; no automatic fallback.</td></tr><tr><td>Caller-configured browser-local text inference</td><td>${link('docs/reference/ai/browser-wasm.md','arcane-os/ai/browser-wasm')}</td><td>Browser-only Wllama lifecycle with a canonical model URL, inherited optional byte-length and SHA-256 checks, observed-byte metadata, honest integrity status, and structural tool results.</td></tr><tr><td>Bounded conversational history</td><td>${link('@reference/module/configured-ai-chat-session','ConfiguredAIChatSession.js')}</td><td>Defaults to <code>Arcane.ai.chat()</code>; owns context limits and atomic turn commit.</td></tr><tr><td>Speech playback</td><td>${link('@reference/module/speech-playback','SpeechPlayback.js')}</td><td>Normalized chunks and playback over admitted native speech or browser media.</td></tr><tr><td>Local readiness and catalog</td><td>${link('@reference/module/local-ai-readiness','LocalAIReadiness.js')}</td><td>Feature-detected readiness; does not grant lifecycle or model-management authority.</td></tr></tbody></table></div><h2 id="runtime-ai-module">Runtime AI module</h2><p><code>AI.js</code> has one export: its default <code>AI</code> class. Import the default binding for explicit use, or load the module for its lifecycle and wait for <code>ai-ready</code> before reading <code>globalThis.ai</code>.</p>${referenceCodeBlock('JavaScript',moduleExample({name:'AI.js'}))}<h2 id="core-ai-chat">Core Arcane.ai</h2><p><code>globalThis.Arcane.ai</code> is a distinct provider-neutral Core surface. Ordinary applications call <code>profile()</code> and <code>chat()</code>; Settings-only provider mutation remains separately admitted.</p>${referenceCodeBlock('JavaScript',`const profile = await globalThis.Arcane.ai.profile();
-const result = await globalThis.Arcane.ai.chat({
-    expectedProvider: profile.provider,
-    messages: [{role: 'user', content: 'Explain the active model in one sentence.'}]
-});
-console.info(result.message.content);`)}<h2 id="browser-wasm-local-text-inference">Browser-WASM local text inference</h2><p>${link('docs/reference/ai/browser-wasm.md','Browser-WASM local AI')} is an explicit browser-only option for a caller-configured GGUF model. It packages the Wllama engine, not model weights. It neither supplies native or speech APIs nor executes returned tools. A normal cache miss can download; <code>load({offline:true})</code> requires a compatible DBOPFS cache, applies only enabled checks, and still requires successful Wllama loading.</p><h2 id="advanced-provider-apis">Advanced provider APIs</h2><p>${link('docs/reference/arcane-ollama.md','Arcane Ollama')} is provider-specific and lower-level. Some admitted applications can call Ollama chat, generate, or embed methods; diagnostics and management are more restricted, and some operations intentionally fail. Never send a renderer directly to <code>127.0.0.1:11434</code>.</p><h2 id="availability-errors-and-fallback">Availability, errors, and fallback</h2><p>Feature-detect the selected normalized surface and inspect ${link('@reference/core/capabilities','effective capabilities')} when a native call is unavailable. Local and cloud providers keep their documented availability and error codes. Arcane does not silently switch providers after failure.</p>`;
+    const choiceRows=`<tr><td>Provider registration, normalized lifecycle, and per-role state</td><td>${link('@reference/module/ai-provider-runtime','AIProviderRuntime.js')} and ${link('@reference/module/ai-runtime-state','AIRuntimeState.js')}</td><td>One application-owned runtime validates selections, publishes independent LLM/STT/TTS state, and routes requests without silent fallback.</td></tr><tr><td>Visible selected-model activation request</td><td>${link('docs/reference/runtime-components.md','chat.html','#chathtml')}</td><td>Send remains disabled for a selected unloaded LLM; a keyboard-operable Start/Try again or Cancel loading control emits a cancelable public request before the host callback. The provider/runtime owner decides whether and how to execute the resulting intent.</td></tr><tr><td>Caller-configured browser-local speech</td><td>${link('docs/reference/ai/browser-speech.md','arcane-os/ai/browser-speech')}</td><td>Browser-only Whisper STT and Kokoro TTS providers over caller-owned, pinned model and adapter closures; no bundled model or runtime bytes.</td></tr><tr><td>Durable chat history and document retrieval</td><td>${link('@reference/module/persistent-ai-chat-session','PersistentAIChatSession.js')} and ${link('@reference/module/dbopfs-document-library','DBOPFSDocumentLibrary.js')}</td><td>Explicit persistence plus bounded lexical retrieval or caller-source evaluation; provider choice and application policy remain outside the storage helpers.</td></tr>`;
+    const lifecycle=`<h2 id="provider-runtime-and-state">Provider runtime and normalized state</h2><p>${link('@reference/module/ai-provider-runtime','AIProviderRuntime.js')} owns admitted provider registration, configuration, lifecycle, cancellation, speech mute state, and normalized request routing. ${link('@reference/module/ai-runtime-state','AIRuntimeState.js')} publishes the normalized aggregate and independent <code>llm</code>, <code>stt</code>, and <code>tts</code> role states. Applications should consume those state records instead of inferring readiness from a loaded module or protocol label.</p>`;
+    const browserSpeech=`<h2 id="browser-speech-providers">Browser speech providers</h2><p>${link('docs/reference/ai/browser-speech.md','Browser speech')} is the explicit browser-only choice for caller-supplied Whisper speech-to-text and Kokoro text-to-speech runtimes. It implements <code>arcane-ai-provider/2</code>, downloads nothing on import, and ships no model weights, adapter runtime bytes, voices, URLs, catalog, or cloud fallback.</p>`;
+    const durable=`<h2 id="durable-chat-and-retrieval">Durable chat and retrieval</h2><p>${link('@reference/module/persistent-ai-chat-session','PersistentAIChatSession.js')} makes chat persistence explicit. ${link('@reference/module/dbopfs-document-library','DBOPFSDocumentLibrary.js')} and ${link('@reference/module/document-lexical-search','DocumentLexicalSearch.js')} provide bounded document storage, caller-source evaluation, context construction, and lexical ranking without assuming a provider or copying provider runtime bytes.</p>`;
+    return baseAIDecisionBody({output,targets})
+        .replace(
+            'Browser-only Wllama lifecycle with a canonical model URL, inherited optional byte-length and SHA-256 checks, observed-byte metadata, honest integrity status, and structural tool results.',
+            'Browser-only Wllama lifecycle with a caller-owned canonical ordered multi-file descriptor <code>{id, files:[{name?,url,bytes?,sha256?},...]}</code>, inherited optional byte-length and SHA-256 checks, observed-byte metadata, honest integrity status, and structural tool results.'
+        )
+        .replace(
+            '</tbody></table></div><h2 id="runtime-ai-module">',
+            `${choiceRows}</tbody></table></div>${lifecycle}<h2 id="runtime-ai-module">`
+        )
+        .replace(
+            '<h2 id="advanced-provider-apis">',
+            `${browserSpeech}${durable}<h2 id="advanced-provider-apis">`
+        );
 }
 
 function capabilityPolicyBody({output,targets}){
@@ -1842,8 +1910,8 @@ export async function createReferenceSite(){
     }
     const runtimeModuleInventory=JSON.parse(runtimeModuleInventoryInput.bytes.toString('utf8'));
     const runtimeModuleRecords=runtimeModuleInventory.artifacts;
-    if(!Array.isArray(runtimeModuleRecords)||runtimeModuleRecords.length!==80){
-        throw new Error('Expected exactly 80 runtime module artifacts.');
+    if(!Array.isArray(runtimeModuleRecords)||runtimeModuleRecords.length!==85){
+        throw new Error('Expected exactly 85 runtime module artifacts.');
     }
     const runtimeContracts=await verifyRuntimeReferenceContracts({
         repositoryRoot,
@@ -1902,11 +1970,11 @@ export async function createReferenceSite(){
             targets
         });
         const moduleDirectory=input.source==='docs/reference/runtime-modules.md'
-            ?`<h2 id="runtime-module-directory">Search all 80 runtime modules</h2><p>Every shipped artifact has one first-party contract page. Search by exact filename, export, behavior, availability, transport, or normalization boundary.</p>${moduleDirectoryBody({records:runtimeModuleRecords,output:input.output,targets,idPrefix:'runtime-module-index'})}`
+            ?`<h2 id="runtime-module-directory">Search all 85 runtime artifacts</h2><p>Every shipped artifact has one first-party contract page. Search by exact filename, export, behavior, availability, transport, or normalization boundary.</p>${moduleDirectoryBody({records:runtimeModuleRecords,output:input.output,targets,idPrefix:'runtime-module-index'})}`
             :'';
         const body=`${aiPreamble({source:input.source,output:input.output,targets})}${moduleDirectory}${rendered.body}${extensionOverlay.body}`;
         const tableOfContents=moduleDirectory
-            ?[{id:'runtime-module-directory',label:'Search all 80 runtime modules'},...rendered.tableOfContents,...extensionOverlay.tableOfContents]
+            ?[{id:'runtime-module-directory',label:'Search all 85 runtime artifacts'},...rendered.tableOfContents,...extensionOverlay.tableOfContents]
             :[...rendered.tableOfContents,...extensionOverlay.tableOfContents];
         const html=Buffer.from(renderPage({
             output:input.output,
@@ -1920,14 +1988,19 @@ export async function createReferenceSite(){
             targets
         }));
         expectedFiles.set(input.output,html);
-        pages.push(outputRecord({
+        const page=outputRecord({
             source:input.source,
             output:input.output,
             route:input.route,
             sourceBytes:input.bytes,
             outputBytes:html,
             kind:'markdown'
-        }));
+        });
+        const behaviorEvidence=referenceGuideBehaviorEvidence[input.source];
+        pages.push(behaviorEvidence?{
+            ...page,
+            behaviorEvidence
+        }:page);
     }
 
     for(const record of runtimeModuleRecords){
@@ -1986,7 +2059,7 @@ export async function createReferenceSite(){
                     source:{
                         repository:behaviorEvidence.repository,
                         commit:behaviorEvidence.commit,
-                        path:record.file.replace(/^runtime\//u,''),
+                        path:behaviorEvidence.sourcePath,
                         blob:behaviorEvidence.sourceBlob,
                         sha256:sha256(sourceBytes)
                     },
@@ -2003,7 +2076,9 @@ export async function createReferenceSite(){
 
     const aiOutput=targets.get('@reference/ai');
     const aiSource='tools/build-reference-site.mjs#normalized-ai-guide';
-    const aiSourceBytes=Buffer.from(aiDecisionBody.toString());
+    const aiSourceBytes=Buffer.from(
+        `${baseAIDecisionBody.toString()}\n${aiDecisionBody.toString()}`
+    );
     const aiHtml=Buffer.from(renderPage({
         output:aiOutput,
         route:routeForOutput(aiOutput),
@@ -2014,9 +2089,12 @@ export async function createReferenceSite(){
         body:aiDecisionBody({output:aiOutput,targets}),
         tableOfContents:[
             {id:'choose-the-normalized-surface',label:'Choose the normalized surface'},
+            {id:'provider-runtime-and-state',label:'Provider runtime and normalized state'},
             {id:'runtime-ai-module',label:'Runtime AI module'},
             {id:'core-ai-chat',label:'Core Arcane.ai'},
             {id:'browser-wasm-local-text-inference',label:'Browser-WASM local text inference'},
+            {id:'browser-speech-providers',label:'Browser speech providers'},
+            {id:'durable-chat-and-retrieval',label:'Durable chat and retrieval'},
             {id:'advanced-provider-apis',label:'Advanced provider APIs'},
             {id:'availability-errors-and-fallback',label:'Availability, errors, and fallback'}
         ],

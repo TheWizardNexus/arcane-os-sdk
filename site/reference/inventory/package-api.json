@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.1.2",
+  "sdkVersion": "0.2.1",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 163,
+  "memberCount": 169,
   "members": [
     {
       "id": "root:APP_BUNDLE_DESCRIPTOR_NAME",
@@ -2046,16 +2046,16 @@
       "name": "validateWorkspace",
       "displayName": "validateWorkspace()",
       "kind": "function",
-      "signature": "async validateWorkspace({workspaceRoot=process.cwd(), appId, signal, onEvent}={})",
+      "signature": "async validateWorkspace({workspaceRoot=process.cwd(), appId, allowMissingManagedImportMap=false, signal, onEvent}={})",
       "entrypoints": [
         "arcane-os"
       ],
       "primaryImport": "arcane-os",
       "group": "Workspace, doctor, repository, and server",
-      "summary": "Runs canonical workspace, runtime, descriptor, and selected-app validation with progress events.",
+      "summary": "Runs canonical workspace, runtime, descriptor, selected-app, and exact installed-SDK validation with progress events.",
       "availability": "Node",
       "protocol": "Node ESM",
-      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+      "normalization": "Returns a frozen workspace receipt and, for external workspaces, the exact canonical or npm-alias-bound SDK installation authority"
     },
     {
       "id": "root:verifyApp",
@@ -2641,15 +2641,31 @@
       "group": "Browser-WASM local AI",
       "summary": "Deep-frozen authority for the packaged Wllama and llama.cpp runtime, authenticated JS and WASM assets, licensing, and disabled compatibility-network policy.",
       "availability": "Browser metadata; import and inspection require neither DBOPFS nor a loaded model",
-      "protocol": "arcane-ai-browser-wasm/1 over the provider-neutral arcane-ai-adapter/1 boundary",
+      "protocol": "arcane-ai-browser-wasm/2 over the provider-neutral arcane-ai-adapter/1 boundary",
       "normalization": "Exact immutable runtime and component identity; it contains no model weights or model catalog"
+    },
+    {
+      "id": "browser-wasm:adaptV1LlmProvider",
+      "name": "adaptV1LlmProvider",
+      "displayName": "adaptV1LlmProvider()",
+      "kind": "function",
+      "signature": "adaptV1LlmProvider(provider)",
+      "entrypoints": [
+        "arcane-os/ai/browser-wasm"
+      ],
+      "primaryImport": "arcane-os/ai/browser-wasm",
+      "group": "Browser-WASM local AI",
+      "summary": "Adapts one compatible browser LLM provider to the provider-neutral LLM role contract.",
+      "availability": "Browser; the wrapped provider retains its own WebGPU, storage, model, and lifecycle requirements",
+      "protocol": "arcane-ai-provider/2 adapted from the browser LLM adapter surface",
+      "normalization": "Projects catalog, inspection, status, lifecycle, chat, stream, cancellation, and disposal without adding a provider or fallback"
     },
     {
       "id": "browser-wasm:createArcaneAI",
       "name": "createArcaneAI",
       "displayName": "createArcaneAI()",
       "kind": "function",
-      "signature": "createArcaneAI({ llm=null, provider=null, loadPolicy='on-demand' }={})",
+      "signature": "createArcaneAI({ llm=null, provider=null, loadPolicy='on-demand', security }={})",
       "entrypoints": [
         "arcane-os/ai/browser-wasm"
       ],
@@ -2658,7 +2674,7 @@
       "summary": "Creates the provider-neutral browser AI facade and LLM lifecycle controller around one compatible provider or controller.",
       "availability": "Browser; the selected provider observes its own WebAssembly, storage, and model readiness",
       "protocol": "arcane-ai-adapter/1",
-      "normalization": "Normalizes lazy or manual load, lifecycle status, cancellation, streaming completion, and structural tool-call visibility without executing tools"
+      "normalization": "Normalizes lazy or manual load, fieldwise app/provider/load security inheritance from SDK secure:false, lifecycle status, cancellation, streaming completion, and structural tool-call visibility without executing tools; an existing ModelController retains its preconfigured security/load policy and rejects a new security option"
     },
     {
       "id": "browser-wasm:createBrowserModelSource",
@@ -2671,42 +2687,122 @@
       ],
       "primaryImport": "arcane-os/ai/browser-wasm",
       "group": "Browser-WASM local AI",
-      "summary": "Validates a caller-supplied immutable HTTPS model authority and creates its cancellable no-credentials download source.",
-      "availability": "Browser with Fetch and a readable response body; each direct open call performs its configured HTTPS fetch",
-      "protocol": "Caller-supplied exact model URL, expected byte length, SHA-256, license identifier, and source revision",
-      "normalization": "Canonical frozen descriptor and download handle; byte integrity is verified by the model store before admission"
+      "summary": "Validates a caller-supplied ordered multi-file model descriptor (or the legacy one-file shape) and creates cancellable no-credentials HTTPS member downloads.",
+      "availability": "Browser with Fetch and a readable response body; each direct member open performs its configured HTTPS fetch",
+      "protocol": "Caller-supplied immutable HTTPS model-file URLs with optional expected byte lengths and SHA-256 values",
+      "normalization": "Canonical frozen ordered descriptor and per-member download handle; expected fields are required and enforced only for their effective enabled checks, and model license is not runtime admission"
     },
     {
       "id": "browser-wasm:createBrowserWasmLlmProvider",
       "name": "createBrowserWasmLlmProvider",
       "displayName": "createBrowserWasmLlmProvider()",
       "kind": "function",
-      "signature": "createBrowserWasmLlmProvider({ source, store, loadDefaults={}, logger=console }={})",
+      "signature": "createBrowserWasmLlmProvider({ source, sources, store, loadDefaults={}, security, logger=console }={})",
       "entrypoints": [
         "arcane-os/ai/browser-wasm"
       ],
       "primaryImport": "arcane-os/ai/browser-wasm",
       "group": "Browser-WASM local AI",
-      "summary": "Creates the packaged Wllama browser provider with verified model admission, serialized inference, streaming, abort, unload, and probe operations.",
-      "availability": "Browser; WebAssembly required, WebGPU optional, and model loading requires verified DBOPFS bytes",
+      "summary": "Creates the packaged Wllama browser provider with effective-check disclosure, honest integrity status, serialized inference, streaming, abort, unload, and probe operations.",
+      "availability": "Browser secure context with WebAssembly, OPFS/DBOPFS, WebGPU, and admitted full-offload/buffer/queue/fence evidence; no CPU fallback",
       "protocol": "arcane-ai-adapter/1 with OpenAI-like chat completion and streaming envelopes",
-      "normalization": "Frozen lifecycle/status/capability records and structured tool-call data; the SDK never invokes application tools"
+      "normalization": "Frozen lifecycle/status/security/integrity records and structured tool-call data; security fields inherit by scope and the SDK never invokes application tools"
     },
     {
       "id": "browser-wasm:createDbopfsModelStore",
       "name": "createDbopfsModelStore",
       "displayName": "createDbopfsModelStore()",
       "kind": "function",
-      "signature": "createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models' }={})",
+      "signature": "createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models', estimateStorage=null }={})",
       "entrypoints": [
         "arcane-os/ai/browser-wasm"
       ],
       "primaryImport": "arcane-os/ai/browser-wasm",
       "group": "Browser-WASM local AI",
-      "summary": "Adapts an existing DBOPFS instance into an authenticated model cache that commits metadata last and rehashes cached bytes before reuse.",
+      "summary": "Adapts an existing DBOPFS instance into a model cache that records observed bytes, commits metadata last, and hashes only when SHA-256 checking is enabled.",
       "availability": "Browser with a ready DBOPFS instance and OPFS support",
-      "protocol": "arcane.ai.browser-wasm.model.v2 completion manifests over existing DBOPFS method semantics",
-      "normalization": "Returns verified or installed cache receipts, fail-closed offline misses, progress snapshots, and explicit removal without changing DBOPFS public names"
+      "protocol": "arcane.ai.browser-wasm.model.v4 completion manifests over existing DBOPFS method semantics",
+      "normalization": "Returns cached or installed receipts with observed byte count and per-check outcomes; disabled expected-length and SHA-256 checks do not compare or hash, while enabled checks fail closed"
+    },
+    {
+      "id": "browser-speech:BROWSER_SPEECH_ARTIFACT_PROTOCOL",
+      "name": "BROWSER_SPEECH_ARTIFACT_PROTOCOL",
+      "displayName": "BROWSER_SPEECH_ARTIFACT_PROTOCOL",
+      "kind": "constant",
+      "signature": "const BROWSER_SPEECH_ARTIFACT_PROTOCOL",
+      "entrypoints": [
+        "arcane-os/ai/browser-speech"
+      ],
+      "primaryImport": "arcane-os/ai/browser-speech",
+      "group": "Browser speech providers",
+      "summary": "Stable protocol identifier for authenticated browser speech artifact stores.",
+      "availability": "Browser metadata; model/runtime admission and use require DBOPFS, Web Locks, Workers, and caller-supplied immutable artifacts",
+      "protocol": "arcane-ai-browser-speech-artifacts/1 over arcane-ai-provider/2",
+      "normalization": "Exact immutable protocol value; it grants no model authority and names no model download"
+    },
+    {
+      "id": "browser-speech:createBrowserKokoroProvider",
+      "name": "createBrowserKokoroProvider",
+      "displayName": "createBrowserKokoroProvider()",
+      "kind": "function",
+      "signature": "createBrowserKokoroProvider(options={})",
+      "entrypoints": [
+        "arcane-os/ai/browser-speech"
+      ],
+      "primaryImport": "arcane-os/ai/browser-speech",
+      "group": "Browser speech providers",
+      "summary": "Creates a local-only Kokoro text-to-speech provider for the provider-neutral AI runtime.",
+      "availability": "Browser with DBOPFS, Web Locks, Workers, object URLs, and a caller-admitted self-contained kokoro-js runtime/model closure",
+      "protocol": "arcane-ai-provider/2 tts/synthesize",
+      "normalization": "Independent load, status, request, unload, cancellation, and disposal; provider-native requests return 24000 Hz Float32Array PCM, while shared AI.js requests admit only wav and return frozen Uint8Array audio/wav data; never selects a cloud fallback"
+    },
+    {
+      "id": "browser-speech:createBrowserSpeechAuthority",
+      "name": "createBrowserSpeechAuthority",
+      "displayName": "createBrowserSpeechAuthority()",
+      "kind": "function",
+      "signature": "createBrowserSpeechAuthority({ providerId, role, model, runtime, security }={})",
+      "entrypoints": [
+        "arcane-os/ai/browser-speech"
+      ],
+      "primaryImport": "arcane-os/ai/browser-speech",
+      "group": "Browser speech providers",
+      "summary": "Validates and freezes one caller-owned Whisper or Kokoro model/runtime authority.",
+      "availability": "Browser descriptor construction; using the authority requires the selected storage and provider Web APIs",
+      "protocol": "arcane-ai-model-authority/1",
+      "normalization": "Requires immutable URL identity, exact adapter role, unique paths/URLs, and caller-supplied revision with optional byte-length and SHA-256 checks"
+    },
+    {
+      "id": "browser-speech:createBrowserWhisperProvider",
+      "name": "createBrowserWhisperProvider",
+      "displayName": "createBrowserWhisperProvider()",
+      "kind": "function",
+      "signature": "createBrowserWhisperProvider(options={})",
+      "entrypoints": [
+        "arcane-os/ai/browser-speech"
+      ],
+      "primaryImport": "arcane-os/ai/browser-speech",
+      "group": "Browser speech providers",
+      "summary": "Creates a local-only Whisper speech-to-text provider for the provider-neutral AI runtime.",
+      "availability": "Browser with DBOPFS, Web Locks, Workers, object URLs, and a caller-admitted self-contained transformers-whisper runtime/model closure",
+      "protocol": "arcane-ai-provider/2 stt/transcribe",
+      "normalization": "Independent load, status, request, unload, cancellation, and disposal; accepts provider-native Float32Array audio at exactly 16000 Hz or decodes the shared AI.js Blob/File payload to authoritative 16000 Hz mono PCM; never selects a cloud fallback"
+    },
+    {
+      "id": "browser-speech:createDbopfsSpeechArtifactStore",
+      "name": "createDbopfsSpeechArtifactStore",
+      "displayName": "createDbopfsSpeechArtifactStore()",
+      "kind": "function",
+      "signature": "createDbopfsSpeechArtifactStore({ dbopfs, tableName='arcane_ai_browser_speech', fetchImpl=null, objectUrlFactory=null }={})",
+      "entrypoints": [
+        "arcane-os/ai/browser-speech"
+      ],
+      "primaryImport": "arcane-os/ai/browser-speech",
+      "group": "Browser speech providers",
+      "summary": "Adapts an existing DBOPFS instance into an authenticated, authority-scoped speech runtime/model artifact store.",
+      "availability": "Browser with a ready DBOPFS instance, Web Locks, Fetch or an explicit fetch implementation, File/Blob, and object URLs",
+      "protocol": "arcane.ai.browser-speech.assets.v1 completion manifests under arcane-ai-browser-speech-artifacts/1",
+      "normalization": "Serializes each authority, commits its completion manifest last, deletes partial state on failure, and supports strict offline cache admission"
     }
   ]
 }
