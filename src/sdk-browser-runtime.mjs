@@ -9,9 +9,9 @@ const MANIFEST_NAME='ARCANE_SDK_BROWSER_RELEASE.json';
 const BUILDER='arcane-sdk-browser-runtime-v1';
 const PROTOCOL='arcane-sdk-browser-runtime/1';
 export const SDK_BROWSER_RUNTIME_MANIFEST_SHA256=
-    'a211a2fcf498751aa8742068e37318c463f4ecf185b86cf6a05b7abf680eed15';
+    '798effd0ff0fbf6949d540a22f95de8e399f79fb7a3fb534581f32f3aefc51d8';
 export const SDK_BROWSER_RUNTIME_CONTENT_SHA256=
-    '23f2dff39f302b3ad44506199343113a1652f5076da393bd8670b0f1b610b06b';
+    'd28cc23ae39d9e5da46fedf85367b01da6d318193901ea302333b72c70cda150';
 const REPOSITORY='https://github.com/TheWizardNexus/arcane-os-sdk.git';
 const SHA256_PATTERN=/^[a-f0-9]{64}$/u;
 const READ_ONLY_NO_FOLLOW=FS_CONSTANTS.O_RDONLY|(FS_CONSTANTS.O_NOFOLLOW??0);

@@ -8,6 +8,7 @@ import {
 } from "./model-controller.mjs";
 import { createPackagedWllamaRuntime } from "./browser-wllama-runtime.mjs";
 import { createStreamingSha256 } from "./internal/sha256.mjs";
+import { arcaneEvents } from "../event-manager.mjs";
 
 const MODEL_MANIFEST_SCHEMA = "arcane.ai.browser-wasm.model.v3";
 const LEGACY_MODEL_MANIFEST_SCHEMA = "arcane.ai.browser-wasm.model.v2";
@@ -19,6 +20,8 @@ const DBOPFS_MODEL_STORES = new WeakSet();
 const V1_LLM_PROVIDER_ADAPTERS = new WeakMap();
 const AI_PROVIDER_PROTOCOL = "arcane-ai-provider/2";
 const AI_MODEL_AUTHORITY_PROTOCOL = "arcane-ai-model-authority/1";
+const WEBGPU_ADAPTER_SELECTED_EVENT = "arcane.ai.browser-wasm.webgpu.adapter.selected";
+const WEBGPU_ADAPTER_SELECTION_PROTOCOL = "arcane-ai-webgpu-adapter-selection/1";
 
 function fail(code, message, cause) {
   return new ArcaneAIError(code, message, {
@@ -112,6 +115,25 @@ function publicDescriptor(source) {
   if (source.bytes !== undefined) descriptor.bytes = source.bytes;
   if (source.sha256 !== undefined) descriptor.sha256 = source.sha256;
   return Object.freeze(descriptor);
+}
+
+function emitWebgpuAdapterSelection(source, runtime) {
+  const evidence = runtime.evidence();
+  const webgpu = evidence?.webgpu;
+  if (webgpu?.observed !== true || !webgpu.adapter) return;
+  arcaneEvents.instrument(WEBGPU_ADAPTER_SELECTED_EVENT, Object.freeze({
+    protocol: WEBGPU_ADAPTER_SELECTION_PROTOCOL,
+    providerId: "arcane-browser-wasm-wllama",
+    modelId: source.id,
+    runtimeEvidenceProtocol: evidence.protocol,
+    adapter: webgpu.adapter,
+    offload: webgpu.offload ?? null,
+    buffers: webgpu.buffers ?? null,
+    queue: webgpu.queue ?? null,
+  }), Object.freeze({
+    source: "sdk:ai/browser-wasm",
+    category: "capability",
+  }));
 }
 
 function manifestModelIdentity(source) {
@@ -1125,6 +1147,7 @@ export function createBrowserWasmLlmProvider({
       webgpuApiPresent: runtimeCapabilities.webgpuApiPresent,
       webgpuOperational: runtimeCapabilities.webgpuOperational,
       webgpuEvidenceProtocol: runtimeCapabilities.webgpuEvidenceProtocol,
+      webgpuAdapterSelectionEvent: WEBGPU_ADAPTER_SELECTED_EVENT,
       crossOriginIsolated: runtimeCapabilities.crossOriginIsolated,
       secureContext: runtimeCapabilities.secureContext,
       hardwareConcurrency: runtimeCapabilities.hardwareConcurrency,
@@ -1269,6 +1292,7 @@ export function createBrowserWasmLlmProvider({
             "Wllama did not confirm that the model loaded successfully.",
           );
         }
+        emitWebgpuAdapterSelection(source, runtime);
         throwIfAborted(signal, "load");
         if (generation !== lifecycleGeneration || state !== "loading") {
           await runtime.exit();

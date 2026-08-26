@@ -330,15 +330,17 @@ sourceTest('browser-WASM provider admits only module-branded model sources and s
 
 sourceTest('browser-WASM provider serializes unload and retries failed disposal cleanup',async t=>{
     const temporary=await temporaryDirectory(t,{prefix:'arcane-provider-lifecycle-'});
-    const internal=path.join(temporary,'internal');
-    await mkdir(internal);
+    const browserRuntime=path.join(temporary,'browser-runtime');
+    const aiDirectory=path.join(browserRuntime,'ai');
+    const internal=path.join(aiDirectory,'internal');
+    await mkdir(internal,{recursive:true});
     await copyFile(
         path.resolve('browser-runtime/ai/browser-wasm-llm-provider.mjs'),
-        path.join(temporary,'browser-wasm-llm-provider.mjs')
+        path.join(aiDirectory,'browser-wasm-llm-provider.mjs')
     );
     await copyFile(
         path.resolve('browser-runtime/ai/model-controller.mjs'),
-        path.join(temporary,'model-controller.mjs')
+        path.join(aiDirectory,'model-controller.mjs')
     );
     await copyFile(
         path.resolve('browser-runtime/ai/internal/sha256.mjs'),
@@ -346,10 +348,18 @@ sourceTest('browser-WASM provider serializes unload and retries failed disposal 
     );
 
     const stateKey=`__arcaneProviderLifecycle${Date.now()}${Math.random()}`;
-    const runtimeState={instances:[]};
+    const runtimeState={instances:[],events:[]};
     globalThis[stateKey]=runtimeState;
     t.after(()=>{delete globalThis[stateKey];});
-    await writeFile(path.join(temporary,'browser-wllama-runtime.mjs'),`
+    await writeFile(path.join(browserRuntime,'event-manager.mjs'),`
+const state=globalThis[${JSON.stringify(stateKey)}];
+export const arcaneEvents=Object.freeze({
+    instrument(type,payload,metadata){
+        state.events.push(Object.freeze({type,payload,metadata}));
+    }
+});
+`);
+    await writeFile(path.join(aiDirectory,'browser-wllama-runtime.mjs'),`
 const state=globalThis[${JSON.stringify(stateKey)}];
 export function createPackagedWllamaRuntime(){
     const instance={loaded:false,workers:0,exitCalls:0,exitBehavior:null};
@@ -364,6 +374,26 @@ export function createPackagedWllamaRuntime(){
         async chat(){return {choices:[]};},
         async stream(){return {choices:[]};},
         async probe(){return {};},
+        evidence:()=>Object.freeze({
+            protocol:'arcane-wllama-runtime-evidence/1',
+            state:instance.loaded?'ready':'unloaded',
+            webgpu:instance.loaded
+                ?Object.freeze({
+                    observed:true,
+                    adapter:Object.freeze({
+                        vendorId:32902,
+                        vendor:'intel',
+                        architecture:'xe-lpg',
+                        deviceId:0,
+                        name:'',
+                        description:''
+                    }),
+                    offload:Object.freeze({layers:36,totalLayers:36}),
+                    buffers:Object.freeze({count:1,descriptorBytes:1}),
+                    queue:Object.freeze({submissions:1,commandBuffers:1,fenceRequests:1,fenceCompletions:1})
+                })
+                :Object.freeze({observed:false})
+        }),
         async exit(){
             instance.exitCalls+=1;
             if(!instance.loaded) return false;
@@ -384,7 +414,7 @@ export function createPackagedWllamaRuntime(){
 }
 `);
     const temporaryModule=await import(`${pathToFileURL(
-        path.join(temporary,'browser-wasm-llm-provider.mjs')
+        path.join(aiDirectory,'browser-wasm-llm-provider.mjs')
     ).href}?case=${Date.now()}`);
     const api={
         createBrowserModelSource:temporaryModule.createBrowserModelSource,
@@ -394,6 +424,28 @@ export function createPackagedWllamaRuntime(){
     const first=genuineSourceAndStore(api,{id:'provider-unload-regression',byte:1});
     const firstProvider=temporaryModule.createBrowserWasmLlmProvider(first);
     await firstProvider.load();
+    assert.equal(runtimeState.events.length,1);
+    assert.deepEqual(runtimeState.events[0],{
+        type:'arcane.ai.browser-wasm.webgpu.adapter.selected',
+        payload:{
+            protocol:'arcane-ai-webgpu-adapter-selection/1',
+            providerId:'arcane-browser-wasm-wllama',
+            modelId:'provider-unload-regression',
+            runtimeEvidenceProtocol:'arcane-wllama-runtime-evidence/1',
+            adapter:{
+                vendorId:32902,
+                vendor:'intel',
+                architecture:'xe-lpg',
+                deviceId:0,
+                name:'',
+                description:''
+            },
+            offload:{layers:36,totalLayers:36},
+            buffers:{count:1,descriptorBytes:1},
+            queue:{submissions:1,commandBuffers:1,fenceRequests:1,fenceCompletions:1}
+        },
+        metadata:{source:'sdk:ai/browser-wasm',category:'capability'}
+    });
     const firstRuntime=runtimeState.instances[0];
     assert.equal(firstRuntime.workers,1);
     const unloadStarted=deferred();
