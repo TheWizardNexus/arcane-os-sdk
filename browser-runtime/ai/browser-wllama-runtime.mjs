@@ -331,12 +331,25 @@ function verifyProjectedTelemetry(value) {
   return value;
 }
 
+function adapterEvidenceConflicts(workerAdapter, loggedAdapter) {
+  if (!workerAdapter || !loggedAdapter) return false;
+  function loggedText(value) {
+    return typeof value === "string" ? value.slice(0, 256) : "";
+  }
+  return workerAdapter.vendor !== loggedText(loggedAdapter.vendor)
+    || workerAdapter.architecture !== loggedText(loggedAdapter.architecture)
+    || workerAdapter.name !== loggedText(loggedAdapter.name)
+    || workerAdapter.description !== loggedText(loggedAdapter.description);
+}
+
 function admittedLoadEvidence(logs, projected) {
   const worker = projected.worker;
+  const adapter = worker.adapter;
   const offload = logs.offload;
   const failures = [];
   if (logs.invalid) failures.push("conflicting-log-evidence");
-  if (!logs.adapter) failures.push("adapter-log");
+  if (!adapter) failures.push("adapter-selection");
+  else if (adapterEvidenceConflicts(adapter, logs.adapter)) failures.push("adapter-log-conflict");
   if (!offload) failures.push("offload-log");
   else if (
     !Number.isSafeInteger(offload.layers)
@@ -362,7 +375,7 @@ function admittedLoadEvidence(logs, projected) {
   }
   return deepFreeze({
     observed: true,
-    adapter: logs.adapter,
+    adapter,
     offload: { ...offload, allReportedModelLayers: true },
     buffers: { count: worker.bufferCount, descriptorBytes: worker.bufferBytes },
     queue: {

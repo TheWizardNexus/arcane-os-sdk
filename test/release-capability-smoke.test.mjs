@@ -381,7 +381,7 @@ export function createPackagedWllamaRuntime(){
                 ?Object.freeze({
                     observed:true,
                     adapter:Object.freeze({
-                        vendorId:32902,
+                        vendorId:null,
                         vendor:'intel',
                         architecture:'xe-lpg',
                         deviceId:0,
@@ -433,7 +433,7 @@ export function createPackagedWllamaRuntime(){
             modelId:'provider-unload-regression',
             runtimeEvidenceProtocol:'arcane-wllama-runtime-evidence/1',
             adapter:{
-                vendorId:32902,
+                vendorId:null,
                 vendor:'intel',
                 architecture:'xe-lpg',
                 deviceId:0,

@@ -71,6 +71,7 @@ test("the projection observes buffers, queue work, cancellation acknowledgement,
     1,
   );
   assert.match(source, new RegExp(WLLAMA_WEBGPU_EVIDENCE_PROTOCOL, "u"));
+  assert.match(source, /navigator\.gpu\.requestAdapter\(opts\).*arcaneRecordSelectedWebgpuAdapter/su);
   assert.match(source, /device\.createBuffer\(desc\).*bufferBytes/su);
   assert.match(source, /queue\.submit\(cmds\).*queueSubmissions/su);
   assert.match(source, /queue\.onSubmittedWorkDone\(\).*queueFenceCompletions/su);
@@ -92,6 +93,9 @@ test("the runtime admits operational WebGPU only from full offload and observed 
   );
   assert.match(runtime, /navigatorPresenceIsOperationalEvidence: false/u);
   assert.match(runtime, /cpuFallback: false/u);
+  assert.match(runtime, /const adapter = worker\.adapter/u);
+  assert.match(runtime, /adapterEvidenceConflicts\(adapter, logs\.adapter\)/u);
+  assert.doesNotMatch(runtime, /if \(!logs\.adapter\) failures\.push\("adapter-log"\)/u);
   assert.match(runtime, /offload\.layers !== offload\.totalLayers/u);
   assert.match(runtime, /worker\.bufferCount < 1/u);
   assert.match(runtime, /worker\.bufferBytes < 1/u);

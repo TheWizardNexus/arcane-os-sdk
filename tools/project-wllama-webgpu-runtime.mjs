@@ -12,8 +12,8 @@ export const WLLAMA_UPSTREAM_AUTHORITY = Object.freeze({
 });
 
 export const WLLAMA_WEBGPU_EVIDENCE_PROTOCOL = "arcane-wllama-webgpu-evidence/1";
-export const WLLAMA_PROJECTED_BYTES = 389_765;
-export const WLLAMA_PROJECTED_SHA256 = "ae9a6ba2aa8687785ed651e28ef92573b409d5e6d3470bfd53340225287908b8";
+export const WLLAMA_PROJECTED_BYTES = 392_852;
+export const WLLAMA_PROJECTED_SHA256 = "b119a7cdffabc8541dce283381d18ada4027c0560728aac1fe45bdd30cdac8e2";
 
 const EXPORT_ANCHOR = "\nexport {\n";
 const PROJECTION_MARKER = "function applyArcaneWllamaProjection()";
@@ -29,7 +29,7 @@ function sha256(value) {
  */
 function applyArcaneWllamaProjection() {
   const protocol = "arcane-wllama-webgpu-evidence/1";
-  const emptyWorkerTelemetry = `{protocol:"${protocol}",bufferCount:0,bufferBytes:0,queueSubmissions:0,commandBuffers:0,queueFenceRequests:0,queueFenceCompletions:0,invalid:false}`;
+  const emptyWorkerTelemetry = `{protocol:"${protocol}",adapter:null,bufferCount:0,bufferBytes:0,queueSubmissions:0,commandBuffers:0,queueFenceRequests:0,queueFenceCompletions:0,invalid:false}`;
 
   function replaceSingle(source, search, replacement, label) {
     const first = source.indexOf(search);
@@ -40,8 +40,17 @@ function applyArcaneWllamaProjection() {
     return `${source.slice(0, first)}${replacement}${source.slice(first + search.length)}`;
   }
 
+  const adapterAnchor = "if(adapter){WebGPU.Internals.jsObjectInsert(adapterPtr,adapter)";
+  const adapterProjection = `if(adapter){(function arcaneRecordSelectedWebgpuAdapter(){const key="__arcaneWllamaWebgpuTelemetry";const previous=globalThis[key]??${emptyWorkerTelemetry};const info=adapter.info??{};const text=value=>typeof value==="string"?value.slice(0,256):"";const next={selected:true,vendorId:null,vendor:text(info.vendor),architecture:text(info.architecture),deviceId:null,name:text(info.device),description:text(info.description)};const conflicts=previous.adapter!==null&&JSON.stringify(previous.adapter)!==JSON.stringify(next);globalThis[key]={protocol:"${protocol}",adapter:previous.adapter??next,bufferCount:previous.bufferCount,bufferBytes:previous.bufferBytes,queueSubmissions:previous.queueSubmissions,commandBuffers:previous.commandBuffers,queueFenceRequests:previous.queueFenceRequests,queueFenceCompletions:previous.queueFenceCompletions,invalid:previous.invalid||conflicts}})();WebGPU.Internals.jsObjectInsert(adapterPtr,adapter)`;
+  WLLAMA_EMSCRIPTEN_CODE = replaceSingle(
+    WLLAMA_EMSCRIPTEN_CODE,
+    adapterAnchor,
+    adapterProjection,
+    "WebGPU adapter selection",
+  );
+
   const bufferAnchor = "var buffer;try{buffer=device.createBuffer(desc)}catch(ex){return false}WebGPU.Internals.jsObjectInsert(bufferPtr,buffer)";
-  const bufferProjection = `${bufferAnchor};(function arcaneRecordWebgpuBuffer(){const key="__arcaneWllamaWebgpuTelemetry";const previous=globalThis[key]??${emptyWorkerTelemetry};const size=desc.size;const bufferCount=previous.bufferCount+1;const bufferBytes=previous.bufferBytes+size;globalThis[key]={protocol:"${protocol}",bufferCount:Number.isSafeInteger(bufferCount)?bufferCount:previous.bufferCount,bufferBytes:Number.isSafeInteger(size)&&size>0&&Number.isSafeInteger(bufferBytes)?bufferBytes:previous.bufferBytes,queueSubmissions:previous.queueSubmissions,commandBuffers:previous.commandBuffers,queueFenceRequests:previous.queueFenceRequests,queueFenceCompletions:previous.queueFenceCompletions,invalid:previous.invalid||!Number.isSafeInteger(size)||size<1||!Number.isSafeInteger(bufferCount)||!Number.isSafeInteger(bufferBytes)}})()`;
+  const bufferProjection = `${bufferAnchor};(function arcaneRecordWebgpuBuffer(){const key="__arcaneWllamaWebgpuTelemetry";const previous=globalThis[key]??${emptyWorkerTelemetry};const size=desc.size;const bufferCount=previous.bufferCount+1;const bufferBytes=previous.bufferBytes+size;globalThis[key]={protocol:"${protocol}",adapter:previous.adapter,bufferCount:Number.isSafeInteger(bufferCount)?bufferCount:previous.bufferCount,bufferBytes:Number.isSafeInteger(size)&&size>0&&Number.isSafeInteger(bufferBytes)?bufferBytes:previous.bufferBytes,queueSubmissions:previous.queueSubmissions,commandBuffers:previous.commandBuffers,queueFenceRequests:previous.queueFenceRequests,queueFenceCompletions:previous.queueFenceCompletions,invalid:previous.invalid||!Number.isSafeInteger(size)||size<1||!Number.isSafeInteger(bufferCount)||!Number.isSafeInteger(bufferBytes)}})()`;
   WLLAMA_EMSCRIPTEN_CODE = replaceSingle(
     WLLAMA_EMSCRIPTEN_CODE,
     bufferAnchor,
@@ -50,7 +59,7 @@ function applyArcaneWllamaProjection() {
   );
 
   const queueAnchor = "queue.submit(cmds)};function _wgpuQueueWriteBuffer";
-  const queueProjection = `queue.submit(cmds);(function arcaneRecordWebgpuSubmission(){const key="__arcaneWllamaWebgpuTelemetry";const previous=globalThis[key]??${emptyWorkerTelemetry};const queueSubmissions=previous.queueSubmissions+1;const commandBuffers=previous.commandBuffers+cmds.length;globalThis[key]={protocol:"${protocol}",bufferCount:previous.bufferCount,bufferBytes:previous.bufferBytes,queueSubmissions:Number.isSafeInteger(queueSubmissions)?queueSubmissions:previous.queueSubmissions,commandBuffers:Number.isSafeInteger(commandBuffers)?commandBuffers:previous.commandBuffers,queueFenceRequests:previous.queueFenceRequests,queueFenceCompletions:previous.queueFenceCompletions,invalid:previous.invalid||!Number.isSafeInteger(queueSubmissions)||!Number.isSafeInteger(commandBuffers)}})()};function _wgpuQueueWriteBuffer`;
+  const queueProjection = `queue.submit(cmds);(function arcaneRecordWebgpuSubmission(){const key="__arcaneWllamaWebgpuTelemetry";const previous=globalThis[key]??${emptyWorkerTelemetry};const queueSubmissions=previous.queueSubmissions+1;const commandBuffers=previous.commandBuffers+cmds.length;globalThis[key]={protocol:"${protocol}",adapter:previous.adapter,bufferCount:previous.bufferCount,bufferBytes:previous.bufferBytes,queueSubmissions:Number.isSafeInteger(queueSubmissions)?queueSubmissions:previous.queueSubmissions,commandBuffers:Number.isSafeInteger(commandBuffers)?commandBuffers:previous.commandBuffers,queueFenceRequests:previous.queueFenceRequests,queueFenceCompletions:previous.queueFenceCompletions,invalid:previous.invalid||!Number.isSafeInteger(queueSubmissions)||!Number.isSafeInteger(commandBuffers)}})()};function _wgpuQueueWriteBuffer`;
   WLLAMA_EMSCRIPTEN_CODE = replaceSingle(
     WLLAMA_EMSCRIPTEN_CODE,
     queueAnchor,
@@ -59,7 +68,7 @@ function applyArcaneWllamaProjection() {
   );
 
   const fenceAnchor = "runtimeKeepalivePush();WebGPU.Internals.futureInsert(futureId,queue.onSubmittedWorkDone().then(()=>{";
-  const fenceProjection = `runtimeKeepalivePush();(function arcaneRecordWebgpuFenceRequest(){const key="__arcaneWllamaWebgpuTelemetry";const previous=globalThis[key]??${emptyWorkerTelemetry};const queueFenceRequests=previous.queueFenceRequests+1;globalThis[key]={protocol:"${protocol}",bufferCount:previous.bufferCount,bufferBytes:previous.bufferBytes,queueSubmissions:previous.queueSubmissions,commandBuffers:previous.commandBuffers,queueFenceRequests:Number.isSafeInteger(queueFenceRequests)?queueFenceRequests:previous.queueFenceRequests,queueFenceCompletions:previous.queueFenceCompletions,invalid:previous.invalid||!Number.isSafeInteger(queueFenceRequests)}})();WebGPU.Internals.futureInsert(futureId,queue.onSubmittedWorkDone().then(function arcaneRecordWebgpuFenceCompletion(){(function arcaneCommitWebgpuFenceCompletion(){const key="__arcaneWllamaWebgpuTelemetry";const previous=globalThis[key]??${emptyWorkerTelemetry};const queueFenceCompletions=previous.queueFenceCompletions+1;globalThis[key]={protocol:"${protocol}",bufferCount:previous.bufferCount,bufferBytes:previous.bufferBytes,queueSubmissions:previous.queueSubmissions,commandBuffers:previous.commandBuffers,queueFenceRequests:previous.queueFenceRequests,queueFenceCompletions:Number.isSafeInteger(queueFenceCompletions)?queueFenceCompletions:previous.queueFenceCompletions,invalid:previous.invalid||!Number.isSafeInteger(queueFenceCompletions)||queueFenceCompletions>previous.queueFenceRequests}})();`;
+  const fenceProjection = `runtimeKeepalivePush();(function arcaneRecordWebgpuFenceRequest(){const key="__arcaneWllamaWebgpuTelemetry";const previous=globalThis[key]??${emptyWorkerTelemetry};const queueFenceRequests=previous.queueFenceRequests+1;globalThis[key]={protocol:"${protocol}",adapter:previous.adapter,bufferCount:previous.bufferCount,bufferBytes:previous.bufferBytes,queueSubmissions:previous.queueSubmissions,commandBuffers:previous.commandBuffers,queueFenceRequests:Number.isSafeInteger(queueFenceRequests)?queueFenceRequests:previous.queueFenceRequests,queueFenceCompletions:previous.queueFenceCompletions,invalid:previous.invalid||!Number.isSafeInteger(queueFenceRequests)}})();WebGPU.Internals.futureInsert(futureId,queue.onSubmittedWorkDone().then(function arcaneRecordWebgpuFenceCompletion(){(function arcaneCommitWebgpuFenceCompletion(){const key="__arcaneWllamaWebgpuTelemetry";const previous=globalThis[key]??${emptyWorkerTelemetry};const queueFenceCompletions=previous.queueFenceCompletions+1;globalThis[key]={protocol:"${protocol}",adapter:previous.adapter,bufferCount:previous.bufferCount,bufferBytes:previous.bufferBytes,queueSubmissions:previous.queueSubmissions,commandBuffers:previous.commandBuffers,queueFenceRequests:previous.queueFenceRequests,queueFenceCompletions:Number.isSafeInteger(queueFenceCompletions)?queueFenceCompletions:previous.queueFenceCompletions,invalid:previous.invalid||!Number.isSafeInteger(queueFenceCompletions)||queueFenceCompletions>previous.queueFenceRequests}})();`;
   WLLAMA_EMSCRIPTEN_CODE = replaceSingle(
     WLLAMA_EMSCRIPTEN_CODE,
     fenceAnchor,
@@ -68,7 +77,7 @@ function applyArcaneWllamaProjection() {
   );
 
   const workerAnchor = "  if (verb === 'module.init') {";
-  const workerProjection = `  if (verb === 'arcane.telemetry') {\n    const observed = globalThis.__arcaneWllamaWebgpuTelemetry;\n    msg({\n      callbackId,\n      result: {\n        protocol: '${protocol}',\n        bufferCount: Number.isSafeInteger(observed?.bufferCount) ? observed.bufferCount : 0,\n        bufferBytes: Number.isSafeInteger(observed?.bufferBytes) ? observed.bufferBytes : 0,\n        queueSubmissions: Number.isSafeInteger(observed?.queueSubmissions) ? observed.queueSubmissions : 0,\n        commandBuffers: Number.isSafeInteger(observed?.commandBuffers) ? observed.commandBuffers : 0,\n        queueFenceRequests: Number.isSafeInteger(observed?.queueFenceRequests) ? observed.queueFenceRequests : 0,\n        queueFenceCompletions: Number.isSafeInteger(observed?.queueFenceCompletions) ? observed.queueFenceCompletions : 0,\n        invalid: observed?.invalid === true,\n      },\n    });\n    return;\n  }\n\n${workerAnchor}`;
+  const workerProjection = `  if (verb === 'arcane.telemetry') {\n    const observed = globalThis.__arcaneWllamaWebgpuTelemetry;\n    const adapter = observed?.adapter?.selected === true ? {\n      selected: true,\n      vendorId: null,\n      vendor: typeof observed.adapter.vendor === 'string' ? observed.adapter.vendor.slice(0, 256) : '',\n      architecture: typeof observed.adapter.architecture === 'string' ? observed.adapter.architecture.slice(0, 256) : '',\n      deviceId: null,\n      name: typeof observed.adapter.name === 'string' ? observed.adapter.name.slice(0, 256) : '',\n      description: typeof observed.adapter.description === 'string' ? observed.adapter.description.slice(0, 256) : '',\n    } : null;\n    msg({\n      callbackId,\n      result: {\n        protocol: '${protocol}',\n        adapter,\n        bufferCount: Number.isSafeInteger(observed?.bufferCount) ? observed.bufferCount : 0,\n        bufferBytes: Number.isSafeInteger(observed?.bufferBytes) ? observed.bufferBytes : 0,\n        queueSubmissions: Number.isSafeInteger(observed?.queueSubmissions) ? observed.queueSubmissions : 0,\n        commandBuffers: Number.isSafeInteger(observed?.commandBuffers) ? observed.commandBuffers : 0,\n        queueFenceRequests: Number.isSafeInteger(observed?.queueFenceRequests) ? observed.queueFenceRequests : 0,\n        queueFenceCompletions: Number.isSafeInteger(observed?.queueFenceCompletions) ? observed.queueFenceCompletions : 0,\n        invalid: observed?.invalid === true,\n      },\n    });\n    return;\n  }\n\n${workerAnchor}`;
   LLAMA_CPP_WORKER_CODE = replaceSingle(
     LLAMA_CPP_WORKER_CODE,
     workerAnchor,
@@ -80,15 +89,43 @@ function applyArcaneWllamaProjection() {
     function nonNegativeCounter(candidate) {
       return Number.isSafeInteger(candidate) && candidate >= 0 ? candidate : 0;
     }
+    function adapterText(candidate) {
+      return typeof candidate === "string" && candidate.length <= 256 ? candidate : "";
+    }
+    const rawAdapter = value?.adapter;
+    const adapterInvalid = rawAdapter !== undefined && rawAdapter !== null && (
+      typeof rawAdapter !== "object"
+      || rawAdapter.selected !== true
+      || rawAdapter.vendorId !== null
+      || typeof rawAdapter.vendor !== "string"
+      || rawAdapter.vendor.length > 256
+      || typeof rawAdapter.architecture !== "string"
+      || rawAdapter.architecture.length > 256
+      || rawAdapter.deviceId !== null
+      || typeof rawAdapter.name !== "string"
+      || rawAdapter.name.length > 256
+      || typeof rawAdapter.description !== "string"
+      || rawAdapter.description.length > 256
+    );
+    const adapter = rawAdapter?.selected === true ? Object.freeze({
+      selected: true,
+      vendorId: null,
+      vendor: adapterText(rawAdapter.vendor),
+      architecture: adapterText(rawAdapter.architecture),
+      deviceId: null,
+      name: adapterText(rawAdapter.name),
+      description: adapterText(rawAdapter.description),
+    }) : null;
     return Object.freeze({
       protocol,
+      adapter,
       bufferCount: nonNegativeCounter(value?.bufferCount),
       bufferBytes: nonNegativeCounter(value?.bufferBytes),
       queueSubmissions: nonNegativeCounter(value?.queueSubmissions),
       commandBuffers: nonNegativeCounter(value?.commandBuffers),
       queueFenceRequests: nonNegativeCounter(value?.queueFenceRequests),
       queueFenceCompletions: nonNegativeCounter(value?.queueFenceCompletions),
-      invalid: value?.invalid === true || value?.protocol !== protocol,
+      invalid: value?.invalid === true || value?.protocol !== protocol || adapterInvalid,
     });
   }
 

@@ -225,13 +225,13 @@ function isChromeBrowser() {
 }
 
 function isLowerPowerIntelAdapter(adapter) {
-  if (adapter?.vendorId !== INTEL_VENDOR_ID) return false;
   const identity = [
     adapter.vendor,
     adapter.architecture,
     adapter.name,
     adapter.description,
   ].filter(Boolean).join(" ");
+  if (adapter?.vendorId !== INTEL_VENDOR_ID && !/\bintel\b/iu.test(identity)) return false;
   return /(?:intel|integrated|xe-lp)/iu.test(identity);
 }
 

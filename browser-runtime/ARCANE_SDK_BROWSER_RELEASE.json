@@ -29,15 +29,15 @@
     ]
   },
   "fileCount": 25,
-  "totalBytes": 9265304,
-  "contentSha256": "9084b13b822b8191e9426f3690ca9bdf01f2c1110f6ba7ee236f50542421330e",
+  "totalBytes": 9269048,
+  "contentSha256": "ba1392154996348e2beb9ffa82c04f2ae1cafeef9781fe33d9e3774510932206",
   "files": [
     {
       "path": "ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json",
       "sourcePath": "browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json",
       "provenance": "sdk-source-identity",
       "bytes": 3173,
-      "sha256": "5e3868eb6ec9d0ca0df6797c22b56209fce6f210638b49f41b26edb374f7c1a3"
+      "sha256": "7f4e361eb2270ea63cdb2f6d4b899d5c87e4b955e1b4692b800f3e89e23568fc"
     },
     {
       "path": "ai/browser-kokoro-worker.mjs",
@@ -71,8 +71,8 @@
       "path": "ai/browser-wasm-llm-provider.mjs",
       "sourcePath": "browser-runtime/ai/browser-wasm-llm-provider.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 86972,
-      "sha256": "2d33360980d1367cd7fe677bdbdcf10aa7e3def0b646084cf3f637890d82f819"
+      "bytes": 87005,
+      "sha256": "1643dfc732cda823b8714a88d23d6e8bee48b7f8d1cf6da95906e75d6562ba9a"
     },
     {
       "path": "ai/browser-wasm.mjs",
@@ -92,8 +92,8 @@
       "path": "ai/browser-wllama-runtime.mjs",
       "sourcePath": "browser-runtime/ai/browser-wllama-runtime.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 31740,
-      "sha256": "ac5cf9a97cd9652bc9feaaf1a03210cf9330c6f0c6a410b8ba089f550b58b8f3"
+      "bytes": 32364,
+      "sha256": "6acc35060af4f519b34ba2eb8ee16abaf38dbe2ad0d003256b61311713984851"
     },
     {
       "path": "ai/internal/sha256.mjs",
@@ -134,8 +134,8 @@
       "path": "ai/wllama/index.mjs",
       "sourcePath": "browser-runtime/ai/wllama/index.mjs",
       "provenance": "deterministic-derived-vendor",
-      "bytes": 389765,
-      "sha256": "ae9a6ba2aa8687785ed651e28ef92573b409d5e6d3470bfd53340225287908b8"
+      "bytes": 392852,
+      "sha256": "b119a7cdffabc8541dce283381d18ada4027c0560728aac1fe45bdd30cdac8e2"
     },
     {
       "path": "ai/wllama/llama.cpp-LICENSE",
