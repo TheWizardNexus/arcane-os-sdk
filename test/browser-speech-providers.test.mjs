@@ -270,6 +270,323 @@ test("browser Whisper and Kokoro expose independent provider-v2 workers", async 
   await kokoro.dispose();
 });
 
+test("browser speech providers normalize shared AI requests at one fail-closed boundary", async (t) => {
+  const offlineAudioContextDescriptor = Object.getOwnPropertyDescriptor(
+    globalThis,
+    "OfflineAudioContext",
+  );
+  const webkitOfflineAudioContextDescriptor = Object.getOwnPropertyDescriptor(
+    globalThis,
+    "webkitOfflineAudioContext",
+  );
+  Object.defineProperty(globalThis, "OfflineAudioContext", {
+    configurable: true,
+    writable: true,
+    value: undefined,
+  });
+  Object.defineProperty(globalThis, "webkitOfflineAudioContext", {
+    configurable: true,
+    writable: true,
+    value: undefined,
+  });
+  t.after(() => {
+    if (offlineAudioContextDescriptor) {
+      Object.defineProperty(
+        globalThis,
+        "OfflineAudioContext",
+        offlineAudioContextDescriptor,
+      );
+    } else {
+      delete globalThis.OfflineAudioContext;
+    }
+    if (webkitOfflineAudioContextDescriptor) {
+      Object.defineProperty(
+        globalThis,
+        "webkitOfflineAudioContext",
+        webkitOfflineAudioContextDescriptor,
+      );
+    } else {
+      delete globalThis.webkitOfflineAudioContext;
+    }
+  });
+
+  const dbopfs = createMemoryDbopfs();
+  const sources = new Map();
+  for (const role of ["stt", "tts"]) {
+    const options = providerOptions(role, null);
+    for (const descriptor of [...options.runtime.files, ...options.model.files]) {
+      sources.set(descriptor.url, role === "stt"
+        ? descriptor.path === "runtime.mjs"
+          ? new TextEncoder().encode("export const pipeline=()=>{};")
+          : new Uint8Array([1, 2, 3])
+        : descriptor.path === "runtime.mjs"
+          ? new TextEncoder().encode("export class KokoroTTS{}")
+          : new Uint8Array([4, 5, 6]));
+    }
+  }
+  let objectUrl = 0;
+  const store = createDbopfsSpeechArtifactStore({
+    dbopfs,
+    fetchImpl: async (url) => responseAt(
+      url,
+      sources.get(String(url)),
+      { status: 200 },
+    ),
+    objectUrlFactory: {
+      create: () => `blob:normalized-speech-${String(++objectUrl)}`,
+      revoke: () => undefined,
+    },
+  });
+  const workers = { stt: [], tts: [] };
+  installContractWorker(t, ({ options }) => {
+    const role = options.name.includes("whisper") ? "stt" : "tts";
+    const contract = createSpeechWorkerContract({ role });
+    workers[role].push(contract);
+    return contract;
+  });
+  const whisper = createBrowserWhisperProvider(providerOptions("stt", store));
+  const kokoro = createBrowserKokoroProvider(providerOptions("tts", store));
+
+  const whisperCatalog = whisper.catalog();
+  const kokoroCatalog = kokoro.catalog();
+  assert.deepEqual(whisperCatalog[0].speech, { inputSampleRate: 16_000 });
+  assert.deepEqual(kokoroCatalog[0].speech, {
+    outputSampleRate: 24_000,
+    responseFormats: ["wav"],
+    defaultResponseFormat: "wav",
+  });
+  assert.equal(Object.isFrozen(whisperCatalog[0].speech), true);
+  assert.equal(Object.isFrozen(kokoroCatalog[0].speech), true);
+  assert.equal(Object.isFrozen(kokoroCatalog[0].speech.responseFormats), true);
+
+  for (const provider of [whisper, kokoro]) {
+    await provider.load({
+      role: provider.role,
+      selection: selection(provider),
+      signal: null,
+      progress: () => undefined,
+      security: { checks: { sha256: true } },
+    });
+  }
+
+  const nativeAudio = new Float32Array([0.125, -0.25]);
+  await whisper.request({
+    role: "stt",
+    selection: selection(whisper),
+    operation: "transcribe",
+    payload: { audio: nativeAudio, sampleRate: 16_000 },
+    signal: null,
+  });
+  const nativeUse = workers.stt[0].posted.find((message) => message.op === "use");
+  assert.notEqual(nativeUse.payload.audio, nativeAudio);
+  assert.deepEqual(nativeUse.payload.audio, nativeAudio);
+  assert.equal(nativeUse.payload.sampleRate, 16_000);
+
+  const sharedAudio = new Blob([new Uint8Array([9, 8, 7])], { type: "audio/webm" });
+  const sharedTranscription = {
+    audio: sharedAudio,
+    mimeType: "audio/webm; codecs=opus",
+    model: whisperCatalog[0].id,
+  };
+  const sttUseCount = () => workers.stt[0].posted.filter(
+    (message) => message.op === "use",
+  ).length;
+
+  await assert.rejects(whisper.request({
+    role: "stt",
+    selection: selection(whisper),
+    operation: "transcribe",
+    payload: sharedTranscription,
+    signal: null,
+  }), (error) => error?.code === "ARCANE_AI_AUDIO_DECODE_UNAVAILABLE");
+  assert.equal(sttUseCount(), 1);
+  assert.equal(whisper.status().state, "ready");
+  assert.equal(workers.stt[0].terminated, false);
+
+  const decoderConstructions = [];
+  const decoderInputs = [];
+  let decodedSampleRate = 16_000;
+  const channels = [
+    new Float32Array([0.25, -0.5]),
+    new Float32Array([0.75, 0.5]),
+  ];
+  Object.defineProperty(globalThis, "OfflineAudioContext", {
+    configurable: true,
+    writable: true,
+    value: function ContractOfflineAudioContext(channelCount, length, sampleRate) {
+      decoderConstructions.push({ channelCount, length, sampleRate });
+      this.decodeAudioData = async function decodeContractAudio(encoded) {
+        decoderInputs.push(new Uint8Array(encoded));
+        return {
+          sampleRate: decodedSampleRate,
+          length: channels[0].length,
+          numberOfChannels: channels.length,
+          getChannelData(index) {
+            return channels[index];
+          },
+        };
+      };
+    },
+  });
+
+  await assert.rejects(whisper.request({
+    role: "stt",
+    selection: { ...selection(whisper), modelId: "different-model" },
+    operation: "transcribe",
+    payload: sharedTranscription,
+    signal: null,
+  }), (error) => error?.code === "ARCANE_AI_MODEL_AUTHORITY_REQUIRED");
+  await assert.rejects(whisper.request({
+    role: "stt",
+    selection: selection(whisper),
+    operation: "transcribe",
+    payload: { ...sharedTranscription, model: "different-model" },
+    signal: null,
+  }), (error) => error?.code === "ARCANE_AI_MODEL_AUTHORITY_REQUIRED");
+  await assert.rejects(whisper.request({
+    role: "stt",
+    selection: selection(whisper),
+    operation: "transcribe",
+    payload: { ...sharedTranscription, mimeType: "audio/ogg" },
+    signal: null,
+  }), (error) => error?.code === "ARCANE_AI_INVALID_REQUEST");
+  assert.equal(decoderInputs.length, 0);
+  assert.equal(sttUseCount(), 1);
+
+  decodedSampleRate = 48_000;
+  await assert.rejects(whisper.request({
+    role: "stt",
+    selection: selection(whisper),
+    operation: "transcribe",
+    payload: sharedTranscription,
+    signal: null,
+  }), (error) => error?.code === "ARCANE_AI_AUDIO_DECODE_FAILED");
+  assert.equal(sttUseCount(), 1);
+  decodedSampleRate = 16_000;
+
+  assert.deepEqual(await whisper.request({
+    role: "stt",
+    selection: selection(whisper),
+    operation: "transcribe",
+    payload: sharedTranscription,
+    signal: null,
+  }), { text: "hello from whisper" });
+  assert.deepEqual(decoderConstructions, [
+    { channelCount: 1, length: 1, sampleRate: 16_000 },
+    { channelCount: 1, length: 1, sampleRate: 16_000 },
+  ]);
+  assert.deepEqual(decoderInputs.map((bytes) => [...bytes]), [
+    [9, 8, 7],
+    [9, 8, 7],
+  ]);
+  const sharedSttUse = workers.stt[0].posted.filter(
+    (message) => message.op === "use",
+  ).at(-1);
+  assert.deepEqual([...sharedSttUse.payload.audio], [0.5, 0]);
+  assert.equal(sharedSttUse.payload.sampleRate, 16_000);
+
+  const ttsUseCount = () => workers.tts[0].posted.filter(
+    (message) => message.op === "use",
+  ).length;
+  await assert.rejects(kokoro.request({
+    role: "tts",
+    selection: selection(kokoro),
+    operation: "synthesize",
+    payload: {
+      model: "different-model",
+      voice: "af_heart",
+      input: "Wrong authority",
+      responseFormat: "wav",
+      speed: 1,
+    },
+    signal: null,
+  }), (error) => error?.code === "ARCANE_AI_MODEL_AUTHORITY_REQUIRED");
+  await assert.rejects(kokoro.request({
+    role: "tts",
+    selection: selection(kokoro),
+    operation: "synthesize",
+    payload: {
+      model: kokoroCatalog[0].id,
+      voice: "af_heart",
+      input: "Unsupported",
+      responseFormat: "mp3",
+      speed: 1,
+    },
+    signal: null,
+  }), (error) => error?.code === "ARCANE_AI_UNSUPPORTED_RESPONSE_FORMAT");
+  assert.equal(ttsUseCount(), 0);
+
+  const wav = await kokoro.request({
+    role: "tts",
+    selection: selection(kokoro),
+    operation: "synthesize",
+    payload: {
+      model: kokoroCatalog[0].id,
+      voice: "af_heart",
+      input: "Shared synthesis",
+      responseFormat: "wav",
+      speed: 1.25,
+    },
+    signal: null,
+  });
+  const sharedTtsUse = workers.tts[0].posted.find((message) => message.op === "use");
+  assert.deepEqual(sharedTtsUse.payload, {
+    text: "Shared synthesis",
+    voice: "af_heart",
+    speed: 1.25,
+  });
+  assert.equal(wav.contentType, "audio/wav");
+  assert.equal(wav.audio instanceof Uint8Array, true);
+  assert.equal(new TextDecoder().decode(wav.audio.subarray(0, 4)), "RIFF");
+  assert.equal(new TextDecoder().decode(wav.audio.subarray(8, 12)), "WAVE");
+  const wavView = new DataView(
+    wav.audio.buffer,
+    wav.audio.byteOffset,
+    wav.audio.byteLength,
+  );
+  assert.equal(wavView.getUint32(24, true), 24_000);
+  assert.equal(wavView.getInt16(44, true), 0);
+  assert.equal(wavView.getInt16(46, true), 8192);
+  assert.equal(wavView.getInt16(48, true), -8192);
+
+  let resolveEncodedAudio;
+  const encodedAudio = new Blob([new Uint8Array([1])], { type: "audio/webm" });
+  Object.defineProperty(encodedAudio, "arrayBuffer", {
+    configurable: true,
+    value: function holdEncodedAudioRead() {
+      return new Promise((resolve) => {
+        resolveEncodedAudio = resolve;
+      });
+    },
+  });
+  const controller = new AbortController();
+  const pendingRequest = whisper.request({
+    role: "stt",
+    selection: selection(whisper),
+    operation: "transcribe",
+    payload: {
+      audio: encodedAudio,
+      mimeType: "audio/webm",
+      model: whisperCatalog[0].id,
+    },
+    signal: controller.signal,
+  });
+  assert.equal(whisper.status().busy, true);
+  controller.abort();
+  await assert.rejects(
+    pendingRequest,
+    (error) => error?.code === "ARCANE_AI_REQUEST_ABORTED",
+  );
+  assert.equal(whisper.status().busy, false);
+  assert.equal(whisper.status().state, "ready");
+  assert.equal(workers.stt[0].terminated, false);
+  assert.equal(sttUseCount(), 2);
+  resolveEncodedAudio(new Uint8Array([1]).buffer);
+
+  await whisper.dispose();
+  await kokoro.dispose();
+});
+
 test("speech request cancellation terminates only the affected role Worker", async (t) => {
   const dbopfs = createMemoryDbopfs();
   const options = providerOptions("stt", null);

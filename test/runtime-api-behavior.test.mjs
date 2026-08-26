@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 
 import test from '../src/testing.mjs';
 import {
@@ -41,6 +42,8 @@ import {
     getAIProviderRuntime
 } from '../runtime/arcane/modules/AIProviderRuntime.js';
 import ConfiguredAIChatSession from '../runtime/arcane/modules/ConfiguredAIChatSession.js';
+
+const repositoryRoot=new URL('../',import.meta.url);
 
 const readyEvents=[];
 const previousDispatchEvent=globalThis.dispatchEvent;
@@ -167,6 +170,92 @@ test('configured chat round-trips structural tool context and keeps prepared tur
         prefixed.send('context overflow'),
         error=>error?.code==='AI_CHAT_CONTEXT_LIMIT',
     );
+});
+
+test('configured chat normalizes one fail-closed OpenAI-compatible completion',async()=>{
+    const providerCompletion=Object.freeze({
+        provider:'OPENAI',
+        model:'gpt-compatible',
+        choices:Object.freeze([
+            Object.freeze({
+                index:0,
+                message:Object.freeze({
+                    role:'assistant',
+                    content:null,
+                    tool_calls:Object.freeze([
+                        Object.freeze({
+                            id:'lookup-1',
+                            type:'function',
+                            function:Object.freeze({
+                                name:'lookup',
+                                arguments:'{"id":"alpha"}'
+                            })
+                        })
+                    ])
+                }),
+                finish_reason:'tool_calls'
+            })
+        ]),
+        usage:Object.freeze({prompt_tokens:12,completion_tokens:7,total_tokens:19})
+    });
+    const session=new ConfiguredAIChatSession({chat:async()=>providerCompletion});
+    const response=await session.send('Find alpha');
+    assert.deepEqual(response,{
+        provider:'OPENAI',
+        model:'gpt-compatible',
+        message:{
+            role:'assistant',
+            content:'',
+            tool_calls:[{
+                id:'lookup-1',
+                type:'function',
+                function:{name:'lookup',arguments:'{"id":"alpha"}'}
+            }]
+        },
+        done:true,
+        doneReason:'tool_calls',
+        promptEvalCount:12,
+        evalCount:7
+    });
+    assert.equal(Object.isFrozen(response),true);
+    assert.equal(Object.isFrozen(response.message),true);
+    assert.equal(session.history().at(-1).tool_calls[0].id,'lookup-1');
+
+    for(const invalid of [
+        {choices:[]},
+        {choices:[{index:0,message:{role:'user',content:'wrong role'}}]},
+        {choices:[
+            {index:0,message:{role:'assistant',content:'one'}},
+            {index:1,message:{role:'assistant',content:'two'}}
+        ]},
+        {choices:[{index:0,message:{role:'assistant',content:'',tool_calls:[]}}]},
+        {choices:[{index:0,message:{role:'assistant',content:'ok'}}],usage:{prompt_tokens:-1}}
+    ]){
+        const rejected=new ConfiguredAIChatSession({chat:async()=>invalid});
+        await assert.rejects(
+            rejected.send('Reject malformed completion'),
+            error=>error?.code==='AI_CHAT_INVALID_RESPONSE'
+        );
+        assert.deepEqual(rejected.history(),[]);
+    }
+
+    const providerFailure=new Error('Provider rejected the request.');
+    providerFailure.code='AI_PROVIDER_REJECTED';
+    const rejected=new ConfiguredAIChatSession({
+        chat:async()=>{throw providerFailure;}
+    });
+    await assert.rejects(rejected.send('Preserve provider error'),providerFailure);
+
+    const cancellation=new AbortController();
+    const cancellable=new ConfiguredAIChatSession({
+        chat:async({signal})=>new Promise((_resolve,reject)=>{
+            signal.addEventListener('abort',()=>reject(signal.reason),{once:true});
+        })
+    });
+    const pending=cancellable.send('Cancel provider request',{signal:cancellation.signal});
+    cancellation.abort(new Error('Caller cancelled.'));
+    await assert.rejects(pending,error=>error?.code==='AI_CHAT_ABORTED');
+    assert.deepEqual(cancellable.history(),[]);
 });
 
 test('the Arcane Ollama module publishes one immutable complete browser surface',()=>{
@@ -1287,5 +1376,400 @@ test(
         assert.equal(runtime.unregister('llm', 'cloud-llm'), true);
         assert.equal(runtime.unregister('stt', 'local-stt'), true);
         assert.equal(runtime.unregister('tts', 'local-tts'), true);
+    }
+);
+
+test(
+    'legacy Cloud and admitted Core routes publish truthful provider-v2 readiness',
+    async function testLegacyLLMProviderAdapters() {
+        const previousWindow=globalThis.window;
+        const previousArcane=globalThis.Arcane;
+        const previousFetch=globalThis.fetch;
+        const windowTarget=new EventTarget();
+        windowTarget.dbopfs={ready:false,get:function ignoreDBOPFSRead(){}};
+        windowTarget.user={ready:false};
+        globalThis.window=windowTarget;
+        const requests=[];
+        globalThis.fetch=async function answerLegacyCloudRequest(url,options) {
+            requests.push({url:String(url),options});
+            return new Response(JSON.stringify({
+                id:'cloud-response',
+                model:'gpt-5-mini',
+                choices:[{
+                    index:0,
+                    message:{role:'assistant',content:'cloud response'},
+                    finish_reason:'stop'
+                }],
+                usage:{prompt_tokens:3,completion_tokens:2,total_tokens:5}
+            }),{
+                status:200,
+                headers:{'content-type':'application/json'}
+            });
+        };
+        try{
+            const {default:AI}=await import(
+                '../runtime/arcane/modules/AI.js?legacy-provider-v2-readiness'
+            );
+            const ai=new AI('OPENAI','OPENAI','OPENAI','OPENAI','OPENAI','OPENAI');
+            const runtime=ai.providerRuntime;
+            assert.deepEqual(runtime.providerIdentity('llm','OPENAI'),{
+                protocol:AI_PROVIDER_PROTOCOL,
+                role:'llm',
+                id:'OPENAI',
+                localOnly:false
+            });
+            assert.equal(runtime.status('llm').state,'unloaded');
+            assert.equal(ai.configured,false);
+
+            ai.license='test-credential';
+            await runtime.load('llm');
+            assert.equal(runtime.status('llm').state,'ready');
+            assert.equal(runtime.status('llm').loaded,true);
+            assert.equal(ai.configured,true);
+            assert.equal(requests.length,0,'Cloud readiness must not probe or download');
+            assert.deepEqual(runtime.catalog('llm').find(
+                entry=>entry.providerId==='OPENAI'
+            ).models,[{id:ai.model}]);
+
+            const directCloud=await runtime.request('llm',{
+                operation:'chat',
+                payload:{messages:[{role:'user',content:'Direct cloud'}]},
+                localOnly:false,
+                signal:null
+            });
+            assert.equal(directCloud.choices[0].message.content,'cloud response');
+            assert.equal(runtime.status('llm').state,'ready');
+            assert.equal(runtime.status('llm').busy,false);
+            const publicCloud=await ai.fetchRequest({
+                messages:[{role:'user',content:'Public cloud'}]
+            });
+            assert.equal(publicCloud.choices[0].message.content,'cloud response');
+            assert.equal(requests.length,2);
+
+            ai.license='';
+            await runtime.unload('llm');
+            assert.equal(runtime.status('llm').state,'unloaded');
+            assert.equal(ai.configured,false);
+
+            const nativeCalls=[];
+            globalThis.Arcane={
+                ollama:{
+                    async chat(request,options) {
+                        nativeCalls.push({request,options});
+                        return {
+                            model:request.model,
+                            message:{role:'assistant',content:'core response'},
+                            done_reason:'stop',
+                            prompt_eval_count:4,
+                            eval_count:3
+                        };
+                    }
+                }
+            };
+            await ai.transitionAI(
+                'OLLAMA','OPENAI','OPENAI','granite3.3:8b','OPENAI','OPENAI'
+            );
+            assert.deepEqual(runtime.providerIdentity('llm','OLLAMA'),{
+                protocol:AI_PROVIDER_PROTOCOL,
+                role:'llm',
+                id:'OLLAMA',
+                localOnly:true
+            });
+            assert.equal(runtime.status('llm').state,'ready');
+            assert.equal(runtime.status('llm').localOnly,true);
+            assert.equal(ai.configured,true);
+            assert.equal(nativeCalls.length,0,'Core readiness must not load or probe a model');
+            const directCore=await runtime.request('llm',{
+                operation:'chat',
+                payload:{messages:[{role:'user',content:'Direct core'}]},
+                localOnly:true,
+                signal:null
+            });
+            assert.equal(directCore.choices[0].message.content,'core response');
+            const publicCore=await ai.fetchRequest({
+                messages:[{role:'user',content:'Public core'}],
+                localOnly:true
+            });
+            assert.equal(publicCore.choices[0].message.content,'core response');
+            assert.equal(nativeCalls.length,2);
+
+            await runtime.unload('llm');
+            const ttsRequests=[];
+            let ttsState='unloaded';
+            const ttsProvider={
+                protocol:AI_PROVIDER_PROTOCOL,
+                role:'tts',
+                id:'catalog-tts',
+                localOnly:true,
+                catalog(){
+                    return [{
+                        id:'catalog-tts-model',
+                        speech:{
+                            outputSampleRate:24_000,
+                            responseFormats:['wav'],
+                            defaultResponseFormat:'wav'
+                        }
+                    }];
+                },
+                inspect(selection){
+                    return {
+                        available:true,
+                        authority:{
+                            protocol:AI_MODEL_AUTHORITY_PROTOCOL,
+                            providerId:'catalog-tts',
+                            modelId:selection.modelId,
+                            admitted:true
+                        }
+                    };
+                },
+                status(){
+                    return {state:ttsState,loaded:ttsState==='ready',busy:false};
+                },
+                async load({progress}){
+                    progress({
+                        phase:'capability',completed:1,total:1,unit:'items',heartbeat:false
+                    });
+                    ttsState='ready';
+                },
+                async request(context){
+                    ttsRequests.push(context.payload);
+                    return {audio:new Uint8Array([1,2,3,4]),contentType:'audio/wav'};
+                },
+                async unload(){ttsState='unloaded';},
+                async dispose(){ttsState='disposed';}
+            };
+            const unregisterTTS=runtime.register(ttsProvider);
+            const ttsSelection={
+                providerId:'catalog-tts',modelId:'catalog-tts-model',localOnly:true
+            };
+            ai.configureProviders({
+                llm:{default:null,localOnly:null},
+                stt:{default:null,localOnly:null},
+                tts:{default:ttsSelection,localOnly:ttsSelection}
+            });
+            windowTarget.user.AI_voice='af_heart';
+            windowTarget.AudioContext=class ContractAudioContext{
+                state='running';
+                destination={};
+                async decodeAudioData(){return {};}
+                createBufferSource(){
+                    return {
+                        connect(){},
+                        disconnect(){},
+                        start(){},
+                        stop(){}
+                    };
+                }
+            };
+            await ai.setSpeechMuted(false);
+            assert.equal(await ai.streamTTS('Shared route synthesis.',true),true);
+            assert.equal(ttsRequests.length,1);
+            assert.deepEqual(ttsRequests[0],{
+                model:'catalog-tts-model',
+                voice:'af_heart',
+                input:'Shared route synthesis.',
+                responseFormat:'wav',
+                speed:1
+            });
+            ai.stopAudio();
+            await ai.setSpeechMuted(true);
+            ai.configureProviders({
+                llm:{default:null,localOnly:null},
+                stt:{default:null,localOnly:null},
+                tts:{default:null,localOnly:null}
+            });
+            assert.equal(unregisterTTS(),true);
+            assert.equal(runtime.providerIdentity('llm','OLLAMA'),null);
+            assert.equal(runtime.status('llm').state,'unavailable');
+        }finally{
+            if(previousWindow===undefined)delete globalThis.window;
+            else globalThis.window=previousWindow;
+            if(previousArcane===undefined)delete globalThis.Arcane;
+            else globalThis.Arcane=previousArcane;
+            if(previousFetch===undefined)delete globalThis.fetch;
+            else globalThis.fetch=previousFetch;
+        }
+    }
+);
+
+test(
+    'chat requires explicit selected-unloaded AI activation before reporting a usable route',
+    async function testChatAIActivationContract() {
+        const source=await readFile(
+            new URL('runtime/arcane/components/chat.html',repositoryRoot),
+            'utf8'
+        );
+        const functionStart=source.indexOf('function createAIActivationController(');
+        const functionEnd=source.indexOf(
+            '\n    function synchronizeAIRuntimeState',
+            functionStart
+        );
+        assert.notEqual(functionStart,-1);
+        assert.notEqual(functionEnd,-1);
+        const factorySource=source.slice(functionStart,functionEnd);
+        const createAIActivationController=Function(
+            `'use strict';\n${factorySource}\nreturn createAIActivationController;`
+        )();
+
+        class ActivationEvent {
+            constructor(type,options={}) {
+                this.type=type;
+                this.detail=options.detail;
+                this.bubbles=options.bubbles===true;
+                this.composed=options.composed===true;
+                this.cancelable=options.cancelable===true;
+                this.defaultPrevented=false;
+            }
+
+            preventDefault() {
+                if(this.cancelable){
+                    this.defaultPrevented=true;
+                }
+            }
+        }
+
+        function element() {
+            const listeners=new Map();
+            return {
+                hidden:false,
+                disabled:false,
+                textContent:'',
+                attributes:new Map(),
+                listeners,
+                setAttribute(name,value) {
+                    this.attributes.set(name,String(value));
+                },
+                addEventListener(name,listener) {
+                    listeners.set(name,listener);
+                },
+                removeEventListener(name,listener) {
+                    if(listeners.get(name)===listener){
+                        listeners.delete(name);
+                    }
+                }
+            };
+        }
+
+        const panel=element();
+        const title=element();
+        const status=element();
+        const button=element();
+        const events=[];
+        const intents=[];
+        let preventNextRequest=false;
+        let activationFailure=null;
+        const host={
+            dispatchEvent(event) {
+                events.push(event);
+                if(preventNextRequest&&event.type==='chat-ai-activation-request'){
+                    preventNextRequest=false;
+                    event.preventDefault();
+                }
+                return !event.defaultPrevented;
+            },
+            async requestAIActivation(intent) {
+                intents.push(intent);
+                if(activationFailure){
+                    const error=activationFailure;
+                    activationFailure=null;
+                    throw error;
+                }
+            }
+        };
+        const controller=createAIActivationController({
+            host,panel,title,status,button,EventClass:ActivationEvent
+        });
+        assert.ok(Object.isFrozen(controller));
+        assert.equal(intents.length,0);
+
+        const unloaded=Object.freeze({
+            role:'llm',
+            state:'unloaded',
+            providerId:'browser-llm',
+            modelId:'selected-model',
+            localOnly:true,
+            progress:null,
+            error:null
+        });
+        controller.synchronize(unloaded);
+        assert.equal(panel.hidden,false);
+        assert.equal(panel.attributes.get('aria-busy'),'false');
+        assert.equal(title.textContent,'Language model not active');
+        assert.equal(button.textContent,'Start language model');
+        assert.equal(button.disabled,false);
+        assert.equal(intents.length,0,'state observation must never start a model');
+
+        assert.equal(await controller.request('load'),true);
+        assert.deepEqual(intents,[{role:'llm',action:'load',reason:'user'}]);
+        assert.ok(Object.isFrozen(intents[0]));
+        const loadEvent=events.find(
+            function findLoadRequest(event) {
+                return event.type==='chat-ai-activation-request'
+                    &&event.detail.intent.action==='load';
+            }
+        );
+        assert.ok(loadEvent);
+        assert.equal(loadEvent.bubbles,true);
+        assert.equal(loadEvent.composed,true);
+        assert.equal(loadEvent.cancelable,true);
+        assert.equal(loadEvent.detail.state,unloaded);
+        assert.ok(Object.isFrozen(loadEvent.detail));
+
+        preventNextRequest=true;
+        assert.equal(await controller.request('load'),false);
+        assert.equal(intents.length,1,'preventDefault must suppress the activation callback');
+
+        const loading=Object.freeze({
+            ...unloaded,
+            state:'loading',
+            progress:Object.freeze({
+                phase:'download',
+                completed:4,
+                total:10,
+                unit:'bytes',
+                heartbeat:true
+            })
+        });
+        controller.synchronize(loading);
+        assert.equal(panel.attributes.get('aria-busy'),'true');
+        assert.equal(title.textContent,'Starting language model');
+        assert.match(status.textContent,/download, 4 of 10 bytes, active heartbeat/u);
+        assert.equal(button.textContent,'Cancel loading');
+        assert.equal(await controller.request('unload'),true);
+        assert.deepEqual(intents.at(-1),{role:'llm',action:'unload',reason:'user'});
+
+        controller.synchronize(Object.freeze({...unloaded,state:'unloading'}));
+        assert.equal(title.textContent,'Canceling language model load');
+        assert.equal(button.disabled,true);
+
+        const runtimeFailure=new Error('Runtime authority rejected the selected model.');
+        controller.synchronize(Object.freeze({...unloaded,state:'error',error:runtimeFailure}));
+        assert.equal(title.textContent,'Language model activation failed');
+        assert.equal(status.textContent,runtimeFailure.message);
+        assert.equal(button.textContent,'Try again');
+
+        const callbackFailure=new Error('Activation callback failed.');
+        activationFailure=callbackFailure;
+        assert.equal(await controller.request('load'),false);
+        const errorEvent=events.at(-1);
+        assert.equal(errorEvent.type,'chat-ai-activation-error');
+        assert.equal(errorEvent.bubbles,true);
+        assert.equal(errorEvent.composed,true);
+        assert.equal(errorEvent.detail.error,callbackFailure);
+        assert.equal(errorEvent.detail.message,callbackFailure.message);
+        assert.equal(errorEvent.detail.request.intent.action,'load');
+        assert.ok(Object.isFrozen(errorEvent.detail));
+
+        controller.synchronize(Object.freeze({...unloaded,state:'ready'}));
+        assert.equal(panel.hidden,true);
+        assert.match(
+            source,
+            /llm:snapshot[.]roles[.]llm[.]state==='ready'/u,
+            'Send availability must remain bound to the sticky ready state.'
+        );
+        assert.match(source,/<button type="button" id="ai_activation_button">/u);
+        controller.destroy();
+        assert.equal(button.listeners.has('click'),false);
+        assert.equal(panel.hidden,true);
     }
 );

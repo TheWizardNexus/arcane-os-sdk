@@ -100,6 +100,7 @@
     }
 
     .chat_area[data-conversation-complete="true"] .conversation_timebox,
+    .chat_area[data-conversation-complete="true"] .ai_activation,
     .chat_area[data-conversation-complete="true"] .chat_input_area,
     .chat_area[data-conversation-complete="true"] > #speech,
     .chat_area[data-conversation-complete="true"] > .controls{
@@ -207,6 +208,63 @@
         border-radius: var(--arcane-chat-radius);
         background: var(--arcane-surface-raised, var(--modal-background));
         box-shadow: var(--arcane-shadow-small, 0 .35rem 1rem var(--shadow-color));
+    }
+
+    .ai_activation {
+        display:flex;
+        flex:0 0 auto;
+        box-sizing:border-box;
+        width:100%;
+        padding:var(--arcane-space-3, .75rem);
+        align-items:center;
+        justify-content:space-between;
+        gap:var(--arcane-space-3, .75rem);
+        border:1px solid var(--arcane-border, var(--border-color));
+        border-radius:var(--arcane-chat-radius);
+        background:var(--arcane-surface-raised, var(--modal-background));
+        color:var(--text-color);
+    }
+
+    .ai_activation[hidden] {
+        display:none;
+    }
+
+    .ai_activation_copy {
+        min-width:0;
+    }
+
+    .ai_activation_copy strong,
+    .ai_activation_copy span {
+        display:block;
+        overflow-wrap:anywhere;
+    }
+
+    .ai_activation_copy span {
+        margin-block-start:.22rem;
+        font-size:.9rem;
+    }
+
+    .ai_activation button {
+        flex:0 0 auto;
+        min-height:2.65rem;
+        padding:.55rem .8rem;
+        border:1px solid var(--arcane-action, var(--primary-color));
+        border-radius:var(--arcane-radius-medium, .7rem);
+        background:var(--arcane-action, var(--primary-color));
+        color:var(--arcane-action-text, var(--button-text-color, var(--text-color)));
+        font:inherit;
+        font-weight:600;
+        cursor:pointer;
+    }
+
+    .ai_activation button:focus-visible {
+        outline:.2rem solid var(--arcane-focus, var(--focus-color));
+        outline-offset:.18rem;
+    }
+
+    .ai_activation button:disabled {
+        cursor:not-allowed;
+        opacity:.65;
     }
 
     .chat_input {
@@ -421,6 +479,20 @@
         >Starting the elapsed timer.</span>
     </section>
     <ul type='text' class='chat_output' id='chat_output' tabindex='-1' aria-label='Conversation transcript'></ul>
+    <section
+        id="ai_activation"
+        class="ai_activation"
+        role="status"
+        aria-live="polite"
+        aria-busy="false"
+        hidden
+    >
+        <span class="ai_activation_copy">
+            <strong id="ai_activation_title">Language model not active</strong>
+            <span id="ai_activation_status">Start the selected language model to enable chat.</span>
+        </span>
+        <button type="button" id="ai_activation_button">Start language model</button>
+    </section>
     <div class="chat_input_area">
         <textarea type='text' class='chat_input' id='chat_input'></textarea>
         <button type="button" id="chat_upload" class="chat_upload" title="Upload files" aria-label="Upload files">
@@ -624,11 +696,15 @@
     const conversationTimeboxPanel=shadowRoot.querySelector('#conversation_timebox');
     const conversationTimeboxElapsed=shadowRoot.querySelector('#conversation_timebox_elapsed');
     const conversationTimeboxStatus=shadowRoot.querySelector('#conversation_timebox_status');
+    const aiActivationPanel=shadowRoot.querySelector('#ai_activation');
+    const aiActivationTitle=shadowRoot.querySelector('#ai_activation_title');
+    const aiActivationStatus=shadowRoot.querySelector('#ai_activation_status');
+    const aiActivationButton=shadowRoot.querySelector('#ai_activation_button');
     const [
         {default:MD},
         {default:FileEntity},
         {ConversationSubmissionBarrier,requireConversationTimeboxDelivery},
-        {subscribeAIRuntimeState}
+        {requestAIRuntimeIntent,subscribeAIRuntimeState}
     ]=await Promise.all([
         import('../modules/MD.js'),
         import('../entities/File.js'),
@@ -662,6 +738,18 @@
     host.languageChanged=host.languageChanged||async function(text=''){
         console.warn('html-import chat.html `host.languageChanged` method not implemented.\n\nThis can also be done by listening for the "chat-language-changed" event.\n\nIt is still best practice to implement the `.languageChanged` method atleast with an empty function.\n\n')
     }
+
+    host.requestAIActivation=host.requestAIActivation||function requestAIActivation(intent){
+        return requestAIRuntimeIntent(intent);
+    }
+
+    const aiActivationController=createAIActivationController({
+        host,
+        panel:aiActivationPanel,
+        title:aiActivationTitle,
+        status:aiActivationStatus,
+        button:aiActivationButton
+    });
 
     host.streamMessage=streamMessage;
     host.setMessageProgress=setMessageProgress;
@@ -861,7 +949,189 @@
         send.setAttribute('aria-label',send.title);
     }
 
+    function createAIActivationController({host,panel,title,status,button,EventClass=CustomEvent}){
+        let role=null;
+        let requestPending=false;
+        let requestError='';
+        let destroyed=false;
+
+        function visibleError(error,fallback){
+            const message=typeof error?.message==='string'
+                ?error.message.trim()
+                :'';
+            return (message||fallback).slice(0,240);
+        }
+
+        function cancellation(error){
+            return error?.name==='AbortError'
+                ||['ARCANE_AI_REQUEST_ABORTED','AI_CHAT_ABORTED'].includes(error?.code);
+        }
+
+        function selected(){
+            return typeof role?.providerId==='string'
+                &&role.providerId.length>0
+                &&typeof role?.modelId==='string'
+                &&role.modelId.length>0;
+        }
+
+        function progressMessage(){
+            if(!role?.progress){
+                return 'The selected language model is loading.';
+            }
+            const progress=role.progress;
+            const amount=progress.total===null
+                ?`${progress.completed} ${progress.unit}`
+                :`${progress.completed} of ${progress.total} ${progress.unit}`;
+            return `${progress.phase}, ${amount}${progress.heartbeat?', active heartbeat':''}.`;
+        }
+
+        function render(){
+            const visible=selected()&&role.state!=='ready';
+            panel.hidden=!visible;
+            panel.setAttribute(
+                'aria-busy',
+                String(requestPending||['loading','unloading'].includes(role?.state))
+            );
+            if(!visible){
+                return;
+            }
+            if(requestPending){
+                title.textContent='Requesting language model activation';
+                status.textContent='Waiting for the selected language model runtime.';
+                button.textContent='Requesting…';
+                button.disabled=true;
+                return;
+            }
+            if(role.state==='loading'){
+                title.textContent='Starting language model';
+                status.textContent=progressMessage();
+                button.textContent='Cancel loading';
+                button.disabled=false;
+                return;
+            }
+            if(role.state==='unloading'){
+                title.textContent='Canceling language model load';
+                status.textContent='Waiting for the selected language model runtime to stop.';
+                button.textContent='Canceling…';
+                button.disabled=true;
+                return;
+            }
+            if(role.state==='error'||requestError){
+                title.textContent='Language model activation failed';
+                status.textContent=requestError||visibleError(
+                    role.error,
+                    'The selected language model could not start.'
+                );
+                button.textContent='Try again';
+                button.disabled=false;
+                return;
+            }
+            if(role.state==='unloaded'){
+                title.textContent='Language model not active';
+                status.textContent='Start the selected language model to enable chat.';
+                button.textContent='Start language model';
+                button.disabled=false;
+                return;
+            }
+            title.textContent='Language model unavailable';
+            status.textContent='The selected language model cannot be activated in this state.';
+            button.textContent='Unavailable';
+            button.disabled=true;
+        }
+
+        async function request(action){
+            if(destroyed||requestPending||!selected()){
+                return false;
+            }
+            const permitted=action==='load'
+                ?['unloaded','error'].includes(role.state)
+                :action==='unload'&&role.state==='loading';
+            if(!permitted){
+                return false;
+            }
+            requestError='';
+            const intent=Object.freeze({role:'llm',action,reason:'user'});
+            const request=Object.freeze({intent,state:role});
+            const activationEvent=new EventClass(
+                'chat-ai-activation-request',
+                {
+                    bubbles:true,
+                    composed:true,
+                    cancelable:true,
+                    detail:request
+                }
+            );
+            if(!host.dispatchEvent(activationEvent)){
+                render();
+                return false;
+            }
+            requestPending=true;
+            render();
+            try{
+                await host.requestAIActivation(intent);
+                return true;
+            }catch(error){
+                if(action==='load'
+                    &&cancellation(error)
+                    &&['unloaded','unloading'].includes(role?.state)){
+                    return false;
+                }
+                const message=visibleError(
+                    error,
+                    `The language model ${action} request failed.`
+                );
+                requestError=message;
+                host.dispatchEvent(
+                    new EventClass(
+                        'chat-ai-activation-error',
+                        {
+                            bubbles:true,
+                            composed:true,
+                            detail:Object.freeze({request,error,message})
+                        }
+                    )
+                );
+                return false;
+            }finally{
+                requestPending=false;
+                render();
+            }
+        }
+
+        function activateSelectedAI(){
+            const action=role?.state==='loading'?'unload':'load';
+            void request(action);
+        }
+
+        function synchronize(nextRole){
+            if(destroyed){
+                return;
+            }
+            if(role?.state!==nextRole.state
+                ||role?.providerId!==nextRole.providerId
+                ||role?.modelId!==nextRole.modelId){
+                requestError='';
+                requestPending=false;
+            }
+            role=nextRole;
+            render();
+        }
+
+        function destroy(){
+            if(destroyed){
+                return;
+            }
+            destroyed=true;
+            button.removeEventListener('click',activateSelectedAI);
+            panel.hidden=true;
+        }
+
+        button.addEventListener('click',activateSelectedAI);
+        return Object.freeze({request,synchronize,destroy});
+    }
+
     function synchronizeAIRuntimeState(snapshot){
+        aiActivationController.synchronize(snapshot.roles.llm);
         applyAIAvailability({
             llm:snapshot.roles.llm.state==='ready',
             stt:snapshot.roles.stt.state==='ready',
@@ -1432,6 +1702,7 @@
 
     function destroy(){
         aiRuntimeStateAbortController.abort();
+        aiActivationController.destroy();
         window.removeEventListener('pagehide',destroy);
         speech.destroy?.();
         host.ready=false;

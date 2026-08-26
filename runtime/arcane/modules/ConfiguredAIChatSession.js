@@ -53,6 +53,17 @@ function usageCount(value){
     return Number.isSafeInteger(value)&&value>=0?value:null;
 }
 
+function providerUsageCount(value,label){
+    if(value===undefined) return null;
+    if(!Number.isSafeInteger(value)||value<0){
+        throw coded(
+            new TypeError(`${label} must be a nonnegative integer when provided.`),
+            'AI_CHAT_INVALID_RESPONSE',
+        );
+    }
+    return value;
+}
+
 function signalLike(value){
     return value===undefined||value===null||(
         typeof value==='object'
@@ -271,14 +282,14 @@ async function configuredArcaneChat(request){
     return api.chat(request);
 }
 
-function normalizeResponse(response,maxMessageCharacters){
-    if(!isPlainRecord(response)||!isPlainRecord(response.message)){
+function normalizeAssistantResponseMessage(value,maxMessageCharacters,{requireRole=false}={}){
+    if(!isPlainRecord(value)){
         throw coded(
             new TypeError('The chat provider returned an invalid response.'),
             'AI_CHAT_INVALID_RESPONSE',
         );
     }
-    if(response.message.role!==undefined&&response.message.role!=='assistant'){
+    if((requireRole&&value.role!=='assistant')||(value.role!==undefined&&value.role!=='assistant')){
         throw coded(
             new TypeError('The chat provider response must contain an assistant message.'),
             'AI_CHAT_INVALID_RESPONSE',
@@ -288,7 +299,7 @@ function normalizeResponse(response,maxMessageCharacters){
     let responseMessage;
     try{
         responseMessage=normalizeMessage(
-            {...response.message,role:'assistant'},
+            {...value,role:'assistant'},
             'The assistant message',
             maxMessageCharacters,
             new Set(['assistant']),
@@ -296,6 +307,14 @@ function normalizeResponse(response,maxMessageCharacters){
     }catch(error){
         throw coded(error,'AI_CHAT_INVALID_RESPONSE');
     }
+    return responseMessage;
+}
+
+function normalizeSessionResponse(response,maxMessageCharacters){
+    const responseMessage=normalizeAssistantResponseMessage(
+        response.message,
+        maxMessageCharacters,
+    );
 
     return Object.freeze({
         provider:optionalMetadata(response.provider,'The provider name',128),
@@ -308,6 +327,63 @@ function normalizeResponse(response,maxMessageCharacters){
     });
 }
 
+function normalizeOpenAICompatibleResponse(response,maxMessageCharacters){
+    if(!Array.isArray(response.choices)||response.choices.length!==1){
+        throw coded(
+            new TypeError('The chat provider completion must contain exactly one choice.'),
+            'AI_CHAT_INVALID_RESPONSE',
+        );
+    }
+    const choice=response.choices[0];
+    if(!isPlainRecord(choice)||(choice.index!==undefined&&choice.index!==0)){
+        throw coded(
+            new TypeError('The chat provider completion contains an invalid choice.'),
+            'AI_CHAT_INVALID_RESPONSE',
+        );
+    }
+    if(response.usage!==undefined&&response.usage!==null&&!isPlainRecord(response.usage)){
+        throw coded(
+            new TypeError('The chat provider completion usage must be a plain object when provided.'),
+            'AI_CHAT_INVALID_RESPONSE',
+        );
+    }
+    const usage=response.usage??{};
+    const responseMessage=normalizeAssistantResponseMessage(
+        choice.message,
+        maxMessageCharacters,
+        {requireRole:true},
+    );
+
+    return Object.freeze({
+        provider:optionalMetadata(response.provider,'The provider name',128),
+        model:optionalMetadata(response.model,'The model name',256),
+        message:responseMessage,
+        done:true,
+        doneReason:optionalMetadata(choice.finish_reason,'The completion reason',128),
+        promptEvalCount:providerUsageCount(
+            usage.prompt_tokens,
+            'The provider prompt token count',
+        ),
+        evalCount:providerUsageCount(
+            usage.completion_tokens,
+            'The provider completion token count',
+        ),
+    });
+}
+
+function normalizeResponse(response,maxMessageCharacters){
+    if(!isPlainRecord(response)){
+        throw coded(
+            new TypeError('The chat provider returned an invalid response.'),
+            'AI_CHAT_INVALID_RESPONSE',
+        );
+    }
+    if(Object.hasOwn(response,'message')){
+        return normalizeSessionResponse(response,maxMessageCharacters);
+    }
+    return normalizeOpenAICompatibleResponse(response,maxMessageCharacters);
+}
+
 /**
  * Maintains one bounded, in-memory conversation through a configured chat provider.
  *
@@ -315,7 +391,9 @@ function normalizeResponse(response,maxMessageCharacters){
  * provider selection. Applications own their prompt policy and may inject an
  * asynchronous contextBuilder that returns additional system text for each send.
  * An explicitly supplied responseLength augments only this conversational
- * session's system prompt through the shared response-length policy.
+ * session's system prompt through the shared response-length policy. An injected
+ * chat function may return either the normalized session response or one
+ * non-stream OpenAI-compatible completion containing exactly one choice.
  */
 export default class ConfiguredAIChatSession{
     #chat;
@@ -498,12 +576,19 @@ export default class ConfiguredAIChatSession{
                     ?this.#conversation.length-toolCallIndex+transientTail.length
                     :transientTail.length,
             );
-            const response=normalizeResponse(
-                await this.#chat({
+            let providerResponse;
+            try{
+                providerResponse=await this.#chat({
                     ...this.#request,
                     ...(options.signal?{signal:options.signal}:{}),
                     messages:requestMessages.map(publicMessage),
-                }),
+                });
+            }catch(error){
+                if(options.signal?.aborted) throw abortError();
+                throw error;
+            }
+            const response=normalizeResponse(
+                providerResponse,
                 this.#limits.maxMessageCharacters,
             );
             if(options.signal?.aborted) throw abortError();

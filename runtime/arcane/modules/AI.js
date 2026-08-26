@@ -1,10 +1,15 @@
 import './DBOPFS.js';
 import UserEntity from '../entities/User.js';
 import {getAIPreferencesForRuntime} from './AIPreferenceRuntime.js';
-import {getAIProviderRuntime} from './AIProviderRuntime.js';
+import {
+    AI_MODEL_AUTHORITY_PROTOCOL,
+    AI_PROVIDER_PROTOCOL,
+    getAIProviderRuntime
+} from './AIProviderRuntime.js';
 import {normalizeOllamaModelIdentifier} from './OllamaModelIdentifier.js';
 
 let credentials='include';
+const LEGACY_TTS_RESPONSE_FORMAT='opus';
 credentials='omit';
 
 const LEGACY_AI_SERVICES=new Set(['OPENAI','OLLAMA','LOCAL_SPEACH']);
@@ -25,6 +30,148 @@ function normalizeAIRequestAbort(error){
     normalized.name='AbortError';
     normalized.code='ARCANE_AI_REQUEST_ABORTED';
     return normalized;
+}
+
+function legacyAIProviderError(message,code,cause){
+    const error=cause===undefined
+        ?new Error(message)
+        :new Error(message,{cause});
+    error.code=code;
+    return error;
+}
+
+function createLegacyAIStreamBridge(execute,sourceSignal){
+    const controller=new AbortController();
+    const queue=[];
+    const waiters=[];
+    let complete=false;
+    let failure=null;
+    let detached=false;
+
+    function forwardLegacyAIStreamAbort(){
+        if(!controller.signal.aborted){
+            controller.abort(sourceSignal?.reason);
+        }
+    }
+
+    function detachLegacyAIStreamAbort(){
+        if(detached){
+            return;
+        }
+        detached=true;
+        sourceSignal?.removeEventListener?.(
+            'abort',
+            forwardLegacyAIStreamAbort
+        );
+    }
+
+    if(sourceSignal?.aborted){
+        forwardLegacyAIStreamAbort();
+    }else{
+        sourceSignal?.addEventListener?.(
+            'abort',
+            forwardLegacyAIStreamAbort,
+            {once:true}
+        );
+    }
+
+    function emitLegacyAIStreamChunk(chunk){
+        if(complete){
+            return false;
+        }
+        const waiter=waiters.shift();
+        if(waiter){
+            waiter.resolve({value:chunk,done:false});
+        }else{
+            queue.push(chunk);
+        }
+        return true;
+    }
+
+    function finishLegacyAIStream(error){
+        if(complete){
+            return;
+        }
+        complete=true;
+        failure=error||null;
+        detachLegacyAIStreamAbort();
+        while(waiters.length){
+            const waiter=waiters.shift();
+            if(failure){
+                waiter.reject(failure);
+            }else{
+                waiter.resolve({value:undefined,done:true});
+            }
+        }
+    }
+
+    const result=Promise.resolve().then(
+        function executeLegacyAIStream(){
+            if(controller.signal.aborted){
+                throw normalizeAIRequestAbort(controller.signal.reason);
+            }
+            return execute({
+                emit:emitLegacyAIStreamChunk,
+                signal:controller.signal
+            });
+        }
+    ).then(
+        function acceptLegacyAIStreamResult(value){
+            finishLegacyAIStream(null);
+            return value;
+        },
+        function rejectLegacyAIStreamResult(error){
+            const normalized=isAIRequestAbort(error,controller.signal)
+                ?normalizeAIRequestAbort(error)
+                :error;
+            finishLegacyAIStream(normalized);
+            throw normalized;
+        }
+    );
+    result.catch(function retainLegacyAIStreamFailure() {});
+
+    async function cancelLegacyAIStream(reason){
+        if(!controller.signal.aborted){
+            controller.abort(reason);
+        }
+        await result.catch(function retainCancelledLegacyAIStream() {});
+        return true;
+    }
+
+    const handle={
+        result,
+        cancel:cancelLegacyAIStream,
+        next:function readLegacyAIStreamChunk(){
+            if(queue.length){
+                return Promise.resolve({value:queue.shift(),done:false});
+            }
+            if(complete){
+                return failure
+                    ?Promise.reject(failure)
+                    :Promise.resolve({value:undefined,done:true});
+            }
+            return new Promise(function waitForLegacyAIStreamChunk(resolve,reject){
+                waiters.push({resolve,reject});
+            });
+        },
+        return:async function returnLegacyAIStream(value){
+            await cancelLegacyAIStream(
+                legacyAIProviderError(
+                    'The legacy AI stream consumer stopped before completion.',
+                    'ARCANE_AI_REQUEST_ABORTED'
+                )
+            );
+            return {value,done:true};
+        },
+        throw:async function throwLegacyAIStream(error){
+            await cancelLegacyAIStream(error);
+            throw error;
+        },
+        [Symbol.asyncIterator]:function iterateLegacyAIStream(){
+            return this;
+        }
+    };
+    return Object.freeze(handle);
 }
 
 function normalizeAIStartupOptions(options){
@@ -190,9 +337,21 @@ class AI {
         this.setAI(
             ...preferences
         );
+
+        const runtime=this;
+        globalThis.addEventListener?.(
+            'arcane-ollama-ready',
+            function reconcileLegacyOllamaReadiness(){
+                runtime.#retainLegacyLLMReadiness(
+                    runtime.#reconcileLegacyLLMReadiness()
+                );
+            }
+        );
     }
 
     #providerRuntime=getAIProviderRuntime();
+    #legacyLLMProviders=new Map();
+    #legacyLLMReadiness=Promise.resolve(null);
     #preferenceTuple=Object.freeze([
         'OPENAI',
         'OPENAI',
@@ -240,11 +399,311 @@ class AI {
     
     set license(value){
         this.#license=typeof value==='string' ? value.trim():'';
+        this.#retainLegacyLLMReadiness(
+            this.#reconcileLegacyLLMReadiness()
+        );
         return this.#license;
+    }
+
+    #legacyLLMCapability(providerId){
+        if(providerId==='OPENAI'){
+            return this.llmService==='OPENAI'
+                &&Boolean(this.model)
+                &&Boolean(this.license)
+                &&typeof globalThis.fetch==='function';
+        }
+        if(providerId==='OLLAMA'){
+            return this.llmService==='OLLAMA'
+                &&Boolean(this.model)
+                &&Boolean(this.#nativeOllama());
+        }
+        return false;
+    }
+
+    #legacyLLMInspection(providerId,selection){
+        const localOnly=providerId==='OLLAMA';
+        if(!selection
+            ||selection.providerId!==providerId
+            ||selection.modelId!==this.model
+            ||selection.localOnly!==localOnly
+            ||this.llmService!==providerId){
+            return Object.freeze({
+                available:false,
+                code:'ARCANE_AI_MODEL_AUTHORITY_REQUIRED',
+                message:'The selected legacy LLM route does not match the active AI configuration.'
+            });
+        }
+        if(!this.#legacyLLMCapability(providerId)){
+            return Object.freeze({
+                available:false,
+                code:providerId==='OLLAMA'
+                    ?'AI_NATIVE_LOCAL_REQUIRED'
+                    :'AI_PROVIDER_NOT_CONFIGURED',
+                message:providerId==='OLLAMA'
+                    ?'Local AI requires the capability-gated Arcane API.'
+                    :'AI provider is not configured.'
+            });
+        }
+        return Object.freeze({
+            available:true,
+            authority:Object.freeze({
+                protocol:AI_MODEL_AUTHORITY_PROTOCOL,
+                providerId,
+                modelId:selection.modelId,
+                admitted:true
+            })
+        });
+    }
+
+    #createLegacyLLMProvider(providerId){
+        const runtime=this;
+        const localOnly=providerId==='OLLAMA';
+        let state='unloaded';
+        let busy=false;
+
+        function statusLegacyLLMProvider(){
+            if(state==='ready'
+                &&!busy
+                &&!runtime.#legacyLLMCapability(providerId)){
+                state='unloaded';
+            }
+            return Object.freeze({
+                state,
+                loaded:state==='ready',
+                busy
+            });
+        }
+
+        function assertLegacyLLMSelection(selection){
+            const inspection=runtime.#legacyLLMInspection(
+                providerId,
+                selection
+            );
+            if(!inspection.available){
+                throw legacyAIProviderError(
+                    inspection.message,
+                    inspection.code
+                );
+            }
+            return inspection;
+        }
+
+        function releaseLegacyLLMRequest(){
+            busy=false;
+        }
+
+        return Object.freeze({
+            protocol:AI_PROVIDER_PROTOCOL,
+            role:'llm',
+            id:providerId,
+            localOnly,
+            catalog:function catalogLegacyLLMProvider(){
+                if(runtime.llmService!==providerId||!runtime.model){
+                    return Object.freeze([]);
+                }
+                return Object.freeze([
+                    Object.freeze({id:runtime.model})
+                ]);
+            },
+            inspect:function inspectLegacyLLMProvider(selection,{signal}={}){
+                if(signal?.aborted){
+                    throw normalizeAIRequestAbort(signal.reason);
+                }
+                return runtime.#legacyLLMInspection(providerId,selection);
+            },
+            status:statusLegacyLLMProvider,
+            load:function loadLegacyLLMProvider(context={}){
+                if(context.signal?.aborted){
+                    throw normalizeAIRequestAbort(context.signal.reason);
+                }
+                if(state==='disposed'){
+                    throw legacyAIProviderError(
+                        'The legacy LLM provider is disposed.',
+                        'ARCANE_AI_PROVIDER_DISPOSED'
+                    );
+                }
+                if(busy){
+                    throw legacyAIProviderError(
+                        'The legacy LLM provider owns an active request.',
+                        'ARCANE_AI_ROLE_BUSY'
+                    );
+                }
+                if(typeof context.progress!=='function'){
+                    throw new TypeError(
+                        'Legacy LLM provider load progress must be a function.'
+                    );
+                }
+                const inspection=assertLegacyLLMSelection(context.selection);
+                state='loading';
+                context.progress({
+                    phase:'capability',
+                    completed:0,
+                    total:1,
+                    unit:'items',
+                    heartbeat:false
+                });
+                if(context.signal?.aborted){
+                    state='unloaded';
+                    throw normalizeAIRequestAbort(context.signal.reason);
+                }
+                state='ready';
+                context.progress({
+                    phase:'capability',
+                    completed:1,
+                    total:1,
+                    unit:'items',
+                    heartbeat:false
+                });
+                return Object.freeze({
+                    authority:inspection.authority,
+                    status:statusLegacyLLMProvider()
+                });
+            },
+            request:function requestLegacyLLMProvider(context={}){
+                if(context.signal?.aborted){
+                    throw normalizeAIRequestAbort(context.signal.reason);
+                }
+                assertLegacyLLMSelection(context.selection);
+                const current=statusLegacyLLMProvider();
+                if(current.state!=='ready'||!current.loaded){
+                    throw legacyAIProviderError(
+                        'The legacy LLM provider is not ready.',
+                        'ARCANE_AI_ROLE_NOT_READY'
+                    );
+                }
+                if(busy){
+                    throw legacyAIProviderError(
+                        'The legacy LLM provider owns an active request.',
+                        'ARCANE_AI_ROLE_BUSY'
+                    );
+                }
+                busy=true;
+                if(context.operation==='chat'){
+                    return Promise.resolve(
+                        runtime.#requestLegacyLLMChat(
+                            context.payload,
+                            context.signal
+                        )
+                    ).finally(releaseLegacyLLMRequest);
+                }
+                if(context.operation==='stream'){
+                    const handle=createLegacyAIStreamBridge(
+                        function executeLegacyLLMProviderStream(bridge){
+                            return runtime.#requestLegacyLLMStream(
+                                context.payload,
+                                bridge
+                            );
+                        },
+                        context.signal
+                    );
+                    handle.result.then(
+                        releaseLegacyLLMRequest,
+                        releaseLegacyLLMRequest
+                    );
+                    return handle;
+                }
+                busy=false;
+                throw legacyAIProviderError(
+                    'The legacy LLM provider operation is unsupported.',
+                    'ARCANE_AI_PROVIDER_RUNTIME_INVALID'
+                );
+            },
+            unload:function unloadLegacyLLMProvider(context={}){
+                if(context.signal?.aborted){
+                    throw normalizeAIRequestAbort(context.signal.reason);
+                }
+                state='unloaded';
+                busy=false;
+                return statusLegacyLLMProvider();
+            },
+            dispose:function disposeLegacyLLMProvider(context={}){
+                if(context.signal?.aborted){
+                    throw normalizeAIRequestAbort(context.signal.reason);
+                }
+                state='disposed';
+                busy=false;
+                return statusLegacyLLMProvider();
+            }
+        });
+    }
+
+    #ensureLegacyLLMProvider(providerId){
+        if(providerId!=='OPENAI'&&providerId!=='OLLAMA'){
+            return false;
+        }
+        if(this.#providerRuntime.hasProvider('llm',providerId)){
+            return false;
+        }
+        const provider=this.#createLegacyLLMProvider(providerId);
+        const unregister=this.#providerRuntime.register(provider);
+        this.#legacyLLMProviders.set(
+            providerId,
+            Object.freeze({provider,unregister})
+        );
+        return true;
+    }
+
+    #releaseInactiveLegacyLLMProviders(activeProviderId){
+        for(const [providerId,record] of this.#legacyLLMProviders){
+            if(providerId===activeProviderId){
+                continue;
+            }
+            if(record.unregister()){
+                this.#legacyLLMProviders.delete(providerId);
+            }
+        }
+    }
+
+    #internalLegacyLLMSelection(localOnly=false){
+        const selection=this.#providerRuntime.selection(
+            'llm',
+            {localOnly}
+        );
+        if(!selection
+            ||!this.#legacyLLMProviders.has(selection.providerId)
+            ||selection.providerId!==this.llmService
+            ||selection.modelId!==this.model){
+            return null;
+        }
+        return selection;
+    }
+
+    #retainLegacyLLMReadiness(operation){
+        this.#legacyLLMReadiness=Promise.resolve(operation).catch(
+            function retainLegacyLLMReadinessFailure(){
+                return null;
+            }
+        );
+        return this.#legacyLLMReadiness;
+    }
+
+    #reconcileLegacyLLMReadiness(){
+        const selection=this.#internalLegacyLLMSelection(false);
+        if(!selection){
+            return Promise.resolve(this.#providerRuntime.status('llm'));
+        }
+        const status=this.#providerRuntime.status('llm');
+        if(this.#legacyLLMCapability(selection.providerId)){
+            if(status.state==='ready'&&status.loaded===true){
+                return Promise.resolve(status);
+            }
+            return this.#providerRuntime.load('llm');
+        }
+        if(status.loaded===true
+            ||status.busy===true
+            ||status.state==='loading'
+            ||status.state==='unloading'){
+            return this.#providerRuntime.unload('llm');
+        }
+        return Promise.resolve(status);
     }
 
     get configured(){
         if(this.#usesProviderRuntime('llm',this.llmService)){
+            if(this.#internalLegacyLLMSelection(false)
+                &&!this.#legacyLLMCapability(this.llmService)){
+                return false;
+            }
             const state=this.#providerRuntime.status('llm');
             return state.state==='ready'&&state.loaded===true;
         }
@@ -259,6 +718,19 @@ class AI {
 
     #assertServiceConfigured(service=this.llmService,role='llm'){
         if(this.#usesProviderRuntime(role,service)){
+            const internal=role==='llm'
+                ?this.#internalLegacyLLMSelection(false)
+                :null;
+            if(internal&&!this.#legacyLLMCapability(internal.providerId)){
+                const inspection=this.#legacyLLMInspection(
+                    internal.providerId,
+                    internal
+                );
+                throw legacyAIProviderError(
+                    inspection.message,
+                    inspection.code
+                );
+            }
             return true;
         }
         if(service==='OLLAMA'){
@@ -298,6 +770,11 @@ class AI {
     }
 
     #shouldUseProviderRuntime(role,service,localOnly=false){
+        // Legacy adapters publish lifecycle without replacing established
+        // public transport callbacks or their cancellation behavior.
+        if(role==='llm'&&this.#internalLegacyLLMSelection(localOnly)){
+            return false;
+        }
         if(!localOnly){
             return this.#usesProviderRuntime(role,service);
         }
@@ -361,6 +838,19 @@ class AI {
         }
     }
 
+    #normalizedLLMModel(service,model){
+        if(service==='OLLAMA'){
+            const mappedModel=model==='OPENAI'?null:this.#models[model];
+            return mappedModel
+                ||normalizeOllamaModelIdentifier(model)
+                ||model;
+        }
+        if(service==='OPENAI'){
+            return this.#models.OPENAI;
+        }
+        return model;
+    }
+
     #applyPreferenceTuple(tuple){
         const [
             llmService,
@@ -370,15 +860,10 @@ class AI {
             modelTTS,
             modelSTT
         ]=tuple;
-        let normalizedLLMModel=model;
-        if(llmService==='OLLAMA'){
-            const mappedModel=model==='OPENAI'?null:this.#models[model];
-            normalizedLLMModel=mappedModel
-                ||normalizeOllamaModelIdentifier(model)
-                ||model;
-        }else if(llmService==='OPENAI'){
-            normalizedLLMModel=this.#models.OPENAI;
-        }
+        const normalizedLLMModel=this.#normalizedLLMModel(
+            llmService,
+            model
+        );
         this.llmService=llmService;
         this.sttService=sttService;
         this.ttsService=ttsService;
@@ -405,7 +890,10 @@ class AI {
 
     #routesFromPreferenceTuple(tuple){
         const roles={
-            llm:[tuple[0],tuple[3]],
+            llm:[
+                tuple[0],
+                this.#normalizedLLMModel(tuple[0],tuple[3])
+            ],
             stt:[tuple[1],tuple[5]],
             tts:[tuple[2],tuple[4]]
         };
@@ -501,15 +989,30 @@ class AI {
             modelSTT
         ]);
         this.#assertValidProviderTuple(tuple);
+        this.#ensureLegacyLLMProvider(tuple[0]);
         this.#providerRuntime.configure(this.#routesFromPreferenceTuple(tuple));
         this.#applyPreferenceTuple(tuple);
+        this.#releaseInactiveLegacyLLMProviders(tuple[0]);
+        this.#retainLegacyLLMReadiness(
+            this.#reconcileLegacyLLMReadiness()
+        );
         return true;
     }
 
     configureProviders(selections){
-        this.#assertRegisteredLegacyRoutes(selections);
-        const configured=this.#providerRuntime.configure(selections);
+        const prepared=this.#providerRuntime.validateConfiguration(selections);
+        this.#ensureLegacyLLMProvider(
+            prepared.llm.default?.providerId
+        );
+        this.#assertRegisteredLegacyRoutes(prepared);
+        const configured=this.#providerRuntime.configure(prepared);
         this.#applyPreferenceTuple(this.#tupleFromProviderRoutes(configured));
+        this.#releaseInactiveLegacyLLMProviders(
+            configured.llm.default?.providerId
+        );
+        this.#retainLegacyLLMReadiness(
+            this.#reconcileLegacyLLMReadiness()
+        );
         return configured;
     }
 
@@ -532,18 +1035,28 @@ class AI {
         this.#assertValidProviderTuple(tuple);
         this.stopAudio();
         await this.#unloadProviderRolesForTransition();
+        this.#ensureLegacyLLMProvider(tuple[0]);
         this.#providerRuntime.configure(this.#routesFromPreferenceTuple(tuple));
         this.#applyPreferenceTuple(tuple);
+        this.#releaseInactiveLegacyLLMProviders(tuple[0]);
+        await this.#reconcileLegacyLLMReadiness();
         return this.#providerRuntime.status();
     }
 
     async transitionProviders(selections){
-        this.#assertRegisteredLegacyRoutes(selections);
         const prepared=this.#providerRuntime.validateConfiguration(selections);
+        this.#ensureLegacyLLMProvider(
+            prepared.llm.default?.providerId
+        );
+        this.#assertRegisteredLegacyRoutes(prepared);
         this.stopAudio();
         await this.#unloadProviderRolesForTransition();
         const configured=this.#providerRuntime.configure(prepared);
         this.#applyPreferenceTuple(this.#tupleFromProviderRoutes(configured));
+        this.#releaseInactiveLegacyLLMProviders(
+            configured.llm.default?.providerId
+        );
+        await this.#reconcileLegacyLLMReadiness();
         return configured;
     }
 
@@ -912,6 +1425,55 @@ class AI {
         return typeof content==='string'?content:completion;
     }
 
+    #requestLegacyLLMChat(payload={},signal=null){
+        return this.#fetchLegacy(
+            payload.messages??[],
+            function ignoreLegacyLLMProviderResponse(){},
+            payload.structuredOutput??false,
+            payload.tools??[],
+            payload.toolChoice??'auto',
+            payload.parallelToolCalls??true,
+            payload.id??Date.now(),
+            function ignoreLegacyLLMProviderRequest(){},
+            signal
+        );
+    }
+
+    #requestLegacyLLMStream(payload={},bridge){
+        function emitLegacyLLMStreamText(text,id,thinking){
+            if(typeof text!=='string'||!text){
+                return;
+            }
+            bridge.emit(
+                thinking
+                    ?{thinking:text}
+                    :{content:text}
+            );
+        }
+
+        function emitLegacyLLMStreamTool(name){
+            if(typeof name==='string'&&name){
+                bridge.emit({toolCalls:[{name}]});
+            }
+        }
+
+        return this.#streamLegacyMessage(
+            payload.messages??[],
+            emitLegacyLLMStreamText,
+            function ignoreLegacyLLMProviderCompletion(){},
+            payload.tools??[],
+            payload.toolChoice??'auto',
+            emitLegacyLLMStreamTool,
+            payload.parallelToolCalls??true,
+            payload.id??Date.now(),
+            payload.seeThinking??false,
+            bridge.signal,
+            function ignoreLegacyLLMProviderRequest(){},
+            payload.structuredOutput??false,
+            false
+        );
+    }
+
     #assertRequiredOllamaToolCall(toolCalls=[],toolChoice='auto'){
         const requiredName=toolChoice?.function?.name;
 
@@ -1152,6 +1714,38 @@ class AI {
                 signal
             });
         }
+
+        return this.#streamLegacyMessage(
+            messages,
+            streamHandler,
+            streamComplete,
+            tools,
+            tool_choice,
+            earlyFunctionTrigger,
+            parallel_tool_calls,
+            id,
+            seeThinking,
+            signal,
+            requestHandler,
+            structuredOutput
+        );
+    }
+
+    async #streamLegacyMessage(
+        messages=[],
+        streamHandler=function ignoreStreamChunk(){},
+        streamComplete=function finishIgnoredStream(){},
+        tools=[],
+        tool_choice='auto',
+        earlyFunctionTrigger=function ignoreEarlyFunction(){},
+        parallel_tool_calls=true,
+        id=Date.now(),
+        seeThinking=false,
+        signal=null,
+        requestHandler=function ignoreStreamRequest(){},
+        structuredOutput=false,
+        finishSpeech=true
+    ){
         let speechTurnCompleted=false;
 
         try{
@@ -1197,6 +1791,13 @@ class AI {
         streamHandler('Thinking...',`M-${id}`,isThinking);
 
         const nativeOllama=this.#nativeOllama();
+
+        if(this.llmService==='OLLAMA'&&!nativeOllama){
+            throw legacyAIProviderError(
+                'Local AI requires the capability-gated Arcane API.',
+                'AI_NATIVE_LOCAL_REQUIRED'
+            );
+        }
 
         if(nativeOllama){
             let nativeContent='';
@@ -1294,7 +1895,9 @@ class AI {
             if(Object.keys(nativeToolCalls).length&&!nativeContent){
                 streamHandler('',`M-${id}`,false);
             }
-            this.finishTTS();
+            if(finishSpeech){
+                this.finishTTS();
+            }
             await streamComplete(nativeResult,`M-${id}`,isThinking);
             speechTurnCompleted=true;
             return nativeResult;
@@ -1496,7 +2099,9 @@ class AI {
         if(Object.keys(tool_funcs).length&&!chunkString){
             streamHandler('',`M-${id}`,false);
         }
-        this.finishTTS();
+        if(finishSpeech){
+            this.finishTTS();
+        }
         await streamComplete(streamResult, `M-${id}`,isThinking);
 
         //sync
@@ -1609,6 +2214,31 @@ class AI {
                 onResponse:responseHandler
             });
         }
+
+        return this.#fetchLegacy(
+            messages,
+            responseHandler,
+            structuredOutput,
+            tools,
+            tool_choice,
+            parallel_tool_calls,
+            id,
+            requestHandler,
+            signal
+        );
+    }
+
+    async #fetchLegacy(
+        messages=[],
+        responseHandler=function ignoreFetchResponse(){},
+        structuredOutput=false,
+        tools=[],
+        tool_choice='auto',
+        parallel_tool_calls=true,
+        id=Date.now(),
+        requestHandler=function ignoreFetchRequest(){},
+        signal=null,
+    ){
         this.#assertServiceConfigured(this.llmService);
         if(signal&&(
             typeof signal.aborted!=='boolean'
@@ -1644,6 +2274,13 @@ class AI {
         }
 
         const nativeOllama=this.#nativeOllama();
+
+        if(this.llmService==='OLLAMA'&&!nativeOllama){
+            throw legacyAIProviderError(
+                'Local AI requires the capability-gated Arcane API.',
+                'AI_NATIVE_LOCAL_REQUIRED'
+            );
+        }
 
         if(nativeOllama){
             const ollamaTools=this.#ollamaTools(tools,tool_choice);
@@ -1931,6 +2568,7 @@ class AI {
     async #requestSpeechAudio(job){
         if(this.#usesProviderRuntime('tts',this.ttsService)){
             job.abortController=new AbortController();
+            const responseFormat=this.#providerSpeechResponseFormat();
             const response=await this.#providerRuntime.request(
                 'tts',
                 {
@@ -1939,7 +2577,7 @@ class AI {
                         model:this.#providerRuntime.selection('tts')?.modelId,
                         voice:String(window.user?.AI_voice||'af_heart'),
                         input:job.text,
-                        responseFormat:this.audioFormat,
+                        responseFormat,
                         speed:this.voiceSpeed
                     },
                     localOnly:false,
@@ -2026,6 +2664,49 @@ class AI {
         }
 
         return {chunks,type:this.audioType};
+    }
+
+    #providerSpeechResponseFormat(){
+        const selection=this.#providerRuntime.selection('tts');
+        if(!selection){
+            return this.audioFormat;
+        }
+        const provider=this.#providerRuntime.catalog('tts').find(
+            entry=>entry.providerId===selection.providerId
+        );
+        const model=provider?.models.find(entry=>entry?.id===selection.modelId);
+        const speech=model?.speech;
+        if(speech===undefined){
+            return this.audioFormat;
+        }
+        const prototype=speech&&typeof speech==='object'
+            ?Object.getPrototypeOf(speech)
+            :null;
+        const descriptors=prototype===Object.prototype||prototype===null
+            ?Object.getOwnPropertyDescriptors(speech)
+            :null;
+        const formats=descriptors?.responseFormats?.value;
+        const defaultFormat=descriptors?.defaultResponseFormat?.value;
+        if(!Array.isArray(formats)
+            ||formats.length<1
+            ||!formats.every(format=>typeof format==='string'&&format.trim()===format&&format)
+            ||typeof defaultFormat!=='string'
+            ||!formats.includes(defaultFormat)){
+            throw legacyAIProviderError(
+                'The selected TTS provider returned an invalid speech format catalog.',
+                'ARCANE_AI_PROVIDER_RUNTIME_INVALID'
+            );
+        }
+        if(formats.includes(this.audioFormat)){
+            return this.audioFormat;
+        }
+        if(this.audioFormat===LEGACY_TTS_RESPONSE_FORMAT){
+            return defaultFormat;
+        }
+        throw legacyAIProviderError(
+            `The selected TTS provider does not support ${this.audioFormat}.`,
+            'ARCANE_AI_UNSUPPORTED_RESPONSE_FORMAT'
+        );
     }
 
     async #normalizeProviderSpeechAudio(response){
