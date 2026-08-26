@@ -2,7 +2,7 @@
 
 This maintained example is a browser Arcane application written with plain
 HTML, CSS, and JavaScript. The basic greeting runs without a model. An optional
-panel demonstrates the browser-WASM AI surface shipped in `arcane-os@0.1.2`
+panel demonstrates the browser-WASM AI surface shipped in `arcane-os@0.2.1`
 without downloading model weights automatically.
 
 ## Requirements
@@ -13,7 +13,7 @@ without downloading model weights automatically.
 ## Create the same project shape
 
 ```sh
-npx arcane-os@0.1.2 new hello-world --path ./hello-world --display-name "Arcane Hello World" --git
+npx arcane-os@0.2.1 new hello-world --path ./hello-world --display-name "Arcane Hello World" --git
 cd hello-world
 npm install
 ```
@@ -25,7 +25,7 @@ fixture extends that generated app with the optional local-AI panel below.
 A global CLI is supported as a convenience:
 
 ```sh
-npm install --global arcane-os@0.1.2
+npm install --global arcane-os@0.2.1
 arcane new hello-world --path ./hello-world
 ```
 
@@ -56,12 +56,26 @@ hello-world/
 │   ├── entities/
 │   ├── img/
 │   ├── modules/
+│   │   ├── AI.js
+│   │   ├── AIProviderRuntime.js
+│   │   ├── AIRuntimeState.js
+│   │   ├── AppDataScope.js
+│   │   ├── DBOPFS.js
+│   │   ├── DBOPFSDocumentLibrary.js
+│   │   ├── DocumentLexicalSearch.js
+│   │   ├── PersistentAIChatSession.js
+│   │   └── ThemeBootstrap.js
 │   ├── sdk/
 │   │   ├── ai/
+│   │   │   ├── browser-kokoro-worker.mjs
+│   │   │   ├── browser-speech.mjs
 │   │   │   ├── browser-wasm.mjs
 │   │   │   ├── browser-wasm-llm-provider.mjs
 │   │   │   ├── browser-wllama-runtime.mjs
+│   │   │   ├── browser-whisper-worker.mjs
 │   │   │   ├── model-controller.mjs
+│   │   │   ├── speech-worker-client.mjs
+│   │   │   ├── speech-worker-runtime.mjs
 │   │   │   └── wllama/
 │   │   ├── dependencies/event-pubsub/
 │   │   ├── dependencies/strong-type/
@@ -74,9 +88,11 @@ hello-world/
 └── package.json
 ```
 
-The authenticated `arcane/` projection contains 173 files. The generated map
-contains 86 entries, including the browser-AI subpath. Its internal
-`./node_modules/strong-type/index.js` request resolves to the authenticated
+The tree above calls out representative paths rather than freezing an inventory
+count. `arcane.lock.json` binds the SDK release, its runtime receipts enumerate
+the authenticated projection, and the generated import map is the authority for
+the current browser names. Its internal `./node_modules/strong-type/index.js`
+request resolves to the authenticated
 `./arcane/dependencies/strong-type/index.js` snapshot, so development and the
 packaged release use the same physical dependency bytes.
 
@@ -85,7 +101,9 @@ packaged release use the same physical dependency bytes.
   "imports": {
     "arcane/AppDataScope": "./arcane/modules/AppDataScope.js",
     "arcane/DBOPFS": "./arcane/modules/DBOPFS.js",
+    "arcane/PersistentAIChatSession": "./arcane/modules/PersistentAIChatSession.js",
     "arcane/ThemeBootstrap": "./arcane/modules/ThemeBootstrap.js",
+    "arcane-os/ai/browser-speech": "./arcane/sdk/ai/browser-speech.mjs",
     "arcane-os/ai/browser-wasm": "./arcane/sdk/ai/browser-wasm.mjs",
     "arcane-os/event-manager": "./arcane/sdk/event-manager.mjs",
     "event-pubsub": "./arcane/sdk/dependencies/event-pubsub/index.js"
@@ -152,6 +170,8 @@ digest, writes a completion manifest, reopens and rehashes the file, and only
 then admits it. `load({offline:true})` makes no model-source request and succeeds
 only when that verified cache already exists. Packaged same-origin Wllama/WASM
 runtime assets may still load. Warm-cache loads still rehash the full model.
+This 0.2.1 browser path requires WebGPU, and the published provider owns its
+full-offload setting; the application does not provide a `gpuLayers` override.
 
 Every inference request sets `localOnly:true`. That guarantees inference stays
 inside this browser provider after load; it does not mean the first-use model
@@ -160,8 +180,9 @@ name/argument records. The SDK does not invoke them, and this example provides
 no tool dispatcher.
 
 Cancel aborts the active load or request. Any verified cache remains, while an
-interrupted model download is discarded. Unload terminates the model worker and
-releases model memory while keeping the verified cache. Leaving the page aborts
+interrupted model download is discarded. Unload ends the Wllama session and
+ensures the browser model Worker is no longer active while keeping the verified
+cache; it does not claim physical VRAM reclamation. Leaving the page aborts
 active work and disposes the session. The UI reports stable `ARCANE_AI_*` and
 `APP_DATA_*` codes instead of exposing provider error text.
 
@@ -169,8 +190,10 @@ The app descriptors declare the pinned model URL's initial Hugging Face origin
 in `security.connectOrigins` but request no Arcane Core capabilities or methods.
 Hugging Face can serve the bytes through a provider-controlled HTTPS redirect
 chain; deployments must account for that chain without pinning an unstable
-regional CDN hostname. This browser-WASM path is not `Arcane.ai`, the legacy
-`arcane/AI` module, ArcaneOllama, speech synthesis, or a Node inference provider.
+regional CDN hostname. This maintained interaction uses the browser-WASM LLM
+path rather than `Arcane.ai`, ArcaneOllama, or a Node inference provider.
+`arcane-os@0.2.1` also ships the separate `arcane-os/ai/browser-speech`
+entrypoint, but this smallest interaction does not load speech artifacts.
 
 ## Develop and test
 
@@ -192,11 +215,12 @@ npm run run
 ```
 
 `package` writes `dist/hello-world/`. The app entry, import map, map targets,
-and all 173 authenticated `arcane/**` files match development byte for byte.
-Source-only authoring files remain outside `dist`; the release adds its own
-authority and license records. `verify` authenticates that directory. `bundle`
-creates `dist/hello-world-0.1.0.arcane-app.tar.gz`; `0.1.0` is the app version.
-`run` verifies and serves the existing browser release.
+and every authenticated `arcane/**` file listed by the release receipt match
+development byte for byte. Source-only authoring files remain outside `dist`;
+the release adds its own authority and license records. `verify` authenticates
+that directory. `bundle` creates
+`dist/hello-world-0.1.0.arcane-app.tar.gz`; `0.1.0` is the app version. `run`
+verifies and serves the existing browser release.
 
 `npm run build` is equivalent to the browser package path. It does not create a
 standalone native executable. Native targets require explicit scaffold intent,

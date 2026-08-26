@@ -1,77 +1,217 @@
 import './DBOPFS.js';
 import UserEntity from '../entities/User.js';
 import {getAIPreferencesForRuntime} from './AIPreferenceRuntime.js';
+import {
+    AI_MODEL_AUTHORITY_PROTOCOL,
+    AI_PROVIDER_PROTOCOL,
+    getAIProviderRuntime
+} from './AIProviderRuntime.js';
 import {normalizeOllamaModelIdentifier} from './OllamaModelIdentifier.js';
 
 let credentials='include';
+const LEGACY_TTS_RESPONSE_FORMAT='opus';
 credentials='omit';
 
-const ARCANE_AI_REQUEST_DIAGNOSTIC_LABEL=
-    '[Arcane AI] exact outbound inference request';
-const ARCANE_AI_RESPONSE_DIAGNOSTIC_LABEL=
-    '[Arcane AI] exact inbound inference response';
-const ARCANE_AI_DIAGNOSTIC_WARNING=
-    'may contain private conversation or document content.';
-
-function snapshotAIConsolePayload(payload){
-    const serialized=JSON.stringify(payload);
-    return serialized===undefined?payload:JSON.parse(serialized);
-}
-
-function reportAIExchangeToConsole(label,{
-    id,
-    operation='',
-    service='',
-    transport='',
-    destination='',
-    payload
-}={}){
-    try{
-        console.info(
-            `${label}; ${ARCANE_AI_DIAGNOSTIC_WARNING}`,
-            {
-                id,
-                operation,
-                service,
-                transport,
-                destination,
-                payload:snapshotAIConsolePayload(payload)
-            }
-        );
-    }catch(error){
-        console.warn('Arcane AI console instrumentation failed:',error);
-    }
-}
-
-function reportAIRequestToConsole({request={},...metadata}={}){
-    reportAIExchangeToConsole(
-        ARCANE_AI_REQUEST_DIAGNOSTIC_LABEL,
-        {...metadata,payload:request}
-    );
-}
-
-function reportAIResponseToConsole({response,...metadata}={}){
-    reportAIExchangeToConsole(
-        ARCANE_AI_RESPONSE_DIAGNOSTIC_LABEL,
-        {...metadata,payload:response}
-    );
-}
+const LEGACY_AI_SERVICES=new Set(['OPENAI','OLLAMA','LOCAL_SPEACH']);
 
 function isAIRequestAbort(error,signal){
     return signal?.aborted
         ||error?.name==='AbortError'
         ||error?.code==='ARCANE_REQUEST_ABORTED'
+        ||error?.code==='ARCANE_AI_REQUEST_ABORTED'
         ||error?.code==='AI_REQUEST_ABORTED';
 }
 
 function normalizeAIRequestAbort(error){
-    if(error?.code==='AI_REQUEST_ABORTED'){
+    if(error?.code==='ARCANE_AI_REQUEST_ABORTED'){
         return error;
     }
     const normalized=new Error('The AI request was cancelled.',{cause:error});
     normalized.name='AbortError';
-    normalized.code='AI_REQUEST_ABORTED';
+    normalized.code='ARCANE_AI_REQUEST_ABORTED';
     return normalized;
+}
+
+function legacyAIProviderError(message,code,cause){
+    const error=cause===undefined
+        ?new Error(message)
+        :new Error(message,{cause});
+    error.code=code;
+    return error;
+}
+
+function createLegacyAIStreamBridge(execute,sourceSignal){
+    const controller=new AbortController();
+    const queue=[];
+    const waiters=[];
+    let complete=false;
+    let failure=null;
+    let detached=false;
+
+    function forwardLegacyAIStreamAbort(){
+        if(!controller.signal.aborted){
+            controller.abort(sourceSignal?.reason);
+        }
+    }
+
+    function detachLegacyAIStreamAbort(){
+        if(detached){
+            return;
+        }
+        detached=true;
+        sourceSignal?.removeEventListener?.(
+            'abort',
+            forwardLegacyAIStreamAbort
+        );
+    }
+
+    if(sourceSignal?.aborted){
+        forwardLegacyAIStreamAbort();
+    }else{
+        sourceSignal?.addEventListener?.(
+            'abort',
+            forwardLegacyAIStreamAbort,
+            {once:true}
+        );
+    }
+
+    function emitLegacyAIStreamChunk(chunk){
+        if(complete){
+            return false;
+        }
+        const waiter=waiters.shift();
+        if(waiter){
+            waiter.resolve({value:chunk,done:false});
+        }else{
+            queue.push(chunk);
+        }
+        return true;
+    }
+
+    function finishLegacyAIStream(error){
+        if(complete){
+            return;
+        }
+        complete=true;
+        failure=error||null;
+        detachLegacyAIStreamAbort();
+        while(waiters.length){
+            const waiter=waiters.shift();
+            if(failure){
+                waiter.reject(failure);
+            }else{
+                waiter.resolve({value:undefined,done:true});
+            }
+        }
+    }
+
+    const result=Promise.resolve().then(
+        function executeLegacyAIStream(){
+            if(controller.signal.aborted){
+                throw normalizeAIRequestAbort(controller.signal.reason);
+            }
+            return execute({
+                emit:emitLegacyAIStreamChunk,
+                signal:controller.signal
+            });
+        }
+    ).then(
+        function acceptLegacyAIStreamResult(value){
+            finishLegacyAIStream(null);
+            return value;
+        },
+        function rejectLegacyAIStreamResult(error){
+            const normalized=isAIRequestAbort(error,controller.signal)
+                ?normalizeAIRequestAbort(error)
+                :error;
+            finishLegacyAIStream(normalized);
+            throw normalized;
+        }
+    );
+    result.catch(function retainLegacyAIStreamFailure() {});
+
+    async function cancelLegacyAIStream(reason){
+        if(!controller.signal.aborted){
+            controller.abort(reason);
+        }
+        await result.catch(function retainCancelledLegacyAIStream() {});
+        return true;
+    }
+
+    const handle={
+        result,
+        cancel:cancelLegacyAIStream,
+        next:function readLegacyAIStreamChunk(){
+            if(queue.length){
+                return Promise.resolve({value:queue.shift(),done:false});
+            }
+            if(complete){
+                return failure
+                    ?Promise.reject(failure)
+                    :Promise.resolve({value:undefined,done:true});
+            }
+            return new Promise(function waitForLegacyAIStreamChunk(resolve,reject){
+                waiters.push({resolve,reject});
+            });
+        },
+        return:async function returnLegacyAIStream(value){
+            await cancelLegacyAIStream(
+                legacyAIProviderError(
+                    'The legacy AI stream consumer stopped before completion.',
+                    'ARCANE_AI_REQUEST_ABORTED'
+                )
+            );
+            return {value,done:true};
+        },
+        throw:async function throwLegacyAIStream(error){
+            await cancelLegacyAIStream(error);
+            throw error;
+        },
+        [Symbol.asyncIterator]:function iterateLegacyAIStream(){
+            return this;
+        }
+    };
+    return Object.freeze(handle);
+}
+
+function normalizeAIStartupOptions(options){
+    if(options===undefined){
+        return Object.freeze({startMuted:true,signal:null});
+    }
+    if(!options||typeof options!=='object'||Array.isArray(options)){
+        throw new TypeError('AI startup options must be a plain object.');
+    }
+    const prototype=Object.getPrototypeOf(options);
+    if(prototype!==Object.prototype&&prototype!==null){
+        throw new TypeError('AI startup options must be a plain object.');
+    }
+    const descriptors=Object.getOwnPropertyDescriptors(options);
+    for(const key of Reflect.ownKeys(descriptors)){
+        if(typeof key==='symbol'||(key!=='startMuted'&&key!=='signal')){
+            throw new TypeError('AI startup options contain an unknown option.');
+        }
+        if(!Object.hasOwn(descriptors[key],'value')){
+            throw new TypeError(`AI startup options.${key} must be a data property.`);
+        }
+    }
+    const startMuted=Object.hasOwn(descriptors,'startMuted')
+        ?descriptors.startMuted.value
+        :true;
+    const signal=Object.hasOwn(descriptors,'signal')
+        ?descriptors.signal.value
+        :null;
+    if(typeof startMuted!=='boolean'){
+        throw new TypeError('AI startup startMuted must be a boolean.');
+    }
+    if(signal!==null&&signal!==undefined&&(
+        typeof signal!=='object'
+        ||typeof signal.aborted!=='boolean'
+        ||typeof signal.addEventListener!=='function'
+        ||typeof signal.removeEventListener!=='function'
+    )){
+        throw new TypeError('AI startup signal must be an AbortSignal.');
+    }
+    return Object.freeze({startMuted,signal});
 }
 
 class AI {
@@ -155,7 +295,7 @@ class AI {
     }
 
     ready=false;
-    muted=false;
+    muted=true;
     
 
     llmService = '';
@@ -186,14 +326,43 @@ class AI {
             return window.ai;
         }
 
+        const preferences=[
+            llmService||'OPENAI',
+            sttService||'OPENAI',
+            ttsService||'OPENAI',
+            model||'OPENAI',
+            modelTTS||'OPENAI',
+            modelSTT||'OPENAI'
+        ];
         this.setAI(
-            llmService || 'OPENAI',
-            sttService || 'OPENAI',
-            ttsService || 'OPENAI',
-            model || 'OPENAI',
-            modelTTS || 'OPENAI',
-            modelSTT || 'OPENAI'
+            ...preferences
         );
+
+        const runtime=this;
+        globalThis.addEventListener?.(
+            'arcane-ollama-ready',
+            function reconcileLegacyOllamaReadiness(){
+                runtime.#retainLegacyLLMReadiness(
+                    runtime.#reconcileLegacyLLMReadiness()
+                );
+            }
+        );
+    }
+
+    #providerRuntime=getAIProviderRuntime();
+    #legacyLLMProviders=new Map();
+    #legacyLLMReadiness=Promise.resolve(null);
+    #preferenceTuple=Object.freeze([
+        'OPENAI',
+        'OPENAI',
+        'OPENAI',
+        'OPENAI',
+        'OPENAI',
+        'OPENAI'
+    ]);
+
+    get providerRuntime(){
+        return this.#providerRuntime;
     }
 
     get url() {
@@ -230,10 +399,314 @@ class AI {
     
     set license(value){
         this.#license=typeof value==='string' ? value.trim():'';
+        this.#retainLegacyLLMReadiness(
+            this.#reconcileLegacyLLMReadiness()
+        );
         return this.#license;
     }
 
+    #legacyLLMCapability(providerId){
+        if(providerId==='OPENAI'){
+            return this.llmService==='OPENAI'
+                &&Boolean(this.model)
+                &&Boolean(this.license)
+                &&typeof globalThis.fetch==='function';
+        }
+        if(providerId==='OLLAMA'){
+            return this.llmService==='OLLAMA'
+                &&Boolean(this.model)
+                &&Boolean(this.#nativeOllama());
+        }
+        return false;
+    }
+
+    #legacyLLMInspection(providerId,selection){
+        const localOnly=providerId==='OLLAMA';
+        if(!selection
+            ||selection.providerId!==providerId
+            ||selection.modelId!==this.model
+            ||selection.localOnly!==localOnly
+            ||this.llmService!==providerId){
+            return Object.freeze({
+                available:false,
+                code:'ARCANE_AI_MODEL_AUTHORITY_REQUIRED',
+                message:'The selected legacy LLM route does not match the active AI configuration.'
+            });
+        }
+        if(!this.#legacyLLMCapability(providerId)){
+            return Object.freeze({
+                available:false,
+                code:providerId==='OLLAMA'
+                    ?'AI_NATIVE_LOCAL_REQUIRED'
+                    :'AI_PROVIDER_NOT_CONFIGURED',
+                message:providerId==='OLLAMA'
+                    ?'Local AI requires the capability-gated Arcane API.'
+                    :'AI provider is not configured.'
+            });
+        }
+        return Object.freeze({
+            available:true,
+            authority:Object.freeze({
+                protocol:AI_MODEL_AUTHORITY_PROTOCOL,
+                providerId,
+                modelId:selection.modelId,
+                admitted:true
+            })
+        });
+    }
+
+    #createLegacyLLMProvider(providerId){
+        const runtime=this;
+        const localOnly=providerId==='OLLAMA';
+        let state='unloaded';
+        let busy=false;
+
+        function statusLegacyLLMProvider(){
+            if(state==='ready'
+                &&!busy
+                &&!runtime.#legacyLLMCapability(providerId)){
+                state='unloaded';
+            }
+            return Object.freeze({
+                state,
+                loaded:state==='ready',
+                busy
+            });
+        }
+
+        function assertLegacyLLMSelection(selection){
+            const inspection=runtime.#legacyLLMInspection(
+                providerId,
+                selection
+            );
+            if(!inspection.available){
+                throw legacyAIProviderError(
+                    inspection.message,
+                    inspection.code
+                );
+            }
+            return inspection;
+        }
+
+        function releaseLegacyLLMRequest(){
+            busy=false;
+        }
+
+        return Object.freeze({
+            protocol:AI_PROVIDER_PROTOCOL,
+            role:'llm',
+            id:providerId,
+            localOnly,
+            catalog:function catalogLegacyLLMProvider(){
+                if(runtime.llmService!==providerId||!runtime.model){
+                    return Object.freeze([]);
+                }
+                return Object.freeze([
+                    Object.freeze({id:runtime.model})
+                ]);
+            },
+            inspect:function inspectLegacyLLMProvider(selection,{signal}={}){
+                if(signal?.aborted){
+                    throw normalizeAIRequestAbort(signal.reason);
+                }
+                return runtime.#legacyLLMInspection(providerId,selection);
+            },
+            status:statusLegacyLLMProvider,
+            load:function loadLegacyLLMProvider(context={}){
+                if(context.signal?.aborted){
+                    throw normalizeAIRequestAbort(context.signal.reason);
+                }
+                if(state==='disposed'){
+                    throw legacyAIProviderError(
+                        'The legacy LLM provider is disposed.',
+                        'ARCANE_AI_PROVIDER_DISPOSED'
+                    );
+                }
+                if(busy){
+                    throw legacyAIProviderError(
+                        'The legacy LLM provider owns an active request.',
+                        'ARCANE_AI_ROLE_BUSY'
+                    );
+                }
+                if(typeof context.progress!=='function'){
+                    throw new TypeError(
+                        'Legacy LLM provider load progress must be a function.'
+                    );
+                }
+                const inspection=assertLegacyLLMSelection(context.selection);
+                state='loading';
+                context.progress({
+                    phase:'capability',
+                    completed:0,
+                    total:1,
+                    unit:'items',
+                    heartbeat:false
+                });
+                if(context.signal?.aborted){
+                    state='unloaded';
+                    throw normalizeAIRequestAbort(context.signal.reason);
+                }
+                state='ready';
+                context.progress({
+                    phase:'capability',
+                    completed:1,
+                    total:1,
+                    unit:'items',
+                    heartbeat:false
+                });
+                return Object.freeze({
+                    authority:inspection.authority,
+                    status:statusLegacyLLMProvider()
+                });
+            },
+            request:function requestLegacyLLMProvider(context={}){
+                if(context.signal?.aborted){
+                    throw normalizeAIRequestAbort(context.signal.reason);
+                }
+                assertLegacyLLMSelection(context.selection);
+                const current=statusLegacyLLMProvider();
+                if(current.state!=='ready'||!current.loaded){
+                    throw legacyAIProviderError(
+                        'The legacy LLM provider is not ready.',
+                        'ARCANE_AI_ROLE_NOT_READY'
+                    );
+                }
+                if(busy){
+                    throw legacyAIProviderError(
+                        'The legacy LLM provider owns an active request.',
+                        'ARCANE_AI_ROLE_BUSY'
+                    );
+                }
+                busy=true;
+                if(context.operation==='chat'){
+                    return Promise.resolve(
+                        runtime.#requestLegacyLLMChat(
+                            context.payload,
+                            context.signal
+                        )
+                    ).finally(releaseLegacyLLMRequest);
+                }
+                if(context.operation==='stream'){
+                    const handle=createLegacyAIStreamBridge(
+                        function executeLegacyLLMProviderStream(bridge){
+                            return runtime.#requestLegacyLLMStream(
+                                context.payload,
+                                bridge
+                            );
+                        },
+                        context.signal
+                    );
+                    handle.result.then(
+                        releaseLegacyLLMRequest,
+                        releaseLegacyLLMRequest
+                    );
+                    return handle;
+                }
+                busy=false;
+                throw legacyAIProviderError(
+                    'The legacy LLM provider operation is unsupported.',
+                    'ARCANE_AI_PROVIDER_RUNTIME_INVALID'
+                );
+            },
+            unload:function unloadLegacyLLMProvider(context={}){
+                if(context.signal?.aborted){
+                    throw normalizeAIRequestAbort(context.signal.reason);
+                }
+                state='unloaded';
+                busy=false;
+                return statusLegacyLLMProvider();
+            },
+            dispose:function disposeLegacyLLMProvider(context={}){
+                if(context.signal?.aborted){
+                    throw normalizeAIRequestAbort(context.signal.reason);
+                }
+                state='disposed';
+                busy=false;
+                return statusLegacyLLMProvider();
+            }
+        });
+    }
+
+    #ensureLegacyLLMProvider(providerId){
+        if(providerId!=='OPENAI'&&providerId!=='OLLAMA'){
+            return false;
+        }
+        if(this.#providerRuntime.hasProvider('llm',providerId)){
+            return false;
+        }
+        const provider=this.#createLegacyLLMProvider(providerId);
+        const unregister=this.#providerRuntime.register(provider);
+        this.#legacyLLMProviders.set(
+            providerId,
+            Object.freeze({provider,unregister})
+        );
+        return true;
+    }
+
+    #releaseInactiveLegacyLLMProviders(activeProviderId){
+        for(const [providerId,record] of this.#legacyLLMProviders){
+            if(providerId===activeProviderId){
+                continue;
+            }
+            if(record.unregister()){
+                this.#legacyLLMProviders.delete(providerId);
+            }
+        }
+    }
+
+    #internalLegacyLLMSelection(localOnly=false){
+        const selection=this.#providerRuntime.selection(
+            'llm',
+            {localOnly}
+        );
+        if(!selection
+            ||!this.#legacyLLMProviders.has(selection.providerId)
+            ||selection.providerId!==this.llmService
+            ||selection.modelId!==this.model){
+            return null;
+        }
+        return selection;
+    }
+
+    #retainLegacyLLMReadiness(operation){
+        this.#legacyLLMReadiness=Promise.resolve(operation).catch(
+            function retainLegacyLLMReadinessFailure(){
+                return null;
+            }
+        );
+        return this.#legacyLLMReadiness;
+    }
+
+    #reconcileLegacyLLMReadiness(){
+        const selection=this.#internalLegacyLLMSelection(false);
+        if(!selection){
+            return Promise.resolve(this.#providerRuntime.status('llm'));
+        }
+        const status=this.#providerRuntime.status('llm');
+        if(this.#legacyLLMCapability(selection.providerId)){
+            if(status.state==='ready'&&status.loaded===true){
+                return Promise.resolve(status);
+            }
+            return this.#providerRuntime.load('llm');
+        }
+        if(status.loaded===true
+            ||status.busy===true
+            ||status.state==='loading'
+            ||status.state==='unloading'){
+            return this.#providerRuntime.unload('llm');
+        }
+        return Promise.resolve(status);
+    }
+
     get configured(){
+        if(this.#usesProviderRuntime('llm',this.llmService)){
+            if(this.#internalLegacyLLMSelection(false)
+                &&!this.#legacyLLMCapability(this.llmService)){
+                return false;
+            }
+            const state=this.#providerRuntime.status('llm');
+            return state.state==='ready'&&state.loaded===true;
+        }
         if(this.llmService==='OLLAMA'){
             return Boolean(this.model)&&Boolean(this.#nativeOllama());
         }
@@ -243,9 +716,25 @@ class AI {
             &&Boolean(this.license);
     }
 
-    #assertServiceConfigured(service=this.llmService){
+    #assertServiceConfigured(service=this.llmService,role='llm'){
+        if(this.#usesProviderRuntime(role,service)){
+            const internal=role==='llm'
+                ?this.#internalLegacyLLMSelection(false)
+                :null;
+            if(internal&&!this.#legacyLLMCapability(internal.providerId)){
+                const inspection=this.#legacyLLMInspection(
+                    internal.providerId,
+                    internal
+                );
+                throw legacyAIProviderError(
+                    inspection.message,
+                    inspection.code
+                );
+            }
+            return true;
+        }
         if(service==='OLLAMA'){
-            if(this.#nativeOllama()){
+            if(role==='llm'&&this.#nativeOllama()){
                 return true;
             }
 
@@ -255,8 +744,16 @@ class AI {
             error.code='AI_NATIVE_LOCAL_REQUIRED';
             throw error;
         }
-        if(service&&service!=='OPENAI'){
-            return true;
+        if(service==='LOCAL_SPEACH'){
+            if(this.#nativeSpeech(service,role)){
+                return true;
+            }
+
+            const error=new Error(
+                `Local ${role.toUpperCase()} requires the capability-gated Arcane API.`
+            );
+            error.code='AI_NATIVE_LOCAL_REQUIRED';
+            throw error;
         }
 
         if(service==='OPENAI'&&this.license){
@@ -266,6 +763,40 @@ class AI {
         const error=new Error('AI provider is not configured.');
         error.code='AI_PROVIDER_NOT_CONFIGURED';
         throw error;
+    }
+
+    #usesProviderRuntime(role,service){
+        return Boolean(this.#providerRuntime.selection(role));
+    }
+
+    #shouldUseProviderRuntime(role,service,localOnly=false){
+        // Legacy adapters publish lifecycle without replacing established
+        // public transport callbacks or their cancellation behavior.
+        if(role==='llm'&&this.#internalLegacyLLMSelection(localOnly)){
+            return false;
+        }
+        if(!localOnly){
+            return this.#usesProviderRuntime(role,service);
+        }
+        const selection=this.#providerRuntime.selection(
+            role,
+            {localOnly:true}
+        );
+        return Boolean(selection);
+    }
+
+    #hasLocalRoute(role,service){
+        const selection=this.#providerRuntime.selection(
+            role,
+            {localOnly:true}
+        );
+        if(selection){
+            return selection.localOnly===true;
+        }
+        if(this.#providerRuntime.selection(role)){
+            return false;
+        }
+        return role==='llm'&&service==='OLLAMA';
     }
 
     audioMessageChunks='';
@@ -281,6 +812,151 @@ class AI {
     speechResumePending=false;
     speechSynthesisTail=Promise.resolve();
     speechUnlockHandler=null;
+
+    #nextPreferenceTuple(values){
+        const current=this.#preferenceTuple;
+        const next=values.map(function normalizeAIPreference(value,index){
+            if(value===undefined||value===null||value===''){
+                return current[index];
+            }
+            if(typeof value!=='string'||value.trim()!==value||!value){
+                throw new TypeError('AI preferences must be nonempty trimmed strings.');
+            }
+            return value;
+        });
+        return Object.freeze(next);
+    }
+
+    #assertValidProviderTuple(tuple){
+        if(tuple[0]==='OLLAMA'){
+            const mappedModel=tuple[3]==='OPENAI'?null:this.#models[tuple[3]];
+            if(!mappedModel&&!normalizeOllamaModelIdentifier(tuple[3])){
+                const error=new TypeError('The Ollama model preference is invalid.');
+                error.code='AI_MODEL_INVALID';
+                throw error;
+            }
+        }
+    }
+
+    #normalizedLLMModel(service,model){
+        if(service==='OLLAMA'){
+            const mappedModel=model==='OPENAI'?null:this.#models[model];
+            return mappedModel
+                ||normalizeOllamaModelIdentifier(model)
+                ||model;
+        }
+        if(service==='OPENAI'){
+            return this.#models.OPENAI;
+        }
+        return model;
+    }
+
+    #applyPreferenceTuple(tuple){
+        const [
+            llmService,
+            sttService,
+            ttsService,
+            model,
+            modelTTS,
+            modelSTT
+        ]=tuple;
+        const normalizedLLMModel=this.#normalizedLLMModel(
+            llmService,
+            model
+        );
+        this.llmService=llmService;
+        this.sttService=sttService;
+        this.ttsService=ttsService;
+        this.model=normalizedLLMModel;
+        this.modelTTS=this.#ttsModels[modelTTS]||modelTTS;
+        this.modelSTT=this.#sttModels[modelSTT]||modelSTT;
+        this.reasoningEffort='';
+        this.#preferenceTuple=Object.freeze(tuple.slice());
+    }
+
+    #tupleFromProviderRoutes(selections){
+        const llm=selections.llm.default;
+        const stt=selections.stt.default;
+        const tts=selections.tts.default;
+        return Object.freeze([
+            llm?.providerId||'',
+            stt?.providerId||'',
+            tts?.providerId||'',
+            llm?.modelId||'',
+            tts?.modelId||'',
+            stt?.modelId||''
+        ]);
+    }
+
+    #routesFromPreferenceTuple(tuple){
+        const roles={
+            llm:[
+                tuple[0],
+                this.#normalizedLLMModel(tuple[0],tuple[3])
+            ],
+            stt:[tuple[1],tuple[5]],
+            tts:[tuple[2],tuple[4]]
+        };
+        const selections={};
+        for(const role of ['llm','stt','tts']){
+            const [providerId,modelId]=roles[role];
+            const identity=providerId&&modelId
+                ?this.#providerRuntime.providerIdentity(role,providerId)
+                :null;
+            const pendingNonLegacy=Boolean(
+                providerId
+                &&modelId
+                &&!LEGACY_AI_SERVICES.has(providerId)
+            );
+            if(!identity&&!pendingNonLegacy){
+                selections[role]={default:null,localOnly:null};
+                continue;
+            }
+            const selection={
+                providerId,
+                modelId,
+                localOnly:identity?.localOnly??null
+            };
+            selections[role]={
+                default:selection,
+                localOnly:identity?.localOnly===true
+                    ?{...selection,localOnly:true}
+                    :null
+            };
+        }
+        return selections;
+    }
+
+    #assertRegisteredLegacyRoutes(selections){
+        for(const role of ['llm','stt','tts']){
+            for(const routeName of ['default','localOnly']){
+                const selection=selections?.[role]?.[routeName];
+                if(selection
+                    &&LEGACY_AI_SERVICES.has(selection.providerId)
+                    &&!this.#providerRuntime.hasProvider(role,selection.providerId)){
+                    const error=new Error(
+                        `Legacy AI provider ${selection.providerId} requires an explicit ${role} adapter before routing.`
+                    );
+                    error.code='ARCANE_AI_PROVIDER_UNAVAILABLE';
+                    throw error;
+                }
+            }
+        }
+    }
+
+    async #unloadProviderRolesForTransition(){
+        const settlements=await Promise.allSettled([
+            this.#providerRuntime.unload('llm'),
+            this.#providerRuntime.unload('stt'),
+            this.#providerRuntime.unload('tts')
+        ]);
+        const failure=settlements.find(function findAITransitionCleanupFailure(result){
+            return result.status==='rejected';
+        });
+        if(failure){
+            throw failure.reason;
+        }
+    }
 
     // Set models to be used by the AI. 
     // Note: Only those that are defined are set.
@@ -304,29 +980,107 @@ class AI {
         ) {
             return false;
         }
+        const tuple=this.#nextPreferenceTuple([
+            llmService,
+            sttService,
+            ttsService,
+            model,
+            modelTTS,
+            modelSTT
+        ]);
+        this.#assertValidProviderTuple(tuple);
+        this.#ensureLegacyLLMProvider(tuple[0]);
+        this.#providerRuntime.configure(this.#routesFromPreferenceTuple(tuple));
+        this.#applyPreferenceTuple(tuple);
+        this.#releaseInactiveLegacyLLMProviders(tuple[0]);
+        this.#retainLegacyLLMReadiness(
+            this.#reconcileLegacyLLMReadiness()
+        );
+        return true;
+    }
 
-        this.llmService=llmService;
-        this.sttService=sttService;
-        this.ttsService=ttsService;
-        if(llmService==='OLLAMA'){
-            const mappedModel=model==='OPENAI'?null:this.#models[model];
-            this.model=mappedModel||normalizeOllamaModelIdentifier(model)||'';
+    configureProviders(selections){
+        const prepared=this.#providerRuntime.validateConfiguration(selections);
+        this.#ensureLegacyLLMProvider(
+            prepared.llm.default?.providerId
+        );
+        this.#assertRegisteredLegacyRoutes(prepared);
+        const configured=this.#providerRuntime.configure(prepared);
+        this.#applyPreferenceTuple(this.#tupleFromProviderRoutes(configured));
+        this.#releaseInactiveLegacyLLMProviders(
+            configured.llm.default?.providerId
+        );
+        this.#retainLegacyLLMReadiness(
+            this.#reconcileLegacyLLMReadiness()
+        );
+        return configured;
+    }
 
-            if(!this.model){
-                const error=new TypeError('The Ollama model preference is invalid.');
-                error.code='AI_MODEL_INVALID';
-                throw error;
-            }
-        }else if(llmService==='OPENAI'){
-            this.model=this.#models.OPENAI;
-        }else{
-            this.model='';
+    async transitionAI(
+        llmService,
+        sttService,
+        ttsService,
+        model,
+        modelTTS,
+        modelSTT
+    ){
+        const tuple=this.#nextPreferenceTuple([
+            llmService,
+            sttService,
+            ttsService,
+            model,
+            modelTTS,
+            modelSTT
+        ]);
+        this.#assertValidProviderTuple(tuple);
+        this.stopAudio();
+        await this.#unloadProviderRolesForTransition();
+        this.#ensureLegacyLLMProvider(tuple[0]);
+        this.#providerRuntime.configure(this.#routesFromPreferenceTuple(tuple));
+        this.#applyPreferenceTuple(tuple);
+        this.#releaseInactiveLegacyLLMProviders(tuple[0]);
+        await this.#reconcileLegacyLLMReadiness();
+        return this.#providerRuntime.status();
+    }
+
+    async transitionProviders(selections){
+        const prepared=this.#providerRuntime.validateConfiguration(selections);
+        this.#ensureLegacyLLMProvider(
+            prepared.llm.default?.providerId
+        );
+        this.#assertRegisteredLegacyRoutes(prepared);
+        this.stopAudio();
+        await this.#unloadProviderRolesForTransition();
+        const configured=this.#providerRuntime.configure(prepared);
+        this.#applyPreferenceTuple(this.#tupleFromProviderRoutes(configured));
+        this.#releaseInactiveLegacyLLMProviders(
+            configured.llm.default?.providerId
+        );
+        await this.#reconcileLegacyLLMReadiness();
+        return configured;
+    }
+
+    async startProviders(options){
+        const normalized=normalizeAIStartupOptions(options);
+        this.muted=normalized.startMuted;
+        if(normalized.startMuted){
+            this.stopAudio();
         }
-        this.modelTTS=this.#ttsModels[modelTTS];
-        this.modelTTS=this.#ttsModels[modelTTS];
-        this.modelSTT=this.#sttModels[modelSTT];
-        this.reasoningEffort='';
+        return this.#providerRuntime.start(normalized);
+    }
 
+    async setSpeechMuted(muted){
+        if(typeof muted!=='boolean'){
+            throw new TypeError('AI speech muted state must be a boolean.');
+        }
+        this.muted=muted;
+        if(muted){
+            this.stopAudio();
+        }
+        if(!this.#usesProviderRuntime('tts',this.ttsService)){
+            return true;
+        }
+        await this.#providerRuntime.setSpeechMuted(muted);
         return true;
     }
 
@@ -376,14 +1130,19 @@ class AI {
             :null;
     }
 
-    #nativeSpeech(service){
+    #nativeSpeech(service,role){
         const client=globalThis.Arcane?.speech;
 
-        return service==='LOCAL_SPEACH'
-            &&typeof client?.synthesize==='function'
-            &&typeof client?.transcribe==='function'
-            ?client
-            :null;
+        if(service!=='LOCAL_SPEACH'){
+            return null;
+        }
+        if(role==='tts'&&typeof client?.synthesize==='function'){
+            return client;
+        }
+        if(role==='stt'&&typeof client?.transcribe==='function'){
+            return client;
+        }
+        return null;
     }
 
     async #androidNativeHost(){
@@ -589,34 +1348,130 @@ class AI {
         return null;
     }
 
-    #reportRequest(requestHandler,request,id,metadata={}){
+    async #reportRequest(requestHandler,request,id){
         if(typeof requestHandler!=='function'){
-            throw new TypeError('AI request diagnostics require a function.');
+            throw new TypeError('AI onRequest callback must be a function.');
         }
-
-        try{
-            Promise.resolve(requestHandler(request,id)).catch(
-                error=>console.warn('AI request diagnostics failed:',error)
-            );
-        }catch(error){
-            console.warn('AI request diagnostics failed:',error);
-        }
-
-        reportAIRequestToConsole({
-            id,
-            service:this.llmService,
-            request,
-            ...metadata
-        });
+        await requestHandler(request,id);
     }
 
-    #reportResponse(response,id,metadata={}){
-        reportAIResponseToConsole({
-            id,
-            service:this.llmService,
-            response,
-            ...metadata
-        });
+    #providerStreamEmissions(chunk,seeThinking){
+        const chunks=[];
+        const toolNames=[];
+        const choices=Array.isArray(chunk?.choices)?chunk.choices:[];
+        for(const choice of choices){
+            const delta=choice?.delta||{};
+            if(seeThinking&&typeof delta.reasoning_content==='string'){
+                chunks.push({text:delta.reasoning_content,thinking:true});
+            }
+            if(typeof delta.content==='string'){
+                chunks.push({text:delta.content,thinking:false});
+            }
+            for(const call of Array.isArray(delta.tool_calls)?delta.tool_calls:[]){
+                const name=call?.function?.name;
+                if(typeof name==='string'&&name){
+                    toolNames.push(name);
+                }
+            }
+        }
+        if(!choices.length){
+            if(seeThinking&&typeof chunk?.thinking==='string'){
+                chunks.push({text:chunk.thinking,thinking:true});
+            }
+            const text=typeof chunk?.text==='string'
+                ?chunk.text
+                :typeof chunk?.content==='string'
+                    ?chunk.content
+                    :'';
+            if(text){
+                chunks.push({text,thinking:false});
+            }
+            const calls=Array.isArray(chunk?.toolCalls)
+                ?chunk.toolCalls
+                :Array.isArray(chunk?.tool_calls)
+                    ?chunk.tool_calls
+                    :[];
+            for(const call of calls){
+                const name=call?.function?.name||call?.name;
+                if(typeof name==='string'&&name){
+                    toolNames.push(name);
+                }
+            }
+        }
+        return {chunks,toolNames};
+    }
+
+    #providerCompletionOutput(completion){
+        if(typeof completion==='string'){
+            return completion;
+        }
+        const toolRecord={};
+        let toolCount=0;
+        for(const choice of Array.isArray(completion?.choices)?completion.choices:[]){
+            for(const call of Array.isArray(choice?.message?.tool_calls)
+                ?choice.message.tool_calls
+                :[]){
+                const name=call?.function?.name;
+                if(typeof name==='string'&&name){
+                    toolRecord[name]=call.function.arguments;
+                    toolCount+=1;
+                }
+            }
+        }
+        if(toolCount){
+            return toolRecord;
+        }
+        const content=completion?.choices?.[0]?.message?.content;
+        return typeof content==='string'?content:completion;
+    }
+
+    #requestLegacyLLMChat(payload={},signal=null){
+        return this.#fetchLegacy(
+            payload.messages??[],
+            function ignoreLegacyLLMProviderResponse(){},
+            payload.structuredOutput??false,
+            payload.tools??[],
+            payload.toolChoice??'auto',
+            payload.parallelToolCalls??true,
+            payload.id??Date.now(),
+            function ignoreLegacyLLMProviderRequest(){},
+            signal
+        );
+    }
+
+    #requestLegacyLLMStream(payload={},bridge){
+        function emitLegacyLLMStreamText(text,id,thinking){
+            if(typeof text!=='string'||!text){
+                return;
+            }
+            bridge.emit(
+                thinking
+                    ?{thinking:text}
+                    :{content:text}
+            );
+        }
+
+        function emitLegacyLLMStreamTool(name){
+            if(typeof name==='string'&&name){
+                bridge.emit({toolCalls:[{name}]});
+            }
+        }
+
+        return this.#streamLegacyMessage(
+            payload.messages??[],
+            emitLegacyLLMStreamText,
+            function ignoreLegacyLLMProviderCompletion(){},
+            payload.tools??[],
+            payload.toolChoice??'auto',
+            emitLegacyLLMStreamTool,
+            payload.parallelToolCalls??true,
+            payload.id??Date.now(),
+            payload.seeThinking??false,
+            bridge.signal,
+            function ignoreLegacyLLMProviderRequest(){},
+            payload.structuredOutput??false,
+            false
+        );
     }
 
     #assertRequiredOllamaToolCall(toolCalls=[],toolChoice='auto'){
@@ -701,12 +1556,115 @@ class AI {
         if(localOnly!==true&&localOnly!==false){
             throw new TypeError('AI localOnly must be a boolean.');
         }
-        if(localOnly&&this.llmService!=='OLLAMA'){
+        if(localOnly&&!this.#hasLocalRoute('llm',this.llmService)){
             const error=new Error(
                 'This AI request requires a configured local model.'
             );
             error.code='AI_LOCAL_MODEL_REQUIRED';
             throw error;
+        }
+        if(this.#shouldUseProviderRuntime('llm',this.llmService,localOnly)){
+            const request={
+                messages,
+                structuredOutput,
+                tools,
+                toolChoice,
+                parallelToolCalls,
+                id,
+                seeThinking
+            };
+            const displayId=`M-${id}`;
+            const announcedTools=new Set();
+            let handle=null;
+            try{
+                if(signal?.aborted){
+                    throw normalizeAIRequestAbort();
+                }
+                await this.#reportRequest(onRequest,request,id);
+                if(signal?.aborted){
+                    throw normalizeAIRequestAbort();
+                }
+                handle=await this.#providerRuntime.request(
+                    'llm',
+                    {
+                        operation:'stream',
+                        payload:request,
+                        localOnly,
+                        signal
+                    }
+                );
+                for await(const chunk of handle){
+                    if(signal?.aborted){
+                        throw normalizeAIRequestAbort();
+                    }
+                    const emissions=this.#providerStreamEmissions(chunk,seeThinking);
+                    for(const emission of emissions.chunks){
+                        if(signal?.aborted){
+                            throw normalizeAIRequestAbort();
+                        }
+                        await onChunk(
+                            emission.text,
+                            displayId,
+                            emission.thinking
+                        );
+                        if(signal?.aborted){
+                            throw normalizeAIRequestAbort();
+                        }
+                    }
+                    for(const name of emissions.toolNames){
+                        if(signal?.aborted){
+                            throw normalizeAIRequestAbort();
+                        }
+                        if(!announcedTools.has(name)){
+                            announcedTools.add(name);
+                            await onToolCall(name);
+                            if(signal?.aborted){
+                                throw normalizeAIRequestAbort();
+                            }
+                        }
+                    }
+                }
+                const completion=await handle.result;
+                if(signal?.aborted){
+                    throw normalizeAIRequestAbort();
+                }
+                for(const choice of Array.isArray(completion?.choices)
+                    ?completion.choices
+                    :[]){
+                    for(const call of Array.isArray(choice?.message?.tool_calls)
+                        ?choice.message.tool_calls
+                        :[]){
+                        const name=call?.function?.name;
+                        if(typeof name==='string'&&name&&!announcedTools.has(name)){
+                            if(signal?.aborted){
+                                throw normalizeAIRequestAbort();
+                            }
+                            announcedTools.add(name);
+                            await onToolCall(name);
+                            if(signal?.aborted){
+                                throw normalizeAIRequestAbort();
+                            }
+                        }
+                    }
+                }
+                const result=this.#providerCompletionOutput(completion);
+                await onComplete(result,displayId,false);
+                if(signal?.aborted){
+                    throw normalizeAIRequestAbort();
+                }
+                this.finishTTS();
+                return result;
+            }catch(error){
+                if(handle){
+                    await handle.cancel(error).catch(
+                        function retainProviderStreamCleanupFailure() {}
+                    );
+                }
+                this.stopAudio();
+                throw isAIRequestAbort(error,signal)
+                    ?normalizeAIRequestAbort(error)
+                    :error;
+            }
         }
 
         return this.streamMessage(
@@ -738,6 +1696,55 @@ class AI {
         signal=null,
         requestHandler=function ignoreStreamRequest(){},
         structuredOutput=false
+    ){
+        if(this.#shouldUseProviderRuntime('llm',this.llmService,false)){
+            return this.streamRequest({
+                messages,
+                structuredOutput,
+                localOnly:false,
+                onChunk:streamHandler,
+                onComplete:streamComplete,
+                tools,
+                toolChoice:tool_choice,
+                onToolCall:earlyFunctionTrigger,
+                onRequest:requestHandler,
+                parallelToolCalls:parallel_tool_calls,
+                id,
+                seeThinking,
+                signal
+            });
+        }
+
+        return this.#streamLegacyMessage(
+            messages,
+            streamHandler,
+            streamComplete,
+            tools,
+            tool_choice,
+            earlyFunctionTrigger,
+            parallel_tool_calls,
+            id,
+            seeThinking,
+            signal,
+            requestHandler,
+            structuredOutput
+        );
+    }
+
+    async #streamLegacyMessage(
+        messages=[],
+        streamHandler=function ignoreStreamChunk(){},
+        streamComplete=function finishIgnoredStream(){},
+        tools=[],
+        tool_choice='auto',
+        earlyFunctionTrigger=function ignoreEarlyFunction(){},
+        parallel_tool_calls=true,
+        id=Date.now(),
+        seeThinking=false,
+        signal=null,
+        requestHandler=function ignoreStreamRequest(){},
+        structuredOutput=false,
+        finishSpeech=true
     ){
         let speechTurnCompleted=false;
 
@@ -785,10 +1792,16 @@ class AI {
 
         const nativeOllama=this.#nativeOllama();
 
+        if(this.llmService==='OLLAMA'&&!nativeOllama){
+            throw legacyAIProviderError(
+                'Local AI requires the capability-gated Arcane API.',
+                'AI_NATIVE_LOCAL_REQUIRED'
+            );
+        }
+
         if(nativeOllama){
             let nativeContent='';
             const nativeToolCalls={};
-            const nativeResponseChunks=[];
             const triggeredTools=new Set();
             const ollamaTools=this.#ollamaTools(tools,tool_choice);
             const ollamaMessages=this.#ollamaMessages(messages,tool_choice);
@@ -802,7 +1815,7 @@ class AI {
             };
 
             function reportEarlyFunctionFailure(error){
-                console.error('Early tool trigger failed:',error);
+                console.error('Early tool trigger failed.');
             }
 
             function receiveNativeToolCalls(message={}){
@@ -832,7 +1845,7 @@ class AI {
                 }
             }
 
-            this.#reportRequest(requestHandler,ollamaRequest,id,{
+            await this.#reportRequest(requestHandler,ollamaRequest,id,{
                 operation:'stream',
                 transport:'native',
                 destination:'Arcane.ollama.chat'
@@ -844,7 +1857,6 @@ class AI {
                         if(signal?.aborted){
                             return;
                         }
-                        nativeResponseChunks.push(chunk);
                         const message=chunk?.message||{};
                         const thinking=seeThinking
                             ?String(message.thinking||'')
@@ -866,15 +1878,6 @@ class AI {
                     signal
                 }
             );
-            this.#reportResponse(
-                {chunks:nativeResponseChunks,final:nativeResponse},
-                id,
-                {
-                    operation:'stream',
-                    transport:'native',
-                    destination:'Arcane.ollama.chat'
-                }
-            );
             if(signal?.aborted){
                 throw normalizeAIRequestAbort();
             }
@@ -892,13 +1895,15 @@ class AI {
             if(Object.keys(nativeToolCalls).length&&!nativeContent){
                 streamHandler('',`M-${id}`,false);
             }
-            this.finishTTS();
+            if(finishSpeech){
+                this.finishTTS();
+            }
             await streamComplete(nativeResult,`M-${id}`,isThinking);
             speechTurnCompleted=true;
             return nativeResult;
         }
 
-        this.#reportRequest(requestHandler,request,id,{
+        await this.#reportRequest(requestHandler,request,id,{
             operation:'stream',
             transport:'http',
             destination:this.url
@@ -921,7 +1926,7 @@ class AI {
             if(signal?.aborted||err?.name==='AbortError'){
                 const error=new Error('The AI request was cancelled.',{cause:err});
                 error.name='AbortError';
-                error.code='AI_REQUEST_ABORTED';
+                error.code='ARCANE_AI_REQUEST_ABORTED';
                 throw error;
             }
             const error=new Error(
@@ -936,7 +1941,6 @@ class AI {
 
         let chunkString='';
         let chunkCache='';
-        const responseEvents=[];
         const streamedToolCalls=new Map();
         const triggeredTools=new Set();
         const decoder = new TextDecoder('utf-8');
@@ -969,7 +1973,7 @@ class AI {
                         Promise.resolve(
                             earlyFunctionTrigger(record.name)
                         ).catch(
-                            error=>console.error('Early tool trigger failed:',error)
+                            ()=>console.error('Early tool trigger failed.')
                         );
                     }
                 }
@@ -1007,14 +2011,12 @@ class AI {
                         chunkCache+=delta;
 
                         if (chunkCache.trim() === '[DONE]') {
-                            responseEvents.push('[DONE]');
                             chunkCache = '';
                             return;
                         }
 
                         try{
                             const resp=JSON.parse(chunkCache)||{};
-                            responseEvents.push(resp);
                             //console.log(JSON.stringify(resp));
                             //console.log(resp)
                             const choice = resp.choices?.[0] || {};
@@ -1058,7 +2060,7 @@ class AI {
                                 receiveStreamedToolCalls(tool_calls);
                             }
                         } catch(err) {
-                            console.warn(err);
+                            console.warn('AI stream callback failed.');
                         }
                     }
                 );
@@ -1071,12 +2073,6 @@ class AI {
         }finally{
             reader.releaseLock();
         }
-
-        this.#reportResponse(responseEvents,id,{
-            operation:'stream',
-            transport:'http',
-            destination:this.url
-        });
 
         const tool_funcs={};
         const orderedToolCalls=[...streamedToolCalls.values()].sort(
@@ -1103,7 +2099,9 @@ class AI {
         if(Object.keys(tool_funcs).length&&!chunkString){
             streamHandler('',`M-${id}`,false);
         }
-        this.finishTTS();
+        if(finishSpeech){
+            this.finishTTS();
+        }
         await streamComplete(streamResult, `M-${id}`,isThinking);
 
         //sync
@@ -1136,12 +2134,46 @@ class AI {
         if(localOnly!==true&&localOnly!==false){
             throw new TypeError('AI localOnly must be a boolean.');
         }
-        if(localOnly&&this.llmService!=='OLLAMA'){
+        if(localOnly&&!this.#hasLocalRoute('llm',this.llmService)){
             const error=new Error(
                 'This AI request requires a configured local model.'
             );
             error.code='AI_LOCAL_MODEL_REQUIRED';
             throw error;
+        }
+        if(this.#shouldUseProviderRuntime('llm',this.llmService,localOnly)){
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort();
+            }
+            const request={
+                messages,
+                structuredOutput,
+                tools,
+                toolChoice,
+                parallelToolCalls,
+                id
+            };
+            await this.#reportRequest(onRequest,request,id);
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort();
+            }
+            const response=await this.#providerRuntime.request(
+                'llm',
+                {
+                    operation:'chat',
+                    payload:request,
+                    localOnly,
+                    signal
+                }
+            );
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort();
+            }
+            await onResponse(response,id,false);
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort();
+            }
+            return response;
         }
 
         return this.fetch(
@@ -1158,6 +2190,45 @@ class AI {
     }
 
     async fetch(
+        messages=[],
+        responseHandler=function ignoreFetchResponse(){},
+        structuredOutput=false,
+        tools=[],
+        tool_choice='auto',
+        parallel_tool_calls=true,
+        id=Date.now(),
+        requestHandler=function ignoreFetchRequest(){},
+        signal=null,
+    ){
+        if(this.#shouldUseProviderRuntime('llm',this.llmService,false)){
+            return this.fetchRequest({
+                messages,
+                structuredOutput,
+                localOnly:false,
+                tools,
+                toolChoice:tool_choice,
+                parallelToolCalls:parallel_tool_calls,
+                id,
+                signal,
+                onRequest:requestHandler,
+                onResponse:responseHandler
+            });
+        }
+
+        return this.#fetchLegacy(
+            messages,
+            responseHandler,
+            structuredOutput,
+            tools,
+            tool_choice,
+            parallel_tool_calls,
+            id,
+            requestHandler,
+            signal
+        );
+    }
+
+    async #fetchLegacy(
         messages=[],
         responseHandler=function ignoreFetchResponse(){},
         structuredOutput=false,
@@ -1204,6 +2275,13 @@ class AI {
 
         const nativeOllama=this.#nativeOllama();
 
+        if(this.llmService==='OLLAMA'&&!nativeOllama){
+            throw legacyAIProviderError(
+                'Local AI requires the capability-gated Arcane API.',
+                'AI_NATIVE_LOCAL_REQUIRED'
+            );
+        }
+
         if(nativeOllama){
             const ollamaTools=this.#ollamaTools(tools,tool_choice);
             const ollamaMessages=this.#ollamaMessages(messages,tool_choice);
@@ -1215,7 +2293,7 @@ class AI {
                 ...(structuredOutputFormat?{format:structuredOutputFormat}:{}),
                 ...(ollamaTools.length?{tools:ollamaTools}:{})
             };
-            this.#reportRequest(requestHandler,nativeRequest,id,{
+            await this.#reportRequest(requestHandler,nativeRequest,id,{
                 operation:'fetch',
                 transport:'native',
                 destination:'Arcane.ollama.chat'
@@ -1232,11 +2310,6 @@ class AI {
                 }
                 throw error;
             }
-            this.#reportResponse(nativeResponse,id,{
-                operation:'fetch',
-                transport:'native',
-                destination:'Arcane.ollama.chat'
-            });
             if(signal?.aborted){
                 throw normalizeAIRequestAbort();
             }
@@ -1258,7 +2331,7 @@ class AI {
             return responseJSON;
         }
 
-        this.#reportRequest(requestHandler,request,id,{
+        await this.#reportRequest(requestHandler,request,id,{
             operation:'fetch',
             transport:'http',
             destination:this.url
@@ -1309,11 +2382,6 @@ class AI {
             }
             throw error;
         }
-        this.#reportResponse(responseJSON,id,{
-            operation:'fetch',
-            transport:'http',
-            destination:this.url
-        });
         if(signal?.aborted){
             throw normalizeAIRequestAbort();
         }
@@ -1348,9 +2416,9 @@ class AI {
         }
 
         try{
-            this.#assertServiceConfigured(this.ttsService);
+            this.#assertServiceConfigured(this.ttsService,'tts');
         }catch(error){
-            console.warn('Error preparing speech from AI:',error);
+            console.warn('AI speech provider is unavailable.');
             return Promise.resolve(false);
         }
 
@@ -1498,7 +2566,28 @@ class AI {
     }
 
     async #requestSpeechAudio(job){
-        const nativeSpeech=this.#nativeSpeech(this.ttsService);
+        if(this.#usesProviderRuntime('tts',this.ttsService)){
+            job.abortController=new AbortController();
+            const responseFormat=this.#providerSpeechResponseFormat();
+            const response=await this.#providerRuntime.request(
+                'tts',
+                {
+                    operation:'synthesize',
+                    payload:{
+                        model:this.#providerRuntime.selection('tts')?.modelId,
+                        voice:String(window.user?.AI_voice||'af_heart'),
+                        input:job.text,
+                        responseFormat,
+                        speed:this.voiceSpeed
+                    },
+                    localOnly:false,
+                    signal:job.abortController.signal
+                }
+            );
+            return this.#normalizeProviderSpeechAudio(response);
+        }
+
+        const nativeSpeech=this.#nativeSpeech(this.ttsService,'tts');
 
         if(nativeSpeech){
             const response=await nativeSpeech.synthesize({
@@ -1577,6 +2666,109 @@ class AI {
         return {chunks,type:this.audioType};
     }
 
+    #providerSpeechResponseFormat(){
+        const selection=this.#providerRuntime.selection('tts');
+        if(!selection){
+            return this.audioFormat;
+        }
+        const provider=this.#providerRuntime.catalog('tts').find(
+            entry=>entry.providerId===selection.providerId
+        );
+        const model=provider?.models.find(entry=>entry?.id===selection.modelId);
+        const speech=model?.speech;
+        if(speech===undefined){
+            return this.audioFormat;
+        }
+        const prototype=speech&&typeof speech==='object'
+            ?Object.getPrototypeOf(speech)
+            :null;
+        const descriptors=prototype===Object.prototype||prototype===null
+            ?Object.getOwnPropertyDescriptors(speech)
+            :null;
+        const formats=descriptors?.responseFormats?.value;
+        const defaultFormat=descriptors?.defaultResponseFormat?.value;
+        if(!Array.isArray(formats)
+            ||formats.length<1
+            ||!formats.every(format=>typeof format==='string'&&format.trim()===format&&format)
+            ||typeof defaultFormat!=='string'
+            ||!formats.includes(defaultFormat)){
+            throw legacyAIProviderError(
+                'The selected TTS provider returned an invalid speech format catalog.',
+                'ARCANE_AI_PROVIDER_RUNTIME_INVALID'
+            );
+        }
+        if(formats.includes(this.audioFormat)){
+            return this.audioFormat;
+        }
+        if(this.audioFormat===LEGACY_TTS_RESPONSE_FORMAT){
+            return defaultFormat;
+        }
+        throw legacyAIProviderError(
+            `The selected TTS provider does not support ${this.audioFormat}.`,
+            'ARCANE_AI_UNSUPPORTED_RESPONSE_FORMAT'
+        );
+    }
+
+    async #normalizeProviderSpeechAudio(response){
+        if(response instanceof Blob){
+            return {
+                chunks:[new Uint8Array(await response.arrayBuffer())],
+                type:response.type||this.audioType
+            };
+        }
+
+        if(response instanceof ArrayBuffer||ArrayBuffer.isView(response)){
+            const bytes=response instanceof ArrayBuffer
+                ?new Uint8Array(response)
+                :new Uint8Array(
+                    response.buffer,
+                    response.byteOffset,
+                    response.byteLength
+                );
+            return {
+                chunks:[bytes],
+                type:this.audioType
+            };
+        }
+
+        if(response&&typeof response==='object'){
+            if(typeof response.audioBase64==='string'){
+                return {
+                    chunks:[this.#base64ToBytes(response.audioBase64)],
+                    type:typeof response.contentType==='string'
+                        ?response.contentType
+                        :this.audioType
+                };
+            }
+            if(response.audio instanceof Blob){
+                return {
+                    chunks:[new Uint8Array(await response.audio.arrayBuffer())],
+                    type:response.audio.type
+                        ||response.contentType
+                        ||this.audioType
+                };
+            }
+            if(response.audio instanceof ArrayBuffer
+                ||ArrayBuffer.isView(response.audio)){
+                const bytes=response.audio instanceof ArrayBuffer
+                    ?new Uint8Array(response.audio)
+                    :new Uint8Array(
+                        response.audio.buffer,
+                        response.audio.byteOffset,
+                        response.audio.byteLength
+                    );
+                return {
+                    chunks:[bytes],
+                    type:typeof response.contentType==='string'
+                        ?response.contentType
+                        :this.audioType
+                };
+            }
+        }
+
+        throw new TypeError('Arcane returned an invalid provider speech response.');
+    }
+
     #getSpeechAudioContext(){
         if(this.audioContext&&this.audioContext.state!=='closed'){
             return this.audioContext;
@@ -1594,11 +2786,50 @@ class AI {
 
     async fetchSTT(
         audioFile,
-        responseHandler=(text='')=>{}
+        responseHandler=(text='')=>{},
+        signal=null
     ){
-        this.#assertServiceConfigured(this.sttService);
+        this.#assertServiceConfigured(this.sttService,'stt');
+        if(signal&&(
+            typeof signal.aborted!=='boolean'
+            ||typeof signal.addEventListener!=='function'
+        )){
+            throw new TypeError('AI request signal must be an AbortSignal.');
+        }
+        if(signal?.aborted){
+            throw normalizeAIRequestAbort();
+        }
 
-        const nativeSpeech=this.#nativeSpeech(this.sttService);
+        if(this.#usesProviderRuntime('stt',this.sttService)){
+            if(!audioFile||typeof audioFile.arrayBuffer!=='function'){
+                throw new TypeError('Speech transcription requires an audio Blob or File.');
+            }
+            const response=await this.#providerRuntime.request(
+                'stt',
+                {
+                    operation:'transcribe',
+                    payload:{
+                        audio:audioFile,
+                        mimeType:String(audioFile.type||'audio/webm'),
+                        model:this.#providerRuntime.selection('stt')?.modelId
+                    },
+                    localOnly:false,
+                    signal
+                }
+            );
+            const text=typeof response==='string'
+                ?response
+                :response?.text;
+            if(typeof text!=='string'){
+                throw new TypeError(
+                    'Arcane returned an invalid provider speech transcription.'
+                );
+            }
+            await responseHandler(text);
+            return text;
+        }
+
+        const nativeSpeech=this.#nativeSpeech(this.sttService,'stt');
 
         if(nativeSpeech){
             if(!audioFile||typeof audioFile.arrayBuffer!=='function'){
@@ -1632,7 +2863,8 @@ class AI {
                 method: 'POST',
                 credentials: credentials,
                 headers: this.#sttHeaders[this.sttService],
-                body: formData
+                body: formData,
+                signal
             }
         );
 
@@ -1672,7 +2904,7 @@ class AI {
                 try{
                     sourceNode.stop();
                 }catch(error){
-                    console.warn('Error stopping AI audio:',error);
+                    console.warn('AI audio could not be stopped cleanly.');
                 }
             }
 
@@ -1798,7 +3030,7 @@ class AI {
     #requestSpeechPlayback(){
         this.#pumpSpeechPlayback().catch(
             function reportSpeechPlaybackFailure(error){
-                console.warn('Error playing audio data:',error);
+                console.warn('AI audio playback failed.');
             }
         );
     }
@@ -1925,7 +3157,7 @@ class AI {
         }
 
         if(job.generation===this.speechGeneration&&error?.name!=='AbortError'){
-            console.warn('Error preparing audio from AI:',error);
+            console.warn('AI speech synthesis failed.');
         }
 
         this.#requestSpeechPlayback();
@@ -1974,7 +3206,7 @@ class AI {
         );
 
         if(error?.name&&error.name!=='NotAllowedError'){
-            console.info('AI speech is waiting for audio playback permission:',error);
+            console.info('AI speech is waiting for audio playback permission.');
         }
 
         return true;

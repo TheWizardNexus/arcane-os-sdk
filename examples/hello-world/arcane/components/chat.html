@@ -1,11 +1,25 @@
 <link rel="stylesheet" href="./arcane/css/layout.css?v=3" />
 <style>
+    :host {
+        display: block;
+        height: 100%;
+        min-width: 0;
+        min-height: 0;
+        --arcane-chat-gap: var(--arcane-space-3, .75rem);
+        --arcane-chat-radius: var(--arcane-radius-large, 1rem);
+    }
+
     .chat_area {
         display: flex;
         flex-direction: column;
         justify-content: flex-end;
-        padding: 1em;
-        height: calc(100% - 2em);
+        box-sizing: border-box;
+        width: min(100%, 72rem);
+        height: 100%;
+        min-height: 0;
+        margin-inline: auto;
+        padding: clamp(.65rem, 1.5vw, 1.25rem);
+        gap: var(--arcane-chat-gap);
         overflow: hidden;
     }
 
@@ -86,6 +100,7 @@
     }
 
     .chat_area[data-conversation-complete="true"] .conversation_timebox,
+    .chat_area[data-conversation-complete="true"] .ai_activation,
     .chat_area[data-conversation-complete="true"] .chat_input_area,
     .chat_area[data-conversation-complete="true"] > #speech,
     .chat_area[data-conversation-complete="true"] > .controls{
@@ -114,80 +129,185 @@
         border:0;
     }
 
-    .chat_area ul {
+    .chat_output {
         flex:1 1 auto;
+        box-sizing: border-box;
+        width: 100%;
         min-height:0;
+        margin: 0;
+        padding: clamp(1rem, 2vw, 1.5rem);
         list-style: none;
         overflow-y: auto;
-        padding: 0 1em;
+        scrollbar-gutter: stable;
+        border: 1px solid var(--arcane-border, var(--border-color));
+        border-radius: var(--arcane-chat-radius);
+        background: var(--arcane-surface-raised, var(--modal-background));
+        box-shadow: var(--arcane-shadow-medium, 0 .65rem 1.8rem var(--shadow-color));
     }
 
-    .chat_area li {
-        padding: 0.5em;
-        margin: 0 0 1em;
+    .chat_output > li {
+        box-sizing: border-box;
         width: auto;
-        max-width: 95%;
+        max-width: min(92%, 48rem);
+        margin: 0 0 .85rem;
+        padding: .85rem 1rem;
         clear: both;
+        border: 1px solid var(--arcane-border, var(--border-color));
+        border-radius: calc(var(--arcane-chat-radius) - .1rem);
+        overflow-wrap: anywhere;
     }
 
-    .chat_area li.ai {
-        width: 90%;
+    .chat_output > li.ai {
+        width: auto;
         float: left;
-        padding: 10px; /* Ensures padding around the content */
+        background: var(--arcane-surface, var(--background));
+        border-start-start-radius: var(--arcane-radius-small, .3rem);
     }
 
-
-    .chat_area li.user {
-        text-align: right;
+    .chat_output > li.user {
         float: right;
+        background: var(--arcane-action, var(--primary-color));
+        color: var(--arcane-action-text, var(--button-text-color, var(--text-color)));
+        border-color: var(--arcane-action, var(--primary-color));
+        border-start-end-radius: var(--arcane-radius-small, .3rem);
+        text-align: right;
+    }
+
+    .chat_output li ul,
+    .chat_output li ol {
+        display: block;
+        min-height: auto;
+        margin: .55rem 0 .55rem 1.35rem;
+        padding: 0;
+        overflow: visible;
+        list-style: revert;
+    }
+
+    .chat_output li li {
+        float: none;
+        width: auto;
+        max-width: none;
+        margin: .28rem 0;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: inherit;
+        text-align: start;
     }
 
     .chat_input_area {
         display: grid;
-        padding-bottom: 2em;
-        grid-template-columns: 1fr auto auto;
-        column-gap: 0.5em;
+        box-sizing: border-box;
+        width: 100%;
+        padding: var(--arcane-space-3, .7rem);
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        align-items: center;
+        gap: var(--arcane-space-2, .6rem);
+        border: 1px solid var(--arcane-border, var(--border-color));
+        border-radius: var(--arcane-chat-radius);
+        background: var(--arcane-surface-raised, var(--modal-background));
+        box-shadow: var(--arcane-shadow-small, 0 .35rem 1rem var(--shadow-color));
+    }
+
+    .ai_activation {
+        display:flex;
+        flex:0 0 auto;
+        box-sizing:border-box;
+        width:100%;
+        padding:var(--arcane-space-3, .75rem);
+        align-items:center;
+        justify-content:space-between;
+        gap:var(--arcane-space-3, .75rem);
+        border:1px solid var(--arcane-border, var(--border-color));
+        border-radius:var(--arcane-chat-radius);
+        background:var(--arcane-surface-raised, var(--modal-background));
+        color:var(--text-color);
+    }
+
+    .ai_activation[hidden] {
+        display:none;
+    }
+
+    .ai_activation_copy {
+        min-width:0;
+    }
+
+    .ai_activation_copy strong,
+    .ai_activation_copy span {
+        display:block;
+        overflow-wrap:anywhere;
+    }
+
+    .ai_activation_copy span {
+        margin-block-start:.22rem;
+        font-size:.9rem;
+    }
+
+    .ai_activation button {
+        flex:0 0 auto;
+        min-height:2.65rem;
+        padding:.55rem .8rem;
+        border:1px solid var(--arcane-action, var(--primary-color));
+        border-radius:var(--arcane-radius-medium, .7rem);
+        background:var(--arcane-action, var(--primary-color));
+        color:var(--arcane-action-text, var(--button-text-color, var(--text-color)));
+        font:inherit;
+        font-weight:600;
+        cursor:pointer;
+    }
+
+    .ai_activation button:focus-visible {
+        outline:.2rem solid var(--arcane-focus, var(--focus-color));
+        outline-offset:.18rem;
+    }
+
+    .ai_activation button:disabled {
+        cursor:not-allowed;
+        opacity:.65;
     }
 
     .chat_input {
-        width: calc(100% - 1em);
-        min-height: 48px;
-        max-height: 160px; 
-        padding: 1.1em 1em;
-        margin: 0;
-        border:2px solid var(--border-color);
-        border-radius: 0.5em;
-        font-family: Arial, sans-serif;
-        font-size: 16px;
-        line-height: 20px; 
         box-sizing: border-box;
+        width: 100%;
+        min-height: 3rem;
+        max-height: 10rem;
+        margin: 0;
+        padding: .82rem .9rem;
+        border: 1px solid var(--arcane-border, var(--border-color));
+        border-radius: var(--arcane-radius-medium, .7rem);
+        background: var(--arcane-surface, var(--background));
+        color: var(--text-color);
+        font: inherit;
+        font-size: 1rem;
+        line-height: 1.35;
         resize: none;
         overflow-y: auto;
     }
 
-    .chat_input:focus {
-        outline:.18em solid var(--focus-color);
-        outline-offset:.12em;
-        border-color:var(--focus-color);
+    .chat_input:focus-visible {
+        outline: .18em solid var(--arcane-focus, var(--focus-color));
+        outline-offset: .12em;
+        border-color: var(--arcane-focus, var(--focus-color));
     }
 
     .chat_submit,
     button.chat_upload {
         display:grid;
         place-items:center;
-        width:3.75em;
-        height:3.75em;
+        width:3rem;
+        height:3rem;
         padding:0;
         margin:0;
-        background-color:var(--primary-color);
-        border:.2em solid var(--primary-color);
-        border-radius:.8em;
+        background-color:var(--arcane-action, var(--primary-color));
+        border:.2em solid var(--arcane-action, var(--primary-color));
+        border-radius:var(--arcane-radius-medium, .7rem);
         cursor: pointer;
         outline: none;
-        box-shadow:0 .18em .45em var(--shadow-color);
-        align-self: end;
+        box-shadow:var(--arcane-shadow-small, 0 .18em .45em var(--shadow-color));
+        align-self:center;
         transition:background-color 180ms,border-color 180ms,box-shadow 180ms,transform 120ms;
-        color:var(--button-text-color,var(--text-color));
+        color:var(--arcane-action-text, var(--button-text-color,var(--text-color)));
     }
 
     .chat_submit::before,
@@ -221,10 +341,57 @@
 
     .chat_submit:hover,
     button.chat_upload:hover {
-        background-color:var(--secondary-color);
-        border-color:var(--secondary-color);
-        color:var(--text-color);
+        background-color:var(--arcane-secondary, var(--secondary-color));
+        border-color:var(--arcane-secondary, var(--secondary-color));
+        color:var(--arcane-secondary-text, var(--text-color));
         box-shadow:0 .25em .6em var(--shadow-color);
+    }
+
+    .chat_submit:focus-visible,
+    button.chat_upload:focus-visible {
+        outline: .2rem solid var(--arcane-focus, var(--focus-color));
+        outline-offset: .18rem;
+    }
+
+    #speech {
+        display: grid;
+        flex: 0 0 auto;
+        min-width: 0;
+    }
+
+    .controls {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .controls select {
+        width: min(100%, 18rem);
+        min-height: 2.65rem;
+        padding: .55rem .75rem;
+        border: 1px solid var(--arcane-border, var(--border-color));
+        border-radius: var(--arcane-radius-medium, .7rem);
+        background: var(--arcane-surface-raised, var(--modal-background));
+        color: var(--text-color);
+        font: inherit;
+    }
+
+    .controls select:focus-visible {
+        outline: .2rem solid var(--arcane-focus, var(--focus-color));
+        outline-offset: .18rem;
+    }
+
+    @media (max-width: 44rem) {
+        .chat_area {
+            padding: var(--arcane-space-2, .5rem);
+        }
+
+        .chat_output > li {
+            max-width: 96%;
+        }
+
+        .controls select {
+            width: 100%;
+        }
     }
 
 
@@ -312,6 +479,20 @@
         >Starting the elapsed timer.</span>
     </section>
     <ul type='text' class='chat_output' id='chat_output' tabindex='-1' aria-label='Conversation transcript'></ul>
+    <section
+        id="ai_activation"
+        class="ai_activation"
+        role="status"
+        aria-live="polite"
+        aria-busy="false"
+        hidden
+    >
+        <span class="ai_activation_copy">
+            <strong id="ai_activation_title">Language model not active</strong>
+            <span id="ai_activation_status">Start the selected language model to enable chat.</span>
+        </span>
+        <button type="button" id="ai_activation_button">Start language model</button>
+    </section>
     <div class="chat_input_area">
         <textarea type='text' class='chat_input' id='chat_input'></textarea>
         <button type="button" id="chat_upload" class="chat_upload" title="Upload files" aria-label="Upload files">
@@ -515,14 +696,20 @@
     const conversationTimeboxPanel=shadowRoot.querySelector('#conversation_timebox');
     const conversationTimeboxElapsed=shadowRoot.querySelector('#conversation_timebox_elapsed');
     const conversationTimeboxStatus=shadowRoot.querySelector('#conversation_timebox_status');
+    const aiActivationPanel=shadowRoot.querySelector('#ai_activation');
+    const aiActivationTitle=shadowRoot.querySelector('#ai_activation_title');
+    const aiActivationStatus=shadowRoot.querySelector('#ai_activation_status');
+    const aiActivationButton=shadowRoot.querySelector('#ai_activation_button');
     const [
         {default:MD},
         {default:FileEntity},
-        {ConversationSubmissionBarrier,requireConversationTimeboxDelivery}
+        {ConversationSubmissionBarrier,requireConversationTimeboxDelivery},
+        {requestAIRuntimeIntent,subscribeAIRuntimeState}
     ]=await Promise.all([
         import('../modules/MD.js'),
         import('../entities/File.js'),
-        import('../modules/ConversationTimebox.js')
+        import('../modules/ConversationTimebox.js'),
+        import('../modules/AIRuntimeState.js')
     ]);
 
     host.language=host.language||'English';
@@ -532,7 +719,10 @@
         ?speech.initialMuted
         :true;
     let initialSpeechMuteListenerInstalled=false;
+    let pendingSpeechAvailability=null;
+    let speechAvailabilityListenerInstalled=false;
     const hostSubmissionBarrier=new ConversationSubmissionBarrier();
+    const aiRuntimeStateAbortController=new AbortController();
     let programmaticSubmissionQueue=Promise.resolve(true);
     let conversationTimeboxController=null;
     let conversationTimeboxUnsubscribe=null;
@@ -549,6 +739,18 @@
         console.warn('html-import chat.html `host.languageChanged` method not implemented.\n\nThis can also be done by listening for the "chat-language-changed" event.\n\nIt is still best practice to implement the `.languageChanged` method atleast with an empty function.\n\n')
     }
 
+    host.requestAIActivation=host.requestAIActivation||function requestAIActivation(intent){
+        return requestAIRuntimeIntent(intent);
+    }
+
+    const aiActivationController=createAIActivationController({
+        host,
+        panel:aiActivationPanel,
+        title:aiActivationTitle,
+        status:aiActivationStatus,
+        button:aiActivationButton
+    });
+
     host.streamMessage=streamMessage;
     host.setMessageProgress=setMessageProgress;
     host.setAIAvailability=setAIAvailability;
@@ -556,8 +758,17 @@
     host.setConversationComplete=setConversationComplete;
     host.bindConversationTimebox=bindConversationTimebox;
     host.submitMessage=submitMessage;
-    host.aiAvailability={llm:true,stt:true,tts:true};
+    host.destroy=destroy;
+    host.aiAvailability={llm:false,stt:false,tts:false};
     host.conversationComplete=false;
+    applyAIAvailability(host.aiAvailability);
+    subscribeAIRuntimeState(
+        synchronizeAIRuntimeState,
+        {
+            signal:aiRuntimeStateAbortController.signal
+        }
+    );
+    window.addEventListener('pagehide',destroy,{once:true});
 
     function setConversationComplete(complete=true){
         if(typeof complete!=='boolean'){
@@ -699,6 +910,7 @@
     }
 
     function setAIAvailability(input={}){
+        const explicitSpeechAvailability={};
         const availability={
             llm:Object.prototype.hasOwnProperty.call(input,'llm')
                 ?Boolean(input.llm)
@@ -711,25 +923,251 @@
                 :host.aiAvailability.tts
         };
 
-        host.aiAvailability=availability;
+        if(Object.prototype.hasOwnProperty.call(input,'stt')){
+            explicitSpeechAvailability.stt=availability.stt;
+        }
+        if(Object.prototype.hasOwnProperty.call(input,'tts')){
+            explicitSpeechAvailability.tts=availability.tts;
+        }
+        applyAIAvailability(availability);
+        if(Object.keys(explicitSpeechAvailability).length){
+            pendingSpeechAvailability={
+                ...(pendingSpeechAvailability||{}),
+                ...explicitSpeechAvailability
+            };
+            synchronizeSpeechCompatibilityAvailability();
+        }
+        return {...availability};
+    }
+
+    function applyAIAvailability(availability){
+        host.aiAvailability={...availability};
         send.disabled=host.conversationComplete||!availability.llm;
         send.title=availability.llm
             ?'Send message'
             :'The selected language model service is unavailable.';
         send.setAttribute('aria-label',send.title);
+    }
 
-        const configureSpeech=()=>speech.setAvailability?.({
-            stt:availability.stt,
-            tts:availability.tts
-        });
+    function createAIActivationController({host,panel,title,status,button,EventClass=CustomEvent}){
+        let role=null;
+        let requestPending=false;
+        let requestError='';
+        let destroyed=false;
 
-        if(speech.componentReady){
-            configureSpeech();
-        }else{
-            speech.addEventListener('speech-ready',configureSpeech,{once:true});
+        function visibleError(error,fallback){
+            const message=typeof error?.message==='string'
+                ?error.message.trim()
+                :'';
+            return (message||fallback).slice(0,240);
         }
 
-        return {...availability};
+        function cancellation(error){
+            return error?.name==='AbortError'
+                ||['ARCANE_AI_REQUEST_ABORTED','AI_CHAT_ABORTED'].includes(error?.code);
+        }
+
+        function selected(){
+            return typeof role?.providerId==='string'
+                &&role.providerId.length>0
+                &&typeof role?.modelId==='string'
+                &&role.modelId.length>0;
+        }
+
+        function progressMessage(){
+            if(!role?.progress){
+                return 'The selected language model is loading.';
+            }
+            const progress=role.progress;
+            const amount=progress.total===null
+                ?`${progress.completed} ${progress.unit}`
+                :`${progress.completed} of ${progress.total} ${progress.unit}`;
+            return `${progress.phase}, ${amount}${progress.heartbeat?', active heartbeat':''}.`;
+        }
+
+        function render(){
+            const visible=selected()&&role.state!=='ready';
+            panel.hidden=!visible;
+            panel.setAttribute(
+                'aria-busy',
+                String(requestPending||['loading','unloading'].includes(role?.state))
+            );
+            if(!visible){
+                return;
+            }
+            if(requestPending){
+                title.textContent='Requesting language model activation';
+                status.textContent='Waiting for the selected language model runtime.';
+                button.textContent='Requesting…';
+                button.disabled=true;
+                return;
+            }
+            if(role.state==='loading'){
+                title.textContent='Starting language model';
+                status.textContent=progressMessage();
+                button.textContent='Cancel loading';
+                button.disabled=false;
+                return;
+            }
+            if(role.state==='unloading'){
+                title.textContent='Canceling language model load';
+                status.textContent='Waiting for the selected language model runtime to stop.';
+                button.textContent='Canceling…';
+                button.disabled=true;
+                return;
+            }
+            if(role.state==='error'||requestError){
+                title.textContent='Language model activation failed';
+                status.textContent=requestError||visibleError(
+                    role.error,
+                    'The selected language model could not start.'
+                );
+                button.textContent='Try again';
+                button.disabled=false;
+                return;
+            }
+            if(role.state==='unloaded'){
+                title.textContent='Language model not active';
+                status.textContent='Start the selected language model to enable chat.';
+                button.textContent='Start language model';
+                button.disabled=false;
+                return;
+            }
+            title.textContent='Language model unavailable';
+            status.textContent='The selected language model cannot be activated in this state.';
+            button.textContent='Unavailable';
+            button.disabled=true;
+        }
+
+        async function request(action){
+            if(destroyed||requestPending||!selected()){
+                return false;
+            }
+            const permitted=action==='load'
+                ?['unloaded','error'].includes(role.state)
+                :action==='unload'&&role.state==='loading';
+            if(!permitted){
+                return false;
+            }
+            requestError='';
+            const intent=Object.freeze({role:'llm',action,reason:'user'});
+            const request=Object.freeze({intent,state:role});
+            const activationEvent=new EventClass(
+                'chat-ai-activation-request',
+                {
+                    bubbles:true,
+                    composed:true,
+                    cancelable:true,
+                    detail:request
+                }
+            );
+            if(!host.dispatchEvent(activationEvent)){
+                render();
+                return false;
+            }
+            requestPending=true;
+            render();
+            try{
+                await host.requestAIActivation(intent);
+                return true;
+            }catch(error){
+                if(action==='load'
+                    &&cancellation(error)
+                    &&['unloaded','unloading'].includes(role?.state)){
+                    return false;
+                }
+                const message=visibleError(
+                    error,
+                    `The language model ${action} request failed.`
+                );
+                requestError=message;
+                host.dispatchEvent(
+                    new EventClass(
+                        'chat-ai-activation-error',
+                        {
+                            bubbles:true,
+                            composed:true,
+                            detail:Object.freeze({request,error,message})
+                        }
+                    )
+                );
+                return false;
+            }finally{
+                requestPending=false;
+                render();
+            }
+        }
+
+        function activateSelectedAI(){
+            const action=role?.state==='loading'?'unload':'load';
+            void request(action);
+        }
+
+        function synchronize(nextRole){
+            if(destroyed){
+                return;
+            }
+            if(role?.state!==nextRole.state
+                ||role?.providerId!==nextRole.providerId
+                ||role?.modelId!==nextRole.modelId){
+                requestError='';
+                requestPending=false;
+            }
+            role=nextRole;
+            render();
+        }
+
+        function destroy(){
+            if(destroyed){
+                return;
+            }
+            destroyed=true;
+            button.removeEventListener('click',activateSelectedAI);
+            panel.hidden=true;
+        }
+
+        button.addEventListener('click',activateSelectedAI);
+        return Object.freeze({request,synchronize,destroy});
+    }
+
+    function synchronizeAIRuntimeState(snapshot){
+        aiActivationController.synchronize(snapshot.roles.llm);
+        applyAIAvailability({
+            llm:snapshot.roles.llm.state==='ready',
+            stt:snapshot.roles.stt.state==='ready',
+            tts:snapshot.roles.tts.state==='ready'
+        });
+    }
+
+    function synchronizeSpeechCompatibilityAvailability(){
+        if(!pendingSpeechAvailability){
+            return;
+        }
+        if(speech.componentReady){
+            const availability=pendingSpeechAvailability;
+            pendingSpeechAvailability=null;
+            speech.setAvailability?.({...availability});
+            return;
+        }
+        if(speechAvailabilityListenerInstalled){
+            return;
+        }
+
+        speechAvailabilityListenerInstalled=true;
+        speech.addEventListener(
+            'speech-ready',
+            applyPendingSpeechAvailability,
+            {once:true}
+        );
+    }
+
+    function applyPendingSpeechAvailability(){
+        speechAvailabilityListenerInstalled=false;
+        if(pendingSpeechAvailability){
+            const availability=pendingSpeechAvailability;
+            pendingSpeechAvailability=null;
+            speech.setAvailability?.({...availability});
+        }
     }
 
     function formatConversationTime(milliseconds=0){
@@ -928,7 +1366,7 @@
                         }
                     )
                 );
-                console.error('The conversation timebox message could not be sent.',error);
+                console.error('The conversation timebox message could not be sent.');
                 return false;
             }
         );
@@ -997,10 +1435,22 @@
         const clearThinking=thinkingHTML;
         
         //console.table(arguments);
-        if(!isThinking&&text&&host.aiAvailability.tts){
-            ai.streamTTS(
-                text
-            )
+        if(
+            !isThinking
+            &&text
+            &&host.aiAvailability.tts
+            &&speech.muted===false
+        ){
+            const aiRuntime=globalThis.ai;
+            if(typeof aiRuntime?.streamTTS==='function'){
+                void Promise.resolve(aiRuntime.streamTTS(text)).catch(
+                    reportTTSError
+                );
+            }else{
+                reportTTSError(
+                    new Error('The ready speech provider has no synthesis adapter.')
+                );
+            }
         }
         
         if(clearThinking){
@@ -1126,7 +1576,7 @@
                         }
                     )
                 );
-                console.error('The chat message could not be submitted.',error);
+                console.error('The chat message could not be submitted.');
                 return false;
             }
         );
@@ -1143,6 +1593,9 @@
         if(host.conversationComplete){
             return false;
         }
+        if(!host.aiAvailability.llm){
+            return false;
+        }
         const submissionContext=Object.freeze({
             source:'user',
             preserveDraft:false,
@@ -1154,7 +1607,6 @@
             return false;
         }
         const messageTime = getMilTime();
-        console.info("Dispatching message:", text);
         if(!submissionContext.preserveDraft){
             textArea.value='';
         }
@@ -1189,8 +1641,15 @@
             }
         );
 
-        ai.stopAudio();
-        ai.resumeAudio?.();
+        if(host.aiAvailability.tts&&speech.muted===false){
+            const aiRuntime=globalThis.ai;
+            aiRuntime?.stopAudio?.();
+            if(typeof aiRuntime?.resumeAudio==='function'){
+                void Promise.resolve(aiRuntime.resumeAudio()).catch(
+                    reportTTSError
+                );
+            }
+        }
 
         host.dispatchEvent(chatEvent);
 
@@ -1217,6 +1676,36 @@
             </li>
         `;
         chatOutput.scrollTop = chatOutput.scrollHeight;
+    }
+
+    function reportTTSError(error){
+        if(typeof speech.reportTTSError==='function'){
+            speech.reportTTSError(error);
+            return;
+        }
+
+        const message=typeof error?.message==='string'&&error.message.trim()
+            ?error.message.trim().slice(0,240)
+            :'Speech synthesis failed.';
+        host.dispatchEvent(
+            new CustomEvent(
+                'chat-speech-synthesis-error',
+                {
+                    bubbles:true,
+                    composed:true,
+                    detail:{error,message}
+                }
+            )
+        );
+        console.error('Speech synthesis failed.');
+    }
+
+    function destroy(){
+        aiRuntimeStateAbortController.abort();
+        aiActivationController.destroy();
+        window.removeEventListener('pagehide',destroy);
+        speech.destroy?.();
+        host.ready=false;
     }
 
     // Initialize and adjust on input

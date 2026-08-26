@@ -13,15 +13,15 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../" aria-label="Arcane OS SDK documentation home"><img src="../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../">Overview</a><a href="./" aria-current="page">Hello World</a><a href="../guides/">Guides</a><a href="../reference/sdk-api/">API</a><a href="../reference/">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../">Docs</a><span aria-hidden="true">/</span><span aria-current="page">Hello World</span></nav><p class="eyebrow">Start here</p><h1>Build Hello World, step by step.</h1><p class="doc-lead">Start with an empty folder and finish with one checked, packaged, verified, bundled, and runnable Arcane browser application. Every command, generated path, import, and source file is shown below.</p><div class="doc-meta"><span>Plain HTML + CSS + JavaScript</span><span>arcane-os@0.1.1</span><span>Node.js 22.23.2+</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../">Docs</a><span aria-hidden="true">/</span><span aria-current="page">Hello World</span></nav><p class="eyebrow">Start here</p><h1>Build Hello World, step by step.</h1><p class="doc-lead">Start with an empty folder and finish with one checked, packaged, verified, bundled, and runnable Arcane browser application. Every command and maintained app source file is shown below, with the generated runtime represented by the paths this walkthrough uses.</p><div class="doc-meta"><span>Plain HTML + CSS + JavaScript</span><span>arcane-os@0.2.1</span><span>Node.js 22.23.2+</span></div></header>
     <div class="docs-layout section-shell">
         <aside class="docs-sidebar" aria-label="Hello World navigation"><p>Hello World</p><nav><a href="#install">Create and install</a><a href="#shape">Project shape</a><a href="#arcane-adds">Arcane and imports</a><a href="#source">Application source</a><a href="#permissions">App contract</a><a href="#browser">Run in browser</a><a href="#local-ai">Local AI</a><a href="#package">Package and verify</a><a href="#packaged-run">Run the package</a><a href="#related">Related reference</a></nav></aside>
       <article class="prose">
-        <section id="install"><p class="step-label">Step 01</p><h2>Create and install the project</h2><p>Install Node.js 22.23.2 or newer, then let the published SDK create the complete browser project. The version in the command and generated lockfile keeps this walkthrough reproducible.</p><div class="code-block"><div class="code-bar"><span>PowerShell</span><button type="button" data-copy-button>Copy</button></div><pre><code>npx arcane-os@0.1.1 new hello-world --path ./hello-world --display-name "Arcane Hello World" --target browser --git
+        <section id="install"><p class="step-label">Step 01</p><h2>Create and install the project</h2><p>Install Node.js 22.23.2 or newer, then let the published SDK create the complete browser project. The version in the command and generated lockfile keeps this walkthrough reproducible.</p><div class="code-block"><div class="code-bar"><span>PowerShell</span><button type="button" data-copy-button>Copy</button></div><pre><code>npx arcane-os@0.2.1 new hello-world --path ./hello-world --display-name "Arcane Hello World" --target browser --git
 Set-Location ./hello-world
-npm install</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p>The npm scripts use the project-local CLI. <code>npm install --global arcane-os@0.1.1</code> is an optional shell convenience; it does not install services, model weights, native providers, or prebuilt executables.</p><p>Want the flags and generated-file contract before continuing? See <a href="../reference/cli/#arcane-new"><code>arcane new</code></a>.</p></section>
+npm install</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p>The npm scripts use the project-local CLI. <code>npm install --global arcane-os@0.2.1</code> is an optional shell convenience; it does not install services, model weights, native providers, or prebuilt executables.</p><p>Want the flags and generated-file contract before continuing? See <a href="../reference/cli/#arcane-new"><code>arcane new</code></a>.</p></section>
 
-        <section id="shape"><p class="step-label">Step 02</p><h2>See the files your app uses</h2><p>You write the files under <code>apps/hello-world/</code>. The scaffold materializes the authenticated SDK browser runtime in a physical <code>arcane/</code> tree beside the app; the browser never imports runtime files from <code>node_modules</code>. These are the paths this example uses directly; the authenticated projection contains 173 files in total.</p><div class="file-tree"><pre><code>hello-world/
+        <section id="shape"><p class="step-label">Step 02</p><h2>See the files your app uses</h2><p>You write the files under <code>apps/hello-world/</code>. The scaffold materializes the authenticated SDK browser runtime in a physical <code>arcane/</code> tree beside the app; the browser never imports runtime files from <code>node_modules</code>. The tree calls out representative paths rather than freezing an inventory count; <code>arcane.lock.json</code>, the runtime receipts, and the generated import map are the current authority.</p><div class="file-tree"><pre><code>hello-world/
 ├── .github/workflows/check.yml
 ├── apps/hello-world/
 │   ├── img/icon.png
@@ -37,13 +37,17 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
 ├── arcane/
 │   ├── css/{primitives.css,theme.css}
 │   ├── dependencies/strong-type/index.js
-│   ├── modules/{AppDataScope.js,DBOPFS.js,ThemeBootstrap.js,…}
+│   ├── modules/{AI.js,AIProviderRuntime.js,AIRuntimeState.js,…}
+│   ├── modules/{AppDataScope.js,DBOPFS.js,DBOPFSDocumentLibrary.js,…}
+│   ├── modules/{DocumentLexicalSearch.js,PersistentAIChatSession.js,ThemeBootstrap.js,…}
 │   ├── sdk/
 │   │   ├── ai/
 │   │   │   ├── ARCANE_AI_BROWSER_WASM_COMPONENTS.json
+│   │   │   ├── browser-speech.mjs
 │   │   │   ├── browser-wasm.mjs
 │   │   │   ├── browser-wasm-llm-provider.mjs
 │   │   │   ├── model-controller.mjs
+│   │   │   ├── speech-worker-{client,runtime}.mjs
 │   │   │   └── wllama/{index.mjs,wllama.wasm,LICENCE,llama.cpp-LICENSE}
 │   │   ├── dependencies/{event-pubsub,strong-type}/
 │   │   └── event-manager.mjs
@@ -67,7 +71,7 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
 │   └── sdk/{ai,dependencies,event-manager.mjs,…}
 └── licenses/arcane-os/</code></pre></div><p>Authoring descriptors, tests, and the unused icon stay outside <code>dist/</code>. <code>arcane.lock.json</code> authenticates the development projection; the release receipts authenticate the packaged projection.</p></section>
 
-        <section id="arcane-adds"><p class="step-label">Step 03</p><h2>What Arcane adds</h2><ul><li><strong>CLI:</strong> <code>arcane</code> creates, checks, tests, serves, packages, verifies, bundles, and runs the application.</li><li><strong>Browser runtime:</strong> <a href="../reference/runtime-modules/theme-bootstrap/">ThemeBootstrap</a> and shared CSS style the app; <a href="../reference/runtime-modules/app-data-scope/">AppDataScope</a> isolates its browser data; <a href="../reference/runtime-modules/dbopfs/">DBOPFS</a> provides app-scoped persistent model storage.</li><li><strong>Stable imports:</strong> the 86-entry generated browser import map binds names such as <code>arcane/AppDataScope</code>, <code>arcane/DBOPFS</code>, <code>arcane/ThemeBootstrap</code>, <code>arcane-os/ai/browser-wasm</code>, and <code>strong-type</code> to authenticated files under <code>arcane/</code>.</li><li><strong>Distribution parity:</strong> development and <code>dist/hello-world/</code> use byte-identical application, runtime, dependency, and import-map bytes.</li></ul><p>Regenerate the map whenever the authenticated runtime projection changes:</p><div class="code-block"><div class="code-bar"><span>Application repository</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run import-map</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p>Application code continues to import by name; the generated map owns the physical paths. The complete generated map is visible in the HTML source below. See the <a href="../reference/cli/#arcane-import-map">import-map command</a> for generation and validation details.</p></section>
+        <section id="arcane-adds"><p class="step-label">Step 03</p><h2>What Arcane adds</h2><ul><li><strong>CLI:</strong> <code>arcane</code> creates, checks, tests, serves, packages, verifies, bundles, and runs the application.</li><li><strong>Browser runtime:</strong> <a href="../reference/runtime-modules/theme-bootstrap/">ThemeBootstrap</a> and shared CSS style the app; <a href="../reference/runtime-modules/app-data-scope/">AppDataScope</a> isolates its browser data; <a href="../reference/runtime-modules/dbopfs/">DBOPFS</a> provides app-scoped persistent model storage.</li><li><strong>Stable imports:</strong> the generated browser import map binds names such as <code>arcane/AppDataScope</code>, <code>arcane/DBOPFS</code>, <code>arcane/ThemeBootstrap</code>, <code>arcane-os/ai/browser-wasm</code>, <code>arcane-os/ai/browser-speech</code>, and <code>strong-type</code> to authenticated files under <code>arcane/</code>.</li><li><strong>Distribution parity:</strong> development and <code>dist/hello-world/</code> use byte-identical application, runtime, dependency, and import-map bytes.</li></ul><p>Regenerate the map whenever the authenticated runtime projection changes:</p><div class="code-block"><div class="code-bar"><span>Application repository</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run import-map</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p>Application code continues to import by name; the generated map owns the physical paths. The complete generated map is visible in the HTML source below. See the <a href="../reference/cli/#arcane-import-map">import-map command</a> for generation and validation details.</p></section>
 
         <section id="source"><p class="step-label">Step 04</p><h2>Write the visible application</h2><p>These are the complete maintained HTML, CSS, and JavaScript files—not fragments. The greeting works immediately. The optional AI panel uses the shipped browser-WASM entrypoint and starts no model download until the user presses its load button.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/index.html</span><button type="button" data-copy-button>Copy</button></div><pre><code>&lt;!doctype html&gt;
 &lt;html lang="en"&gt;
@@ -78,14 +82,18 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
     &lt;script type="importmap" data-arcane-import-map&gt;
 {
   "imports": {
+    "#arcane/persistent-ai-chat-session": "./arcane/modules/PersistentAIChatSession.js",
     "./node_modules/strong-type/index.js": "./arcane/dependencies/strong-type/index.js",
+    "arcane-os/ai/browser-speech": "./arcane/sdk/ai/browser-speech.mjs",
     "arcane-os/ai/browser-wasm": "./arcane/sdk/ai/browser-wasm.mjs",
     "arcane-os/event-manager": "./arcane/sdk/event-manager.mjs",
     "arcane/AI": "./arcane/modules/AI.js",
     "arcane/AIPreferenceRuntime": "./arcane/modules/AIPreferenceRuntime.js",
     "arcane/AIPreferenceTuple": "./arcane/modules/AIPreferenceTuple.js",
+    "arcane/AIProviderRuntime": "./arcane/modules/AIProviderRuntime.js",
     "arcane/AIResponseLength": "./arcane/modules/AIResponseLength.js",
     "arcane/AIResponseURLPolicy": "./arcane/modules/AIResponseURLPolicy.js",
+    "arcane/AIRuntimeState": "./arcane/modules/AIRuntimeState.js",
     "arcane/AnsiText": "./arcane/modules/AnsiText.js",
     "arcane/ApiModelDatabase": "./arcane/modules/ApiModelDatabase.js",
     "arcane/AppDataScope": "./arcane/modules/AppDataScope.js",
@@ -110,9 +118,11 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
     "arcane/CoreLocalModelCatalog": "./arcane/modules/CoreLocalModelCatalog.js",
     "arcane/DBLS": "./arcane/modules/DBLS.js",
     "arcane/DBOPFS": "./arcane/modules/DBOPFS.js",
+    "arcane/DBOPFSDocumentLibrary": "./arcane/modules/DBOPFSDocumentLibrary.js",
     "arcane/DataMaintenance": "./arcane/modules/DataMaintenance.js",
     "arcane/DevelopmentWorkspace": "./arcane/modules/DevelopmentWorkspace.js",
     "arcane/DirectoryPicker": "./arcane/modules/DirectoryPicker.js",
+    "arcane/DocumentLexicalSearch": "./arcane/modules/DocumentLexicalSearch.js",
     "arcane/DocumentNavigation": "./arcane/modules/DocumentNavigation.js",
     "arcane/Errors": "./arcane/modules/Errors.js",
     "arcane/GifEncoder": "./arcane/modules/GifEncoder.js",
@@ -132,6 +142,7 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
     "arcane/OllamaModelIdentifier": "./arcane/modules/OllamaModelIdentifier.js",
     "arcane/OllamaSettings": "./arcane/modules/OllamaSettings.js",
     "arcane/OpenMeteoWeatherProvider": "./arcane/modules/OpenMeteoWeatherProvider.js",
+    "arcane/PersistentAIChatSession": "./arcane/modules/PersistentAIChatSession.js",
     "arcane/PreferenceStore": "./arcane/modules/PreferenceStore.js",
     "arcane/Questionnaire": "./arcane/modules/Questionnaire.js",
     "arcane/RecordLinkIndex": "./arcane/modules/RecordLinkIndex.js",
@@ -156,6 +167,7 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
     "arcane/YouTubeMedia": "./arcane/modules/YouTubeMedia.js",
     "arcane/entities/ApiModelRecord": "./arcane/entities/ApiModelRecord.js",
     "arcane/entities/Calculation": "./arcane/entities/Calculation.js",
+    "arcane/entities/Chat": "./arcane/entities/Chat.js",
     "arcane/entities/CommunicationMessage": "./arcane/entities/CommunicationMessage.js",
     "arcane/entities/CommunicationThread": "./arcane/entities/CommunicationThread.js",
     "arcane/entities/Preference": "./arcane/entities/Preference.js",
@@ -377,12 +389,9 @@ import {
 
 const MODEL=Object.freeze({
     id:'ibm-granite-4.1-3b-q4-k-s',
-    name:'granite-4.1-3b-Q4_K_S.gguf',
-    immutableUrl:'https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/ab4701481089b58a082ef63cc1cee738887293ff/granite-4.1-3b-Q4_K_S.gguf',
+    url:'https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/ab4701481089b58a082ef63cc1cee738887293ff/granite-4.1-3b-Q4_K_S.gguf',
     bytes:1_998_371_424,
-    sha256:'ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a',
-    licenseSpdx:'Apache-2.0',
-    sourceRevision:'ab4701481089b58a082ef63cc1cee738887293ff'
+    sha256:'ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a'
 });
 
 const SHOW_GREETING_TOOL=Object.freeze({
@@ -488,7 +497,8 @@ function renderProgress(value){
     const total=Number(value.total)||MODEL.bytes;
     const loaded=Math.min(total,Math.max(0,Number(value.loaded)||0));
     const phase={
-        download:'Downloading authenticated model bytes',
+        download:'Downloading model bytes',
+        'verify-download':'Verifying the downloaded model SHA-256',
         'verify-cache':'Rehashing the DBOPFS cache',
         initialize:'Starting the browser-local runtime'
     }[value.phase]??'Preparing local AI';
@@ -552,11 +562,14 @@ async function localAI(){
                 contextTokens:1024,
                 threads:1,
                 batchTokens:256,
-                microBatchTokens:64,
-                gpuLayers:0
+                microBatchTokens:64
             }
         });
-        const created=createArcaneAI({provider,loadPolicy:'manual'});
+        const created=createArcaneAI({
+            provider,
+            loadPolicy:'manual',
+            security:{secure:true}
+        });
         created.llm.addEventListener('progress',event=&gt;{
             renderProgress(event.detail?.progress);
         });
@@ -576,7 +589,7 @@ async function loadModel({offline=false}={}){
     if(!controller)return;
     aiStatus.textContent=offline
         ?'Checking the verified DBOPFS cache without a model-source request. Packaged same-origin Wllama/WASM assets may still load.'
-        :'Checking the verified cache. A 1.86 GiB model download starts only if it is missing.';
+        :'Checking the strict cache. A 1.86 GiB model download starts only if it is missing.';
     aiProgress.hidden=true;
     aiProgressLabel.textContent='';
     try{
@@ -662,11 +675,11 @@ async function askLocalAI(){
 async function unloadModel(){
     const controller=beginOperation('unload');
     if(!controller)return;
-    aiStatus.textContent='Unloading the model and releasing its worker memory.';
+    aiStatus.textContent='Ending the browser model session; the verified cache will remain.';
     try{
         const local=await localAI();
         await local.unload();
-        aiStatus.textContent='Model unloaded. Worker memory was released; the verified DBOPFS cache remains.';
+        aiStatus.textContent='Model unloaded. The browser model Worker is no longer active; the verified DBOPFS cache remains.';
     }catch(error){
         renderError(error);
     }finally{
@@ -717,16 +730,16 @@ npm run check
 npm test
 npm run dev</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>You will see:</strong> an Arcane-styled page with a working <strong>Say hello</strong> button. Each click updates the app-scoped greeting count while named imports resolve from the committed runtime. Open the printed loopback URL; press <kbd>Ctrl</kbd>+<kbd>C</kbd> when finished.</p></section>
 
-        <section id="local-ai"><p class="step-label">Step 07 · optional</p><h2>Try the shipped browser-local AI</h2><p>The <code>arcane-os/ai/browser-wasm</code> entrypoint ships authenticated Wllama JavaScript and WebAssembly, but it ships no model weights and starts no model download automatically. This example supplies an immutable Granite 4.1 3B Q4_K_S model authority: 1,998,371,424 bytes (1.86 GiB), Apache-2.0, revision <code>ab4701481089b58a082ef63cc1cee738887293ff</code>, and SHA-256 <code>ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a</code>.</p><ol><li>Press <strong>Load local AI</strong> to allow the first network fetch. The UI reports byte progress. A first network load can follow provider-controlled HTTPS redirects from the declared Hugging Face origin; deployments must account for that chain without pinning a transient regional CDN hostname.</li><li>Arcane verifies the complete SHA-256 before DBOPFS admission, writes the completion record, reopens the cached model, and rehashes it before use. <strong>Model downloaded, SHA-256 verified, admitted to app-scoped DBOPFS, and loaded locally</strong> is the successful first-use boundary.</li><li>Press <strong>Load verified cache offline</strong> on a later visit. <code>load({offline:true})</code> makes no model-source request and succeeds only with a verified cache. Packaged same-origin Wllama/WASM assets may still load, and every warm-cache load rehashes the full model.</li><li>Ask the model. Every request sets <code>localOnly:true</code>, which keeps inference in this browser provider after load; it does not make first-use model acquisition offline.</li></ol><p><strong>Lifecycle:</strong> cancel aborts the active load or request, retains any verified cache, and discards an interrupted model download. Unload terminates the worker and releases model memory while retaining the verified cache. Leaving the page aborts active work and disposes the session.</p><p><strong>Tool calls:</strong> proposed calls appear as structural name-and-argument records. The SDK does not execute them, and this example has no dispatcher. The UI shows stable <code>ARCANE_AI_*</code> and <code>APP_DATA_*</code> failure codes instead of provider error text.</p><p>This shipped entrypoint manages a browser LLM only. It does not claim Node inference, speech synthesis, or speech recognition. Compare the <a href="../reference/ai/browser-wasm/">browser-WASM guide</a>, the normalized <a href="../reference/ai/">AI surface</a>, and the runtime <a href="../reference/runtime-modules/ai/">AI.js module</a> before choosing a different host integration.</p></section>
+        <section id="local-ai"><p class="step-label">Step 07 · optional</p><h2>Try the shipped browser-local AI</h2><p>The <code>arcane-os@0.2.1</code> <code>arcane-os/ai/browser-wasm</code> entrypoint ships authenticated Wllama JavaScript and WebAssembly, but it ships no model weights and starts no model download automatically. This example supplies an immutable Granite 4.1 3B Q4_K_S model authority: 1,998,371,424 bytes (1.86 GiB), Apache-2.0, revision <code>ab4701481089b58a082ef63cc1cee738887293ff</code>, and SHA-256 <code>ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a</code>.</p><ol><li>Press <strong>Load local AI</strong> to allow the first network fetch. The UI reports byte progress. A first network load can follow provider-controlled HTTPS redirects from the declared Hugging Face origin; deployments must account for that chain without pinning a transient regional CDN hostname.</li><li>Arcane verifies the complete SHA-256 before DBOPFS admission, writes the completion record, reopens the cached model, and rehashes it before use. <strong>Model downloaded, SHA-256 verified, admitted to app-scoped DBOPFS, and loaded locally</strong> is the successful first-use boundary.</li><li>Press <strong>Load verified cache offline</strong> on a later visit. <code>load({offline:true})</code> makes no model-source request and succeeds only with a verified cache. Packaged same-origin Wllama/WASM assets may still load, and every warm-cache load rehashes the full model.</li><li>Ask the model. Every request sets <code>localOnly:true</code>, which keeps inference in this browser provider after load; it does not make first-use model acquisition offline.</li></ol><p><strong>WebGPU:</strong> this 0.2.1 browser path requires WebGPU. The published provider owns its full-offload setting; the application does not provide a <code>gpuLayers</code> override.</p><p><strong>Lifecycle:</strong> cancel aborts the active load or request, retains any verified cache, and discards an interrupted model download. Unload ends the Wllama session and ensures the browser model Worker is no longer active while retaining the verified cache; it does not claim physical VRAM reclamation. Leaving the page aborts active work and disposes the session.</p><p><strong>Tool calls:</strong> proposed calls appear as structural name-and-argument records. The SDK does not execute them, and this example has no dispatcher. The UI shows stable <code>ARCANE_AI_*</code> and <code>APP_DATA_*</code> failure codes instead of provider error text.</p><p>This maintained interaction uses the browser-WASM LLM path and does not claim Node inference. Arcane 0.2.1 also ships the separate <a href="../reference/ai/browser-speech/"><code>arcane-os/ai/browser-speech</code></a> entrypoint, but this smallest app does not fetch speech runtime or model bytes. Compare the <a href="../reference/ai/browser-wasm/">browser-WASM guide</a>, the normalized <a href="../reference/ai/">AI surface</a>, and the runtime <a href="../reference/runtime-modules/ai/">AI.js module</a> before choosing a different host integration.</p></section>
 
         <section id="package"><p class="step-label">Step 08</p><h2>Package, verify, and bundle the browser application</h2><div class="code-block"><div class="code-bar"><span>Create and authenticate dist/hello-world</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run package
 npm run verify
-npm run bundle</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>Output:</strong> <code>dist/hello-world/</code> plus <code>dist/hello-world-0.1.0.arcane-app.tar.gz</code>. The <code>0.1.0</code> in that filename is this app’s version; the SDK dependency remains <code>arcane-os@0.1.1</code>. Verification compares the packaged inventory, byte sizes, and hashes with its release receipt.</p><p>See the CLI reference for <a href="../reference/cli/#arcane-package">package</a>, <a href="../reference/cli/#arcane-verify">verify</a>, and <a href="../reference/cli/#arcane-bundle">bundle</a>.</p></section>
+npm run bundle</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>Output:</strong> <code>dist/hello-world/</code> plus <code>dist/hello-world-0.1.0.arcane-app.tar.gz</code>. The <code>0.1.0</code> in that filename is this app’s version; the SDK dependency remains <code>arcane-os@0.2.1</code>. Verification compares the packaged inventory, byte sizes, and hashes with its release receipt.</p><p>See the CLI reference for <a href="../reference/cli/#arcane-package">package</a>, <a href="../reference/cli/#arcane-verify">verify</a>, and <a href="../reference/cli/#arcane-bundle">bundle</a>.</p></section>
 
         <section id="packaged-run"><p class="step-label">Step 09</p><h2>Build and run the packaged browser release</h2><p>The maintained scripts name the browser target explicitly. <code>build</code> regenerates the map and packages <code>dist/hello-world/</code>; <code>run</code> verifies the existing packaged release and serves it on a loopback URL.</p><div class="code-block"><div class="code-bar"><span>Browser build and packaged run</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run build
 npm run run</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>You will see:</strong> the same greeting and optional local-AI interface running from the verified packaged browser release. These commands do not create or launch a standalone native executable. Standalone native execution is provider-supplied and belongs to the separate <a href="../guides/native-builds/">native-build workflow</a>.</p></section>
 
-        <section id="related"><p class="step-label">Keep going</p><h2>Open the related reference where you need it</h2><ul><li><strong>Commands:</strong> <a href="../reference/cli/">CLI reference</a> and the direct <a href="../reference/sdk-api/">SDK API inventory</a>.</li><li><strong>App and host:</strong> <a href="../reference/core/capabilities/">capabilities</a>, <a href="../reference/core/reference/arcane-api/core-and-events/#arcaneruntimecurrent"><code>Arcane.runtime.current()</code></a>, <a href="../reference/core/reference/arcane-api/applications-terminal-capabilities/#arcaneappcurrent"><code>Arcane.app.current()</code></a>, and <a href="../reference/core/reference/arcane-api/applications-terminal-capabilities/#arcanecapabilitieslist"><code>Arcane.capabilities.list()</code></a>.</li><li><strong>Runtime modules:</strong> <a href="../reference/runtime-modules/theme-bootstrap/">ThemeBootstrap</a>, <a href="../reference/runtime-modules/app-data-scope/">AppDataScope</a>, <a href="../reference/runtime-modules/dbopfs/">DBOPFS</a>, and <a href="../reference/runtime-modules/directory-picker/">DirectoryPicker</a>. DirectoryPicker is related host functionality; this browser-only example does not request its <a href="../reference/core/capabilities/#capability-filesystemdirectoryselect"><code>filesystem.directory.select</code> capability</a>.</li><li><strong>AI:</strong> <a href="../reference/ai/browser-wasm/">browser-WASM local AI</a>, <a href="../reference/ai/">normalized AI guidance</a>, <a href="../reference/runtime-modules/ai/">AI.js</a>, and <a href="../reference/core/reference/arcane-api/ai-and-ollama/#arcaneaichat"><code>Arcane.ai.chat</code></a>.</li></ul></section>
+        <section id="related"><p class="step-label">Keep going</p><h2>Open the related reference where you need it</h2><ul><li><strong>Commands:</strong> <a href="../reference/cli/">CLI reference</a> and the direct <a href="../reference/sdk-api/">SDK API inventory</a>.</li><li><strong>App and host:</strong> <a href="../reference/core/capabilities/">capabilities</a>, <a href="../reference/core/reference/arcane-api/core-and-events/#arcaneruntimecurrent"><code>Arcane.runtime.current()</code></a>, <a href="../reference/core/reference/arcane-api/applications-terminal-capabilities/#arcaneappcurrent"><code>Arcane.app.current()</code></a>, and <a href="../reference/core/reference/arcane-api/applications-terminal-capabilities/#arcanecapabilitieslist"><code>Arcane.capabilities.list()</code></a>.</li><li><strong>Runtime modules:</strong> <a href="../reference/runtime-modules/theme-bootstrap/">ThemeBootstrap</a>, <a href="../reference/runtime-modules/app-data-scope/">AppDataScope</a>, <a href="../reference/runtime-modules/dbopfs/">DBOPFS</a>, and <a href="../reference/runtime-modules/directory-picker/">DirectoryPicker</a>. DirectoryPicker is related host functionality; this browser-only example does not request its <a href="../reference/core/capabilities/#capability-filesystemdirectoryselect"><code>filesystem.directory.select</code> capability</a>.</li><li><strong>AI:</strong> <a href="../reference/ai/browser-wasm/">browser-WASM local AI</a>, <a href="../reference/ai/browser-speech/">browser speech</a>, <a href="../reference/ai/">normalized AI guidance</a>, <a href="../reference/runtime-modules/ai/">AI.js</a>, and <a href="../reference/core/reference/arcane-api/ai-and-ollama/#arcaneaichat"><code>Arcane.ai.chat</code></a>.</li></ul></section>
 
         <nav class="page-pagination" aria-label="Page navigation"><a href="../"><span>Previous</span><strong>SDK overview</strong></a><a href="../guides/"><span>Next</span><strong>Choose a guide</strong></a></nav>
       </article>

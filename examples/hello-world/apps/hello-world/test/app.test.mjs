@@ -417,7 +417,12 @@ test('application shell installs its managed import map before every module',asy
     assert.ok(base>=0&&importMap>base&&appModule>importMap);
     assert.ok(managed);
     assert.deepEqual(Object.keys(parsed),['imports']);
-    assert.equal(Object.keys(parsed.imports).length,86);
+    const importSpecifiers=Object.keys(parsed.imports);
+    assert.deepEqual(importSpecifiers,[...importSpecifiers].sort());
+    assert.equal(
+        parsed.imports['arcane-os/ai/browser-speech'],
+        './arcane/sdk/ai/browser-speech.mjs'
+    );
     assert.equal(
         parsed.imports['arcane-os/ai/browser-wasm'],
         './arcane/sdk/ai/browser-wasm.mjs'
@@ -452,19 +457,32 @@ test('workspace pins the published SDK and browser release workflow',async funct
         readFile(new URL('arcane-packager.json',workspaceRoot),'utf8').then(JSON.parse),
         readFile(new URL('README.md',workspaceRoot),'utf8')
     ]);
-    assert.equal(packageJson.devDependencies['arcane-os'],'0.1.2');
+    assert.equal(packageJson.devDependencies['arcane-os'],'0.2.1');
     assert.equal(packageJson.engines.node,'>=22.23.2');
-    assert.equal(packageLock.packages[''].devDependencies['arcane-os'],'0.1.2');
-    assert.equal(packageLock.packages['node_modules/arcane-os'].version,'0.1.2');
+    assert.equal(packageLock.packages[''].devDependencies['arcane-os'],'0.2.1');
+    assert.equal(packageLock.packages['node_modules/arcane-os'].version,'0.2.1');
     assert.equal(
         packageLock.packages['node_modules/arcane-os'].integrity,
-        'sha512-fzVbd01xwFVCHTN6k8x/xPK8xtPy5yCtSkzFLmr1jNVTUBHzmnubLK8a5pWSGH7IhsWce+/AFHOu/TnWSKwDsQ=='
+        'sha512-FJ7zCFvQVZEMLQ8kn9IqddnFkfw397S87tENfLULwt0bN5hYn22wmN2zU50BqYC4zDKI/fdf4Rcl5G6A6KwlCg=='
     );
-    assert.equal(lock.sdk.version,'0.1.2');
-    assert.equal(lock.sdkBrowserRuntime.sdkVersion,'0.1.2');
+    assert.equal(
+        packageLock.packages['node_modules/arcane-os'].resolved,
+        'https://registry.npmjs.org/arcane-os/-/arcane-os-0.2.1.tgz'
+    );
+    assert.equal(lock.sdk.version,'0.2.1');
+    assert.equal(
+        lock.runtime.contentSha256,
+        '5b921d50b6a0cf36a13f7a7dedf96cd3a68104a322e5139136fd4197aa1ca7cb'
+    );
+    assert.equal(lock.runtime.upstreamCommit,'c540014afe69f14cf5ae60493b7295f36dbcec64');
+    assert.equal(lock.sdkBrowserRuntime.sdkVersion,'0.2.1');
     assert.equal(
         lock.sdkBrowserRuntime.contentSha256,
-        '5e03f45a732db51cb5a2b2193cc79ecda34501d07a9b2e82e794e5fa37d55d00'
+        'a9715c4b3aef70ec4042e4738089568d6588877b29582e0f758ed83897b6814f'
+    );
+    assert.equal(
+        lock.sdkBrowserRuntime.manifestSha256,
+        '44efd97352d970ebeac5363e86c0e71e908a71098f17514b6ea67c4792b4b3d4'
     );
     assert.deepEqual(
         Object.fromEntries([
@@ -495,8 +513,10 @@ test('workspace pins the published SDK and browser release workflow',async funct
         runtimeRoutes.some(route=>route.destination==='node_modules/strong-type'),
         false
     );
-    assert.match(readme,/173 files/u);
-    assert.match(readme,/86 entries/u);
+    assert.match(readme,/runtime receipts enumerate\s+the authenticated projection/u);
+    assert.match(readme,/generated import map is the authority/u);
+    assert.match(readme,/listed by the release receipt/u);
+    assert.doesNotMatch(readme,/173 files|86 entries/u);
     assert.match(readme,/does not create a\s+standalone native executable/u);
     assert.match(readme,/no model download starts until a load button is chosen/u);
     assert.match(readme,/`load\(\{offline:true\}\)` makes no model-source request/u);
@@ -532,6 +552,7 @@ test('application demonstrates direct named Arcane and browser-AI imports',async
     assert.match(script,/Packaged same-origin Wllama\/WASM assets may still load/u);
     assert.match(script,/Any verified cache remains; an interrupted model download is discarded/u);
     assert.match(script,/Proposed tool calls \(structural output only\)/u);
+    assert.doesNotMatch(script,/gpuLayers/u);
     assert.doesNotMatch(`${html}\n${script}`,/Tool-call receipt|never executed|executes tool calls/iu);
     assert.doesNotMatch(script,/ThemeBootstrap[.]js|AppDataScope[.]js|DBOPFS[.]js/u);
     assert.doesNotMatch(script,/toolHandlers|executeTools|Date[.]now|SDK update/iu);
@@ -567,9 +588,9 @@ test('online load authenticates the exact model and request stays local',async f
             contextTokens:1024,
             threads:1,
             batchTokens:256,
-            microBatchTokens:64,
-            gpuLayers:0
+            microBatchTokens:64
         });
+        assert.equal('gpuLayers' in aiRuntime.calls.provider[0].loadDefaults,false);
         assert.equal(aiRuntime.calls.load.length,1);
         assert.equal(aiRuntime.calls.load[0].offline,false);
         assert.ok(aiRuntime.calls.load[0].signal instanceof AbortSignal);
@@ -640,6 +661,7 @@ test('unload and page exit release runtime state but never delete cache',async f
         await elements.get('#ai-load').trigger('click');
         await elements.get('#ai-unload').trigger('click');
         assert.equal(aiRuntime.calls.unload,1);
+        assert.match(elements.get('#ai-status').textContent,/browser model Worker is no longer active/u);
         assert.match(elements.get('#ai-status').textContent,/verified DBOPFS cache remains/u);
         assert.equal(aiRuntime.calls.storeRemove,0);
 

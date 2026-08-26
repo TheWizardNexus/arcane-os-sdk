@@ -1,3 +1,10 @@
+import DocumentLexicalSearch,{
+    documentContextExcerpt,
+    documentSearchTokens,
+    normalizedDocumentSearchText,
+    scoreDocumentBody,
+} from './DocumentLexicalSearch.js';
+
 const CATALOG_SCHEMA_VERSION=1;
 const DEFAULT_LIMITS=Object.freeze({
     cacheTimeoutMs:2000,
@@ -26,15 +33,6 @@ const LANGUAGE_PATTERN=/^[a-z][a-z0-9.+#_-]{0,31}$/;
 const MEDIA_TYPES=new Set(['text/markdown','text/plain']);
 const SHA256_PATTERN=/^[a-f0-9]{64}$/;
 const TEXTUAL_CONTENT_TYPE=/^(?:text\/|application\/(?:javascript|json|xml|xhtml\+xml)(?:;|$)|image\/svg\+xml(?:;|$))/i;
-const SEARCH_FIELD_ORDER=Object.freeze([
-    'title','searchTerms','tags','headings','summary','category','navigationGroup',
-    'navigationParent','audiences','platforms','sourcePath','path','language','id'
-]);
-const SEARCH_STOP_WORDS=new Set([
-    'a','an','and','are','as','at','be','by','do','does','for','from','how','i',
-    'in','is','it','of','on','or','that','the','this','to','use','using','what',
-    'when','where','which','who','why','with','you','your'
-]);
 
 function isPlainRecord(value){
     return Boolean(value)
@@ -486,150 +484,6 @@ function normalizeOptions(input){
     });
 }
 
-function normalizedSearchText(value){
-    return value.normalize('NFKD').toLowerCase();
-}
-
-function searchTokens(value){
-    return [...new Set(normalizedSearchText(value).match(/[\p{L}\p{N}]+/gu)??[])]
-        .filter(token=>!SEARCH_STOP_WORDS.has(token))
-        .slice(0,32);
-}
-
-function searchIndex(record){
-    return Object.freeze({
-        audiences:record.audiences.map(normalizedSearchText),
-        category:normalizedSearchText(record.category),
-        id:normalizedSearchText(record.id),
-        navigationGroup:normalizedSearchText(record.navigationGroup),
-        navigationParent:normalizedSearchText(record.navigationParent),
-        path:normalizedSearchText(record.path),
-        sourcePath:normalizedSearchText(record.sourcePath),
-        language:normalizedSearchText(record.language),
-        platforms:record.platforms.map(normalizedSearchText),
-        title:normalizedSearchText(record.title),
-        summary:normalizedSearchText(record.summary),
-        tags:record.tags.map(normalizedSearchText),
-        searchTerms:record.searchTerms.map(normalizedSearchText),
-        headings:record.headings.map(heading=>normalizedSearchText(heading.text)),
-    });
-}
-
-function fieldScore(index,phrase,tokens){
-    const matched=new Set();
-    let score=0;
-    if(index.title===phrase){score+=120;matched.add('title');}
-    else if(index.title.includes(phrase)){score+=60;matched.add('title');}
-    if(index.id===phrase){score+=100;matched.add('id');}
-    else if(index.id.includes(phrase)){score+=20;matched.add('id');}
-    if(index.path.includes(phrase)){score+=24;matched.add('path');}
-    if(index.sourcePath.includes(phrase)){score+=24;matched.add('sourcePath');}
-    if(index.language===phrase){score+=30;matched.add('language');}
-    if(index.summary.includes(phrase)){score+=18;matched.add('summary');}
-    if(index.category===phrase){score+=40;matched.add('category');}
-    else if(index.category.includes(phrase)){score+=16;matched.add('category');}
-    if(index.navigationGroup===phrase){score+=40;matched.add('navigationGroup');}
-    else if(index.navigationGroup.includes(phrase)){score+=16;matched.add('navigationGroup');}
-    if(index.navigationParent===phrase){score+=36;matched.add('navigationParent');}
-    else if(index.navigationParent.includes(phrase)){score+=14;matched.add('navigationParent');}
-    if(index.audiences.some(function audienceEqualsPhrase(audience){return audience===phrase;})){score+=32;matched.add('audiences');}
-    else if(index.audiences.some(function audienceIncludesPhrase(audience){return audience.includes(phrase);})){score+=12;matched.add('audiences');}
-    if(index.platforms.some(function platformEqualsPhrase(platform){return platform===phrase;})){score+=32;matched.add('platforms');}
-    else if(index.platforms.some(function platformIncludesPhrase(platform){return platform.includes(phrase);})){score+=12;matched.add('platforms');}
-    if(index.searchTerms.some(term=>term===phrase)){score+=110;matched.add('searchTerms');}
-    else if(index.searchTerms.some(term=>term.includes(phrase))){score+=52;matched.add('searchTerms');}
-    for(const tag of index.tags){
-        if(tag===phrase){score+=40;matched.add('tags');}
-        else if(tag.includes(phrase)){score+=16;matched.add('tags');}
-    }
-    if(index.headings.some(heading=>heading.includes(phrase))){score+=22;matched.add('headings');}
-
-    for(const token of tokens){
-        if(index.title.split(/[^\p{L}\p{N}]+/u).includes(token)){score+=14;matched.add('title');}
-        else if(index.title.includes(token)){score+=7;matched.add('title');}
-        if(index.tags.some(tag=>tag===token)){score+=12;matched.add('tags');}
-        else if(index.tags.some(tag=>tag.includes(token))){score+=5;matched.add('tags');}
-        if(index.headings.some(heading=>heading.includes(token))){score+=5;matched.add('headings');}
-        if(index.summary.includes(token)){score+=3;matched.add('summary');}
-        if(index.category.includes(token)){score+=6;matched.add('category');}
-        if(index.navigationGroup.includes(token)){score+=6;matched.add('navigationGroup');}
-        if(index.navigationParent.includes(token)){score+=6;matched.add('navigationParent');}
-        if(index.audiences.some(function audienceIncludesToken(audience){return audience.includes(token);})){score+=6;matched.add('audiences');}
-        if(index.platforms.some(function platformIncludesToken(platform){return platform.includes(token);})){score+=6;matched.add('platforms');}
-        if(index.searchTerms.some(term=>term===token)){score+=18;matched.add('searchTerms');}
-        else if(index.searchTerms.some(term=>term.includes(token))){score+=9;matched.add('searchTerms');}
-        if(index.sourcePath.includes(token)){score+=4;matched.add('sourcePath');}
-        if(index.language===token){score+=8;matched.add('language');}
-        if(index.path.includes(token)){score+=4;matched.add('path');}
-        if(index.id.includes(token)){score+=5;matched.add('id');}
-    }
-    return {matched,score};
-}
-
-function bodyScore(value,phrase,tokens){
-    const body=normalizedSearchText(value);
-    let score=0;
-    if(phrase&&body.includes(phrase))score+=30;
-    for(const token of tokens){
-        if(body.includes(token))score+=6;
-    }
-    return score;
-}
-
-function boundedSearchResults(results,limit){
-    if(results.length<=limit)return results;
-    const collectionLimit=Math.max(1,Math.floor(limit/4));
-    const collectionCounts=new Map();
-    const selected=new Set();
-    const deferred=[];
-
-    for(const result of results){
-        if(selected.size>=limit)break;
-        if(!result.navigationParent){
-            selected.add(result);
-            continue;
-        }
-        const parent=canonicalKey(result.navigationParent);
-        const count=collectionCounts.get(parent)??0;
-        if(count>=collectionLimit){
-            deferred.push(result);
-            continue;
-        }
-        collectionCounts.set(parent,count+1);
-        selected.add(result);
-    }
-
-    for(const result of deferred){
-        if(selected.size>=limit)break;
-        selected.add(result);
-    }
-
-    return results.filter(function selectBoundedSearchResult(result){
-        return selected.has(result);
-    });
-}
-
-function relevantSliceStart(value,query,maximum){
-    if(value.length<=maximum)return 0;
-    const phrase=String(query||'').trim().toLowerCase();
-    const tokens=searchTokens(query);
-    const body=value.toLowerCase();
-    const positions=[phrase,...tokens]
-        .filter(Boolean)
-        .map(term=>body.indexOf(term))
-        .filter(index=>index>=0);
-    const match=positions.length?Math.min(...positions):0;
-    let start=Math.max(0,match-Math.floor(maximum/3));
-    const priorNewline=start>0?value.lastIndexOf('\n',start-1):-1;
-    const alignedStart=priorNewline+1;
-    if(match-alignedStart<=Math.floor(maximum*2/3))start=alignedStart;
-    if(start>0){
-        const code=value.charCodeAt(start);
-        if(code>=0xdc00&&code<=0xdfff)start++;
-    }
-    return start;
-}
-
 function lineNumberAt(value,offset){
     let line=1;
     let cursor=value.indexOf('\n');
@@ -638,18 +492,6 @@ function lineNumberAt(value,offset){
         cursor=value.indexOf('\n',cursor+1);
     }
     return line;
-}
-
-function contextExcerpt(value,query,maximum,{relevant=false}={}){
-    const start=relevant?relevantSliceStart(value,query,maximum):0;
-    const text=safeSlice(value.slice(start),maximum);
-    const end=start+text.length;
-    return Object.freeze({
-        lineEnd:lineNumberAt(value,Math.max(start,end-1)),
-        lineStart:lineNumberAt(value,start),
-        text,
-        truncated:start>0||end<value.length,
-    });
 }
 
 function queryText(value){
@@ -865,14 +707,6 @@ function boundedError(error){
     });
 }
 
-function safeSlice(value,maximum){
-    if(value.length<=maximum) return value;
-    let end=maximum;
-    const code=value.charCodeAt(end-1);
-    if(code>=0xd800&&code<=0xdbff) end--;
-    return value.slice(0,end);
-}
-
 function contextType(record){
     return record.mediaType==='text/plain'?'SOURCE CODE':'DOCUMENT';
 }
@@ -910,7 +744,7 @@ export default class StaticDocumentCatalog{
     #cache;
     #digest;
     #fetchImpl;
-    #indexes;
+    #lexicalSearch;
     #limits;
     #manifest;
     #onCacheError;
@@ -930,7 +764,10 @@ export default class StaticDocumentCatalog{
         this.#fetchImpl=normalizedOptions.fetchImpl;
         this.#onCacheError=normalizedOptions.onCacheError;
         this.#recordsById=new Map(this.#manifest.documents.map(record=>[record.id,record]));
-        this.#indexes=new Map(this.#manifest.documents.map(record=>[record.id,searchIndex(record)]));
+        this.#lexicalSearch=new DocumentLexicalSearch(
+            this.#manifest.documents,
+            {maxResults:this.#limits.maxResults},
+        );
         this.#verifiedHydrations=new Map();
     }
 
@@ -948,30 +785,13 @@ export default class StaticDocumentCatalog{
     }
 
     search(query,options={}){
-        const text=queryText(query);
-        const normalized=normalizedSearchText(text);
-        const tokens=searchTokens(text);
+        queryText(query);
         const settings=searchOptions(options,this.#limits.maxResults);
-        const results=[];
-        for(const record of this.#manifest.documents){
-            if(settings.kinds&&!settings.kinds.has(record.kind)) continue;
-            if(settings.tags&&![...settings.tags].every(tag=>record.tags.some(item=>canonicalKey(item)===tag))) continue;
-            const {matched,score}=text
-                ?fieldScore(this.#indexes.get(record.id),normalized,tokens)
-                :{matched:new Set(),score:0};
-            if(text&&!score) continue;
-            results.push(Object.freeze({
-                ...record,
-                score,
-                matchedFields:Object.freeze(SEARCH_FIELD_ORDER.filter(field=>matched.has(field))),
-            }));
-        }
-        results.sort((left,right)=>
-            right.score-left.score
-            ||compareText(normalizedSearchText(left.title),normalizedSearchText(right.title))
-            ||compareText(left.id,right.id)
-        );
-        return Object.freeze(boundedSearchResults(results,settings.limit));
+        return this.#lexicalSearch.search(query,{
+            kinds:settings.kinds?[...settings.kinds]:undefined,
+            limit:settings.limit,
+            tags:settings.tags?[...settings.tags]:undefined,
+        });
     }
 
     #cacheKey(record){
@@ -1147,15 +967,14 @@ export default class StaticDocumentCatalog{
             'Context body-search scan limit',
             {minimum:1,maximum:Math.min(this.size,100)},
         ):0;
-        const indexedMatches=this.search(queryValue,{limit:this.#limits.maxResults});
-        const searchTermMatch=indexedMatches.some(match=>match.matchedFields.includes('searchTerms'));
+        const indexedMatches=this.#lexicalSearch.rank(queryValue);
         const candidates=new Map(indexedMatches.map(match=>[match.id,match]));
         const hydratedById=new Map();
         const failures=[];
         const failedIds=new Set();
-        if(bodySearch&&!searchTermMatch){
-            const phrase=normalizedSearchText(queryValue);
-            const tokens=searchTokens(queryValue);
+        if(bodySearch){
+            const phrase=normalizedDocumentSearchText(queryValue);
+            const tokens=documentSearchTokens(queryValue);
             for(const record of this.#manifest.documents.slice(0,scanLimit)){
                 let hydrated;
                 try{
@@ -1168,7 +987,7 @@ export default class StaticDocumentCatalog{
                     failedIds.add(record.id);
                     continue;
                 }
-                const score=bodyScore(hydrated.text,phrase,tokens);
+                const score=scoreDocumentBody(hydrated.text,phrase,tokens);
                 if(!score)continue;
                 const existing=candidates.get(record.id);
                 candidates.set(record.id,Object.freeze({
@@ -1181,7 +1000,7 @@ export default class StaticDocumentCatalog{
         const matches=[...candidates.values()]
             .sort((left,right)=>
                 right.score-left.score
-                ||compareText(normalizedSearchText(left.title),normalizedSearchText(right.title))
+                ||compareText(normalizedDocumentSearchText(left.title),normalizedDocumentSearchText(right.title))
                 ||compareText(left.id,right.id)
             )
             .slice(0,Math.min(limit,this.#limits.maxResults));
@@ -1210,7 +1029,7 @@ export default class StaticDocumentCatalog{
             const remaining=maxCharacters-text.length-budgetHeading.length-footer.length;
             if(remaining<=0){truncated=true;break;}
             const allowed=Math.min(maxDocumentCharacters,remaining);
-            const excerpt=contextExcerpt(hydrated.text,queryValue,allowed,{relevant:bodySearch});
+            const excerpt=documentContextExcerpt(hydrated.text,queryValue,allowed,{relevant:bodySearch});
             const heading=contextHeading(match,excerpt);
             text+=heading+excerpt.text+footer;
             truncated=truncated||excerpt.truncated;

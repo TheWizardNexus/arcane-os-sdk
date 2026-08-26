@@ -1,14 +1,18 @@
 {
   "schemaVersion": 1,
   "kind": "arcane-ai-browser-wasm-components",
-  "protocol": "arcane-ai-browser-wasm/1",
+  "protocol": "arcane-ai-browser-wasm/2",
   "packageExport": "arcane-os/ai/browser-wasm",
   "browserEntry": "ai/browser-wasm.mjs",
   "runtimePolicy": {
-    "modelAuthorities": "caller-supplied-exact-bytes-and-sha256",
+    "modelAuthorities": "fieldwise-security-default-false-with-optional-byteLength-and-sha256-checks",
     "modelWeightsPacked": false,
     "remoteModelHelpers": false,
     "compatibilityRuntime": false,
+    "webgpuAdmission": "adapter-plus-full-offload-plus-buffer-queue-and-settled-fence-evidence",
+    "cpuFallback": false,
+    "cancellation": "abortSignal-plus-llama-cancel-acknowledgement",
+    "cleanup": "worker-termination-only-no-native-unload-claim",
     "toolCalls": "structural-only-never-executed"
   },
   "components": [
@@ -28,9 +32,16 @@
         {
           "role": "runtime-module",
           "path": "ai/wllama/index.mjs",
-          "sourcePath": "node_modules/@wllama/wllama/esm/index.js",
-          "bytes": 373519,
-          "sha256": "4637e42d636010493a9b274fbbe70bfd8120365da726b1d9e589d85ca84a00d6"
+          "sourcePath": "browser-runtime/ai/wllama/index.mjs",
+          "bytes": 392852,
+          "sha256": "b119a7cdffabc8541dce283381d18ada4027c0560728aac1fe45bdd30cdac8e2",
+          "projection": {
+            "protocol": "arcane-wllama-webgpu-evidence/1",
+            "inputPath": "node_modules/@wllama/wllama/esm/index.js",
+            "inputBytes": 373519,
+            "inputSha256": "4637e42d636010493a9b274fbbe70bfd8120365da726b1d9e589d85ca84a00d6",
+            "wasmModified": false
+          }
         },
         {
           "role": "runtime-wasm",

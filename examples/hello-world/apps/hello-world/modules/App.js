@@ -186,8 +186,7 @@ async function localAI(){
                 contextTokens:1024,
                 threads:1,
                 batchTokens:256,
-                microBatchTokens:64,
-                gpuLayers:0
+                microBatchTokens:64
             }
         });
         const created=createArcaneAI({
@@ -300,11 +299,11 @@ async function askLocalAI(){
 async function unloadModel(){
     const controller=beginOperation('unload');
     if(!controller)return;
-    aiStatus.textContent='Unloading the model and releasing its worker memory.';
+    aiStatus.textContent='Ending the browser model session; the verified cache will remain.';
     try{
         const local=await localAI();
         await local.unload();
-        aiStatus.textContent='Model unloaded. Worker memory was released; the verified DBOPFS cache remains.';
+        aiStatus.textContent='Model unloaded. The browser model Worker is no longer active; the verified DBOPFS cache remains.';
     }catch(error){
         renderError(error);
     }finally{

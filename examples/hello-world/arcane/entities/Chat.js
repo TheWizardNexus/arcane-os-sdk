@@ -6,6 +6,74 @@ import {normalizeMemoryContent} from '../modules/MemoryRecords.js';
 
 const is = new Is(false);
 
+function plainRecord(value){
+    return Boolean(value)
+        &&typeof value==='object'
+        &&!Array.isArray(value)
+        &&Object.getPrototypeOf(value)===Object.prototype;
+}
+
+function copyToolCalls(value){
+    if(value===undefined) return null;
+    if(!Array.isArray(value)||value.length!==1){
+        throw new TypeError('assistantMessage.tool_calls must contain exactly one structural tool call.');
+    }
+    const ids=new Set();
+    return value.map((call,index)=>{
+        if(!plainRecord(call)||!plainRecord(call.function)||call.type!=='function'){
+            throw new TypeError(`assistantMessage.tool_calls[${index}] is invalid.`);
+        }
+        const id=String(call.id??'').trim();
+        const name=String(call.function.name??'').trim();
+        const argumentValue=call.function.arguments;
+        if(!id||id.length>128||ids.has(id)||!name||name.length>128||typeof argumentValue!=='string'){
+            throw new TypeError(`assistantMessage.tool_calls[${index}] is invalid.`);
+        }
+        ids.add(id);
+        return {
+            function:{arguments:argumentValue,name},
+            id,
+            type:'function'
+        };
+    });
+}
+
+function turnMessage(value,label){
+    if(!plainRecord(value)||!['tool','user'].includes(value.role)||typeof value.content!=='string'){
+        throw new TypeError(`${label} must be a user or tool message.`);
+    }
+    if(value.role==='tool'){
+        const toolCallId=String(value.tool_call_id??'').trim();
+        if(!toolCallId||toolCallId.length>128) throw new TypeError(`${label}.tool_call_id is invalid.`);
+        return {content:value.content,role:'tool',tool_call_id:toolCallId};
+    }
+    return {content:value.content,role:'user'};
+}
+
+function pendingToolCallId(messages){
+    let pending=null;
+    for(const [index,message] of messages.entries()){
+        if(message.role==='user'&&pending){
+            throw new TypeError(`Chat message ${index+1} starts a user turn before the pending tool result.`);
+        }
+        if(message.role==='assistant'&&message.tool_calls){
+            const calls=copyToolCalls(message.tool_calls);
+            if(pending){
+                throw new TypeError(`Chat message ${index+1} overlaps a pending tool call.`);
+            }
+            pending=calls[0].id;
+        }
+        if(message.role==='tool'){
+            const toolCallId=String(message.tool_call_id??'').trim();
+            if(!pending||pending!==toolCallId){
+                throw new TypeError(`Chat message ${index+1} does not match the pending tool call.`);
+            }
+            pending=null;
+        }
+    }
+    return pending;
+}
+
 /**
  * Represents a single chat message.
  *
@@ -19,6 +87,8 @@ const is = new Is(false);
  * Internal persistence marker omitted from model-facing messages.
  * @property {boolean} [ui_hidden]
  * Internal persistence marker for messages intentionally omitted from chat UI.
+ * @property {boolean} [persistence_excluded]
+ * Internal marker for session-only messages omitted from durable chat and memory.
  * @property {Array<Object>} [tool_calls]
  * Assistant tool calls retained in the saved conversation log.
  * @property {string} [tool_call_id]
@@ -111,6 +181,9 @@ class ChatEntity{
     /** Serializes snapshot and append writes for this chat instance. */
     #persistenceQueue=Promise.resolve();
 
+    /** Serializes automatic memory updates without delaying the completed turn. */
+    #memoryQueue=Promise.resolve(false);
+
 
     /**
      * Creates a new chat session.
@@ -154,7 +227,15 @@ class ChatEntity{
     get messages(){
         return Object.freeze(this.#messages.map(function publicChatMessage(message){
             const copy={...message};
+            if(copy.tool_calls){
+                copy.tool_calls=Object.freeze(copyToolCalls(copy.tool_calls).map(call=>Object.freeze({
+                    function:Object.freeze({...call.function}),
+                    id:call.id,
+                    type:call.type,
+                })));
+            }
             delete copy.memory_excluded;
+            delete copy.persistence_excluded;
             delete copy.ui_hidden;
             delete copy.timestamp;
             return Object.freeze(copy);
@@ -205,15 +286,21 @@ class ChatEntity{
      *
      * @param {string} text
      * Message content from the user.
-     * @param {{hidden?:boolean}} options
+     * @param {{hidden?:boolean,persist?:boolean}} options
      * Hidden messages remain in the saved/model context but are not user-authored UI turns.
      */
-    addUserMessage(text='',{hidden=false}={}){
+    addUserMessage(text='',{hidden=false,persist=true}={}){
         if(!is.string(text)){
             throw new Error('user message must be string');
         }
         if(!is.boolean(hidden)){
             throw new Error('hidden must be boolean');
+        }
+        if(!is.boolean(persist)){
+            throw new Error('persist must be boolean');
+        }
+        if(pendingToolCallId(this.#messages)){
+            throw new TypeError('The pending structural tool result must be supplied before a new user turn.');
         }
 
         const message={
@@ -227,7 +314,8 @@ class ChatEntity{
         }
 
         return this.#appendMessage(
-            message
+            message,
+            {persist}
         );
     }
 
@@ -239,10 +327,10 @@ class ChatEntity{
      *
      * @param {string|number} text
      * Message content generated by the AI.
-     * @param {{extractMemory?:boolean}} options
+     * @param {{extractMemory?:boolean,persist?:boolean}} options
      * Set extractMemory to false for deterministic application-authored messages.
      */
-    addAIMessage(text='',{extractMemory=true}={}){
+    addAIMessage(text='',{extractMemory=true,persist=true}={}){
 
         if(!is.union(text,'string','number')){
             throw new Error('assistant message must be string or number');
@@ -250,11 +338,8 @@ class ChatEntity{
         if(!is.boolean(extractMemory)){
             throw new Error('extractMemory must be boolean');
         }
-
-        if(extractMemory){
-            void this.getMemoriesAboutUser().catch(function reportMemoryFailure(error){
-                console.warn('Unable to update chat memory.',error);
-            });
+        if(!is.boolean(persist)){
+            throw new Error('persist must be boolean');
         }
 
         const message={
@@ -266,20 +351,31 @@ class ChatEntity{
             message.memory_excluded=true;
         }
 
-        return this.#appendMessage(
-            message
-        )
+        const appended=this.#appendMessage(message,{persist});
+        if(extractMemory&&persist&&this.persist){
+            return Promise.resolve(appended).then(result=>{
+                this.#queueMemoryUpdate(messages=>ai.fetch(messages));
+                return result;
+            });
+        }
+        return appended;
     }
 
     /**
      * Adds an assistant tool call and its result as one hidden, atomic log exchange.
      * The host application decides whether anything is rendered in the chat UI.
      */
-    addToolExchange({id='',name='',arguments:argumentValue='',result=''}={}){
+    addToolExchange({id='',name='',arguments:argumentValue='',result='',persist=true}={}){
         const toolCallId=String(id).trim();
         const toolName=String(name).trim();
         if(!toolCallId||!toolName){
             throw new TypeError('Tool exchanges require an id and name.');
+        }
+        if(!is.boolean(persist)){
+            throw new TypeError('persist must be boolean.');
+        }
+        if(pendingToolCallId(this.#messages)){
+            throw new TypeError('The pending structural tool result must be supplied before another tool exchange.');
         }
 
         const serializedArguments=typeof argumentValue==='string'
@@ -317,7 +413,68 @@ class ChatEntity{
                 timestamp,
                 memory_excluded:true
             }
-        ]);
+        ],{persist});
+    }
+
+    /**
+     * Atomically adds one model request and its assistant response. Persistence
+     * failures remove both in-memory records so the caller can roll back its
+     * recurring provider context without divergence.
+     */
+    addTurn({
+        assistantMessage,
+        extractMemory=true,
+        memoryRequest=messages=>ai.fetch(messages),
+        messagePersist=true,
+        requestMessage,
+        responsePersist=messagePersist,
+    }={}){
+        const request=turnMessage(requestMessage,'requestMessage');
+        if(!plainRecord(assistantMessage)||assistantMessage.role!=='assistant'){
+            throw new TypeError('assistantMessage must be an assistant message.');
+        }
+        if(!is.boolean(messagePersist)||!is.boolean(responsePersist)||!is.boolean(extractMemory)){
+            throw new TypeError('Turn persistence and memory options must be boolean.');
+        }
+        if(typeof memoryRequest!=='function'){
+            throw new TypeError('memoryRequest must be a function.');
+        }
+        if(messagePersist!==responsePersist){
+            throw new TypeError('messagePersist and responsePersist must match for one coherent durable turn.');
+        }
+        const pendingTool=pendingToolCallId(this.#messages);
+        if(request.role==='user'&&pendingTool){
+            throw new TypeError('The pending structural tool result must be supplied before a new user turn.');
+        }
+        if(request.role==='tool'&&pendingTool!==request.tool_call_id){
+            throw new TypeError('requestMessage does not match the pending structural tool call.');
+        }
+        const toolCalls=copyToolCalls(assistantMessage.tool_calls);
+        const assistantContent=assistantMessage.content??'';
+        if(!is.union(assistantContent,'string','number')||(!String(assistantContent)&&!toolCalls)){
+            throw new TypeError('assistantMessage must contain text or structural tool calls.');
+        }
+        const timestamp=Date.now();
+        const requestRecord={...request,timestamp};
+        const assistantRecord={
+            content:assistantContent,
+            role:'assistant',
+            timestamp,
+            ...(toolCalls?{tool_calls:toolCalls}:{})
+        };
+        if(request.role==='tool') requestRecord.memory_excluded=true;
+        if(!extractMemory||toolCalls) assistantRecord.memory_excluded=true;
+        if(!messagePersist) requestRecord.persistence_excluded=true;
+        if(!responsePersist) assistantRecord.persistence_excluded=true;
+
+        const appended=this.#appendMessages([requestRecord,assistantRecord],{prepared:true});
+        if(extractMemory&&messagePersist&&responsePersist&&!toolCalls&&this.persist){
+            return Promise.resolve(appended).then(result=>{
+                this.#queueMemoryUpdate(memoryRequest);
+                return result;
+            });
+        }
+        return appended;
     }
 
     /**
@@ -337,8 +494,9 @@ class ChatEntity{
             this.fileName
         );
 
-        if(!content){
-            this.#messages=[];
+        if(!content||(Array.isArray(content)&&content.length===0)){
+            const systemMessage=this.#messages.find(message=>message.role==='system');
+            this.#messages=systemMessage?[systemMessage]:[];
             this.#persistedMessageCount=0;
             this.#saved=true;
             return this.messages;
@@ -351,26 +509,44 @@ class ChatEntity{
                 .map(row=>row.trim())
                 .filter(Boolean)
                 .map(row=>JSON.parse(row));
-        this.#persistedMessageCount=this.#messages.length;
+        this.#persistedMessageCount=this.#durableMessages().length;
         this.#saved=true;
 
         return this.messages;
     }
 
-    async getMemoriesAboutUser(){
-        if(!hasUserEntry(this.#messages)){
+    async getMemoriesAboutUser({request=messages=>ai.fetch(messages)}={}){
+        if(typeof request!=='function'){
+            throw new TypeError('Memory request must be a function.');
+        }
+        return this.#writeMemory(
+            this.#durableMessages().map(message=>({...message})),
+            request
+        );
+    }
+
+    /** Waits for all automatic memory work owned by this chat instance. */
+    async settleMemory(){
+        return this.#memoryQueue;
+    }
+
+    async #writeMemory(snapshot,request){
+        if(!hasUserEntry(snapshot)){
             return false;
         }
 
-        const transcript=this.#messages
-            .slice(2)
-            .filter(message=>message.memory_excluded!==true)
+        const transcript=snapshot
+            .filter(message=>
+                ['assistant','user'].includes(message.role)
+                &&message.memory_excluded!==true
+            )
             .map(function publicMemoryMessage(message){
                 const copy={...message};
                 delete copy.memory_excluded;
+                delete copy.persistence_excluded;
                 return copy;
             });
-        const summary=await ai.fetch(
+        const summary=await request(
             [
                 {
                     role:'system',
@@ -388,7 +564,7 @@ ${JSON.stringify(transcript)}`
         );
         
         const memory=normalizeMemoryContent(
-            summary.choices?.[0]?.message?.content
+            summary?.choices?.[0]?.message?.content??summary?.message?.content
         );
 
         if(!memory){
@@ -412,17 +588,27 @@ ${JSON.stringify(transcript)}`
      * @returns {Promise<*>}
      */
     async save(){
-        if(!hasUserEntry(this.#messages)){
+        if(!hasUserEntry(this.#durableMessages())){
             this.#saved=false;
             return false;
         }
 
-        const snapshot=this.#messages.map(message=>({...message}));
+        const snapshot=this.#durableMessages().map(message=>({...message}));
         this.#saved=false;
 
         return this.#queuePersistence(
             async()=>this.#writeSnapshot(snapshot)
         );
+    }
+
+    #queueMemoryUpdate(request){
+        const snapshot=this.#durableMessages().map(message=>({...message}));
+        const queued=this.#memoryQueue.then(()=>this.#writeMemory(snapshot,request));
+        this.#memoryQueue=queued.catch(()=>{
+            console.warn('Unable to update chat memory.');
+            return false;
+        });
+        return this.#memoryQueue;
     }
 
     #queuePersistence(operation){
@@ -444,7 +630,7 @@ ${JSON.stringify(transcript)}`
                 content
             );
             this.#persistedMessageCount=snapshot.length;
-            this.#saved=this.#persistedMessageCount===this.#messages.length;
+            this.#saved=this.#persistedMessageCount===this.#durableMessages().length;
             return true;
         }catch(error){
             this.#saved=false;
@@ -515,24 +701,33 @@ ${JSON.stringify(transcript)}`
      * );
      * ```
      */
-    async #appendMessage(message){
-        return this.#appendMessages([message]);
+    async #appendMessage(message,options){
+        return this.#appendMessages([message],options);
     }
 
-    async #appendMessages(messages){
-        const records=Array.from(messages||[]);
+    #durableMessages(){
+        return this.#messages.filter(message=>message.persistence_excluded!==true);
+    }
+
+    async #appendMessages(messages,{persist=true,prepared=false}={}){
+        const records=Array.from(messages||[]).map(message=>
+            prepared?message:(persist?message:{...message,persistence_excluded:true})
+        );
         if(!records.length){
             return false;
         }
 
         this.#messages.push(...records);
-        this.#saved=false;
+        const durableRecords=records.filter(message=>message.persistence_excluded!==true);
+        if(durableRecords.length){
+            this.#saved=false;
+        }
 
-        if(!this.persist){
+        if(!this.persist||!durableRecords.length){
             return;
         }
 
-        if(!hasUserEntry(this.#messages)){
+        if(!hasUserEntry(this.#durableMessages())){
             return false;
         }
 
@@ -548,22 +743,30 @@ ${JSON.stringify(transcript)}`
                 if(!recordsAreContiguous){
                     throw new Error('Chat records changed before persistence completed.');
                 }
-                const lastMessageIndex=messageIndex+records.length-1;
-                if(this.#persistedMessageCount===messageIndex){
+                const durableSnapshot=this.#durableMessages();
+                const durableIndex=durableSnapshot.indexOf(durableRecords[0]);
+                const durableRecordsAreContiguous=durableRecords.every(
+                    (record,index)=>durableSnapshot[durableIndex+index]===record
+                );
+                if(durableIndex<0||!durableRecordsAreContiguous){
+                    throw new Error('Durable chat records changed before persistence completed.');
+                }
+                const lastDurableIndex=durableIndex+durableRecords.length-1;
+                if(this.#persistedMessageCount===durableIndex){
                     await dbopfs.set(
                         this.#tableName,
                         this.fileName,
-                        records.map(record=>JSON.stringify(record)).join('\n')+'\n',
+                        durableRecords.map(record=>JSON.stringify(record)).join('\n')+'\n',
                         true
                     );
-                    this.#persistedMessageCount=lastMessageIndex+1;
+                    this.#persistedMessageCount=lastDurableIndex+1;
                 }else{
-                    const snapshot=this.#messages
-                        .slice(0,lastMessageIndex+1)
+                    const snapshot=durableSnapshot
+                        .slice(0,lastDurableIndex+1)
                         .map(entry=>({...entry}));
                     await this.#writeSnapshot(snapshot);
                 }
-                this.#saved=this.#persistedMessageCount===this.#messages.length;
+                this.#saved=this.#persistedMessageCount===this.#durableMessages().length;
                 return true;
             }catch(error){
                 const failedIndex=this.#messages.indexOf(records[0]);
@@ -571,7 +774,7 @@ ${JSON.stringify(transcript)}`
                     this.#messages.splice(failedIndex,records.length);
                 }
                 this.#saved=
-                    this.#persistedMessageCount===this.#messages.length;
+                    this.#persistedMessageCount===this.#durableMessages().length;
                 throw error;
             }
         });

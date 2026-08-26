@@ -2,19 +2,19 @@
   "schemaVersion": 1,
   "sdk": {
     "name": "arcane-os",
-    "version": "0.1.2"
+    "version": "0.2.1"
   },
   "runtime": {
     "manifest": "node_modules/arcane-os/runtime/ARCANE_RUNTIME_RELEASE.json",
-    "contentSha256": "7b1b583b4adf6a6ec794da6f0c03c553cdee79784dab75094d83ee24f9637098",
-    "upstreamCommit": "567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e"
+    "contentSha256": "5b921d50b6a0cf36a13f7a7dedf96cd3a68104a322e5139136fd4197aa1ca7cb",
+    "upstreamCommit": "c540014afe69f14cf5ae60493b7295f36dbcec64"
   },
   "sdkBrowserRuntime": {
     "manifest": "node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json",
-    "manifestSha256": "88395493b411fd5461fbb2bb065ae2b745f6d1672f796583fd248ec97f71f4f7",
-    "contentSha256": "5e03f45a732db51cb5a2b2193cc79ecda34501d07a9b2e82e794e5fa37d55d00",
+    "manifestSha256": "44efd97352d970ebeac5363e86c0e71e908a71098f17514b6ea67c4792b4b3d4",
+    "contentSha256": "a9715c4b3aef70ec4042e4738089568d6588877b29582e0f758ed83897b6814f",
     "builder": "arcane-sdk-browser-runtime-v1",
-    "sdkVersion": "0.1.2",
+    "sdkVersion": "0.2.1",
     "source": {
       "authority": "arcane-os-sdk",
       "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
