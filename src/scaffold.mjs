@@ -7,12 +7,11 @@ import {materializeWorkspaceRuntime} from './workspace-runtime.mjs';
 import {generateImportMap} from './import-map.mjs';
 import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
 import {SDK_NAME,SDK_VERSION,workspaceTemplate} from './templates/workspace-template.mjs';
-import {inspectWorkspaceProfile} from './workspace.mjs';
+import {inspectWorkspaceProfile,resolveSdkPackageDeclaration} from './workspace.mjs';
 import {parseSemver} from './packager/core.mjs';
 
 const APP_ID_PATTERN=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const DISPLAY_CONTROL_PATTERN=/[\x00-\x1f\x7f]/;
-const LOCAL_TARBALL_PATTERN=/^file:.+\.tgz$/iu;
 
 function fail(message,code='ARCANE_WORKSPACE_INVALID'){
     const error=new Error(message);
@@ -152,31 +151,35 @@ async function assertNoLinkedAncestors(workspaceRoot,relative){
     }
 }
 
-function isSupportedSdkDeclaration(value){
-    return value===SDK_VERSION||(typeof value==='string'&&LOCAL_TARBALL_PATTERN.test(value)
-        &&!DISPLAY_CONTROL_PATTERN.test(value));
-}
-
-async function prepareExistingPackage(workspaceRoot,files){
+async function readExistingPackage(workspaceRoot){
     const packagePath=path.join(workspaceRoot,'package.json');
     let source;
     try{source=await readFile(packagePath,'utf8');}
     catch(error){
-        if(error?.code==='ENOENT')return Object.freeze({exists:false,updated:false});
+        if(error?.code==='ENOENT'){
+            return Object.freeze({exists:false,packagePath,source:null,document:null});
+        }
         throw error;
     }
     let existing;
     try{existing=JSON.parse(source);}
     catch(error){fail(`Existing package.json is not valid JSON: ${error.message}.`);}
     if(!existing||typeof existing!=='object'||Array.isArray(existing))fail('Existing package.json must be a JSON object.');
+    return Object.freeze({exists:true,packagePath,source,document:existing});
+}
+
+function defaultSdkDeclaration(){
+    return resolveSdkPackageDeclaration({devDependencies:{[SDK_NAME]:SDK_VERSION}});
+}
+
+async function prepareExistingPackage(workspaceRoot,files,existingPackage,sdkDeclaration){
+    const packageState=existingPackage??await readExistingPackage(workspaceRoot);
+    if(!packageState.exists)return Object.freeze({exists:false,updated:false});
+    const {packagePath,source,document:existing}=packageState;
     const generated=JSON.parse(files.get('package.json'));
     const conflicts=[];
     if(existing.private!==undefined&&existing.private!==true)conflicts.push('private must be true');
     if(existing.type!==undefined&&existing.type!=='module')conflicts.push('type must be "module"');
-    const declared=existing.devDependencies?.[SDK_NAME]??existing.dependencies?.[SDK_NAME];
-    if(declared!==undefined&&!isSupportedSdkDeclaration(declared)){
-        conflicts.push(`${SDK_NAME} must be ${SDK_VERSION} or a local file: tarball`);
-    }
     const appSelectionScripts=new Set(['build','run']);
     for(const [name,command] of Object.entries(generated.scripts)){
         if(appSelectionScripts.has(name))continue;
@@ -192,12 +195,15 @@ async function prepareExistingPackage(workspaceRoot,files){
         private:true,
         type:'module',
         scripts:{...generated.scripts,...(existing.scripts||{})},
-        devDependencies:{...(existing.devDependencies||{}),[SDK_NAME]:declared??SDK_VERSION},
+        devDependencies:{
+            ...(existing.devDependencies||{}),
+            [sdkDeclaration.dependencyName]:sdkDeclaration.specifier
+        },
         engines:{...generated.engines,...(existing.engines||{})}
     };
-    if(existing.dependencies?.[SDK_NAME]!==undefined){
+    if(existing.dependencies?.[sdkDeclaration.dependencyName]!==undefined){
         merged.dependencies={...existing.dependencies};
-        delete merged.dependencies[SDK_NAME];
+        delete merged.dependencies[sdkDeclaration.dependencyName];
         if(Object.keys(merged.dependencies).length===0)delete merged.dependencies;
     }
     if(JSON.stringify(existing)===JSON.stringify(merged)){
@@ -422,6 +428,20 @@ export async function initWorkspace({
     const sdkBrowserRuntimeReceipt=workspaceMode==='external'
         ?await verifySdkBrowserRuntime({signal,onEvent})
         :null;
+    const existingPackage=workspaceMode==='external'
+        ?await readExistingPackage(resolvedRoot)
+        :null;
+    const sdkDeclaration=workspaceMode==='external'
+        ?profile?.config.sdkPackageSource!==undefined
+            ?resolveSdkPackageDeclaration(existingPackage.document??{}, {
+                allowMissing:true,
+                packageSource:profile.config.sdkPackageSource
+            })
+            :(existingPackage.exists
+                    ?resolveSdkPackageDeclaration(existingPackage.document,{allowMissing:true})
+                    :null)
+                ??defaultSdkDeclaration()
+        :null;
     const template=workspaceMode==='integrated'
         ?workspaceTemplate({
             appId,
@@ -437,12 +457,20 @@ export async function initWorkspace({
             displayName,
             runtimeRelease:runtimeReceipt,
             sdkBrowserRuntimeRelease:sdkBrowserRuntimeReceipt,
+            sdkDependencyName:sdkDeclaration.dependencyName,
+            sdkDependencySpecifier:sdkDeclaration.specifier,
+            sdkPackageSource:sdkDeclaration.packageSource,
             target,
             appIcon:await scaffoldIcon(target)
         });
     const packagePlan=workspaceMode==='integrated'
         ?Object.freeze({exists:true,updated:false})
-        :await prepareExistingPackage(resolvedRoot,template.files);
+        :await prepareExistingPackage(
+            resolvedRoot,
+            template.files,
+            existingPackage,
+            sdkDeclaration
+        );
     if(workspaceMode==='external'){
         await assertExistingLockAdmission(resolvedRoot,template.files);
     }

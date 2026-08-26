@@ -9,6 +9,9 @@ import {startDevServer} from '../src/dev-server.mjs';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';
 import {packageApp} from '../src/packager/core.mjs';
 import {SDK_NAME,SDK_VERSION} from '../src/constants.mjs';
+import {verifyRuntime} from '../src/runtime.mjs';
+import {verifySdkBrowserRuntime} from '../src/sdk-browser-runtime.mjs';
+import {verifyWorkspaceRuntime} from '../src/workspace-runtime.mjs';
 import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
 
 const BROWSER_RUNTIME_CSP=[
@@ -74,8 +77,8 @@ async function requestWithHost(instance,requestPath,host){
     });
 }
 
-async function installRuntime(workspaceRoot){
-    const installedRoot=path.join(workspaceRoot,'node_modules','arcane-os');
+async function installRuntime(workspaceRoot,dependencyName=SDK_NAME){
+    const installedRoot=path.join(workspaceRoot,'node_modules',...dependencyName.split('/'));
     for(const directory of ['runtime','browser-runtime']){
         await cp(
             path.join(repositoryRoot,directory),
@@ -98,6 +101,27 @@ async function installRuntime(workspaceRoot){
     for(const license of ['LICENSE','COMMERCIAL-LICENSE.md','NOTICE']){
         await cp(path.join(repositoryRoot,license),path.join(installedRoot,license));
     }
+}
+
+async function configureSdkAlias(workspaceRoot,dependencyName='arcane-sdk'){
+    const packagePath=path.join(workspaceRoot,'package.json');
+    const packageDocument=JSON.parse(await readFile(packagePath,'utf8'));
+    delete packageDocument.devDependencies[SDK_NAME];
+    packageDocument.devDependencies[dependencyName]=`npm:${SDK_NAME}@${SDK_VERSION}`;
+    await writeFile(packagePath,`${JSON.stringify(packageDocument,null,2)}\n`);
+
+    const packageSource=`node_modules/${dependencyName}`;
+    const rootConfigPath=path.join(workspaceRoot,'arcane-packager.json');
+    const rootConfig=JSON.parse(await readFile(rootConfigPath,'utf8'));
+    rootConfig.sharedPayloads['browser-runtime'][1].source=packageSource;
+    await writeFile(rootConfigPath,`${JSON.stringify(rootConfig,null,2)}\n`);
+
+    const lockPath=path.join(workspaceRoot,'arcane.lock.json');
+    const lock=JSON.parse(await readFile(lockPath,'utf8'));
+    lock.runtime.manifest=`${packageSource}/runtime/ARCANE_RUNTIME_RELEASE.json`;
+    lock.sdkBrowserRuntime.manifest=
+        `${packageSource}/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json`;
+    await writeFile(lockPath,`${JSON.stringify(lock,null,2)}\n`);
 }
 
 async function createSdkRuntimeSource(parent,{
@@ -296,6 +320,63 @@ test('source server exposes only the selected app and SDK browser routes',async 
     const changedRuntime=await request(origin,'/arcane/css/theme.css',{cookie});
     assert.equal(changedRuntime.status,500);
     assert.doesNotMatch(await changedRuntime.text(),/tampered workspace runtime bytes/);
+});
+
+test('direct source server fallback consumes the bound npm-alias installation authority',async t=>{
+    const parent=await temporaryDirectory(t,{prefix:'arcane-alias-source-server-'});
+    const workspaceRoot=path.join(parent,'workspace');
+    const appId='alias-served-app';
+    await createWorkspace({targetPath:workspaceRoot,appId});
+    await configureSdkAlias(workspaceRoot);
+    await installRuntime(workspaceRoot,'arcane-sdk');
+
+    const instance=await startDevServer({
+        workspaceRoot,
+        appId,
+        host:'127.0.0.1',
+        port:0
+    });
+    t.after(()=>instance.close());
+    const {origin,cookie}=await authorize(instance);
+    const theme=await request(origin,'/arcane/css/theme.css',{cookie});
+    assert.equal(theme.status,200);
+    assert.match(theme.headers.get('content-type'),/^text\/css/u);
+});
+
+test('source server rejects a supplied workspace receipt after its SDK installation is rebound',async t=>{
+    const parent=await temporaryDirectory(t,{prefix:'arcane-rebound-source-server-'});
+    const workspaceRoot=path.join(parent,'workspace');
+    const appId='rebound-served-app';
+    await createWorkspace({targetPath:workspaceRoot,appId});
+    await installRuntime(workspaceRoot);
+    const canonicalRoot=path.join(workspaceRoot,'node_modules','arcane-os');
+    const runtimeRoot=path.join(canonicalRoot,'runtime');
+    const browserRuntimeRoot=path.join(canonicalRoot,'browser-runtime');
+    const [runtimeReceipt,sdkBrowserRuntimeReceipt]=await Promise.all([
+        verifyRuntime({runtimeRoot}),
+        verifySdkBrowserRuntime({browserRuntimeRoot})
+    ]);
+    const workspaceRuntimeReceipt=await verifyWorkspaceRuntime({
+        workspaceRoot,
+        runtimeRoot,
+        runtimeReceipt,
+        browserRuntimeRoot,
+        sdkBrowserRuntimeReceipt
+    });
+
+    await configureSdkAlias(workspaceRoot);
+    await installRuntime(workspaceRoot,'arcane-sdk');
+    await assert.rejects(
+        startDevServer({
+            workspaceRoot,
+            appId,
+            workspaceRuntimeReceipt,
+            host:'127.0.0.1',
+            port:0
+        }),
+        error=>error?.code==='ARCANE_INTEGRITY_FAILED'
+            &&/receipt sources.*bound SDK installation authority/iu.test(error.message)
+    );
 });
 
 test('explicit SDK runtime source mount is live, narrow, and observable',async t=>{

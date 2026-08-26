@@ -380,11 +380,19 @@ async function preparedWorkspace(options){
         onEvent:options.onEvent
     });
     const external=workspace.workspaceMode==='external';
+    if(external&&(!workspace.sdkInstallation
+        ||typeof workspace.sdkInstallation.runtimeRoot!=='string'
+        ||typeof workspace.sdkInstallation.browserRuntimeRoot!=='string')){
+        throw new ArcaneError(
+            ERROR_CODES.workspaceInvalid,
+            'Validated external workspace is missing its bound SDK installation authority.'
+        );
+    }
     const runtimeRoot=external
-        ?path.join(workspace.workspaceRoot,'node_modules','arcane-os','runtime')
+        ?workspace.sdkInstallation.runtimeRoot
         :workspace.workspaceRoot;
     const browserRuntimeRoot=external
-        ?path.join(workspace.workspaceRoot,'node_modules','arcane-os','browser-runtime')
+        ?workspace.sdkInstallation.browserRuntimeRoot
         :null;
     const runtimeReceipt=external&&!options.deferRuntimeVerification
         ?await verifyRuntime({

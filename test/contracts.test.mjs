@@ -271,6 +271,36 @@ test('lock and target schemas pin the emitted SDK contracts',async t=>{
     await t.test('lock schema pins the current SDK version',()=>{
         assert.equal(lockSchema.properties.sdk.properties.version.const,packageDocument.version);
     });
+    await t.test('lock schema admits safe canonical and npm-alias installation manifest paths',()=>{
+        const runtimeManifest=new RegExp(
+            lockSchema.properties.runtime.properties.manifest.pattern,
+            'u'
+        );
+        const browserManifest=new RegExp(
+            lockSchema.properties.sdkBrowserRuntime.properties.manifest.pattern,
+            'u'
+        );
+        assert.equal(
+            runtimeManifest.test('node_modules/arcane-os/runtime/ARCANE_RUNTIME_RELEASE.json'),
+            true
+        );
+        assert.equal(
+            runtimeManifest.test('node_modules/arcane-sdk/runtime/ARCANE_RUNTIME_RELEASE.json'),
+            true
+        );
+        assert.equal(
+            browserManifest.test(
+                'node_modules/arcane-sdk/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json'
+            ),
+            true
+        );
+        assert.equal(
+            runtimeManifest.test(
+                'node_modules/arcane-sdk/../arcane-os/runtime/ARCANE_RUNTIME_RELEASE.json'
+            ),
+            false
+        );
+    });
 
     const allowedKeys=new Set(Object.keys(targetSchema.properties));
     for(const descriptor of listTargets()){

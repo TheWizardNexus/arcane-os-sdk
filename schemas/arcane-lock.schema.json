@@ -42,7 +42,8 @@
       ],
       "properties": {
         "manifest": {
-          "const": "node_modules/arcane-os/runtime/ARCANE_RUNTIME_RELEASE.json"
+          "type": "string",
+          "pattern": "^node_modules/(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*/runtime/ARCANE_RUNTIME_RELEASE\\.json$"
         },
         "contentSha256": {
           "$ref": "#/$defs/sha256"
@@ -66,7 +67,8 @@
       ],
       "properties": {
         "manifest": {
-          "const": "node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json"
+          "type": "string",
+          "pattern": "^node_modules/(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*/browser-runtime/ARCANE_SDK_BROWSER_RELEASE\\.json$"
         },
         "manifestSha256": {
           "type": "string",

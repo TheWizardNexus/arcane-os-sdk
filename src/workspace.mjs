@@ -2,6 +2,7 @@ import {createHash} from 'node:crypto';
 import {lstat,readFile,readdir,realpath} from 'node:fs/promises';
 import path from 'node:path';
 import {
+    normalizeRelativePath,
     validateAppConfig as validatePackagerAppConfig,
     validateRootConfig as validatePackagerRootConfig
 } from './packager/core.mjs';
@@ -19,6 +20,8 @@ import {
 const APP_ID_PATTERN=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const SHA256_PATTERN=/^[a-f0-9]{64}$/;
 const LOCAL_TARBALL_PATTERN=/^file:.+\.tgz$/iu;
+const NPM_PACKAGE_NAME_PATTERN=/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/u;
+const EXACT_SDK_ALIAS=`npm:${EXPECTED_SDK_NAME}@${EXPECTED_SDK_VERSION}`;
 const ROOT_CONFIG_NAME='arcane-packager.json';
 const APP_CONFIG_NAME='arcane-package.json';
 
@@ -145,10 +148,105 @@ async function assertRealDirectoryIdentity(captured,label){
     }
 }
 
+function sdkPackageSourceForDependency(dependencyName){
+    if(typeof dependencyName!=='string'||dependencyName.length>214
+        ||!NPM_PACKAGE_NAME_PATTERN.test(dependencyName)){
+        fail(`Invalid installed SDK dependency name: ${String(dependencyName)}.`);
+    }
+    const source=`node_modules/${dependencyName}`;
+    try{
+        if(normalizeRelativePath(source,'installed SDK package source')!==source)throw new Error();
+    }catch{
+        fail(`Invalid installed SDK package source for dependency ${dependencyName}.`);
+    }
+    return source;
+}
+
+function dependencyNameForSdkPackageSource(source){
+    if(typeof source!=='string'||!source.startsWith('node_modules/'))return null;
+    const dependencyName=source.slice('node_modules/'.length);
+    try{
+        return sdkPackageSourceForDependency(dependencyName)===source?dependencyName:null;
+    }catch{
+        return null;
+    }
+}
+
+function supportedCanonicalSdkDeclaration(value){
+    return value===EXPECTED_SDK_VERSION
+        ||(typeof value==='string'&&LOCAL_TARBALL_PATTERN.test(value)
+            &&!/[\x00-\x1f\x7f]/.test(value));
+}
+
+export function resolveSdkPackageDeclaration(rootPackage,{
+    allowMissing=false,
+    packageSource
+}={}){
+    if(!isObject(rootPackage))fail('package.json must contain a JSON object.');
+    const candidates=[];
+    for(const groupName of ['devDependencies','dependencies']){
+        const group=rootPackage[groupName];
+        if(group===undefined)continue;
+        if(!isObject(group))fail(`package.json ${groupName} must be a JSON object.`);
+        for(const [dependencyName,specifier] of Object.entries(group)){
+            const canonicalName=dependencyName===EXPECTED_SDK_NAME;
+            const aliasTarget=typeof specifier==='string'
+                &&(specifier===`npm:${EXPECTED_SDK_NAME}`
+                    ||specifier.startsWith(`npm:${EXPECTED_SDK_NAME}@`));
+            if(!canonicalName&&!aliasTarget)continue;
+            const supported=canonicalName
+                ?supportedCanonicalSdkDeclaration(specifier)
+                :specifier===EXACT_SDK_ALIAS;
+            if(!supported){
+                fail(
+                    `package.json ${groupName}.${dependencyName} must be ${EXPECTED_SDK_VERSION}, `
+                    +`a local file: tarball under ${EXPECTED_SDK_NAME}, or the exact npm alias `
+                    +`${EXACT_SDK_ALIAS} under a distinct dependency key.`
+                );
+            }
+            candidates.push(Object.freeze({
+                dependencyName,
+                dependencyGroup:groupName,
+                packageSource:sdkPackageSourceForDependency(dependencyName),
+                specifier
+            }));
+        }
+    }
+    if(candidates.length>1){
+        fail('package.json must declare exactly one Arcane SDK installation; remove duplicate canonical or alias declarations.');
+    }
+    if(candidates.length===0){
+        if(allowMissing&&packageSource===undefined)return null;
+        fail(
+            `package.json must declare exactly one ${EXPECTED_SDK_NAME} installation as `
+            +`${EXPECTED_SDK_VERSION}, a local file: tarball, or the exact npm alias ${EXACT_SDK_ALIAS}.`
+        );
+    }
+    const [declaration]=candidates;
+    if(packageSource!==undefined&&declaration.packageSource!==packageSource){
+        fail(
+            `${ROOT_CONFIG_NAME} SDK license source ${String(packageSource)} does not match `
+            +`the declared SDK installation ${declaration.packageSource}.`
+        );
+    }
+    return declaration;
+}
+
+function sdkManifestPaths(packageSource){
+    return Object.freeze({
+        runtimeManifest:`${packageSource}/runtime/ARCANE_RUNTIME_RELEASE.json`,
+        browserRuntimeManifest:`${packageSource}/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json`
+    });
+}
+
 function classifyRootConfig(config){
     const validated=validatePackagerRootConfig(config,ROOT_CONFIG_NAME);
     const routes=validated.sharedPayloads['browser-runtime'];
     if(!Array.isArray(routes))fail(`${ROOT_CONFIG_NAME} must define browser-runtime routes.`);
+    const externalPackageSource=routes.length===2
+        &&dependencyNameForSdkPackageSource(routes[1]?.source)!==null
+        ?routes[1].source
+        :null;
     const external=[
         {
             source:'arcane',
@@ -156,7 +254,7 @@ function classifyRootConfig(config){
             include:['components','css','dependencies','entities','img','modules','sdk','security']
         },
         {
-            source:'node_modules/arcane-os',
+            source:externalPackageSource,
             destination:'licenses/arcane-os',
             include:['LICENSE','COMMERCIAL-LICENSE.md','NOTICE']
         }
@@ -201,7 +299,12 @@ function classifyRootConfig(config){
     }else{
         fail(`${ROOT_CONFIG_NAME} browser-runtime routes must match the external SDK or integrated Arcane workspace contract.`);
     }
-    return Object.freeze({...validated,workspaceMode,browserRuntimeLayout});
+    return Object.freeze({
+        ...validated,
+        workspaceMode,
+        browserRuntimeLayout,
+        ...(workspaceMode==='external'?{sdkPackageSource:externalPackageSource}:{})
+    });
 }
 
 async function discoverAppsInRoot(root,config){
@@ -307,7 +410,7 @@ export async function resolveWorkspace({workspaceRoot=process.cwd(),appId}={}){
     });
 }
 
-function validateLock(lock){
+function validateLock(lock,sdkDeclaration){
     const browser=lock?.sdkBrowserRuntime;
     const browserSource=browser?.source;
     const dependencies=browserSource?.dependencies;
@@ -340,6 +443,7 @@ function validateLock(lock){
                 &&actual.name===expected.name&&actual.version===expected.version
                 &&actual.resolved===expected.resolved&&actual.integrity===expected.integrity;
         });
+    const manifests=sdkManifestPaths(sdkDeclaration.packageSource);
     if(!exactKeys(lock,['schemaVersion','sdk','runtime','sdkBrowserRuntime','protocols'])
         ||lock.schemaVersion!==1
         ||!exactKeys(lock.sdk,['name','version'])
@@ -347,11 +451,11 @@ function validateLock(lock){
         ||!exactKeys(lock.runtime,['manifest','contentSha256','upstreamCommit'])
         ||!SHA256_PATTERN.test(lock.runtime.contentSha256)
         ||!/^([a-f0-9]{40})$/.test(lock.runtime.upstreamCommit)
-        ||lock.runtime.manifest!=='node_modules/arcane-os/runtime/ARCANE_RUNTIME_RELEASE.json'
+        ||lock.runtime.manifest!==manifests.runtimeManifest
         ||!exactKeys(browser,[
             'manifest','manifestSha256','contentSha256','builder','sdkVersion','source'
         ])
-        ||browser.manifest!=='node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json'
+        ||browser.manifest!==manifests.browserRuntimeManifest
         ||browser.manifestSha256!==SDK_BROWSER_RUNTIME_MANIFEST_SHA256
         ||browser.contentSha256!==SDK_BROWSER_RUNTIME_CONTENT_SHA256
         ||browser.builder!=='arcane-sdk-browser-runtime-v1'
@@ -370,6 +474,43 @@ function validateLock(lock){
         fail('arcane.lock.json is incompatible with this SDK. Run arcane init only after reviewing missing files; existing locks are never overwritten.');
     }
     return lock;
+}
+
+async function resolveInstalledSdkInstallation(workspaceRoot,declaration){
+    let current=workspaceRoot;
+    for(const segment of declaration.packageSource.split('/')){
+        current=path.join(current,segment);
+        await assertRealDirectory(current,`Installed SDK package path ${declaration.packageSource}`);
+    }
+    const canonicalPackageRoot=await realpath(current);
+    if(!sameDirectoryPath(current,canonicalPackageRoot)){
+        fail(`Installed SDK package root must be one direct physical directory: ${current}.`);
+    }
+    const installedPackage=await readJson(
+        path.join(canonicalPackageRoot,'package.json'),
+        'installed SDK package manifest'
+    );
+    if(installedPackage.name!==EXPECTED_SDK_NAME||installedPackage.version!==EXPECTED_SDK_VERSION){
+        fail(`Installed SDK package must identify exactly as ${EXPECTED_SDK_NAME}@${EXPECTED_SDK_VERSION}.`);
+    }
+    const runtimeRoot=path.join(canonicalPackageRoot,'runtime');
+    const browserRuntimeRoot=path.join(canonicalPackageRoot,'browser-runtime');
+    await Promise.all([
+        assertRealDirectory(runtimeRoot,'Installed SDK runtime root'),
+        assertRealDirectory(browserRuntimeRoot,'Installed SDK browser runtime root')
+    ]);
+    const manifests=sdkManifestPaths(declaration.packageSource);
+    return Object.freeze({
+        dependencyName:declaration.dependencyName,
+        packageSource:declaration.packageSource,
+        canonicalPackageRoot,
+        packageName:installedPackage.name,
+        packageVersion:installedPackage.version,
+        runtimeRoot,
+        browserRuntimeRoot,
+        runtimeManifest:manifests.runtimeManifest,
+        browserRuntimeManifest:manifests.browserRuntimeManifest
+    });
 }
 
 function sameBrowserRuntimeSource(actual,pinned){
@@ -585,6 +726,8 @@ export async function validateWorkspace({
         await emit(onEvent,{type:'workspace.validate.check',name,ok:true});
     };
     let lock;
+    let sdkDeclaration;
+    let sdkInstallation;
     let validatedApplication;
     const workspaceMode=resolved.config.workspaceMode;
     await add('workspace-profile',async()=>{
@@ -599,7 +742,14 @@ export async function validateWorkspace({
     });
     if(workspaceMode==='external'){
         await add('lock',async()=>{
-            lock=validateLock(await readJson(path.join(resolved.workspaceRoot,'arcane.lock.json'),'arcane.lock.json'));
+            sdkDeclaration=resolveSdkPackageDeclaration(
+                await readJson(path.join(resolved.workspaceRoot,'package.json'),'package.json'),
+                {packageSource:resolved.config.sdkPackageSource}
+            );
+            lock=validateLock(
+                await readJson(path.join(resolved.workspaceRoot,'arcane.lock.json'),'arcane.lock.json'),
+                sdkDeclaration
+            );
         });
     }
     await add('package',async()=>{
@@ -610,26 +760,31 @@ export async function validateWorkspace({
             }
             return;
         }
-        const configured=rootPackage?.devDependencies?.[EXPECTED_SDK_NAME]
-            ??rootPackage?.dependencies?.[EXPECTED_SDK_NAME];
-        const supported=configured===EXPECTED_SDK_VERSION
-            ||(typeof configured==='string'&&LOCAL_TARBALL_PATTERN.test(configured)
-                &&!/[\x00-\x1f\x7f]/.test(configured));
-        if(rootPackage?.private!==true||rootPackage?.type!=='module'||!supported){
-            fail(`package.json must be private, use modules, and declare ${EXPECTED_SDK_NAME} as ${EXPECTED_SDK_VERSION} or a local file: tarball.`);
+        const declaration=resolveSdkPackageDeclaration(rootPackage,{
+            packageSource:resolved.config.sdkPackageSource
+        });
+        if(rootPackage?.private!==true||rootPackage?.type!=='module'){
+            fail(
+                `package.json must be private, use modules, and declare one exact `
+                +`${EXPECTED_SDK_NAME} installation.`
+            );
+        }
+        if(declaration.dependencyName!==sdkDeclaration.dependencyName
+            ||declaration.dependencyGroup!==sdkDeclaration.dependencyGroup
+            ||declaration.packageSource!==sdkDeclaration.packageSource
+            ||declaration.specifier!==sdkDeclaration.specifier){
+            fail('The declared SDK installation changed after workspace profile inspection.',
+                'ARCANE_INTEGRITY_FAILED');
         }
     });
     if(workspaceMode==='external'){
         await add('installed-runtime',async()=>{
-            const installedPackage=await readJson(
-                path.join(resolved.workspaceRoot,'node_modules','arcane-os','package.json'),
-                'installed SDK package manifest'
+            sdkInstallation=await resolveInstalledSdkInstallation(
+                resolved.workspaceRoot,
+                sdkDeclaration
             );
-            if(installedPackage.name!==EXPECTED_SDK_NAME||installedPackage.version!==EXPECTED_SDK_VERSION){
-                fail(`Installed SDK package must identify exactly as ${EXPECTED_SDK_NAME}@${EXPECTED_SDK_VERSION}.`);
-            }
             const installed=await readJson(
-                path.join(resolved.workspaceRoot,'node_modules','arcane-os','runtime','ARCANE_RUNTIME_RELEASE.json'),
+                path.join(sdkInstallation.runtimeRoot,'ARCANE_RUNTIME_RELEASE.json'),
                 'installed SDK runtime manifest'
             );
             if(installed.contentSha256!==lock.runtime.contentSha256
@@ -637,10 +792,7 @@ export async function validateWorkspace({
                 fail('Installed SDK runtime does not match arcane.lock.json.');
             }
             const browserManifestPath=path.join(
-                resolved.workspaceRoot,
-                'node_modules',
-                'arcane-os',
-                'browser-runtime',
+                sdkInstallation.browserRuntimeRoot,
                 'ARCANE_SDK_BROWSER_RELEASE.json'
             );
             const browserBytes=await readFile(browserManifestPath);
@@ -697,6 +849,7 @@ export async function validateWorkspace({
         config:resolved.config,
         app:validatedApplication.app,
         lock,
+        ...(sdkInstallation?{sdkInstallation}:{}),
         checks:Object.freeze(checks)
     });
     await emit(onEvent,{type:'workspace.validate.completed',workspaceRoot:resolved.workspaceRoot,appId:resolved.appId,checks});

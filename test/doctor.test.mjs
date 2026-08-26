@@ -61,7 +61,7 @@ async function writeTemplateFiles(workspaceRoot,files){
     }
 }
 
-async function externalDoctorWorkspace(t){
+async function externalDoctorWorkspace(t,{dependencyName=SDK_NAME}={}){
     const workspaceRoot=await mkdtemp(path.join(os.tmpdir(),'arcane-doctor-external-'));
     t.after(()=>rm(workspaceRoot,{recursive:true,force:true}));
     const [runtimeReceipt,sdkBrowserRuntimeReceipt]=await Promise.all([
@@ -72,7 +72,12 @@ async function externalDoctorWorkspace(t){
         appId:'doctor-app',
         displayName:'Doctor App',
         runtimeRelease:runtimeReceipt,
-        sdkBrowserRuntimeRelease:sdkBrowserRuntimeReceipt
+        sdkBrowserRuntimeRelease:sdkBrowserRuntimeReceipt,
+        sdkDependencyName:dependencyName,
+        sdkDependencySpecifier:dependencyName===SDK_NAME
+            ?SDK_VERSION
+            :`npm:${SDK_NAME}@${SDK_VERSION}`,
+        sdkPackageSource:`node_modules/${dependencyName}`
     });
     await writeTemplateFiles(workspaceRoot,template.files);
     await materializeWorkspaceRuntime({
@@ -83,7 +88,7 @@ async function externalDoctorWorkspace(t){
         sdkBrowserRuntimeReceipt
     });
 
-    const installedRoot=path.join(workspaceRoot,'node_modules','arcane-os');
+    const installedRoot=path.join(workspaceRoot,'node_modules',...dependencyName.split('/'));
     await mkdir(path.join(installedRoot,'src'),{recursive:true});
     await Promise.all([
         cp(path.join(repositoryRoot,'runtime'),path.join(installedRoot,'runtime'),{recursive:true}),
@@ -324,6 +329,17 @@ test('doctor authenticates both external runtime authorities and their physical 
     assert.match(runtime.details.runtimeContentSha256,/^[a-f0-9]{64}$/u);
     assert.match(runtime.details.browserManifestSha256,/^[a-f0-9]{64}$/u);
     assert.match(runtime.details.browserContentSha256,/^[a-f0-9]{64}$/u);
+});
+
+test('doctor consumes the alias-aware SDK installation authority from workspace validation',async t=>{
+    const {workspaceRoot}=await externalDoctorWorkspace(t,{dependencyName:'arcane-sdk'});
+    const report=await doctor(workspaceRoot);
+    const [workspace,runtime]=workspaceChecks(report);
+
+    assert.equal(report.ok,true,JSON.stringify(report.checks,null,2));
+    assert.equal(workspace.status,'pass');
+    assert.equal(workspace.details.workspaceMode,'external');
+    assert.equal(runtime.status,'pass');
 });
 
 test('doctor fails closed on missing, corrupt, or unadmitted installed SDK browser authority',async t=>{

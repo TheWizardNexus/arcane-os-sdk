@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {cp,lstat,mkdir,readFile,readdir,rm,unlink,writeFile} from 'node:fs/promises';
+import {cp,lstat,mkdir,readFile,readdir,rm,symlink,unlink,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {createWorkspace} from '../src/scaffold.mjs';
+import {SDK_NAME,SDK_VERSION} from '../src/constants.mjs';
 import {verifyRuntime} from '../src/runtime.mjs';
 import {verifySdkBrowserRuntime} from '../src/sdk-browser-runtime.mjs';
 import {verifyWorkspaceRuntime} from '../src/workspace-runtime.mjs';
+import {validateWorkspace} from '../src/workspace.mjs';
 import {
     authenticateAppReleaseReceipt,
     normalizeRelativePath,
@@ -121,8 +123,8 @@ async function snapshotRelease(workspaceRoot){
     return {manifest,entry};
 }
 
-async function installSdkRuntime(workspaceRoot){
-    const installedRoot=path.join(workspaceRoot,'node_modules','arcane-os');
+async function installSdkRuntime(workspaceRoot,dependencyName=SDK_NAME){
+    const installedRoot=path.join(workspaceRoot,'node_modules',...dependencyName.split('/'));
     await mkdir(path.join(installedRoot,'src'),{recursive:true});
     await Promise.all([
         cp(
@@ -158,6 +160,27 @@ async function installSdkRuntime(workspaceRoot){
     for(const license of ['LICENSE','COMMERCIAL-LICENSE.md','NOTICE']){
         await cp(path.join(repositoryRoot,license),path.join(installedRoot,license));
     }
+}
+
+async function configureSdkAlias(workspaceRoot,dependencyName='arcane-sdk'){
+    const packagePath=path.join(workspaceRoot,'package.json');
+    const packageDocument=JSON.parse(await readFile(packagePath,'utf8'));
+    delete packageDocument.devDependencies[SDK_NAME];
+    packageDocument.devDependencies[dependencyName]=`npm:${SDK_NAME}@${SDK_VERSION}`;
+    await writeJson(packagePath,packageDocument);
+
+    const packageSource=`node_modules/${dependencyName}`;
+    const rootConfigPath=path.join(workspaceRoot,'arcane-packager.json');
+    const rootConfig=JSON.parse(await readFile(rootConfigPath,'utf8'));
+    rootConfig.sharedPayloads['browser-runtime'][1].source=packageSource;
+    await writeJson(rootConfigPath,rootConfig);
+
+    const lockPath=path.join(workspaceRoot,'arcane.lock.json');
+    const lock=JSON.parse(await readFile(lockPath,'utf8'));
+    lock.runtime.manifest=`${packageSource}/runtime/ARCANE_RUNTIME_RELEASE.json`;
+    lock.sdkBrowserRuntime.manifest=
+        `${packageSource}/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json`;
+    await writeJson(lockPath,lock);
 }
 
 async function authenticatedWorkspace(t,{prefix,appId}){
@@ -314,6 +337,67 @@ test('external workspace packages deterministically and detects release tamperin
     await assert.rejects(
         verifyApp({workspaceRoot,appId:'fixture-app'}),
         /hash|integrity|inventory|bytes|release/i
+    );
+});
+
+test('workspace validation and packaging bind one exact npm alias installation authority',async t=>{
+    const appId='alias-authority-app';
+    const parent=await temporaryDirectory(t,{prefix:'arcane-sdk-alias-package-'});
+    const workspaceRoot=path.join(parent,'workspace');
+    await createWorkspace({targetPath:workspaceRoot,appId});
+    await configureSdkAlias(workspaceRoot);
+    await installSdkRuntime(workspaceRoot,'arcane-sdk');
+
+    const validation=await validateWorkspace({workspaceRoot,appId});
+    const installedRoot=path.join(workspaceRoot,'node_modules','arcane-sdk');
+    assert.equal(validation.sdkInstallation.dependencyName,'arcane-sdk');
+    assert.equal(validation.sdkInstallation.packageSource,'node_modules/arcane-sdk');
+    assert.equal(validation.sdkInstallation.canonicalPackageRoot,installedRoot);
+    assert.equal(validation.sdkInstallation.packageName,SDK_NAME);
+    assert.equal(validation.sdkInstallation.packageVersion,SDK_VERSION);
+    assert.equal(validation.sdkInstallation.runtimeRoot,path.join(installedRoot,'runtime'));
+    assert.equal(
+        validation.sdkInstallation.browserRuntimeRoot,
+        path.join(installedRoot,'browser-runtime')
+    );
+    assert.equal(
+        validation.sdkInstallation.runtimeManifest,
+        'node_modules/arcane-sdk/runtime/ARCANE_RUNTIME_RELEASE.json'
+    );
+    assert.equal(
+        validation.sdkInstallation.browserRuntimeManifest,
+        'node_modules/arcane-sdk/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json'
+    );
+
+    const packaged=await packageApplication({workspaceRoot,appId});
+    assert.equal(packaged.workspaceMode,'external');
+    assert.ok(packaged.release.receipt.files.some(
+        file=>file.path==='licenses/arcane-os/LICENSE'
+    ));
+    assert.equal(
+        await readFile(path.join(workspaceRoot,'dist',appId,'licenses','arcane-os','LICENSE'),'utf8'),
+        await readFile(path.join(repositoryRoot,'LICENSE'),'utf8')
+    );
+});
+
+test('workspace validation rejects a linked npm-alias installation root',async t=>{
+    const appId='linked-alias-app';
+    const parent=await temporaryDirectory(t,{prefix:'arcane-sdk-linked-alias-'});
+    const workspaceRoot=path.join(parent,'workspace');
+    await createWorkspace({targetPath:workspaceRoot,appId});
+    await configureSdkAlias(workspaceRoot);
+    const physicalRoot=path.join(parent,'physical-sdk');
+    await installSdkRuntime(physicalRoot,'arcane-sdk');
+    await mkdir(path.join(workspaceRoot,'node_modules'),{recursive:true});
+    await symlink(
+        path.join(physicalRoot,'node_modules','arcane-sdk'),
+        path.join(workspaceRoot,'node_modules','arcane-sdk'),
+        process.platform==='win32'?'junction':'dir'
+    );
+
+    await assert.rejects(
+        validateWorkspace({workspaceRoot,appId}),
+        /must be a real directory/u
     );
 });
 

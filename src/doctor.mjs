@@ -290,9 +290,7 @@ export async function runDoctor({
             ));
         }else if(result.workspaceMode==='external'){
             try{
-                const installedRoot=path.join(result.workspaceRoot,'node_modules','arcane-os');
-                const runtimeRoot=path.join(installedRoot,'runtime');
-                const browserRuntimeRoot=path.join(installedRoot,'browser-runtime');
+                const {runtimeRoot,browserRuntimeRoot}=result.sdkInstallation;
                 const runtimeReceipt=await verifyRuntime({runtimeRoot,signal,onEvent});
                 const sdkBrowserRuntimeReceipt=await verifySdkBrowserRuntime({
                     browserRuntimeRoot,

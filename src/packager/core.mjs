@@ -1182,15 +1182,30 @@ async function integratedWorkspaceCandidate(context){
     return document.value?.name==='arcane-os'&&document.value?.type==='module';
 }
 
-function packageRuntimeLocations(context){
-    const installedRoot=path.join(context.workspaceRoot,'node_modules','arcane-os');
+function packageRuntimeLocations(context,validation){
+    const installation=validation?.sdkInstallation;
+    const licenseRoute=context.rootConfig.sharedPayloads['browser-runtime']?.find(
+        route=>route.destination==='licenses/arcane-os'
+    );
+    if(validation?.workspaceMode!=='external'||!isPlainObject(installation)
+        ||typeof installation.packageSource!=='string'
+        ||typeof installation.canonicalPackageRoot!=='string'
+        ||typeof installation.runtimeRoot!=='string'
+        ||typeof installation.browserRuntimeRoot!=='string'
+        ||licenseRoute?.source!==installation.packageSource
+        ||path.resolve(installation.runtimeRoot)
+            !==path.join(path.resolve(installation.canonicalPackageRoot),'runtime')
+        ||path.resolve(installation.browserRuntimeRoot)
+            !==path.join(path.resolve(installation.canonicalPackageRoot),'browser-runtime')){
+        fail('External workspace validation did not return its bound SDK installation authority.');
+    }
     return Object.freeze({
-        runtimeRoot:path.join(installedRoot,'runtime'),
-        browserRuntimeRoot:path.join(installedRoot,'browser-runtime')
+        runtimeRoot:installation.runtimeRoot,
+        browserRuntimeRoot:installation.browserRuntimeRoot
     });
 }
 
-async function authenticatePackageRuntimeVerificationState(context,state,{signal}={}){
+async function authenticatePackageRuntimeVerificationState(context,state,{signal,validation}={}){
     assertOnlyKeys(
         state,
         new Set(['runtimeReceipt','sdkBrowserRuntimeReceipt','workspaceRuntimeReceipt']),
@@ -1211,7 +1226,7 @@ async function authenticatePackageRuntimeVerificationState(context,state,{signal
         ||!snapshot.workspaceRuntimeReceipt){
         fail('The runtime verification state must contain all three authenticated receipts.');
     }
-    const {runtimeRoot,browserRuntimeRoot}=packageRuntimeLocations(context);
+    const {runtimeRoot,browserRuntimeRoot}=packageRuntimeLocations(context,validation);
     await authenticateRuntimeReceipt(snapshot.runtimeReceipt,{runtimeRoot,signal});
     await authenticateSdkBrowserRuntimeReceipt(snapshot.sdkBrowserRuntimeReceipt,{
         browserRuntimeRoot,
@@ -1254,8 +1269,8 @@ async function authenticatePackageRuntimeVerificationState(context,state,{signal
     return snapshot;
 }
 
-async function issuePackageRuntimeVerificationState(context,{signal,onEvent}={}){
-    const {runtimeRoot,browserRuntimeRoot}=packageRuntimeLocations(context);
+async function issuePackageRuntimeVerificationState(context,{signal,onEvent,validation}={}){
+    const {runtimeRoot,browserRuntimeRoot}=packageRuntimeLocations(context,validation);
     const [runtimeReceipt,sdkBrowserRuntimeReceipt]=await Promise.all([
         verifyRuntime({runtimeRoot,signal,onEvent}),
         verifySdkBrowserRuntime({browserRuntimeRoot,signal,onEvent})
@@ -1356,11 +1371,11 @@ async function refreshPackageImportMap(context,{
     let authenticatedRuntimeState=null;
     if(validation.workspaceMode==='external'){
         authenticatedRuntimeState=runtimeVerificationState===undefined
-            ?await issuePackageRuntimeVerificationState(context,{signal,onEvent})
+            ?await issuePackageRuntimeVerificationState(context,{signal,onEvent,validation})
             :await authenticatePackageRuntimeVerificationState(
                 context,
                 runtimeVerificationState,
-                {signal}
+                {signal,validation}
             );
         workspaceRuntimeReceipt=authenticatedRuntimeState.workspaceRuntimeReceipt;
     }
@@ -1556,7 +1571,7 @@ async function prepareRuntimeAuthorityState(context,{
         }
         return null;
     }
-    await validateExternalRuntimeAdmission(context,{signal,onEvent});
+    const workspaceValidation=await validateExternalRuntimeAdmission(context,{signal,onEvent});
 
     let verificationState=null;
     let receipt=null;
@@ -1564,7 +1579,7 @@ async function prepareRuntimeAuthorityState(context,{
         verificationState=await authenticatePackageRuntimeVerificationState(
             context,
             runtimeVerificationState,
-            {signal}
+            {signal,validation:workspaceValidation}
         );
         receipt=verificationState.workspaceRuntimeReceipt;
     }else if(validation?.kind==='arcane-workspace-runtime-verification'){
@@ -1574,7 +1589,11 @@ async function prepareRuntimeAuthorityState(context,{
             signal
         });
     }else{
-        verificationState=await issuePackageRuntimeVerificationState(context,{signal,onEvent});
+        verificationState=await issuePackageRuntimeVerificationState(context,{
+            signal,
+            onEvent,
+            validation:workspaceValidation
+        });
         receipt=verificationState.workspaceRuntimeReceipt;
     }
     return Object.freeze({
@@ -1595,12 +1614,12 @@ async function authenticateRuntimeAuthorityState(context,state,{signal,onEvent}=
     if(!await hasExternalRuntimeAdmission(context)){
         fail('External runtime authority admission disappeared during package verification.');
     }
-    await validateExternalRuntimeAdmission(context,{signal,onEvent});
+    const workspaceValidation=await validateExternalRuntimeAdmission(context,{signal,onEvent});
     if(state.verificationState){
         await authenticatePackageRuntimeVerificationState(
             context,
             state.verificationState,
-            {signal}
+            {signal,validation:workspaceValidation}
         );
     }else{
         await authenticateWorkspaceRuntimeReceipt(state.receipt,{
@@ -3366,10 +3385,14 @@ export async function packageApp(options){
             if(!await hasExternalRuntimeAdmission(context)){
                 fail('A runtime verification state cannot be supplied to an integrated workspace.');
             }
+            const validation=await validateExternalRuntimeAdmission(context,{
+                signal:options?.signal,
+                onEvent:options?.onEvent
+            });
             await authenticatePackageRuntimeVerificationState(
                 context,
                 options.runtimeVerificationState,
-                {signal:options?.signal}
+                {signal:options?.signal,validation}
             );
         }
         return packageAppUnlocked({...options,context,authenticatedSharedPayloadState});

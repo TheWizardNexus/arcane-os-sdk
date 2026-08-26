@@ -455,6 +455,174 @@ test('init preserves a supported local SDK tarball declaration',async t=>{
     assert.equal(result.devDependencies['arcane-os'],'file:../sdk-artifacts/arcane-os-0.1.0-dev.0.tgz');
 });
 
+test('init preserves one exact npm alias and derives its package routes and lock paths',async t=>{
+    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-sdk-alias-init-'});
+    await writeFile(path.join(workspaceRoot,'package.json'),`${JSON.stringify({
+        name:'alias-sdk-app',
+        private:true,
+        type:'module',
+        devDependencies:{'arcane-sdk':`npm:arcane-os@${SDK_VERSION}`}
+    },null,2)}\n`);
+
+    await initWorkspace({workspaceRoot,appId:'alias-sdk-app'});
+
+    const packageDocument=JSON.parse(await readFile(path.join(workspaceRoot,'package.json'),'utf8'));
+    assert.equal(packageDocument.devDependencies['arcane-sdk'],`npm:arcane-os@${SDK_VERSION}`);
+    assert.equal(Object.hasOwn(packageDocument.devDependencies,'arcane-os'),false);
+    const packager=JSON.parse(await readFile(path.join(workspaceRoot,'arcane-packager.json'),'utf8'));
+    assert.equal(
+        packager.sharedPayloads['browser-runtime'][1].source,
+        'node_modules/arcane-sdk'
+    );
+    const lock=JSON.parse(await readFile(path.join(workspaceRoot,'arcane.lock.json'),'utf8'));
+    assert.equal(
+        lock.runtime.manifest,
+        'node_modules/arcane-sdk/runtime/ARCANE_RUNTIME_RELEASE.json'
+    );
+    assert.equal(
+        lock.sdkBrowserRuntime.manifest,
+        'node_modules/arcane-sdk/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json'
+    );
+});
+
+test('init rejects multiple qualifying SDK installation declarations without creating template files',async t=>{
+    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-sdk-duplicate-init-'});
+    await writeFile(path.join(workspaceRoot,'package.json'),`${JSON.stringify({
+        name:'duplicate-sdk-app',
+        private:true,
+        type:'module',
+        devDependencies:{
+            'arcane-os':SDK_VERSION,
+            'arcane-sdk':`npm:arcane-os@${SDK_VERSION}`
+        }
+    },null,2)}\n`);
+
+    await assert.rejects(
+        initWorkspace({workspaceRoot,appId:'duplicate-sdk-app'}),
+        /exactly one Arcane SDK installation/u
+    );
+    await assert.rejects(
+        lstat(path.join(workspaceRoot,'arcane-packager.json')),
+        error=>error?.code==='ENOENT'
+    );
+});
+
+test('init rejects an npm alias that does not target the exact SDK version',async t=>{
+    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-sdk-inexact-alias-init-'});
+    await writeFile(path.join(workspaceRoot,'package.json'),`${JSON.stringify({
+        name:'inexact-sdk-app',
+        private:true,
+        type:'module',
+        devDependencies:{'arcane-sdk':`npm:arcane-os@^${SDK_VERSION}`}
+    },null,2)}\n`);
+
+    await assert.rejects(
+        initWorkspace({workspaceRoot,appId:'inexact-sdk-app'}),
+        /exact npm alias/u
+    );
+    await assert.rejects(
+        lstat(path.join(workspaceRoot,'arcane-packager.json')),
+        error=>error?.code==='ENOENT'
+    );
+});
+
+test('init rejects a versionless npm alias even beside an exact canonical SDK declaration',async t=>{
+    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-sdk-versionless-alias-init-'});
+    await writeFile(path.join(workspaceRoot,'package.json'),`${JSON.stringify({
+        name:'versionless-alias-sdk-app',
+        private:true,
+        type:'module',
+        devDependencies:{
+            'arcane-os':SDK_VERSION,
+            'arcane-sdk':'npm:arcane-os'
+        }
+    },null,2)}\n`);
+
+    await assert.rejects(
+        initWorkspace({workspaceRoot,appId:'versionless-alias-sdk-app'}),
+        /exact npm alias/u
+    );
+    await assert.rejects(
+        lstat(path.join(workspaceRoot,'arcane-packager.json')),
+        error=>error?.code==='ENOENT'
+    );
+});
+
+test('init rejects an npm alias declared under the canonical SDK dependency key',async t=>{
+    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-sdk-canonical-alias-init-'});
+    await writeFile(path.join(workspaceRoot,'package.json'),`${JSON.stringify({
+        name:'canonical-alias-sdk-app',
+        private:true,
+        type:'module',
+        devDependencies:{'arcane-os':`npm:arcane-os@${SDK_VERSION}`}
+    },null,2)}\n`);
+
+    await assert.rejects(
+        initWorkspace({workspaceRoot,appId:'canonical-alias-sdk-app'}),
+        /distinct dependency key/u
+    );
+    await assert.rejects(
+        lstat(path.join(workspaceRoot,'arcane-packager.json')),
+        error=>error?.code==='ENOENT'
+    );
+});
+
+test('init binds an existing external package route before defaulting a missing SDK declaration',async t=>{
+    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-sdk-bound-alias-init-'});
+    const [runtimeRelease,sdkBrowserRuntimeRelease]=await Promise.all([
+        verifyRuntime(),
+        verifySdkBrowserRuntime()
+    ]);
+    const generated=workspaceTemplate({
+        appId:'bound-alias-sdk-app',
+        runtimeRelease,
+        sdkBrowserRuntimeRelease,
+        sdkDependencyName:'arcane-sdk',
+        sdkDependencySpecifier:`npm:arcane-os@${SDK_VERSION}`,
+        sdkPackageSource:'node_modules/arcane-sdk'
+    });
+    await writeFile(
+        path.join(workspaceRoot,'arcane-packager.json'),
+        generated.files.get('arcane-packager.json')
+    );
+    const packageSource=`${JSON.stringify({
+        name:'bound-alias-sdk-app',
+        private:true,
+        type:'module',
+        devDependencies:{}
+    },null,2)}\n`;
+    const packagePath=path.join(workspaceRoot,'package.json');
+    await writeFile(packagePath,packageSource);
+
+    await assert.rejects(
+        initWorkspace({workspaceRoot,appId:'bound-alias-sdk-app'}),
+        /must declare exactly one arcane-os installation/u
+    );
+    assert.equal(await readFile(packagePath,'utf8'),packageSource);
+    await assert.rejects(
+        lstat(path.join(workspaceRoot,'arcane.lock.json')),
+        error=>error?.code==='ENOENT'
+    );
+});
+
+test('workspace template rejects an npm alias under the canonical SDK dependency key',async()=>{
+    const [runtimeRelease,sdkBrowserRuntimeRelease]=await Promise.all([
+        verifyRuntime(),
+        verifySdkBrowserRuntime()
+    ]);
+    assert.throws(
+        ()=>workspaceTemplate({
+            appId:'canonical-alias-template-app',
+            runtimeRelease,
+            sdkBrowserRuntimeRelease,
+            sdkDependencyName:'arcane-os',
+            sdkDependencySpecifier:`npm:arcane-os@${SDK_VERSION}`,
+            sdkPackageSource:'node_modules/arcane-os'
+        }),
+        /Invalid scaffold SDK installation authority/u
+    );
+});
+
 test('init adds only app-owned files to an integrated Arcane workspace',async t=>{
     const workspaceRoot=await temporaryDirectory(t);
     const rootPackage={

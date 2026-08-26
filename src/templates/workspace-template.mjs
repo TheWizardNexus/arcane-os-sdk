@@ -4,6 +4,9 @@ import {
     SDK_BROWSER_RUNTIME_MANIFEST_SHA256
 } from '../sdk-browser-runtime.mjs';
 
+const NPM_PACKAGE_NAME_PATTERN=/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/u;
+const LOCAL_TARBALL_PATTERN=/^file:.+\.tgz$/iu;
+
 function json(value){
     return `${JSON.stringify(value,null,2)}\n`;
 }
@@ -28,12 +31,28 @@ export function workspaceTemplate({
     displayName,
     runtimeRelease,
     sdkBrowserRuntimeRelease,
+    sdkDependencyName=SDK_NAME,
+    sdkDependencySpecifier=SDK_VERSION,
+    sdkPackageSource=`node_modules/${sdkDependencyName}`,
     appOnly=false,
     namedImports=true,
     minimumCoreVersion='0.8.12',
     target='browser',
     appIcon
 }){
+    const canonicalSpecifier=sdkDependencyName===SDK_NAME
+        &&(sdkDependencySpecifier===SDK_VERSION
+            ||(typeof sdkDependencySpecifier==='string'
+                &&LOCAL_TARBALL_PATTERN.test(sdkDependencySpecifier)
+                &&!/[\x00-\x1f\x7f]/.test(sdkDependencySpecifier)));
+    const aliasSpecifier=sdkDependencyName!==SDK_NAME
+        &&sdkDependencySpecifier===`npm:${SDK_NAME}@${SDK_VERSION}`;
+    if(typeof sdkDependencyName!=='string'||sdkDependencyName.length>214
+        ||!NPM_PACKAGE_NAME_PATTERN.test(sdkDependencyName)
+        ||sdkPackageSource!==`node_modules/${sdkDependencyName}`
+        ||(!canonicalSpecifier&&!aliasSpecifier)){
+        throw new Error('Invalid scaffold SDK installation authority.');
+    }
     const supportedTargets=['browser','portable','windows-x64','linux-x64','linux-arm64','android-arm64'];
     if(!supportedTargets.includes(target)){
         throw new Error(`Unsupported scaffold target: ${String(target)}.`);
@@ -222,7 +241,7 @@ Every browser release also carries Arcane OS licensing material under \`licenses
             }:{})
         },
         devDependencies:{
-            [SDK_NAME]:SDK_VERSION
+            [sdkDependencyName]:sdkDependencySpecifier
         },
         engines:{node:'>=22.23.2'}
     }));
@@ -239,7 +258,7 @@ Every browser release also carries Arcane OS licensing material under \`licenses
                     exclude:[]
                 },
                 {
-                    source:'node_modules/arcane-os',
+                    source:sdkPackageSource,
                     destination:'licenses/arcane-os',
                     include:['LICENSE','COMMERCIAL-LICENSE.md','NOTICE'],
                     exclude:[]
@@ -251,12 +270,12 @@ Every browser release also carries Arcane OS licensing material under \`licenses
         schemaVersion:1,
         sdk:{name:SDK_NAME,version:SDK_VERSION},
         runtime:{
-            manifest:'node_modules/arcane-os/runtime/ARCANE_RUNTIME_RELEASE.json',
+            manifest:`${sdkPackageSource}/runtime/ARCANE_RUNTIME_RELEASE.json`,
             contentSha256:runtimeContentSha256,
             upstreamCommit
         },
         sdkBrowserRuntime:{
-            manifest:'node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json',
+            manifest:`${sdkPackageSource}/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json`,
             manifestSha256:browserManifestSha256,
             contentSha256:browserContentSha256,
             builder:sdkBrowserRuntimeRelease?.builder,

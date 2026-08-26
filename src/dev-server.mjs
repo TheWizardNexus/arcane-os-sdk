@@ -15,7 +15,7 @@ import {
 } from './workspace-runtime.mjs';
 import {verifyRuntime} from './runtime.mjs';
 import {verifySdkBrowserRuntime} from './sdk-browser-runtime.mjs';
-import {resolveWorkspace} from './workspace.mjs';
+import {resolveWorkspace,validateWorkspace} from './workspace.mjs';
 import {createEventQueue} from './event-queue.mjs';
 import {SDK_NAME,SDK_VERSION} from './constants.mjs';
 
@@ -570,24 +570,29 @@ async function sourceRoutes(workspaceRoot,appId,{
         };
     }
     const runtimeRoot=path.join(resolved.workspaceRoot,'arcane');
+    const validation=await validateWorkspace({
+        workspaceRoot:resolved.workspaceRoot,
+        appId:resolved.appId,
+        allowMissingManagedImportMap:true,
+        signal
+    });
+    const sdkInstallation=validation.sdkInstallation;
+    if(!sdkInstallation
+        ||typeof sdkInstallation.runtimeRoot!=='string'
+        ||typeof sdkInstallation.browserRuntimeRoot!=='string'){
+        fail(
+            'Validated external workspace is missing its bound SDK installation authority.',
+            'ARCANE_WORKSPACE_INVALID'
+        );
+    }
     let verified=workspaceRuntimeReceipt;
     if(!verified){
-        const sdkRuntimeRoot=path.join(
-            resolved.workspaceRoot,
-            'node_modules',
-            'arcane-os',
-            'runtime'
-        );
+        const sdkRuntimeRoot=sdkInstallation.runtimeRoot;
         const sdkRuntimeReceipt=await verifyRuntime({
             runtimeRoot:sdkRuntimeRoot,
             signal
         });
-        const sdkBrowserRuntimeRoot=path.join(
-            resolved.workspaceRoot,
-            'node_modules',
-            'arcane-os',
-            'browser-runtime'
-        );
+        const sdkBrowserRuntimeRoot=sdkInstallation.browserRuntimeRoot;
         const sdkBrowserRuntimeReceipt=await verifySdkBrowserRuntime({
             browserRuntimeRoot:sdkBrowserRuntimeRoot,
             signal
@@ -605,6 +610,17 @@ async function sourceRoutes(workspaceRoot,appId,{
         workspaceRoot:resolved.workspaceRoot,
         signal
     });
+    if(typeof verified.sourceRuntimeLocation!=='string'
+        ||typeof verified.sourceBrowserRuntimeLocation!=='string'
+        ||canonicalLocationKey(verified.sourceRuntimeLocation)
+            !==canonicalLocationKey(sdkInstallation.runtimeRoot)
+        ||canonicalLocationKey(verified.sourceBrowserRuntimeLocation)
+            !==canonicalLocationKey(sdkInstallation.browserRuntimeRoot)){
+        fail(
+            'Workspace runtime receipt sources do not match the bound SDK installation authority.',
+            'ARCANE_INTEGRITY_FAILED'
+        );
+    }
     const arcaneIdentities=identityMap(verified.identities);
     return {
         workspaceRoot:resolved.workspaceRoot,
