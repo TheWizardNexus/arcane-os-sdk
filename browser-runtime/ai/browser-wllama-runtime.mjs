@@ -205,24 +205,30 @@ function verifyProjectedTelemetry(value) {
 function admittedLoadEvidence(logs, projected) {
   const worker = projected.worker;
   const offload = logs.offload;
-  if (
-    logs.invalid
-    || !logs.adapter
-    || !offload
-    || !Number.isSafeInteger(offload.layers)
+  const failures = [];
+  if (logs.invalid) failures.push("conflicting-log-evidence");
+  if (!logs.adapter) failures.push("adapter-log");
+  if (!offload) failures.push("offload-log");
+  else if (
+    !Number.isSafeInteger(offload.layers)
     || !Number.isSafeInteger(offload.totalLayers)
     || offload.totalLayers < 1
-    || offload.layers !== offload.totalLayers
-    || worker.bufferCount < 1
-    || worker.bufferBytes < 1
-    || worker.queueSubmissions < 1
-    || worker.commandBuffers < 1
-    || worker.queueFenceRequests < 1
-    || worker.queueFenceCompletions < worker.queueFenceRequests
-  ) {
+  ) failures.push("offload-shape");
+  else if (offload.layers !== offload.totalLayers) {
+    failures.push(`full-offload(${offload.layers}/${offload.totalLayers})`);
+  }
+  if (worker.bufferCount < 1) failures.push(`buffer-count(${worker.bufferCount})`);
+  if (worker.bufferBytes < 1) failures.push(`buffer-bytes(${worker.bufferBytes})`);
+  if (worker.queueSubmissions < 1) failures.push(`queue-submissions(${worker.queueSubmissions})`);
+  if (worker.commandBuffers < 1) failures.push(`command-buffers(${worker.commandBuffers})`);
+  if (worker.queueFenceRequests < 1) failures.push(`fence-requests(${worker.queueFenceRequests})`);
+  if (worker.queueFenceCompletions < worker.queueFenceRequests) {
+    failures.push(`fence-completions(${worker.queueFenceCompletions}/${worker.queueFenceRequests})`);
+  }
+  if (failures.length > 0) {
     throw runtimeFailure(
       "ARCANE_AI_WEBGPU_REQUIRED",
-      "Wllama did not produce complete, conflict-free WebGPU adapter, full-offload, and buffer evidence.",
+      `Wllama WebGPU admission failed: ${failures.join(", ")}.`,
     );
   }
   return deepFreeze({
