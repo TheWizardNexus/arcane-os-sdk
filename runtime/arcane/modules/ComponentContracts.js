@@ -1,4 +1,78 @@
+import {
+    createArcaneEventSource,
+    projectArcaneDOMEvent
+} from 'arcane-os/event-manager';
+
 const own=(value,key)=>Object.prototype.hasOwnProperty.call(value,key);
+
+const STT_ACTIVATION_EVENT_TYPES=Object.freeze({
+    error:'speech-stt-activation-error',
+    request:'speech-stt-activation-request'
+});
+
+const STT_ACTIVATION_ERROR_CODES=Object.freeze({
+    buttonInvalid:'ARCANE_STT_ACTIVATION_BUTTON_INVALID',
+    buttonListenerFailed:'ARCANE_STT_ACTIVATION_BUTTON_LISTENER_FAILED',
+    domProjectionUnavailable:'ARCANE_STT_ACTIVATION_DOM_PROJECTION_UNAVAILABLE',
+    eventClassInvalid:'ARCANE_STT_ACTIVATION_EVENT_CLASS_INVALID',
+    eventSourceInvalid:'ARCANE_STT_ACTIVATION_EVENT_SOURCE_INVALID',
+    hostInvalid:'ARCANE_STT_ACTIVATION_HOST_INVALID',
+    onChangeInvalid:'ARCANE_STT_ACTIVATION_ON_CHANGE_INVALID',
+    presentationCallbackFailed:'ARCANE_STT_ACTIVATION_PRESENTATION_CALLBACK_FAILED',
+    requestRejected:'ARCANE_STT_ACTIVATION_REQUEST_REJECTED'
+});
+
+const STT_ACTIVATION_REASONS=Object.freeze({
+    explicitRequest:'explicit-request',
+    presentationCallbackThrew:'activation-presentation-callback-threw',
+    requestRejected:'activation-request-rejected'
+});
+
+function codedError(message,code,ErrorClass=Error,cause){
+    const error=new ErrorClass(message);
+    error.code=code;
+    if(cause!==undefined){
+        error.cause=cause;
+    }
+    return error;
+}
+
+function projectSTTActivationEvent(
+    host,
+    occurrence,
+    EventClass,
+    options={}
+){
+    if(typeof globalThis.CustomEvent!=='function'){
+        throw codedError(
+            'The STT activation DOM compatibility projection requires CustomEvent.',
+            STT_ACTIVATION_ERROR_CODES.domProjectionUnavailable
+        );
+    }
+    if(EventClass===globalThis.CustomEvent){
+        return projectArcaneDOMEvent(host,occurrence,options);
+    }
+    const compatibilityTarget={
+        dispatchEvent(projectedEvent){
+            const event=new EventClass(
+                projectedEvent.type,
+                {
+                    detail:projectedEvent.detail,
+                    bubbles:projectedEvent.bubbles,
+                    composed:projectedEvent.composed,
+                    cancelable:projectedEvent.cancelable
+                }
+            );
+            const accepted=host.dispatchEvent(event)!==false
+                &&!event.defaultPrevented;
+            if(!accepted&&projectedEvent.cancelable){
+                projectedEvent.preventDefault();
+            }
+            return accepted;
+        }
+    };
+    return projectArcaneDOMEvent(compatibilityTarget,occurrence,options);
+}
 
 function record(value,label){
     if(value===undefined){
@@ -331,12 +405,66 @@ function createSTTActivationController({
     host,
     button,
     onChange,
-    EventClass=CustomEvent
+    EventClass=globalThis.CustomEvent,
+    eventSource=null
 }){
+    if(!host||typeof host.dispatchEvent!=='function'
+        ||typeof host.requestSTTActivation!=='function'){
+        throw codedError(
+            'The STT activation host must provide dispatchEvent() and requestSTTActivation().',
+            STT_ACTIVATION_ERROR_CODES.hostInvalid,
+            TypeError
+        );
+    }
+    if(typeof EventClass!=='function'){
+        throw codedError(
+            'The STT activation event class must be a constructor.',
+            STT_ACTIVATION_ERROR_CODES.eventClassInvalid,
+            TypeError
+        );
+    }
+    if(!button
+        ||typeof button.addEventListener!=='function'
+        ||typeof button.removeEventListener!=='function'){
+        throw codedError(
+            'The STT activation button must provide addEventListener() and removeEventListener().',
+            STT_ACTIVATION_ERROR_CODES.buttonInvalid,
+            TypeError
+        );
+    }
+    if(typeof onChange!=='function'){
+        throw codedError(
+            'The STT activation onChange callback must be a function.',
+            STT_ACTIVATION_ERROR_CODES.onChangeInvalid,
+            TypeError
+        );
+    }
+    if(eventSource!==null
+        &&(
+            typeof eventSource!=='object'
+            ||typeof eventSource.dispatch!=='function'
+            ||typeof eventSource.dispose!=='function'
+            ||typeof eventSource.instanceId!=='string'
+        )){
+        throw codedError(
+            'The STT activation event source must be a compatible Arcane event source.',
+            STT_ACTIVATION_ERROR_CODES.eventSourceInvalid,
+            TypeError
+        );
+    }
+    const ownsEventSource=eventSource===null;
+    const events=eventSource||createArcaneEventSource(
+        host,
+        {
+            source:'arcane.module.component-contracts.stt-activation',
+            eventTypes:Object.values(STT_ACTIVATION_EVENT_TYPES)
+        }
+    );
     let role=null;
     let requestPending=false;
     let requestError='';
     let requestGeneration=0;
+    let operationSequence=0;
     let destroyed=false;
 
     function visibleError(error,fallback){
@@ -468,34 +596,51 @@ function createSTTActivationController({
             }
         );
         const activationRequest=Object.freeze({intent,state:role});
-        const activationEvent=new EventClass(
-            'speech-stt-activation-request',
-            {
-                bubbles:true,
-                composed:true,
-                cancelable:true,
-                detail:activationRequest
-            }
-        );
+        const operationId=
+            `${events.instanceId}:stt-activation:${(++operationSequence).toString(36)}`;
+        let requestInvoked=false;
         requestPending=true;
-        const accepted=host.dispatchEvent(activationEvent);
-        if(!accepted
-            ||destroyed
-            ||generation!==requestGeneration
-            ||action()!==nextAction){
-            if(!destroyed&&generation===requestGeneration){
-                requestPending=false;
-                onChange();
-            }
-            return false;
-        }
         try{
+            const publication=events.dispatch(
+                STT_ACTIVATION_EVENT_TYPES.request,
+                activationRequest,
+                {
+                    cancelable:true,
+                    operationId,
+                    publicDetail:{
+                        role:'stt',
+                        action:nextAction,
+                        reason:STT_ACTIVATION_REASONS.explicitRequest,
+                        state:role.state,
+                        roleOperationId:typeof role?.operationId==='string'
+                            ?role.operationId
+                            :null
+                    }
+                }
+            );
+            if(!publication.accepted
+                ||!projectSTTActivationEvent(
+                    host,
+                    publication.occurrence,
+                    EventClass,
+                    {
+                        bubbles:true,
+                        composed:true,
+                        cancelable:true
+                    }
+                )
+                ||destroyed
+                ||generation!==requestGeneration
+                ||action()!==nextAction){
+                return false;
+            }
             onChange();
             if(destroyed
                 ||generation!==requestGeneration
                 ||action()!==nextAction){
                 return false;
             }
+            requestInvoked=true;
             await host.requestSTTActivation(intent);
             if(destroyed||generation!==requestGeneration){
                 return false;
@@ -515,21 +660,42 @@ function createSTTActivationController({
                 `The transcription ${nextAction} request failed.`
             );
             requestError=message;
-            host.dispatchEvent(
-                new EventClass(
-                    'speech-stt-activation-error',
+            const code=requestInvoked
+                ?STT_ACTIVATION_ERROR_CODES.requestRejected
+                :STT_ACTIVATION_ERROR_CODES.presentationCallbackFailed;
+            const reason=requestInvoked
+                ?STT_ACTIVATION_REASONS.requestRejected
+                :STT_ACTIVATION_REASONS.presentationCallbackThrew;
+            const errorPublication=events.dispatch(
+                STT_ACTIVATION_EVENT_TYPES.error,
+                Object.freeze(
                     {
-                        bubbles:true,
-                        composed:true,
-                        detail:Object.freeze(
-                            {
-                                request:activationRequest,
-                                error,
-                                message
-                            }
-                        )
+                        request:activationRequest,
+                        error,
+                        message
                     }
-                )
+                ),
+                {
+                    operationId,
+                    publicDetail:{
+                        role:'stt',
+                        action:nextAction,
+                        code,
+                        reason,
+                        causeCode:typeof error?.code==='string'
+                            ?error.code
+                            :null
+                    }
+                }
+            );
+            projectSTTActivationEvent(
+                host,
+                errorPublication.occurrence,
+                EventClass,
+                {
+                    bubbles:true,
+                    composed:true
+                }
             );
             return false;
         }finally{
@@ -547,7 +713,11 @@ function createSTTActivationController({
     function activateSelectedSTT(){
         const nextAction=action();
         if(nextAction){
-            void request(nextAction);
+            void request(nextAction).catch(
+                function reportSTTActivationRequestFailure(error){
+                    console.error('The STT activation request could not settle.',error);
+                }
+            );
         }
     }
 
@@ -575,10 +745,35 @@ function createSTTActivationController({
         destroyed=true;
         requestGeneration+=1;
         requestPending=false;
-        button.removeEventListener('click',activateSelectedSTT);
+        try{
+            button.removeEventListener('click',activateSelectedSTT);
+        }catch(error){
+            throw codedError(
+                'The STT activation button listener could not be removed.',
+                STT_ACTIVATION_ERROR_CODES.buttonListenerFailed,
+                Error,
+                error
+            );
+        }finally{
+            if(ownsEventSource){
+                events.dispose();
+            }
+        }
     }
 
-    button.addEventListener('click',activateSelectedSTT);
+    try{
+        button.addEventListener('click',activateSelectedSTT);
+    }catch(error){
+        if(ownsEventSource){
+            events.dispose();
+        }
+        throw codedError(
+            'The STT activation button listener could not be installed.',
+            STT_ACTIVATION_ERROR_CODES.buttonListenerFailed,
+            Error,
+            error
+        );
+    }
     return Object.freeze(
         {
             get action(){return action();},
@@ -841,6 +1036,9 @@ export {
     DASHBOARD_LABELS,
     MARKDOWN_FORMATS,
     MARKDOWN_LABELS,
+    STT_ACTIVATION_ERROR_CODES,
+    STT_ACTIVATION_EVENT_TYPES,
+    STT_ACTIVATION_REASONS,
     VOICE_LABELS,
     VOICE_MESSAGES,
     appendTranscription,
