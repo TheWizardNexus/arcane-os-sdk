@@ -1,12 +1,22 @@
 import assert from 'node:assert/strict';
+import {Worker} from 'node:worker_threads';
 import test from '../src/testing.mjs';
 import {
+    ARCANE_EVENT_AUTHORITY_BRAND,
+    ARCANE_EVENT_AUTHORITY_PROTOCOL,
+    ARCANE_EVENT_ERROR_CODES,
+    ARCANE_EVENT_LISTENER_ERROR_EVENT,
+    ARCANE_EVENT_OCCURRENCE_PROTOCOL,
+    ARCANE_EVENT_SOURCE_DISPOSED_EVENT,
     ARCANE_EVENT_STACK_PROTOCOL,
     arcaneEvents,
+    createArcaneEventSource,
     createEventManager,
     EventManager,
+    isArcaneEventOccurrence,
     parseEventStack,
     PLAYBACK_RECORD_EVENT,
+    projectArcaneDOMEvent,
     TIME_TRAVEL_OVERFLOW_EVENT,
     TIME_TRAVEL_SEEK_EVENT
 } from '../src/event-manager.mjs';
@@ -15,6 +25,123 @@ import {createEventQueue} from '../src/event-queue.mjs';
 function advancingClock(start='2026-08-24T02:00:00.000Z'){
     let milliseconds=Date.parse(start);
     return ()=>new Date(milliseconds++);
+}
+
+function authorityCollision(caseName){
+    const moduleUrl=new URL('../src/event-manager.mjs',import.meta.url).href;
+    const source=`
+        import {parentPort,workerData} from 'node:worker_threads';
+        const brand=Symbol.for('arcane-os.arcane-events-authority');
+        const protocol='arcane-event-authority/1';
+        const required=[
+            'on','once','off','reset','emit','instrument','forward','subscribe','createSource',
+            'projectDOMEvent','isOccurrence','addEventListener','removeEventListener','dispatchEvent'
+        ];
+        function compatibleValue(){
+            const value={protocol};
+            for(const name of required)value[name]=function authorityMethod(){};
+            Object.defineProperty(value,brand,{
+                value:protocol,
+                enumerable:false,
+                configurable:false,
+                writable:false
+            });
+            return value;
+        }
+        const current=workerData.caseName;
+        if(current==='accessor'){
+            Object.defineProperty(globalThis,'arcaneEvents',{
+                get(){throw new Error('authority getter must not run');},
+                configurable:false
+            });
+        }else if(current==='value'){
+            Object.defineProperty(globalThis,'arcaneEvents',{
+                value:{},enumerable:false,configurable:false,writable:false
+            });
+        }else if(current==='descriptor'){
+            Object.defineProperty(globalThis,'arcaneEvents',{
+                value:compatibleValue(),enumerable:true,configurable:false,writable:false
+            });
+        }else if(current==='brand-descriptor'){
+            const value=compatibleValue();
+            const replacement={protocol};
+            for(const name of required)replacement[name]=value[name];
+            Object.defineProperty(replacement,brand,{
+                value:protocol,enumerable:true,configurable:false,writable:false
+            });
+            Object.defineProperty(globalThis,'arcaneEvents',{
+                value:replacement,enumerable:false,configurable:false,writable:false
+            });
+        }else if(current==='protocol'){
+            const value=compatibleValue();
+            Object.defineProperty(value,'protocol',{value:'arcane-event-authority/0'});
+            Object.defineProperty(globalThis,'arcaneEvents',{
+                value,enumerable:false,configurable:false,writable:false
+            });
+        }else if(current==='api'){
+            const value={protocol};
+            Object.defineProperty(value,brand,{
+                value:protocol,enumerable:false,configurable:false,writable:false
+            });
+            Object.defineProperty(value,'on',{
+                get(){throw new Error('authority API getter must not run');}
+            });
+            Object.defineProperty(globalThis,'arcaneEvents',{
+                value,enumerable:false,configurable:false,writable:false
+            });
+        }
+        try{
+            await import(workerData.moduleUrl+'?collision='+current);
+            parentPort.postMessage({ok:true});
+        }catch(error){
+            parentPort.postMessage({
+                ok:false,
+                code:error?.code??null,
+                message:error?.message??String(error)
+            });
+        }
+    `;
+    const workerUrl=new URL(`data:text/javascript,${encodeURIComponent(source)}`);
+    return new Promise(function resolveAuthorityCollision(resolve,reject){
+        const worker=new Worker(workerUrl,{
+            type:'module',
+            workerData:{caseName,moduleUrl}
+        });
+        worker.once('message',resolve);
+        worker.once('error',reject);
+        worker.once('exit',function rejectUnexpectedExit(code){
+            if(code!==0)reject(new Error(`Authority collision worker exited with ${String(code)}.`));
+        });
+    });
+}
+
+function installTestCustomEvent(){
+    const existing=Object.getOwnPropertyDescriptor(globalThis,'CustomEvent');
+    if(typeof globalThis.CustomEvent==='function')return function keepCustomEvent(){};
+    class TestCustomEvent{
+        constructor(type,{detail,bubbles=false,composed=false,cancelable=false}={}){
+            this.type=type;
+            this.detail=detail;
+            this.bubbles=bubbles;
+            this.composed=composed;
+            this.cancelable=cancelable;
+            this.defaultPrevented=false;
+        }
+
+        preventDefault(){
+            if(this.cancelable)this.defaultPrevented=true;
+        }
+    }
+    Object.defineProperty(globalThis,'CustomEvent',{
+        value:TestCustomEvent,
+        enumerable:false,
+        configurable:true,
+        writable:true
+    });
+    return function restoreCustomEvent(){
+        if(existing)Object.defineProperty(globalThis,'CustomEvent',existing);
+        else delete globalThis.CustomEvent;
+    };
 }
 
 test('EventManager preserves synchronous event-pubsub behavior while recording is disabled',()=>{
@@ -526,4 +653,496 @@ test('SDK event queues mirror one normalized event through the central manager',
     }finally{
         arcaneEvents.off('sdk.example',handler);
     }
+});
+
+test('arcaneEvents is one branded realm authority across duplicate module URLs',async()=>{
+    const globalDescriptor=Object.getOwnPropertyDescriptor(globalThis,'arcaneEvents');
+    const brandDescriptor=Object.getOwnPropertyDescriptor(
+        arcaneEvents,
+        ARCANE_EVENT_AUTHORITY_BRAND
+    );
+    assert.equal(globalDescriptor?.value,arcaneEvents);
+    assert.equal(globalDescriptor?.enumerable,false);
+    assert.equal(globalDescriptor?.writable,false);
+    assert.equal(globalDescriptor?.configurable,false);
+    assert.deepEqual(brandDescriptor,{
+        value:ARCANE_EVENT_AUTHORITY_PROTOCOL,
+        enumerable:false,
+        writable:false,
+        configurable:false
+    });
+
+    const duplicate=await import('../src/event-manager.mjs?duplicate-authority-contract');
+    const packageRoot=await import('../src/index.mjs?event-authority-root-contract');
+    assert.equal(duplicate.arcaneEvents,arcaneEvents);
+    assert.equal(packageRoot.arcaneEvents,arcaneEvents);
+    assert.equal(packageRoot.createArcaneEventSource,createArcaneEventSource);
+    const occurrences=[];
+    const unsubscribe=arcaneEvents.subscribe(
+        'sdk.test.duplicate-authority',
+        function observeDuplicateAuthority(occurrence){occurrences.push(occurrence);}
+    );
+    const source=duplicate.createArcaneEventSource(
+        {},
+        {
+            source:'sdk.test.duplicate-authority',
+            eventTypes:['sdk.test.duplicate-authority']
+        }
+    );
+    try{
+        const publication=source.dispatch(
+            'sdk.test.duplicate-authority',
+            Object.freeze({compatibility:true}),
+            {publicDetail:{visible:true}}
+        );
+        assert.equal(occurrences.length,1);
+        assert.equal(occurrences[0],publication.occurrence);
+        assert.equal(publication.occurrence.protocol,ARCANE_EVENT_OCCURRENCE_PROTOCOL);
+        assert.match(publication.occurrence.occurrenceId,/^arcane-event-[0-9a-z]+$/u);
+        assert.match(publication.occurrence.instanceId,/^arcane-source-[0-9a-z]+$/u);
+        assert.equal(isArcaneEventOccurrence(publication.occurrence),true);
+        assert.equal(duplicate.isArcaneEventOccurrence(publication.occurrence),true);
+        assert.equal(Object.isFrozen(publication.occurrence),true);
+        assert.equal(unsubscribe.dispose,unsubscribe);
+    }finally{
+        unsubscribe();
+        source.dispose();
+    }
+});
+
+test('authority admission fails closed for every global collision class',async()=>{
+    const expectations=new Map([
+        ['accessor','ARCANE_EVENT_AUTHORITY_ACCESSOR_COLLISION'],
+        ['value','ARCANE_EVENT_AUTHORITY_VALUE_COLLISION'],
+        ['descriptor','ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH'],
+        ['brand-descriptor','ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH'],
+        ['protocol','ARCANE_EVENT_AUTHORITY_PROTOCOL_MISMATCH'],
+        ['api','ARCANE_EVENT_AUTHORITY_API_MISMATCH']
+    ]);
+    for(const [caseName,code] of expectations){
+        const result=await authorityCollision(caseName);
+        assert.equal(result.ok,false,caseName);
+        assert.equal(result.code,code,caseName);
+        assert.equal(result.message.length>0,true,caseName);
+    }
+});
+
+test('source dispatch preserves canonical order, privacy, and rich local compatibility',()=>{
+    const type='sdk.test.source-privacy';
+    const order=[];
+    const central=[];
+    const scoped=[];
+    const host={kind:'host-record'};
+    const thrown=new Error('owner-local only');
+    const richCompatibility={host,thrown,secretMarker:'compatibility-only-marker'};
+    const publicDetail={availability:{state:'ready'},count:1};
+    const legacy=[];
+    const owner={};
+    const source=createArcaneEventSource(owner,{
+        source:'sdk.test.source-privacy',
+        eventTypes:[type]
+    });
+    const unsubscribeCentralOne=arcaneEvents.subscribe(
+        type,
+        function observeCanonicalFirst(occurrence){
+            order.push('central-one');
+            central.push(occurrence);
+        }
+    );
+    const unsubscribeCentralTwo=arcaneEvents.subscribe(
+        type,
+        function observeCanonicalSecond(){order.push('central-two');}
+    );
+    const unsubscribeSourceOne=source.on(type,function observeCompatibilityFirst(event){
+        order.push('source-one');
+        scoped.push(event);
+    });
+    const unsubscribeSourceTwo=source.on(type,function observeCompatibilitySecond(){
+        order.push('source-two');
+    });
+    function observeLegacyPayload(value){legacy.push(value);}
+    arcaneEvents.on(type,observeLegacyPayload);
+    arcaneEvents.clearHistory();
+    arcaneEvents.enableTimeTravel();
+    try{
+        const publication=source.dispatch(type,richCompatibility,{
+            operationId:'operation-source-privacy',
+            publicDetail
+        });
+        publicDetail.availability.state='changed-after-dispatch';
+
+        assert.deepEqual(order,['central-one','central-two','source-one','source-two']);
+        assert.equal(central[0],publication.occurrence);
+        assert.equal(scoped[0].type,type);
+        assert.notEqual(scoped[0].detail,richCompatibility);
+        assert.equal(Object.isFrozen(scoped[0].detail),true);
+        assert.equal(scoped[0].detail.host,host);
+        assert.equal(scoped[0].detail.thrown,thrown);
+        assert.equal(Object.isFrozen(host),false);
+        assert.equal(publication.occurrence.detail.availability.state,'ready');
+        assert.equal(Object.isFrozen(publication.occurrence.detail),true);
+        assert.equal(Object.isFrozen(publication.occurrence.detail.availability),true);
+        assert.equal(publication.occurrence.operationId,'operation-source-privacy');
+        assert.deepEqual(legacy,[]);
+        assert.doesNotMatch(
+            JSON.stringify(arcaneEvents.history),
+            /compatibility-only-marker|owner-local only/u
+        );
+    }finally{
+        arcaneEvents.disableTimeTravel();
+        arcaneEvents.clearHistory();
+        arcaneEvents.off(type,observeLegacyPayload);
+        unsubscribeCentralOne();
+        unsubscribeCentralTwo();
+        unsubscribeSourceOne();
+        unsubscribeSourceTwo();
+        source.dispose();
+    }
+});
+
+test('canonical cancellation and one-way DOM projection share one occurrence',()=>{
+    const restoreCustomEvent=installTestCustomEvent();
+    const cancelType='sdk.test.cancellation';
+    const projectType='sdk.test.projection';
+    const source=createArcaneEventSource({}, {
+        source:'sdk.test.cancellation',
+        eventTypes:[cancelType,projectType]
+    });
+    const delivered=[];
+    const unsubscribeCancel=arcaneEvents.subscribe(
+        cancelType,
+        function cancelCanonicalOccurrence(occurrence){
+            delivered.push('central-cancel');
+            occurrence.preventDefault();
+        }
+    );
+    const unsubscribeFollowing=arcaneEvents.subscribe(
+        cancelType,
+        function observeAfterCancellation(occurrence){
+            delivered.push(`central-following:${String(occurrence.defaultPrevented)}`);
+        }
+    );
+    const unsubscribeScoped=source.on(cancelType,function observeScopedCancellation(event){
+        delivered.push(`source:${String(event.defaultPrevented)}`);
+    });
+    try{
+        const cancelled=source.dispatch(
+            cancelType,
+            Object.freeze({message:'cancel me'}),
+            {publicDetail:{status:'requested'},cancelable:true}
+        );
+        assert.equal(cancelled.accepted,false);
+        assert.equal(cancelled.occurrence.defaultPrevented,true);
+        assert.deepEqual(delivered,[
+            'central-cancel',
+            'central-following:true',
+            'source:true'
+        ]);
+
+        let projected=null;
+        const target={
+            dispatchEvent(event){
+                projected=event;
+                event.preventDefault();
+                return false;
+            }
+        };
+        const publication=source.dispatch(
+            projectType,
+            {message:'projected'},
+            {
+                operationId:'operation-projection',
+                publicDetail:{status:'ready'},
+                cancelable:true
+            }
+        );
+        assert.equal(projectArcaneDOMEvent(target,publication.occurrence),false);
+        assert.equal(publication.occurrence.defaultPrevented,true);
+        assert.equal(projected.detail.message,'projected');
+        assert.equal(projected.detail.occurrenceId,publication.occurrence.occurrenceId);
+        assert.equal(projected.detail.source,source.source);
+        assert.equal(projected.detail.instanceId,source.instanceId);
+        assert.equal(projected.detail.operationId,'operation-projection');
+        assert.equal(Object.isFrozen(projected.detail),true);
+
+        let skipped=0;
+        assert.equal(projectArcaneDOMEvent({dispatchEvent(){skipped+=1;}},cancelled.occurrence),false);
+        assert.equal(skipped,0);
+
+        const collision=source.dispatch(
+            projectType,
+            {occurrenceId:'caller-owned-id'},
+            {publicDetail:{},cancelable:false}
+        );
+        assert.throws(
+            function rejectProjectionCollision(){
+                projectArcaneDOMEvent(target,collision.occurrence);
+            },
+            function isProjectionCollision(error){
+                return error?.code==='ARCANE_EVENT_DOM_DETAIL_COLLISION';
+            }
+        );
+    }finally{
+        unsubscribeCancel();
+        unsubscribeFollowing();
+        unsubscribeScoped();
+        source.dispose();
+        restoreCustomEvent();
+    }
+});
+
+test('subscriptions abort, unsubscribe, reenter, and dispose without corrupting delivery',()=>{
+    const type='sdk.test.subscription-lifecycle';
+    const source=createArcaneEventSource({}, {
+        source:'sdk.test.subscription-lifecycle',
+        eventTypes:[type]
+    });
+    const calls=[];
+    const alreadyAborted=new AbortController();
+    alreadyAborted.abort();
+    const absent=arcaneEvents.subscribe(
+        type,
+        function shouldNeverInstall(){calls.push('aborted');},
+        {signal:alreadyAborted.signal}
+    );
+    assert.equal(absent.dispose,absent);
+
+    let unsubscribeSelf;
+    unsubscribeSelf=arcaneEvents.subscribe(type,function removeCurrentDuringDispatch(){
+        calls.push('self');
+        unsubscribeSelf();
+    });
+    const unsubscribeFollower=arcaneEvents.subscribe(type,function retainFollowingListener(){
+        calls.push('follower');
+    });
+    let onceCalls=0;
+    const unsubscribeOnce=arcaneEvents.subscribe(type,function reenterOnceListener(){
+        onceCalls+=1;
+        if(onceCalls===1)source.dispatch(type,Object.freeze({nested:true}));
+    },{once:true});
+    const sourceAbort=new AbortController();
+    source.on(type,function shouldBeRemovedByAbort(){calls.push('source-aborted');},{
+        signal:sourceAbort.signal
+    });
+    sourceAbort.abort();
+    try{
+        source.dispatch(type,Object.freeze({outer:true}));
+        assert.deepEqual(calls,['self','follower','follower']);
+        assert.equal(onceCalls,1);
+        assert.equal(unsubscribeSelf(),false);
+        assert.equal(unsubscribeSelf.dispose,unsubscribeSelf);
+
+        arcaneEvents.off(type);
+        arcaneEvents.reset();
+        source.dispatch(type,Object.freeze({afterReset:true}));
+        assert.deepEqual(calls,['self','follower','follower','follower']);
+
+        let reentrantDispose;
+        source.on(
+            ARCANE_EVENT_SOURCE_DISPOSED_EVENT,
+            function disposeAgainFromFinalOccurrence(){reentrantDispose=source.dispose();}
+        );
+        assert.equal(source.dispose(),true);
+        assert.equal(reentrantDispose,false);
+        assert.equal(source.dispose(),false);
+        assert.throws(
+            function rejectDisposedDispatch(){source.dispatch(type,{});},
+            function isDisposed(error){return error?.code==='ARCANE_EVENT_SOURCE_DISPOSED';}
+        );
+    }finally{
+        absent();
+        unsubscribeSelf();
+        unsubscribeFollower();
+        unsubscribeOnce();
+        if(!source.disposed)source.dispose();
+    }
+});
+
+test('EventTarget adapters deduplicate listeners and preserve declared cancellation',()=>{
+    const centralType='sdk.test.event-target-adapter';
+    const sourceType='sdk.test.source-event-target';
+    const centralSeen=[];
+    function centralListener(occurrence){
+        centralSeen.push(occurrence.defaultPrevented);
+        occurrence.preventDefault();
+    }
+    arcaneEvents.addEventListener(centralType,centralListener);
+    arcaneEvents.addEventListener(centralType,centralListener);
+    arcaneEvents.addEventListener(centralType,centralListener,true);
+    const centralInput={
+        type:centralType,
+        detail:{operationId:'operation-event-target',status:'ready'},
+        cancelable:true,
+        defaultPrevented:true,
+        preventDefault(){this.defaultPrevented=true;}
+    };
+    try{
+        assert.equal(arcaneEvents.dispatchEvent(centralInput),false);
+        assert.deepEqual(centralSeen,[true,true]);
+        arcaneEvents.removeEventListener(centralType,centralListener);
+        centralInput.defaultPrevented=false;
+        assert.equal(arcaneEvents.dispatchEvent(centralInput),false);
+        assert.deepEqual(centralSeen,[true,true,false]);
+
+        let onceCalls=0;
+        function onceListener(){onceCalls+=1;}
+        arcaneEvents.addEventListener(centralType,onceListener,{once:true});
+        arcaneEvents.dispatchEvent(centralInput);
+        arcaneEvents.addEventListener(centralType,onceListener,{once:true});
+        arcaneEvents.dispatchEvent(centralInput);
+        assert.equal(onceCalls,2);
+
+        assert.throws(
+            function rejectMissingDataDetail(){
+                arcaneEvents.dispatchEvent({type:centralType});
+            },
+            function isInvalidDispatchEvent(error){
+                return error?.code==='ARCANE_EVENT_DISPATCH_EVENT_INVALID';
+            }
+        );
+        const accessorInput={type:centralType};
+        Object.defineProperty(accessorInput,'detail',{
+            get(){throw new Error('detail getter must not run');}
+        });
+        assert.throws(
+            function rejectAccessorDetail(){arcaneEvents.dispatchEvent(accessorInput);},
+            function isAccessorDispatchInvalid(error){
+                return error?.code==='ARCANE_EVENT_DISPATCH_EVENT_INVALID';
+            }
+        );
+
+        const source=createArcaneEventSource({}, {
+            source:'sdk.test.source-event-target',
+            eventTypes:[sourceType]
+        });
+        try{
+            let sourceEvent=null;
+            source.addEventListener(sourceType,function cancelSourceEvent(event){
+                sourceEvent=event;
+                event.preventDefault();
+            });
+            const sourceInput={
+                type:sourceType,
+                detail:{value:42},
+                cancelable:true,
+                defaultPrevented:false,
+                preventDefault(){this.defaultPrevented=true;}
+            };
+            assert.equal(source.dispatchEvent(sourceInput),false);
+            assert.equal(sourceInput.defaultPrevented,true);
+            assert.equal(sourceEvent.detail.value,42);
+            assert.throws(
+                function rejectUndeclaredSourceEvent(){
+                    source.dispatchEvent({type:'sdk.test.undeclared',detail:{}});
+                },
+                function isUndeclared(error){
+                    return error?.code==='ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED';
+                }
+            );
+        }finally{
+            source.dispose();
+        }
+    }finally{
+        arcaneEvents.removeEventListener(centralType,centralListener,true);
+    }
+});
+
+test('listener failures are observational, privacy-safe, and nonrecursive',()=>{
+    const type='sdk.test.listener-failure';
+    const rawFailure=new Error('private listener failure');
+    const recursiveFailure=new Error('listener-error observer failed');
+    const order=[];
+    const errorOccurrences=[];
+    const ownerFailures=[];
+    const reports=[];
+    let failedOccurrenceId=null;
+    const reportErrorDescriptor=Object.getOwnPropertyDescriptor(globalThis,'reportError');
+    Object.defineProperty(globalThis,'reportError',{
+        value:function captureReportedError(error){
+            reports.push(error);
+            order.push(error===rawFailure?'report-domain':'report-listener-error');
+        },
+        enumerable:false,
+        configurable:true,
+        writable:true
+    });
+    const source=createArcaneEventSource({}, {
+        source:'sdk.test.listener-failure',
+        eventTypes:[type],
+        onListenerError(error,errorOccurrence){
+            ownerFailures.push([error,errorOccurrence]);
+            order.push('owner-callback');
+        }
+    });
+    const unsubscribeFailure=arcaneEvents.subscribe(type,function failCanonicalListener(occurrence){
+        failedOccurrenceId=occurrence.occurrenceId;
+        order.push('domain-failure');
+        throw rawFailure;
+    });
+    const unsubscribeFollowing=arcaneEvents.subscribe(type,function observeCommittedDomain(){
+        order.push('domain-following');
+    });
+    const unsubscribeError=arcaneEvents.subscribe(
+        ARCANE_EVENT_LISTENER_ERROR_EVENT,
+        function observeListenerError(occurrence){
+            errorOccurrences.push(occurrence);
+            order.push('listener-error-occurrence');
+        }
+    );
+    const unsubscribeRecursive=arcaneEvents.subscribe(
+        ARCANE_EVENT_LISTENER_ERROR_EVENT,
+        function failListenerErrorObserver(){throw recursiveFailure;}
+    );
+    try{
+        const publication=source.dispatch(type,Object.freeze({privateValue:rawFailure}),{
+            operationId:'operation-listener-failure',
+            publicDetail:{status:'committed'}
+        });
+        assert.equal(publication.accepted,true);
+        assert.equal(errorOccurrences.length,1);
+        assert.equal(ownerFailures.length,1);
+        assert.equal(ownerFailures[0][0],rawFailure);
+        assert.equal(ownerFailures[0][1],errorOccurrences[0]);
+        assert.equal(errorOccurrences[0].type,ARCANE_EVENT_LISTENER_ERROR_EVENT);
+        assert.deepEqual(errorOccurrences[0].detail,{
+            code:'ARCANE_EVENT_LISTENER_CALLBACK_FAILED',
+            reason:'listener-threw',
+            eventType:type,
+            occurrenceId:failedOccurrenceId,
+            source:source.source,
+            instanceId:source.instanceId,
+            operationId:'operation-listener-failure'
+        });
+        assert.equal(Object.isFrozen(errorOccurrences[0].detail),true);
+        assert.doesNotMatch(JSON.stringify(errorOccurrences[0]),/private listener failure/u);
+        assert.deepEqual(reports,[recursiveFailure,rawFailure]);
+        assert.deepEqual(order,[
+            'domain-failure',
+            'listener-error-occurrence',
+            'report-listener-error',
+            'report-domain',
+            'owner-callback',
+            'domain-following'
+        ]);
+    }finally{
+        unsubscribeFailure();
+        unsubscribeFollowing();
+        unsubscribeError();
+        unsubscribeRecursive();
+        source.dispose();
+        if(reportErrorDescriptor){
+            Object.defineProperty(globalThis,'reportError',reportErrorDescriptor);
+        }else{
+            delete globalThis.reportError;
+        }
+    }
+});
+
+test('canonical subscribe is exact typed and rejects wildcard admission',()=>{
+    assert.throws(
+        function rejectCanonicalWildcard(){arcaneEvents.subscribe('*',function noWildcard(){});},
+        function isInvalidSubscriptionType(error){
+            return error?.code===ARCANE_EVENT_ERROR_CODES.ARCANE_EVENT_SUBSCRIPTION_TYPE_INVALID;
+        }
+    );
 });

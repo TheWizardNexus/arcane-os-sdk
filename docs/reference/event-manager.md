@@ -1,20 +1,24 @@
 # EventManager and time-travel diagnostics
 
-`EventManager` gives Arcane applications one synchronous event bus and an optional,
-bounded diagnostic timeline. Use it to observe SDK operation events, add semantic
-application events, capture browser interactions, export evidence, and review a
-recording without implying that Arcane has restored live state.
+`arcaneEvents` gives Arcane SDK publishers one canonical synchronous event
+authority per JavaScript realm. `EventManager` remains the constructor for an
+isolated strict pub/sub bus and optional bounded diagnostic timeline. Use source
+handles for SDK semantic events; use isolated managers for local diagnostics,
+DOM capture, export, and review.
 
 The API is capability-first:
 
 - ordinary pub/sub works in Node and browser JavaScript;
+- duplicate module URLs reuse the same branded `globalThis.arcaneEvents` value;
+- canonical occurrences expose only deeply frozen privacy-admitted public detail;
+- rich compatibility detail remains local to source listeners and DOM projection;
 - recording creates immutable, normalized `arcane-event-stack/1` records;
 - browser DOM capture is opt-in and privacy-preserving by default;
 - review playback is safe by default; live event redispatch is explicitly effectful;
 - no event stack is uploaded, persisted, bridged to Core, or sent to a cloud service
   automatically.
 
-All 20 JavaScript exports are available from both `arcane-os` and
+All 32 JavaScript exports are available from both `arcane-os` and
 `arcane-os/event-manager`. The bindings are identical, so choose the focused
 subpath when event instrumentation is the only SDK capability you need. Node
 can resolve either package entrypoint. The generated browser map intentionally
@@ -26,36 +30,43 @@ root.
 ```javascript
 import {
     arcaneEvents,
+    createArcaneEventSource,
+    createEventManager,
+    projectArcaneDOMEvent,
     PLAYBACK_RECORD_EVENT
 } from 'arcane-os/event-manager';
 
-arcaneEvents.on('document.save.completed',event=>{
-    console.info('Saved',event.documentId);
+const events=createArcaneEventSource(editorController,{
+    source:'app.editor',
+    eventTypes:['document.save.completed']
 });
 
-arcaneEvents.enableTimeTravel();
-try{
-    arcaneEvents.instrument(
-        'document.save.completed',
-        {documentId:'example'},
-        {source:'app:editor',category:'operation',correlationId:'save-42'}
-    );
-}finally{
-    arcaneEvents.disableTimeTravel();
-}
+const unsubscribe=arcaneEvents.subscribe('document.save.completed',occurrence=>{
+    console.info('Saved',occurrence.detail.documentId);
+});
 
-const stack=arcaneEvents.exportStack();
-arcaneEvents.on(PLAYBACK_RECORD_EVENT,record=>console.info(record.type));
-await arcaneEvents.playback({stack,mode:'review',speed:0});
+const publication=events.dispatch(
+    'document.save.completed',
+    Object.freeze({documentId:'example',document:liveDocument}),
+    {operationId:'save-42',publicDetail:{documentId:'example'}}
+);
+projectArcaneDOMEvent(editorElement,publication.occurrence);
+unsubscribe();
+
+const diagnostics=createEventManager({timeTravel:true});
+const stack=diagnostics.exportStack();
+diagnostics.on(PLAYBACK_RECORD_EVENT,record=>console.info(record.type));
+await diagnostics.playback({stack,mode:'review',speed:0});
 ```
 
-Recording is disabled on `arcaneEvents` by default. Keep diagnostic sessions
-bounded, export intentionally, then call `clearHistory()`.
+Recording is disabled by default. Keep isolated diagnostic sessions bounded,
+export intentionally, then call `clearHistory()`.
 
 ## Availability and normalization
 
 | Capability | Node | Browser renderer | Native/Core host | Remote or cloud | Normalization |
 | --- | --- | --- | --- | --- | --- |
+| Canonical per-realm authority and source occurrences | Yes | Yes, per window or worker realm | Only when the SDK module runs in that JavaScript realm | No automatic transport | `arcane-event-authority/1`, `arcane-event-source/1`, and `arcane-event-occurrence/1` |
 | Pub/sub, semantic instrumentation, parse/export, seek, playback | Yes | Yes, through a bundler or the managed Arcane import map | Only when the SDK module runs in that JavaScript host | No automatic transport | Same synchronous API; optional immutable JSON-like snapshots |
 | DOM selectors and target descriptions | With DOM-like values or a test shim | Yes | No native UI observation | No | Stable diagnostic descriptors |
 | DOM interaction and mutation capture | No native DOM | Yes | No | No | DOM activity becomes semantic event-stack records |
@@ -77,6 +88,15 @@ service.
 | Export | Kind | Primary capability |
 | --- | --- | --- |
 | `ARCANE_EVENT_STACK_PROTOCOL` | String constant | Identify the durable stack format |
+| `ARCANE_EVENT_AUTHORITY_PROTOCOL` | String constant | Identify singleton authority compatibility |
+| `ARCANE_EVENT_OCCURRENCE_PROTOCOL` | String constant | Identify canonical occurrences |
+| `ARCANE_EVENT_SOURCE_PROTOCOL` | String constant | Identify source handles |
+| `ARCANE_EVENT_AUTHORITY_BRAND` | Global symbol | Inspect the authority brand descriptor |
+| `ARCANE_EVENT_AUTHORITY_KIND` | String constant | Identify an authority descriptor |
+| `ARCANE_EVENT_SOURCE_KIND` | String constant | Identify a source descriptor |
+| `ARCANE_EVENT_LISTENER_ERROR_EVENT` | String constant | Observe privacy-safe listener failures |
+| `ARCANE_EVENT_SOURCE_DISPOSED_EVENT` | String constant | Observe a source's final occurrence |
+| `ARCANE_EVENT_ERROR_CODES` | Frozen object | Match stable authority error codes |
 | `TIME_TRAVEL_SEEK_EVENT` | String constant | Observe review-cursor movement |
 | `PLAYBACK_STARTED_EVENT` | String constant | Observe playback startup |
 | `PLAYBACK_RECORD_EVENT` | String constant | Receive safe review records |
@@ -95,7 +115,10 @@ service.
 | `parseEventStack()` | Function | Strictly import and freeze a stack |
 | `EventManager` | Class | Create an isolated bus and timeline |
 | `createEventManager()` | Function | Create an `EventManager` |
-| `arcaneEvents` | `EventManager` singleton | Observe shared SDK events |
+| `arcaneEvents` | Branded `EventManager` authority | Observe canonical SDK events in this realm |
+| `createArcaneEventSource()` | Function | Register one declared semantic source per owner |
+| `projectArcaneDOMEvent()` | Function | Project one occurrence to one `CustomEvent` |
+| `isArcaneEventOccurrence()` | Function | Recognize authority-created occurrences and views |
 
 ## `EventManager`
 
@@ -314,27 +337,203 @@ const events=createEventManager({timeTravel:true,maxEvents:1_000});
 
 ### Overview
 
-The SDK-wide `EventManager` singleton. Recording is off by default. SDK operation
-queues forward each normalized event object through this manager before their
-awaited callback; nested queues deduplicate the same object identity.
+The SDK's canonical per-realm event authority. Module evaluation first inspects
+the own descriptor of `globalThis.arcaneEvents`. If absent, it constructs,
+brands, and installs one authority as a non-enumerable, non-writable,
+non-configurable data property. A duplicate module URL validates and reuses that
+exact object without constructing a transient second bus. Accessor collisions,
+unbranded values, malformed descriptors, incompatible protocols, and incomplete
+APIs fail closed with stable `ARCANE_EVENT_AUTHORITY_*` codes.
 
 ### Value
 
 ```javascript
-const arcaneEvents = new EventManager()
+globalThis.arcaneEvents === arcaneEvents
+arcaneEvents.protocol === 'arcane-event-authority/1'
+arcaneEvents[ARCANE_EVENT_AUTHORITY_BRAND] === 'arcane-event-authority/1'
 ```
 
 ### Availability and normalization
 
-One singleton per resolved SDK module graph in Node or a browser bundle. It is not
-a cross-process, cross-frame, Core, native, or cloud singleton.
+Exactly one authority per JavaScript realm. A window, worker, frame, Node realm,
+or process has its own boundary. Nothing automatically transports occurrences
+to another realm, Core, a native host, or a remote service.
+
+`subscribe(type,handler,{once=false,signal}={})` observes one exact canonical
+event type. `handler` is a function or EventListener object and receives the
+canonical occurrence as its sole argument. The returned idempotent unsubscribe
+has `unsubscribe.dispose === unsubscribe`. An already-aborted signal installs
+nothing; later abort marks the listener inactive synchronously and removes it
+without corrupting an in-progress dispatch. `'*'` is not a canonical subscription
+type.
+
+`addEventListener()` and `removeEventListener()` expose EventTarget-shaped
+canonical registration, including function/EventListener-object callbacks,
+type/listener/capture deduplication, `once`, and `signal`. They return
+`undefined`. Authority-level `dispatchEvent()` is a deprecated admission adapter
+for older `aiRuntimeEvents` callers. It accepts an Event-like value with a valid
+type and data `detail`, creates one new occurrence from source
+`event-target-compatibility`, preserves preexisting and observer cancellation,
+and never uses raw `EventManager.emit()` as a parallel path.
+
+The inherited `on`, `once`, `off`, `reset`, `emit`, `instrument`, and `forward`
+surface is retained for legacy direct diagnostics. Its registrations are
+separate: source dispatch does not re-emit raw compatibility detail to legacy
+listeners, and legacy `off()`/`reset()` cannot remove canonical or source-owned
+registrations. New SDK publishers use `createArcaneEventSource()`.
 
 ### Example
 
 ```javascript
-import {arcaneEvents} from 'arcane-os';
-arcaneEvents.on('sdk.operation.completed',event=>console.info(event));
+import {arcaneEvents} from 'arcane-os/event-manager';
+
+const unsubscribe=arcaneEvents.subscribe('sdk.operation.completed',occurrence=>{
+    console.info(occurrence.occurrenceId,occurrence.detail);
+});
+unsubscribe();
 ```
+
+## `createArcaneEventSource()`
+
+### Overview
+
+Registers one active semantic source for a non-null object or function owner.
+The options object has only `source`, `eventTypes`, and optional
+`onListenerError`. Source and event names are trimmed lowercase identifiers of
+at most 128 characters matching
+`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`. `eventTypes` contains 1 through 256 unique
+declared types. A second active source for the same owner fails closed.
+
+### Signature and value
+
+```javascript
+const source=createArcaneEventSource(owner,{
+    source:'sdk.document-store',
+    eventTypes:['document.saved'],
+    onListenerError(error,errorOccurrence){
+        reportOwnerLocalFailure(error,errorOccurrence.occurrenceId);
+    }
+});
+```
+
+The returned handle and its descriptor are frozen. The descriptor identifies
+`arcane-event-source/1`, the stable source name, an authority-sequenced opaque
+`arcane-source-<base36>` instance id, and the declared event types plus the final
+`arcane.event.source.disposed` event. IDs are unique only during one authority's
+lifetime in one realm.
+
+### Dispatch
+
+```javascript
+const {occurrence,accepted}=source.dispatch(
+    'document.saved',
+    Object.freeze({document:liveDocument,documentId:'document-7'}),
+    {
+        operationId:'save-42',
+        publicDetail:{documentId:'document-7'},
+        cancelable:true
+    }
+);
+```
+
+`dispatch()` is synchronous. Exact canonical subscribers run first in
+registration order, followed by this source's exact `on()`/EventListener
+registrations in registration order. Source listeners receive one frozen
+EventTarget-compatible view whose `detail` is the locally held compatibility
+detail and whose cancellation state is shared with the occurrence. The public
+occurrence contains:
+
+```javascript
+{
+    protocol:'arcane-event-occurrence/1',
+    occurrenceId:'arcane-event-<base36>',
+    type,
+    source,
+    instanceId,
+    operationId,       // string or null
+    detail,            // defensive, privacy-admitted, deeply frozen snapshot
+    cancelable,
+    get defaultPrevented(),
+    preventDefault()
+}
+```
+
+The frozen result is `{occurrence,accepted:!occurrence.defaultPrevented}`.
+Cancellation does not roll back domain work automatically. All active listeners
+run even when one prevents default or throws. Listener exceptions create one
+nonrecursive, privacy-safe `arcane.event.listener.error` occurrence and are
+reported through `reportError` or `console.error`; committed source dispatch does
+not throw because an observer failed. `onListenerError(error,errorOccurrence)`
+is invoked synchronously only at the source-owner boundary after canonical error
+publication and platform reporting. If that callback throws, its failure is
+reported directly without another listener-error occurrence.
+
+`on(type,handler,{once=false,signal}={})` and `subscribe()` on the source are
+aliases returning an idempotent disposable unsubscribe. `once()` is the
+one-delivery form. `addEventListener()`/`removeEventListener()` use EventTarget
+deduplication and `undefined` returns. `dispatchEvent(event)` is a compatibility
+adapter that accepts only a declared type, preserves cancellation, and publishes
+a new canonical occurrence rather than the raw input.
+
+`dispose()` is idempotent: the first call publishes the final noncancelable
+`arcane.event.source.disposed` occurrence, removes source-owned registrations,
+and returns `true`; reentrant or later calls return `false`. Dispatch or new
+registration after disposal fails with `ARCANE_EVENT_SOURCE_DISPOSED`. The owner
+may register a new source after disposal. `destroy()` aliases `dispose()`.
+
+Rich compatibility detail is shallow-copied and frozen when it is a plain record
+or array; host objects such as DOM nodes, `File`, or `Error` remain local and are
+not recursively frozen. Compatibility detail never enters canonical
+EventPubSub/time-travel payloads. Only privacy-admitted `publicDetail` enters the
+occurrence and optional diagnostics.
+
+## `projectArcaneDOMEvent()`
+
+### Overview
+
+Projects one authority-created occurrence to one `CustomEvent`. This is a
+one-way compatibility boundary; DOM dispatch never republishes into
+`arcaneEvents`.
+
+### Signature
+
+```javascript
+projectArcaneDOMEvent(target,occurrence,{
+    type=occurrence.type,
+    bubbles=false,
+    composed=false,
+    cancelable=occurrence.cancelable
+}={})
+```
+
+The authority retrieves the centrally held compatibility detail, creates a
+frozen outer projection detail, and additively supplies `occurrenceId`, `source`,
+`instanceId`, and `operationId`. A conflicting caller-owned metadata value fails
+with `ARCANE_EVENT_DOM_DETAIL_COLLISION`. If the occurrence is already canceled,
+the function skips DOM dispatch and returns `false`. Otherwise it dispatches
+exactly one event, propagates DOM cancellation to a cancelable occurrence, and
+returns the combined acceptance result.
+
+## `isArcaneEventOccurrence()`
+
+Returns `true` only for a canonical occurrence or source compatibility view
+created by the current realm's authority. It does not authenticate hostile
+same-realm code; the brand and protocol are compatibility boundaries.
+
+## Authority protocols and constants
+
+- `ARCANE_EVENT_AUTHORITY_PROTOCOL` is exactly `arcane-event-authority/1`.
+- `ARCANE_EVENT_OCCURRENCE_PROTOCOL` is exactly `arcane-event-occurrence/1`.
+- `ARCANE_EVENT_SOURCE_PROTOCOL` is exactly `arcane-event-source/1`.
+- `ARCANE_EVENT_AUTHORITY_BRAND` is
+  `Symbol.for('arcane-os.arcane-events-authority')`.
+- `ARCANE_EVENT_AUTHORITY_KIND` and `ARCANE_EVENT_SOURCE_KIND` identify frozen
+  descriptors.
+- `ARCANE_EVENT_LISTENER_ERROR_EVENT` is
+  `arcane.event.listener.error`.
+- `ARCANE_EVENT_SOURCE_DISPOSED_EVENT` is
+  `arcane.event.source.disposed`.
+- `ARCANE_EVENT_ERROR_CODES` maps each stable authority error code to itself.
 
 ## `parseEventStack()`
 
@@ -923,6 +1122,25 @@ kernel/application snapshot.
 
 | Operation | Error | Recovery |
 | --- | --- | --- |
+| `globalThis.arcaneEvents` is an accessor | `ARCANE_EVENT_AUTHORITY_ACCESSOR_COLLISION` | Remove the incompatible realm bootstrap before importing the SDK |
+| Authority value is unbranded | `ARCANE_EVENT_AUTHORITY_VALUE_COLLISION` | Install no competing global value |
+| Global, brand, or protocol descriptor flags differ | `ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH` | Use the exact non-enumerable/non-writable/non-configurable authority and brand contract |
+| Authority brand/protocol differs | `ARCANE_EVENT_AUTHORITY_PROTOCOL_MISMATCH` | Load a compatible SDK authority protocol |
+| Required authority method is absent, non-callable, or an accessor | `ARCANE_EVENT_AUTHORITY_API_MISMATCH` | Remove the incompatible authority; accessors are never evaluated for admission |
+| Authority cannot be installed | `ARCANE_EVENT_AUTHORITY_INSTALL_FAILED` | Make the realm global extensible before first import |
+| Source owner/options/name/event types/callback invalid | `ARCANE_EVENT_SOURCE_INVALID` | Use one owner, exact data options, valid names, and 1–256 unique declared types |
+| Owner already has an active source | `ARCANE_EVENT_SOURCE_ALREADY_REGISTERED` | Reuse or dispose the current handle |
+| Source is disposing or disposed | `ARCANE_EVENT_SOURCE_DISPOSED` | Stop publishing or create a new source after disposal completes |
+| Source publishes/listens to an undeclared type | `ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED` | Add the exact type to `eventTypes` before source creation |
+| Occurrence/options invalid | `ARCANE_EVENT_OCCURRENCE_INVALID` | Use the authority-created occurrence and documented dispatch options |
+| Realm occurrence sequence exhausted | `ARCANE_EVENT_OCCURRENCE_SEQUENCE_EXHAUSTED` | Start a new JavaScript realm |
+| Realm source sequence exhausted | `ARCANE_EVENT_SOURCE_SEQUENCE_EXHAUSTED` | Start a new JavaScript realm |
+| Compatibility detail cannot be safely admitted | `ARCANE_EVENT_COMPATIBILITY_DETAIL_INVALID` | Use a host object directly or a plain/array value with data properties only |
+| Canonical listener throws | `ARCANE_EVENT_LISTENER_CALLBACK_FAILED` in a listener-error occurrence | Fix the observer; committed domain dispatch remains successful |
+| Subscription type/handler/options/signal invalid | `ARCANE_EVENT_SUBSCRIPTION_*` | Use an exact declared name, callable/EventListener object, data options, and AbortSignal |
+| EventTarget adapter input lacks a valid type or data detail | `ARCANE_EVENT_DISPATCH_EVENT_INVALID` | Pass an Event or an Event-like data object; do not use accessors |
+| DOM target/options invalid | `ARCANE_EVENT_DOM_TARGET_INVALID` / `ARCANE_EVENT_DOM_OPTIONS_INVALID` | Supply `CustomEvent` support, `dispatchEvent`, and boolean projection flags |
+| DOM detail conflicts with authority identifiers | `ARCANE_EVENT_DOM_DETAIL_COLLISION` | Remove conflicting `occurrenceId`, `source`, `instanceId`, or `operationId` fields |
 | Constructor flags, clocks, or session id invalid | `TypeError` | Correct types; keep session id non-empty and at most 256 characters |
 | Constructor/import retention or snapshot limits invalid | `RangeError` | Use positive safe integers and keep `maxSnapshotStringLength` at least 64 |
 | Clock returns invalid timestamp or monotonic value | `TypeError` | Supply a valid UTC-compatible clock and finite non-negative monotonic clock |
@@ -948,7 +1166,10 @@ The executable contract is covered by:
   stack-suppression defaults, minimum-budget BigInt/collision/truncation round
   trips, strict forged-import rejection, cursor behavior, review and event
   playback, cancellation, bounded overflow, attach-at-limit cleanup, recovery,
-  and central queue mirroring;
+  central queue mirroring, singleton descriptor/collision admission, duplicate
+  module reuse, source order/privacy/lifecycle, dispatch-safe unsubscribe,
+  EventTarget adapters, one-way DOM projection, and observational listener
+  failures;
 - `test/dom-event-instrumentation.test.mjs`: browser interaction/mutation capture,
   open-shadow observation, privacy defaults, lifecycle, and cleanup;
 - `test/contracts.test.mjs`: published schema and package-export stability;

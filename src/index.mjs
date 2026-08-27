@@ -33,8 +33,18 @@ export {
     validateUpdateRegistry
 } from './update-check.mjs';
 export {
+    ARCANE_EVENT_AUTHORITY_BRAND,
+    ARCANE_EVENT_AUTHORITY_KIND,
+    ARCANE_EVENT_AUTHORITY_PROTOCOL,
+    ARCANE_EVENT_ERROR_CODES,
+    ARCANE_EVENT_LISTENER_ERROR_EVENT,
+    ARCANE_EVENT_OCCURRENCE_PROTOCOL,
+    ARCANE_EVENT_SOURCE_DISPOSED_EVENT,
+    ARCANE_EVENT_SOURCE_KIND,
+    ARCANE_EVENT_SOURCE_PROTOCOL,
     ARCANE_EVENT_STACK_PROTOCOL,
     arcaneEvents,
+    createArcaneEventSource,
     createDOMInstrumentation,
     createEventManager,
     DEFAULT_DOM_EVENT_TYPES,
@@ -45,12 +55,14 @@ export {
     DOM_OBSERVATION_STOPPED_EVENT,
     domSelector,
     EventManager,
+    isArcaneEventOccurrence,
     parseEventStack,
     PLAYBACK_CANCELLED_EVENT,
     PLAYBACK_COMPLETED_EVENT,
     PLAYBACK_FAILED_EVENT,
     PLAYBACK_RECORD_EVENT,
     PLAYBACK_STARTED_EVENT,
+    projectArcaneDOMEvent,
     TIME_TRAVEL_OVERFLOW_EVENT,
     TIME_TRAVEL_SEEK_EVENT
 } from './event-manager.mjs';

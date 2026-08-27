@@ -1,46 +1,98 @@
-# Central event instrumentation and time-travel review
+# Canonical SDK events and time-travel review
 
-`EventManager` is the preferred event instrumentation surface for new Arcane
-SDK code. It composes `event-pubsub` for synchronous delivery and adds Arcane's
-optional diagnostic record around that bus. Existing SDK operation queues mirror
-their normalized events through the shared `arcaneEvents` manager exactly once
-without replacing their awaited callback, backpressure, cancellation, or failure
-semantics.
+`arcaneEvents` is the canonical synchronous SDK event authority. The module
+installs or reuses exactly one branded authority at `globalThis.arcaneEvents` in
+each JavaScript realm, even when the same source is loaded through duplicate
+module URLs. It is not a cross-frame, worker, process, native-host, or cloud bus.
+
+`EventManager` remains the isolated diagnostics API. `new EventManager()` and
+`createEventManager()` each create an independent `event-pubsub` bus whose
+`on()`, `emit()`, and `instrument()` handlers are strict: a synchronous listener
+failure propagates to that publisher. Use `arcaneEvents.subscribe()` and
+`createArcaneEventSource()` for canonical SDK semantic events instead.
 
 Import the dedicated host-neutral entry point:
 
 ```javascript
 import {
     arcaneEvents,
+    createArcaneEventSource,
     createEventManager,
+    projectArcaneDOMEvent,
     PLAYBACK_RECORD_EVENT
 } from 'arcane-os/event-manager';
 ```
 
-Prefer one manager for an application or process boundary. Publish semantic
-events through `instrument()` when source and correlation metadata are known:
+An SDK publisher owns one source handle for its lifetime and declares every
+semantic event type up front:
 
 ```javascript
-arcaneEvents.on('document.save.completed',event=>{
-    console.info('Saved',event.documentId);
+const controller={};
+const events=createArcaneEventSource(controller,{
+    source:'app.editor',
+    eventTypes:['document.save.completed']
 });
 
-arcaneEvents.instrument(
+const unsubscribe=arcaneEvents.subscribe('document.save.completed',occurrence=>{
+    console.info('Saved',occurrence.detail.documentId);
+});
+
+const publication=events.dispatch(
     'document.save.completed',
-    {documentId:'example'},
+    Object.freeze({documentId:'example',document:liveDocument}),
     {
-        source:'app:example',
-        category:'operation',
-        correlationId:'save-42'
+        operationId:'save-42',
+        publicDetail:{documentId:'example'},
+        cancelable:false
     }
 );
+
+projectArcaneDOMEvent(editorElement,publication.occurrence);
+unsubscribe();
 ```
 
-`on`, `once`, `off`, `emit`, `reset`, and `list` retain the synchronous
-`event-pubsub` contract. Synchronous subscriber exceptions propagate to the
-publisher. Subscriber promises are not awaited, so use the SDK's owned event
-queues for work whose completion, failure, or cancellation depends on an
-asynchronous callback.
+`dispatch()` synchronously delivers one immutable `arcane-event-occurrence/1`
+to exact-type canonical subscribers, then an EventTarget-compatible view to the
+source's own listeners. The occurrence contains `occurrenceId`, `type`, `source`,
+`instanceId`, `operationId`, deeply frozen privacy-admitted `detail`,
+`cancelable`, live `defaultPrevented`, and `preventDefault()`. The richer
+compatibility detail remains local to the authority for source listeners and
+optional DOM projection; it is not placed on the canonical bus or in time-travel
+history.
+
+Canonical delivery is observational. Every active listener runs in registration
+order. A listener failure publishes one privacy-safe
+`arcane.event.listener.error` occurrence and is reported through `reportError`
+or `console.error`; it does not undo committed domain work or make
+`dispatch()` throw. An optional source `onListenerError(error,errorOccurrence)`
+callback receives the raw failure only at that owner-local boundary. Subscriber
+promises are not awaited, so keep completion, backpressure, and asynchronous
+failure in the SDK-owned queue or operation that owns them.
+
+`arcaneEvents.subscribe(type,handler,{once=false,signal}={})` returns an
+idempotent unsubscribe function whose `.dispose` property is the same function.
+An already-aborted signal installs nothing, and abort removes the registration
+deterministically. Source `on()` follows the same lifecycle. EventTarget-shaped
+`addEventListener()`/`removeEventListener()` calls deduplicate by
+type/listener/capture. Calling a source's idempotent `dispose()` emits its final
+`arcane.event.source.disposed` occurrence, removes its registrations, and frees
+the owner to register a later source.
+
+Cancellation is synchronous and observational. For a cancelable occurrence,
+canonical or source listeners may call `preventDefault()`; `dispatch()` then
+returns `{occurrence,accepted:false}`. Callers decide whether cancellation gates
+their domain operation. `projectArcaneDOMEvent()` is a one-way compatibility
+projection: it creates one `CustomEvent`, adds the canonical identifiers to a
+frozen outer detail object, propagates DOM cancellation back to the occurrence,
+and never republishes the DOM event into the authority. It returns `false`
+without dispatching when the occurrence is already canceled.
+
+The authority also retains `on`, `once`, `off`, `reset`, `emit`, `instrument`,
+and `forward` for legacy direct EventManager-style diagnostics. Those handlers
+are separate from canonical `subscribe()` registrations; `off()` and `reset()`
+cannot remove canonical or source-owned registrations. New SDK publishers must
+use source handles. Authority-level `dispatchEvent()` exists only as a deprecated
+EventTarget admission adapter for older `aiRuntimeEvents` callers.
 
 ## Enable a bounded, complete event stack
 
@@ -71,7 +123,7 @@ arcaneEvents.disableTimeTravel();
 const serialized=arcaneEvents.exportStack();
 ```
 
-While enabled, every manager event receives an immutable
+While enabled, every isolated-manager event receives an immutable
 `arcane-event-stack/1` record containing the session and event ids, sequence,
 UTC and monotonic timestamps, source/category, correlation and causation ids,
 nested dispatch depth, a bounded payload snapshot, completion or failure
@@ -159,8 +211,6 @@ The npm artifact bundles the exact `event-pubsub` and `strong-type` pair because
 use must preserve that physical sibling layout and provide import-map entries
 for the public SDK entry and `event-pubsub`.
 
-The current `0.1.0-dev.5` hash-pinned Arcane browser runtime does not yet
-bootstrap or package this SDK-authored module. Built-in Shell, Provisioner, and
-native Arcane application instrumentation therefore belongs in the downstream
-Arcane OS integration work; this SDK release does not claim automatic coverage
-inside those surfaces.
+The managed Arcane browser runtime ships the authenticated focused entry and its
+dependency closure. Its import map resolves `arcane-os/event-manager` exactly;
+query, fragment, and subpath variants are not alternate authority identities.

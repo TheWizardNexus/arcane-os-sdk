@@ -13,6 +13,10 @@ export {
 } from './dom-event-instrumentation.mjs';
 
 export const ARCANE_EVENT_STACK_PROTOCOL='arcane-event-stack/1';
+export const ARCANE_EVENT_AUTHORITY_PROTOCOL='arcane-event-authority/1';
+export const ARCANE_EVENT_OCCURRENCE_PROTOCOL='arcane-event-occurrence/1';
+export const ARCANE_EVENT_SOURCE_PROTOCOL='arcane-event-source/1';
+export const ARCANE_EVENT_AUTHORITY_BRAND=Symbol.for('arcane-os.arcane-events-authority');
 export const TIME_TRAVEL_SEEK_EVENT='arcane.time-travel.seek';
 export const PLAYBACK_STARTED_EVENT='arcane.time-travel.playback.started';
 export const PLAYBACK_RECORD_EVENT='arcane.time-travel.playback.record';
@@ -20,6 +24,76 @@ export const PLAYBACK_COMPLETED_EVENT='arcane.time-travel.playback.completed';
 export const PLAYBACK_CANCELLED_EVENT='arcane.time-travel.playback.cancelled';
 export const PLAYBACK_FAILED_EVENT='arcane.time-travel.playback.failed';
 export const TIME_TRAVEL_OVERFLOW_EVENT='arcane.time-travel.overflow';
+
+export const ARCANE_EVENT_AUTHORITY_KIND='arcane-event-authority';
+export const ARCANE_EVENT_SOURCE_KIND='arcane-event-source';
+export const ARCANE_EVENT_LISTENER_ERROR_EVENT='arcane.event.listener.error';
+export const ARCANE_EVENT_SOURCE_DISPOSED_EVENT='arcane.event.source.disposed';
+const ARCANE_EVENT_TARGET_COMPATIBILITY_SOURCE='event-target-compatibility';
+const ARCANE_EVENT_NAME_PATTERN=/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/u;
+const ARCANE_EVENT_CHANNEL_PREFIX='arcane.event.authority.internal:';
+const ARCANE_EVENT_PROJECTION_KEYS=Object.freeze([
+    'occurrenceId','source','instanceId','operationId'
+]);
+const ARCANE_EVENT_REQUIRED_AUTHORITY_API=Object.freeze([
+    'on','once','off','reset','emit','instrument','forward','subscribe','createSource',
+    'projectDOMEvent','isOccurrence','addEventListener','removeEventListener','dispatchEvent'
+]);
+const EVENT_MANAGER_BUS_ON=Symbol('EventManager.busOn');
+const EVENT_MANAGER_BUS_OFF=Symbol('EventManager.busOff');
+const EVENT_MANAGER_DISPATCH=Symbol('EventManager.dispatch');
+
+const ARCANE_EVENT_ERRORS=Object.freeze({
+    ARCANE_EVENT_AUTHORITY_ACCESSOR_COLLISION:
+        'globalThis.arcaneEvents must be an own data property.',
+    ARCANE_EVENT_AUTHORITY_VALUE_COLLISION:
+        'globalThis.arcaneEvents is occupied by an unbranded value.',
+    ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH:
+        'The globalThis.arcaneEvents property, authority brand, or protocol descriptor is incompatible.',
+    ARCANE_EVENT_AUTHORITY_PROTOCOL_MISMATCH:
+        'globalThis.arcaneEvents uses an incompatible authority protocol.',
+    ARCANE_EVENT_AUTHORITY_API_MISMATCH:
+        'globalThis.arcaneEvents does not expose the required authority API.',
+    ARCANE_EVENT_AUTHORITY_INSTALL_FAILED:
+        'The Arcane event authority could not be installed on globalThis.',
+    ARCANE_EVENT_SOURCE_INVALID:
+        'Arcane event source options are invalid.',
+    ARCANE_EVENT_SOURCE_ALREADY_REGISTERED:
+        'The owner already has an active Arcane event source.',
+    ARCANE_EVENT_SOURCE_DISPOSED:
+        'The Arcane event source is disposed.',
+    ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED:
+        'The Arcane event source cannot publish an undeclared event type.',
+    ARCANE_EVENT_COMPATIBILITY_DETAIL_INVALID:
+        'Arcane event compatibility detail must be immutable or safely shallow-copyable.',
+    ARCANE_EVENT_OCCURRENCE_INVALID:
+        'The Arcane event occurrence value or creation options are invalid.',
+    ARCANE_EVENT_OCCURRENCE_SEQUENCE_EXHAUSTED:
+        'The Arcane event occurrence sequence is exhausted.',
+    ARCANE_EVENT_SOURCE_SEQUENCE_EXHAUSTED:
+        'The Arcane event source sequence is exhausted.',
+    ARCANE_EVENT_LISTENER_CALLBACK_FAILED:
+        'An Arcane event listener threw during observational delivery.',
+    ARCANE_EVENT_DOM_DETAIL_COLLISION:
+        'Arcane DOM projection metadata conflicts with compatibility detail.',
+    ARCANE_EVENT_DOM_TARGET_INVALID:
+        'Arcane DOM projection requires a target with dispatchEvent and CustomEvent support.',
+    ARCANE_EVENT_DOM_OPTIONS_INVALID:
+        'Arcane DOM projection options are invalid.',
+    ARCANE_EVENT_SUBSCRIPTION_TYPE_INVALID:
+        'Arcane event subscription type must be a nonempty trimmed string.',
+    ARCANE_EVENT_SUBSCRIPTION_HANDLER_INVALID:
+        'Arcane event subscription handler must be a function or EventListener object.',
+    ARCANE_EVENT_SUBSCRIPTION_OPTIONS_INVALID:
+        'Arcane event subscription options are invalid.',
+    ARCANE_EVENT_SUBSCRIPTION_SIGNAL_INVALID:
+        'Arcane event subscription signal must be an AbortSignal.',
+    ARCANE_EVENT_DISPATCH_EVENT_INVALID:
+        'arcaneEvents.dispatchEvent requires an Event-like object with a valid type and data detail.'
+});
+export const ARCANE_EVENT_ERROR_CODES=Object.freeze(Object.fromEntries(
+    Object.keys(ARCANE_EVENT_ERRORS).map(code=>[code,code])
+));
 
 const SENSITIVE_KEY_PATTERN=/(?:authorization|cookie|credential|pass(?:word|phrase)?|private.?key|secret|session.?token|token|api.?key)/iu;
 const PRIVATE_CONTENT_KEY_PATTERN=/^(?:data|detail|key)$/iu;
@@ -899,6 +973,20 @@ export class EventManager{
     get history(){return Object.freeze([...this.#history]);}
     get domInstrumentation(){return this.#domInstrumentation;}
 
+    [EVENT_MANAGER_BUS_ON](type,handler,once=false){
+        this.#bus.on(type,handler,once);
+        return this;
+    }
+
+    [EVENT_MANAGER_BUS_OFF](type,handler='*'){
+        this.#bus.off(type,handler);
+        return this;
+    }
+
+    [EVENT_MANAGER_DISPATCH](type,payload,metadata={}){
+        return this.#dispatch(type,[payload],metadata);
+    }
+
     on(type,handler,once=false){
         this.#bus.on(type,handler,once);
         return this;
@@ -1339,4 +1427,978 @@ export function createEventManager(options){
     return new EventManager(options);
 }
 
-export const arcaneEvents=new EventManager();
+function eventAuthorityError(code,cause,ErrorType=Error){
+    const message=ARCANE_EVENT_ERRORS[code]??'The Arcane event authority failed.';
+    const error=cause===undefined
+        ?new ErrorType(message)
+        :new ErrorType(message,{cause});
+    error.code=code;
+    return error;
+}
+
+function eventName(value,code='ARCANE_EVENT_SUBSCRIPTION_TYPE_INVALID'){
+    if(typeof value!=='string'
+        ||value.trim()!==value
+        ||value.length<1
+        ||value.length>128
+        ||!ARCANE_EVENT_NAME_PATTERN.test(value)){
+        throw eventAuthorityError(code,undefined,TypeError);
+    }
+    return value;
+}
+
+function eventDataOptions(value,allowed,code){
+    if(value===undefined)return Object.create(null);
+    if(!value||typeof value!=='object'||Array.isArray(value)){
+        throw eventAuthorityError(code,undefined,TypeError);
+    }
+    const prototype=Object.getPrototypeOf(value);
+    if(prototype!==Object.prototype&&prototype!==null){
+        throw eventAuthorityError(code,undefined,TypeError);
+    }
+    const result=Object.create(null);
+    for(const key of Reflect.ownKeys(value)){
+        if(typeof key!=='string'||!allowed.has(key)){
+            throw eventAuthorityError(code,undefined,TypeError);
+        }
+        const descriptor=Object.getOwnPropertyDescriptor(value,key);
+        if(!descriptor||!('value' in descriptor)){
+            throw eventAuthorityError(code,undefined,TypeError);
+        }
+        result[key]=descriptor.value;
+    }
+    return result;
+}
+
+function eventSignal(value){
+    if(value===undefined||value===null)return null;
+    if(!value
+        ||typeof value!=='object'
+        ||typeof value.aborted!=='boolean'
+        ||typeof value.addEventListener!=='function'
+        ||typeof value.removeEventListener!=='function'){
+        throw eventAuthorityError(
+            'ARCANE_EVENT_SUBSCRIPTION_SIGNAL_INVALID',
+            undefined,
+            TypeError
+        );
+    }
+    return value;
+}
+
+function eventListener(value){
+    if(typeof value==='function'){
+        return Object.freeze({
+            identity:value,
+            invoke(event,thisArg,...rest){return value.call(thisArg,event,...rest);}
+        });
+    }
+    if(value&&typeof value==='object'&&typeof value.handleEvent==='function'){
+        return Object.freeze({
+            identity:value,
+            invoke(event){return value.handleEvent(event);}
+        });
+    }
+    throw eventAuthorityError(
+        'ARCANE_EVENT_SUBSCRIPTION_HANDLER_INVALID',
+        undefined,
+        TypeError
+    );
+}
+
+function compatibilityDetail(value){
+    if(value===null||(typeof value!=='object'&&typeof value!=='function'))return value;
+    if(Array.isArray(value))return Object.freeze(value.slice());
+    const prototype=Object.getPrototypeOf(value);
+    if(prototype!==Object.prototype&&prototype!==null)return value;
+    const copy=prototype===null?Object.create(null):{};
+    for(const key of Reflect.ownKeys(value)){
+        const descriptor=Object.getOwnPropertyDescriptor(value,key);
+        if(!descriptor||!('value' in descriptor)){
+            throw eventAuthorityError(
+                'ARCANE_EVENT_COMPATIBILITY_DETAIL_INVALID',
+                undefined,
+                TypeError
+            );
+        }
+        Object.defineProperty(copy,key,{
+            value:descriptor.value,
+            enumerable:descriptor.enumerable,
+            configurable:false,
+            writable:false
+        });
+    }
+    return Object.freeze(copy);
+}
+
+function eventTargetOptions(value){
+    if(value===undefined)return Object.freeze({capture:false,once:false,signal:null});
+    if(typeof value==='boolean'){
+        return Object.freeze({capture:value,once:false,signal:null});
+    }
+    const options=eventDataOptions(
+        value,
+        new Set(['capture','once','passive','signal']),
+        'ARCANE_EVENT_SUBSCRIPTION_OPTIONS_INVALID'
+    );
+    for(const key of ['capture','once','passive']){
+        if(options[key]!==undefined&&typeof options[key]!=='boolean'){
+            throw eventAuthorityError(
+                'ARCANE_EVENT_SUBSCRIPTION_OPTIONS_INVALID',
+                undefined,
+                TypeError
+            );
+        }
+    }
+    return Object.freeze({
+        capture:options.capture===true,
+        once:options.once===true,
+        signal:eventSignal(options.signal)
+    });
+}
+
+function subscriptionOptions(value){
+    const options=eventDataOptions(
+        value,
+        new Set(['once','signal']),
+        'ARCANE_EVENT_SUBSCRIPTION_OPTIONS_INVALID'
+    );
+    if(options.once!==undefined&&typeof options.once!=='boolean'){
+        throw eventAuthorityError(
+            'ARCANE_EVENT_SUBSCRIPTION_OPTIONS_INVALID',
+            undefined,
+            TypeError
+        );
+    }
+    return Object.freeze({
+        once:options.once===true,
+        signal:eventSignal(options.signal)
+    });
+}
+
+function defineDisposable(unsubscribe){
+    Object.defineProperty(unsubscribe,'dispose',{
+        value:unsubscribe,
+        enumerable:false,
+        configurable:false,
+        writable:false
+    });
+    return unsubscribe;
+}
+
+function eventLikeRecord(value){
+    try{
+        if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError();
+        const EventConstructor=globalThis.Event;
+        if(typeof EventConstructor==='function'&&value instanceof EventConstructor){
+            if(!('detail' in value))throw new TypeError();
+            return {
+                type:eventName(value.type,'ARCANE_EVENT_DISPATCH_EVENT_INVALID'),
+                detail:value.detail,
+                cancelable:value.cancelable===true,
+                defaultPrevented:value.defaultPrevented===true,
+                preventDefault:typeof value.preventDefault==='function'
+                    ?()=>value.preventDefault()
+                    :null
+            };
+        }
+        const typeDescriptor=Object.getOwnPropertyDescriptor(value,'type');
+        const detailDescriptor=Object.getOwnPropertyDescriptor(value,'detail');
+        const cancelableDescriptor=Object.getOwnPropertyDescriptor(value,'cancelable');
+        const preventedDescriptor=Object.getOwnPropertyDescriptor(value,'defaultPrevented');
+        if(!typeDescriptor||!('value' in typeDescriptor)
+            ||!detailDescriptor||!('value' in detailDescriptor)
+            ||(cancelableDescriptor&&!('value' in cancelableDescriptor))
+            ||(preventedDescriptor&&!('value' in preventedDescriptor))){
+            throw new TypeError();
+        }
+        return {
+            type:eventName(typeDescriptor.value,'ARCANE_EVENT_DISPATCH_EVENT_INVALID'),
+            detail:detailDescriptor?.value,
+            cancelable:cancelableDescriptor?.value===true,
+            defaultPrevented:preventedDescriptor?.value===true,
+            preventDefault:typeof value.preventDefault==='function'
+                ?()=>value.preventDefault()
+                :null
+        };
+    }catch(error){
+        if(error?.code==='ARCANE_EVENT_DISPATCH_EVENT_INVALID')throw error;
+        throw eventAuthorityError(
+            'ARCANE_EVENT_DISPATCH_EVENT_INVALID',
+            error,
+            TypeError
+        );
+    }
+}
+
+function createArcaneEventAuthority(){
+    const manager=new EventManager();
+    const sourceByOwner=new WeakMap();
+    const occurrences=new WeakSet();
+    const canonicalByView=new WeakMap();
+    const compatibilityByOccurrence=new WeakMap();
+    const sourceRecordByOccurrence=new WeakMap();
+    const authorityTargetListeners=[];
+    const legacyListeners=[];
+    let occurrenceSequence=0;
+    let sourceSequence=0;
+    let reportingListenerError=false;
+    let canonicalDispatchDepth=0;
+    const pendingChannelRemovals=[];
+
+    const descriptor=Object.freeze({
+        kind:ARCANE_EVENT_AUTHORITY_KIND,
+        protocol:ARCANE_EVENT_AUTHORITY_PROTOCOL,
+        realm:'current'
+    });
+
+    function nextOccurrenceId(){
+        if(occurrenceSequence===Number.MAX_SAFE_INTEGER){
+            throw eventAuthorityError('ARCANE_EVENT_OCCURRENCE_SEQUENCE_EXHAUSTED');
+        }
+        occurrenceSequence+=1;
+        return `arcane-event-${occurrenceSequence.toString(36)}`;
+    }
+
+    function nextSourceId(){
+        if(sourceSequence===Number.MAX_SAFE_INTEGER){
+            throw eventAuthorityError('ARCANE_EVENT_SOURCE_SEQUENCE_EXHAUSTED');
+        }
+        sourceSequence+=1;
+        return `arcane-source-${sourceSequence.toString(36)}`;
+    }
+
+    function directListenerFailure(error){
+        try{
+            if(typeof globalThis.reportError==='function'){
+                globalThis.reportError(error);
+                return;
+            }
+        }catch{}
+        try{globalThis.console?.error?.('Arcane event listener failed.',error);}
+        catch{}
+    }
+
+    function publicEventDetail(value){
+        return frozenSnapshot(value??{}, {
+            redactSensitive:true,
+            captureStacks:false,
+            maxDepth:16,
+            maxEntries:256,
+            maxStringLength:2_048
+        });
+    }
+
+    function canonicalOccurrence({
+        type,
+        source,
+        instanceId,
+        operationId,
+        detail,
+        cancelable,
+        defaultPrevented=false
+    }){
+        let prevented=cancelable&&defaultPrevented;
+        const occurrence={};
+        Object.defineProperties(occurrence,{
+            protocol:{value:ARCANE_EVENT_OCCURRENCE_PROTOCOL,enumerable:true},
+            occurrenceId:{value:nextOccurrenceId(),enumerable:true},
+            type:{value:type,enumerable:true},
+            source:{value:source,enumerable:true},
+            instanceId:{value:instanceId,enumerable:true},
+            operationId:{value:operationId,enumerable:true},
+            detail:{value:detail,enumerable:true},
+            cancelable:{value:cancelable,enumerable:true},
+            defaultPrevented:{get(){return prevented;},enumerable:true},
+            preventDefault:{
+                value:function preventArcaneEventDefault(){
+                    if(cancelable)prevented=true;
+                },
+                enumerable:true
+            }
+        });
+        Object.freeze(occurrence);
+        occurrences.add(occurrence);
+        return occurrence;
+    }
+
+    function compatibilityView(occurrence,detail){
+        const view={};
+        Object.defineProperties(view,{
+            protocol:{value:occurrence.protocol,enumerable:true},
+            occurrenceId:{value:occurrence.occurrenceId,enumerable:true},
+            type:{value:occurrence.type,enumerable:true},
+            source:{value:occurrence.source,enumerable:true},
+            instanceId:{value:occurrence.instanceId,enumerable:true},
+            operationId:{value:occurrence.operationId,enumerable:true},
+            detail:{value:detail,enumerable:true},
+            cancelable:{value:occurrence.cancelable,enumerable:true},
+            defaultPrevented:{get(){return occurrence.defaultPrevented;},enumerable:true},
+            preventDefault:{value:()=>occurrence.preventDefault(),enumerable:true}
+        });
+        Object.freeze(view);
+        canonicalByView.set(view,occurrence);
+        return view;
+    }
+
+    function removeChannelListener(channel,handler){
+        if(canonicalDispatchDepth>0){
+            pendingChannelRemovals.push(Object.freeze({channel,handler}));
+            return;
+        }
+        manager[EVENT_MANAGER_BUS_OFF](channel,handler);
+    }
+
+    function flushChannelRemovals(){
+        if(canonicalDispatchDepth>0)return;
+        for(const {channel,handler} of pendingChannelRemovals.splice(0)){
+            manager[EVENT_MANAGER_BUS_OFF](channel,handler);
+        }
+    }
+
+    function dispatchChannel(channel,value,metadata){
+        canonicalDispatchDepth+=1;
+        try{return manager[EVENT_MANAGER_DISPATCH](channel,value,metadata);}
+        finally{
+            canonicalDispatchDepth-=1;
+            flushChannelRemovals();
+        }
+    }
+
+    function subscribeChannel(channel,handler,options,{
+        thisArg=undefined,
+        sourceRecord=null,
+        select=value=>value,
+        onRemove=null
+    }={}){
+        const admitted=eventListener(handler);
+        const normalized=subscriptionOptions(options);
+        let active=false;
+        let abortHandler=null;
+        function unsubscribeArcaneEvent(){
+            if(!active)return false;
+            active=false;
+            removeChannelListener(channel,deliverArcaneEvent);
+            if(abortHandler){
+                normalized.signal?.removeEventListener('abort',abortHandler);
+                abortHandler=null;
+            }
+            onRemove?.(unsubscribeArcaneEvent);
+            return true;
+        }
+        defineDisposable(unsubscribeArcaneEvent);
+        if(normalized.signal?.aborted)return unsubscribeArcaneEvent;
+        function deliverArcaneEvent(value){
+            if(!active)return;
+            if(normalized.once)unsubscribeArcaneEvent();
+            const delivered=select(value);
+            try{admitted.invoke(delivered,thisArg);}
+            catch(error){reportListenerFailure(error,delivered,sourceRecord);}
+        }
+        manager[EVENT_MANAGER_BUS_ON](channel,deliverArcaneEvent);
+        active=true;
+        if(normalized.signal){
+            abortHandler=unsubscribeArcaneEvent;
+            normalized.signal.addEventListener('abort',abortHandler,{once:true});
+        }
+        return unsubscribeArcaneEvent;
+    }
+
+    function reportListenerFailure(error,event,sourceRecord){
+        const occurrence=occurrences.has(event)
+            ?event
+            :canonicalByView.get(event)??null;
+        const ownerRecord=sourceRecord??(occurrence
+            ?sourceRecordByOccurrence.get(occurrence)??null
+            :null);
+        if(reportingListenerError){
+            directListenerFailure(error);
+            return;
+        }
+        reportingListenerError=true;
+        let errorOccurrence=null;
+        try{
+            const detail=Object.freeze({
+                code:'ARCANE_EVENT_LISTENER_CALLBACK_FAILED',
+                reason:'listener-threw',
+                eventType:occurrence?.type??null,
+                occurrenceId:occurrence?.occurrenceId??null,
+                source:occurrence?.source??ownerRecord?.source??'event-authority',
+                instanceId:occurrence?.instanceId??ownerRecord?.instanceId??null,
+                operationId:occurrence?.operationId??null
+            });
+            errorOccurrence=dispatchOccurrence({
+                type:ARCANE_EVENT_LISTENER_ERROR_EVENT,
+                sourceRecord:null,
+                source:'event-authority',
+                instanceId:'arcane-source-authority',
+                compatibility:detail,
+                publicDetail:detail,
+                operationId:occurrence?.operationId??null,
+                cancelable:false
+            }).occurrence;
+        }catch(reportingError){
+            directListenerFailure(reportingError);
+        }
+        directListenerFailure(error);
+        try{ownerRecord?.onListenerError?.(error,errorOccurrence);}
+        catch(callbackError){directListenerFailure(callbackError);}
+        reportingListenerError=false;
+    }
+
+    function globalChannel(type){return `${ARCANE_EVENT_CHANNEL_PREFIX}global:${type}`;}
+    function sourceChannel(instanceId,type){
+        return `${ARCANE_EVENT_CHANNEL_PREFIX}source:${instanceId}:${type}`;
+    }
+
+    function dispatchOccurrence({
+        type,
+        sourceRecord,
+        source,
+        instanceId,
+        compatibility,
+        publicDetail,
+        operationId=null,
+        cancelable=false,
+        defaultPrevented=false
+    }){
+        const admittedType=eventName(type,'ARCANE_EVENT_OCCURRENCE_INVALID');
+        const admittedCompatibility=compatibilityDetail(compatibility);
+        const occurrence=canonicalOccurrence({
+            type:admittedType,
+            source,
+            instanceId,
+            operationId,
+            detail:publicEventDetail(publicDetail),
+            cancelable,
+            defaultPrevented
+        });
+        const view=compatibilityView(occurrence,admittedCompatibility);
+        compatibilityByOccurrence.set(occurrence,admittedCompatibility);
+        if(sourceRecord)sourceRecordByOccurrence.set(occurrence,sourceRecord);
+        dispatchChannel(globalChannel(admittedType),occurrence,{
+            source:'event-authority',
+            category:'semantic'
+        });
+        if(sourceRecord){
+            dispatchChannel(
+                sourceChannel(instanceId,admittedType),
+                view,
+                {source,category:'semantic',correlationId:operationId}
+            );
+        }
+        return Object.freeze({occurrence,accepted:!occurrence.defaultPrevented});
+    }
+
+    function subscribe(type,handler,options){
+        const admittedType=eventName(type);
+        return subscribeChannel(globalChannel(admittedType),handler,options,{
+            thisArg:manager
+        });
+    }
+
+    function addEventTargetListener(registrations,type,handler,options,subscribeWith,thisArg){
+        const admittedType=eventName(type);
+        const admitted=eventListener(handler);
+        const normalized=eventTargetOptions(options);
+        if(normalized.signal?.aborted)return;
+        if(registrations.some(record=>record.type===admittedType
+            &&record.identity===admitted.identity
+            &&record.capture===normalized.capture))return;
+        const record={
+            type:admittedType,
+            identity:admitted.identity,
+            capture:normalized.capture,
+            unsubscribe:null
+        };
+        const unsubscribe=subscribeWith(
+            admittedType,
+            function deliverEventTargetOccurrence(event){
+                if(normalized.once){
+                    const index=registrations.indexOf(record);
+                    if(index>=0)registrations.splice(index,1);
+                    record.unsubscribe?.();
+                }
+                return admitted.invoke(event,thisArg);
+            },
+            {once:false,signal:normalized.signal}
+        );
+        record.unsubscribe=unsubscribe;
+        registrations.push(record);
+        if(normalized.signal){
+            normalized.signal.addEventListener('abort',function removeAbortedEventTargetRecord(){
+                const index=registrations.indexOf(record);
+                if(index>=0)registrations.splice(index,1);
+            },{once:true});
+        }
+    }
+
+    function removeEventTargetListener(registrations,type,handler,options){
+        const admittedType=eventName(type);
+        const admitted=eventListener(handler);
+        const normalized=eventTargetOptions(options);
+        const index=registrations.findIndex(record=>record.type===admittedType
+            &&record.identity===admitted.identity
+            &&record.capture===normalized.capture);
+        if(index<0)return;
+        const [record]=registrations.splice(index,1);
+        record.unsubscribe();
+    }
+
+    function dispatchEventLike(value,sourceRecord=null){
+        const admitted=eventLikeRecord(value);
+        if(sourceRecord&&!sourceRecord.eventTypes.has(admitted.type)){
+            throw eventAuthorityError('ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED');
+        }
+        const detail=compatibilityDetail(admitted.detail);
+        const operationId=detail&&typeof detail==='object'
+            &&typeof detail.operationId==='string'
+            &&detail.operationId.trim()===detail.operationId
+            &&detail.operationId
+            ?detail.operationId
+            :null;
+        const publication=dispatchOccurrence({
+            type:admitted.type,
+            sourceRecord,
+            source:sourceRecord?.source??ARCANE_EVENT_TARGET_COMPATIBILITY_SOURCE,
+            instanceId:sourceRecord?.instanceId??'arcane-source-compatibility',
+            compatibility:detail,
+            publicDetail:detail,
+            operationId,
+            cancelable:admitted.cancelable,
+            defaultPrevented:admitted.defaultPrevented
+        });
+        if(publication.occurrence.defaultPrevented)admitted.preventDefault?.();
+        return !publication.occurrence.defaultPrevented;
+    }
+
+    function createSource(owner,options){
+        if(!owner||(typeof owner!=='object'&&typeof owner!=='function')){
+            throw eventAuthorityError('ARCANE_EVENT_SOURCE_INVALID',undefined,TypeError);
+        }
+        const admitted=eventDataOptions(
+            options,
+            new Set(['source','eventTypes','onListenerError']),
+            'ARCANE_EVENT_SOURCE_INVALID'
+        );
+        const source=eventName(admitted.source,'ARCANE_EVENT_SOURCE_INVALID');
+        if(!Array.isArray(admitted.eventTypes)
+            ||admitted.eventTypes.length<1
+            ||admitted.eventTypes.length>256){
+            throw eventAuthorityError('ARCANE_EVENT_SOURCE_INVALID',undefined,TypeError);
+        }
+        const eventTypes=[];
+        const seen=new Set();
+        for(const type of admitted.eventTypes){
+            const normalized=eventName(type,'ARCANE_EVENT_SOURCE_INVALID');
+            if(seen.has(normalized)){
+                throw eventAuthorityError('ARCANE_EVENT_SOURCE_INVALID',undefined,TypeError);
+            }
+            seen.add(normalized);
+            eventTypes.push(normalized);
+        }
+        if(admitted.onListenerError!==undefined
+            &&typeof admitted.onListenerError!=='function'){
+            throw eventAuthorityError('ARCANE_EVENT_SOURCE_INVALID',undefined,TypeError);
+        }
+        const existing=sourceByOwner.get(owner);
+        if(existing&&!existing.disposed){
+            throw eventAuthorityError('ARCANE_EVENT_SOURCE_ALREADY_REGISTERED');
+        }
+        const record={
+            source,
+            instanceId:nextSourceId(),
+            eventTypes:new Set(eventTypes),
+            onListenerError:admitted.onListenerError??null,
+            subscriptions:new Set(),
+            targetListeners:[],
+            disposing:false,
+            disposed:false,
+            handle:null
+        };
+        function assertOpen(){
+            if(record.disposing||record.disposed){
+                throw eventAuthorityError('ARCANE_EVENT_SOURCE_DISPOSED');
+            }
+        }
+        function sourceSubscribe(type,handler,subscribeOptions){
+            assertOpen();
+            const admittedType=eventName(type);
+            if(!record.eventTypes.has(admittedType)
+                &&admittedType!==ARCANE_EVENT_SOURCE_DISPOSED_EVENT){
+                throw eventAuthorityError('ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED');
+            }
+            let unsubscribe;
+            unsubscribe=subscribeChannel(
+                sourceChannel(record.instanceId,admittedType),
+                handler,
+                subscribeOptions,
+                {
+                    thisArg:record.handle,
+                    sourceRecord:record,
+                    onRemove(){record.subscriptions.delete(unsubscribe);}
+                }
+            );
+            record.subscriptions.add(unsubscribe);
+            return unsubscribe;
+        }
+        function dispatch(type,detail,dispatchOptions){
+            assertOpen();
+            const admittedType=eventName(type,'ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED');
+            if(!record.eventTypes.has(admittedType)){
+                throw eventAuthorityError('ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED');
+            }
+            const normalized=eventDataOptions(
+                dispatchOptions,
+                new Set(['operationId','publicDetail','cancelable']),
+                'ARCANE_EVENT_OCCURRENCE_INVALID'
+            );
+            const operationId=normalized.operationId??null;
+            if(operationId!==null&&(typeof operationId!=='string'
+                ||operationId.trim()!==operationId
+                ||operationId.length<1
+                ||operationId.length>256)){
+                throw eventAuthorityError('ARCANE_EVENT_OCCURRENCE_INVALID',undefined,TypeError);
+            }
+            if(normalized.cancelable!==undefined&&typeof normalized.cancelable!=='boolean'){
+                throw eventAuthorityError('ARCANE_EVENT_OCCURRENCE_INVALID',undefined,TypeError);
+            }
+            return dispatchOccurrence({
+                type:admittedType,
+                sourceRecord:record,
+                source:record.source,
+                instanceId:record.instanceId,
+                compatibility:detail,
+                publicDetail:normalized.publicDetail??{},
+                operationId,
+                cancelable:normalized.cancelable===true
+            });
+        }
+        function dispose(){
+            if(record.disposed||record.disposing)return false;
+            record.disposing=true;
+            try{
+                dispatchOccurrence({
+                    type:ARCANE_EVENT_SOURCE_DISPOSED_EVENT,
+                    sourceRecord:record,
+                    source:record.source,
+                    instanceId:record.instanceId,
+                    compatibility:Object.freeze({
+                        source:record.source,
+                        instanceId:record.instanceId,
+                        reason:'source-disposed'
+                    }),
+                    publicDetail:Object.freeze({reason:'source-disposed'}),
+                    operationId:null,
+                    cancelable:false
+                });
+                return true;
+            }finally{
+                record.disposed=true;
+                for(const unsubscribe of [...record.subscriptions])unsubscribe();
+                record.targetListeners.length=0;
+                sourceByOwner.delete(owner);
+                record.disposing=false;
+            }
+        }
+        const sourceDescriptor=Object.freeze({
+            kind:ARCANE_EVENT_SOURCE_KIND,
+            protocol:ARCANE_EVENT_SOURCE_PROTOCOL,
+            source,
+            instanceId:record.instanceId,
+            eventTypes:Object.freeze([...eventTypes,ARCANE_EVENT_SOURCE_DISPOSED_EVENT])
+        });
+        const handle={
+            protocol:ARCANE_EVENT_SOURCE_PROTOCOL,
+            descriptor:sourceDescriptor,
+            source,
+            instanceId:record.instanceId,
+            eventTypes:sourceDescriptor.eventTypes,
+            subscribe:sourceSubscribe,
+            on:sourceSubscribe,
+            once(type,handler,options={}){
+                const normalized=subscriptionOptions(options);
+                return sourceSubscribe(type,handler,{
+                    once:true,
+                    signal:normalized.signal
+                });
+            },
+            addEventListener(type,handler,options){
+                assertOpen();
+                addEventTargetListener(
+                    record.targetListeners,
+                    type,
+                    handler,
+                    options,
+                    sourceSubscribe,
+                    handle
+                );
+            },
+            removeEventListener(type,handler,options){
+                removeEventTargetListener(record.targetListeners,type,handler,options);
+            },
+            dispatch,
+            dispatchEvent(value){assertOpen();return dispatchEventLike(value,record);},
+            dispose,
+            destroy:dispose
+        };
+        Object.defineProperty(handle,'disposed',{
+            get(){return record.disposing||record.disposed;},
+            enumerable:true
+        });
+        record.handle=Object.freeze(handle);
+        sourceByOwner.set(owner,record);
+        return record.handle;
+    }
+
+    function projectDOMEvent(target,occurrence,options){
+        if(!occurrences.has(occurrence)){
+            throw eventAuthorityError('ARCANE_EVENT_OCCURRENCE_INVALID',undefined,TypeError);
+        }
+        if(occurrence.defaultPrevented)return false;
+        const admitted=eventDataOptions(
+            options,
+            new Set(['type','bubbles','composed','cancelable']),
+            'ARCANE_EVENT_DOM_OPTIONS_INVALID'
+        );
+        const type=admitted.type===undefined
+            ?occurrence.type
+            :eventName(admitted.type,'ARCANE_EVENT_DOM_OPTIONS_INVALID');
+        for(const key of ['bubbles','composed','cancelable']){
+            if(admitted[key]!==undefined&&typeof admitted[key]!=='boolean'){
+                throw eventAuthorityError('ARCANE_EVENT_DOM_OPTIONS_INVALID',undefined,TypeError);
+            }
+        }
+        if(!target||typeof target.dispatchEvent!=='function'
+            ||typeof globalThis.CustomEvent!=='function'){
+            throw eventAuthorityError('ARCANE_EVENT_DOM_TARGET_INVALID',undefined,TypeError);
+        }
+        const compatibility=compatibilityByOccurrence.get(occurrence);
+        let detail;
+        const compatibilityPrototype=compatibility&&typeof compatibility==='object'
+            ?Object.getPrototypeOf(compatibility)
+            :undefined;
+        if(compatibility&&typeof compatibility==='object'
+            &&!Array.isArray(compatibility)
+            &&(compatibilityPrototype===Object.prototype||compatibilityPrototype===null)){
+            detail={};
+            for(const key of Reflect.ownKeys(compatibility)){
+                const descriptor=Object.getOwnPropertyDescriptor(compatibility,key);
+                if(!descriptor||!('value' in descriptor)){
+                    throw eventAuthorityError('ARCANE_EVENT_COMPATIBILITY_DETAIL_INVALID');
+                }
+                Object.defineProperty(detail,key,{
+                    value:descriptor.value,
+                    enumerable:descriptor.enumerable,
+                    configurable:false,
+                    writable:false
+                });
+            }
+        }else{
+            detail={value:compatibility};
+        }
+        const metadata={
+            occurrenceId:occurrence.occurrenceId,
+            source:occurrence.source,
+            instanceId:occurrence.instanceId,
+            operationId:occurrence.operationId
+        };
+        for(const key of ARCANE_EVENT_PROJECTION_KEYS){
+            if(Object.hasOwn(detail,key)&&detail[key]!==metadata[key]){
+                throw eventAuthorityError('ARCANE_EVENT_DOM_DETAIL_COLLISION');
+            }
+            Object.defineProperty(detail,key,{
+                value:metadata[key],
+                enumerable:true,
+                configurable:false,
+                writable:false
+            });
+        }
+        Object.freeze(detail);
+        const cancelable=admitted.cancelable??occurrence.cancelable;
+        const event=new CustomEvent(type,{
+            detail,
+            bubbles:admitted.bubbles===true,
+            composed:admitted.composed===true,
+            cancelable
+        });
+        const accepted=target.dispatchEvent(event)!==false&&!event.defaultPrevented;
+        if(!accepted&&occurrence.cancelable)occurrence.preventDefault();
+        return accepted&&!occurrence.defaultPrevented;
+    }
+
+    function safeLegacyOn(type,handler,once=false){
+        const admittedType=type==='*'?'*':eventName(type);
+        const admitted=eventListener(handler);
+        if(typeof once!=='boolean'){
+            throw eventAuthorityError('ARCANE_EVENT_SUBSCRIPTION_OPTIONS_INVALID',undefined,TypeError);
+        }
+        const record={type:admittedType,identity:admitted.identity,wrapper:null};
+        function safeLegacyListener(value,...rest){
+            if(once)removeLegacyRecord(record);
+            try{admitted.invoke(value,manager,...rest);}
+            catch(error){reportListenerFailure(error,null,null);}
+        }
+        record.wrapper=safeLegacyListener;
+        legacyListeners.push(record);
+        manager[EVENT_MANAGER_BUS_ON](admittedType,safeLegacyListener);
+        return manager;
+    }
+
+    function removeLegacyRecord(record){
+        const index=legacyListeners.indexOf(record);
+        if(index<0)return false;
+        legacyListeners.splice(index,1);
+        manager[EVENT_MANAGER_BUS_OFF](record.type,record.wrapper);
+        return true;
+    }
+
+    function safeLegacyOff(type='*',handler='*'){
+        const admittedType=type==='*'?'*':eventName(type);
+        const selected=legacyListeners.filter(record=>(admittedType==='*'||record.type===admittedType)
+            &&(handler==='*'||record.identity===handler));
+        if(handler!=='*')eventListener(handler);
+        for(const record of selected)removeLegacyRecord(record);
+        return manager;
+    }
+
+    function safeLegacyReset(){
+        for(const record of [...legacyListeners])removeLegacyRecord(record);
+        return manager;
+    }
+
+    Object.defineProperties(manager,{
+        [ARCANE_EVENT_AUTHORITY_BRAND]:{
+            value:ARCANE_EVENT_AUTHORITY_PROTOCOL,
+            enumerable:false,
+            configurable:false,
+            writable:false
+        },
+        protocol:{value:ARCANE_EVENT_AUTHORITY_PROTOCOL,enumerable:true},
+        descriptor:{value:descriptor,enumerable:true},
+        on:{value:safeLegacyOn},
+        once:{value:(type,handler)=>safeLegacyOn(type,handler,true)},
+        off:{value:safeLegacyOff},
+        reset:{value:safeLegacyReset},
+        subscribe:{value:subscribe,enumerable:true},
+        createSource:{value:createSource,enumerable:true},
+        projectDOMEvent:{value:projectDOMEvent,enumerable:true},
+        isOccurrence:{
+            value:value=>occurrences.has(value)||canonicalByView.has(value),
+            enumerable:true
+        },
+        addEventListener:{
+            value(type,handler,options){
+                addEventTargetListener(
+                    authorityTargetListeners,
+                    type,
+                    handler,
+                    options,
+                    subscribe,
+                    manager
+                );
+            },
+            enumerable:true
+        },
+        removeEventListener:{
+            value(type,handler,options){
+                removeEventTargetListener(authorityTargetListeners,type,handler,options);
+            },
+            enumerable:true
+        },
+        dispatchEvent:{value:value=>dispatchEventLike(value),enumerable:true}
+    });
+    return Object.freeze(manager);
+}
+
+function validateInstalledArcaneEventAuthority(value,descriptor){
+    if(!descriptor||!('value' in descriptor)){
+        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_ACCESSOR_COLLISION');
+    }
+    if(descriptor.enumerable!==false
+        ||descriptor.writable!==false
+        ||descriptor.configurable!==false){
+        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH');
+    }
+    if(!value||(typeof value!=='object'&&typeof value!=='function')){
+        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_VALUE_COLLISION');
+    }
+    const brand=Object.getOwnPropertyDescriptor(value,ARCANE_EVENT_AUTHORITY_BRAND);
+    if(!brand||!('value' in brand)){
+        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_VALUE_COLLISION');
+    }
+    if(brand.enumerable!==false
+        ||brand.writable!==false
+        ||brand.configurable!==false){
+        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH');
+    }
+    const protocol=Object.getOwnPropertyDescriptor(value,'protocol');
+    if(!protocol||!('value' in protocol)){
+        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_API_MISMATCH');
+    }
+    if(brand.value!==ARCANE_EVENT_AUTHORITY_PROTOCOL
+        ||protocol.value!==ARCANE_EVENT_AUTHORITY_PROTOCOL){
+        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_PROTOCOL_MISMATCH');
+    }
+    let current=value;
+    const callables=new Map();
+    try{
+        while(current!==null&&callables.size<ARCANE_EVENT_REQUIRED_AUTHORITY_API.length){
+            for(const name of ARCANE_EVENT_REQUIRED_AUTHORITY_API){
+                if(callables.has(name))continue;
+                const method=Object.getOwnPropertyDescriptor(current,name);
+                if(method)callables.set(name,method);
+            }
+            current=Object.getPrototypeOf(current);
+        }
+    }catch(error){
+        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_API_MISMATCH',error);
+    }
+    if(ARCANE_EVENT_REQUIRED_AUTHORITY_API.some(name=>{
+        const method=callables.get(name);
+        return !method||!('value' in method)||typeof method.value!=='function';
+    })){
+        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_API_MISMATCH');
+    }
+    if(protocol.enumerable!==true
+        ||protocol.writable!==false
+        ||protocol.configurable!==false){
+        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH');
+    }
+    return value;
+}
+
+function installArcaneEventAuthority(){
+    const own=Object.getOwnPropertyDescriptor(globalThis,'arcaneEvents');
+    if(own)return validateInstalledArcaneEventAuthority(own.value,own);
+    if('arcaneEvents' in globalThis){
+        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_VALUE_COLLISION');
+    }
+    const authority=createArcaneEventAuthority();
+    try{
+        Object.defineProperty(globalThis,'arcaneEvents',{
+            value:authority,
+            enumerable:false,
+            configurable:false,
+            writable:false
+        });
+    }catch(error){
+        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_INSTALL_FAILED',error);
+    }
+    const installed=Object.getOwnPropertyDescriptor(globalThis,'arcaneEvents');
+    return validateInstalledArcaneEventAuthority(installed?.value,installed);
+}
+
+export const arcaneEvents=installArcaneEventAuthority();
+
+export function createArcaneEventSource(owner,options){
+    return arcaneEvents.createSource(owner,options);
+}
+
+export function projectArcaneDOMEvent(target,occurrence,options){
+    return arcaneEvents.projectDOMEvent(target,occurrence,options);
+}
+
+export function isArcaneEventOccurrence(value){
+    return arcaneEvents.isOccurrence(value);
+}
