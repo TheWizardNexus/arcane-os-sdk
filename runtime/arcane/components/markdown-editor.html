@@ -89,6 +89,9 @@
         applyMarkdownFormat,
         normalizeMarkdownOptions
     }=await import(moduleURL('ComponentContracts.js'));
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.markdown-editor',eventTypes:['markdown-editor-change','markdown-editor-saved','markdown-editor-ready']});
+    const lifecycleController=new AbortController();
     const titleInput=host.shadowRoot.querySelector('#entryTitle');
     const preview=host.shadowRoot.querySelector('#preview');
     const toolbar=host.shadowRoot.querySelector('#toolbar');
@@ -97,29 +100,43 @@
     const status=host.shadowRoot.querySelector('#status');
 
     let previewFrame=0;
+    let operationSequence=0;
+    let saveGeneration=0;
+    let saveController=null;
+    let destroyed=false;
     let options=normalizeMarkdownOptions(optionsFromDataset());
+
+    function emit(type,detail={},publicDetail={},operationId=null){
+        if(destroyed){
+            return false;
+        }
+        const publication=events.dispatch(type,detail,{publicDetail,operationId});
+        return projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});
+    }
 
     host.clear=clear;
     host.configure=configure;
-    host.focus=()=>textarea.focus();
+    host.destroy=destroy;
+    host.focus=()=>{if(destroyed)return false;textarea.focus();return true;};
     host.saveEntry=saveEntry;
 
     Object.defineProperties(
         host,
         {
             entryTitle:{
+                configurable:true,
                 get:()=>titleInput.value,
                 set:value=>setTitle(value)
             },
-            options:{get:getOptions,set:configure},
-            value:{get:()=>textarea.value,set:setValue}
+            options:{configurable:true,get:getOptions,set:configure},
+            value:{configurable:true,get:()=>textarea.value,set:setValue}
         }
     );
 
-    textarea.addEventListener('input',contentChanged);
-    titleInput.addEventListener('input',contentChanged);
-    toolbar.addEventListener('click',formatMarkdown);
-    saveButton.addEventListener('click',saveEntry);
+    textarea.addEventListener('input',contentChanged,{signal:lifecycleController.signal});
+    titleInput.addEventListener('input',contentChanged,{signal:lifecycleController.signal});
+    toolbar.addEventListener('click',formatMarkdown,{signal:lifecycleController.signal});
+    saveButton.addEventListener('click',saveEntry,{signal:lifecycleController.signal});
 
     function optionsFromDataset(){
         const dataset=host.dataset||{};
@@ -152,6 +169,9 @@
     }
 
     function configure(input={}){
+        if(destroyed){
+            return false;
+        }
         const setInitialValue=Object.prototype.hasOwnProperty.call(
             input||{},
             'initialValue'
@@ -163,9 +183,11 @@
         options=normalizeMarkdownOptions(input,options);
         renderOptions();
         if(setInitialTitle){
+            supersedeSave('markdown-title-replaced');
             titleInput.value=options.initialTitle;
         }
         if(setInitialValue){
+            supersedeSave('markdown-content-replaced');
             textarea.value=options.initialValue;
         }
         updatePreview();
@@ -204,17 +226,16 @@
     }
 
     function contentChanged(){
+        if(destroyed){
+            return;
+        }
+        supersedeSave('markdown-content-edited');
         schedulePreview();
         const detail={
             markdown:textarea.value,
             title:titleInput.value
         };
-        host.dispatchEvent(
-            new CustomEvent(
-                'markdown-editor-change',
-                {bubbles:true,composed:true,detail}
-            )
-        );
+        emit('markdown-editor-change',detail,{markdownLength:detail.markdown.length,titleLength:detail.title.length});
         if(options.onChange){
             Promise.resolve(options.onChange(detail)).catch(
                 error=>console.error('Markdown change callback failed:',error)
@@ -223,6 +244,9 @@
     }
 
     function schedulePreview(){
+        if(destroyed){
+            return;
+        }
         if(previewFrame){
             cancelAnimationFrame(previewFrame);
         }
@@ -230,6 +254,9 @@
     }
 
     function updatePreview(){
+        if(destroyed){
+            return;
+        }
         if(previewFrame){
             cancelAnimationFrame(previewFrame);
         }
@@ -268,7 +295,7 @@
     }
 
     async function saveEntry(){
-        if(options.readOnly||!options.showSave){
+        if(destroyed||options.readOnly||!options.showSave){
             return false;
         }
         const markdown=textarea.value;
@@ -287,35 +314,52 @@
             return false;
         }
 
+        saveController?.abort('markdown-save-replaced');
+        const controller=new AbortController();
+        saveController=controller;
+        const generation=++saveGeneration;
+        const operationId=`${events.descriptor.instanceId}:save:${++operationSequence}`;
         saveButton.disabled=true;
         status.innerText=options.labels.saving;
         try{
-            await save({title:entryTitle,markdown});
+            await save({title:entryTitle,markdown},{signal:controller.signal,operationId});
+            if(destroyed||generation!==saveGeneration){
+                return false;
+            }
             if(options.clearOnSave){
-                clear();
+                resetEditor(false);
             }
             status.innerText=options.labels.saved;
-            host.dispatchEvent(
-                new CustomEvent(
-                    'markdown-editor-saved',
-                    {
-                        bubbles:true,
-                        composed:true,
-                        detail:{title:entryTitle,markdown}
-                    }
-                )
-            );
+            emit('markdown-editor-saved',{title:entryTitle,markdown},{markdownLength:markdown.length,titleLength:entryTitle.length},operationId);
             return true;
         }catch(error){
+            if(destroyed||generation!==saveGeneration||controller.signal.aborted){
+                return false;
+            }
             status.innerText=options.labels.saveError;
             console.error('Unable to save Markdown content:',error);
             return false;
         }finally{
-            syncSaveButton();
+            if(saveController===controller){
+                saveController=null;
+            }
+            if(!destroyed&&generation===saveGeneration){
+                syncSaveButton();
+            }
         }
     }
 
     function clear(){
+        return resetEditor(true);
+    }
+
+    function resetEditor(supersede){
+        if(destroyed){
+            return false;
+        }
+        if(supersede){
+            supersedeSave('markdown-content-cleared');
+        }
         titleInput.value='';
         textarea.value='';
         updatePreview();
@@ -323,12 +367,20 @@
     }
 
     function setValue(value=''){
+        if(destroyed){
+            return false;
+        }
+        supersedeSave('markdown-content-replaced');
         textarea.value=`${value??''}`;
         updatePreview();
         return textarea.value;
     }
 
     function setTitle(value=''){
+        if(destroyed){
+            return false;
+        }
+        supersedeSave('markdown-title-replaced');
         titleInput.value=`${value??''}`;
         return titleInput.value;
     }
@@ -345,16 +397,41 @@
         };
     }
 
+    function supersedeSave(reason){
+        const active=saveController!==null;
+        saveGeneration+=1;
+        saveController?.abort(reason);
+        saveController=null;
+        if(!destroyed){
+            if(active){
+                status.innerText='';
+            }
+            syncSaveButton();
+        }
+    }
+
+    function destroy(){
+        if(destroyed){
+            return false;
+        }
+        destroyed=true;
+        supersedeSave('markdown-editor-destroyed');
+        lifecycleController.abort('markdown-editor-destroyed');
+        if(previewFrame){
+            cancelAnimationFrame(previewFrame);
+            previewFrame=0;
+        }
+        preview.replaceChildren();
+        events.dispose();
+        host.ready=false;
+        return true;
+    }
+
     renderOptions();
     titleInput.value=options.initialTitle;
     textarea.value=options.initialValue;
     updatePreview();
     status.innerText='';
     host.ready=true;
-    host.dispatchEvent(
-        new CustomEvent(
-            'markdown-editor-ready',
-            {bubbles:true,composed:true}
-        )
-    );
+    emit('markdown-editor-ready',{}, {ready:true});
 </script>
