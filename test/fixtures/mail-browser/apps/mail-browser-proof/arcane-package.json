@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "mail-browser-proof",
+  "displayName": "Arcane Mail Browser Proof",
+  "version": "0.1.0",
+  "entry": "index.html",
+  "strategy": "static",
+  "security": {
+    "connectOrigins": ["http://127.0.0.1:8025"],
+    "frameOrigins": [],
+    "mediaOrigins": []
+  },
+  "include": ["mail-browser-proof.css", "index.html", "manifest.json", "modules"],
+  "exclude": [],
+  "shared": ["browser-runtime"]
+}

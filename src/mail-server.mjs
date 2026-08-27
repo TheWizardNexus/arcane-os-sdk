@@ -241,6 +241,7 @@ function normalizeConfiguration(options={}){
         throw configurationError('requestIdFactory must be a function when supplied.');
     }
     return Object.freeze({
+        allowAnyRecipient:false,
         allowedOrigins:normalizeOrigins(options.allowedOrigins),
         allowedRecipients,
         apiKey:validateApiKey(options.apiKey),
@@ -871,7 +872,7 @@ function normalizeReportRecipients(report,configuration){
         if(seen.has(address)){
             throw new MailGatewayFault('mail_duplicate_recipient',{statusCode:422});
         }
-        if(!configuration.allowedRecipients.has(address)){
+        if(!configuration.allowAnyRecipient&&!configuration.allowedRecipients.has(address)){
             throw new MailGatewayFault('mail_recipient_not_allowed',{statusCode:403});
         }
         seen.add(address);
@@ -1238,6 +1239,139 @@ async function performResendAttempt(configuration,delivery,idempotencyKey,signal
             requestId,
             providerStatus:Number.isSafeInteger(Number(response?.status))?Number(response.status):0
         });
+    }
+}
+
+function normalizeDirectSendOptions(options){
+    if(!options||typeof options!=='object'||Array.isArray(options)){
+        throw configurationError('Mail send options must be an object.');
+    }
+    if(typeof options.reportKey!=='string'||!IDEMPOTENCY_KEY_PATTERN.test(options.reportKey)){
+        throw configurationError('reportKey must contain 8-128 safe identifier characters.');
+    }
+    const maxMessageBytes=boundedInteger(
+        options.maxMessageBytes,
+        DEFAULT_MAX_MESSAGE_BYTES,
+        {label:'maxMessageBytes',min:1,max:DEFAULT_MAX_MESSAGE_BYTES}
+    );
+    const maxRequestBytes=boundedInteger(
+        options.maxRequestBytes,
+        DEFAULT_MAX_REQUEST_BYTES,
+        {label:'maxRequestBytes',min:256,max:64*1024*1024}
+    );
+    if(maxRequestBytes<maxMessageBytes+256){
+        throw configurationError('maxRequestBytes must leave at least 256 bytes beyond maxMessageBytes.');
+    }
+    const fetchImpl=options.fetchImpl??globalThis.fetch;
+    if(typeof fetchImpl!=='function'){
+        throw configurationError('A fetch implementation is required for Resend delivery.');
+    }
+    if(options.onEvent!==undefined&&typeof options.onEvent!=='function'){
+        throw configurationError('onEvent must be a function when supplied.');
+    }
+    if(options.requestIdFactory!==undefined&&typeof options.requestIdFactory!=='function'){
+        throw configurationError('requestIdFactory must be a function when supplied.');
+    }
+    return Object.freeze({
+        allowAnyRecipient:true,
+        allowedRecipients:null,
+        apiKey:validateApiKey(options.apiKey),
+        appId:validateAppId(options.appId),
+        errorRecipients:[],
+        fetchImpl,
+        from:validateFrom(options.from),
+        maxMessageBytes,
+        maxProviderResponseBytes:boundedInteger(
+            options.maxProviderResponseBytes,
+            DEFAULT_MAX_PROVIDER_RESPONSE_BYTES,
+            {label:'maxProviderResponseBytes',min:64,max:1024*1024}
+        ),
+        maxRequestBytes,
+        observerDrainTimeoutMs:boundedInteger(
+            options.observerDrainTimeoutMs,
+            1_000,
+            {label:'observerDrainTimeoutMs',min:1,max:10_000}
+        ),
+        providerTimeoutMs:boundedInteger(
+            options.providerTimeoutMs,
+            120_000,
+            {label:'providerTimeoutMs',min:100,max:600_000}
+        ),
+        requestIdFactory:options.requestIdFactory??randomUUID,
+        retryableDelayMs:boundedInteger(
+            options.retryableDelayMs,
+            1_000,
+            {label:'retryableDelayMs',min:1,max:60_000}
+        ),
+        signal:validateSignal(options.signal),
+        report:options.report,
+        reportKey:options.reportKey,
+        onEvent:options.onEvent
+    });
+}
+
+function directSendResult(result,{recipientCount,requestId}){
+    const common={
+        provider:'resend',
+        status:result.kind==='accepted'
+            ?'accepted'
+            :result.kind==='ambiguous'?'delivery_uncertain':'rejected',
+        classification:result.kind==='rejected'
+            ?result.fault.retryable?'retryable':'permanent'
+            :result.kind,
+        requestId,
+        providerStatus:result.providerStatus,
+        recipientCount
+    };
+    if(result.kind==='accepted'){
+        return Object.freeze({...common,providerId:result.providerId});
+    }
+    if(result.kind==='ambiguous'){
+        return Object.freeze({
+            ...common,
+            code:result.code,
+            ...(result.retryAfterMs?{retryAfterMs:result.retryAfterMs}:{}),
+            retryable:true,
+            uncertain:true
+        });
+    }
+    return Object.freeze({
+        ...common,
+        code:result.fault.code,
+        ...(result.fault.retryAfterMs?{retryAfterMs:result.fault.retryAfterMs}:{}),
+        retryable:result.fault.retryable,
+        uncertain:false
+    });
+}
+
+export async function sendResendMail(options={}){
+    const configuration=normalizeDirectSendOptions(options);
+    const delivery=normalizeReport(configuration.report,configuration);
+    if(configuration.signal?.aborted){
+        const error=new Error('Mail send cancelled before provider attempt.');
+        error.code='ARCANE_CANCELLED';
+        throw error;
+    }
+    const requestId=createRequestId(configuration.requestIdFactory);
+    const observer=createObserver(
+        configuration.onEvent,
+        configuration.observerDrainTimeoutMs
+    );
+    try{
+        const result=await performResendAttempt(
+            configuration,
+            delivery,
+            configuration.reportKey,
+            configuration.signal,
+            requestId,
+            observer.observe
+        );
+        return directSendResult(result,{
+            recipientCount:delivery.recipientCount,
+            requestId
+        });
+    }finally{
+        await observer.drain();
     }
 }
 

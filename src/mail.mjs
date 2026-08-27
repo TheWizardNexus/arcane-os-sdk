@@ -5,12 +5,13 @@ import {
     readMailCredential,
     setMailCredential
 } from './mail-credentials.mjs';
-import {startResendMailServer} from './mail-server.mjs';
+import {sendResendMail,startResendMailServer} from './mail-server.mjs';
 
 export const MAIL_COMMAND_ACTIONS=Object.freeze([
     'key-set',
     'key-status',
     'key-delete',
+    'send',
     'serve'
 ]);
 
@@ -110,6 +111,74 @@ async function deleteCredential(options){
     return remove(credentialOptions(options));
 }
 
+function safeSendFailure(result){
+    return Object.freeze({
+        provider:'resend',
+        status:result.status,
+        classification:result.classification,
+        requestId:result.requestId,
+        providerStatus:result.providerStatus,
+        recipientCount:result.recipientCount,
+        retryable:result.retryable===true,
+        uncertain:result.uncertain===true,
+        ...(typeof result.code==='string'?{code:result.code}:{}),
+        ...(Number.isSafeInteger(result.retryAfterMs)&&result.retryAfterMs>0
+            ?{retryAfterMs:result.retryAfterMs}
+            :{})
+    });
+}
+
+async function sendMail(options){
+    const readReport=dependency(options,'readReport',null);
+    const readCredential=dependency(options,'readCredential',readMailCredential);
+    const send=dependency(options,'sendMail',sendResendMail);
+    throwIfAborted(options.signal);
+    const report=await readReport();
+    throwIfAborted(options.signal);
+    let apiKey=await readCredential(credentialOptions(options));
+    if(apiKey===null){
+        throw new ArcaneError(
+            ERROR_CODES.prerequisiteMissing,
+            `No Resend credential is configured for profile ${String(options.profile)}.`
+        );
+    }
+    if(typeof apiKey!=='string'||!apiKey){
+        throw new ArcaneError(
+            ERROR_CODES.operationFailed,
+            'The configured Resend credential could not be read.'
+        );
+    }
+    try{
+        throwIfAborted(options.signal);
+        const result=await send({
+            apiKey,
+            appId:'arcane-cli',
+            fetchImpl:options.fetchImpl,
+            from:options.from,
+            maxProviderResponseBytes:options.maxProviderResponseBytes,
+            maxRequestBytes:options.maxRequestBytes,
+            onEvent:options.onEvent,
+            providerTimeoutMs:options.requestTimeout,
+            report,
+            reportKey:options.reportKey,
+            requestIdFactory:options.requestIdFactory,
+            retryableDelayMs:options.retryableDelayMs,
+            signal:options.signal
+        });
+        if(result?.classification==='accepted'&&result.status==='accepted'){
+            return result;
+        }
+        const details=safeSendFailure(result||{});
+        throw new ArcaneError(
+            ERROR_CODES.operationFailed,
+            `Resend did not authoritatively accept the mail request (${details.classification||'unknown'}).`,
+            {details}
+        );
+    }finally{
+        apiKey='';
+    }
+}
+
 async function serveMail(options){
     const readCredential=dependency(options,'readCredential',readMailCredential);
     const readAppKey=dependency(options,'readAppKey',null);
@@ -183,6 +252,7 @@ export async function executeMailCommand(rawOptions={}){
         case 'key-set':return setCredential(options);
         case 'key-status':return credentialStatus(options);
         case 'key-delete':return deleteCredential(options);
+        case 'send':return sendMail(options);
         case 'serve':return serveMail(options);
         default:usage('Unsupported Mail action.');
     }

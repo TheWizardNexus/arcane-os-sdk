@@ -11,6 +11,7 @@ the local Node gateway rather than in browser or WASM bytes.
 | `Mail.js` | Browser or native WebView | Validates and formats reports, persists each exact outbound request in DBOPFS, and owns retry/drain lifecycle. |
 | `MailOutbox.mjs` | Browser or compatible injected storage | Stores immutable requests in the `mail_outbox` DBOPFS table before delivery and normalizes terminal, retry, and reconciliation states. |
 | `MailTransport.mjs` | Browser, WebView, or compatible Fetch host | Sends one already-persisted request to the configured Arcane gateway with the stable report key as its idempotency key. |
+| `arcane mail send` | Node on the local machine | Reads one bounded provider-neutral report from redirected stdin and performs one explicit Resend attempt with a caller-owned idempotency key. |
 | `arcane mail serve` | Node on the local machine | Authenticates the local caller, enforces the app/Origin/recipient policy, and makes the single server-side Resend request. |
 | `arcane mail key ...` | Node on Windows | Stores, inspects, or deletes a Resend API key in Windows Credential Manager. |
 
@@ -45,7 +46,7 @@ This entrypoint contains only the portable browser/WebView runtime, outbox, and
 transport contract. It does not import the Node HTTP gateway or Windows
 Credential Manager adapter. Programmatic developer tooling reaches those
 host-owned operations through the existing `createToolchain().mail(...)`
-boundary; ordinary operators use `arcane mail serve` and
+boundary; ordinary operators use `arcane mail send`, `arcane mail serve`, and
 `arcane mail key ...`. This keeps Node credential and server authority out of a
 browser import while preserving one shared CLI/toolchain implementation.
 
@@ -54,8 +55,8 @@ browser import while preserving one shared CLI/toolchain implementation.
 Arcane Mail deliberately separates two credentials:
 
 - The **Resend API key** is provider authority. `arcane mail key set <profile>`
-  stores it in Windows Credential Manager and `mail serve --profile <profile>`
-  reads it only inside the server process.
+  stores it in Windows Credential Manager. `mail send --profile <profile>` and
+  `mail serve --profile <profile>` read it only inside the owning Node process.
 - The **mail app key** authenticates one browser/application caller to the
   loopback gateway. It is supplied to `mail serve` through hidden terminal
   input, or through redirected input with `--app-key-stdin`, and must match the
@@ -240,7 +241,7 @@ uncertain same-key retry, while temporary native transport unavailability is a
 non-ambiguous retryable failure. Once a valid accepted result has returned, a
 racing lifecycle cancellation cannot erase that authoritative acceptance.
 
-## Start the local gateway
+## Operate the CLI and local gateway
 
 Store one Resend key under a local profile:
 
@@ -252,6 +253,28 @@ arcane mail key delete arcane-dev
 
 `key set` prompts with hidden input. `--secret-stdin` is the explicit
 non-interactive alternative and rejects a TTY.
+
+Perform one provider attempt directly from the SDK CLI:
+
+```text
+arcane mail send --profile arcane-dev --from "Arcane <verified@example.com>" --report-key <stable-id> --report-stdin
+```
+
+The redirected UTF-8 JSON input is bounded to 52 MiB and uses the exact closed
+report shape admitted by the gateway: `type`, `to`, `subject`, and at least one
+of `text` or `html`. Direct CLI sends require one to 50 explicit recipients,
+including for `error` reports. Message content is not accepted in argv and is
+never copied into progress events, results, or normalized errors.
+
+The caller must create and retain the 8–128 character `--report-key` before the
+attempt. It is the Resend idempotency key and may be reused only with the same
+byte-equivalent logical report for an intentional retry or reconciliation. The
+CLI performs exactly one attempt and never retries automatically. Exit zero
+requires a successful Resend response containing a valid provider id; that is
+provider acceptance, not an inbox-delivery claim. Timeout, connection loss, or
+cancellation after the provider attempt begins is returned as an ambiguous
+nonzero outcome because the provider may already have accepted the request.
+Cancellation before the attempt exits 130 without sending.
 
 Start the authenticated gateway:
 

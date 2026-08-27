@@ -32,6 +32,7 @@ and exits nonzero on failure. Machine output is defined by
 | `arcane targets` | Lists target ids, declared status, formats, architectures, signing profiles, methods, and pairing reason. |
 | `arcane repo status\|pull\|push` | Runs one selected repository operation for the current app workspace. |
 | `arcane mail key set\|status\|delete` | Manages one server-only Resend API-key profile in Windows Credential Manager. |
+| `arcane mail send` | Performs one explicit, idempotency-keyed Resend attempt from a bounded JSON report on redirected stdin. |
 | `arcane mail serve` | Starts one authenticated numeric-loopback Arcane-to-Resend gateway with exact app, Origin, and recipient admission. |
 
 ## Parser-wide options
@@ -53,11 +54,12 @@ meaning and cardinality rules:
 | `--scope` | `app` or `shared` | `test`, `check`; defaults to `app`. |
 | `--test-file` | repository-relative `.test.mjs` | `test --scope shared` only |
 | `--artifact` | bundle path | `bundle`, `verify-bundle` |
-| `--profile` | credential profile id | `mail serve` |
-| `--from` | verified sender | `mail serve` |
+| `--profile` | credential profile id | `mail send`, `mail serve` |
+| `--from` | verified sender | `mail send`, `mail serve` |
 | `--origin` | exact browser origin | `mail serve` |
 | `--allow-to` | one to 50 comma-separated addresses | `mail serve` |
-| `--request-timeout` | integer 1000–600000 ms | `mail serve` |
+| `--report-key` | 8–128 safe characters | `mail send`; caller-owned stable Resend idempotency key |
+| `--request-timeout` | integer 1000–600000 ms | `mail send`, `mail serve` |
 | `--output` | `human`, `json`, `ndjson` | Every invocation; the final occurrence wins. |
 | `--git` | flag | `new` |
 | `--skip-tests` | flag | `check --scope app` |
@@ -66,6 +68,7 @@ meaning and cardinality rules:
 | `--overwrite` | flag | `bundle` only |
 | `--secret-stdin` | flag | `mail key set`; requires redirected input |
 | `--app-key-stdin` | flag | `mail serve`; requires redirected input |
+| `--report-stdin` | flag | `mail send`; requires redirected JSON input |
 | `--help`, `-h` | flag | Prints help and exits zero. |
 | `--version`, `-v` | flag | Prints the exact SDK version and exits zero. |
 
@@ -680,6 +683,48 @@ new deletion from an already-absent profile. Non-Windows hosts fail closed.
 Machine output for `key set` requires `--secret-stdin`. Raw CLI arguments are
 not included in acceptance events, and usage errors do not echo unknown option
 or positional values.
+
+### One-shot provider send
+
+`mail send` performs exactly one Resend provider attempt without starting a
+loopback server:
+
+```text
+arcane mail send --profile <profile> --from <verified-sender> --report-key <id> --report-stdin [--request-timeout <ms>]
+```
+
+`--report-stdin` is mandatory and rejects a terminal before attaching input
+listeners. It accepts one UTF-8 JSON object up to 52 MiB using the existing
+gateway report shape:
+
+```json
+{
+  "type": "report",
+  "to": ["recipient@example.com"],
+  "subject": "Example",
+  "text": "Message content"
+}
+```
+
+The exact closed report keys are `type`, `to`, `subject`, and at least one of
+`text` or `html`. Direct CLI sending requires one to 50 explicit unique
+recipients, including for `error` reports. The Resend credential comes only
+from the selected Windows Credential Manager profile; neither it nor report
+content is accepted through argv, environment variables, or result fields.
+
+The caller owns `--report-key`. It must contain 8–128 ASCII letters, digits,
+periods, underscores, colons, or hyphens. Reuse the same key only with the same
+byte-equivalent logical report when deliberately reconciling or retrying an
+ambiguous attempt. The CLI never retries automatically.
+
+Exit zero means Resend returned a successful response with a valid provider
+acceptance id. The privacy-safe result contains only provider, status,
+classification, request id, provider id, provider HTTP status, and recipient
+count. It proves provider API acceptance, not inbox delivery. Permanent,
+retryable, and ambiguous outcomes exit nonzero with only normalized code,
+status, retry, uncertainty, and count metadata. Cancellation before the
+provider attempt exits 130 without sending; cancellation, timeout, or transport
+loss after the attempt begins is ambiguous because Resend may have accepted it.
 
 ### Authenticated local gateway
 

@@ -26,6 +26,7 @@ const VALUE_OPTIONS=new Set([
     'from',
     'origin',
     'allow-to',
+    'report-key',
     'request-timeout',
     'output'
 ]);
@@ -37,6 +38,7 @@ const FLAG_OPTIONS=new Set([
     'overwrite',
     'secret-stdin',
     'app-key-stdin',
+    'report-stdin',
     'help',
     'version'
 ]);
@@ -72,6 +74,7 @@ Usage:
   ${CLI_NAME} mail key set <profile> [--secret-stdin]
   ${CLI_NAME} mail key status <profile>
   ${CLI_NAME} mail key delete <profile>
+  ${CLI_NAME} mail send --profile <profile> --from <address> --report-key <id> --report-stdin [--request-timeout <ms>]
   ${CLI_NAME} mail serve --profile <profile> --from <address> --app <id> --origin <origin> --allow-to <addresses> [--app-key-stdin] [--host 127.0.0.1] [--port 8025] [--request-timeout <ms>]
 
 Development:
@@ -185,6 +188,7 @@ function readRequestTimeout(value,defaultValue){
 }
 
 const MAX_MAIL_SECRET_BYTES=8_192;
+const MAX_MAIL_REPORT_BYTES=52*1024*1024;
 
 function normalizedSecret(value){
     const secret=String(value??'').trim();
@@ -333,6 +337,90 @@ export function readMailSecretInput({input=process.stdin,output=process.stderr,
         : readMaskedMailSecret(input,output,signal,label,stdinOption);
 }
 
+function readPipedMailReport(input,signal){
+    return new Promise((resolve,reject)=>{
+        const chunks=[];
+        let byteLength=0;
+        let settled=false;
+
+        const cleanup=function cleanupMailReportRead(){
+            input.removeListener('data',onData);
+            input.removeListener('end',onEnd);
+            input.removeListener('error',onError);
+            signal?.removeEventListener('abort',onAbort);
+        };
+        const finish=function finishMailReportRead(callback,value){
+            if(settled)return;
+            settled=true;
+            cleanup();
+            callback(value);
+        };
+        const onData=function collectMailReportChunk(chunk){
+            const bytes=Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk);
+            byteLength+=bytes.byteLength;
+            if(byteLength>MAX_MAIL_REPORT_BYTES){
+                finish(reject,new ArcaneError(
+                    ERROR_CODES.usage,
+                    `Mail report input cannot exceed ${MAX_MAIL_REPORT_BYTES} UTF-8 bytes.`
+                ));
+                return;
+            }
+            chunks.push(bytes);
+        };
+        const onEnd=function finishPipedMailReport(){
+            try{
+                const serialized=Buffer.concat(chunks).toString('utf8');
+                let report;
+                try{
+                    report=JSON.parse(serialized);
+                }catch{
+                    usage('Mail report input must be one valid JSON object.');
+                }
+                if(!report||typeof report!=='object'||Array.isArray(report)){
+                    usage('Mail report input must be one valid JSON object.');
+                }
+                finish(resolve,report);
+            }catch(error){
+                finish(reject,error);
+            }
+        };
+        const onError=function failPipedMailReport(error){
+            finish(reject,new ArcaneError(
+                ERROR_CODES.operationFailed,
+                'Unable to read the mail report from standard input.',
+                {cause:error}
+            ));
+        };
+        const onAbort=function cancelPipedMailReport(){
+            finish(reject,new ArcaneError(
+                ERROR_CODES.cancelled,
+                'Mail report input was cancelled.',
+                {cause:signal?.reason,exitCode:130}
+            ));
+        };
+
+        input.on('data',onData);
+        input.once('end',onEnd);
+        input.once('error',onError);
+        signal?.addEventListener('abort',onAbort,{once:true});
+        if(signal?.aborted){
+            onAbort();
+        }else{
+            input.resume?.();
+        }
+    });
+}
+
+export function readMailReportInput({input=process.stdin,reportStdin=false,signal}={}){
+    if(!reportStdin){
+        usage('mail send requires --report-stdin.');
+    }
+    if(input?.isTTY){
+        usage('--report-stdin requires redirected or piped input.');
+    }
+    return readPipedMailReport(input,signal);
+}
+
 function readScope(value){
     const scope=value??'app';
     if(!['app','shared'].includes(scope)){
@@ -380,7 +468,7 @@ function operationOptions(command,parsed,cwd){
     if(flags.has('overwrite')&&command!=='bundle'){
         usage('--overwrite is supported only by bundle.');
     }
-    const mailOnlyOptions=['profile','from','origin','allow-to','request-timeout'];
+    const mailOnlyOptions=['profile','from','origin','allow-to','report-key','request-timeout'];
     if(command!=='mail'&&mailOnlyOptions.some(name=>values[name]!==undefined)){
         usage(`Mail options are supported only by the mail command.`);
     }
@@ -389,6 +477,9 @@ function operationOptions(command,parsed,cwd){
     }
     if(command!=='mail'&&flags.has('app-key-stdin')){
         usage('--app-key-stdin is supported only by mail serve.');
+    }
+    if(command!=='mail'&&flags.has('report-stdin')){
+        usage('--report-stdin is supported only by mail send.');
     }
 
     if(command==='new'){
@@ -543,9 +634,10 @@ function operationOptions(command,parsed,cwd){
             if(!['set','status','delete'].includes(action)||!profile){
                 usage('mail key requires set, status, or delete followed by one profile id.');
             }
-            if(values.profile!==undefined||values.from!==undefined||values.origin!==undefined
+            if(values.profile!==undefined||values.from!==undefined||values.app!==undefined
+                ||values.origin!==undefined
                 ||values['allow-to']!==undefined||values.host!==undefined||values.port!==undefined
-                ||values['request-timeout']!==undefined){
+                ||values['report-key']!==undefined||values['request-timeout']!==undefined){
                 usage('mail key accepts only its profile argument and optional --secret-stdin for set.');
             }
             if(flags.has('secret-stdin')&&action!=='set'){
@@ -553,6 +645,9 @@ function operationOptions(command,parsed,cwd){
             }
             if(flags.has('app-key-stdin')){
                 usage('--app-key-stdin is supported only by mail serve.');
+            }
+            if(flags.has('report-stdin')){
+                usage('--report-stdin is supported only by mail send.');
             }
             return {
                 action:`key-${action}`,
@@ -564,6 +659,9 @@ function operationOptions(command,parsed,cwd){
             noExtraPositionals(command,positionals,1);
             if(flags.has('secret-stdin')){
                 usage('--secret-stdin is not supported by mail serve.');
+            }
+            if(flags.has('report-stdin')||values['report-key']!==undefined){
+                usage('--report-stdin and --report-key are supported only by mail send.');
             }
             for(const [name,value]of Object.entries({
                 profile:values.profile,
@@ -587,7 +685,36 @@ function operationOptions(command,parsed,cwd){
                 requestTimeout:readRequestTimeout(values['request-timeout'],30_000),
             };
         }
-        usage('mail requires either key set|status|delete <profile> or serve.');
+        if(area==='send'){
+            noExtraPositionals(command,positionals,1);
+            if(flags.has('secret-stdin')||flags.has('app-key-stdin')){
+                usage('mail send accepts report input only through --report-stdin.');
+            }
+            if(values.app!==undefined||values.origin!==undefined
+                ||values['allow-to']!==undefined||values.host!==undefined
+                ||values.port!==undefined){
+                usage('mail send does not accept gateway server options.');
+            }
+            for(const [name,value]of Object.entries({
+                profile:values.profile,
+                from:values.from,
+                'report-key':values['report-key'],
+            })){
+                if(!value)usage(`mail send requires --${name} <value>.`);
+            }
+            if(!flags.has('report-stdin')){
+                usage('mail send requires --report-stdin.');
+            }
+            return {
+                action:'send',
+                profile:values.profile,
+                from:values.from,
+                reportKey:values['report-key'],
+                reportStdin:true,
+                requestTimeout:readRequestTimeout(values['request-timeout'],30_000),
+            };
+        }
+        usage('mail requires key set|status|delete <profile>, send, or serve.');
     }
     usage(`Unknown command. Run ${CLI_NAME} --help for usage.`);
 }
@@ -830,6 +957,15 @@ export async function runCli(argv=process.argv.slice(2),{
                     signal:controller.signal,
                     label:'Mail gateway app key',
                     stdinOption:'--app-key-stdin',
+                });
+            };
+        }
+        if(command==='mail'&&operation.action==='send'){
+            operation.readReport=function readMailReportForOperation(){
+                return readMailReportInput({
+                    input:stdin,
+                    reportStdin:operation.reportStdin,
+                    signal:controller.signal,
                 });
             };
         }

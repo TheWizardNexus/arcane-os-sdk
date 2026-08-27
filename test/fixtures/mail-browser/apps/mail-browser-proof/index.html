@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="arcane-app-id" content="mail-browser-proof">
+    <base href="../../">
+    <script type="importmap" data-arcane-import-map>
+{
+  "imports": {
+    "arcane/Mail": "./arcane/modules/Mail.js",
+    "arcane/ThemeBootstrap": "./arcane/modules/ThemeBootstrap.js",
+    "../../node_modules/strong-type/index.js": "./arcane/dependencies/strong-type/index.js",
+    "arcane-os/event-manager": "./arcane/sdk/event-manager.mjs",
+    "event-pubsub": "./arcane/sdk/dependencies/event-pubsub/index.js"
+  }
+}
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Arcane Mail Browser Proof</title>
+    <link rel="stylesheet" href="./arcane/css/theme.css?v=1">
+    <link rel="stylesheet" href="./arcane/css/primitives.css?v=1">
+    <link rel="stylesheet" href="./apps/mail-browser-proof/mail-browser-proof.css?v=1">
+</head>
+<body>
+    <main class="proof-shell">
+        <section class="arcane-card" aria-labelledby="proof-title">
+            <header class="arcane-card__header">
+                <div>
+                    <p class="eyebrow">SDK browser acceptance</p>
+                    <h1 id="proof-title">Mail + DBOPFS proof</h1>
+                </div>
+            </header>
+            <div class="arcane-card__body proof-grid">
+                <label>
+                    Local gateway app key
+                    <input id="app-key" type="password" autocomplete="off" spellcheck="false">
+                </label>
+                <label>
+                    Acceptance recipient
+                    <input id="recipient" type="email" autocomplete="off" spellcheck="false">
+                </label>
+                <div class="proof-actions" aria-label="Mail acceptance steps">
+                    <button id="configure" class="arcane-button" type="button">1. Configure</button>
+                    <button id="send-online" class="arcane-button" type="button" disabled>2. Send online</button>
+                    <button id="queue-offline" class="arcane-button" type="button" disabled>3. Queue offline</button>
+                    <button id="reconnect" class="arcane-button" type="button" disabled>4. Reconnect and drain</button>
+                    <button id="cleanup" class="arcane-button" type="button" disabled>5. Clean up</button>
+                </div>
+                <p id="status" role="status" aria-live="polite">Enter the local app key and recipient.</p>
+                <pre id="evidence" aria-label="Privacy-safe acceptance evidence"></pre>
+            </div>
+        </section>
+    </main>
+    <script type="module" src="./apps/mail-browser-proof/modules/App.js?v=1"></script>
+</body>
+</html>
