@@ -305,10 +305,13 @@ jobs:
           #!/usr/bin/env bash
           set -euo pipefail
           export HOME=/tmp/arcane-home
+          export EM_CACHE=/work/emscripten-cache
           export SOURCE_DATE_EPOCH=1724522532
           export TZ=UTC
           export LC_ALL=C.UTF-8
-          mkdir -p "$HOME" /work/native /work/wasm /work/selected-data /out
+          mkdir -p "$HOME" "$EM_CACHE" /work/native /work/wasm /work/selected-data /out
+          cp --archive /emsdk/upstream/emscripten/cache/. "$EM_CACHE"/
+          test -w "$EM_CACHE"
           tar --extract --gzip --file /inputs/espeak-ng.tar.gz --directory /work/native \
             --strip-components 1 --no-same-owner --no-same-permissions
           tar --extract --gzip --file /inputs/espeak-ng.tar.gz --directory /work/wasm \
