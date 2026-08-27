@@ -2157,7 +2157,7 @@ function createArcaneEventAuthority(){
                     handler,
                     options,
                     sourceSubscribe,
-                    handle
+                    record.owner
                 );
             },
             removeEventListener(type,handler,options){

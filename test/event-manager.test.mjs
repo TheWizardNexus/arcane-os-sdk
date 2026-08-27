@@ -1053,7 +1053,8 @@ test('EventTarget adapters deduplicate listeners and preserve declared cancellat
             }
         );
 
-        const source=createArcaneEventSource({}, {
+        const sourceOwner={kind:'source-event-target-owner'};
+        const source=createArcaneEventSource(sourceOwner, {
             source:'sdk.test.source-event-target',
             eventTypes:[sourceType]
         });
@@ -1065,7 +1066,9 @@ test('EventTarget adapters deduplicate listeners and preserve declared cancellat
                 source.removeEventListener(sourceType,7);
             });
             let sourceEvent=null;
+            let sourceListenerThis=null;
             source.addEventListener(sourceType,function cancelSourceEvent(event){
+                sourceListenerThis=this;
                 sourceEvent=event;
                 event.preventDefault();
             });
@@ -1079,6 +1082,9 @@ test('EventTarget adapters deduplicate listeners and preserve declared cancellat
             assert.equal(source.dispatchEvent(sourceInput),false);
             assert.equal(sourceInput.defaultPrevented,true);
             assert.equal(sourceEvent.detail.value,42);
+            assert.equal(sourceListenerThis,sourceOwner);
+            assert.equal(sourceEvent.target,sourceOwner);
+            assert.equal(sourceEvent.currentTarget,sourceOwner);
             assert.throws(
                 function rejectUndeclaredSourceEvent(){
                     source.dispatchEvent({type:'sdk.test.undeclared',detail:{}});
