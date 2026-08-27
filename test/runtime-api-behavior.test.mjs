@@ -1487,6 +1487,42 @@ test(
         assert.equal(runtime.speechMuted, true);
         assert.equal(runtime.status('tts').state, 'unloaded');
 
+        await runtime.unload('stt');
+        const llmBeforeSpeechConfiguration = runtime.status('llm');
+        const speechOnlyRoutes = runtime.configureSpeech(
+            {
+                stt: {
+                    default: selection('local-stt', 'local-stt-model', true),
+                    localOnly: selection('local-stt', 'local-stt-model', true)
+                },
+                tts: {
+                    default: selection('local-tts', 'local-tts-model', true),
+                    localOnly: selection('local-tts', 'local-tts-model', true)
+                }
+            }
+        );
+        assert.ok(Object.isFrozen(speechOnlyRoutes));
+        assert.deepEqual(runtime.status('llm'), llmBeforeSpeechConfiguration);
+        assert.equal(runtime.status('llm').state, 'ready');
+        assert.equal(runtime.status('stt').state, 'unloaded');
+        assert.equal(runtime.status('tts').state, 'unloaded');
+        assert.throws(
+            function rejectMalformedSpeechConfiguration() {
+                runtime.validateSpeechConfiguration(
+                    {
+                        stt: {
+                            default: null,
+                            localOnly: null
+                        }
+                    }
+                );
+            },
+            function isSpeechConfigurationContractMismatch(error) {
+                return error?.code === 'ARCANE_AI_PROVIDER_RUNTIME_INVALID'
+                    && error?.reason === 'speech-configuration-contract-mismatch';
+            }
+        );
+
         await runtime.unload('llm');
         await runtime.unload('stt');
         runtime.configure(

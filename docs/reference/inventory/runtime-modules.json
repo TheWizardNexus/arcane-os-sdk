@@ -75,7 +75,7 @@
       "availability": "Cross-host in-process runtime; registered providers remain browser, native, or cloud specific",
       "protocol": "arcane-ai-runtime/2, arcane-ai-provider/2, arcane-ai-model-authority/1",
       "normalization": "Normalizes immutable per-role routes, lifecycle/status, cancellation, streaming cleanup, and local-only selection without creating a fallback.",
-      "surface": "Protocol constants; singleton-only `AIProviderRuntime`; `aiProviderRuntime`; `getAIProviderRuntime()`; provider registration/configuration, lifecycle, request, stream, speech, cancellation, and mute controls."
+      "surface": "Protocol constants; singleton-only `AIProviderRuntime`; `aiProviderRuntime`; `getAIProviderRuntime()`; provider registration, closed three-role and STT/TTS-only configuration, lifecycle, request, stream, speech, cancellation, and mute controls."
     },
     {
       "file": "runtime/arcane/modules/AIResponseLength.js",

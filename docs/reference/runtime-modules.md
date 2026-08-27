@@ -231,11 +231,24 @@ Exact exports: `AI_PROVIDER_PROTOCOL`, `AI_PROVIDER_RUNTIME_PROTOCOL`,
 `getAIProviderRuntime`.
 
 The singleton exposes provider registration, closed three-role configuration,
+closed STT/TTS-only `validateSpeechConfiguration()` and `configureSpeech()`
+that preserve the LLM route and sticky LLM record,
 catalog and status inspection, `start()`, independent `load()`, `unload()`,
 `dispose()`, and `cancel()` operations, plus `chat()`, `stream()`,
 `transcribe()`, `synthesize()`, and `setSpeechMuted()`. Provider payloads must
 be data-only; callbacks, accessors, symbols, cycles, and excessive nesting are
 rejected at the provider boundary.
+
+`validateSpeechConfiguration({stt,tts})` returns one frozen two-role selection
+record without committing it. `configureSpeech({stt,tts})` accepts the same
+closed record, requires both speech roles to own no ready/load/unload/dispose or
+request work, commits only STT/TTS, restores muted speech admission, and returns
+the frozen selection record. The current LLM routes, selection, readiness,
+operation generation, and sticky state remain unchanged. A malformed top-level,
+route, or selection record preserves the compatibility code
+`ARCANE_AI_PROVIDER_RUNTIME_INVALID` and adds exact reason
+`speech-configuration-contract-mismatch`; runtime-disposed, reentrant,
+role-busy, and provider-locality failures retain their existing exact codes.
 
 `start({startMuted=true,startTranscription=false,signal=null}={})` waits for
 prior speech-state and role unload work, applies the requested initial mute

@@ -12,6 +12,7 @@ export const AI_PROVIDER_RUNTIME_PROTOCOL = 'arcane-ai-runtime/2';
 export const AI_MODEL_AUTHORITY_PROTOCOL = 'arcane-ai-model-authority/1';
 
 const ROLE_SET = new Set(AI_RUNTIME_ROLES);
+const SPEECH_ROLES = Object.freeze(['stt', 'tts']);
 const PROVIDER_METHODS = Object.freeze([
     'catalog',
     'inspect',
@@ -263,6 +264,24 @@ function immutableSelections(value) {
             tts: immutableRoleRoutes('tts', value.tts)
         }
     );
+}
+
+function immutableSpeechSelections(value) {
+    try {
+        assertClosedRecord(value, SPEECH_ROLES, 'AI speech provider selections');
+        return Object.freeze(
+            {
+                stt: immutableRoleRoutes('stt', value.stt),
+                tts: immutableRoleRoutes('tts', value.tts)
+            }
+        );
+    } catch (error) {
+        if (error?.code === 'ARCANE_AI_PROVIDER_RUNTIME_INVALID'
+            && !Object.hasOwn(error, 'reason')) {
+            error.reason = 'speech-configuration-contract-mismatch';
+        }
+        throw error;
+    }
 }
 
 function immutableStartupOptions(options) {
@@ -709,6 +728,29 @@ export class AIProviderRuntime {
         return selections;
     }
 
+    validateSpeechConfiguration(value) {
+        this.#assertOpen();
+        const selections = immutableSpeechSelections(value);
+        for (const role of SPEECH_ROLES) {
+            for (const routeName of ROUTE_KEYS) {
+                const selection = selections[role][routeName];
+                if (!selection) {
+                    continue;
+                }
+                const provider = this.#providers.get(
+                    providerKey(role, selection.providerId)
+                ) ?? null;
+                if (provider && selection.localOnly !== provider.localOnly) {
+                    throw operationError(
+                        `AI ${role} route ${routeName} does not match provider locality.`,
+                        'ARCANE_AI_PROVIDER_LOCALITY_MISMATCH'
+                    );
+                }
+            }
+        }
+        return selections;
+    }
+
     configure(value) {
         this.#assertOpen();
         if (this.#configuring) {
@@ -743,6 +785,51 @@ export class AIProviderRuntime {
             publishAIRuntimeRolesState(
                 {
                     llm: roleRecord('llm', this.#slots.llm.selection),
+                    stt: roleRecord('stt', this.#slots.stt.selection),
+                    tts: roleRecord('tts', this.#slots.tts.selection)
+                }
+            );
+        } finally {
+            this.#configuring = false;
+        }
+        return selections;
+    }
+
+    configureSpeech(value) {
+        this.#assertOpen();
+        if (this.#configuring) {
+            throw operationError(
+                'AI speech provider configuration cannot be changed reentrantly.',
+                'ARCANE_AI_SPEECH_CONFIGURATION_REENTRANT'
+            );
+        }
+        const selections = this.validateSpeechConfiguration(value);
+        for (const role of SPEECH_ROLES) {
+            const slot = this.#slots[role];
+            if (this.#roleHasOwnedWork(slot)) {
+                throw operationError(
+                    `AI role ${role} must be unloaded before it is reconfigured.`,
+                    'ARCANE_AI_ROLE_BUSY'
+                );
+            }
+        }
+
+        this.#configuring = true;
+        try {
+            for (const role of SPEECH_ROLES) {
+                const slot = this.#slots[role];
+                slot.generation += 1;
+                slot.disposed = false;
+                slot.ready = false;
+                slot.routes = selections[role];
+                slot.selection = selections[role].default;
+            }
+            this.#speechDesiredMuted = true;
+            this.#speechMuted = true;
+            this.#configured = true;
+            publishAIRuntimeRolesState(
+                {
+                    llm: this.status('llm'),
                     stt: roleRecord('stt', this.#slots.stt.selection),
                     tts: roleRecord('tts', this.#slots.tts.selection)
                 }
