@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.3
+
+- Made shared voice transcription consume authoritative sticky STT state,
+  expose explicit selected-unloaded activation, and keep recording disabled
+  until the selected route is genuinely ready and non-busy.
+- Added owned cancellation and current-operation guards across microphone
+  permission, recording, transcription, save, completion, transcript
+  replacement, synchronous public events, teardown, and stale settlement.
+- Centralized the shared STT activation control in
+  `createSTTActivationController()` without automatic downloads, hidden
+  provider selection, or application policy.
+
 ## 0.2.2
 
 - Corrected latest-request-wins ownership so each newly admitted AI request

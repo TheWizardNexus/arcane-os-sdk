@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "builder": "arcane-sdk-runtime-v1",
-  "sdkVersion": "0.2.2",
+  "sdkVersion": "0.2.3",
   "source": {
     "authority": "sdk-canonical",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
@@ -14,8 +14,8 @@
     }
   },
   "fileCount": 160,
-  "totalBytes": 3643083,
-  "contentSha256": "0b09b1fd548152416f583d5e117197c7886b5a9e63071e43493577b4090e4a8c",
+  "totalBytes": 3655536,
+  "contentSha256": "f96a27bd79a809201708f73ca729bc60ab02696daf619365f77267a28b47b4b3",
   "files": [
     {
       "path": "arcane/components/app-bar.html",
@@ -159,8 +159,8 @@
     },
     {
       "path": "arcane/components/speech.html",
-      "bytes": 49596,
-      "sha256": "2a8b2929d28699ab9011f358b09b5fd2d53a0703542b2fee5cda8334261c6c86"
+      "bytes": 41300,
+      "sha256": "0ed5dd29c37747702f114114ad66bedd419fd39bed35fc12362c63c6357a41d9"
     },
     {
       "path": "arcane/components/summary-strip.html",
@@ -199,8 +199,8 @@
     },
     {
       "path": "arcane/components/voice-transcription.html",
-      "bytes": 14471,
-      "sha256": "7fab0ca767c252f661f7a3a5e09cf7325692b64a1d03e5731dc5d4f83c80c124"
+      "bytes": 26991,
+      "sha256": "8140b918791df5043be9254d52bf7864fe91759ab6e5e60af2364d6b4a8fcb7b"
     },
     {
       "path": "arcane/components/weather-widget.html",
@@ -494,8 +494,8 @@
     },
     {
       "path": "arcane/modules/ComponentContracts.js",
-      "bytes": 20507,
-      "sha256": "4115d4ce8081e1dbaeb0a1a2fa3201ecddabf05a471f76e4deb7a071f9c31d20"
+      "bytes": 28736,
+      "sha256": "f5ba011094835b45258ee833a90bfa17980e860ef9ceac88aa56ecad3abe9d53"
     },
     {
       "path": "arcane/modules/ConfiguredAIChatSession.js",
