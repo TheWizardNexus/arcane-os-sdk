@@ -43,6 +43,7 @@ import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 import {createEventQueue} from './event-queue.mjs';
 import {ARCANE_MACHINE_BUNDLE_VERSION} from './constants.mjs';
 import {checkForSdkUpdate} from './update-check.mjs';
+import {executeMailCommand} from './mail.mjs';
 import {
     APP_BUNDLE_EXTENSION,
     createAppReleaseBundle,
@@ -1542,6 +1543,7 @@ export async function executeOperation(command,options={}){
         build:buildApplication,
         run:runApplication,
         'update-check':checkSdkUpdate,
+        mail:executeMailCommand,
         targets:async options=>describeTargets(options),
         repo:repositoryApplication
     };
@@ -1573,6 +1575,7 @@ export function createToolchain(defaults={}){
         build:options=>buildApplication({...defaults,...options}),
         run:options=>runApplication({...defaults,...options}),
         updateCheck:options=>checkSdkUpdate({...defaults,...options}),
+        mail:options=>executeMailCommand({...defaults,...options}),
         targets:options=>describeTargets({...defaults,...options}),
         repository:options=>repositoryApplication({...defaults,...options})
     });

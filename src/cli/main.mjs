@@ -22,6 +22,11 @@ const VALUE_OPTIONS=new Set([
     'scope',
     'test-file',
     'artifact',
+    'profile',
+    'from',
+    'origin',
+    'allow-to',
+    'request-timeout',
     'output'
 ]);
 const FLAG_OPTIONS=new Set([
@@ -30,8 +35,15 @@ const FLAG_OPTIONS=new Set([
     'dry-run',
     'require-local-ai',
     'overwrite',
+    'secret-stdin',
+    'app-key-stdin',
     'help',
     'version'
+]);
+const REPORTABLE_COMMANDS=new Set([
+    'build','bundle','check','dev','doctor','help','import-map','init','mail',
+    'native-doctor','native-prepare','new','package','repo','run','targets','test',
+    'update-check','verify','verify-bundle','version'
 ]);
 
 export const HELP_TEXT=`Arcane OS application SDK ${SDK_VERSION}
@@ -57,6 +69,10 @@ Usage:
   ${CLI_NAME} update-check
   ${CLI_NAME} targets
   ${CLI_NAME} repo status|pull|push
+  ${CLI_NAME} mail key set <profile> [--secret-stdin]
+  ${CLI_NAME} mail key status <profile>
+  ${CLI_NAME} mail key delete <profile>
+  ${CLI_NAME} mail serve --profile <profile> --from <address> --app <id> --origin <origin> --allow-to <addresses> [--app-key-stdin] [--host 127.0.0.1] [--port 8025] [--request-timeout <ms>]
 
 Development:
   --sdk-runtime-source <sdk-root>  Dev-only live SDK checkout; omitted preserves the workspace runtime mode.
@@ -99,7 +115,7 @@ function extractOutput(argv){
         remaining.push(argument);
     }
     if(!OUTPUT_MODES.includes(output)){
-        usage(`Invalid --output value: ${String(output)}. Expected human, json, or ndjson.`);
+        usage('Invalid --output value. Expected human, json, or ndjson.');
     }
     return {output,remaining};
 }
@@ -126,7 +142,7 @@ export function parseCliArguments(argv){
                 continue;
             }
             if(!VALUE_OPTIONS.has(name)){
-                usage(`Unknown option: ${argument}.`);
+                usage('Unknown command-line option.');
             }
             const value=equal===-1?argv[++index]:argument.slice(equal+1);
             if(value===undefined||value===''||(equal===-1&&value.startsWith('-'))){
@@ -154,6 +170,169 @@ function readPort(value,defaultValue){
     return port;
 }
 
+function readRequestTimeout(value,defaultValue){
+    if(value===undefined){
+        return defaultValue;
+    }
+    if(!/^\d+$/u.test(value)){
+        usage(`Invalid request timeout: ${value}.`);
+    }
+    const timeout=Number(value);
+    if(!Number.isSafeInteger(timeout)||timeout<1_000||timeout>600_000){
+        usage('Mail request timeout must be an integer between 1000 and 600000 milliseconds.');
+    }
+    return timeout;
+}
+
+const MAX_MAIL_SECRET_BYTES=8_192;
+
+function normalizedSecret(value){
+    const secret=String(value??'').trim();
+    if(!secret||Buffer.byteLength(secret,'utf8')>MAX_MAIL_SECRET_BYTES){
+        usage(`Mail credential input must contain 1-${MAX_MAIL_SECRET_BYTES} UTF-8 bytes.`);
+    }
+    return secret;
+}
+
+function readPipedMailSecret(input,signal){
+    return new Promise((resolve,reject)=>{
+        const chunks=[];
+        let byteLength=0;
+        let settled=false;
+
+        const cleanup=function cleanupMailSecretRead(){
+            input.removeListener('data',onData);
+            input.removeListener('end',onEnd);
+            input.removeListener('error',onError);
+            signal?.removeEventListener('abort',onAbort);
+        };
+        const finish=function finishMailSecretRead(callback,value){
+            if(settled)return;
+            settled=true;
+            cleanup();
+            callback(value);
+        };
+        const onData=function collectMailSecretChunk(chunk){
+            const bytes=Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk);
+            byteLength+=bytes.byteLength;
+            if(byteLength>MAX_MAIL_SECRET_BYTES+2){
+                finish(reject,new ArcaneError(
+                    ERROR_CODES.usage,
+                    `Mail credential input cannot exceed ${MAX_MAIL_SECRET_BYTES} UTF-8 bytes.`
+                ));
+                return;
+            }
+            chunks.push(bytes);
+        };
+        const onEnd=function finishPipedMailSecret(){
+            try{
+                finish(resolve,normalizedSecret(Buffer.concat(chunks).toString('utf8')));
+            }catch(error){
+                finish(reject,error);
+            }
+        };
+        const onError=function failPipedMailSecret(error){
+            finish(reject,new ArcaneError(
+                ERROR_CODES.operationFailed,
+                'Unable to read the mail credential from standard input.',
+                {cause:error}
+            ));
+        };
+        const onAbort=function cancelPipedMailSecret(){
+            finish(reject,new ArcaneError(
+                ERROR_CODES.cancelled,
+                'Mail credential entry was cancelled.',
+                {cause:signal?.reason,exitCode:130}
+            ));
+        };
+
+        input.on('data',onData);
+        input.once('end',onEnd);
+        input.once('error',onError);
+        signal?.addEventListener('abort',onAbort,{once:true});
+        if(signal?.aborted){
+            onAbort();
+        }else{
+            input.resume?.();
+        }
+    });
+}
+
+function readMaskedMailSecret(input,output,signal,label,stdinOption){
+    if(!input?.isTTY||typeof input.setRawMode!=='function'||typeof output?.write!=='function'){
+        usage(`Interactive mail credential entry requires a terminal; use ${stdinOption} for piped input.`);
+    }
+    return new Promise((resolve,reject)=>{
+        let secret='';
+        let settled=false;
+        const priorRaw=Boolean(input.isRaw);
+
+        const cleanup=function cleanupMaskedMailSecret(){
+            input.removeListener('data',onData);
+            signal?.removeEventListener('abort',onAbort);
+            input.setRawMode(priorRaw);
+            if(!priorRaw)input.pause?.();
+        };
+        const finish=function finishMaskedMailSecret(callback,value){
+            if(settled)return;
+            settled=true;
+            cleanup();
+            output.write('\n');
+            callback(value);
+        };
+        const onAbort=function cancelMaskedMailSecret(){
+            finish(reject,new ArcaneError(
+                ERROR_CODES.cancelled,
+                'Mail credential entry was cancelled.',
+                {cause:signal?.reason,exitCode:130}
+            ));
+        };
+        const onData=function collectMaskedMailSecret(chunk){
+            for(const character of String(chunk)){
+                if(character==='\u0003'){
+                    onAbort();
+                    return;
+                }
+                if(character==='\r'||character==='\n'){
+                    try{
+                        finish(resolve,normalizedSecret(secret));
+                    }catch(error){
+                        finish(reject,error);
+                    }
+                    return;
+                }
+                if(character==='\b'||character==='\u007f'){
+                    secret=Array.from(secret).slice(0,-1).join('');
+                    continue;
+                }
+                if(character>=' '&&character!=='\u007f'){
+                    const candidate=secret+character;
+                    if(Buffer.byteLength(candidate,'utf8')<=MAX_MAIL_SECRET_BYTES){
+                        secret=candidate;
+                    }
+                }
+            }
+        };
+
+        output.write(`${label} (input hidden): `);
+        input.setRawMode(true);
+        input.on('data',onData);
+        signal?.addEventListener('abort',onAbort,{once:true});
+        input.resume();
+        if(signal?.aborted)onAbort();
+    });
+}
+
+export function readMailSecretInput({input=process.stdin,output=process.stderr,
+    secretStdin=false,signal,label='Resend API key',stdinOption='--secret-stdin'}={}){
+    if(secretStdin&&input?.isTTY){
+        usage(`${stdinOption} requires redirected or piped input; omit it for hidden interactive entry.`);
+    }
+    return secretStdin
+        ? readPipedMailSecret(input,signal)
+        : readMaskedMailSecret(input,output,signal,label,stdinOption);
+}
+
 function readScope(value){
     const scope=value??'app';
     if(!['app','shared'].includes(scope)){
@@ -173,7 +352,7 @@ function inferredAppId(workspaceRoot){
 
 function noExtraPositionals(command,positionals,expected=0){
     if(positionals.length>expected){
-        usage(`Unexpected argument for ${command}: ${positionals[expected]}.`);
+        usage(`Unexpected argument for ${command}.`);
     }
 }
 
@@ -184,7 +363,10 @@ function operationOptions(command,parsed,cwd){
     const scope=readScope(values.scope);
     const common={workspaceRoot,appId:values.app,scope};
     if(scope==='shared'&&!['test','check'].includes(command)){
-        usage(`--scope shared is not supported by ${command}; shared development cannot package or build app output.`);
+        usage(
+            `--scope shared is not supported by ${reportableCommand(command)}; `
+            +'shared development cannot package or build app output.'
+        );
     }
     if(values['test-file']!==undefined&&command!=='test'){
         usage('--test-file is supported only by test --scope shared.');
@@ -197,6 +379,16 @@ function operationOptions(command,parsed,cwd){
     }
     if(flags.has('overwrite')&&command!=='bundle'){
         usage('--overwrite is supported only by bundle.');
+    }
+    const mailOnlyOptions=['profile','from','origin','allow-to','request-timeout'];
+    if(command!=='mail'&&mailOnlyOptions.some(name=>values[name]!==undefined)){
+        usage(`Mail options are supported only by the mail command.`);
+    }
+    if(command!=='mail'&&flags.has('secret-stdin')){
+        usage('--secret-stdin is supported only by mail key set.');
+    }
+    if(command!=='mail'&&flags.has('app-key-stdin')){
+        usage('--app-key-stdin is supported only by mail serve.');
     }
 
     if(command==='new'){
@@ -342,7 +534,62 @@ function operationOptions(command,parsed,cwd){
         }
         return {...common,action};
     }
-    usage(`Unknown command: ${command}. Run ${CLI_NAME} --help for usage.`);
+    if(command==='mail'){
+        const area=positionals[0];
+        if(area==='key'){
+            noExtraPositionals(command,positionals,3);
+            const action=positionals[1];
+            const profile=positionals[2];
+            if(!['set','status','delete'].includes(action)||!profile){
+                usage('mail key requires set, status, or delete followed by one profile id.');
+            }
+            if(values.profile!==undefined||values.from!==undefined||values.origin!==undefined
+                ||values['allow-to']!==undefined||values.host!==undefined||values.port!==undefined
+                ||values['request-timeout']!==undefined){
+                usage('mail key accepts only its profile argument and optional --secret-stdin for set.');
+            }
+            if(flags.has('secret-stdin')&&action!=='set'){
+                usage('--secret-stdin is supported only by mail key set.');
+            }
+            if(flags.has('app-key-stdin')){
+                usage('--app-key-stdin is supported only by mail serve.');
+            }
+            return {
+                action:`key-${action}`,
+                profile,
+                secretStdin:flags.has('secret-stdin'),
+            };
+        }
+        if(area==='serve'){
+            noExtraPositionals(command,positionals,1);
+            if(flags.has('secret-stdin')){
+                usage('--secret-stdin is not supported by mail serve.');
+            }
+            for(const [name,value]of Object.entries({
+                profile:values.profile,
+                from:values.from,
+                app:values.app,
+                origin:values.origin,
+                'allow-to':values['allow-to'],
+            })){
+                if(!value)usage(`mail serve requires --${name} <value>.`);
+            }
+            return {
+                action:'serve',
+                profile:values.profile,
+                from:values.from,
+                appId:values.app,
+                origin:values.origin,
+                allowTo:values['allow-to'],
+                appKeyStdin:flags.has('app-key-stdin'),
+                host:values.host??'127.0.0.1',
+                port:readPort(values.port,8025),
+                requestTimeout:readRequestTimeout(values['request-timeout'],30_000),
+            };
+        }
+        usage('mail requires either key set|status|delete <profile> or serve.');
+    }
+    usage(`Unknown command. Run ${CLI_NAME} --help for usage.`);
 }
 
 const NATIVE_REQUESTS=Object.freeze({
@@ -460,6 +707,10 @@ function commandFromArgs(args){
     return 'help';
 }
 
+function reportableCommand(command){
+    return REPORTABLE_COMMANDS.has(command)?command:'unknown';
+}
+
 function serverSummary(result){
     return {
         target:result.target??'browser',
@@ -517,6 +768,7 @@ async function waitForServer(result,signal,reporter){
 
 export async function runCli(argv=process.argv.slice(2),{
     cwd=process.cwd(),
+    stdin=process.stdin,
     stdout=process.stdout,
     stderr=process.stderr,
     execute=executeOperation,
@@ -529,8 +781,13 @@ export async function runCli(argv=process.argv.slice(2),{
     try{
         const extracted=extractOutput([...argv]);
         command=commandFromArgs(extracted.remaining);
-        reporter=createReporter({command,output:extracted.output,stdout,stderr});
-        reporter.accept({argv:extracted.remaining});
+        reporter=createReporter({
+            command:reportableCommand(command),
+            output:extracted.output,
+            stdout,
+            stderr
+        });
+        reporter.accept();
         process.once('SIGINT',onSignal);
         process.once('SIGTERM',onSignal);
 
@@ -544,9 +801,38 @@ export async function runCli(argv=process.argv.slice(2),{
             return 0;
         }
 
+        const operation=operationOptions(command,parsed,cwd);
+        if(command==='mail'&&operation.action==='key-set'){
+            operation.readSecret=function readMailCredentialForOperation(){
+                if(reporter.output!=='human'&&!operation.secretStdin){
+                    usage('Structured output requires mail key set --secret-stdin.');
+                }
+                return readMailSecretInput({
+                    input:stdin,
+                    output:stderr,
+                    secretStdin:operation.secretStdin,
+                    signal:controller.signal,
+                });
+            };
+        }
+        if(command==='mail'&&operation.action==='serve'){
+            operation.readAppKey=function readMailGatewayAppKeyForOperation(){
+                if(reporter.output!=='human'&&!operation.appKeyStdin){
+                    usage('Structured output requires mail serve --app-key-stdin.');
+                }
+                return readMailSecretInput({
+                    input:stdin,
+                    output:stderr,
+                    secretStdin:operation.appKeyStdin,
+                    signal:controller.signal,
+                    label:'Mail gateway app key',
+                    stdinOption:'--app-key-stdin',
+                });
+            };
+        }
         const options=await pairNativeProvider(
             command,
-            operationOptions(command,parsed,cwd),
+            operation,
             loadNativeProvider,
             {signal:controller.signal,onEvent:event=>reporter.forward(event)}
         );
@@ -555,7 +841,8 @@ export async function runCli(argv=process.argv.slice(2),{
             signal:controller.signal,
             onEvent:event=>reporter.forward(event)
         });
-        const finalResult=(command==='dev'||(command==='run'&&(options.target??'browser')==='browser'))
+        const finalResult=(command==='dev'||(command==='run'&&(options.target??'browser')==='browser')
+            ||(command==='mail'&&options.action==='serve'))
             ?await waitForServer(result,controller.signal,reporter)
             :result;
         reporter.complete(finalResult);
