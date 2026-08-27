@@ -50,6 +50,17 @@ jobs:
       MUSL_COPYRIGHT_URL: https://raw.githubusercontent.com/emscripten-core/emscripten/273f0216fede04f2445367765eaf2aabeeb60d84/system/lib/libc/musl/COPYRIGHT
       MUSL_COPYRIGHT_BYTES: '6204'
       MUSL_COPYRIGHT_SHA256: f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af
+      PHONEMIZER_REVISION: 6835144b7ee9043129222549c1ed2f6a27216278
+      PHONEMIZER_SOURCE_URL: https://raw.githubusercontent.com/xenova/phonemizer.js/6835144b7ee9043129222549c1ed2f6a27216278/src/phonemizer.js
+      PHONEMIZER_SOURCE_BYTES: '2204'
+      PHONEMIZER_SOURCE_SHA256: 1edf7dc6ca674d91e8be9f7e07ab268af5bb1d56f87bcf24624d937c3599d175
+      KOKORO_REVISION: 664c76a704021239ba59c84dcbaa4d3dece01fe9
+      KOKORO_PHONEMIZE_SOURCE_URL: https://raw.githubusercontent.com/hexgrad/kokoro/664c76a704021239ba59c84dcbaa4d3dece01fe9/kokoro.js/src/phonemize.js
+      KOKORO_PHONEMIZE_SOURCE_BYTES: '6617'
+      KOKORO_PHONEMIZE_SOURCE_SHA256: fc8f3c63edd56bdaa967b92274ad6df891a1926211fbc884675b7069f398a2d4
+      KOKORO_PHONEMIZE_TEST_URL: https://raw.githubusercontent.com/hexgrad/kokoro/664c76a704021239ba59c84dcbaa4d3dece01fe9/kokoro.js/tests/phonemize.test.js
+      KOKORO_PHONEMIZE_TEST_BYTES: '4801'
+      KOKORO_PHONEMIZE_TEST_SHA256: 3c90f9bdce54c2378981fe5f137f41c0de73153e59f55084a05a22994cc7bbeb
       UBUNTU_SNAPSHOT: https://snapshot.ubuntu.com/ubuntu/20250225T232300Z
     steps:
       - name: Admit only the canonical main workflow dispatch
@@ -136,6 +147,21 @@ jobs:
             "$MUSL_COPYRIGHT_BYTES" \
             "$MUSL_COPYRIGHT_SHA256" \
             "$MUSL_COPYRIGHT_URL"
+          download_exact \
+            PHONEMIZER_SOURCE.js \
+            "$PHONEMIZER_SOURCE_BYTES" \
+            "$PHONEMIZER_SOURCE_SHA256" \
+            "$PHONEMIZER_SOURCE_URL"
+          download_exact \
+            KOKORO_PHONEMIZE_SOURCE.js \
+            "$KOKORO_PHONEMIZE_SOURCE_BYTES" \
+            "$KOKORO_PHONEMIZE_SOURCE_SHA256" \
+            "$KOKORO_PHONEMIZE_SOURCE_URL"
+          download_exact \
+            KOKORO_PHONEMIZE_TEST.js \
+            "$KOKORO_PHONEMIZE_TEST_BYTES" \
+            "$KOKORO_PHONEMIZE_TEST_SHA256" \
+            "$KOKORO_PHONEMIZE_TEST_URL"
 
           cat > "$inputs/dependencies.tsv" <<'EOF'
           autoconf_2.71-2_all.deb	337608	96b528889794c4134015a63c75050f93d8aecdf5e3f2a20993c1433f4c61b80e	pool/main/a/autoconf/autoconf_2.71-2_all.deb
@@ -323,8 +349,18 @@ jobs:
           patched_sha256 = hashlib.sha256(patched).hexdigest()
           if patched_sha256 != patch["outputSha256"]:
               raise SystemExit(f"Unexpected wctype.h output: {patched_sha256}")
+          if len(patched) != patch["outputBytes"]:
+              raise SystemExit(f"Unexpected wctype.h output bytes: {len(patched)}")
+          patched_git_blob = hashlib.sha1(
+              b"blob " + str(len(patched)).encode("ascii") + b"\0" + patched
+          ).hexdigest()
+          if patched_git_blob != patch["outputGitBlob"]:
+              raise SystemExit(f"Unexpected wctype.h output Git blob: {patched_git_blob}")
           target.write_bytes(patched)
-          print(f"wctype.h {original_sha256} -> {patched_sha256}")
+          print(
+              f"wctype.h {original_sha256} -> {patched_sha256} "
+              f"({len(patched)} bytes, Git blob {patched_git_blob})"
+          )
           PY
 
           printf 'export default null;\n' > "$inputs/arcane-browser-node-unavailable.mjs"
@@ -433,6 +469,21 @@ jobs:
 
           const root = process.argv[2];
           if (!root) throw new Error("The exact runtime directory is required.");
+          const compatibilityAuthorityPath = process.argv[3];
+          if (!compatibilityAuthorityPath) {
+            throw new Error("The authenticated compatibility authority is required.");
+          }
+          const compatibilityAuthority = JSON.parse(
+            await fs.readFile(compatibilityAuthorityPath, "utf8"),
+          );
+          if (
+            compatibilityAuthority.schema !==
+              "arcane.browser-speech.espeak-compatibility-authority/1" ||
+            !Array.isArray(compatibilityAuthority.verifiedVectors) ||
+            compatibilityAuthority.verifiedVectors.length !== 2
+          ) {
+            throw new Error("The authenticated compatibility authority is invalid.");
+          }
           const releaseBase =
             "https://github.com/TheWizardNexus/arcane-os-sdk/releases/download/0.3.0";
           const assets = new Map([
@@ -508,18 +559,14 @@ jobs:
               language: "en-us",
               expected: ["həlˈoʊ", "wˈɜːld"],
             },
-            {
-              id: "kokoro-hello-world-en",
-              text: "Hello World",
-              language: "en",
-              expected: ["həlˈəʊ wˈɜːld"],
-            },
-            {
-              id: "kokoro-hello-world-en-us",
-              text: "Hello World",
-              language: "en-us",
-              expected: ["həlˈoʊ wˈɜːld"],
-            },
+            ...compatibilityAuthority.verifiedVectors.map(
+              ([language, text, phonemes]) => ({
+                id: `kokoro-${text.toLowerCase().replaceAll(" ", "-")}-${language}`,
+                text,
+                language,
+                expected: [phonemes],
+              }),
+            ),
             {
               id: "arcane-en",
               text: "Arcane OS is ready.",
@@ -605,6 +652,7 @@ jobs:
           }
           process.stdout.write(`${JSON.stringify({
             schema: "arcane.browser-speech.espeak-functional-proof/2",
+            compatibilityAuthority,
             empty,
             corpus: corpusResults,
             invalidLanguage,
@@ -632,6 +680,8 @@ jobs:
               "path": "src/include/compat/wctype.h",
               "inputSha256": "1f70c90c9ba2ef7fef4d2d2e1734f047b1af697c0b0b0ed1d808491a92dc4ed1",
               "outputSha256": "0d602dbf151dba62481d92997c8644dbf77e6a4381b655c2055f17d853969835",
+              "outputBytes": 1546,
+              "outputGitBlob": "c1ed30c40bf084498a1d8aa873b337505ac1a9dd",
               "upstreamCommit": "690ee601ff8fb91c2eb6b37cce746d4d0913fcd3",
               "upstreamReference": {
                 "bytes": 1490,
@@ -756,17 +806,21 @@ jobs:
               "phonemizerSource": {
                 "revision": "6835144b7ee9043129222549c1ed2f6a27216278",
                 "path": "src/phonemizer.js",
+                "sourceUrl": "https://raw.githubusercontent.com/xenova/phonemizer.js/6835144b7ee9043129222549c1ed2f6a27216278/src/phonemizer.js",
                 "bytes": 2204,
                 "sha256": "1edf7dc6ca674d91e8be9f7e07ab268af5bb1d56f87bcf24624d937c3599d175"
               },
               "kokoroSource": {
                 "revision": "664c76a704021239ba59c84dcbaa4d3dece01fe9",
                 "path": "kokoro.js/src/phonemize.js",
+                "sourceUrl": "https://raw.githubusercontent.com/hexgrad/kokoro/664c76a704021239ba59c84dcbaa4d3dece01fe9/kokoro.js/src/phonemize.js",
                 "bytes": 6617,
                 "sha256": "fc8f3c63edd56bdaa967b92274ad6df891a1926211fbc884675b7069f398a2d4"
               },
               "kokoroTests": {
+                "revision": "664c76a704021239ba59c84dcbaa4d3dece01fe9",
                 "path": "kokoro.js/tests/phonemize.test.js",
+                "sourceUrl": "https://raw.githubusercontent.com/hexgrad/kokoro/664c76a704021239ba59c84dcbaa4d3dece01fe9/kokoro.js/tests/phonemize.test.js",
                 "bytes": 4801,
                 "sha256": "3c90f9bdce54c2378981fe5f137f41c0de73153e59f55084a05a22994cc7bbeb"
               },
@@ -778,6 +832,131 @@ jobs:
             }
           }
           EOF
+
+          cat > "$inputs/verify-compatibility-authority.py" <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          import sys
+          from pathlib import Path
+
+          inputs = Path(sys.argv[1])
+          contract = json.loads(
+              (inputs / "ARCANE_ESPEAK_NG_BUILD_CONTRACT.json").read_text(encoding="utf-8")
+          )
+          target = contract["compatibilityTarget"]
+
+          specs = {
+              "phonemizerSource": (
+                  "PHONEMIZER_SOURCE.js",
+                  "src/phonemizer.js",
+                  "PHONEMIZER_REVISION",
+                  "PHONEMIZER_SOURCE_URL",
+                  "PHONEMIZER_SOURCE_BYTES",
+                  "PHONEMIZER_SOURCE_SHA256",
+              ),
+              "kokoroSource": (
+                  "KOKORO_PHONEMIZE_SOURCE.js",
+                  "kokoro.js/src/phonemize.js",
+                  "KOKORO_REVISION",
+                  "KOKORO_PHONEMIZE_SOURCE_URL",
+                  "KOKORO_PHONEMIZE_SOURCE_BYTES",
+                  "KOKORO_PHONEMIZE_SOURCE_SHA256",
+              ),
+              "kokoroTests": (
+                  "KOKORO_PHONEMIZE_TEST.js",
+                  "kokoro.js/tests/phonemize.test.js",
+                  "KOKORO_REVISION",
+                  "KOKORO_PHONEMIZE_TEST_URL",
+                  "KOKORO_PHONEMIZE_TEST_BYTES",
+                  "KOKORO_PHONEMIZE_TEST_SHA256",
+              ),
+          }
+          for key, (
+              filename,
+              source_path,
+              revision_env,
+              url_env,
+              bytes_env,
+              sha_env,
+          ) in specs.items():
+              source = (inputs / filename).read_bytes()
+              source_bytes = len(source)
+              source_sha256 = hashlib.sha256(source).hexdigest()
+              if source_bytes != int(os.environ[bytes_env]):
+                  raise SystemExit(f"The authenticated {key} byte count changed.")
+              if source_sha256 != os.environ[sha_env]:
+                  raise SystemExit(f"The authenticated {key} SHA-256 changed.")
+              actual = {
+                  "revision": os.environ[revision_env],
+                  "path": source_path,
+                  "sourceUrl": os.environ[url_env],
+                  "bytes": source_bytes,
+                  "sha256": source_sha256,
+              }
+              if actual != target[key]:
+                  raise SystemExit(f"The authenticated {key} identity changed: {actual!r}")
+
+          phonemizer = (inputs / "PHONEMIZER_SOURCE.js").read_text(encoding="utf-8")
+          kokoro = (inputs / "KOKORO_PHONEMIZE_SOURCE.js").read_text(encoding="utf-8")
+          tests = (inputs / "KOKORO_PHONEMIZE_TEST.js").read_text(encoding="utf-8")
+          phonemizer_fragments = [
+              'export const phonemize = async (text, language = "en-us") => {',
+              "worker.set_voice(language);",
+              ".synthesize_ipa(text)",
+              '.ipa?.split("\\n")',
+          ]
+          kokoro_fragments = [
+              'import { phonemize as espeakng } from "phonemizer";',
+              'const lang = language === "a" ? "en-us" : "en";',
+              '(await espeakng(text, lang)).join(" ")',
+          ]
+          for fragment in phonemizer_fragments:
+              if phonemizer.count(fragment) != 1:
+                  raise SystemExit(f"The phonemizer compatibility contract changed: {fragment}")
+          for fragment in kokoro_fragments:
+              if kokoro.count(fragment) != 1:
+                  raise SystemExit(f"The Kokoro compatibility contract changed: {fragment}")
+
+          a_start = tests.index("const A_TEST_CASES = new Map([")
+          b_start = tests.index("const B_TEST_CASES = new Map([")
+          test_start = tests.index('describe("phonemize"')
+          blocks = {
+              "en-us": tests[a_start:b_start],
+              "en": tests[b_start:test_start],
+          }
+          vectors = []
+          for language in ("en-us", "en"):
+              matches = re.findall(
+                  r'^\s*\["Hello World", "([^"\r\n]+)"\],\s*$',
+                  blocks[language],
+                  flags=re.MULTILINE,
+              )
+              if len(matches) != 1:
+                  raise SystemExit(
+                      f"Expected exactly one authenticated Hello World vector for {language}."
+                  )
+              vectors.append([language, "Hello World", matches[0]])
+          if vectors != target["verifiedVectors"]:
+              raise SystemExit(f"The authenticated Kokoro vectors changed: {vectors!r}")
+
+          authority = {
+              "schema": "arcane.browser-speech.espeak-compatibility-authority/1",
+              **target,
+              "mechanicalBinding": {
+                  "phonemizerContract": "authenticated source exports async string-array phonemize through synthesize_ipa newline splitting",
+                  "kokoroContract": "authenticated source maps a to en-us and b to en, then joins each phonemizer string array with one space",
+                  "vectorSource": "the exact Hello World entries parsed from the authenticated A_TEST_CASES and B_TEST_CASES maps",
+              },
+          }
+          (inputs / "ARCANE_ESPEAK_COMPATIBILITY_AUTHORITY.json").write_text(
+              json.dumps(authority, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+              newline="\n",
+          )
+          PY
+          python3 "$inputs/verify-compatibility-authority.py" "$inputs"
 
           cat > "$inputs/ARCANE_ESPEAK_NG_MODIFICATIONS.txt" <<'EOF'
           Arcane OS SDK eSpeak-NG compatibility modifications
@@ -902,7 +1081,7 @@ jobs:
           {
             printf 'emcc\t%s\n' "$(emcc --version | sed -n '1p')"
             printf 'em++\t%s\n' "$(em++ --version | sed -n '1p')"
-            printf 'clang\t%s\n' "$(clang --version | sed -n '1p')"
+            printf 'clang\t%s\n' "$(/emsdk/upstream/bin/clang --version | sed -n '1p')"
             printf 'node\t%s\n' "$(node --version)"
             printf 'python3\t%s\n' "$(python3 --version 2>&1)"
             printf 'make\t%s\n' "$(make --version | sed -n '1p')"
@@ -1291,6 +1470,7 @@ jobs:
             test "$(wc -l < /evidence/runtime.sha256)" = 5
           )
           node /inputs/verify-runtime.mjs /out \
+            /inputs/ARCANE_ESPEAK_COMPATIBILITY_AUTHORITY.json \
             > /evidence/runtime-proof.json
           ARCANE_BUILD
           done
@@ -1363,6 +1543,8 @@ jobs:
             "$artifact/ARCANE_ESPEAK_NG_INPUTS.sha256"
           cp "$INPUTS/ARCANE_ESPEAK_NG_BUILD_CONTRACT.json" \
             "$artifact/ARCANE_ESPEAK_NG_BUILD_CONTRACT.json"
+          cp "$INPUTS/ARCANE_ESPEAK_COMPATIBILITY_AUTHORITY.json" \
+            "$artifact/ARCANE_ESPEAK_COMPATIBILITY_AUTHORITY.json"
           test -z "$(find "$artifact" -mindepth 1 ! -type d ! -type f -print -quit)"
           test -z "$(find "$artifact" -type f -empty -print -quit)"
           (
@@ -1554,8 +1736,15 @@ jobs:
                   encoding="utf-8"
               )
           )
+          compatibility_authority = json.loads(
+              (artifact / "ARCANE_ESPEAK_COMPATIBILITY_AUTHORITY.json").read_text(
+                  encoding="utf-8"
+              )
+          )
           if proof_1 != proof_2:
               raise SystemExit("The two exact runtime proofs differ.")
+          if proof_1.get("compatibilityAuthority") != compatibility_authority:
+              raise SystemExit("The runtime proof compatibility authority changed.")
 
           files_before_receipt = sorted(
               (identity(path) for path in artifact.rglob("*") if path.is_file()),
@@ -1582,9 +1771,6 @@ jobs:
                       "purpose": "apply the exact SDK-derived two-line base-preserving adaptation informed by the authenticated upstream Emscripten fix",
                       "upstreamIssue": "https://github.com/espeak-ng/espeak-ng/issues/1887",
                       "upstreamPullRequest": "https://github.com/espeak-ng/espeak-ng/pull/2401",
-                      "upstreamParent": "724808c5a83f9ef95fdd0db886ba7ba537ff224a",
-                      "outputBytes": 1546,
-                      "outputGitBlob": "c1ed30c40bf084498a1d8aa873b337505ac1a9dd",
                   },
               },
               "toolchain": {
@@ -1632,6 +1818,12 @@ jobs:
                           artifact / "ARCANE_ESPEAK_NG_BUILD_CONTRACT.json"
                       ),
                       "record": build_contract,
+                  },
+                  "compatibilityAuthority": {
+                      "identity": identity(
+                          artifact / "ARCANE_ESPEAK_COMPATIBILITY_AUTHORITY.json"
+                      ),
+                      "record": compatibility_authority,
                   },
                   "completeManifestExcludesItself": True,
               },
