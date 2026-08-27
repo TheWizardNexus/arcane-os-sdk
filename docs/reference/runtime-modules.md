@@ -41,7 +41,7 @@ Apps import renderer ESM from `/arcane/modules/<file>`. Classic scripts, the OPF
 | [`CommunicationHub.js`](#communicationhubjs) | esm | Fans out provider refresh/send operations and aggregates normalized threads/messages. | Cross-host with injected providers | Normalized aggregates; refresh contains per-provider failures. |
 | [`CommunicationPreferences.js`](#communicationpreferencesjs) | esm | Stores app-scoped, non-secret communication provider preferences. | Browser / native WebView hybrid | Normalized preference record; storage failures mixed. |
 | [`CommunicationProviderRegistry.js`](#communicationproviderregistryjs) | esm | Registers and queries validated provider definitions, channels, and required methods. | Cross-host | Strict normalized registry. |
-| [`ComponentContracts.js`](#componentcontractsjs) | esm | Owns normalized configuration/value contracts shared by chart, dashboard, Markdown, and voice components. | Cross-host | Fully normalized labels, rows, definitions, visibility, formats, editor and voice options. |
+| [`ComponentContracts.js`](#componentcontractsjs) | esm | Owns normalized configuration/value contracts and shared explicit STT activation behavior for chart, dashboard, Markdown, and voice components. | Cross-host | Fully normalized labels, rows, definitions, visibility, formats, editor and voice options, plus capability-neutral STT activation intent and presentation state. |
 | [`ConfiguredAIChatSession.js`](#configuredaichatsessionjs) | esm | Owns bounded in-memory AI turns, context construction, response-length instruction, and atomic history commit. | Native bridge by default; cross-host with injected chat | Normalized session/result; provider rejection preserved. |
 | [`ConversationActionItems.js`](#conversationactionitemsjs) | esm | Normalizes, creates, updates, remembers, selects, and formats bounded conversation action items. | Cross-host | Fully normalized status/base/presentation contract. |
 | [`ConversationClosingReport.js`](#conversationclosingreportjs) | esm | Defines the closing-report tool, instruction, result normalizer, call classifier, and formatter. | Cross-host | Fully normalized report contract. |
@@ -791,17 +791,40 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Owns normalized configuration/value contracts shared by chart, dashboard, Markdown, and voice components.
+Owns normalized configuration/value contracts and shared explicit STT activation
+behavior for chart, dashboard, Markdown, and voice components.
 
 ### Public surface
 
-Six constant sets and twelve normalization/formatting helpers.
+Constant sets plus normalization, formatting, and explicit STT activation
+helpers. `createSTTActivationController({host,button,onChange,EventClass=CustomEvent})`
+consumes only normalized
+[`AIRuntimeState`](#airuntimestatejs) `stt` role records. Its frozen controller
+exposes `action`, `error`, `label`, `pending`, `selected`, `status`, `title`, and
+`visible` getters plus `request(action)`, `synchronize(role)`, and `destroy()`.
+`host` supplies `dispatchEvent(event)` and `requestSTTActivation(intent)`;
+`button` supplies `addEventListener()` and `removeEventListener()`; and
+`onChange()` is called whenever presentation should be rendered again. Browser
+callers use the default `CustomEvent`; non-DOM callers must inject a compatible
+`EventClass` constructor.
 
-Exact exports: `CHART_LABELS`, `DASHBOARD_LABELS`, `MARKDOWN_FORMATS`, `MARKDOWN_LABELS`, `VOICE_LABELS`, `VOICE_MESSAGES`, `appendTranscription`, `applyMarkdownFormat`, `effectiveDashboardVisibility`, `normalizeChartOptions`, `normalizeChartRows`, `normalizeDashboardDefinitions`, `normalizeDashboardOptions`, `normalizeDashboardVisibility`, `normalizeMarkdownFormats`, `normalizeMarkdownOptions`, `normalizeVoiceOptions`.
+`request('load'|'unload')` emits the cancelable
+`speech-stt-activation-request` event with frozen `{intent,state}` before it
+invokes `host.requestSTTActivation(intent)`. Callback failure emits
+`speech-stt-activation-error` with frozen `{request,error,message}`. Syncing
+sticky state only changes the controller's observation and presentation; it
+never emits a lifecycle intent, chooses a provider, or starts a download.
+`destroy()` removes its button listener and suppresses late callback effects.
+
+Exact exports: `CHART_LABELS`, `DASHBOARD_LABELS`, `MARKDOWN_FORMATS`, `MARKDOWN_LABELS`, `VOICE_LABELS`, `VOICE_MESSAGES`, `appendTranscription`, `applyMarkdownFormat`, `createSTTActivationController`, `effectiveDashboardVisibility`, `normalizeChartOptions`, `normalizeChartRows`, `normalizeDashboardDefinitions`, `normalizeDashboardOptions`, `normalizeDashboardVisibility`, `normalizeMarkdownFormats`, `normalizeMarkdownOptions`, `normalizeVoiceOptions`.
 
 ### Availability and normalization
 
-**Cross-host.** Fully normalized labels, rows, definitions, visibility, formats, editor and voice options. Transport: In-process only. [Deep protocol details](protocols.md).
+**Cross-host with an injected event constructor outside DOM hosts.** Fully
+normalized labels, rows, definitions, visibility, formats, editor and voice
+options, plus capability-neutral STT activation intent and presentation state.
+Provider authority and lifecycle execution remain with the configured runtime
+owner. Transport: In-process only. [Deep protocol details](protocols.md).
 
 ### Example
 

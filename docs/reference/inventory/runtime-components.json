@@ -715,6 +715,7 @@
       "dependencies": [
         "AI.js",
         "AIRuntimeState.js",
+        "ComponentContracts.js",
         "DBLS.js"
       ],
       "availability": "Browser and supported native WebViews",
@@ -884,9 +885,10 @@
     {
       "file": "runtime/arcane/components/voice-transcription.html",
       "name": "voice-transcription.html",
-      "purpose": "Records segmented microphone audio, transcribes, persists, and completes a combined transcript.",
+      "purpose": "Records segmented microphone audio only after authoritative STT admission, exposes explicit selected-STT activation, transcribes with cancellation, persists, and completes a combined transcript.",
       "methods": [
         "configure()",
+        "requestSTTActivation()",
         "startRecording()",
         "stopRecording()",
         "save()",
@@ -901,17 +903,21 @@
         "voice-transcription-segment",
         "voice-transcription-change",
         "voice-transcription-complete",
-        "speech-transcription-complete"
+        "speech-transcription-complete",
+        "speech-transcription-cancelled",
+        "speech-stt-activation-request",
+        "speech-stt-activation-error"
       ],
       "slots": [],
       "dependencies": [
         "MD.js",
         "ComponentContracts.js",
+        "AIRuntimeState.js",
         "AI.js"
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "State/text normalized; media/provider behavior mixed"
+      "normalization": "Sticky runtime STT readiness, explicit activation, request cancellation, and state/text are normalized; media/provider behavior remains external"
     },
     {
       "file": "runtime/arcane/components/weather-widget.html",

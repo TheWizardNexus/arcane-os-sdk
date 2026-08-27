@@ -64,6 +64,11 @@ The published package is exactly `arcane-os@0.2.2` from source commit
 `d5326d206bf0bec6ad82d53605e666841aa79899`. The npm `latest` dist-tag resolves
 to `0.2.2`; the separate `dev` dist-tag remains `0.1.0-dev.5`.
 
+The admission-aware `voice-transcription.html` lifecycle and shared
+`createSTTActivationController()` contract documented below are newer canonical
+source. They are not package authority in `0.2.2`; consumers require a fresh
+numeric publication before relying on them.
+
 | Evidence | Exact value |
 | --- | --- |
 | npm integrity | `sha512-JnLzZ4+FqX9tMgRv8HMcaCPSFx3xNNRf8BF8T03fD2ymg2g8cIGZRdD/3Tbd9PLtpx1PIKCpxz6nCP6ztnu1Nw==` |
@@ -133,7 +138,7 @@ Ollama, Wllama, Whisper, Kokoro, native, or cloud transport:
 | --- | --- | --- |
 | Select, load, unload, inspect, cancel, and use LLM/STT/TTS independently | [`AIProviderRuntime.js`](runtime-modules.md#aiproviderruntimejs) | Cross-host controller; each registered provider declares its own host requirements. |
 | Observe sticky role state and startup settlement | [`AIRuntimeState.js`](runtime-modules.md#airuntimestatejs) | Cross-host EventTarget state; observation grants no authority. |
-| Offer explicit selected-model start/cancel UI | [`chat.html`](runtime-components.md#chathtml) and [`speech.html`](runtime-components.md#speechhtml) | Browser/native WebView components; user activation emits a cancelable request before any LLM or STT load intent. |
+| Offer explicit selected-model start/cancel UI | [`chat.html`](runtime-components.md#chathtml), [`speech.html`](runtime-components.md#speechhtml), and [`voice-transcription.html`](runtime-components.md#voice-transcriptionhtml) | Browser/native WebView components; user activation emits a cancelable request before any LLM or STT load intent, and recording stays disabled without sticky ready STT. |
 | Use Core-normalized chat | [`globalThis.Arcane.ai`](core/arcane-ai-contracts.md) | Native/Core only when separately admitted. |
 | Run a caller-selected GGUF LLM locally | [`arcane-os/ai/browser-wasm`](ai/browser-wasm.md) | Browser secure context with WebGPU/full-offload evidence, WebAssembly, and OPFS/DBOPFS. |
 | Run caller-selected Whisper/Kokoro locally | [`arcane-os/ai/browser-speech`](ai/browser-speech.md) | Browser with DBOPFS, Web Locks, Workers, and caller-supplied immutable runtime/model bytes. |
@@ -147,11 +152,12 @@ profiles, tools, business policy, and private data remain app-owned.
 
 An explicitly selected but unloaded model is not “ready.” `chat.html` keeps
 Send disabled and exposes a visible keyboard-operable LLM Start/Try again or
-Cancel loading control. `speech.html` keeps Hold to talk unavailable and offers
-the equivalent Start transcription/Try again/Cancel loading control for STT.
-Applications can override `requestAIActivation(intent)` or
-`requestSTTActivation(intent)`, or cancel the corresponding activation-request
-event. Imports and state observation emit no lifecycle intent, and default
+Cancel loading control. `speech.html` and `voice-transcription.html` keep their
+recording operations unavailable and share the equivalent Start
+transcription/Try again/Cancel loading control for STT. Applications can
+override `requestAIActivation(intent)` or `requestSTTActivation(intent)`, or
+cancel the corresponding activation-request event. Imports and state
+observation emit no lifecycle intent, and default
 `startTranscription=false` does not request an STT startup load or begin an
 automatic model download. It does not unload a role started independently.
 Compatibility availability never creates ready STT/TTS state without an

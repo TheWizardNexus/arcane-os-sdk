@@ -15,7 +15,7 @@
   },
   "artifactCount": 85,
   "javascriptArtifactCount": 83,
-  "esmExportCount": 318,
+  "esmExportCount": 319,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -407,6 +407,7 @@
         "VOICE_MESSAGES",
         "appendTranscription",
         "applyMarkdownFormat",
+        "createSTTActivationController",
         "effectiveDashboardVisibility",
         "normalizeChartOptions",
         "normalizeChartRows",
@@ -417,11 +418,11 @@
         "normalizeMarkdownOptions",
         "normalizeVoiceOptions"
       ],
-      "summary": "Owns normalized configuration/value contracts shared by chart, dashboard, Markdown, and voice components.",
-      "availability": "Cross-host",
+      "summary": "Owns normalized configuration/value contracts and shared explicit STT activation behavior for chart, dashboard, Markdown, and voice components.",
+      "availability": "Cross-host with an injected event constructor outside DOM hosts",
       "protocol": "In-process only",
-      "normalization": "Fully normalized labels, rows, definitions, visibility, formats, editor and voice options.",
-      "surface": "Six constant sets and twelve normalization/formatting helpers."
+      "normalization": "Fully normalized labels, rows, definitions, visibility, formats, editor and voice options, plus capability-neutral STT activation intent and presentation state.",
+      "surface": "Constant sets plus normalization, formatting, and explicit STT activation helpers."
     },
     {
       "file": "runtime/arcane/modules/ConfiguredAIChatSession.js",

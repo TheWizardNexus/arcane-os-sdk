@@ -451,7 +451,7 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
         )).map(file=>path.relative(repositoryRoot,file).split(path.sep).join('/')));
         assert.equal(moduleInventory.artifactCount,85);
         assert.equal(moduleInventory.javascriptArtifactCount,83);
-        assert.equal(moduleInventory.esmExportCount,318);
+        assert.equal(moduleInventory.esmExportCount,319);
         assert.deepEqual(
             sorted(moduleInventory.artifacts.map(artifact=>artifact.file)),
             actualPaths
@@ -484,6 +484,16 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
         assert.equal(componentInventory.componentCount,39);
         assert.equal(live.components.length,39);
         assert.equal(live.parsedComponentScriptCount,39);
+        const componentContractSource=await readFile(
+            path.join(
+                repositoryRoot,
+                'runtime',
+                'arcane',
+                'modules',
+                'ComponentContracts.js'
+            ),
+            'utf8'
+        );
         assert.deepEqual(
             sorted(live.components.map(component=>component.file)),
             sorted(componentInventory.artifacts.map(component=>component.file))
@@ -543,8 +553,18 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
                 );
             }
             for(const event of component.events){
+                const sharedSTTActivationEvent=
+                    component.methods.includes('requestSTTActivation()')
+                    &&component.dependencies.includes('ComponentContracts.js')
+                    &&[
+                        'speech-stt-activation-request',
+                        'speech-stt-activation-error'
+                    ].includes(event);
+                const eventSource=sharedSTTActivationEvent
+                    ?`${source}\n${componentContractSource}`
+                    :source;
                 assert.match(
-                    source,
+                    eventSource,
                     new RegExp(`['"]${escapeRegExp(event)}['"]`,'u'),
                     `${component.file} no longer references event ${event}.`
                 );
@@ -597,19 +617,45 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
         assert.match(chat.normalization,/destroy aborts state\/activation observation[\s\S]*returns undefined/u);
     });
 
-    await t.test('speech documents explicit selected-STT activation without hidden startup',async()=>{
+    await t.test('speech components document one shared selected-STT activation contract',async()=>{
         const speech=componentInventory.artifacts.find(
             component=>component.name==='speech.html'
         );
+        const voice=componentInventory.artifacts.find(
+            component=>component.name==='voice-transcription.html'
+        );
         assert.ok(speech);
-        const source=await readFile(path.join(repositoryRoot,speech.file),'utf8');
+        assert.ok(voice);
+        for(const component of [speech,voice]){
+            assert.ok(component.methods.includes('requestSTTActivation()'));
+            assert.ok(component.events.includes('speech-stt-activation-request'));
+            assert.ok(component.events.includes('speech-stt-activation-error'));
+            assert.ok(component.events.includes('speech-transcription-cancelled'));
+        }
+        const [speechSource,voiceSource,contractSource]=await Promise.all([
+            readFile(path.join(repositoryRoot,speech.file),'utf8'),
+            readFile(path.join(repositoryRoot,voice.file),'utf8'),
+            readFile(
+                path.join(
+                    repositoryRoot,
+                    'runtime/arcane/modules/ComponentContracts.js'
+                ),
+                'utf8'
+            )
+        ]);
         for(const value of [
-            "role: 'stt'",
+            "role:'stt'",
             "'speech-stt-activation-request'",
             "'speech-stt-activation-error'"
-        ])assert.match(source,new RegExp(escapeRegExp(value),'u'),value);
-        assert.match(source,/cancelable: true[\s\S]*const accepted = host[.]dispatchEvent\(activationEvent\)[\s\S]*if \(!accepted/u);
-        assert.match(source,/state === 'loading'[\s\S]*return 'unload'/u);
+        ])assert.match(contractSource,new RegExp(escapeRegExp(value),'u'),value);
+        assert.match(contractSource,/cancelable:true[\s\S]*const accepted=host[.]dispatchEvent\(activationEvent\)[\s\S]*if\(!accepted/u);
+        assert.match(contractSource,/role[.]state==='loading'[\s\S]*return 'unload'/u);
+        for(const source of [speechSource,voiceSource]){
+            assert.match(source,/createSTTActivationController/u);
+            assert.match(source,/subscribeAIRuntimeState/u);
+        }
+        assert.match(voiceSource,/canStartVoiceRecording\(sttRole,state,destroyed\)/u);
+        assert.match(voiceSource,/fetchSTT\(file,undefined,signal\)/u);
         assert.match(componentGuide,/Start transcription[\s\S]*Cancel loading[\s\S]*Try again/u);
         assert.match(componentGuide,/preventDefault\(\)[\s\S]*suppresses the callback/u);
         assert.match(componentGuide,/emits no activation request on import or state observation/u);

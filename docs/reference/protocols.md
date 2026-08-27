@@ -377,14 +377,19 @@ STT. It declines to request a startup STT load; it does not unload a role alread
 started through another explicit lifecycle action. A selected unloaded
 transcription provider remains selected and unloaded until a user lifecycle
 intent or explicit `startTranscription:true` opt-in asks the provider owner to
-load it. Neither state observation nor the shared speech component imports a
-model or selects a fallback.
+load it. Neither state observation nor either shared speech component imports a
+model or selects a fallback. `speech.html` and `voice-transcription.html` consume
+one shared `createSTTActivationController()` contract for selected, unloaded,
+loading, unloading, error, and ready presentation plus cancelable user intent.
+Both keep capture fail-closed until sticky STT state is exactly ready.
 
-The shared speech component owns an `AbortController` for each STT request and
-passes its signal through `AI.fetchSTT()`. Cancel, superseding capture, and
-component teardown abort that signal and suppress late delivery. Whether the
-provider's underlying computation stops remains governed by its own
-cancellation contract. User TTS unmute calls `AI.setSpeechMuted(false)` before
+Each shared speech component owns an `AbortController` for its STT request and
+passes its signal through `AI.fetchSTT()`. `voice-transcription.html` also adds
+that signal to the existing injected `transcribe(file,context)` callback
+context. Cancel, readiness loss, superseding capture, and component teardown
+abort the owned signal and suppress late delivery. Whether the provider's
+underlying computation stops remains governed by its own cancellation contract.
+User TTS unmute calls `AI.setSpeechMuted(false)` before
 or with its load intent so the runtime records the unmuted lifecycle preference;
 mute calls `AI.setSpeechMuted(true)`, cancels active synthesis, and unloads TTS.
 The selected TTS model catalog owns `defaultVoice`. AI.js uses a saved OpenAI
