@@ -311,13 +311,82 @@ silent switch to native/Core/cloud inference.
 The browser-speech package contains plain-JavaScript authority, DBOPFS store,
 provider, client, and Worker machinery. It supplies no Whisper or Kokoro
 runtime adapter bytes, model weights, voice bytes, download URL, catalog, or
-cloud fallback. The caller must provide a closed immutable runtime/model
-declaration for each role. Construction validates and freezes its declared
-identity; preparation validates the actual downloaded or cached closed runtime
-graph. The SDK downloads only declared files when permitted, commits its
-completion manifest last, and removes incomplete stored state after a
-cache/install failure. `offline:true` never uses the
-network and rejects a cache miss with `ARCANE_AI_ARTIFACT_OFFLINE_MISS`.
+cloud fallback. New operational integrations use
+`createBrowserSpeechArtifactGraph()` to declare one caller-selected immutable
+closure with an explicit entrypoint and every auxiliary ESM, WASM, model, data,
+and voice file bound by canonical path, media type, byte length, SHA-256,
+immutable source/revision, license declaration, and canonical graph identity.
+The published single-self-contained-module authority remains available only as
+an additive compatibility path.
+
+Graph construction rejects ambiguous paths and routes, mutable source
+authorities, undeclared or unmatched static imports, dynamic imports, fetches,
+Cache Storage opens, module Workers, undeclared executable-string construction,
+and incomplete file reachability. `edges.cacheOpens[]` binds the exact module,
+occurrence, policy, cache name, and readable non-JavaScript target paths. The
+two admitted transforms are the exact audited `Function("return this")()`
+compatibility site and typed-array constructor sites later bound to intrinsic
+typed-array prototypes.
+
+A source download uses redirect rejection and exact final URL, media type,
+length, and SHA-256 checks, persists and rehashes every file, rescans the closed
+module graph, and commits the completion manifest last. A warm admission
+rehashes and rescans every cached file. Strict `offline:true` never calls the
+source fetch function and returns only
+`artifact-graph-offline-dbopfs-cache-verified`; a miss rejects with
+`ARCANE_AI_ARTIFACT_GRAPH_OFFLINE_CACHE_MISS` /
+`artifact-graph-offline-cache-miss`. Cold and warm admissions are exactly
+`artifact-graph-network-dbopfs-verified` and
+`artifact-graph-dbopfs-cache-verified`.
+
+Every admission then uses module-captured native Blob URL functions, ignoring
+the legacy caller `objectUrlFactory`, and reads back each unique `blob:` URL to
+verify its exact identity, media type, byte length, and SHA-256 before
+execution. A fresh cryptographic guard capability binds every rewritten graph
+call for that materialization; it is not caller input, persisted authority, or
+part of the graph identity.
+
+The graph Worker establishes a private `MessageChannel` on its first load and
+routes subsequent request, progress, and cancellation settlement through that
+port. Scanned runtime edges are rewritten through one authenticated guard.
+Fetch and each declared cache-open edge can read only exact graph routes backed
+by already verified object URLs; raw fetch/cache calls and cache writes reject.
+The Worker also denies Function-family constructor escape, string timers,
+IndexedDB, OPFS, and raw `BroadcastChannel`, `EventSource`, `RTCPeerConnection`,
+`ShadowRealm`, `SharedWorker`, `WebSocket`, `WebSocketStream`, `WebTransport`,
+`Worker`, `XMLHttpRequest`, `eval`, and `importScripts` capability. Declared
+nested module Workers start through the SDK role Worker and receive the same
+authenticated graph. An exact runtime request alias, including Kokoro's audited
+mutable voice request, is a local route to caller-authenticated bytes and is
+never a source or network authority.
+
+Worker operations use `arcane-ai-speech-worker/1`. The public Worker client
+admits only `load`, `use`, `status`, `unload`, and `dispose`; the transport host
+additionally admits only its internal `cancel` control. Every other operation
+rejects with code `ARCANE_AI_INVALID_REQUEST`, message
+`The speech worker operation is not part of its protocol.`, and role-specific
+reason `stt-worker-operation-unknown` or `tts-worker-operation-unknown`.
+Failures use the separate
+`arcane-ai-speech-worker-error/1` envelope. Its exact own-key set is
+`code,message,protocol,reason`, all four must be data properties, and its
+registered code, fixed message, reason, role, and operation must agree. A
+foreign, incomplete, extra-keyed, accessor-bearing, cross-role, or
+cross-operation error envelope is rejected and terminates that role Worker.
+Nested module Workers use
+`arcane-ai-browser-speech-artifact-module-worker/1` and report bootstrap
+rejection only as `artifact-module-worker-bootstrap-rejected`.
+
+Kokoro is configured only through `namespace.env.wasmPaths`; Transformers is
+configured only through `namespace.env.backends.onnx.wasm.wasmPaths` plus its
+verified outer cache fields. Optional `numThreads` is caller-owned and
+Transformers-STT-only; a Kokoro declaration rejects with
+`ARCANE_AI_KOKORO_ENV_NUM_THREADS_FIELD_NOT_EXPOSED` /
+`kokoro-env-num-threads-field-not-exposed`. Missing or rejected namespace
+shapes fail closed with distinct `*-unavailable` and
+`*-assignment-rejected` reasons for each verified setting; the Worker never
+substitutes a different namespace. The caller also owns dtype, STT input sample
+rate, TTS output sample rate, default voice, and the complete voice inventory;
+the SDK selects no hardware default, runtime, model, or fallback.
 
 Whisper `stt` and Kokoro `tts` each own catalog, inspect, status, load, request,
 unload, and dispose state. They load, cancel, unload, fail, and recover
@@ -326,7 +395,12 @@ begins terminates that role's Worker slot and returns the provider to unloaded;
 a later use must load it again. If shared STT `Blob` decoding is cancelled
 before Worker use, the request rejects while the loaded provider remains ready.
 Speech failure neither disables text chat nor retries through another local,
-native, or cloud provider.
+native, or cloud provider. The provider/Worker layer is event-neutral: it
+exposes promises, `AbortSignal`, precise lifecycle/status records, and one
+caller progress callback, but owns no event bus or listener registry. Progress
+is the provider-neutral record
+`{phase,completed,total,unit,heartbeat}`; role is encoded in Worker phase names,
+not added as a second field.
 
 ### Persistent chat and document context
 
@@ -403,13 +477,18 @@ policy, dispatch, and the matching tool-result turn.
 <summary>Portable AI protocol disclosure</summary>
 
 The normalized runtime protocol is `arcane-ai-runtime/2`; registered adapters
-implement `arcane-ai-provider/2` and must prove matching
-`arcane-ai-model-authority/1` inspection before load. The browser-WASM component
-receipt is `arcane-ai-browser-wasm/2`; its direct controller adapter uses
-`arcane-ai-adapter/1`, and `adaptV1LlmProvider()` projects that surface into the
-provider/2 LLM role. Browser speech stores identify themselves as
-`arcane-ai-browser-speech-artifacts/1`; that identifier describes the store
-contract, not a model authority, capability grant, or complete-cache receipt.
+implement `arcane-ai-provider/2` and must prove matching model authority before
+load. The browser-WASM component receipt is `arcane-ai-browser-wasm/2`; its
+direct controller adapter uses `arcane-ai-adapter/1`, and
+`adaptV1LlmProvider()` projects that surface into the provider/2 LLM role.
+Browser speech stores identify themselves as
+`arcane-ai-browser-speech-artifacts/1`. Legacy authorities retain
+`arcane-ai-model-authority/1`. Authenticated browser-speech graphs use
+`arcane-ai-browser-speech-artifact-graph/1`, kind
+`browser-speech-authenticated-artifact-graph`, and a canonical SHA-256 graph
+identity. Those identifiers describe validation and lifecycle contracts; none
+is by itself a capability grant, publisher-authenticity claim, or complete
+cache receipt.
 
 These identifiers normalize lifecycle records. They do not erase provider
 availability: browser providers still require their browser capabilities,
