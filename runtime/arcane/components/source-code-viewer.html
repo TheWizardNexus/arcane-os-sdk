@@ -179,6 +179,18 @@
 <script type="module">
     const host=this;
     host.ready=false;
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{
+        source:'arcane.component.source-code-viewer',
+        eventTypes:[
+            'source-code-viewer-state',
+            'source-code-viewer-state-empty',
+            'source-code-viewer-state-error',
+            'source-code-viewer-state-loading',
+            'source-code-viewer-state-ready',
+            'source-code-viewer-ready'
+        ]
+    });
 
     const viewer=host.shadowRoot.querySelector('#viewer');
     const status=host.shadowRoot.querySelector('#status');
@@ -210,12 +222,15 @@
         text:'',
         title:''
     });
+    let destroyed=false;
+    let eventOperationSequence=0;
     let loadSequence=0;
     let options=normalizeOptions({},defaultOptions);
     let state='empty';
 
     host.clear=clear;
     host.configure=configure;
+    host.destroy=destroy;
     host.fail=fail;
     host.focus=focusSource;
     host.focusLine=focusLine;
@@ -289,12 +304,13 @@
     }
 
     async function load(source='',renderOptions={}){
+        if(destroyed)return false;
         const sequence=++loadSequence;
         transition('loading');
         try{
             const pending=typeof source==='function'?source():source;
             const result=await pending;
-            if(sequence!==loadSequence)return false;
+            if(destroyed||sequence!==loadSequence)return false;
             if(result&&typeof result==='object'&&!Array.isArray(result)){
                 return renderSource(result.text??result.value??'',{
                     ...renderOptions,
@@ -303,12 +319,13 @@
             }
             return renderSource(result??'',renderOptions);
         }catch(error){
-            if(sequence===loadSequence)showError(error);
+            if(!destroyed&&sequence===loadSequence)showError(error);
             return false;
         }
     }
 
     function render(text='',renderOptions={}){
+        if(destroyed)return false;
         ++loadSequence;
         try{
             return renderSource(text,renderOptions);
@@ -394,8 +411,11 @@
     }
 
     function transition(next,error=null){
+        if(destroyed)return false;
         state=next;
         updateStateDOM();
+        const operationId=
+            `${events.instanceId}:source-state:${(++eventOperationSequence).toString(36)}`;
         const detail={
             characters:current.text.length,
             language:current.language,
@@ -404,8 +424,46 @@
             state
         };
         if(error)detail.message=String(error?.message||'Source rendering failed.').slice(0,512);
-        host.dispatchEvent(new CustomEvent('source-code-viewer-state',{bubbles:true,composed:true,detail}));
-        host.dispatchEvent(new CustomEvent(`source-code-viewer-${state}`,{bubbles:true,composed:true,detail}));
+        const reason={
+            empty:'source-code-viewer-cleared',
+            error:'source-code-viewer-render-rejected',
+            loading:'source-code-viewer-load-started',
+            ready:'source-code-viewer-rendered'
+        }[state];
+        const publicDetail={
+            characters:detail.characters,
+            language:detail.language,
+            lines:detail.lines,
+            state:`source-code-viewer-${state}`,
+            reason,
+            ...(state==='error'?{
+                code:typeof error?.code==='string'
+                    ?error.code
+                    :'ARCANE_SOURCE_CODE_VIEWER_RENDER_REJECTED'
+            }:{})
+        };
+        const statePublication=events.dispatch(
+            'source-code-viewer-state',
+            detail,
+            {operationId,publicDetail}
+        );
+        projectArcaneDOMEvent(host,statePublication.occurrence,{bubbles:true,composed:true});
+        const exactPublication=events.dispatch(
+            `source-code-viewer-state-${state}`,
+            detail,
+            {operationId,publicDetail}
+        );
+        projectArcaneDOMEvent(host,exactPublication.occurrence,{type:`source-code-viewer-${state}`,bubbles:true,composed:true});
+        return true;
+    }
+
+    function destroy(){
+        if(destroyed)return false;
+        destroyed=true;
+        loadSequence+=1;
+        host.ready=false;
+        events.dispose();
+        return true;
     }
 
     function updateStateDOM(){
@@ -433,9 +491,18 @@
     repositoryLink.textContent=options.labels.repository;
     transition('empty');
     host.ready=true;
-    host.dispatchEvent(new CustomEvent('source-code-viewer-ready',{
-        bubbles:true,
-        composed:true,
-        detail:{component:host,state}
-    }));
+    const readyPublication=events.dispatch(
+        'source-code-viewer-ready',
+        {component:host,state},
+        {
+            operationId:
+                `${events.instanceId}:ready:${(++eventOperationSequence).toString(36)}`,
+            publicDetail:{
+                ready:true,
+                state:'source-code-viewer-empty',
+                reason:'source-code-viewer-ready'
+            }
+        }
+    );
+    projectArcaneDOMEvent(host,readyPublication.occurrence,{bubbles:true,composed:true});
 </script>

@@ -47,6 +47,8 @@
 <script type="module">
     const host=this;
     const root=host.shadowRoot;
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.task-progress',eventTypes:['task-progress-started','task-progress-error','task-progress-complete','task-progress-change','task-progress-ready']});
     const panel=root.querySelector('#panel');
     const heading=root.querySelector('#taskProgressTitle');
     const description=root.querySelector('#description');
@@ -58,12 +60,26 @@
 
     const allowedStatuses=new Set(['pending','running','complete','failed','canceled']);
     let activeRun=Promise.resolve([]);
+    let destroyed=false;
+    let eventOperationSequence=0;
     let options={};
+    let runGeneration=0;
     let running=false;
     let tasks=[];
 
+    function emit(type,detail={},publicDetail={},operationId=null){
+        if(destroyed)return false;
+        const publication=events.dispatch(
+            type,
+            detail,
+            {publicDetail,operationId}
+        );
+        return projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});
+    }
+
     host.clear=clear;
     host.configure=configure;
+    host.destroy=destroy;
     host.runTasks=runTasks;
     host.setTasks=setTasks;
     host.updateTask=updateTask;
@@ -92,6 +108,7 @@
     }
 
     function setTasks(values=[]){
+        if(destroyed)return [];
         const ids=new Set();
         tasks=Array.from(values||[]).map((value,index)=>{
             const task=normalizeTask(value,index);
@@ -117,6 +134,7 @@
     }
 
     function updateTask(id,update={}){
+        if(destroyed)return null;
         const index=typeof id==='number'?id:tasks.findIndex(task=>task.id===`${id}`);
         if(index<0||index>=tasks.length){
             return null;
@@ -181,6 +199,7 @@
     }
 
     async function runTasks(title='Progress',jobs=[]){
+        if(destroyed)return [];
         if(running){
             return activeRun;
         }
@@ -197,36 +216,60 @@
             status:'pending'
         })));
         running=true;
+        const generation=++runGeneration;
+        const operationId=
+            `${events.instanceId}:task-run:${(++eventOperationSequence).toString(36)}`;
         syncOverall();
-        host.dispatchEvent(new CustomEvent('task-progress-started',{
-            bubbles:true,
-            composed:true,
-            detail:getSnapshot()
-        }));
+        emit(
+            'task-progress-started',
+            getSnapshot(),
+            {
+                reason:'task-run-started',
+                taskCount:tasks.length,
+                running:true
+            },
+            operationId
+        );
         activeRun=Promise.allSettled(runnable.map(async(job,index)=>{
             updateTask(index,{status:'running'});
             try{
                 const value=await job.task();
+                if(destroyed||generation!==runGeneration)return value;
                 updateTask(index,{status:'complete',message:job.completeMessage||''});
                 return value;
             }catch(error){
+                if(destroyed||generation!==runGeneration)throw error;
                 updateTask(index,{status:'failed',message:job.errorMessage||error?.message||'Unable to complete.'});
-                host.dispatchEvent(new CustomEvent('task-progress-error',{
-                    bubbles:true,
-                    composed:true,
-                    detail:{error,id:tasks[index]?.id,index,task:{...tasks[index]}}
-                }));
+                emit(
+                    'task-progress-error',
+                    {error,id:tasks[index]?.id,index,task:{...tasks[index]}},
+                    {
+                        code:typeof error?.code==='string'
+                            ?error.code
+                            :'ARCANE_TASK_EXECUTION_REJECTED',
+                        index,
+                        reason:'task-execution-rejected'
+                    },
+                    operationId
+                );
                 throw error;
             }
         }));
         const results=await activeRun;
         running=false;
+        if(destroyed||generation!==runGeneration)return results;
         syncOverall();
-        host.dispatchEvent(new CustomEvent('task-progress-complete',{
-            bubbles:true,
-            composed:true,
-            detail:{...getSnapshot(),results:results.slice()}
-        }));
+        emit(
+            'task-progress-complete',
+            {...getSnapshot(),results:results.slice()},
+            {
+                reason:'task-run-settled',
+                taskCount:tasks.length,
+                rejectedCount:results.filter(result=>result.status==='rejected').length,
+                running:false
+            },
+            operationId
+        );
         return results;
     }
 
@@ -258,14 +301,20 @@
     }
 
     function emitChange(task=null){
-        host.dispatchEvent(new CustomEvent('task-progress-change',{
-            bubbles:true,
-            composed:true,
-            detail:{...getSnapshot(),task:task?{...task}:null}
-        }));
+        emit(
+            'task-progress-change',
+            {...getSnapshot(),task:task?{...task}:null},
+            {
+                taskCount:tasks.length,
+                running,
+                reason:'task-state-changed',
+                taskStatus:task?.status?`task-${task.status}`:null
+            }
+        );
     }
 
     function clear(){
+        if(destroyed)return false;
         if(running){
             return false;
         }
@@ -275,8 +324,17 @@
         return true;
     }
 
+    function destroy(){
+        if(destroyed)return false;
+        destroyed=true;
+        runGeneration+=1;
+        host.ready=false;
+        events.dispose();
+        return true;
+    }
+
     configure(datasetOptions());
     render();
     host.ready=true;
-    host.dispatchEvent(new CustomEvent('task-progress-ready',{bubbles:true,composed:true}));
+    emit('task-progress-ready',{}, {ready:true,reason:'task-progress-ready'});
 </script>
