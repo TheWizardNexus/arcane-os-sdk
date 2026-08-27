@@ -1,11 +1,83 @@
 import {loadAndApplyTheme} from './ThemeManager.js';
+import {createArcaneEventSource} from 'arcane-os/event-manager';
 
 const sharedKey='arcaneThemeReady';
 const listenerKey='arcaneThemeAppearanceListener';
+const THEME_BOOTSTRAP_EVENT_OWNER=Object.freeze({});
+let themeBootstrapOperationSequence=0;
+const themeBootstrapEvents=createArcaneEventSource(
+    THEME_BOOTSTRAP_EVENT_OWNER,
+    {
+        source:'theme-bootstrap',
+        eventTypes:Object.freeze(['appearance.changed'])
+    }
+);
+
+function installAppearanceListener(ready){
+    const hostEvents=globalThis.Arcane?.events;
+    if(typeof hostEvents?.on!=='function'||globalThis[listenerKey]){
+        return;
+    }
+
+    let active=true;
+    const hostUnsubscribe=hostEvents.on(
+        'appearance.changed',
+        function forwardAppearanceChange(detail={}){
+            themeBootstrapOperationSequence+=1;
+            const forwarded=Object.freeze({
+                scheme:typeof detail?.scheme==='string'?detail.scheme:null,
+                effectiveScheme:typeof detail?.effectiveScheme==='string'
+                    ?detail.effectiveScheme
+                    :null,
+                source:typeof detail?.source==='string'?detail.source:null,
+                reason:'host-appearance-changed'
+            });
+            themeBootstrapEvents.dispatch(
+                'appearance.changed',
+                forwarded,
+                {
+                    operationId:`theme-bootstrap-${themeBootstrapEvents.instanceId}-${themeBootstrapOperationSequence}`,
+                    publicDetail:forwarded
+                }
+            );
+            Promise.resolve(ready).then(function reloadTheme(result){
+                return result?.manager?.load?.();
+            }).catch(function reportThemeReloadFailure(error){
+                console.warn(
+                    '[Arcane theme] Unable to apply the changed host appearance.',
+                    error
+                );
+            });
+        }
+    );
+    const dispose=function disposeArcaneThemeAppearanceListener(){
+        if(!active){
+            return false;
+        }
+        active=false;
+        if(typeof hostUnsubscribe==='function'){
+            hostUnsubscribe();
+        }
+        if(globalThis[listenerKey]===dispose){
+            delete globalThis[listenerKey];
+        }
+        return true;
+    };
+    Object.defineProperty(dispose,'dispose',{
+        value:dispose,
+        enumerable:false,
+        configurable:false,
+        writable:false
+    });
+    globalThis[listenerKey]=dispose;
+}
 
 export function bootstrapArcaneTheme(options={}){
     const useSharedPromise=Object.keys(options).length===0;
-    if(useSharedPromise&&globalThis[sharedKey]) return globalThis[sharedKey];
+    if(useSharedPromise&&globalThis[sharedKey]){
+        installAppearanceListener(globalThis[sharedKey]);
+        return globalThis[sharedKey];
+    }
 
     const ready=loadAndApplyTheme(options).catch(error=>{
         console.warn('[Arcane theme] Unable to load the saved appearance; using the system theme.',error);
@@ -13,13 +85,15 @@ export function bootstrapArcaneTheme(options={}){
     });
 
     if(useSharedPromise) globalThis[sharedKey]=ready;
-    if(useSharedPromise&&globalThis.Arcane?.events?.on&&!globalThis[listenerKey]){
-        globalThis[listenerKey]=globalThis.Arcane.events.on('appearance.changed',async()=>{
-            const result=await ready;
-            if(result?.manager) await result.manager.load();
-        });
+    if(useSharedPromise){
+        installAppearanceListener(ready);
     }
     return ready;
+}
+
+export function disposeArcaneThemeBootstrap(){
+    const dispose=globalThis[listenerKey];
+    return typeof dispose==='function'?dispose():false;
 }
 
 export const arcaneThemeReady=bootstrapArcaneTheme();
