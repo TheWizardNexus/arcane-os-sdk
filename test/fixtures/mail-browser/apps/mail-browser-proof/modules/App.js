@@ -13,7 +13,7 @@ const evidence=document.querySelector('#evidence');
 
 let mail=null;
 let recipient='';
-let simulatedOnline=true;
+let simulatedOnline=false;
 let onlineReportKey='';
 let offlineReportKey='';
 let stateEvents=[];
@@ -49,11 +49,12 @@ function requireValue(input,label){
 }
 
 function setBusy(busy){
+    const hasOwnedRecords=onlineReportKey!==''||offlineReportKey!==''||stateEvents.length!==0;
     configureButton.disabled=busy||mail!==null;
     onlineButton.disabled=busy||mail===null||onlineReportKey!=='';
     offlineButton.disabled=busy||mail===null||onlineReportKey===''||offlineReportKey!=='';
     reconnectButton.disabled=busy||mail===null||offlineReportKey===''||reconnectComplete;
-    cleanupButton.disabled=busy||mail===null||onlineReportKey===''||offlineReportKey===''||!reconnectComplete;
+    cleanupButton.disabled=busy||(mail===null&&!hasOwnedRecords);
 }
 
 async function runStep(step){
@@ -74,10 +75,38 @@ function collectStateEvent(event){
     stateEvents.push({reportKey:detail.reportKey,state:detail.state});
 }
 
+function waitForOnlineDrain(){
+    const events=mail?.events;
+    if(!events) return Promise.reject(new Error('Mail events are unavailable.'));
+    return new Promise(function waitForEventOwnedOnlineDrain(resolve,reject){
+        let settled=false;
+        let timeoutId=null;
+        let unsubscribe=null;
+        function finish(error,detail){
+            if(settled) return;
+            settled=true;
+            if(timeoutId!==null) clearTimeout(timeoutId);
+            unsubscribe?.();
+            if(error) reject(error);
+            else resolve(detail);
+        }
+        function observeOnlineDrain(event){
+            const detail=event?.detail;
+            if(detail?.reason!=='online') return;
+            finish(null,detail);
+        }
+        function rejectTimedOutOnlineDrain(){
+            finish(new Error('Timed out waiting for the event-owned online drain.'));
+        }
+        unsubscribe=events.on('mail-outbox-drain',observeOnlineDrain);
+        timeoutId=setTimeout(rejectTimedOutOnlineDrain,30_000);
+    });
+}
+
 async function configureMail(){
     const appKey=requireValue(appKeyInput,'Local gateway app key');
     recipient=requireValue(recipientInput,'Acceptance recipient').toLowerCase();
-    simulatedOnline=true;
+    simulatedOnline=false;
     const config={
         appName:'mail-browser-proof',
         appKey,
@@ -91,24 +120,37 @@ async function configureMail(){
         isOnline:function acceptanceOnlineState(){return simulatedOnline;},
         onlineTarget:globalThis
     });
-    appKeyInput.value='';
-    recipientInput.value='';
     try{
         candidate.events.on('mail-outbox-state',collectStateEvent);
-        const startup=await candidate.start();
+        const existingOutbox=await candidate.auditOutbox();
         if(globalThis.dbopfs?.applicationId!=='mail-browser-proof'){
             throw new Error('DBOPFS did not bind the acceptance application id.');
         }
+        if(existingOutbox.totalFiles!==0){
+            throw new Error(
+                'The acceptance proof requires an empty disposable DBOPFS outbox; existing records were left untouched.'
+            );
+        }
+        const startup=await candidate.start();
+        if(startup.online!==false||startup.considered!==0||startup.attempted!==0){
+            throw new Error('Offline startup did not preserve the empty outbox without an attempt.');
+        }
         mail=candidate;
+        appKeyInput.value='';
+        recipientInput.value='';
         appendEvidence('configured',{
             dbopfs:true,
             lockManager:typeof globalThis.navigator?.locks?.request==='function',
             opfs:typeof globalThis.navigator?.storage?.getDirectory==='function',
+            preexistingOutboxFiles:existingOutbox.totalFiles,
+            startupAttempts:startup.attempted,
+            startupOnline:startup.online,
             startupPending:startup.pending
         });
         setStatus('Configured with the canonical Mail runtime and DBOPFS.');
     }catch(error){
         candidate.dispose();
+        if(mail===candidate) mail=null;
         delete globalThis.arcane.config.mail;
         recipient='';
         throw error;
@@ -119,8 +161,8 @@ async function sendOnline(){
     simulatedOnline=true;
     const result=await mail.send(
         [recipient],
-        `Arcane SDK browser online acceptance ${new Date().toISOString()}`,
-        {acceptancePhase:'online'},
+        `[Roshi's Codex PRIME] Arcane SDK browser online acceptance ${new Date().toISOString()}`,
+        {identity:"[Roshi's Codex PRIME]",acceptancePhase:'online'},
         '',
         'report'
     );
@@ -140,8 +182,8 @@ async function queueOffline(){
     simulatedOnline=false;
     const result=await mail.send(
         [recipient],
-        `Arcane SDK browser offline queue ${new Date().toISOString()}`,
-        {acceptancePhase:'offline-queue'},
+        `[Roshi's Codex PRIME] Arcane SDK browser offline queue ${new Date().toISOString()}`,
+        {identity:"[Roshi's Codex PRIME]",acceptancePhase:'offline-queue'},
         '',
         'report'
     );
@@ -159,29 +201,35 @@ async function queueOffline(){
     setStatus('Offline report persisted with zero provider attempts.');
 }
 
-async function reconnectAndDrain(){
+async function reconnectAndAwaitEventDrain(){
     simulatedOnline=true;
     let observedOnline=false;
     globalThis.addEventListener('online',function observeAcceptanceOnline(){
         observedOnline=true;
     },{once:true});
+    const onlineDrainPromise=waitForOnlineDrain();
     globalThis.dispatchEvent(new Event('online'));
-    const summary=await mail.drain({reason:'verification-join'});
+    const drainSummary=await onlineDrainPromise;
     const stored=await mail.getOutboxRecord(offlineReportKey);
     const states=stateEvents.filter(function offlineState(event){
         return event.reportKey===offlineReportKey;
     }).map(function stateName(event){return event.state;});
-    if(!observedOnline||stored?.state!=='accepted'||stored.attempts!==1
+    if(!observedOnline||drainSummary.online!==true||drainSummary.attempted!==1
+        ||drainSummary.considered<1||stored?.state!=='accepted'||stored.attempts!==1
         ||!stored.result?.requestId||!stored.result?.providerId
         ||!states.includes('queued')||!states.includes('sending')||!states.includes('accepted')){
         throw new Error('The online event did not drain the same durable report to acceptance once.');
     }
     appendEvidence('reconnected-accepted',{
         attempts:stored.attempts,
-        considered:summary.considered,
+        attempted:drainSummary.attempted,
+        considered:drainSummary.considered,
+        drainReason:drainSummary.reason,
+        eventOwned:true,
         providerId:stored.result.providerId,
         reportKey:stored.reportKey,
         requestId:stored.result.requestId,
+        state:stored.state,
         states
     });
     reconnectComplete=true;
@@ -189,20 +237,30 @@ async function reconnectAndDrain(){
 }
 
 async function cleanupProof(){
-    const names=[onlineReportKey,offlineReportKey].map(function outboxName(reportKey){
+    const activeMail=mail;
+    const reportKeys=[...new Set([
+        onlineReportKey,
+        offlineReportKey,
+        ...stateEvents.map(function stateEventReportKey(event){return event.reportKey;})
+    ])].filter(function nonEmptyReportKey(reportKey){return reportKey!=='';});
+    const names=reportKeys.map(function outboxName(reportKey){
         return `${reportKey}.mail-outbox.json`;
     });
-    for(const name of names){
-        await globalThis.dbopfs.delete('mail_outbox',name);
+    try{
+        for(const name of names){
+            await globalThis.dbopfs.delete('mail_outbox',name);
+        }
+        const remaining=await globalThis.dbopfs.getAllKeys('mail_outbox');
+        if(remaining.length!==0){
+            throw new Error('The disposable DBOPFS outbox is not empty after cleanup.');
+        }
+    }finally{
+        activeMail?.dispose();
+        if(globalThis.arcane?.config) delete globalThis.arcane.config.mail;
+        mail=null;
+        recipient='';
+        simulatedOnline=false;
     }
-    const remaining=await globalThis.dbopfs.getAllKeys('mail_outbox');
-    if(names.some(function retainedName(name){return remaining.includes(name);})){
-        throw new Error('Owned DBOPFS acceptance records were not removed.');
-    }
-    mail.dispose();
-    delete globalThis.arcane.config.mail;
-    mail=null;
-    recipient='';
     onlineReportKey='';
     offlineReportKey='';
     stateEvents=[];
@@ -221,7 +279,7 @@ offlineButton.addEventListener('click',function offlineClick(){
     void runStep(queueOffline);
 });
 reconnectButton.addEventListener('click',function reconnectClick(){
-    void runStep(reconnectAndDrain);
+    void runStep(reconnectAndAwaitEventDrain);
 });
 cleanupButton.addEventListener('click',function cleanupClick(){
     void runStep(cleanupProof);
