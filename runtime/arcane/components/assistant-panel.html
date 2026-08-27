@@ -300,6 +300,9 @@
 <script type="module">
     const host=this;
     const root=host.shadowRoot;
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.assistant-panel',eventTypes:['assistant-opened','assistant-closed','assistant-send','assistant-clear','assistant-ready']});
+    const lifecycleController=new AbortController();
     const shell=root.querySelector('.assistant-shell');
     const panel=root.querySelector('.panel');
     const stateRegion=root.querySelector('.state');
@@ -311,10 +314,18 @@
     const backdrop=root.querySelector('.backdrop');
     const validStates=new Set(['ready','empty','pending','streaming','error']);
     const handledSubmits=new WeakSet();
-    const pendingDisabledState=new WeakMap();
+    const pendingDisabledState=new Map();
 
     let previousFocus=null;
     let opened=host.hasAttribute('data-open');
+    let operationSequence=0;
+    let destroyed=false;
+    const reservedProjectionKeys=Object.freeze([
+        'occurrenceId',
+        'arcaneSource',
+        'instanceId',
+        'operationId'
+    ]);
 
     host.open=open;
     host.close=close;
@@ -324,6 +335,29 @@
     host.setState=setState;
     host.focusComposer=focusComposer;
     host.scrollToEnd=scrollToEnd;
+    host.destroy=destroy;
+
+    function nextOperationId(kind){
+        operationSequence+=1;
+        return `${events.descriptor.instanceId}:${kind}:${operationSequence}`;
+    }
+
+    function compatibilityDetail(input={}){
+        const detail={...input};
+        for(const key of reservedProjectionKeys){
+            delete detail[key];
+        }
+        return detail;
+    }
+
+    function emit(type,detail={},publicDetail={},options={}){
+        if(destroyed){
+            return false;
+        }
+        const publication=events.dispatch(type,detail,{publicDetail,operationId:options.operationId||null,cancelable:Boolean(options.cancelable)});
+        if(options.cancelable&&!publication.accepted) return false;
+        return projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true,cancelable:Boolean(options.cancelable)});
+    }
 
     Object.defineProperties(
         host,
@@ -349,15 +383,15 @@
         }
     );
 
-    closeButton.addEventListener('click',()=>close());
-    clearButton.addEventListener('click',()=>clear());
-    backdrop.addEventListener('click',()=>close());
-    root.addEventListener('submit',onComposerSubmit);
-    host.addEventListener('submit',onComposerSubmit);
-    host.addEventListener('click',onHostAction);
-    document.addEventListener('keydown',onDocumentKeydown);
-    messagesSlot.addEventListener('slotchange',syncState);
-    composerSlot.addEventListener('slotchange',syncComposerState);
+    closeButton.addEventListener('click',()=>close(),{signal:lifecycleController.signal});
+    clearButton.addEventListener('click',()=>clear(),{signal:lifecycleController.signal});
+    backdrop.addEventListener('click',()=>close(),{signal:lifecycleController.signal});
+    root.addEventListener('submit',onComposerSubmit,{signal:lifecycleController.signal});
+    host.addEventListener('submit',onComposerSubmit,{signal:lifecycleController.signal});
+    host.addEventListener('click',onHostAction,{signal:lifecycleController.signal});
+    document.addEventListener('keydown',onDocumentKeydown,{signal:lifecycleController.signal});
+    messagesSlot.addEventListener('slotchange',syncState,{signal:lifecycleController.signal});
+    composerSlot.addEventListener('slotchange',syncComposerState,{signal:lifecycleController.signal});
 
     const observer=new MutationObserver(
         records=>{
@@ -400,6 +434,9 @@
     }
 
     function setOpened(next,options={}){
+        if(destroyed){
+            return false;
+        }
         const changed=next!==opened;
 
         if(next&&changed){
@@ -415,16 +452,7 @@
             return false;
         }
 
-        host.dispatchEvent(
-            new CustomEvent(
-                next?'assistant-opened':'assistant-closed',
-                {
-                    detail:{assistant:host,layout:host.layout},
-                    bubbles:true,
-                    composed:true
-                }
-            )
-        );
+        emit(next?'assistant-opened':'assistant-closed',{assistant:host,layout:host.layout},{opened:next,layout:host.layout});
 
         if(next&&options.focus!==false){
             requestAnimationFrame(()=>focusComposer());
@@ -503,6 +531,9 @@
     }
 
     function setState(next='ready',message=''){
+        if(destroyed){
+            return shell.dataset.state;
+        }
         if(next==='auto'||next===null){
             host.removeAttribute('data-state');
             host.removeAttribute('data-state-message');
@@ -523,16 +554,25 @@
     function syncComposerState(){
         const disabled=shell.dataset.state==='pending';
         const controls=composerControls();
+        const currentControls=new Set(controls);
+        for(const [control,original] of pendingDisabledState){
+            if(!disabled||!currentControls.has(control)){
+                restoreComposerControl(control,original);
+                pendingDisabledState.delete(control);
+            }
+        }
         controls.forEach(control=>{
             if(control.matches('button,input,textarea,select')){
                 if(disabled&&!pendingDisabledState.has(control)){
-                    pendingDisabledState.set(control,control.disabled);
+                    pendingDisabledState.set(
+                        control,
+                        {
+                            disabled:control.disabled,
+                            ariaDisabled:control.getAttribute('aria-disabled')
+                        }
+                    );
                     control.disabled=true;
                     control.setAttribute('aria-disabled','true');
-                }else if(!disabled&&pendingDisabledState.has(control)){
-                    control.disabled=pendingDisabledState.get(control);
-                    control.toggleAttribute('aria-disabled',control.disabled);
-                    pendingDisabledState.delete(control);
                 }
             }
         });
@@ -551,7 +591,26 @@
         return controls;
     }
 
+    function restoreComposerControl(control,original){
+        control.disabled=original.disabled;
+        if(original.ariaDisabled===null){
+            control.removeAttribute('aria-disabled');
+        }else{
+            control.setAttribute('aria-disabled',original.ariaDisabled);
+        }
+    }
+
+    function restoreComposerControls(){
+        for(const [control,original] of pendingDisabledState){
+            restoreComposerControl(control,original);
+        }
+        pendingDisabledState.clear();
+    }
+
     function focusComposer(){
+        if(destroyed){
+            return null;
+        }
         const controls=composerControls();
         const target=controls.find(
             element=>element.matches?.('textarea,input:not([type="hidden"]),[contenteditable="true"]')&&!element.disabled
@@ -562,6 +621,9 @@
     }
 
     function scrollToEnd(options={}){
+        if(destroyed){
+            return 0;
+        }
         const messages=root.querySelector('.messages');
         messages.scrollTo({
             top:messages.scrollHeight,
@@ -595,37 +657,23 @@
     }
 
     function send(message='',context={}){
+        if(destroyed){
+            return false;
+        }
         const normalized=String(message??'').trim();
 
         if(!normalized){
             return false;
         }
 
-        return host.dispatchEvent(
-            new CustomEvent(
-                'assistant-send',
-                {
-                    detail:{...context,message:normalized,assistant:host},
-                    bubbles:true,
-                    composed:true,
-                    cancelable:true
-                }
-            )
-        );
+        return emit('assistant-send',{...compatibilityDetail(context),message:normalized,assistant:host},{messageLength:normalized.length,layout:host.layout},{cancelable:true,operationId:nextOperationId('send')});
     }
 
     function clear(detail={}){
-        return host.dispatchEvent(
-            new CustomEvent(
-                'assistant-clear',
-                {
-                    detail:{...detail,assistant:host},
-                    bubbles:true,
-                    composed:true,
-                    cancelable:true
-                }
-            )
-        );
+        if(destroyed){
+            return false;
+        }
+        return emit('assistant-clear',{...compatibilityDetail(detail),assistant:host},{layout:host.layout},{cancelable:true,operationId:nextOperationId('clear')});
     }
 
     function onHostAction(event){
@@ -695,6 +743,20 @@
         }
     }
 
+    function destroy(){
+        if(destroyed){
+            return false;
+        }
+        restoreComposerControls();
+        destroyed=true;
+        lifecycleController.abort();
+        observer.disconnect();
+        returnFocus();
+        events.dispose();
+        host.ready=false;
+        return true;
+    }
+
     syncLabels();
     syncLayout();
     syncOpenedState();
@@ -702,14 +764,5 @@
     syncComposerState();
 
     host.ready=true;
-    host.dispatchEvent(
-        new CustomEvent(
-            'assistant-ready',
-            {
-                detail:{assistant:host},
-                bubbles:true,
-                composed:true
-            }
-        )
-    );
+    emit('assistant-ready',{assistant:host},{ready:true});
 </script>

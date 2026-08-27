@@ -23,6 +23,9 @@
         normalizeDashboardOptions,
         normalizeDashboardVisibility
     }=await import(moduleURL('ComponentContracts.js'));
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.dashboard-config',eventTypes:['dashboard-config-closed','dashboard-config-opened','dashboard-config-change','dashboard-config-ready']});
+    const lifecycleController=new AbortController();
     const openButton=host.shadowRoot.querySelector('#openConfig');
     const configModal=host.shadowRoot.querySelector('#configModal');
 
@@ -30,9 +33,22 @@
     let visibility={};
     let content=null;
     let labels=normalizeDashboardOptions(optionsFromDataset()).labels;
+    let operationSequence=0;
+    let operationGeneration=0;
+    let destroyed=false;
+
+    function emit(type,detail={},publicDetail={},options={}){
+        if(destroyed){
+            return false;
+        }
+        const publication=events.dispatch(type,detail,{publicDetail,operationId:options.operationId||null,cancelable:Boolean(options.cancelable)});
+        if(options.cancelable&&!publication.accepted) return false;
+        return projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true,cancelable:Boolean(options.cancelable)});
+    }
 
     host.close=closeConfig;
     host.configure=configure;
+    host.destroy=destroy;
     host.getChartOptions=getChartOptions;
     host.getEffectiveVisibility=getEffectiveVisibility;
     host.open=openConfig;
@@ -42,34 +58,33 @@
     Object.defineProperties(
         host,
         {
-            definitions:{get:getDefinitions,set:setDefinitions},
-            effectiveVisibility:{get:getEffectiveVisibility},
-            options:{get:getOptions,set:configure},
-            visibility:{get:getVisibility,set:setVisibility}
+            definitions:{configurable:true,get:getDefinitions,set:setDefinitions},
+            effectiveVisibility:{configurable:true,get:getEffectiveVisibility},
+            options:{configurable:true,get:getOptions,set:configure},
+            visibility:{configurable:true,get:getVisibility,set:setVisibility}
         }
     );
 
     openButton.addEventListener(
         'click',
         ()=>openConfig().catch(
-            error=>console.error('Unable to configure dashboard:',error)
-        )
+            error=>{
+                if(!destroyed){
+                    console.error('Unable to configure dashboard:',error);
+                }
+            }
+        ),
+        {signal:lifecycleController.signal}
     );
     configModal.addEventListener(
         'modal-closed',
-        ()=>host.dispatchEvent(
-            new CustomEvent(
-                'dashboard-config-closed',
-                {
-                    bubbles:true,
-                    composed:true,
-                    detail:{
-                        effectiveVisibility:getEffectiveVisibility(),
-                        visibility:getVisibility()
-                    }
-                }
-            )
-        )
+        ()=>emit(
+            'dashboard-config-closed',
+            {effectiveVisibility:getEffectiveVisibility(),visibility:getVisibility()},
+            {definitionCount:definitions.length},
+            {operationId:`${events.descriptor.instanceId}:close:${++operationSequence}`}
+        ),
+        {signal:lifecycleController.signal}
     );
 
     function optionsFromDataset(){
@@ -84,6 +99,9 @@
     }
 
     function configure(input={}){
+        if(destroyed){
+            return getOptions();
+        }
         const normalized=normalizeDashboardOptions(
             input,
             {definitions,labels,visibility}
@@ -97,6 +115,9 @@
     }
 
     function setDefinitions(values=[]){
+        if(destroyed){
+            return getDefinitions();
+        }
         definitions=normalizeDashboardDefinitions(values);
         renderTrigger();
         refreshContent();
@@ -104,6 +125,9 @@
     }
 
     function setVisibility(values={}){
+        if(destroyed){
+            return getVisibility();
+        }
         visibility=normalizeDashboardVisibility(values);
         syncOptions();
         return getVisibility();
@@ -143,50 +167,60 @@
     }
 
     async function openConfig(){
-        if(!definitions.length){
+        if(destroyed||!definitions.length){
             return false;
         }
+        const generation=++operationGeneration;
         const modal=await waitForComponent(
             configModal,
             {
                 methods:['populate','open'],
                 property:'ready',
-                event:'modal-ready'
+                event:'modal-ready',
+                signal:lifecycleController.signal
             }
         );
+        if(destroyed||generation!==operationGeneration){
+            return false;
+        }
         if(!content){
             content=createContent();
             await modal.populate(content,false);
+            if(destroyed||generation!==operationGeneration){
+                return false;
+            }
         }
         refreshContent();
-        modal.open();
-        host.dispatchEvent(
-            new CustomEvent(
-                'dashboard-config-opened',
-                {
-                    bubbles:true,
-                    composed:true,
-                    detail:{
-                        effectiveVisibility:getEffectiveVisibility(),
-                        visibility:getVisibility()
-                    }
-                }
-            )
-        );
+        const opened=await modal.open();
+        if(destroyed||generation!==operationGeneration||opened!==true){
+            return false;
+        }
+        emit('dashboard-config-opened',{effectiveVisibility:getEffectiveVisibility(),visibility:getVisibility()},{definitionCount:definitions.length},{operationId:`${events.descriptor.instanceId}:open:${++operationSequence}`});
         return true;
     }
 
     async function closeConfig(){
+        if(destroyed){
+            return false;
+        }
+        const generation=++operationGeneration;
         const modal=await waitForComponent(
             configModal,
             {
                 methods:['close'],
                 property:'ready',
-                event:'modal-ready'
+                event:'modal-ready',
+                signal:lifecycleController.signal
             }
         );
-        modal.close();
-        return true;
+        if(destroyed||generation!==operationGeneration){
+            return false;
+        }
+        const closed=await modal.close();
+        if(destroyed||generation!==operationGeneration){
+            return false;
+        }
+        return closed===true;
     }
 
     function createContent(){
@@ -205,7 +239,7 @@
         empty.dataset.dashboardConfigEmpty='';
         items.className='chart-options';
         items.dataset.dashboardConfigOptions='';
-        items.addEventListener('change',changeVisibility);
+        items.addEventListener('change',changeVisibility,{signal:lifecycleController.signal});
         section.append(styles,heading,message,empty,items);
         return section;
     }
@@ -280,22 +314,14 @@
         const previous=isVisible(definition);
         const next={...visibility,[definition.key]:checkbox.checked};
         const effective=effectiveDashboardVisibility(definitions,next);
-        const changeEvent=new CustomEvent(
+        operationSequence+=1;
+        const accepted=emit(
             'dashboard-config-change',
-            {
-                bubbles:true,
-                cancelable:true,
-                composed:true,
-                detail:{
-                    definition:cloneDefinition(definition),
-                    effectiveVisibility:effective,
-                    key:definition.key,
-                    visibility:{...next},
-                    visible:checkbox.checked
-                }
-            }
+            {definition:cloneDefinition(definition),effectiveVisibility:effective,key:definition.key,visibility:{...next},visible:checkbox.checked},
+            {key:definition.key,visible:checkbox.checked},
+            {cancelable:true,operationId:`${events.descriptor.instanceId}:change:${operationSequence}`}
         );
-        if(!host.dispatchEvent(changeEvent)){
+        if(!accepted){
             checkbox.checked=previous;
             return;
         }
@@ -330,12 +356,23 @@
         };
     }
 
+    function destroy(){
+        if(destroyed){
+            return false;
+        }
+        destroyed=true;
+        operationGeneration+=1;
+        lifecycleController.abort('dashboard-config-destroyed');
+        configModal.destroy?.();
+        definitions=[];
+        visibility={};
+        content=null;
+        events.dispose();
+        host.ready=false;
+        return true;
+    }
+
     renderTrigger();
     host.ready=true;
-    host.dispatchEvent(
-        new CustomEvent(
-            'dashboard-config-ready',
-            {bubbles:true,composed:true}
-        )
-    );
+    emit('dashboard-config-ready',{}, {ready:true});
 </script>
