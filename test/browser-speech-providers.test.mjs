@@ -556,7 +556,7 @@ test("artifact graph source redirects bind exact canonical final origins", () =>
     ...entrypoint,
     redirectFinalOrigins: [
       "https://us.aws.cdn.hf.co/",
-      "https://huggingface.co",
+      "https://huggingface.co:443",
     ],
   };
   const redirected = createBrowserSpeechArtifactGraph({
@@ -591,6 +591,7 @@ test("artifact graph source redirects bind exact canonical final origins", () =>
     [["https://huggingface.co?source=mutable"], "artifact-graph-source-redirect-final-origin-query-rejected"],
     [["https://huggingface.co#source"], "artifact-graph-source-redirect-final-origin-fragment-rejected"],
     [["https://HUGGINGFACE.co", "https://huggingface.co/"], "artifact-graph-source-redirect-final-origin-duplicate"],
+    [["https://huggingface.co:443", "https://huggingface.co"], "artifact-graph-source-redirect-final-origin-duplicate"],
   ];
   for (const [redirectFinalOrigins, reason] of invalidInventories) {
     assert.throws(
@@ -1165,6 +1166,7 @@ test("artifact graph cold redirects require declared final origin and source med
 
   function redirectFailureStore(finalUrl, {
     redirected = true,
+    status = 200,
     mediaType = "text/plain",
     body = sources.get(target.sourceUrl).body,
   } = {}) {
@@ -1183,7 +1185,7 @@ test("artifact graph cold redirects require declared final origin and source med
           });
         }
         return responseAt(finalUrl, body, {
-          status: 200,
+          status,
           redirected,
           headers: {
             "content-length": String(body.byteLength),
@@ -1197,6 +1199,18 @@ test("artifact graph cold redirects require declared final origin and source med
   await assert.rejects(
     redirectFailureStore("https://undeclared.example/xet/model").prepare(graph),
     (error) => error?.reason === "artifact-graph-source-redirect-final-origin-mismatch",
+  );
+  await assert.rejects(
+    redirectFailureStore("https://undeclared.example/xet/model", {
+      status: 404,
+    }).prepare(graph),
+    (error) => error?.reason === "artifact-graph-source-redirect-final-origin-mismatch",
+  );
+  await assert.rejects(
+    redirectFailureStore("https://huggingface.co/xet/model", {
+      status: 404,
+    }).prepare(graph),
+    (error) => error?.reason === "artifact-graph-source-http-response-rejected",
   );
   await assert.rejects(
     redirectFailureStore("not a final URL").prepare(graph),
@@ -1213,6 +1227,10 @@ test("artifact graph cold redirects require declared final origin and source med
   await assert.rejects(
     redirectFailureStore("https://huggingface.co/xet/model#fragment").prepare(graph),
     (error) => error?.reason === "artifact-graph-source-response-url-fragment-rejected",
+  );
+  await assert.rejects(
+    redirectFailureStore("https://huggingface.co:444/xet/model").prepare(graph),
+    (error) => error?.reason === "artifact-graph-source-redirect-final-origin-mismatch",
   );
   await assert.rejects(
     redirectFailureStore("https://huggingface.co/not-a-redirect", {
