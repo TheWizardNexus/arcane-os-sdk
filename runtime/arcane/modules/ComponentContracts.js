@@ -327,6 +327,275 @@ function effectiveDashboardVisibility(definitions=[],visibility={}){
     );
 }
 
+function createSTTActivationController({
+    host,
+    button,
+    onChange,
+    EventClass=CustomEvent
+}){
+    let role=null;
+    let requestPending=false;
+    let requestError='';
+    let requestGeneration=0;
+    let destroyed=false;
+
+    function visibleError(error,fallback){
+        const message=typeof error?.message==='string'
+            ?error.message.trim()
+            :'';
+        return (message||fallback).slice(0,240);
+    }
+
+    function cancellation(error){
+        return error?.name==='AbortError'
+            ||[
+                'ARCANE_AI_REQUEST_ABORTED',
+                'ARCANE_AI_OPERATION_SUPERSEDED'
+            ].includes(error?.code);
+    }
+
+    function selected(){
+        return typeof role?.providerId==='string'
+            &&role.providerId.length>0
+            &&typeof role?.modelId==='string'
+            &&role.modelId.length>0;
+    }
+
+    function action(){
+        if(!selected()){
+            return null;
+        }
+        if(role.state==='loading'){
+            return 'unload';
+        }
+        if(!role.busy&&['unloaded','error'].includes(role.state)){
+            return 'load';
+        }
+        return null;
+    }
+
+    function label(){
+        if(requestPending){
+            return 'Requesting…';
+        }
+        if(role?.state==='loading'){
+            return 'Cancel loading';
+        }
+        if(role?.state==='unloading'){
+            return 'Canceling…';
+        }
+        if(role?.state==='error'){
+            return 'Try again';
+        }
+        return 'Start transcription';
+    }
+
+    function title(){
+        if(requestPending){
+            return 'Requesting transcription activation.';
+        }
+        if(role?.state==='loading'){
+            return 'Cancel loading the selected transcription service.';
+        }
+        if(role?.state==='unloading'){
+            return 'The selected transcription service is being released.';
+        }
+        if(role?.state==='error'){
+            return requestError||visibleError(
+                role.error,
+                'Retry loading the selected transcription service.'
+            );
+        }
+        return 'Start the selected transcription service.';
+    }
+
+    function formatProgress(progress,fallback){
+        if(!progress){
+            return fallback;
+        }
+        const amount=progress.total===null
+            ?`${progress.completed} ${progress.unit}`
+            :`${progress.completed} of ${progress.total} ${progress.unit}`;
+        const heartbeat=progress.heartbeat?', active heartbeat':'';
+        return `${progress.phase}, ${amount}${heartbeat}`;
+    }
+
+    function status(){
+        if(requestError){
+            return `Transcription activation error: ${requestError}.`;
+        }
+        if(requestPending){
+            return 'Transcription activation requested.';
+        }
+        if(role?.state==='ready'){
+            return role.busy?'Transcription busy.':'Transcription ready.';
+        }
+        if(role?.state==='loading'){
+            return `Transcription ${formatProgress(role.progress,'loading')}; Cancel is available.`;
+        }
+        if(role?.state==='unloading'){
+            return `Transcription ${formatProgress(role.progress,'releasing')}.`;
+        }
+        if(role?.state==='error'){
+            return `Transcription error: ${visibleError(role.error,'Unknown error')}.`;
+        }
+        if(role?.state==='disposed'){
+            return 'Transcription disposed.';
+        }
+        if(role?.state==='unloaded'&&selected()){
+            return 'Transcription selected and waiting to load.';
+        }
+        return 'Transcription unavailable.';
+    }
+
+    function visible(){
+        return selected()
+            &&role.state!=='ready'
+            &&['unloaded','loading','unloading','error'].includes(role.state);
+    }
+
+    async function request(nextAction){
+        if(destroyed||requestPending||action()!==nextAction){
+            return false;
+        }
+        const generation=++requestGeneration;
+        requestError='';
+        const intent=Object.freeze(
+            {
+                role:'stt',
+                action:nextAction,
+                reason:'user'
+            }
+        );
+        const activationRequest=Object.freeze({intent,state:role});
+        const activationEvent=new EventClass(
+            'speech-stt-activation-request',
+            {
+                bubbles:true,
+                composed:true,
+                cancelable:true,
+                detail:activationRequest
+            }
+        );
+        requestPending=true;
+        const accepted=host.dispatchEvent(activationEvent);
+        if(!accepted
+            ||destroyed
+            ||generation!==requestGeneration
+            ||action()!==nextAction){
+            if(!destroyed&&generation===requestGeneration){
+                requestPending=false;
+                onChange();
+            }
+            return false;
+        }
+        try{
+            onChange();
+            if(destroyed
+                ||generation!==requestGeneration
+                ||action()!==nextAction){
+                return false;
+            }
+            await host.requestSTTActivation(intent);
+            if(destroyed||generation!==requestGeneration){
+                return false;
+            }
+            return true;
+        }catch(error){
+            if(destroyed||generation!==requestGeneration){
+                return false;
+            }
+            if(nextAction==='load'
+                &&cancellation(error)
+                &&['unloaded','unloading'].includes(role?.state)){
+                return false;
+            }
+            const message=visibleError(
+                error,
+                `The transcription ${nextAction} request failed.`
+            );
+            requestError=message;
+            host.dispatchEvent(
+                new EventClass(
+                    'speech-stt-activation-error',
+                    {
+                        bubbles:true,
+                        composed:true,
+                        detail:Object.freeze(
+                            {
+                                request:activationRequest,
+                                error,
+                                message
+                            }
+                        )
+                    }
+                )
+            );
+            return false;
+        }finally{
+            if(!destroyed&&generation===requestGeneration){
+                requestPending=false;
+                try{
+                    onChange();
+                }catch(error){
+                    console.error('Unable to render STT activation state:',error);
+                }
+            }
+        }
+    }
+
+    function activateSelectedSTT(){
+        const nextAction=action();
+        if(nextAction){
+            void request(nextAction);
+        }
+    }
+
+    function synchronize(nextRole){
+        if(destroyed){
+            return;
+        }
+        if(role?.state!==nextRole.state
+            ||role?.providerId!==nextRole.providerId
+            ||role?.modelId!==nextRole.modelId
+            ||role?.loaded!==nextRole.loaded
+            ||role?.busy!==nextRole.busy
+            ||role?.operationId!==nextRole.operationId){
+            requestGeneration+=1;
+            requestError='';
+            requestPending=false;
+        }
+        role=nextRole;
+    }
+
+    function destroy(){
+        if(destroyed){
+            return;
+        }
+        destroyed=true;
+        requestGeneration+=1;
+        requestPending=false;
+        button.removeEventListener('click',activateSelectedSTT);
+    }
+
+    button.addEventListener('click',activateSelectedSTT);
+    return Object.freeze(
+        {
+            get action(){return action();},
+            get error(){return requestError;},
+            get label(){return label();},
+            get pending(){return requestPending;},
+            get selected(){return selected();},
+            get status(){return status();},
+            get title(){return title();},
+            get visible(){return visible();},
+            request,
+            synchronize,
+            destroy
+        }
+    );
+}
+
 const VOICE_LABELS=Object.freeze({
     complete:'Complete Transcription',
     description:'Record one or more segments. Each segment is transcribed after you press Stop.',
@@ -337,6 +606,7 @@ const VOICE_LABELS=Object.freeze({
 });
 
 const VOICE_MESSAGES=Object.freeze({
+    cancelled:'Transcription canceled.',
     complete:'Complete.',
     completeError:'Unable to complete this transcription.',
     completing:'Completing transcription...',
@@ -354,6 +624,7 @@ const VOICE_MESSAGES=Object.freeze({
     transcribed:'Transcription added. Record another segment or complete.',
     transcribeError:'Unable to transcribe this recording.',
     transcribing:'Transcribing this segment...',
+    transcriptReplaced:'Transcript replaced.',
     unsupported:'Audio recording is not supported by this browser.'
 });
 
@@ -574,6 +845,7 @@ export {
     VOICE_MESSAGES,
     appendTranscription,
     applyMarkdownFormat,
+    createSTTActivationController,
     effectiveDashboardVisibility,
     normalizeChartOptions,
     normalizeChartRows,

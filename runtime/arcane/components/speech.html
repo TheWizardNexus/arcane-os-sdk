@@ -156,6 +156,9 @@
         requestAIRuntimeIntent,
         subscribeAIRuntimeState
     } = await import('../modules/AIRuntimeState.js');
+    const {
+        createSTTActivationController
+    } = await import('../modules/ComponentContracts.js');
 
     const host = this;
     const shadowRoot = host.shadowRoot;
@@ -253,191 +256,6 @@
             }
         )
     );
-
-    function createSTTActivationController({
-        host,
-        button,
-        onChange,
-        EventClass = CustomEvent
-    }) {
-        let role = null;
-        let requestPending = false;
-        let requestError = '';
-        let requestGeneration = 0;
-        let destroyed = false;
-
-        function visibleError(error, fallback) {
-            const message = typeof error?.message === 'string'
-                ? error.message.trim()
-                : '';
-            return (message || fallback).slice(0, 240);
-        }
-
-        function cancellation(error) {
-            return error?.name === 'AbortError'
-                || [
-                    'ARCANE_AI_REQUEST_ABORTED',
-                    'ARCANE_AI_OPERATION_SUPERSEDED'
-                ]
-                    .includes(error?.code);
-        }
-
-        function selected() {
-            return typeof role?.providerId === 'string'
-                && role.providerId.length > 0
-                && typeof role?.modelId === 'string'
-                && role.modelId.length > 0;
-        }
-
-        function action() {
-            if (!selected()) {
-                return null;
-            }
-            if (role.state === 'loading') {
-                return 'unload';
-            }
-            if (!role.busy && ['unloaded', 'error'].includes(role.state)) {
-                return 'load';
-            }
-            return null;
-        }
-
-        async function request(nextAction) {
-            if (destroyed || requestPending || action() !== nextAction) {
-                return false;
-            }
-            const generation = ++requestGeneration;
-            requestError = '';
-            const intent = Object.freeze(
-                {
-                    role: 'stt',
-                    action: nextAction,
-                    reason: 'user'
-                }
-            );
-            const activationRequest = Object.freeze({intent, state: role});
-            const activationEvent = new EventClass(
-                'speech-stt-activation-request',
-                {
-                    bubbles: true,
-                    composed: true,
-                    cancelable: true,
-                    detail: activationRequest
-                }
-            );
-            requestPending = true;
-            const accepted = host.dispatchEvent(activationEvent);
-            if (!accepted
-                || destroyed
-                || generation !== requestGeneration
-                || action() !== nextAction) {
-                if (!destroyed && generation === requestGeneration) {
-                    requestPending = false;
-                    onChange();
-                }
-                return false;
-            }
-            onChange();
-            try {
-                await host.requestSTTActivation(intent);
-                if (destroyed || generation !== requestGeneration) {
-                    return false;
-                }
-                return true;
-            } catch (error) {
-                if (destroyed || generation !== requestGeneration) {
-                    return false;
-                }
-                if (nextAction === 'load'
-                    && cancellation(error)
-                    && ['unloaded', 'unloading'].includes(role?.state)) {
-                    return false;
-                }
-                const message = visibleError(
-                    error,
-                    `The transcription ${nextAction} request failed.`
-                );
-                requestError = message;
-                host.dispatchEvent(
-                    new EventClass(
-                        'speech-stt-activation-error',
-                        {
-                            bubbles: true,
-                            composed: true,
-                            detail: Object.freeze(
-                                {
-                                    request: activationRequest,
-                                    error,
-                                    message
-                                }
-                            )
-                        }
-                    )
-                );
-                return false;
-            } finally {
-                if (!destroyed && generation === requestGeneration) {
-                    requestPending = false;
-                    onChange();
-                }
-            }
-        }
-
-        function activateSelectedSTT() {
-            const nextAction = action();
-            if (nextAction) {
-                void request(nextAction);
-            }
-        }
-
-        function synchronize(nextRole) {
-            if (destroyed) {
-                return;
-            }
-            if (role?.state !== nextRole.state
-                || role?.providerId !== nextRole.providerId
-                || role?.modelId !== nextRole.modelId
-                || role?.loaded !== nextRole.loaded
-                || role?.busy !== nextRole.busy
-                || role?.operationId !== nextRole.operationId) {
-                requestGeneration += 1;
-                requestError = '';
-                requestPending = false;
-            }
-            role = nextRole;
-        }
-
-        function destroy() {
-            if (destroyed) {
-                return;
-            }
-            destroyed = true;
-            requestGeneration += 1;
-            requestPending = false;
-            button.removeEventListener('click', activateSelectedSTT);
-        }
-
-        button.addEventListener('click', activateSelectedSTT);
-        return Object.freeze(
-            {
-                get action() {
-                    return action();
-                },
-                get error() {
-                    return requestError;
-                },
-                get pending() {
-                    return requestPending;
-                },
-                get selected() {
-                    return selected();
-                },
-                request,
-                synchronize,
-                destroy
-            }
-        );
-    }
 
     function unavailableRole(role) {
         return Object.freeze(
@@ -598,10 +416,7 @@
     function renderControls() {
         const transcriptionReady = sttRole.state === 'ready';
         const microphoneReady = host.availability.microphone;
-        const activationVisible = sttActivationController.selected
-            && sttRole.state !== 'ready'
-            && ['unloaded', 'loading', 'unloading', 'error']
-                .includes(sttRole.state);
+        const activationVisible = sttActivationController.visible;
         recordButton.hidden = activationVisible;
         recordButton.disabled = !transcriptionReady
             || !microphoneReady
@@ -620,8 +435,8 @@
             || sttActivationController.pending
             || sttRole.state === 'unloading'
             || sttActivationController.action === null;
-        sttActivationButton.textContent = transcriptionActivationLabel();
-        sttActivationButton.title = transcriptionActivationTitle();
+        sttActivationButton.textContent = sttActivationController.label;
+        sttActivationButton.title = sttActivationController.title;
         sttActivationButton.setAttribute(
             'aria-label',
             sttActivationButton.title
@@ -634,41 +449,6 @@
             )
         );
         renderTTSControl();
-    }
-
-    function transcriptionActivationLabel() {
-        if (sttActivationController.pending) {
-            return 'Requesting…';
-        }
-        if (sttRole.state === 'loading') {
-            return 'Cancel loading';
-        }
-        if (sttRole.state === 'unloading') {
-            return 'Canceling…';
-        }
-        if (sttRole.state === 'error') {
-            return 'Try again';
-        }
-        return 'Start transcription';
-    }
-
-    function transcriptionActivationTitle() {
-        if (sttActivationController.pending) {
-            return 'Requesting transcription activation.';
-        }
-        if (sttRole.state === 'loading') {
-            return 'Cancel loading the selected transcription service.';
-        }
-        if (sttRole.state === 'unloading') {
-            return 'The selected transcription service is being released.';
-        }
-        if (sttRole.state === 'error') {
-            return sttActivationController.error || visibleErrorMessage(
-                sttRole.error,
-                'Retry loading the selected transcription service.'
-            );
-        }
-        return 'Start the selected transcription service.';
     }
 
     function transcriptionButtonTitle() {
@@ -776,34 +556,10 @@
     }
 
     function describeSTTRole() {
-        if (sttActivationController.error) {
-            return `Transcription activation error: ${sttActivationController.error}.`;
+        if (sttRole.state === 'ready' && !host.availability.microphone) {
+            return 'Microphone unavailable.';
         }
-        if (sttActivationController.pending) {
-            return 'Transcription activation requested.';
-        }
-        if (sttRole.state === 'ready') {
-            if (!host.availability.microphone) {
-                return 'Microphone unavailable.';
-            }
-            return sttRole.busy ? 'Transcription busy.' : 'Transcription ready.';
-        }
-        if (sttRole.state === 'loading') {
-            return `Transcription ${formatRoleProgress(sttRole.progress, 'loading')}; Cancel is available.`;
-        }
-        if (sttRole.state === 'unloading') {
-            return `Transcription ${formatRoleProgress(sttRole.progress, 'releasing')}.`;
-        }
-        if (sttRole.state === 'error') {
-            return `Transcription error: ${visibleErrorMessage(sttRole.error, 'Unknown error')}.`;
-        }
-        if (sttRole.state === 'disposed') {
-            return 'Transcription disposed.';
-        }
-        if (sttRole.state === 'unloaded' && sttActivationController.selected) {
-            return 'Transcription selected and waiting to load.';
-        }
-        return 'Transcription unavailable.';
+        return sttActivationController.status;
     }
 
     function describeTTSRole() {

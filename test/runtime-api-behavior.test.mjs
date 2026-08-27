@@ -44,6 +44,9 @@ import {
 import {
     availabilityFromReport
 } from '../runtime/arcane/modules/LocalAIReadinessController.js';
+import {
+    createSTTActivationController
+} from '../runtime/arcane/modules/ComponentContracts.js';
 import ConfiguredAIChatSession from '../runtime/arcane/modules/ConfiguredAIChatSession.js';
 
 const repositoryRoot=new URL('../',import.meta.url);
@@ -2055,25 +2058,19 @@ test(
 );
 
 test(
-    'speech exposes explicit cancelable STT activation without hidden startup',
+    'shared speech components expose explicit admitted STT activation without hidden startup',
     async function testSpeechSTTActivationContract() {
         const source = await readFile(
             new URL('runtime/arcane/components/speech.html', repositoryRoot),
             'utf8'
         );
-        const functionStart = source.indexOf(
-            'function createSTTActivationController('
+        const voiceSource = await readFile(
+            new URL(
+                'runtime/arcane/components/voice-transcription.html',
+                repositoryRoot
+            ),
+            'utf8'
         );
-        const functionEnd = source.indexOf(
-            '\n    function unavailableRole',
-            functionStart
-        );
-        assert.notEqual(functionStart, -1);
-        assert.notEqual(functionEnd, -1);
-        const factorySource = source.slice(functionStart, functionEnd);
-        const createSTTActivationController = Function(
-            `'use strict';\n${factorySource}\nreturn createSTTActivationController;`
-        )();
 
         class ActivationEvent {
             constructor(type, options = {}) {
@@ -2175,6 +2172,12 @@ test(
         );
         controller.synchronize(unloaded);
         assert.equal(controller.action, 'load');
+        assert.equal(controller.visible, true);
+        assert.equal(controller.label, 'Start transcription');
+        assert.equal(
+            controller.status,
+            'Transcription selected and waiting to load.'
+        );
         assert.equal(intents.length, 0, 'state observation must never load STT');
         assert.equal(await controller.request('load'), true);
         assert.deepEqual(
@@ -2222,14 +2225,42 @@ test(
         );
         controller.synchronize(loading);
         assert.equal(controller.action, 'unload');
+        assert.equal(controller.label, 'Cancel loading');
+        assert.match(controller.status, /download, 4 of 10 bytes, active heartbeat/u);
         assert.equal(await controller.request('unload'), true);
         assert.deepEqual(
             intents.at(-1),
             {role: 'stt', action: 'unload', reason: 'user'}
         );
+        controller.synchronize(
+            Object.freeze(
+                {
+                    ...loading,
+                    progress: Object.freeze(
+                        {
+                            ...loading.progress,
+                            total: null,
+                            heartbeat: false
+                        }
+                    )
+                }
+            )
+        );
+        assert.equal(
+            controller.status,
+            'Transcription download, 4 bytes; Cancel is available.'
+        );
+
+        controller.synchronize(
+            Object.freeze({...loading, state: 'unloading', progress: null})
+        );
+        assert.equal(controller.action, null);
+        assert.equal(controller.label, 'Canceling…');
+        assert.match(controller.status, /releasing/u);
 
         const callbackFailure = new Error('STT activation callback failed.');
         controller.synchronize(Object.freeze({...unloaded, state: 'error'}));
+        assert.equal(controller.label, 'Try again');
         synchronizeNextRequest = loading;
         assert.equal(await controller.request('load'), false);
         assert.equal(
@@ -2284,13 +2315,95 @@ test(
             )
         );
         assert.equal(controller.action, null);
+        assert.equal(controller.status, 'Transcription busy.');
+
+        function createActivationReentrancyHarness(onChange) {
+            const caseEvents = [];
+            const caseIntents = [];
+            let caseController;
+            const caseHost = {
+                dispatchEvent(event) {
+                    caseEvents.push(event);
+                    return !event.defaultPrevented;
+                },
+                async requestSTTActivation(intent) {
+                    caseIntents.push(intent);
+                }
+            };
+            caseController = createSTTActivationController(
+                {
+                    host: caseHost,
+                    button: {
+                        addEventListener() {},
+                        removeEventListener() {}
+                    },
+                    onChange() {
+                        onChange(caseController);
+                    },
+                    EventClass: ActivationEvent
+                }
+            );
+            caseController.synchronize(unloaded);
+            return {controller: caseController, events: caseEvents, intents: caseIntents};
+        }
+
+        let destroyOnChange = true;
+        const destroyedOnChange = createActivationReentrancyHarness(
+            function destroyActivationController(activeController) {
+                if (destroyOnChange) {
+                    destroyOnChange = false;
+                    activeController.destroy();
+                }
+            }
+        );
+        assert.equal(await destroyedOnChange.controller.request('load'), false);
+        assert.equal(destroyedOnChange.controller.pending, false);
+        assert.deepEqual(destroyedOnChange.intents, []);
+
+        let synchronizeOnChange = true;
+        const synchronizedOnChange = createActivationReentrancyHarness(
+            function replaceActivationState(activeController) {
+                if (synchronizeOnChange) {
+                    synchronizeOnChange = false;
+                    activeController.synchronize(loading);
+                }
+            }
+        );
+        assert.equal(await synchronizedOnChange.controller.request('load'), false);
+        assert.deepEqual(synchronizedOnChange.intents, []);
+
+        let reentrantOnChangeRequest = null;
+        const reenteredOnChange = createActivationReentrancyHarness(
+            function reenterActivation(activeController) {
+                if (!reentrantOnChangeRequest) {
+                    reentrantOnChangeRequest = activeController.request('load');
+                }
+            }
+        );
+        assert.equal(await reenteredOnChange.controller.request('load'), true);
+        assert.equal(await reentrantOnChangeRequest, false);
+        assert.equal(reenteredOnChange.intents.length, 1);
+
+        let throwOnChange = true;
+        const failedOnChange = createActivationReentrancyHarness(
+            function failActivationPresentation() {
+                if (throwOnChange) {
+                    throwOnChange = false;
+                    throw new Error('STT presentation failed.');
+                }
+            }
+        );
+        assert.equal(await failedOnChange.controller.request('load'), false);
+        assert.equal(failedOnChange.controller.pending, false);
+        assert.deepEqual(failedOnChange.intents, []);
+        assert.equal(
+            failedOnChange.events.at(-1).type,
+            'speech-stt-activation-error'
+        );
         assert.match(
             source,
             /<button id="sttActivationButton" type="button" hidden disabled>/u
         );
-        assert.match(source, /Start transcription/u);
-        assert.match(source, /Cancel loading/u);
-        assert.match(source, /Try again/u);
         assert.match(
             source,
             /fetchSTT\([\s\S]*audioFile,[\s\S]*undefined,[\s\S]*controller[.]signal/u,
@@ -2310,6 +2423,910 @@ test(
             source,
             /Object[.]prototype[.]hasOwnProperty[.]call\(input, 'stt'\)[\s\S]*!Boolean\(input[.]stt\)[\s\S]*!selectedRole\(sttRole\)/u,
             'Speech compatibility input must neither create readiness nor replace a selected sticky STT role.'
+        );
+
+        const admissionStart = voiceSource.indexOf(
+            'function canStartVoiceRecording('
+        );
+        const admissionEnd = voiceSource.indexOf(
+            '\n\n    function optionsFromDataset',
+            admissionStart
+        );
+        assert.notEqual(admissionStart, -1);
+        assert.notEqual(admissionEnd, -1);
+        const admissionSource = voiceSource.slice(admissionStart, admissionEnd);
+        const canStartVoiceRecording = Function(
+            `'use strict';\n${admissionSource}\nreturn canStartVoiceRecording;`
+        )();
+        const ready = Object.freeze(
+            {
+                ...unloaded,
+                state: 'ready',
+                loaded: true
+            }
+        );
+        for (const unavailableState of [
+            'unavailable',
+            'unloaded',
+            'loading',
+            'unloading',
+            'error',
+            'disposed'
+        ]) {
+            assert.equal(
+                canStartVoiceRecording(
+                    Object.freeze({...unloaded, state: unavailableState}),
+                    'idle',
+                    false
+                ),
+                false
+            );
+        }
+        assert.equal(canStartVoiceRecording(ready, 'idle', false), true);
+        assert.equal(canStartVoiceRecording(ready, 'error', false), true);
+        assert.equal(
+            canStartVoiceRecording(Object.freeze({...ready, busy: true}), 'idle', false),
+            false
+        );
+        assert.equal(canStartVoiceRecording(ready, 'recording', false), false);
+        assert.equal(canStartVoiceRecording(ready, 'idle', true), false);
+
+        assert.match(
+            voiceSource,
+            /setState\('starting'[\s\S]*recordingStartIsCurrent\(generation,'starting'\)[\s\S]*getUserMedia[\s\S]*recordingStartIsCurrent\(generation,'starting'\)[\s\S]*rejectRecordingStart\(generation,stream\)/u,
+            'Starting reentrancy and ready-to-busy permission races must reject the returned stream.'
+        );
+        assert.match(
+            voiceSource,
+            /setState\('recording'[\s\S]*recordingStartIsCurrent\(generation,'recording'\)[\s\S]*rejectAssignedRecordingStart\(generation,stream\)/u,
+            'Recording-state reentrancy must release the recorder and stream.'
+        );
+        assert.match(
+            voiceSource,
+            /const activeRecorder=recorder[\s\S]*setState\('transcribing'[\s\S]*recorder!==activeRecorder[\s\S]*activeRecorder[.]stop\(\)/u,
+            'Stop must retain and recheck the recorder identity after state publication.'
+        );
+        const startLifecycleStart = voiceSource.indexOf(
+            'async function startRecording()'
+        );
+        const startLifecycleEnd = voiceSource.indexOf(
+            '\n\n    function createRecorder',
+            startLifecycleStart
+        );
+        const createStartLifecycleHarness = Function(
+            `'use strict';
+            return function createStartLifecycleHarness(destroyOnState=''){
+                let chunks=[];
+                let mediaStream=null;
+                let recorder=null;
+                let state='idle';
+                let sttRole={state:'ready',busy:false};
+                let destroyed=false;
+                let sessionGeneration=0;
+                let permissionRequests=0;
+                let resolvePermission;
+                let recorderStarts=0;
+                let recorderStops=0;
+                let trackStops=0;
+                const track={
+                    addEventListener(){},
+                    removeEventListener(){},
+                    stop(){trackStops+=1;}
+                };
+                const stream={
+                    getAudioTracks(){return [track];},
+                    getTracks(){return [track];}
+                };
+                const options={
+                    mediaConstraints:{audio:true},
+                    messages:{
+                        ready:'Ready.',
+                        recording:'Recording.',
+                        requesting:'Requesting.',
+                        startError:'Start failed.',
+                        unsupported:'Unsupported.'
+                    }
+                };
+                class MediaRecorder {}
+                const navigator={
+                    mediaDevices:{
+                        getUserMedia(){
+                            permissionRequests+=1;
+                            return new Promise(
+                                resolve=>{resolvePermission=resolve;}
+                            );
+                        }
+                    }
+                };
+                function setState(nextState){
+                    state=nextState;
+                    if(nextState===destroyOnState){
+                        destroyed=true;
+                        sessionGeneration+=1;
+                        releaseMicrophone();
+                        state='idle';
+                    }
+                }
+                function createRecorder(){
+                    return {
+                        state:'inactive',
+                        addEventListener(){},
+                        removeEventListener(){},
+                        start(){
+                            this.state='recording';
+                            recorderStarts+=1;
+                        },
+                        stop(){
+                            this.state='inactive';
+                            recorderStops+=1;
+                        }
+                    };
+                }
+                function stopMediaStream(activeStream){
+                    for(const activeTrack of activeStream?.getTracks?.()||[]){
+                        activeTrack.stop();
+                    }
+                }
+                function releaseMicrophone(){
+                    if(recorder?.state==='recording'){
+                        recorder.stop();
+                    }
+                    stopMediaStream(mediaStream);
+                    mediaStream=null;
+                    recorder=null;
+                    chunks=[];
+                }
+                function collectAudio(){}
+                function finishRecording(){}
+                function recordingError(){}
+                function recordingInterrupted(){}
+                ${admissionSource}
+                ${voiceSource.slice(startLifecycleStart, startLifecycleEnd)}
+                return Object.freeze({
+                    busy(){sttRole={...sttRole,busy:true};},
+                    get permissionRequests(){return permissionRequests;},
+                    get recorderStarts(){return recorderStarts;},
+                    get recorderStops(){return recorderStops;},
+                    resolve(){resolvePermission?.(stream);},
+                    start:startRecording,
+                    get state(){return state;},
+                    get trackStops(){return trackStops;}
+                });
+            };`
+        )();
+        const busyDuringPermission = createStartLifecycleHarness();
+        const busyStart=busyDuringPermission.start();
+        busyDuringPermission.busy();
+        busyDuringPermission.resolve();
+        assert.equal(await busyStart, false);
+        assert.equal(busyDuringPermission.permissionRequests, 1);
+        assert.equal(busyDuringPermission.recorderStarts, 0);
+        assert.equal(busyDuringPermission.trackStops, 1);
+        assert.equal(busyDuringPermission.state, 'idle');
+
+        const destroyedWhileStarting = createStartLifecycleHarness('starting');
+        assert.equal(await destroyedWhileStarting.start(), false);
+        assert.equal(destroyedWhileStarting.permissionRequests, 0);
+
+        const destroyedWhileRecording = createStartLifecycleHarness('recording');
+        const destroyedRecordingStart=destroyedWhileRecording.start();
+        destroyedWhileRecording.resolve();
+        assert.equal(await destroyedRecordingStart, false);
+        assert.equal(destroyedWhileRecording.recorderStarts, 1);
+        assert.equal(destroyedWhileRecording.recorderStops, 1);
+        assert.equal(destroyedWhileRecording.trackStops, 1);
+
+        const stopLifecycleStart = voiceSource.indexOf(
+            'function stopRecording()'
+        );
+        const stopLifecycleEnd = voiceSource.indexOf(
+            '\n\n    async function finishRecording',
+            stopLifecycleStart
+        );
+        const stopDuringDestroy = Function(
+            `'use strict';
+            let state='recording';
+            let destroyed=false;
+            let sessionGeneration=9;
+            let stopCalls=0;
+            let recorder={state:'recording',stop(){stopCalls+=1;}};
+            const options={messages:{transcribing:'Transcribing.'}};
+            function isCurrentVoiceOperation(generation,expectedState){
+                return !destroyed
+                    &&generation===sessionGeneration
+                    &&state===expectedState;
+            }
+            function setState(nextState){
+                state=nextState;
+                destroyed=true;
+                sessionGeneration+=1;
+                recorder=null;
+                state='idle';
+            }
+            ${voiceSource.slice(stopLifecycleStart, stopLifecycleEnd)}
+            return Object.freeze({
+                run:stopRecording,
+                get stopCalls(){return stopCalls;}
+            });`
+        )();
+        assert.equal(stopDuringDestroy.run(), false);
+        assert.equal(stopDuringDestroy.stopCalls, 0);
+        assert.match(
+            voiceSource,
+            /<button id="start" type="button" disabled><\/button>[\s\S]*<button id="sttActivation" type="button" hidden disabled>/u
+        );
+        assert.match(
+            voiceSource,
+            /subscribeAIRuntimeState\([\s\S]*synchronizeAIRuntimeState,[\s\S]*signal:runtimeStateAbortController[.]signal/u
+        );
+        assert.match(
+            voiceSource,
+            /async function startRecording\(\)\{[\s\S]*!canStartVoiceRecording\(sttRole,state,destroyed\)[\s\S]*getUserMedia/u,
+            'Programmatic recording must fail before microphone access when STT is not admitted.'
+        );
+        assert.match(
+            voiceSource,
+            /return globalThis[.]ai[.]fetchSTT\(file,undefined,signal\)/u,
+            'The default voice path must preserve the AI.fetchSTT callback position and owned signal.'
+        );
+        assert.match(
+            voiceSource,
+            /signal:controller[.]signal[\s\S]*return options[.]transcribe\(file,context\)/u,
+            'Injected transcribers must receive the owned signal additively in their existing context.'
+        );
+        const releaseStart = voiceSource.indexOf(
+            'function releaseTranscriptionController('
+        );
+        const releaseEnd = voiceSource.indexOf(
+            '\n\n    async function transcribeAudio',
+            releaseStart
+        );
+        assert.notEqual(releaseStart, -1);
+        assert.notEqual(releaseEnd, -1);
+        const releaseSource = voiceSource.slice(releaseStart, releaseEnd);
+        const controllerOwnership = Function(
+            `'use strict';
+            let transcriptionAbortController=null;
+            ${releaseSource}
+            return Object.freeze({
+                get active(){return transcriptionAbortController;},
+                release:releaseTranscriptionController,
+                set active(value){transcriptionAbortController=value;}
+            });`
+        )();
+        const staleController = new AbortController();
+        const currentController = new AbortController();
+        controllerOwnership.active = staleController;
+        staleController.abort();
+        controllerOwnership.active = currentController;
+        assert.equal(staleController.signal.aborted, true);
+        assert.equal(currentController.signal.aborted, false);
+        assert.equal(controllerOwnership.release(staleController), false);
+        assert.equal(
+            controllerOwnership.active,
+            currentController,
+            'An abort-ignoring stale transcription must not clear the newer request controller.'
+        );
+        assert.equal(controllerOwnership.release(currentController), true);
+        assert.equal(controllerOwnership.active, null);
+
+        const replacementStart = voiceSource.indexOf(
+            'function supersedeForTranscriptReplacement()'
+        );
+        const replacementEnd = voiceSource.indexOf(
+            '\n\n    function clear',
+            replacementStart
+        );
+        const completionStart = voiceSource.indexOf(
+            'async function completeStream()'
+        );
+        const completionEnd = voiceSource.indexOf(
+            '\n\n    function supersedeForTranscriptReplacement',
+            completionStart
+        );
+        const transcribeAwait = voiceSource.indexOf(
+            'const result=await transcribeAudio('
+        );
+        const transcribeSegment = voiceSource.indexOf(
+            "const segment=typeof result==='string'",
+            transcribeAwait
+        );
+        const saveBlockStart = voiceSource.indexOf(
+            'if(options.persist){',
+            transcribeSegment
+        );
+        const saveBlockEnd = voiceSource.indexOf(
+            '\n            const detail=',
+            saveBlockStart
+        );
+        const createReplacementHarness = Function(
+            `'use strict';
+            return function createReplacementHarness(
+                initialState,
+                withController=true,
+                settings={}
+            ){
+                let state=initialState;
+                let transcript='original';
+                let sessionGeneration=12;
+                let destroyed=false;
+                const controller=withController?new AbortController():null;
+                let transcriptionAbortController=controller;
+                let releases=0;
+                const cancellations=[];
+                const events=[];
+                const transitions=[];
+                const options={
+                    onComplete:settings.onComplete,
+                    onSave:settings.onSave,
+                    persist:true,
+                    messages:{
+                        complete:'Complete.',
+                        completeError:'Completion failed.',
+                        completing:'Completing.',
+                        ready:'Ready.',
+                        saveError:'Save failed.',
+                        saving:'Saving.',
+                        transcriptReplaced:'Transcript replaced.'
+                    }
+                };
+                const sttRole={state:'ready'};
+                const host={
+                    dispatchEvent(event){
+                        events.push(event);
+                        if(event.type===settings.replaceOnEvent){
+                            setValue('replacement');
+                        }
+                    }
+                };
+                class CustomEvent {
+                    constructor(type,{detail}){
+                        this.type=type;
+                        this.detail=detail;
+                    }
+                }
+                function releaseMicrophone(){releases+=1;}
+                function renderTranscript(){}
+                function reportSTTCancellation(reason,message){
+                    cancellations.push({reason,message});
+                    state='idle';
+                }
+                function setState(nextState){
+                    state=nextState;
+                    transitions.push(nextState);
+                    if(nextState===settings.replaceOnState){
+                        setValue('replacement');
+                    }
+                    if(nextState===settings.destroyOnState){
+                        destroyed=true;
+                        sessionGeneration+=1;
+                        state='idle';
+                    }
+                }
+                function isCurrentVoiceOperation(generation,expectedState){
+                    return !destroyed
+                        &&generation===sessionGeneration
+                        &&state===expectedState;
+                }
+                function releaseTranscriptionController(activeController){
+                    if(transcriptionAbortController!==activeController){
+                        return false;
+                    }
+                    transcriptionAbortController=null;
+                    return true;
+                }
+                function transcribeAudio(file,context,signal){
+                    return settings.transcribe(file,context,signal);
+                }
+                ${voiceSource.slice(completionStart, completionEnd)}
+                ${voiceSource.slice(replacementStart, replacementEnd)}
+                async function settleTranscription(){
+                    const generation=sessionGeneration;
+                    const controller=transcriptionAbortController;
+                    const file={};
+                    const audio={};
+                    const mimeType='audio/webm';
+                    ${voiceSource.slice(transcribeAwait, transcribeSegment)}
+                    return result;
+                }
+                async function persistSegment(){
+                    const generation=sessionGeneration;
+                    const segment='segment';
+                    ${voiceSource.slice(saveBlockStart, saveBlockEnd)}
+                    return isCurrentVoiceOperation(generation,'saving');
+                }
+                return Object.freeze({
+                    get cancellations(){return cancellations;},
+                    complete:completeStream,
+                    get controller(){return controller;},
+                    get events(){return events;},
+                    get generation(){return sessionGeneration;},
+                    isCurrent:isCurrentVoiceOperation,
+                    get releases(){return releases;},
+                    persist:persistSegment,
+                    set:setValue,
+                    settleTranscription,
+                    get state(){return state;},
+                    get transcript(){return transcript;},
+                    get transitions(){return transitions;}
+                });
+            };`
+        )();
+        for (const activeState of [
+            'starting',
+            'transcribing',
+            'saving',
+            'completing'
+        ]) {
+            const replacement = createReplacementHarness(activeState);
+            const operationGeneration = replacement.generation;
+            assert.equal(replacement.set('replacement'), 'replacement');
+            assert.equal(replacement.generation, operationGeneration + 1);
+            assert.equal(replacement.controller.signal.aborted, true);
+            assert.equal(replacement.releases, 1);
+            assert.equal(replacement.state, 'idle');
+            assert.equal(
+                replacement.isCurrent(operationGeneration, activeState),
+                false,
+                `Late ${activeState} settlement must be stale after transcript replacement.`
+            );
+            assert.deepEqual(
+                replacement.cancellations,
+                [{reason: 'transcript-replaced', message: 'Transcript replaced.'}]
+            );
+            assert.equal(replacement.events.at(-1).type, 'voice-transcription-change');
+            assert.deepEqual(
+                replacement.events.at(-1).detail,
+                {transcript: 'replacement'}
+            );
+        }
+        const recordingReplacement = createReplacementHarness('recording', false);
+        const recordingGeneration = recordingReplacement.generation;
+        recordingReplacement.set('replacement');
+        assert.equal(recordingReplacement.generation, recordingGeneration);
+        assert.equal(recordingReplacement.releases, 0);
+        assert.deepEqual(recordingReplacement.cancellations, []);
+        assert.equal(recordingReplacement.state, 'recording');
+
+        let resolveLateTranscription;
+        const lateTranscription = createReplacementHarness(
+            'transcribing',
+            true,
+            {
+                transcribe(){
+                    return new Promise(
+                        resolve=>{resolveLateTranscription=resolve;}
+                    );
+                }
+            }
+        );
+        const pendingTranscription=lateTranscription.settleTranscription();
+        lateTranscription.set('replacement');
+        resolveLateTranscription('stale segment');
+        assert.equal(await pendingTranscription, false);
+        assert.equal(lateTranscription.transcript, 'replacement');
+
+        let savingStateCallbacks=0;
+        const replacedOnSaving = createReplacementHarness(
+            'transcribing',
+            false,
+            {
+                replaceOnState:'saving',
+                onSave(){savingStateCallbacks+=1;}
+            }
+        );
+        assert.equal(await replacedOnSaving.persist(), false);
+        assert.equal(savingStateCallbacks, 0);
+
+        let destroyedSavingCallbacks=0;
+        const destroyedOnSaving = createReplacementHarness(
+            'transcribing',
+            false,
+            {
+                destroyOnState:'saving',
+                onSave(){destroyedSavingCallbacks+=1;}
+            }
+        );
+        assert.equal(await destroyedOnSaving.persist(), false);
+        assert.equal(destroyedSavingCallbacks, 0);
+
+        let resolveLateSave;
+        let saveInput=null;
+        const lateSave = createReplacementHarness(
+            'transcribing',
+            false,
+            {
+                onSave(input){
+                    saveInput=input;
+                    return new Promise(resolve=>{resolveLateSave=resolve;});
+                }
+            }
+        );
+        const pendingSave=lateSave.persist();
+        lateSave.set('replacement');
+        resolveLateSave();
+        assert.equal(await pendingSave, false);
+        assert.deepEqual(
+            saveInput,
+            {transcript:'original',segment:'segment'}
+        );
+        assert.equal(lateSave.transcript, 'replacement');
+
+        let completingStateCallbacks=0;
+        const destroyedOnCompleting = createReplacementHarness(
+            'idle',
+            false,
+            {
+                destroyOnState:'completing',
+                onComplete(){completingStateCallbacks+=1;}
+            }
+        );
+        assert.equal(await destroyedOnCompleting.complete(), false);
+        assert.equal(completingStateCallbacks, 0);
+
+        let resolveLateCompletion;
+        let completionInput=null;
+        const lateCompletion = createReplacementHarness(
+            'idle',
+            false,
+            {
+                onComplete(input){
+                    completionInput=input;
+                    return new Promise(resolve=>{resolveLateCompletion=resolve;});
+                }
+            }
+        );
+        const pendingCompletion=lateCompletion.complete();
+        lateCompletion.set('replacement');
+        resolveLateCompletion();
+        assert.equal(await pendingCompletion, false);
+        assert.deepEqual(completionInput, {transcript:'original'});
+        assert.equal(
+            lateCompletion.events.some(event=>
+                event.type==='voice-transcription-complete'
+            ),
+            false
+        );
+        assert.equal(lateCompletion.transcript, 'replacement');
+
+        const replacedFromCompletionEvent = createReplacementHarness(
+            'idle',
+            false,
+            {
+                onComplete(){},
+                replaceOnEvent:'voice-transcription-complete'
+            }
+        );
+        assert.equal(await replacedFromCompletionEvent.complete(), false);
+        assert.deepEqual(
+            replacedFromCompletionEvent.events[0].detail,
+            {transcript:'original'}
+        );
+        assert.equal(replacedFromCompletionEvent.state, 'idle');
+        assert.equal(
+            replacedFromCompletionEvent.transitions.includes('complete'),
+            false
+        );
+
+        const destroyedOnCompleteState = createReplacementHarness(
+            'idle',
+            false,
+            {destroyOnState:'complete',onComplete(){}}
+        );
+        assert.equal(await destroyedOnCompleteState.complete(), false);
+        assert.deepEqual(
+            destroyedOnCompleteState.transitions,
+            ['completing','complete']
+        );
+        assert.match(
+            voiceSource,
+            /value:\{get:\(\)=>transcript,set:setValue\}/u
+        );
+        assert.match(
+            voiceSource,
+            /hasOwnProperty[.]call\(input\|\|\{\},'initialValue'\)[\s\S]*if\(setInitial\)\{[\s\S]*setValue\(options[.]initialValue\)/u
+        );
+
+        const successStart = voiceSource.indexOf(
+            'function reportTranscriptionSuccess('
+        );
+        const successEnd = voiceSource.indexOf(
+            '\n\n    function releaseTranscriptionController',
+            successStart
+        );
+        const createSuccessHarness = Function(
+            `'use strict';
+            return function createSuccessHarness(
+                eventAction='',
+                destroyOnIdle=false,
+                destroyOnEvent=false
+            ){
+                let destroyed=false;
+                let state='transcribing';
+                let sessionGeneration=21;
+                const events=[];
+                const transitions=[];
+                const controls={
+                    destroy(){
+                        destroyed=true;
+                        sessionGeneration+=1;
+                        state='idle';
+                    },
+                    replace(){
+                        sessionGeneration+=1;
+                        state='idle';
+                    }
+                };
+                const host={
+                    dispatchEvent(event){
+                        events.push(event.type);
+                        if(event.type===eventAction){
+                            controls[destroyOnEvent?'destroy':'replace']();
+                        }
+                    }
+                };
+                class CustomEvent {
+                    constructor(type,{detail}){
+                        this.type=type;
+                        this.detail=detail;
+                    }
+                }
+                function isCurrentVoiceOperation(generation,expectedState){
+                    return !destroyed
+                        &&generation===sessionGeneration
+                        &&state===expectedState;
+                }
+                function setState(nextState){
+                    state=nextState;
+                    transitions.push(nextState);
+                    if(nextState==='idle'&&destroyOnIdle){controls.destroy();}
+                }
+                ${voiceSource.slice(successStart, successEnd)}
+                const generation=sessionGeneration;
+                return Object.freeze({
+                    events,
+                    run(){
+                        return reportTranscriptionSuccess(
+                            generation,
+                            'transcribing',
+                            {text:'segment',transcript:'original segment'},
+                            'Transcribed.'
+                        );
+                    },
+                    get state(){return state;},
+                    transitions
+                });
+            };`
+        )();
+        const replacedFromFirstSuccess = createSuccessHarness(
+            'speech-transcription-complete'
+        );
+        assert.equal(replacedFromFirstSuccess.run(), false);
+        assert.deepEqual(
+            replacedFromFirstSuccess.events,
+            ['speech-transcription-complete']
+        );
+        assert.deepEqual(replacedFromFirstSuccess.transitions, []);
+
+        const destroyedFromFirstSuccess = createSuccessHarness(
+            'speech-transcription-complete',
+            false,
+            true
+        );
+        assert.equal(destroyedFromFirstSuccess.run(), false);
+        assert.deepEqual(
+            destroyedFromFirstSuccess.events,
+            ['speech-transcription-complete']
+        );
+        assert.deepEqual(destroyedFromFirstSuccess.transitions, []);
+
+        const replacedFromSegment = createSuccessHarness(
+            'voice-transcription-segment'
+        );
+        assert.equal(replacedFromSegment.run(), false);
+        assert.deepEqual(
+            replacedFromSegment.events,
+            ['speech-transcription-complete', 'voice-transcription-segment']
+        );
+        assert.deepEqual(replacedFromSegment.transitions, []);
+
+        const destroyedFromIdleState = createSuccessHarness('', true);
+        assert.equal(destroyedFromIdleState.run(), false);
+        assert.deepEqual(destroyedFromIdleState.transitions, ['idle']);
+
+        const transcribeSettlementGuard = voiceSource.indexOf(
+            'generation!==sessionGeneration',
+            transcribeAwait
+        );
+        assert.ok(
+            transcribeAwait<transcribeSettlementGuard
+            &&transcribeSettlementGuard<transcribeSegment,
+            'Transcript replacement must invalidate a late transcription before it can append.'
+        );
+        const saveAwait = voiceSource.indexOf(
+            'await save({transcript,segment});'
+        );
+        const saveSettlementGuard = voiceSource.indexOf(
+            "isCurrentVoiceOperation(generation,'saving')",
+            saveAwait
+        );
+        const successCall = voiceSource.indexOf(
+            'return reportTranscriptionSuccess(',
+            saveAwait
+        );
+        assert.ok(
+            saveAwait<saveSettlementGuard&&saveSettlementGuard<successCall,
+            'Transcript replacement must invalidate a late save before success events.'
+        );
+
+        const initialState = voiceSource.lastIndexOf(
+            "setState('idle',options.messages.ready);"
+        );
+        const guardedSubscription = voiceSource.indexOf(
+            'if(!destroyed){',
+            initialState
+        );
+        const subscription = voiceSource.indexOf(
+            'subscribeAIRuntimeState(',
+            guardedSubscription
+        );
+        const guardedReady = voiceSource.indexOf(
+            'if(!destroyed){',
+            subscription
+        );
+        const readyPublication = voiceSource.indexOf(
+            'host.ready=true;',
+            guardedReady
+        );
+        assert.ok(
+            initialState<guardedSubscription
+            &&guardedSubscription<subscription
+            &&subscription<guardedReady
+            &&guardedReady<readyPublication,
+            'Synchronous teardown must prevent subscription or ready publication during initialization.'
+        );
+        const initializationEnd = voiceSource.indexOf(
+            '\n</script>',
+            initialState
+        );
+        const createInitializationHarness = Function(
+            `'use strict';
+            return function createInitializationHarness(destroyAt){
+                let destroyed=false;
+                let transcript='';
+                let subscriptions=0;
+                const events=[];
+                const options={
+                    initialValue:'initial',
+                    messages:{ready:'Ready.'}
+                };
+                const host={
+                    ready:false,
+                    dispatchEvent(event){events.push(event.type);}
+                };
+                class CustomEvent {
+                    constructor(type){this.type=type;}
+                }
+                const runtimeStateAbortController={signal:{}};
+                function renderOptions(){}
+                function renderTranscript(){}
+                function setState(){
+                    if(destroyAt==='state'){destroyed=true;}
+                }
+                function synchronizeAIRuntimeState(){
+                    if(destroyAt==='subscription'){destroyed=true;}
+                }
+                function subscribeAIRuntimeState(callback){
+                    subscriptions+=1;
+                    callback();
+                }
+                ${voiceSource.slice(initialState, initializationEnd)}
+                return Object.freeze({events,ready:host.ready,subscriptions});
+            };`
+        )();
+        assert.deepEqual(
+            createInitializationHarness('state'),
+            {events:[],ready:false,subscriptions:0}
+        );
+        assert.deepEqual(
+            createInitializationHarness('subscription'),
+            {events:[],ready:false,subscriptions:1}
+        );
+        assert.match(
+            voiceSource,
+            /finally\{[\s\S]*releaseTranscriptionController\(controller\)/u,
+            'Every transcription settlement must use the identity-checked release boundary.'
+        );
+        assert.match(
+            voiceSource,
+            /setState\('saving',options[.]messages[.]saving\)[\s\S]*isCurrentVoiceOperation\(generation,'saving'\)[\s\S]*await save\(\{transcript,segment\}\)[\s\S]*catch\(error\)\{[\s\S]*isCurrentVoiceOperation\(generation,'saving'\)[\s\S]*return reportTranscriptionSuccess/u,
+            'Save settlement must suppress stale teardown errors and success events.'
+        );
+        const saveCatchStart = voiceSource.indexOf(
+            'await save({transcript,segment});'
+        );
+        const saveCatchEnd = voiceSource.indexOf(
+            '\n                }',
+            saveCatchStart
+        );
+        const saveCatchSource = voiceSource.slice(saveCatchStart, saveCatchEnd);
+        assert.doesNotMatch(
+            saveCatchSource,
+            /isTranscriptionCancellation/u,
+            'A current app save AbortError must take the observable save-error path.'
+        );
+        assert.match(
+            voiceSource,
+            /catch\(error\)\{[\s\S]*generation!==sessionGeneration\|\|destroyed[\s\S]*isTranscriptionCancellation\(error,controller\)[\s\S]*reportSTTCancellation\([\s\S]*stt-provider-request-cancelled/u,
+            'A current provider cancellation must leave the transcribing state observably.'
+        );
+        assert.match(
+            voiceSource,
+            /async function completeStream\(\)\{[\s\S]*const completionTranscript=transcript[\s\S]*setState\('completing'[\s\S]*isCurrentVoiceOperation\(generation,'completing'\)[\s\S]*await complete\(\{transcript:completionTranscript\}\)[\s\S]*isCurrentVoiceOperation\(generation,'completing'\)/u,
+            'Complete must remain terminal after destroy, including late callback settlement.'
+        );
+        assert.match(
+            voiceSource,
+            /completeButton[.]disabled=destroyed[\s\S]*sttActivationButton[.]hidden=destroyed[\s\S]*function runtimeStatusMessage\(\)\{[\s\S]*if\(destroyed\)[\s\S]*Transcription unavailable[.]/u,
+            'Destroyed presentation must stay unavailable with Complete and activation disabled.'
+        );
+        const cancellationStart = voiceSource.indexOf(
+            'function cancelSTTOperation('
+        );
+        const cancellationEnd = voiceSource.indexOf(
+            '\n\n    function renderState',
+            cancellationStart
+        );
+        assert.notEqual(cancellationStart, -1);
+        assert.notEqual(cancellationEnd, -1);
+        const cancellationSource = voiceSource.slice(
+            cancellationStart,
+            cancellationEnd
+        );
+        const savingCancellation = Function(
+            `'use strict';
+            let state='saving';
+            let mediaStream=null;
+            let recorder=null;
+            let transcriptionAbortController=null;
+            let sessionGeneration=17;
+            let stateMessage='Saving transcription…';
+            const destroyed=false;
+            const host={
+                dispatchEvent(){throw new Error('No cancellation event expected.');}
+            };
+            function releaseMicrophone(){
+                throw new Error('No media release expected.');
+            }
+            function renderState(){
+                throw new Error('No cancellation render expected.');
+            }
+            const CustomEvent=class UnexpectedCustomEvent{};
+            ${cancellationSource}
+            return Object.freeze({
+                cancel:cancelSTTOperation,
+                get generation(){return sessionGeneration;},
+                get state(){return state;}
+            });`
+        )();
+        assert.equal(savingCancellation.cancel('runtime-unready'), false);
+        assert.equal(
+            savingCancellation.generation,
+            17,
+            'Readiness loss during an app save must not invalidate that save.'
+        );
+        assert.equal(
+            savingCancellation.state,
+            'saving',
+            'Readiness loss during an app save must not strand or rewrite its workflow state.'
+        );
+        assert.match(
+            voiceSource,
+            /function cancelSTTOperation[\s\S]*transcriptionAbortController[?][.]abort\(\)[\s\S]*speech-transcription-cancelled/u
+        );
+        assert.match(
+            voiceSource,
+            /function destroy\(\)[\s\S]*runtimeStateAbortController[.]abort\(\)[\s\S]*sttActivationController[.]destroy\(\)/u
         );
 
         let rejectDestroyedActivation;
