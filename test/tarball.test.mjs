@@ -170,6 +170,9 @@ test('packed npm artifact installs and drives an external repository end to end'
         assert.ok(packReport.files.some(file=>file.path==='schemas/arcane-app-bundle.schema.json'));
         assert.ok(packReport.files.some(file=>file.path==='schemas/event-stack.schema.json'));
         assert.ok(packReport.files.some(file=>file.path==='src/event-manager.mjs'));
+        assert.ok(packReport.files.some(file=>
+            file.path==='browser-runtime/ai/ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json'
+        ));
         assert.ok(packReport.files.some(file=>file.path==='node_modules/event-pubsub/index.js'));
         assert.ok(packReport.files.some(file=>file.path==='node_modules/event-pubsub/package.json'));
         assert.ok(packReport.files.some(file=>file.path==='node_modules/event-pubsub/licence'));
@@ -280,6 +283,36 @@ test('packed npm artifact installs and drives an external repository end to end'
         assert.equal(aiComponents.runtimePolicy.toolCalls,'structural-only-never-executed');
         const aiComponentFiles=new Map(aiComponents.components.flatMap(component=>
             component.files.map(file=>[file.path,file])
+        ));
+        const speechComponents=JSON.parse(await readFile(
+            path.join(browserRuntimeRoot,'ai','ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json'),
+            'utf8'
+        ));
+        assert.equal(speechComponents.packageExport,'arcane-os/ai/browser-speech');
+        assert.equal(
+            speechComponents.closureStatus,
+            'browser-speech-runtime-composite-license-notice-and-corresponding-source-closure-incomplete'
+        );
+        assert.equal(
+            speechComponents.publicationStatus,
+            'browser-speech-public-operational-runtime-graphs-blocked-by-composite-legal-evidence'
+        );
+        assert.equal(speechComponents.runtimeBytesPacked,false);
+        assert.equal(speechComponents.modelWeightsPacked,false);
+        assert.equal(speechComponents.voiceBytesPacked,false);
+        assert.equal(speechComponents.materializedLegalCorpus,false);
+        assert.ok(speechComponents.components.every(component=>
+            typeof component.name==='string'&&typeof component.version==='string'
+        ));
+        assert.ok(speechComponents.components.flatMap(component=>
+            component.selectedArtifacts??[]
+        ).every(file=>
+            Number.isSafeInteger(file.bytes)
+            &&/^[a-f0-9]{64}$/u.test(file.sha256)
+        ));
+        assert.ok(speechComponents.legalEvidence.every(evidence=>
+            Number.isSafeInteger(evidence.bytes)
+            &&/^[a-f0-9]{64}$/u.test(evidence.sha256)
         ));
         for(const file of manifest.files){
             const snapshot=await readFile(path.join(browserRuntimeRoot,...file.path.split('/')));

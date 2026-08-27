@@ -2,6 +2,7 @@
   "schema": "arcane.browser-speech-package-authority/1",
   "purpose": "Pre-download supply-chain metadata authority for the caller-selected Arcane SDK browser speech runtime artifacts used by Whisper STT and Kokoro TTS.",
   "status": "browser-speech-package-authority-registry-and-selected-bytes-verified",
+  "publicationStatus": "browser-speech-public-operational-runtime-graphs-blocked-by-composite-legal-evidence",
   "auditedOn": "2026-08-27",
   "evidenceBoundary": {
     "packageCodeDownloaded": true,
@@ -9,7 +10,7 @@
     "packageCodeExecuted": false,
     "registryTarballsVerified": true,
     "candidateFileDigestsAuthenticatedByRegistryTarballs": true,
-    "description": "All 23 exact registry tarballs matched the recorded SHA-512 integrity and SHA-1 shasum before extraction. Archive paths and member types were admitted before extraction, every extracted root manifest matched its recorded name, version and declared license, and all four selected runtime files matched their recorded byte lengths and SHA-256 values. Package code was not installed, imported or executed."
+    "description": "All 23 exact registry tarballs matched the recorded SHA-512 integrity and SHA-1 shasum before extraction. Archive paths and member types were admitted before extraction, every extracted root manifest matched its recorded name, version and declared license, and all four selected runtime files matched their recorded byte lengths and SHA-256 values. The two caller-owned candidate model inventories also have exact file byte lengths and SHA-256 values. Package code was not installed, imported or executed. These byte facts do not complete the composite legal-evidence boundary."
   },
   "selectedBrowserDependencyClosure": {
     "root": "kokoro-js@1.2.1",
@@ -391,6 +392,232 @@
       "sourceAdmission": "exact-version-source-url-no-redirect-media-type-verified"
     }
   ],
+  "candidateModelAuthorities": {
+    "status": "browser-speech-caller-model-byte-inventories-verified-public-graph-admission-blocked-by-license-notice-evidence",
+    "runtimeBytesPacked": false,
+    "modelWeightsPacked": false,
+    "voiceBytesPacked": false,
+    "sourceAdmissionContract": {
+      "sdkSourceCommits": [
+        "f84c27f66b0642d7f04cf5886cae32f38ab2d12f",
+        "4c9a2f9afcb641122ac4fe0a3e811b977ff5ab4d",
+        "d5e08e33dc9c20e95688444572176070db006052"
+      ],
+      "defaultRedirectPolicy": "artifact-graph-source-redirects-rejected",
+      "declaredRedirectPolicy": "artifact-graph-only-declared-final-https-origins-admitted",
+      "descriptorFields": {
+        "redirectFinalOrigins": "Optional nonempty exact HTTPS-origin inventory. Supplying it changes graph identity and permits Fetch redirect following only when the exposed final response origin is declared.",
+        "sourceMediaType": "Optional exact transport Content-Type when the authenticated source response media type differs from the execution mediaType. Supplying it changes graph identity."
+      },
+      "immutableAuthority": "The revision-pinned sourceUrl remains authority. A followed final URL, redirect cache URL, Xet path, signed query, or ETag never replaces it and is not persisted as authority.",
+      "byteAuthority": "Every cold response must still match the declared positive byte length and SHA-256, is persisted to DBOPFS, reopened and rehashed, and is admitted only after the manifest is written last.",
+      "browserObservationBoundary": "Browser Fetch exposes the final response URL, not every intermediate redirect hop. The SDK validates the exposed final HTTPS origin; CORS or redirect policy rejection before a Response exists propagates as artifact-graph-source-fetch-rejected. This record makes no per-hop-origin proof claim.",
+      "credentials": "omit",
+      "cache": "no-store",
+      "referrerPolicy": "no-referrer"
+    },
+    "graphs": [
+      {
+        "id": "xenova-whisper-small-q8-2d67713f236afa48a18992566e7647f6ca848e13",
+        "role": "stt",
+        "modelId": "Xenova/whisper-small",
+        "dtype": "q8",
+        "revision": "2d67713f236afa48a18992566e7647f6ca848e13",
+        "inputSampleRate": 16000,
+        "licenseDeclaration": "Apache-2.0",
+        "licenseEvidence": {
+          "url": "https://huggingface.co/api/models/Xenova/whisper-small/revision/2d67713f236afa48a18992566e7647f6ca848e13?blobs=true",
+          "status": "exact-revision-api-license-declaration-only-immutable-license-file-digest-not-captured"
+        },
+        "baseSourceUrl": "https://huggingface.co/Xenova/whisper-small/resolve/2d67713f236afa48a18992566e7647f6ca848e13/",
+        "fileCount": 7,
+        "modelBytes": 251875316,
+        "modelAndSelectedRuntimeBytes": 275656889,
+        "files": [
+          {
+            "kind": "model-configuration-json",
+            "path": "config.json",
+            "sourceUrl": "https://huggingface.co/Xenova/whisper-small/resolve/2d67713f236afa48a18992566e7647f6ca848e13/config.json",
+            "mediaType": "application/json",
+            "sourceMediaType": "text/plain",
+            "license": "Apache-2.0",
+            "bytes": 2232,
+            "sha256": "5a6429d21d7a3379dd0861b74510f9f7076f32b563bffc9fcb072482d55ab3be",
+            "redirectFinalOrigins": ["https://huggingface.co"],
+            "observedRedirect": "307-to-same-origin-resolve-cache",
+            "observedEtag": "a239fdd538b77d3c496d13d085848eca67fe993a"
+          },
+          {
+            "kind": "model-generation-configuration-json",
+            "path": "generation_config.json",
+            "sourceUrl": "https://huggingface.co/Xenova/whisper-small/resolve/2d67713f236afa48a18992566e7647f6ca848e13/generation_config.json",
+            "mediaType": "application/json",
+            "sourceMediaType": "text/plain",
+            "license": "Apache-2.0",
+            "bytes": 3837,
+            "sha256": "0b7407a4e53a677f826e03c75d409e6f830663932bf43dda3b08c5efa2223279",
+            "redirectFinalOrigins": ["https://huggingface.co"],
+            "observedRedirect": "307-to-same-origin-resolve-cache",
+            "observedEtag": "66f96818620f7b67c276aed4a35bedc4f6986dc3"
+          },
+          {
+            "kind": "model-preprocessor-json",
+            "path": "preprocessor_config.json",
+            "sourceUrl": "https://huggingface.co/Xenova/whisper-small/resolve/2d67713f236afa48a18992566e7647f6ca848e13/preprocessor_config.json",
+            "mediaType": "application/json",
+            "sourceMediaType": "text/plain",
+            "license": "Apache-2.0",
+            "bytes": 339,
+            "sha256": "a6a76d28c93edb273669eb9e0b0636a2bddbb1272c3261e47b7ca6dfdbac1b8d",
+            "redirectFinalOrigins": ["https://huggingface.co"],
+            "observedRedirect": "307-to-same-origin-resolve-cache",
+            "observedEtag": "91876762a536a746d268353c5cba57286e76b058"
+          },
+          {
+            "kind": "model-tokenizer-json",
+            "path": "tokenizer.json",
+            "sourceUrl": "https://huggingface.co/Xenova/whisper-small/resolve/2d67713f236afa48a18992566e7647f6ca848e13/tokenizer.json",
+            "mediaType": "application/json",
+            "sourceMediaType": "text/plain",
+            "license": "Apache-2.0",
+            "bytes": 2480466,
+            "sha256": "27fc476bfe7f17299480be2273fc0608e4d5a99aba2ab5dec5374b4482d1a566",
+            "redirectFinalOrigins": ["https://huggingface.co"],
+            "observedRedirect": "307-to-same-origin-resolve-cache",
+            "observedEtag": "1e95340ff836fad1b5932e800fb7b8c5e6d78a74"
+          },
+          {
+            "kind": "model-tokenizer-json",
+            "path": "tokenizer_config.json",
+            "sourceUrl": "https://huggingface.co/Xenova/whisper-small/resolve/2d67713f236afa48a18992566e7647f6ca848e13/tokenizer_config.json",
+            "mediaType": "application/json",
+            "sourceMediaType": "text/plain",
+            "license": "Apache-2.0",
+            "bytes": 282683,
+            "sha256": "2a4c4281cf9f51ac6ccc406fdc711a087afe6530f671fa7b80953edc498275ce",
+            "redirectFinalOrigins": ["https://huggingface.co"],
+            "observedRedirect": "307-to-same-origin-resolve-cache",
+            "observedEtag": "d13b786c04765fb1a06492b53587752cd67665ea"
+          },
+          {
+            "kind": "model-onnx-binary",
+            "path": "onnx/encoder_model_quantized.onnx",
+            "sourceUrl": "https://huggingface.co/Xenova/whisper-small/resolve/2d67713f236afa48a18992566e7647f6ca848e13/onnx/encoder_model_quantized.onnx",
+            "mediaType": "application/octet-stream",
+            "license": "Apache-2.0",
+            "bytes": 92324809,
+            "sha256": "969f5ac12974340386bf7a02ea6626003e5e2dee396ffc6ab0eec282bf55ba06",
+            "redirectFinalOrigins": ["https://us.aws.cdn.hf.co"],
+            "observedRedirect": "302-to-expiring-signed-xet",
+            "observedFinalPath": "/xet-bridge-us/6452c2113a794b2d9b15b8ae/ca019c006b3a393c1cf31063a4a186fc9060d1e24e93a71a03cddfb3363faccb",
+            "signedFinalQueryRecorded": false
+          },
+          {
+            "kind": "model-onnx-binary",
+            "path": "onnx/decoder_model_merged_quantized.onnx",
+            "sourceUrl": "https://huggingface.co/Xenova/whisper-small/resolve/2d67713f236afa48a18992566e7647f6ca848e13/onnx/decoder_model_merged_quantized.onnx",
+            "mediaType": "application/octet-stream",
+            "license": "Apache-2.0",
+            "bytes": 156780950,
+            "sha256": "fcfc6100dc7339e7507e10f8b274350be7c4f8d8b575f0293f94cc0e156d6d24",
+            "redirectFinalOrigins": ["https://us.aws.cdn.hf.co"],
+            "observedRedirect": "302-to-expiring-signed-xet",
+            "observedFinalPath": "/xet-bridge-us/6452c2113a794b2d9b15b8ae/414ba17dccaae99fa86802d93b740843da55ca419ca751126fe6165caf68fbd8",
+            "signedFinalQueryRecorded": false
+          }
+        ]
+      },
+      {
+        "id": "onnx-community-kokoro-82m-v1-q8-af-heart-1939ad2a8e416c0acfeecc08a694d14ef25f2231",
+        "role": "tts",
+        "modelId": "onnx-community/Kokoro-82M-v1.0-ONNX",
+        "dtype": "q8",
+        "revision": "1939ad2a8e416c0acfeecc08a694d14ef25f2231",
+        "outputSampleRate": 24000,
+        "defaultVoice": "af_heart",
+        "licenseDeclaration": "Apache-2.0",
+        "licenseEvidence": {
+          "url": "https://huggingface.co/api/models/onnx-community/Kokoro-82M-v1.0-ONNX/revision/1939ad2a8e416c0acfeecc08a694d14ef25f2231?blobs=true",
+          "status": "exact-revision-api-license-declaration-only-immutable-license-file-digest-not-captured"
+        },
+        "baseSourceUrl": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/",
+        "fileCount": 5,
+        "modelAndVoiceBytes": 92887010,
+        "modelVoiceAndSelectedRuntimeBytes": 116662659,
+        "files": [
+          {
+            "kind": "model-configuration-json",
+            "path": "config.json",
+            "sourceUrl": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/config.json",
+            "mediaType": "application/json",
+            "sourceMediaType": "text/plain",
+            "license": "Apache-2.0",
+            "bytes": 44,
+            "sha256": "df34b4f930b23447cd4dc410fabfb42eb3f24e803e6c3f97d618fb359380a36f",
+            "redirectFinalOrigins": ["https://huggingface.co"],
+            "observedRedirect": "307-to-same-origin-resolve-cache",
+            "observedEtag": "790faf216e7e3f490e71e8bc80df79ed8941101c"
+          },
+          {
+            "kind": "model-tokenizer-json",
+            "path": "tokenizer.json",
+            "sourceUrl": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/tokenizer.json",
+            "mediaType": "application/json",
+            "sourceMediaType": "text/plain",
+            "license": "Apache-2.0",
+            "bytes": 3497,
+            "sha256": "77a02c8e164413299b4b4c403b14f8e0e1c1b727db4d46a09d6327b861060a34",
+            "redirectFinalOrigins": ["https://huggingface.co"],
+            "observedRedirect": "307-to-same-origin-resolve-cache",
+            "observedEtag": "4280f55fc1c32211bc9bb4d55545759a00054ecd"
+          },
+          {
+            "kind": "model-tokenizer-json",
+            "path": "tokenizer_config.json",
+            "sourceUrl": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/tokenizer_config.json",
+            "mediaType": "application/json",
+            "sourceMediaType": "text/plain",
+            "license": "Apache-2.0",
+            "bytes": 113,
+            "sha256": "be1cb066d6ef6b074b3f15e6a6dd21ac88ff3cdaedf325f0aaed686c70f75d20",
+            "redirectFinalOrigins": ["https://huggingface.co"],
+            "observedRedirect": "307-to-same-origin-resolve-cache",
+            "observedEtag": "5c81e9a3a06db9139900d6ee5b60e8bb701ccb0b"
+          },
+          {
+            "kind": "model-onnx-binary",
+            "path": "onnx/model_quantized.onnx",
+            "sourceUrl": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/onnx/model_quantized.onnx",
+            "mediaType": "application/octet-stream",
+            "license": "Apache-2.0",
+            "bytes": 92361116,
+            "sha256": "fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478",
+            "redirectFinalOrigins": ["https://us.aws.cdn.hf.co"],
+            "observedRedirect": "302-to-expiring-signed-xet",
+            "observedFinalPath": "/xet-bridge-us/67a5e958d363dcc0e458b910/72db5d760d8920a2fbd09b5a5b109b29c71c5e525956e6166025d1146c851e15",
+            "signedFinalQueryRecorded": false
+          },
+          {
+            "kind": "voice-style-binary",
+            "path": "voices/af_heart.bin",
+            "sourceUrl": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/voices/af_heart.bin",
+            "mediaType": "application/octet-stream",
+            "license": "Apache-2.0",
+            "bytes": 522240,
+            "sha256": "d583ccff3cdca2f7fae535cb998ac07e9fcb90f09737b9a41fa2734ec44a8f0b",
+            "redirectFinalOrigins": ["https://us.aws.cdn.hf.co"],
+            "observedRedirect": "302-to-expiring-signed-xet",
+            "observedFinalPath": "/xet-bridge-us/67a5e958d363dcc0e458b910/478bbd0d587a03135a4899153eac4a80a046d65a32d924b25ea059319b055df8",
+            "signedFinalQueryRecorded": false,
+            "runtimeRequestUrls": [
+              "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/voices/af_heart.bin"
+            ],
+            "runtimeAliasAuthority": "authenticated-local-route-only-never-source-or-network-authority"
+          }
+        ]
+      }
+    ]
+  },
   "authenticatedVerification": {
     "status": "browser-speech-registry-tarballs-and-selected-runtime-bytes-verified",
     "registryTarballCount": 23,
@@ -401,7 +628,7 @@
     "selectedArtifactAdmission": "all-selected-byte-lengths-and-sha256-values-verified",
     "onnxPackagingRelationship": "transformers-jsep-mjs-and-wasm-byte-identical-to-recorded-onnxruntime-web-package",
     "networkSourceAdmission": "all-selected-exact-version-source-urls-returned-without-redirect-and-with-admitted-media-types",
-    "temporaryExport": "nonrepository-audit-export-cleanup-blocked-by-host-command-policy-after-runtime-capability-fixture-recorded"
+    "temporaryExport": "read-only-nonrepository-audit-export-identity-checked-and-removed"
   },
   "immutableOnnxNoticeEvidence": {
     "sourceRevision": "89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0",
@@ -419,8 +646,89 @@
     },
     "evidenceBoundary": "These files are immutable source-revision evidence. The published onnxruntime-web tarball omits LICENSE and ThirdPartyNotices, so this record does not claim that the package itself carries complete notice closure or that the notice file proves the exact compiled feature set."
   },
+  "compositeLicenseNoticeEvidence": {
+    "status": "browser-speech-runtime-composite-license-notice-and-corresponding-source-closure-incomplete",
+    "publicOperationalSttGraphStatus": "browser-speech-stt-public-graph-admission-blocked-by-composite-notice-evidence",
+    "publicOperationalTtsGraphStatus": "browser-speech-tts-public-graph-admission-blocked-by-phonemizer-espeak-provenance-and-composite-notice-evidence",
+    "runtimeRedistributionAuthorized": false,
+    "contentAddressedLicenseReceiptPublished": false,
+    "verifiedCoreLegalEvidence": [
+      {
+        "component": "kokoro-js@1.2.1",
+        "declaredLicense": "Apache-2.0",
+        "sourceKind": "registry-integrity-verified-tarball-member",
+        "sourcePath": "package/LICENSE",
+        "bytes": 11357,
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "evidenceStatus": "package-license-bytes-verified-embedded-component-obligations-not-closed"
+      },
+      {
+        "component": "@huggingface/transformers@3.5.1",
+        "declaredLicense": "Apache-2.0",
+        "sourceKind": "registry-integrity-verified-tarball-member",
+        "sourcePath": "package/LICENSE",
+        "bytes": 11358,
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "evidenceStatus": "package-license-bytes-verified-bundled-onnx-component-obligations-not-closed"
+      },
+      {
+        "component": "phonemizer@1.2.1",
+        "declaredLicense": "Apache-2.0",
+        "sourceKind": "registry-integrity-verified-tarball-member",
+        "sourcePath": "package/LICENSE",
+        "bytes": 11357,
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "evidenceStatus": "package-license-bytes-verified-embedded-espeak-obligations-not-identified"
+      },
+      {
+        "component": "onnxruntime-web@1.22.0-dev.20250409-89f8206ba4",
+        "declaredLicense": "MIT",
+        "sourceKind": "immutable-upstream-source-revision",
+        "sourceRevision": "89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0",
+        "licenseBytes": 1073,
+        "licenseSha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c",
+        "thirdPartyNoticesBytes": 326866,
+        "thirdPartyNoticesSha256": "e9e90971a8e75a9a8ac0c6412e29c1202d079998389915aa485f46c816c3b4cc",
+        "evidenceStatus": "immutable-source-license-and-notices-verified-published-tarball-carriage-and-exact-compiled-feature-closure-unproven"
+      }
+    ],
+    "phonemizerEmbeddedEspeakFinding": {
+      "hostPackage": "phonemizer@1.2.1",
+      "hostSourceRevision": "6835144b7ee9043129222549c1ed2f6a27216278",
+      "generatedWorkerPath": "src/espeakng.worker.js",
+      "generatedWorkerBytes": 1449799,
+      "generatedWorkerSha256": "6bab8f2f2cf25d65b596b87471cb17567a496012ee6ce649cfa88b284c1fb9f8",
+      "embeddedDataPath": "data/espeakng.worker.data",
+      "embeddedDataBytes": 890802,
+      "embeddedDataSha256": "6262621f3f8267fb61ef41fe7af75b8fe7e2315d6c9092afd29d7629bb21a60b",
+      "exactEspeakUpstreamRevision": null,
+      "exactBuildToolchainReceipt": null,
+      "exactGeneratedOutputToCorrespondingSourceBinding": null,
+      "licenseNoticeClosureStatus": "phonemizer-embedded-espeak-license-and-notice-evidence-missing",
+      "correspondingSourceStatus": "phonemizer-embedded-espeak-corresponding-source-unidentified",
+      "finding": "The exact generated Worker and data are not byte-identical to the audited candidate eSpeak package output. The phonemizer package and source revision identify no exact eSpeak upstream revision, build recipe, corresponding-source mapping, or complete embedded notice set. Adding an unbound license text would not close this boundary."
+    },
+    "dependencyLegalInventory": {
+      "dependencyNodeCount": 23,
+      "tarballsWithLegalMembers": 20,
+      "tarballsWithoutRootLegalMembers": [
+        "guid-typescript@1.0.9",
+        "onnxruntime-common@1.22.0-dev.20250409-89f8206ba4",
+        "onnxruntime-web@1.22.0-dev.20250409-89f8206ba4"
+      ],
+      "artifactToComponentInclusionMapStatus": "browser-speech-selected-bundle-artifact-to-component-inclusion-map-incomplete"
+    },
+    "requiredClosure": [
+      "Bind the exact embedded eSpeak upstream revision, applicable license and notice bytes, build toolchain, and generated Worker/data outputs to corresponding source.",
+      "Prove which of the 23 dependency nodes are incorporated into each selected bundled runtime artifact and bind every applicable legal obligation.",
+      "Bind ONNX Runtime legal evidence to the exact compiled JSEP feature set and the selected package artifacts rather than only to the upstream source revision.",
+      "Capture immutable LICENSE and NOTICE evidence for each selected model revision or keep its repository license value as a declaration only.",
+      "Only after every prior item is verified, materialize a content-addressed composite license receipt and permit public operational graph admission."
+    ],
+    "evidenceBoundary": "This is a fail-closed evidence record, not a completed redistribution receipt. It authenticates the listed legal bytes and identifies the unresolved obligations; it does not authorize public operational STT or TTS graph release."
+  },
   "operationalRuntimeFindings": {
-    "status": "browser-speech-runtime-network-capabilities-require-sdk-worker-interception",
+    "status": "browser-speech-runtime-network-capabilities-contained-by-authenticated-worker-graph",
     "kokoroVoiceRequest": {
       "requestPattern": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/voices/${voice}.bin",
       "cacheStorageName": "kokoro-voices",
@@ -482,33 +790,35 @@
     "description": "The checked core npm metadata exposes no dist attestations. This authority makes no Sigstore or npm provenance claim. Registry integrity and signatures are not substitutes for selected-file verification."
   },
   "plannedVerification": {
-    "status": "browser-speech-runtime-graph-implemented-selected-release-materialization-pending",
+    "status": "browser-speech-runtime-graph-implemented-public-license-notice-closure-blocked",
     "sequence": [
-      "fetch-exact-registry-tarballs-without-installing-or-executing-package-code",
-      "verify-each-registry-tarball-against-recorded-sha512-before-extraction",
-      "extract-verified-tarballs-into-a-read-only-nonrepository-temporary-export-with-path-traversal-and-symlink-rejection",
-      "compare-selected-artifact-byte-length-and-sha256-against-this-metadata-record",
-      "verify-exact-source-http-media-type-no-redirect-behavior-and-final-url-identity",
-      "audit-every-selected-file-license-header-package-license-and-third-party-notice-obligation",
-      "lex-every-selected-javascript-and-esm-file-without-evaluation-and-inventory-static-import-dynamic-import-fetch-cache-worker-wasm-and-platform-conditional-edges",
-      "bind-the-canonical-runtime-graph-identity-to-entrypoint-files-revisions-source-urls-media-types-byte-lengths-sha256-values-licenses-and-declared-edges",
-      "add-caller-owned-model-dtype-revision-voice-and-external-data-nodes-without-selecting-fallbacks-or-downloading-hidden-assets",
-      "record-an-authenticated-verification-receipt-and-delete-the-read-only-temporary-export",
-      "permit-browser-runtime-execution-only-after-every-prior-verification-boundary-succeeds"
+      "identify-the-exact-phonemizer-embedded-espeak-upstream-revision-build-toolchain-and-corresponding-source",
+      "bind-every-selected-bundle-byte-range-to-its-incorporated-component-and-effective-license-obligation",
+      "bind-onnx-third-party-notices-to-the-exact-selected-jsep-compiled-feature-set",
+      "capture-immutable-license-and-notice-file-digests-for-each-selected-model-revision",
+      "materialize-and-authenticate-a-content-addressed-license-and-notice-corpus",
+      "extend-the-browser-runtime-authority-generator-verifier-and-release-legal-gate-to-validate-that-corpus-without-fixed-file-counts",
+      "permit-public-operational-graph-admission-only-after-every-prior-legal-evidence-boundary-succeeds"
     ]
   },
   "runtimeImplementation": {
     "status": "browser-speech-runtime-graph-implemented-and-focused-contracts-passed",
     "sourceCommits": [
       "fba95ed0fa2e9ab11727e19b257a8d7e1e95a495",
-      "f466458a09a2f6210c46aeaafcdc56a9da5c3a82"
+      "f466458a09a2f6210c46aeaafcdc56a9da5c3a82",
+      "f84c27f66b0642d7f04cf5886cae32f38ab2d12f",
+      "4c9a2f9afcb641122ac4fe0a3e811b977ff5ab4d",
+      "d5e08e33dc9c20e95688444572176070db006052"
     ],
     "documentationCommit": "c1967fe3dc46986844666f5bb881485a462989b6",
     "focusedVerification": {
       "command": "node ./bin/arcane-test.mjs test/browser-speech-providers.test.mjs",
-      "result": "23-passed-0-failed",
+      "result": "25-passed-0-failed",
       "verifiedBoundaries": [
         "deterministic-closed-artifact-graph",
+        "declared-final-https-origin-redirect-admission",
+        "independent-source-media-type-identity-binding",
+        "fetch-response-shape-and-redirect-error-propagation",
         "cold-warm-and-zero-network-offline-dbopfs-admission",
         "manifest-last-persistence",
         "declared-edge-and-dynamic-code-isolation",
@@ -519,12 +829,20 @@
         "provider-worker-cleanup"
       ]
     },
+    "componentManifest": {
+      "path": "browser-runtime/ai/ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json",
+      "closureStatus": "browser-speech-runtime-composite-license-notice-and-corresponding-source-closure-incomplete",
+      "publicationStatus": "browser-speech-public-operational-runtime-graphs-blocked-by-composite-legal-evidence"
+    },
     "deferredReleaseBoundary": "The combined numeric 0.3.0 package, runtime/browser receipts, npm integrity/provenance, tag, and GitHub release remain assigned to the shared release owner after Browser Speech, singleton events, and Mail source increments are reconciled."
   },
   "omittedUntilVerified": [
     "Final composite SPDX license expressions for the bundled JavaScript entrypoints.",
     "A claim that published package tarballs carry complete ONNX Runtime ThirdPartyNotices; they do not.",
-    "Caller-selected immutable model, tokenizer, processor, external-data and Kokoro voice artifact inventories.",
+    "A completed content-addressed legal corpus; the component manifest deliberately records materializedLegalCorpus false.",
+    "Public operational STT or TTS graph admission; exact candidate byte inventories are recorded, but their composite legal-evidence boundaries remain blocked.",
+    "The exact phonemizer embedded-eSpeak corresponding source, upstream revision, build toolchain and complete notice set.",
+    "Immutable LICENSE and NOTICE file digests for both selected model revisions; their exact-revision API values remain declarations only.",
     "Sigstore provenance for the checked core packages because npm dist attestations were absent."
   ]
 }

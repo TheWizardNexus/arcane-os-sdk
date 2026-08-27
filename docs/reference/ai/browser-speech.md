@@ -145,9 +145,11 @@ Every `files[]` entry contains all of these fields:
   revision,
   license,
   mediaType,
+  sourceMediaType?,
   bytes,
   sha256,
-  runtimeRequestUrls?
+  runtimeRequestUrls?,
+  redirectFinalOrigins?
 }
 ```
 
@@ -155,13 +157,15 @@ Every `files[]` entry contains all of these fields:
 | --- | --- |
 | `kind` | One exact kind from the table below. |
 | `path` | Nonempty NFC-normalized relative path. Leading/trailing slash, backslash, empty/`.`/`..` segment, percent escape, query/fragment delimiter, control character, duplicate spelling, or case-folded collision is rejected. |
-| `sourceUrl` | Immutable HTTPS or same-origin URL without credentials or fragment. The pathname must not name `main`, `master`, `latest`, `refs/heads/main`, `refs/heads/master`, `resolve/main`, or `resolve/master`, or an `@latest`/`@next` channel. The URL must contain the declared revision or SHA-256. `url` is accepted as an input alias. |
+| `sourceUrl` | Immutable starting HTTPS or same-origin authority without credentials or fragment. The pathname must not name `main`, `master`, `latest`, `refs/heads/main`, `refs/heads/master`, `resolve/main`, or `resolve/master`, or an `@latest`/`@next` channel. The URL must contain the declared revision or SHA-256 and remains authoritative even when redirect following is opted in. `url` is accepted as an input alias. |
 | `revision` | Nonempty 1–128 character immutable file revision. Runtime entry revision equals the runtime revision; all model/voice revisions equal the model revision. |
-| `license` | Nonempty declaration up to 256 characters. It is part of graph identity and the DBOPFS manifest authority. The caller remains responsible for complete immutable license/notice evidence; the SDK does not infer a license from bytes. |
+| `license` | Nonempty declaration up to 256 characters. It is part of graph identity and the DBOPFS manifest authority, but it is only a declaration: it is not provenance, a composite notice, corresponding-source evidence, or a license inferred from bytes. The caller remains responsible for complete immutable license/notice evidence. |
 | `mediaType` | Exact lowercase `type/subtype` without parameters. JavaScript is `application/javascript` or `text/javascript`; WASM is `application/wasm`; `*-json` kinds are `application/json`. |
+| `sourceMediaType` | Optional exact lowercase `type/subtype` without parameters for the cold HTTP response. It defaults to `mediaType`; when different, it is exposed in the normalized descriptor and graph identity while `mediaType` remains the authenticated materialized Blob type. |
 | `bytes` | Positive safe integer; always required and always verified for graphs. |
 | `sha256` | Exactly 64 lowercase hexadecimal characters; always required and always verified for graphs. |
 | `runtimeRequestUrls` | Optional unique absolute HTTPS aliases used only inside the authenticated Worker. An alias may describe a third-party runtime's hard-coded mutable request, but it is never a download authority: the Worker maps it to this already verified local file. |
+| `redirectFinalOrigins` | Optional nonempty array that opts this file into Fetch redirect following. Every member must canonicalize to a unique HTTPS origin with no credentials, path, query, or fragment. The normalized array is lexically sorted, frozen, and graph-identity-bound. Omit the field for redirect rejection; an empty array is rejected. |
 
 The closed file kinds are:
 
@@ -246,9 +250,16 @@ disabling any graph check is rejected with code
 1. Acquire the exact authority's exclusive Web Lock.
 2. Delete incomplete prior state.
 3. Fetch only each declared immutable `sourceUrl` using `credentials:"omit"`,
-   `cache:"no-store"`, `redirect:"error"`, and `referrerPolicy:"no-referrer"`.
-4. Reject any redirect or final-URL change and require the declared media type.
-5. Stream exact byte-length and SHA-256 verification into DBOPFS.
+   `cache:"no-store"`, `mode:"cors"`, and `referrerPolicy:"no-referrer"`.
+   The default is `redirect:"error"`; only a file with declared
+   `redirectFinalOrigins` uses `redirect:"follow"`.
+4. Without a followed redirect, require the response URL to remain exactly the
+   immutable `sourceUrl`. After a followed redirect, require a readable final
+   HTTPS URL without credentials or a fragment and require its canonical origin
+   to occur in that file's declared final-origin inventory.
+5. Require the response Content-Type to equal `sourceMediaType` (which defaults
+   to `mediaType`), then stream exact byte-length and SHA-256 verification into
+   DBOPFS.
 6. Reopen and rehash every persisted file.
 7. Decode and scan every runtime JavaScript file and prove exact edge/transform
    closure.
@@ -258,6 +269,21 @@ disabling any graph check is rejected with code
 The returned admission is
 `artifact-graph-network-dbopfs-verified`. A failure before manifest completion
 removes the graph's incomplete records.
+
+`redirectFinalOrigins` admits only a final origin, not a final path, query, or
+signed/expiring URL. The browser may follow such an implementation-specific
+final URL, but that URL is neither persisted nor accepted as source, revision,
+signature, graph identity, or future download authority. Trust remains bound to
+the immutable starting `sourceUrl` and the exact authenticated length and
+SHA-256 of the received bytes.
+
+Browser Fetch exposes the final CORS response, not an inspectable list of every
+intermediate redirect hop. The SDK therefore cannot authenticate intermediate
+hop origins or headers. CORS must succeed for the browser-managed chain, and
+the SDK can enforce only the immutable start, the declared final HTTPS origin,
+the final response metadata, and the end-to-end bytes. A caller that requires
+every hop to be independently pinned must use a direct immutable source rather
+than this redirect opt-in.
 
 ### Warm and offline admission
 
@@ -272,6 +298,11 @@ fetch function. It returns
 `ARCANE_AI_ARTIFACT_GRAPH_OFFLINE_CACHE_MISS` and reason
 `artifact-graph-offline-cache-miss`. There is no network repair, runtime CDN,
 private Cache Storage fallback, or partial-cache admission.
+
+The manifest authority binds each file's `sourceMediaType` and
+`redirectFinalOrigins` through the graph identity. A valid warm or offline
+admission does not resolve the starting URL again, follow a redirect, or reuse a
+prior final URL; it authenticates only the complete cached bytes and graph.
 
 After every cold, warm, or offline admission, the store materializes a fresh
 set of unique native `blob:` URLs. Each URL is fetched back with omitted
@@ -403,6 +434,22 @@ own explicit admitted or inactive policy. The Worker satisfies the cache read
 from verified local voice bytes; it never opens Kokoro's private durable cache.
 If the graph does not prove those exact edges, Kokoro fails closed before the
 mutable request can reach the network.
+
+That operational network closure does not establish a releasable public Kokoro
+artifact graph. The Kokoro/phonemizer composite notice and corresponding-source
+closure remains incomplete because the exact embedded eSpeak/Emscripten Worker
+has not been bound to immutable preferred source, build/toolchain provenance,
+the effective composite license, and its required notices and corresponding
+source. Public Kokoro graph release and admission must remain blocked until
+that evidence is mechanically bound. A graph file's `license` value remains an
+identity-bound declaration only and cannot satisfy this hold.
+
+The selected Transformers/ONNX Runtime STT graph has a separate public-release
+hold. The immutable ONNX Runtime source revision's MIT license and
+ThirdPartyNotices are authenticated, but the npm tarball omits them and the
+exact selected JSEP compiled-feature-to-notice map is not proven. Public STT
+graph release/admission remains blocked until that artifact-specific composite
+notice boundary is mechanically closed.
 
 ## Providers
 
@@ -840,6 +887,50 @@ Graph construction and store errors use
 `code = "ARCANE_AI_" + reason.toUpperCase().replaceAll("-", "_")`. The
 following closed reason groups therefore define their exact matching codes.
 
+The redirect and source-response descriptor/runtime pairs are exactly:
+
+| Reason | Code |
+| --- | --- |
+| `artifact-graph-file-source-media-type-missing` | `ARCANE_AI_ARTIFACT_GRAPH_FILE_SOURCE_MEDIA_TYPE_MISSING` |
+| `artifact-graph-file-source-media-type-format-mismatch` | `ARCANE_AI_ARTIFACT_GRAPH_FILE_SOURCE_MEDIA_TYPE_FORMAT_MISMATCH` |
+| `artifact-graph-source-redirect-final-origins-not-array` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_REDIRECT_FINAL_ORIGINS_NOT_ARRAY` |
+| `artifact-graph-source-redirect-final-origin-inventory-empty` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_REDIRECT_FINAL_ORIGIN_INVENTORY_EMPTY` |
+| `artifact-graph-source-redirect-final-origin-text-required` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_REDIRECT_FINAL_ORIGIN_TEXT_REQUIRED` |
+| `artifact-graph-source-redirect-final-origin-whitespace-rejected` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_REDIRECT_FINAL_ORIGIN_WHITESPACE_REJECTED` |
+| `artifact-graph-source-redirect-final-origin-not-absolute` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_REDIRECT_FINAL_ORIGIN_NOT_ABSOLUTE` |
+| `artifact-graph-source-redirect-final-origin-protocol-not-https` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_REDIRECT_FINAL_ORIGIN_PROTOCOL_NOT_HTTPS` |
+| `artifact-graph-source-redirect-final-origin-credentials-rejected` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_REDIRECT_FINAL_ORIGIN_CREDENTIALS_REJECTED` |
+| `artifact-graph-source-redirect-final-origin-path-rejected` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_REDIRECT_FINAL_ORIGIN_PATH_REJECTED` |
+| `artifact-graph-source-redirect-final-origin-query-rejected` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_REDIRECT_FINAL_ORIGIN_QUERY_REJECTED` |
+| `artifact-graph-source-redirect-final-origin-fragment-rejected` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_REDIRECT_FINAL_ORIGIN_FRAGMENT_REJECTED` |
+| `artifact-graph-source-redirect-final-origin-duplicate` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_REDIRECT_FINAL_ORIGIN_DUPLICATE` |
+| `artifact-graph-source-response-url-unreadable` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_RESPONSE_URL_UNREADABLE` |
+| `artifact-graph-source-redirected` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_REDIRECTED` |
+| `artifact-graph-source-response-url-protocol-not-https` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_RESPONSE_URL_PROTOCOL_NOT_HTTPS` |
+| `artifact-graph-source-response-url-credentials-rejected` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_RESPONSE_URL_CREDENTIALS_REJECTED` |
+| `artifact-graph-source-response-url-fragment-rejected` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_RESPONSE_URL_FRAGMENT_REJECTED` |
+| `artifact-graph-source-redirect-final-origin-mismatch` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_REDIRECT_FINAL_ORIGIN_MISMATCH` |
+| `artifact-graph-source-response-url-mismatch` | `ARCANE_AI_ARTIFACT_GRAPH_SOURCE_RESPONSE_URL_MISMATCH` |
+
+When an explicit `sourceMediaType` differs from `mediaType`, a cold response
+mismatch uses the exact file-kind-specific pair below. When the two fields are
+equal, the existing `*-media-type-mismatch` pair applies instead.
+
+| Reason | Code |
+| --- | --- |
+| `artifact-graph-entrypoint-source-media-type-mismatch` | `ARCANE_AI_ARTIFACT_GRAPH_ENTRYPOINT_SOURCE_MEDIA_TYPE_MISMATCH` |
+| `artifact-graph-runtime-auxiliary-javascript-source-media-type-mismatch` | `ARCANE_AI_ARTIFACT_GRAPH_RUNTIME_AUXILIARY_JAVASCRIPT_SOURCE_MEDIA_TYPE_MISMATCH` |
+| `artifact-graph-runtime-wasm-binary-source-media-type-mismatch` | `ARCANE_AI_ARTIFACT_GRAPH_RUNTIME_WASM_BINARY_SOURCE_MEDIA_TYPE_MISMATCH` |
+| `artifact-graph-runtime-opaque-data-source-media-type-mismatch` | `ARCANE_AI_ARTIFACT_GRAPH_RUNTIME_OPAQUE_DATA_SOURCE_MEDIA_TYPE_MISMATCH` |
+| `artifact-graph-model-configuration-json-source-media-type-mismatch` | `ARCANE_AI_ARTIFACT_GRAPH_MODEL_CONFIGURATION_JSON_SOURCE_MEDIA_TYPE_MISMATCH` |
+| `artifact-graph-model-generation-configuration-json-source-media-type-mismatch` | `ARCANE_AI_ARTIFACT_GRAPH_MODEL_GENERATION_CONFIGURATION_JSON_SOURCE_MEDIA_TYPE_MISMATCH` |
+| `artifact-graph-model-onnx-binary-source-media-type-mismatch` | `ARCANE_AI_ARTIFACT_GRAPH_MODEL_ONNX_BINARY_SOURCE_MEDIA_TYPE_MISMATCH` |
+| `artifact-graph-model-onnx-external-data-source-media-type-mismatch` | `ARCANE_AI_ARTIFACT_GRAPH_MODEL_ONNX_EXTERNAL_DATA_SOURCE_MEDIA_TYPE_MISMATCH` |
+| `artifact-graph-model-opaque-data-source-media-type-mismatch` | `ARCANE_AI_ARTIFACT_GRAPH_MODEL_OPAQUE_DATA_SOURCE_MEDIA_TYPE_MISMATCH` |
+| `artifact-graph-model-preprocessor-json-source-media-type-mismatch` | `ARCANE_AI_ARTIFACT_GRAPH_MODEL_PREPROCESSOR_JSON_SOURCE_MEDIA_TYPE_MISMATCH` |
+| `artifact-graph-model-tokenizer-json-source-media-type-mismatch` | `ARCANE_AI_ARTIFACT_GRAPH_MODEL_TOKENIZER_JSON_SOURCE_MEDIA_TYPE_MISMATCH` |
+| `artifact-graph-voice-style-binary-source-media-type-mismatch` | `ARCANE_AI_ARTIFACT_GRAPH_VOICE_STYLE_BINARY_SOURCE_MEDIA_TYPE_MISMATCH` |
+
 Descriptor and identity reasons:
 
 - `artifact-graph-kind-mismatch`, `artifact-graph-role-not-stt-or-tts`,
@@ -865,10 +956,23 @@ Descriptor and identity reasons:
   `artifact-graph-file-license-length-exceeded`,
   `artifact-graph-file-media-type-missing`,
   `artifact-graph-file-media-type-format-mismatch`,
+  `artifact-graph-file-source-media-type-missing`,
+  `artifact-graph-file-source-media-type-format-mismatch`,
   `artifact-graph-file-identity-ambiguous`,
   `artifact-graph-source-url-missing`,
   `artifact-graph-source-url-mutable`,
   `artifact-graph-source-revision-unbound`,
+  `artifact-graph-source-redirect-final-origins-not-array`,
+  `artifact-graph-source-redirect-final-origin-inventory-empty`,
+  `artifact-graph-source-redirect-final-origin-text-required`,
+  `artifact-graph-source-redirect-final-origin-whitespace-rejected`,
+  `artifact-graph-source-redirect-final-origin-not-absolute`,
+  `artifact-graph-source-redirect-final-origin-protocol-not-https`,
+  `artifact-graph-source-redirect-final-origin-credentials-rejected`,
+  `artifact-graph-source-redirect-final-origin-path-rejected`,
+  `artifact-graph-source-redirect-final-origin-query-rejected`,
+  `artifact-graph-source-redirect-final-origin-fragment-rejected`,
+  `artifact-graph-source-redirect-final-origin-duplicate`,
   `artifact-graph-javascript-media-type-mismatch`,
   `artifact-graph-wasm-media-type-mismatch`,
   `artifact-graph-json-media-type-mismatch`,
@@ -1032,6 +1136,12 @@ Source, cache, and security reasons:
   `artifact-graph-source-fetch-rejected`,
   `artifact-graph-source-http-response-rejected`,
   `artifact-graph-source-redirected`,
+  `artifact-graph-source-response-url-unreadable`,
+  `artifact-graph-source-response-url-protocol-not-https`,
+  `artifact-graph-source-response-url-credentials-rejected`,
+  `artifact-graph-source-response-url-fragment-rejected`,
+  `artifact-graph-source-redirect-final-origin-mismatch`,
+  `artifact-graph-source-response-url-mismatch`,
   `artifact-graph-offline-cache-miss`, and
   `artifact-graph-preparation-cancelled`.
 
@@ -1039,10 +1149,12 @@ For an exact file verification failure, `reason` is
 `artifact-graph-{subject}-{boundary}`. `{subject}` is `entrypoint` for
 `runtime-entrypoint-javascript`; otherwise it is the exact file kind from the
 closed kind table. `{boundary}` is one of `media-type-mismatch`,
-`byte-length-mismatch`, `sha256-mismatch`,
+`source-media-type-mismatch`, `byte-length-mismatch`, `sha256-mismatch`,
 `dbopfs-persisted-byte-length-mismatch`, or
-`dbopfs-persisted-sha256-mismatch`. This expansion produces the exact public
-code by the rule above; for example,
+`dbopfs-persisted-sha256-mismatch`. `source-media-type-mismatch` occurs only
+when an explicit `sourceMediaType` differs from `mediaType`; otherwise a source
+Content-Type mismatch uses `media-type-mismatch`. This expansion produces the
+exact public code by the rule above; for example,
 `artifact-graph-entrypoint-sha256-mismatch` becomes
 `ARCANE_AI_ARTIFACT_GRAPH_ENTRYPOINT_SHA256_MISMATCH`.
 
@@ -1110,9 +1222,10 @@ and keep all graph checks enabled.
 - Every graph byte is caller-selected, immutable, exact-length, SHA-256 bound,
   revision bound, media-type bound, license-declaration bound, and reachable
   through one closed graph identity.
-- Redirects, mutable source authorities, ambiguous paths/routes, undeclared
-  code/data edges, raw network transports, cache writes, and incomplete offline
-  closures fail closed.
+- Redirects are rejected by default. An undeclared redirect, an undeclared or
+  non-HTTPS final origin, a mutable starting source authority, an ambiguous
+  path/route, an undeclared code/data edge, a raw network transport, a cache
+  write, or an incomplete offline closure fails closed.
 - DBOPFS is the sole durable artifact store; the Worker sees only authenticated
   local object bytes and an exact read-only cache facade.
 - Runtime/model/sample-rate/default-voice/voice inventory and optional
@@ -1120,6 +1233,14 @@ and keep all graph checks enabled.
   hidden fallback, startup download, native/Core call, or cloud retry is added.
 - A completion manifest and SHA-256 prove consistency with the caller's graph;
   they are not independent publisher authenticity or complete license evidence.
+- Public Kokoro graph release/admission remains blocked while the exact
+  phonemizer eSpeak/Emscripten composite notice and corresponding-source
+  provenance is incomplete.
+- Public Transformers/ONNX STT graph release/admission remains blocked while
+  the exact selected JSEP compiled-feature notice mapping is incomplete.
+- The fail-closed component evidence authority is
+  `browser-runtime/ai/ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json`; the detailed
+  package/model audit is `docs/reference/ai/browser-speech-package-authority.json`.
 - The application owns provenance, licenses/notices, user disclosure, selected
   model/voice policy, and integration with the one shared SDK state/event owner.
 

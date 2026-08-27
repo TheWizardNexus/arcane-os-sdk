@@ -314,8 +314,9 @@ runtime adapter bytes, model weights, voice bytes, download URL, catalog, or
 cloud fallback. New operational integrations use
 `createBrowserSpeechArtifactGraph()` to declare one caller-selected immutable
 closure with an explicit entrypoint and every auxiliary ESM, WASM, model, data,
-and voice file bound by canonical path, media type, byte length, SHA-256,
-immutable source/revision, license declaration, and canonical graph identity.
+and voice file bound by canonical path, materialized media type, optional source
+media type, byte length, SHA-256, immutable starting source/revision, optional
+redirect-final-origin inventory, license declaration, and canonical graph identity.
 The published single-self-contained-module authority remains available only as
 an additive compatibility path.
 
@@ -328,16 +329,27 @@ two admitted transforms are the exact audited `Function("return this")()`
 compatibility site and typed-array constructor sites later bound to intrinsic
 typed-array prototypes.
 
-A source download uses redirect rejection and exact final URL, media type,
-length, and SHA-256 checks, persists and rehashes every file, rescans the closed
-module graph, and commits the completion manifest last. A warm admission
-rehashes and rescans every cached file. Strict `offline:true` never calls the
-source fetch function and returns only
+A source download rejects redirects by default. A file may opt in with a
+nonempty, graph-identity-bound `redirectFinalOrigins` inventory; only that file
+uses Fetch redirect following, and the final response must expose one declared
+HTTPS origin without credentials or a fragment. The immutable starting URL
+remains the source authority, and the final path, query, or signed/expiring URL
+is never persisted or admitted as authority. Fetch exposes only the final CORS
+response, so browser code cannot inspect or authenticate intermediate redirect
+hops. The store then checks the declared source media type, exact length, and
+SHA-256, persists and rehashes every file, rescans the closed module graph, and
+commits the completion manifest last.
+
+A valid warm admission performs no source request; it rehashes and rescans every
+cached file and returns `artifact-graph-dbopfs-cache-verified`. Strict
+`offline:true` never calls the source fetch function and returns only
 `artifact-graph-offline-dbopfs-cache-verified`; a miss rejects with
 `ARCANE_AI_ARTIFACT_GRAPH_OFFLINE_CACHE_MISS` /
 `artifact-graph-offline-cache-miss`. Cold and warm admissions are exactly
 `artifact-graph-network-dbopfs-verified` and
-`artifact-graph-dbopfs-cache-verified`.
+`artifact-graph-dbopfs-cache-verified`. Both cached paths bind redirect origins
+and source media type through graph/manifest identity but never reuse a prior
+final URL.
 
 Every admission then uses module-captured native Blob URL functions, ignoring
 the legacy caller `objectUrlFactory`, and reads back each unique `blob:` URL to
@@ -376,6 +388,11 @@ Nested module Workers use
 `arcane-ai-browser-speech-artifact-module-worker/1` and report bootstrap
 rejection only as `artifact-module-worker-bootstrap-rejected`.
 
+The exact redirect and source-media error registry is published in the
+[browser-speech reference](ai/browser-speech.md#graph-reasoncode-rule); graph
+errors retain the mechanical exact code pairing
+`ARCANE_AI_` plus the uppercased, underscore-normalized reason.
+
 Kokoro is configured only through `namespace.env.wasmPaths`; Transformers is
 configured only through `namespace.env.backends.onnx.wasm.wasmPaths` plus its
 verified outer cache fields. Optional `numThreads` is caller-owned and
@@ -387,6 +404,16 @@ shapes fail closed with distinct `*-unavailable` and
 substitutes a different namespace. The caller also owns dtype, STT input sample
 rate, TTS output sample rate, default voice, and the complete voice inventory;
 the SDK selects no hardware default, runtime, model, or fallback.
+
+Network isolation is not license closure. The Transformers/ONNX STT composite
+record lacks an exact selected-JSEP compiled-feature-to-notice map, so public
+STT graph release/admission remains blocked. The Kokoro/phonemizer composite
+notice and corresponding-source record for the embedded eSpeak/Emscripten
+Worker is also incomplete, so public Kokoro graph release/admission must remain
+blocked until exact immutable source, build/toolchain provenance, effective
+license, notices, and corresponding source are mechanically bound. The
+fail-closed component record is
+`browser-runtime/ai/ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json`.
 
 Whisper `stt` and Kokoro `tts` each own catalog, inspect, status, load, request,
 unload, and dispose state. They load, cancel, unload, fail, and recover

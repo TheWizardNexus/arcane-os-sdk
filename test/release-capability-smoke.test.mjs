@@ -642,6 +642,32 @@ test('the exact npm artifact exposes the supported installed capability contract
     assert.equal(browserAiComponents.runtimePolicy.modelWeightsPacked,false);
     assert.equal(browserAiComponents.runtimePolicy.remoteModelHelpers,false);
     assert.equal(browserAiComponents.runtimePolicy.toolCalls,'structural-only-never-executed');
+    const browserSpeechComponents=JSON.parse(await readFile(
+        path.join(
+            installedRoot,'browser-runtime','ai','ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json'
+        ),
+        'utf8'
+    ));
+    assert.equal(browserSpeechComponents.packageExport,'arcane-os/ai/browser-speech');
+    assert.equal(
+        browserSpeechComponents.closureStatus,
+        'browser-speech-runtime-composite-license-notice-and-corresponding-source-closure-incomplete'
+    );
+    assert.equal(
+        browserSpeechComponents.publicationStatus,
+        'browser-speech-public-operational-runtime-graphs-blocked-by-composite-legal-evidence'
+    );
+    assert.equal(browserSpeechComponents.runtimeBytesPacked,false);
+    assert.equal(browserSpeechComponents.modelWeightsPacked,false);
+    assert.equal(browserSpeechComponents.voiceBytesPacked,false);
+    assert.equal(browserSpeechComponents.materializedLegalCorpus,false);
+    assert.ok(browserSpeechComponents.publicationBlocks.includes(
+        'browser-speech-phonemizer-embedded-espeak-corresponding-source-unidentified'
+    ));
+    assert.ok(browserSpeechComponents.legalEvidence.every(evidence=>
+        Number.isSafeInteger(evidence.bytes)
+        &&/^[a-f0-9]{64}$/u.test(evidence.sha256)
+    ));
     const componentFiles=browserAiComponents.components.flatMap(component=>component.files);
     const projectedWllamaModule=componentFiles.find(file=>file.role==='runtime-module');
     const projectedWllamaWasm=componentFiles.find(file=>file.role==='runtime-wasm');
