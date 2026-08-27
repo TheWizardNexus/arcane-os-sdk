@@ -62,7 +62,9 @@ history.
 
 Source listeners retain EventTarget compatibility: function listeners receive
 the source owner as `this`, and the frozen compatibility view exposes that owner
-as both `target` and `currentTarget`.
+as both `target` and `currentTarget`. Already-frozen compatibility detail retains
+its identity. Other plain records and arrays are shallow-copied and frozen;
+rich host objects remain local and are not recursively frozen.
 
 Canonical delivery is observational. Every active listener runs in registration
 order. A listener failure publishes one privacy-safe

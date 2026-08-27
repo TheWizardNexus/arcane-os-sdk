@@ -483,8 +483,9 @@ and returns `true`; reentrant or later calls return `false`. Dispatch or new
 registration after disposal fails with `ARCANE_EVENT_SOURCE_DISPOSED`. The owner
 may register a new source after disposal. `destroy()` aliases `dispose()`.
 
-Rich compatibility detail is shallow-copied and frozen when it is a plain record
-or array; host objects such as DOM nodes, `File`, or `Error` remain local and are
+Already-frozen compatibility detail retains its identity. Other rich
+compatibility detail is shallow-copied and frozen when it is a plain record or
+array; host objects such as DOM nodes, `File`, or `Error` remain local and are
 not recursively frozen. Compatibility detail never enters canonical
 EventPubSub/time-travel payloads. Only privacy-admitted `publicDetail` enters the
 occurrence and optional diagnostics.

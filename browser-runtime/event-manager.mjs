@@ -1508,6 +1508,7 @@ function eventListener(value){
 
 function compatibilityDetail(value){
     if(value===null||(typeof value!=='object'&&typeof value!=='function'))return value;
+    if(Object.isFrozen(value))return value;
     if(Array.isArray(value))return Object.freeze(value.slice());
     const prototype=Object.getPrototypeOf(value);
     if(prototype!==Object.prototype&&prototype!==null)return value;

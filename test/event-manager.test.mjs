@@ -805,6 +805,26 @@ test('source dispatch preserves canonical order, privacy, and rich local compati
     }
 });
 
+test('source dispatch preserves already-frozen compatibility detail identity',()=>{
+    const type='sdk.test.source-frozen-compatibility';
+    const detail=Object.freeze({revision:7});
+    const source=createArcaneEventSource({}, {
+        source:'sdk.test.source-frozen-compatibility',
+        eventTypes:[type]
+    });
+    let delivered=null;
+    const unsubscribe=source.on(type,function observeFrozenCompatibility(event){
+        delivered=event.detail;
+    });
+    try{
+        source.dispatch(type,detail,{publicDetail:{revision:detail.revision}});
+        assert.equal(delivered,detail);
+    }finally{
+        unsubscribe();
+        source.dispose();
+    }
+});
+
 test('canonical cancellation and one-way DOM projection share one occurrence',()=>{
     const restoreCustomEvent=installTestCustomEvent();
     const cancelType='sdk.test.cancellation';
