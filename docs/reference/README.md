@@ -39,9 +39,9 @@ This repository contains explicitly versioned surfaces with different owners:
 
 | Surface | Source identity | Meaning |
 | --- | --- | --- |
-| SDK and CLI | `arcane-os` `0.2.2` | The Node.js toolchain plus the browser-only `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints in this checkout. |
-| Browser runtime | SDK source commit `d5326d206bf0bec6ad82d53605e666841aa79899`, SDK `0.2.2`, protocol `arcane/1` | The SDK-canonical exact 160-file runtime shipped under `runtime/`; Arcane OS commit `c540014afe69f14cf5ae60493b7295f36dbcec64` is legacy projection provenance, not a second source authority. |
-| Browser SDK runtime | SDK source commit `d5326d206bf0bec6ad82d53605e666841aa79899`, SDK `0.2.2` | The exact 25-file authenticated browser closure: EventManager/DOM instrumentation and pinned event dependencies, Wllama runtime assets, and SDK browser speech provider/store/Worker mechanisms. It contains no model weights or speech adapter/model bytes. |
+| SDK and CLI | `arcane-os` `0.2.3` | The Node.js toolchain plus the browser-only `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints in this checkout. |
+| Browser runtime | SDK source commit `f97ac4f2e7cc92a00a3a466c38a67446dd112acf`, SDK `0.2.3`, protocol `arcane/1` | The SDK-canonical exact 160-file runtime shipped under `runtime/`; Arcane OS commit `c540014afe69f14cf5ae60493b7295f36dbcec64` is legacy projection provenance, not a second source authority. |
+| Browser SDK runtime | SDK source commit `f97ac4f2e7cc92a00a3a466c38a67446dd112acf`, SDK `0.2.3` | The exact 25-file authenticated browser closure: EventManager/DOM instrumentation and pinned event dependencies, Wllama runtime assets, and SDK browser speech provider/store/Worker mechanisms. It contains no model weights or speech adapter/model bytes. |
 | Core reference snapshot | Arcane OS commit `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, protocol `arcane/1` | The application-facing Core contract derived into `docs/reference/core/`. Canonical inventory and focused-member content was verified unchanged at Arcane OS `main` commit `13f3ce0ae34f77a3495331c8b4c30b1bb105f8ed`; SDK-local provenance, link, and package-boundary annotations are added explicitly. |
 
 The SDK runtime receipt and Core reference are distinct evidence and have
