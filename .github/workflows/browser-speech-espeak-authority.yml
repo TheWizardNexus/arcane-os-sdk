@@ -1300,10 +1300,10 @@ jobs:
           legal/build-tools/libsigsegv2-copyright
           legal/build-tools/libtool-copyright
           legal/build-tools/m4-copyright
-          legal/emsdk/LICENSE
           legal/emscripten/LICENSE
           legal/emscripten/compiler-rt-LICENSE.txt
           legal/emscripten/musl-COPYRIGHT
+          legal/emsdk/LICENSE
           legal/espeak-ng/COPYING
           legal/espeak-ng/COPYING.APACHE
           legal/espeak-ng/COPYING.BSD2
@@ -1317,8 +1317,8 @@ jobs:
           legal
           legal/arcane-sdk
           legal/build-tools
-          legal/emsdk
           legal/emscripten
+          legal/emsdk
           legal/espeak-ng
           EOF_OUTPUT_DIRECTORIES
           test -z "$(find /out -mindepth 1 ! -type d ! -type f -print -quit)"
