@@ -1,15 +1,15 @@
 {
   "schema": "arcane.browser-speech-package-authority/1",
   "purpose": "Pre-download supply-chain metadata authority for the caller-selected Arcane SDK browser speech runtime artifacts used by Whisper STT and Kokoro TTS.",
-  "status": "browser-speech-package-authority-pre-download-metadata-recorded",
+  "status": "browser-speech-package-authority-registry-and-selected-bytes-verified",
   "auditedOn": "2026-08-27",
   "evidenceBoundary": {
-    "packageCodeDownloaded": false,
+    "packageCodeDownloaded": true,
     "packageCodeInstalled": false,
     "packageCodeExecuted": false,
-    "registryTarballsVerified": false,
-    "candidateFileDigestsAuthenticatedByRegistryTarballs": false,
-    "description": "Package metadata came from committed manifests and lock data plus npm registry metadata. Candidate file byte lengths and SHA-256 values came from exact-version jsDelivr metadata and no-redirect HTTP metadata. They remain consistency evidence until the registry-integrity-verified tarballs are extracted and matched byte-for-byte."
+    "registryTarballsVerified": true,
+    "candidateFileDigestsAuthenticatedByRegistryTarballs": true,
+    "description": "All 23 exact registry tarballs matched the recorded SHA-512 integrity and SHA-1 shasum before extraction. Archive paths and member types were admitted before extraction, every extracted root manifest matched its recorded name, version and declared license, and all four selected runtime files matched their recorded byte lengths and SHA-256 values. Package code was not installed, imported or executed."
   },
   "selectedBrowserDependencyClosure": {
     "root": "kokoro-js@1.2.1",
@@ -337,8 +337,9 @@
       "sourceUrl": "https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js",
       "sourceRevision": "664c76a704021239ba59c84dcbaa4d3dece01fe9",
       "declaredPackageLicense": "Apache-2.0",
-      "fileLicenseVerificationStatus": "bundle-license-and-notice-audit-pending-registry-tarball-verification",
-      "digestEvidence": "exact-version-jsdelivr-metadata-not-yet-registry-tarball-authenticated"
+      "fileLicenseVerificationStatus": "published-bundle-package-license-recorded-third-party-notice-closure-incomplete",
+      "digestEvidence": "registry-integrity-verified-tarball-byte-match",
+      "sourceAdmission": "exact-version-source-url-no-redirect-media-type-verified"
     },
     {
       "id": "transformers-whisper-browser-entry",
@@ -351,8 +352,9 @@
       "sourceUrl": "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/transformers.js",
       "sourceRevision": "746c8c25bf27c5e0684a20f76889b4bb8d23e295",
       "declaredPackageLicense": "Apache-2.0",
-      "fileLicenseVerificationStatus": "bundle-license-and-notice-audit-pending-registry-tarball-verification",
-      "digestEvidence": "exact-version-jsdelivr-metadata-not-yet-registry-tarball-authenticated"
+      "fileLicenseVerificationStatus": "published-bundle-package-license-and-inline-onnx-mit-headers-recorded-third-party-notice-closure-incomplete",
+      "digestEvidence": "registry-integrity-verified-tarball-byte-match",
+      "sourceAdmission": "exact-version-source-url-no-redirect-media-type-verified"
     },
     {
       "id": "onnx-runtime-jsep-module",
@@ -367,8 +369,9 @@
       "packagingRevision": "746c8c25bf27c5e0684a20f76889b4bb8d23e295",
       "upstreamSourceRevision": "89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0",
       "declaredPackageLicense": "MIT",
-      "fileLicenseVerificationStatus": "onnx-license-and-third-party-notice-audit-pending-registry-tarball-verification",
-      "digestEvidence": "exact-version-jsdelivr-metadata-not-yet-registry-tarball-authenticated"
+      "fileLicenseVerificationStatus": "onnx-mit-package-license-and-immutable-source-notices-recorded-published-tarball-notices-absent",
+      "digestEvidence": "transformers-and-onnx-registry-integrity-verified-tarball-byte-match",
+      "sourceAdmission": "exact-version-source-url-no-redirect-media-type-verified"
     },
     {
       "id": "onnx-runtime-jsep-wasm",
@@ -383,10 +386,54 @@
       "packagingRevision": "746c8c25bf27c5e0684a20f76889b4bb8d23e295",
       "upstreamSourceRevision": "89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0",
       "declaredPackageLicense": "MIT",
-      "fileLicenseVerificationStatus": "onnx-license-and-third-party-notice-audit-pending-registry-tarball-verification",
-      "digestEvidence": "exact-version-jsdelivr-metadata-not-yet-registry-tarball-authenticated"
+      "fileLicenseVerificationStatus": "onnx-mit-package-license-and-immutable-source-notices-recorded-published-tarball-notices-absent",
+      "digestEvidence": "transformers-and-onnx-registry-integrity-verified-tarball-byte-match",
+      "sourceAdmission": "exact-version-source-url-no-redirect-media-type-verified"
     }
   ],
+  "authenticatedVerification": {
+    "status": "browser-speech-registry-tarballs-and-selected-runtime-bytes-verified",
+    "registryTarballCount": 23,
+    "dependencyEdgeCount": 25,
+    "archiveAdmission": "all-registry-tarball-paths-and-member-types-verified-before-extraction",
+    "manifestAdmission": "all-extracted-package-name-version-license-fields-verified",
+    "selectedArtifactCount": 4,
+    "selectedArtifactAdmission": "all-selected-byte-lengths-and-sha256-values-verified",
+    "onnxPackagingRelationship": "transformers-jsep-mjs-and-wasm-byte-identical-to-recorded-onnxruntime-web-package",
+    "networkSourceAdmission": "all-selected-exact-version-source-urls-returned-without-redirect-and-with-admitted-media-types",
+    "temporaryExport": "nonrepository-audit-export-cleanup-blocked-by-host-command-policy-after-runtime-capability-fixture-recorded"
+  },
+  "immutableOnnxNoticeEvidence": {
+    "sourceRevision": "89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0",
+    "license": {
+      "url": "https://raw.githubusercontent.com/microsoft/onnxruntime/89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0/LICENSE",
+      "bytes": 1073,
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c",
+      "mediaType": "text/plain"
+    },
+    "thirdPartyNotices": {
+      "url": "https://raw.githubusercontent.com/microsoft/onnxruntime/89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0/ThirdPartyNotices.txt",
+      "bytes": 326866,
+      "sha256": "e9e90971a8e75a9a8ac0c6412e29c1202d079998389915aa485f46c816c3b4cc",
+      "mediaType": "text/plain"
+    },
+    "evidenceBoundary": "These files are immutable source-revision evidence. The published onnxruntime-web tarball omits LICENSE and ThirdPartyNotices, so this record does not claim that the package itself carries complete notice closure or that the notice file proves the exact compiled feature set."
+  },
+  "operationalRuntimeFindings": {
+    "status": "browser-speech-runtime-network-capabilities-require-sdk-worker-interception",
+    "kokoroVoiceRequest": {
+      "requestPattern": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/voices/${voice}.bin",
+      "cacheStorageName": "kokoro-voices",
+      "packageOverride": "kokoro-js-1.2.1-exposes-no-voice-url-bytes-resolver-or-provider-override",
+      "admissionRequirement": "mutable-voice-request-must-resolve-only-to-a-caller-declared-authenticated-local-voice-file"
+    },
+    "onnxWasmFallback": {
+      "requestPattern": "https://cdn.jsdelivr.net/npm/@huggingface/transformers@${version}/dist/",
+      "admissionRequirement": "caller-declared-wasm-paths-must-be-installed-before-runtime-load-and-every-undeclared-fallback-request-must-be-rejected"
+    },
+    "workerBoundary": "The dedicated SDK Worker must replace fetch and Cache Storage with exact read-only graph routes before importing either runtime. Mutable /resolve/main/ values may exist only as local request aliases and must never become source or download authorities.",
+    "failClosedBoundary": "If fetch, Cache Storage, dynamic import, module Worker, XMLHttpRequest, dynamic code, or another transport cannot be constrained to the declared authenticated graph, runtime admission must fail before entrypoint evaluation."
+  },
   "exclusions": {
     "selectedBrowserClosureContainsOptionalDependencyEdges": false,
     "selectedBrowserClosureContainsPeerDependencyEdges": false,
@@ -435,7 +482,7 @@
     "description": "The checked core npm metadata exposes no dist attestations. This authority makes no Sigstore or npm provenance claim. Registry integrity and signatures are not substitutes for selected-file verification."
   },
   "plannedVerification": {
-    "status": "browser-speech-package-verification-pending-authenticated-tarball-download",
+    "status": "browser-speech-package-and-runtime-capability-verification-recorded-runtime-graph-implementation-pending",
     "sequence": [
       "fetch-exact-registry-tarballs-without-installing-or-executing-package-code",
       "verify-each-registry-tarball-against-recorded-sha512-before-extraction",
@@ -451,9 +498,8 @@
     ]
   },
   "omittedUntilVerified": [
-    "Authenticated per-file derivation from registry-integrity-verified tarballs.",
     "Final composite SPDX license expressions for the bundled JavaScript entrypoints.",
-    "Final ONNX Runtime ThirdPartyNotices obligations for the selected MJS and WASM bytes.",
+    "A claim that published package tarballs carry complete ONNX Runtime ThirdPartyNotices; they do not.",
     "Caller-selected immutable model, tokenizer, processor, external-data and Kokoro voice artifact inventories.",
     "Sigstore provenance for the checked core packages because npm dist attestations were absent."
   ]
