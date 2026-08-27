@@ -1531,7 +1531,7 @@ jobs:
             --env SOURCE_DATE_EPOCH \
             --env TOOLCHAIN_IMAGE \
             --env TOOLCHAIN_CONFIG_SHA256 \
-            --env EMSDK_REVISION \
+            --env "ARCANE_EMSDK_REVISION=$EMSDK_REVISION" \
             --env EMSCRIPTEN_REVISION \
             --env UBUNTU_SNAPSHOT \
             --env GITHUB_REPOSITORY \
@@ -1737,7 +1737,7 @@ jobs:
           derived_inspect = json.loads(
               (inputs / "derived-image-authority.json").read_text(encoding="utf-8")
           )
-          if base_inspect["EmsdkSourceAuthority"]["revision"] != os.environ["EMSDK_REVISION"]:
+          if base_inspect["EmsdkSourceAuthority"]["revision"] != os.environ["ARCANE_EMSDK_REVISION"]:
               raise SystemExit("The selected emsdk source authority revision changed.")
           proof_1 = json.loads(
               (artifact / "arcane-espeak-ng.runtime-proof-1.json").read_text(encoding="utf-8")
