@@ -980,6 +980,11 @@ jobs:
             build.sh and browser-speech-espeak-authority.yml record the exact
             authenticated toolchain, selected data, flags, proofs, and outputs.
 
+          Runtime output metadata
+            The pinned linker emits arcane-espeak-ng.wasm with executable mode.
+            Normalize that browser-loaded data member to 0644 before inventory;
+            all five runtime members must then pass the strict 0644 assertion.
+
           The complete modified source, build recipe, notices, and authenticated
           base archive are distributed beside the runtime authority without charge.
           EOF
@@ -1185,6 +1190,13 @@ jobs:
           arcane-espeak-ng.wasm
           arcane-espeak-phonemizer.mjs
           EOF_RUNTIME_FILES
+          # Preserved authority artifact 9660162838 records arcane-espeak-ng.wasm as
+          # 0755 and the other four runtime members as 0644. Normalize that one member.
+          test -f /out/arcane-espeak-ng.wasm
+          test ! -L /out/arcane-espeak-ng.wasm
+          test -s /out/arcane-espeak-ng.wasm
+          test "$(stat -c '%a' /out/arcane-espeak-ng.wasm)" = 755
+          chmod 0644 /out/arcane-espeak-ng.wasm
           while IFS= read -r runtime_file; do
             test -f "/out/$runtime_file"
             test ! -L "/out/$runtime_file"
