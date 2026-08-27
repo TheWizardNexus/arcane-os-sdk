@@ -1,5 +1,10 @@
 import './DBOPFS.js';
 import UserEntity from '../entities/User.js';
+import {
+    arcaneEvents,
+    createArcaneEventSource,
+    projectArcaneDOMEvent
+} from 'arcane-os/event-manager';
 import {getAIPreferencesForRuntime} from './AIPreferenceRuntime.js';
 import {
     AI_MODEL_AUTHORITY_PROTOCOL,
@@ -13,6 +18,84 @@ const LEGACY_TTS_RESPONSE_FORMAT='opus';
 credentials='omit';
 
 const LEGACY_AI_SERVICES=new Set(['OPENAI','OLLAMA','LOCAL_SPEACH']);
+export const AI_READY_EVENT='ai-ready';
+export const AI_INITIALIZATION_ERROR_CODES=Object.freeze({
+    userReadyRegistrationCollision:
+        'ARCANE_AI_USER_READY_REGISTRATION_COLLISION'
+});
+export const AI_INITIALIZATION_REASONS=Object.freeze({
+    initialized:'ai-initialized',
+    userReadyRegistrationCollision:'ai-user-ready-registration-collision'
+});
+export const AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL=
+    'arcane-ai-browser-speech-configuration/1';
+export const AI_BROWSER_SPEECH_EVENT_TYPES=Object.freeze({
+    configurationCancelled:'ai-browser-speech-configuration-cancelled',
+    configurationError:'ai-browser-speech-configuration-error',
+    configurationStarted:'ai-browser-speech-configuration-started',
+    configured:'ai-browser-speech-configured',
+    disposed:'ai-browser-speech-disposed'
+});
+export const AI_BROWSER_SPEECH_ERROR_CODES=Object.freeze({
+    artifactStoreConstructionRejected:
+        'ARCANE_AI_BROWSER_SPEECH_ARTIFACT_STORE_CONSTRUCTION_REJECTED',
+    asyncTransitionRequired:
+        'ARCANE_AI_BROWSER_SPEECH_ASYNC_TRANSITION_REQUIRED',
+    configurationCancelled:'ARCANE_AI_BROWSER_SPEECH_CONFIGURATION_CANCELLED',
+    configurationContractMismatch:
+        'ARCANE_AI_BROWSER_SPEECH_CONFIGURATION_CONTRACT_MISMATCH',
+    configurationSuperseded:
+        'ARCANE_AI_BROWSER_SPEECH_CONFIGURATION_SUPERSEDED',
+    operationOptionsContractMismatch:
+        'ARCANE_AI_BROWSER_SPEECH_OPERATION_OPTIONS_CONTRACT_MISMATCH',
+    operationSequenceExhausted:
+        'ARCANE_AI_BROWSER_SPEECH_OPERATION_SEQUENCE_EXHAUSTED',
+    moduleImportRejected:'ARCANE_AI_BROWSER_SPEECH_MODULE_IMPORT_REJECTED',
+    providerConstructionRejected:
+        'ARCANE_AI_BROWSER_SPEECH_PROVIDER_CONSTRUCTION_REJECTED',
+    providerDisposalRejected:
+        'ARCANE_AI_BROWSER_SPEECH_PROVIDER_DISPOSAL_REJECTED',
+    providerRouteOwnershipMismatch:
+        'ARCANE_AI_BROWSER_SPEECH_PROVIDER_ROUTE_OWNERSHIP_MISMATCH',
+    providerUnregistrationRejected:
+        'ARCANE_AI_BROWSER_SPEECH_PROVIDER_UNREGISTRATION_REJECTED',
+    routeCommitRejected:'ARCANE_AI_BROWSER_SPEECH_ROUTE_COMMIT_REJECTED',
+    routeRollbackRejected:'ARCANE_AI_BROWSER_SPEECH_ROUTE_ROLLBACK_REJECTED',
+    routeViewUpdateRejected:
+        'ARCANE_AI_BROWSER_SPEECH_ROUTE_VIEW_UPDATE_REJECTED'
+});
+export const AI_BROWSER_SPEECH_REASONS=Object.freeze({
+    artifactStoreConstructionRejected:'speech-artifact-store-construction-rejected',
+    asyncTransitionRequired:'speech-configuration-async-transition-required',
+    configurationAdded:'speech-configuration-added',
+    configurationCancelled:'speech-configuration-cancelled',
+    configurationContractMismatch:'speech-configuration-contract-mismatch',
+    configurationDisposed:'speech-configuration-disposed',
+    configurationReplaced:'speech-configuration-replaced',
+    moduleImportRejected:'speech-module-import-rejected',
+    operationOptionsContractMismatch:'speech-operation-options-contract-mismatch',
+    operationSequenceExhausted:'speech-operation-sequence-exhausted',
+    providerConstructionRejected:'speech-provider-construction-rejected',
+    providerDisposalRejected:'speech-provider-disposal-rejected',
+    providerRouteOwnershipMismatch:'speech-provider-route-ownership-mismatch',
+    providerUnregistrationRejected:'speech-provider-unregistration-rejected',
+    routeCommitRejected:'speech-route-commit-rejected',
+    routeRollbackRejected:'speech-route-rollback-rejected',
+    routeViewUpdateRejected:'speech-route-view-update-rejected'
+});
+const AI_PUBLISH_READY=Symbol('publish-ai-ready');
+const AI_USER_READY_REGISTRATION_KEY=Symbol.for(
+    'arcane.ai.user-ready-registration'
+);
+const AI_USER_READY_REGISTRATION_PROTOCOL=
+    'arcane-ai-user-ready-registration/1';
+
+function aiInitializationError(code,reason,message){
+    const error=new Error(message);
+    error.code=code;
+    error.reason=reason;
+    return error;
+}
 
 function isAIRequestAbort(error,signal){
     return signal?.aborted
@@ -228,6 +311,184 @@ function normalizeAIStartupOptions(options){
     return Object.freeze({startMuted,startTranscription,signal});
 }
 
+function aiBrowserSpeechError(code,reason,message,cause,{committed=false,name='Error'}={}){
+    const error=cause===undefined
+        ?new Error(message)
+        :new Error(message,{cause});
+    error.name=name;
+    error.code=code;
+    error.reason=reason;
+    if(committed)error.committed=true;
+    return error;
+}
+
+function isAbortSignal(value){
+    return Boolean(value)
+        &&typeof value==='object'
+        &&typeof value.aborted==='boolean'
+        &&typeof value.addEventListener==='function'
+        &&typeof value.removeEventListener==='function';
+}
+
+function frozenClosedRecord(value,keys,required,label){
+    if(!value
+        ||typeof value!=='object'
+        ||Array.isArray(value)
+        ||![Object.prototype,null].includes(Object.getPrototypeOf(value))
+        ||!Object.isFrozen(value)){
+        throw aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+            AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+            `${label} must be a frozen plain data record.`
+        );
+    }
+    const descriptors=Object.getOwnPropertyDescriptors(value);
+    for(const key of Reflect.ownKeys(descriptors)){
+        if(typeof key!=='string'
+            ||!keys.includes(key)
+            ||!Object.hasOwn(descriptors[key],'value')){
+            throw aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+                AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+                `${label} contains an unsupported or accessor field.`
+            );
+        }
+    }
+    for(const key of required){
+        if(!Object.hasOwn(descriptors,key)){
+            throw aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+                AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+                `${label}.${key} is required.`
+            );
+        }
+    }
+    return descriptors;
+}
+
+function browserSpeechIdentifier(value,label){
+    if(typeof value!=='string'
+        ||value.trim()!==value
+        ||value.length<1
+        ||value.length>128){
+        throw aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+            AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+            `${label} must be a trimmed 1-128 character string.`
+        );
+    }
+    return value;
+}
+
+function normalizeBrowserSpeechRole(value,role){
+    const label=`AI browser speech ${role}`;
+    const descriptors=frozenClosedRecord(
+        value,
+        ['providerId','graph','offline'],
+        ['providerId','graph','offline'],
+        label
+    );
+    const providerId=browserSpeechIdentifier(
+        descriptors.providerId.value,
+        `${label}.providerId`
+    );
+    const graph=descriptors.graph.value;
+    if(!graph||typeof graph!=='object'||!Object.isFrozen(graph)){
+        throw aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+            AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+            `${label}.graph must be an SDK-created frozen artifact graph.`
+        );
+    }
+    if(typeof descriptors.offline.value!=='boolean'){
+        throw aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+            AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+            `${label}.offline must be a boolean.`
+        );
+    }
+    return Object.freeze({
+        providerId,
+        graph,
+        offline:descriptors.offline.value
+    });
+}
+
+function normalizeBrowserSpeechConfiguration(value){
+    const descriptors=frozenClosedRecord(
+        value,
+        ['protocol','id','dbopfs','tableName','stt','tts'],
+        ['protocol','id','dbopfs','stt','tts'],
+        'AI browser speech configuration'
+    );
+    if(descriptors.protocol.value!==AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL){
+        throw aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+            AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+            `AI browser speech configuration.protocol must be ${AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL}.`
+        );
+    }
+    const id=browserSpeechIdentifier(
+        descriptors.id.value,
+        'AI browser speech configuration.id'
+    );
+    const dbopfs=descriptors.dbopfs.value;
+    if(!dbopfs||typeof dbopfs!=='object'){
+        throw aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+            AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+            'AI browser speech configuration.dbopfs must be an existing DBOPFS instance.'
+        );
+    }
+    const tableName=descriptors.tableName
+        ?browserSpeechIdentifier(
+            descriptors.tableName.value,
+            'AI browser speech configuration.tableName'
+        )
+        :undefined;
+    return Object.freeze({
+        configuration:value,
+        id,
+        dbopfs,
+        ...(tableName?{tableName}:{}),
+        stt:normalizeBrowserSpeechRole(descriptors.stt.value,'stt'),
+        tts:normalizeBrowserSpeechRole(descriptors.tts.value,'tts')
+    });
+}
+
+function normalizeBrowserSpeechOperationOptions(value,label){
+    if(value===undefined)return Object.freeze({signal:null});
+    if(!value
+        ||typeof value!=='object'
+        ||Array.isArray(value)
+        ||![Object.prototype,null].includes(Object.getPrototypeOf(value))){
+        throw aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.operationOptionsContractMismatch,
+            AI_BROWSER_SPEECH_REASONS.operationOptionsContractMismatch,
+            `${label} options must be a plain object.`
+        );
+    }
+    const descriptors=Object.getOwnPropertyDescriptors(value);
+    for(const key of Reflect.ownKeys(descriptors)){
+        if(key!=='signal'||!Object.hasOwn(descriptors[key],'value')){
+            throw aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.operationOptionsContractMismatch,
+                AI_BROWSER_SPEECH_REASONS.operationOptionsContractMismatch,
+                `${label} options support only a signal data property.`
+            );
+        }
+    }
+    const signal=descriptors.signal?.value??null;
+    if(signal!==null&&!isAbortSignal(signal)){
+        throw aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.operationOptionsContractMismatch,
+            AI_BROWSER_SPEECH_REASONS.operationOptionsContractMismatch,
+            `${label} signal must be an AbortSignal.`
+        );
+    }
+    return Object.freeze({signal});
+}
+
 class AI {
     // This is the enum section for inference configuration
     #service = {
@@ -340,6 +601,19 @@ class AI {
             return window.ai;
         }
 
+        this.#events=createArcaneEventSource(
+            this,
+            {
+                source:'ai',
+                eventTypes:Object.freeze(
+                    [
+                        AI_READY_EVENT,
+                        ...Object.values(AI_BROWSER_SPEECH_EVENT_TYPES)
+                    ]
+                )
+            }
+        );
+
         const preferences=[
             llmService||'OPENAI',
             sttService||'OPENAI',
@@ -353,7 +627,7 @@ class AI {
         );
 
         const runtime=this;
-        globalThis.addEventListener?.(
+        this.#stopOllamaReady=arcaneEvents.subscribe(
             'arcane-ollama-ready',
             function reconcileLegacyOllamaReadiness(){
                 runtime.#retainLegacyLLMReadiness(
@@ -364,10 +638,21 @@ class AI {
     }
 
     #providerRuntime=getAIProviderRuntime();
+    #events=null;
+    #browserSpeechConfigurationRecord=null;
+    #browserSpeechController=null;
+    #browserSpeechGeneration=0;
+    #browserSpeechModulePromise=null;
+    #browserSpeechOperationSequence=0;
+    #browserSpeechRetiredRecords=new Set();
+    #browserSpeechRetiredLegacyRecords=new Set();
+    #browserSpeechTransition=Promise.resolve();
     #legacyLLMProviders=new Map();
     #legacyLLMReadiness=Promise.resolve(null);
     #legacySpeechProviders=new Map();
     #legacySpeechReadiness=Promise.resolve(null);
+    #speechControlGeneration=0;
+    #stopOllamaReady=null;
     #preferenceTuple=Object.freeze([
         'OPENAI',
         'OPENAI',
@@ -379,6 +664,40 @@ class AI {
 
     get providerRuntime(){
         return this.#providerRuntime;
+    }
+
+    [AI_PUBLISH_READY](){
+        const operationId=`${this.#events.instanceId}:ready:1`;
+        const reason=AI_INITIALIZATION_REASONS.initialized;
+        const {occurrence}=this.#events.dispatch(
+            AI_READY_EVENT,
+            Object.freeze({db:this,operationId,reason}),
+            {
+                operationId,
+                publicDetail:Object.freeze({
+                    ready:true,
+                    reason
+                })
+            }
+        );
+        projectArcaneDOMEvent(window,occurrence);
+        return occurrence;
+    }
+
+    get browserSpeechConfiguration(){
+        return this.#browserSpeechRecordIsActive(
+            this.#browserSpeechConfigurationRecord
+        )
+            ?this.#browserSpeechConfigurationRecord.configuration
+            :null;
+    }
+
+    get browserSpeechDescriptor(){
+        return this.#browserSpeechRecordIsActive(
+            this.#browserSpeechConfigurationRecord
+        )
+            ?this.#browserSpeechConfigurationRecord.descriptor
+            :null;
     }
 
     get url() {
@@ -1228,6 +1547,14 @@ class AI {
         this.#preferenceTuple=Object.freeze(tuple.slice());
     }
 
+    #applySpeechPreferenceTuple(tuple){
+        this.sttService=tuple[1];
+        this.ttsService=tuple[2];
+        this.modelTTS=this.#ttsModels[tuple[4]]||tuple[4];
+        this.modelSTT=this.#sttModels[tuple[5]]||tuple[5];
+        this.#preferenceTuple=Object.freeze(tuple.slice());
+    }
+
     #tupleFromProviderRoutes(selections){
         const llm=selections.llm.default;
         const stt=selections.stt.default;
@@ -1237,6 +1564,20 @@ class AI {
             stt?.providerId||'',
             tts?.providerId||'',
             llm?.modelId||'',
+            tts?.modelId||'',
+            stt?.modelId||''
+        ]);
+    }
+
+    #tupleFromSpeechProviderRoutes(selections){
+        const current=this.#preferenceTuple;
+        const stt=selections.stt.default;
+        const tts=selections.tts.default;
+        return Object.freeze([
+            current[0],
+            stt?.providerId||'',
+            tts?.providerId||'',
+            current[3],
             tts?.modelId||'',
             stt?.modelId||''
         ]);
@@ -1312,6 +1653,33 @@ class AI {
         }
     }
 
+    async #unloadSpeechProviderRolesForTransition(
+        signal=null,
+        expectedProviders=null
+    ){
+        const runtime=this;
+        const settlements=await Promise.allSettled(
+            ['stt','tts'].map(async function unloadSpeechProviderRole(role){
+                if(expectedProviders?.[role]
+                    &&!runtime.#providerRuntime.ownsProvider(
+                        role,
+                        expectedProviders[role]
+                    )){
+                    throw runtime.#browserSpeechProviderRouteOwnershipError(
+                        `The ${role} browser speech provider identity changed before unload.`
+                    );
+                }
+                return runtime.#providerRuntime.unload(role,{signal});
+            })
+        );
+        const failure=settlements.find(function findAISpeechTransitionCleanupFailure(result){
+            return result.status==='rejected';
+        });
+        if(failure){
+            throw failure.reason;
+        }
+    }
+
     // Set models to be used by the AI. 
     // Note: Only those that are defined are set.
     setAI(
@@ -1343,10 +1711,12 @@ class AI {
             modelSTT
         ]);
         this.#assertValidProviderTuple(tuple);
+        this.#assertSynchronousBrowserSpeechSupersession('AI.setAI');
         this.#ensureLegacyLLMProvider(tuple[0]);
         this.#ensureLegacySpeechProvider('stt',tuple[1]);
         this.#ensureLegacySpeechProvider('tts',tuple[2]);
         this.#providerRuntime.configure(this.#routesFromPreferenceTuple(tuple));
+        this.#invalidateSpeechControl();
         this.#applyPreferenceTuple(tuple);
         this.#releaseInactiveLegacyLLMProviders(tuple[0]);
         this.#releaseInactiveLegacySpeechProviders({
@@ -1364,6 +1734,7 @@ class AI {
 
     configureProviders(selections){
         const prepared=this.#providerRuntime.validateConfiguration(selections);
+        this.#assertSynchronousBrowserSpeechSupersession('AI.configureProviders');
         this.#ensureLegacyLLMProvider(
             prepared.llm.default?.providerId
         );
@@ -1377,6 +1748,7 @@ class AI {
         );
         this.#assertRegisteredLegacyRoutes(prepared);
         const configured=this.#providerRuntime.configure(prepared);
+        this.#invalidateSpeechControl();
         this.#applyPreferenceTuple(this.#tupleFromProviderRoutes(configured));
         this.#releaseInactiveLegacyLLMProviders(
             configured.llm.default?.providerId
@@ -1391,6 +1763,37 @@ class AI {
         this.#retainLegacySpeechReadiness(
             this.#reconcileLegacySpeechReadiness()
         );
+        return configured;
+    }
+
+    configureSpeechProviders(selections){
+        const prepared=this.#providerRuntime.validateSpeechConfiguration(selections);
+        this.#assertSynchronousBrowserSpeechSupersession(
+            'AI.configureSpeechProviders'
+        );
+        this.#ensureLegacySpeechProvider(
+            'stt',
+            prepared.stt.default?.providerId
+        );
+        this.#ensureLegacySpeechProvider(
+            'tts',
+            prepared.tts.default?.providerId
+        );
+        this.#assertRegisteredLegacyRoutes(prepared);
+        const configured=this.#providerRuntime.configureSpeech(prepared);
+        this.#invalidateSpeechControl();
+        this.#applySpeechPreferenceTuple(
+            this.#tupleFromSpeechProviderRoutes(configured)
+        );
+        this.#releaseInactiveLegacySpeechProviders({
+            stt:configured.stt.default?.providerId,
+            tts:configured.tts.default?.providerId
+        });
+        this.#retainLegacySpeechReadiness(
+            this.#reconcileLegacySpeechReadiness()
+        );
+        this.muted=true;
+        this.stopAudio();
         return configured;
     }
 
@@ -1411,7 +1814,8 @@ class AI {
             modelSTT
         ]);
         this.#assertValidProviderTuple(tuple);
-        this.stopAudio();
+        await this.#supersedeBrowserSpeechForRouteChange();
+        this.#invalidateSpeechControl();
         await this.#unloadProviderRolesForTransition();
         this.#ensureLegacyLLMProvider(tuple[0]);
         this.#ensureLegacySpeechProvider('stt',tuple[1]);
@@ -1430,6 +1834,7 @@ class AI {
 
     async transitionProviders(selections){
         const prepared=this.#providerRuntime.validateConfiguration(selections);
+        await this.#supersedeBrowserSpeechForRouteChange();
         this.#ensureLegacyLLMProvider(
             prepared.llm.default?.providerId
         );
@@ -1442,7 +1847,7 @@ class AI {
             prepared.tts.default?.providerId
         );
         this.#assertRegisteredLegacyRoutes(prepared);
-        this.stopAudio();
+        this.#invalidateSpeechControl();
         await this.#unloadProviderRolesForTransition();
         const configured=this.#providerRuntime.configure(prepared);
         this.#applyPreferenceTuple(this.#tupleFromProviderRoutes(configured));
@@ -1458,27 +1863,1084 @@ class AI {
         return configured;
     }
 
+    async transitionSpeechProviders(selections){
+        const prepared=this.#providerRuntime.validateSpeechConfiguration(selections);
+        await this.#supersedeBrowserSpeechForRouteChange();
+        this.#invalidateSpeechControl();
+        await this.#unloadSpeechProviderRolesForTransition();
+        this.#ensureLegacySpeechProvider(
+            'stt',
+            prepared.stt.default?.providerId
+        );
+        this.#ensureLegacySpeechProvider(
+            'tts',
+            prepared.tts.default?.providerId
+        );
+        this.#assertRegisteredLegacyRoutes(prepared);
+        const configured=this.#providerRuntime.configureSpeech(prepared);
+        this.#applySpeechPreferenceTuple(
+            this.#tupleFromSpeechProviderRoutes(configured)
+        );
+        this.#releaseInactiveLegacySpeechProviders({
+            stt:configured.stt.default?.providerId,
+            tts:configured.tts.default?.providerId
+        });
+        await this.#reconcileLegacySpeechReadiness();
+        this.muted=true;
+        return configured;
+    }
+
+    #browserSpeechOperationId(action){
+        if(this.#browserSpeechOperationSequence===Number.MAX_SAFE_INTEGER){
+            throw aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.operationSequenceExhausted,
+                AI_BROWSER_SPEECH_REASONS.operationSequenceExhausted,
+                'The browser speech operation sequence is exhausted.'
+            );
+        }
+        this.#browserSpeechOperationSequence+=1;
+        return `${this.#events.instanceId}:${action}:${this.#browserSpeechOperationSequence.toString(36)}`;
+    }
+
+    #browserSpeechAbortError(controller,generation,{committed=false}={}){
+        const reason=controller.signal.reason;
+        if(reason?.code===AI_BROWSER_SPEECH_ERROR_CODES.configurationSuperseded){
+            if(Boolean(reason.committed)===committed)return reason;
+            return aiBrowserSpeechError(
+                reason.code,
+                reason.reason||AI_BROWSER_SPEECH_REASONS.configurationReplaced,
+                reason.message
+                    ||'The browser speech configuration was superseded.',
+                reason,
+                {committed,name:'AbortError'}
+            );
+        }
+        if(generation!==this.#browserSpeechGeneration){
+            return aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.configurationSuperseded,
+                AI_BROWSER_SPEECH_REASONS.configurationReplaced,
+                'The browser speech configuration was replaced by a newer configuration.',
+                controller.signal.reason,
+                {committed,name:'AbortError'}
+            );
+        }
+        return aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.configurationCancelled,
+            AI_BROWSER_SPEECH_REASONS.configurationCancelled,
+            'The browser speech configuration was cancelled.',
+            reason,
+            {committed,name:'AbortError'}
+        );
+    }
+
+    #assertBrowserSpeechOperation(controller,generation,{committed=false}={}){
+        if(generation!==this.#browserSpeechGeneration||controller.signal.aborted){
+            throw this.#browserSpeechAbortError(
+                controller,
+                generation,
+                {committed}
+            );
+        }
+    }
+
+    #invalidateSpeechControl(){
+        this.#speechControlGeneration+=1;
+        this.muted=true;
+        this.stopAudio();
+    }
+
+    #sameBrowserSpeechSelection(left,right){
+        if(left===null||right===null)return left===right;
+        return Boolean(left&&right)
+            &&left.providerId===right.providerId
+            &&left.modelId===right.modelId
+            &&left.localOnly===right.localOnly;
+    }
+
+    #sameBrowserSpeechRoutes(left,right){
+        return ['stt','tts'].every(role=>
+            ['default','localOnly'].every(routeName=>
+                this.#sameBrowserSpeechSelection(
+                    left?.[role]?.[routeName]??null,
+                    right?.[role]?.[routeName]??null
+                )
+            )
+        );
+    }
+
+    #browserSpeechRecordOwnsProviders(record){
+        if(!record)return false;
+        return ['stt','tts'].every(role=>{
+            if(record.registrationState?.[role]===false)return false;
+            return this.#providerRuntime.ownsProvider(
+                role,
+                record.providers[role]
+            );
+        });
+    }
+
+    #browserSpeechRecordIsActive(record){
+        return this.#browserSpeechRecordOwnsProviders(record)
+            &&this.#sameBrowserSpeechRoutes(
+                this.#currentSpeechRoutes(),
+                record.routes
+            );
+    }
+
+    #browserSpeechProviderRouteOwnershipError(message){
+        return aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.providerRouteOwnershipMismatch,
+            AI_BROWSER_SPEECH_REASONS.providerRouteOwnershipMismatch,
+            message
+        );
+    }
+
+    #browserSpeechReplacementBoundary(previousRecord){
+        if(previousRecord){
+            return Object.freeze({
+                expectedProviders:previousRecord.providers,
+                legacyRecords:Object.freeze([])
+            });
+        }
+        const expectedProviders={};
+        const legacyRecords=[];
+        for(const role of ['stt','tts']){
+            const selection=this.#providerRuntime.selection(role);
+            if(!selection){
+                expectedProviders[role]=null;
+                continue;
+            }
+            const record=this.#legacySpeechProviders.get(
+                this.#legacySpeechProviderKey(role,selection.providerId)
+            );
+            if(!record
+                ||!this.#providerRuntime.ownsProvider(role,record.provider)){
+                throw this.#browserSpeechProviderRouteOwnershipError(
+                    `The selected ${role} route is not owned by the replaceable AI legacy speech boundary.`
+                );
+            }
+            expectedProviders[role]=record.provider;
+            legacyRecords.push(record);
+        }
+        if(Boolean(expectedProviders.stt)!==Boolean(expectedProviders.tts)){
+            throw this.#browserSpeechProviderRouteOwnershipError(
+                'Browser speech configuration requires an exact replaceable STT/TTS provider pair or two empty speech routes.'
+            );
+        }
+        return Object.freeze({
+            expectedProviders:Object.freeze(expectedProviders),
+            legacyRecords:Object.freeze(legacyRecords)
+        });
+    }
+
+    async #cleanupRetiredLegacySpeechProviders(
+        {signal=null,committed=false}={}
+    ){
+        const failures=[];
+        for(const record of [...this.#browserSpeechRetiredLegacyRecords]){
+            try{
+                if(this.#providerRuntime.ownsProvider(
+                    record.role,
+                    record.provider
+                )){
+                    throw this.#browserSpeechProviderRouteOwnershipError(
+                        `The retired ${record.role} legacy speech provider still owns its registry entry.`
+                    );
+                }
+                await record.provider.dispose({role:record.role,signal});
+                const key=this.#legacySpeechProviderKey(
+                    record.role,
+                    record.providerId
+                );
+                if(this.#legacySpeechProviders.get(key)===record){
+                    this.#legacySpeechProviders.delete(key);
+                }
+                this.#browserSpeechRetiredLegacyRecords.delete(record);
+            }catch(error){
+                failures.push(error);
+            }
+        }
+        if(failures.length){
+            throw aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.providerDisposalRejected,
+                AI_BROWSER_SPEECH_REASONS.providerDisposalRejected,
+                'The replaced legacy speech providers could not be disposed.',
+                failures.length===1
+                    ?failures[0]
+                    :new AggregateError(
+                        failures,
+                        'Multiple replaced legacy speech provider disposals were rejected.'
+                    ),
+                {committed}
+            );
+        }
+        return true;
+    }
+
+    #assertSynchronousBrowserSpeechSupersession(method){
+        if(!this.#browserSpeechConfigurationRecord
+            &&this.#browserSpeechRetiredRecords.size===0){
+            return;
+        }
+        throw aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.asyncTransitionRequired,
+            AI_BROWSER_SPEECH_REASONS.asyncTransitionRequired,
+            `${method} cannot replace SDK-owned browser speech providers synchronously; await AI.disposeBrowserSpeech() or use an asynchronous transition method.`
+        );
+    }
+
+    async #supersedeBrowserSpeechForRouteChange(){
+        if(!this.#browserSpeechConfigurationRecord
+            &&this.#browserSpeechRetiredRecords.size===0){
+            return false;
+        }
+        return this.disposeBrowserSpeech();
+    }
+
+    #publishBrowserSpeechEvent(type,normalized,operationId,reason,{descriptor=null,error=null}={}){
+        const compatibilityDetail=Object.freeze({
+            configuration:normalized.configuration,
+            configurationId:normalized.id,
+            ...(descriptor?{descriptor}:{}),
+            ...(error?{error}:{}),
+            reason
+        });
+        return this.#events.dispatch(
+            type,
+            compatibilityDetail,
+            {
+                operationId,
+                publicDetail:Object.freeze({
+                    configurationId:normalized.id,
+                    ...(descriptor?{descriptor}:{}),
+                    ...(typeof error?.code==='string'?{code:error.code}:{}),
+                    reason
+                })
+            }
+        );
+    }
+
+    #browserSpeechRoutes(sttProvider,ttsProvider){
+        const sttCatalog=sttProvider.catalog();
+        const ttsCatalog=ttsProvider.catalog();
+        if(sttCatalog.length!==1
+            ||ttsCatalog.length!==1
+            ||typeof sttCatalog[0]?.id!=='string'
+            ||typeof ttsCatalog[0]?.id!=='string'){
+            throw aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.providerConstructionRejected,
+                AI_BROWSER_SPEECH_REASONS.providerConstructionRejected,
+                'Browser speech providers must expose one admitted model each.'
+            );
+        }
+        function roleRoutes(provider,catalog){
+            const selection=Object.freeze({
+                providerId:provider.id,
+                modelId:catalog.id,
+                localOnly:true
+            });
+            return Object.freeze({default:selection,localOnly:selection});
+        }
+        return Object.freeze({
+            routes:Object.freeze({
+                stt:roleRoutes(sttProvider,sttCatalog[0]),
+                tts:roleRoutes(ttsProvider,ttsCatalog[0])
+            }),
+            sttCatalog:sttCatalog[0],
+            ttsCatalog:ttsCatalog[0]
+        });
+    }
+
+    #browserSpeechDescriptor(normalized,sttCatalog,ttsCatalog){
+        function roleDescriptor(role,configured,catalog){
+            return Object.freeze({
+                role,
+                providerId:configured.providerId,
+                modelId:catalog.id,
+                artifactGraphId:catalog.artifactGraphId,
+                offline:configured.offline,
+                ...(role==='tts'?{defaultVoice:catalog.defaultVoice}:{})
+            });
+        }
+        return Object.freeze({
+            protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+            configurationId:normalized.id,
+            stt:roleDescriptor('stt',normalized.stt,sttCatalog),
+            tts:roleDescriptor('tts',normalized.tts,ttsCatalog)
+        });
+    }
+
+    #currentSpeechRoutes(){
+        return Object.freeze({
+            stt:Object.freeze({
+                default:this.#providerRuntime.selection('stt'),
+                localOnly:this.#providerRuntime.selection('stt',{localOnly:true})
+            }),
+            tts:Object.freeze({
+                default:this.#providerRuntime.selection('tts'),
+                localOnly:this.#providerRuntime.selection('tts',{localOnly:true})
+            })
+        });
+    }
+
+    #emptySpeechRoutes(){
+        return Object.freeze({
+            stt:Object.freeze({default:null,localOnly:null}),
+            tts:Object.freeze({default:null,localOnly:null})
+        });
+    }
+
+    async #browserSpeechModule(){
+        if(!this.#browserSpeechModulePromise){
+            const runtime=this;
+            this.#browserSpeechModulePromise=import(
+                'arcane-os/ai/browser-speech'
+            ).catch(function clearRejectedBrowserSpeechImport(error){
+                runtime.#browserSpeechModulePromise=null;
+                throw error;
+            });
+        }
+        return this.#browserSpeechModulePromise;
+    }
+
+    #assertBrowserSpeechGraphs(normalized,module){
+        for(const role of ['stt','tts']){
+            const configured=normalized[role];
+            const graph=configured.graph;
+            if(graph.protocol!==module.BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL
+                ||graph.role!==role
+                ||(graph.providerId!==null
+                    &&graph.providerId!==undefined
+                    &&graph.providerId!==configured.providerId)){
+                throw aiBrowserSpeechError(
+                    AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+                    AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+                    `AI browser speech ${role}.graph does not match its role, provider, or graph protocol.`
+                );
+            }
+        }
+    }
+
+    #browserSpeechCandidate(normalized,descriptor,providers,routes){
+        return {
+            configuration:normalized.configuration,
+            descriptor,
+            providers,
+            routes,
+            unregisters:{stt:null,tts:null},
+            registrationState:{stt:false,tts:false}
+        };
+    }
+
+    #freezeBrowserSpeechRecord(record){
+        record.unregisters=Object.freeze({...record.unregisters});
+        Object.seal(record.registrationState);
+        return Object.freeze(record);
+    }
+
+    #browserSpeechRecordFromReplacement(record,replacement){
+        return this.#freezeBrowserSpeechRecord({
+            configuration:record.configuration,
+            descriptor:record.descriptor,
+            providers:record.providers,
+            routes:replacement.routes,
+            unregisters:{
+                stt:replacement.unregisters.stt,
+                tts:replacement.unregisters.tts
+            },
+            registrationState:{stt:true,tts:true}
+        });
+    }
+
+    #retireBrowserSpeechRegistration(record){
+        if(!record)return;
+        record.registrationState.stt=false;
+        record.registrationState.tts=false;
+        this.#browserSpeechRetiredRecords.add(record);
+    }
+
+    #unregisterBrowserSpeechRecord(record,{committed=false}={}){
+        const failures=[];
+        for(const role of ['tts','stt']){
+            if(record.registrationState?.[role]===false)continue;
+            const unregister=record.unregisters?.[role];
+            if(typeof unregister!=='function'){
+                failures.push(aiBrowserSpeechError(
+                    AI_BROWSER_SPEECH_ERROR_CODES.providerUnregistrationRejected,
+                    AI_BROWSER_SPEECH_REASONS.providerUnregistrationRejected,
+                    `The ${role} browser speech provider ${record.providers[role].id} has no unregister handle.`
+                ));
+                continue;
+            }
+            try{
+                const removed=unregister();
+                if(removed!==true){
+                    failures.push(aiBrowserSpeechError(
+                        AI_BROWSER_SPEECH_ERROR_CODES.providerUnregistrationRejected,
+                        AI_BROWSER_SPEECH_REASONS.providerUnregistrationRejected,
+                        `The ${role} browser speech provider ${record.providers[role].id} no longer owns its registry entry.`
+                    ));
+                    continue;
+                }
+                if(record.registrationState)record.registrationState[role]=false;
+            }catch(error){
+                failures.push(error);
+            }
+        }
+        if(failures.length){
+            throw aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.providerUnregistrationRejected,
+                AI_BROWSER_SPEECH_REASONS.providerUnregistrationRejected,
+                'The browser speech providers could not be unregistered.',
+                failures.length===1
+                    ?failures[0]
+                    :new AggregateError(
+                        failures,
+                        'Multiple browser speech provider unregistrations were rejected.'
+                    ),
+                {committed}
+            );
+        }
+    }
+
+    async #disposeBrowserSpeechProviders(record,{signal=null}={}){
+        if(!record)return;
+        const roles=['stt','tts'].filter(role=>record.providers?.[role]);
+        const settlements=await Promise.allSettled(
+            roles.map(function disposeBrowserSpeechProvider(role){
+                return record.providers[role].dispose({
+                    role,
+                    selection:record.routes[role].default,
+                    signal
+                });
+            })
+        );
+        const failures=settlements
+            .filter(result=>result.status==='rejected')
+            .map(result=>result.reason);
+        if(failures.length){
+            throw failures.length===1
+                ?failures[0]
+                :new AggregateError(
+                    failures,
+                    'Multiple browser speech provider disposals were rejected.'
+                );
+        }
+    }
+
+    async #cleanupBrowserSpeechRecord(
+        record,
+        {signal=null,committed=false}={}
+    ){
+        if(!record)return false;
+        this.#browserSpeechRetiredRecords.add(record);
+        this.#unregisterBrowserSpeechRecord(record,{committed});
+        try{
+            await this.#disposeBrowserSpeechProviders(record,{signal});
+        }catch(error){
+            throw aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.providerDisposalRejected,
+                AI_BROWSER_SPEECH_REASONS.providerDisposalRejected,
+                'The browser speech providers could not be disposed.',
+                error,
+                {committed}
+            );
+        }
+        this.#browserSpeechRetiredRecords.delete(record);
+        return true;
+    }
+
+    async #throwAfterBrowserSpeechCandidateCleanup(record,failure){
+        try{
+            await this.#cleanupBrowserSpeechRecord(record);
+        }catch(cleanupError){
+            throw aiBrowserSpeechError(
+                cleanupError.code
+                    ||AI_BROWSER_SPEECH_ERROR_CODES.providerDisposalRejected,
+                cleanupError.reason
+                    ||AI_BROWSER_SPEECH_REASONS.providerDisposalRejected,
+                'Browser speech candidate cleanup was rejected after configuration rejection.',
+                new AggregateError(
+                    [failure,cleanupError],
+                    'Browser speech configuration and candidate cleanup were both rejected.'
+                )
+            );
+        }
+        throw failure;
+    }
+
+    async #configureBrowserSpeechOperation(normalized,controller,generation,operationId){
+        this.#assertBrowserSpeechOperation(controller,generation);
+        this.#publishBrowserSpeechEvent(
+            AI_BROWSER_SPEECH_EVENT_TYPES.configurationStarted,
+            normalized,
+            operationId,
+            this.#browserSpeechConfigurationRecord
+                ?AI_BROWSER_SPEECH_REASONS.configurationReplaced
+                :AI_BROWSER_SPEECH_REASONS.configurationAdded
+        );
+        this.#assertBrowserSpeechOperation(controller,generation);
+
+        let module;
+        try{
+            module=await this.#browserSpeechModule();
+        }catch(error){
+            this.#assertBrowserSpeechOperation(controller,generation);
+            throw aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.moduleImportRejected,
+                AI_BROWSER_SPEECH_REASONS.moduleImportRejected,
+                'The browser speech SDK module could not be imported.',
+                error
+            );
+        }
+        this.#assertBrowserSpeechOperation(controller,generation);
+        this.#assertBrowserSpeechGraphs(normalized,module);
+        const previousRecord=this.#browserSpeechConfigurationRecord;
+
+        let store;
+        try{
+            store=module.createDbopfsSpeechArtifactStore({
+                dbopfs:normalized.dbopfs,
+                ...(normalized.tableName?{tableName:normalized.tableName}:{})
+            });
+        }catch(error){
+            throw aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.artifactStoreConstructionRejected,
+                AI_BROWSER_SPEECH_REASONS.artifactStoreConstructionRejected,
+                'The browser speech artifact store could not be constructed.',
+                error
+            );
+        }
+
+        let sttProvider=null;
+        let ttsProvider=null;
+        let providers=null;
+        let prepared=null;
+        try{
+            sttProvider=module.createBrowserWhisperProvider({
+                id:normalized.stt.providerId,
+                graph:normalized.stt.graph,
+                store,
+                offline:normalized.stt.offline
+            });
+            ttsProvider=module.createBrowserKokoroProvider({
+                id:normalized.tts.providerId,
+                graph:normalized.tts.graph,
+                store,
+                offline:normalized.tts.offline
+            });
+            providers=Object.freeze({stt:sttProvider,tts:ttsProvider});
+            prepared=this.#browserSpeechRoutes(sttProvider,ttsProvider);
+        }catch(error){
+            const failure=error?.code===AI_BROWSER_SPEECH_ERROR_CODES.providerConstructionRejected
+                ?error
+                :aiBrowserSpeechError(
+                    AI_BROWSER_SPEECH_ERROR_CODES.providerConstructionRejected,
+                    AI_BROWSER_SPEECH_REASONS.providerConstructionRejected,
+                    'The browser speech providers could not be constructed.',
+                    error
+                );
+            const partialProviders={stt:sttProvider,tts:ttsProvider};
+            if(sttProvider||ttsProvider){
+                const partialRoutes={};
+                for(const role of ['stt','tts']){
+                    const provider=partialProviders[role];
+                    const selection=provider
+                        ?Object.freeze({
+                            providerId:provider.id,
+                            modelId:normalized[role].graph.model.id,
+                            localOnly:true
+                        })
+                        :null;
+                    partialRoutes[role]=Object.freeze({
+                        default:selection,
+                        localOnly:selection
+                    });
+                }
+                const partial=this.#browserSpeechCandidate(
+                    normalized,
+                    null,
+                    partialProviders,
+                    Object.freeze(partialRoutes)
+                );
+                return this.#throwAfterBrowserSpeechCandidateCleanup(
+                    partial,
+                    failure
+                );
+            }
+            throw failure;
+        }
+        const descriptor=this.#browserSpeechDescriptor(
+            normalized,
+            prepared.sttCatalog,
+            prepared.ttsCatalog
+        );
+        const candidate=this.#browserSpeechCandidate(
+            normalized,
+            descriptor,
+            providers,
+            prepared.routes
+        );
+        if(previousRecord&&!this.#browserSpeechRecordIsActive(previousRecord)){
+            return this.#throwAfterBrowserSpeechCandidateCleanup(
+                candidate,
+                this.#browserSpeechProviderRouteOwnershipError(
+                    'The prior browser speech provider or route ownership changed before replacement.'
+                )
+            );
+        }
+        let replacementBoundary;
+        try{
+            replacementBoundary=this.#browserSpeechReplacementBoundary(
+                previousRecord
+            );
+        }catch(error){
+            return this.#throwAfterBrowserSpeechCandidateCleanup(
+                candidate,
+                error
+            );
+        }
+        try{
+            await this.#unloadSpeechProviderRolesForTransition(
+                controller.signal,
+                replacementBoundary.expectedProviders
+            );
+            this.#assertBrowserSpeechOperation(controller,generation);
+        }catch(error){
+            return this.#throwAfterBrowserSpeechCandidateCleanup(candidate,error);
+        }
+
+        let replacement;
+        try{
+            replacement=this.#providerRuntime.replaceSpeechProviders({
+                providers,
+                routes:prepared.routes,
+                expectedProviders:replacementBoundary.expectedProviders
+            });
+        }catch(error){
+            const commitFailure=aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.routeCommitRejected,
+                AI_BROWSER_SPEECH_REASONS.routeCommitRejected,
+                'The browser speech provider and route replacement could not be committed.',
+                error
+            );
+            return this.#throwAfterBrowserSpeechCandidateCleanup(
+                candidate,
+                commitFailure
+            );
+        }
+
+        const record=this.#browserSpeechRecordFromReplacement(
+            candidate,
+            replacement
+        );
+        for(const legacyRecord of replacementBoundary.legacyRecords){
+            this.#browserSpeechRetiredLegacyRecords.add(legacyRecord);
+        }
+        if(previousRecord)this.#retireBrowserSpeechRegistration(previousRecord);
+        this.#browserSpeechConfigurationRecord=record;
+        try{
+            this.#applySpeechPreferenceTuple(
+                this.#tupleFromSpeechProviderRoutes(replacement.routes)
+            );
+        }catch(error){
+            const finalizationFailure=aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.routeViewUpdateRejected,
+                AI_BROWSER_SPEECH_REASONS.routeViewUpdateRejected,
+                'The committed browser speech replacement could not update the AI speech route view.',
+                error
+            );
+            if(!previousRecord){
+                finalizationFailure.committed=true;
+                throw finalizationFailure;
+            }
+
+            let rollback;
+            try{
+                rollback=this.#providerRuntime.replaceSpeechProviders({
+                    providers:previousRecord.providers,
+                    routes:previousRecord.routes,
+                    expectedProviders:record.providers
+                });
+            }catch(rollbackError){
+                const candidateCommitted=this.#browserSpeechRecordIsActive(record);
+                if(!candidateCommitted){
+                    this.#browserSpeechConfigurationRecord=null;
+                    this.#browserSpeechRetiredRecords.add(record);
+                }
+                throw aiBrowserSpeechError(
+                    AI_BROWSER_SPEECH_ERROR_CODES.routeRollbackRejected,
+                    AI_BROWSER_SPEECH_REASONS.routeRollbackRejected,
+                    'The prior browser speech providers and routes could not be restored after AI speech route view rejection.',
+                    new AggregateError(
+                        [finalizationFailure,rollbackError],
+                        'Browser speech replacement finalization and rollback were both rejected.'
+                    ),
+                    {committed:candidateCommitted}
+                );
+            }
+
+            this.#retireBrowserSpeechRegistration(record);
+            const restoredRecord=this.#browserSpeechRecordFromReplacement(
+                previousRecord,
+                rollback
+            );
+            this.#browserSpeechRetiredRecords.delete(previousRecord);
+            this.#browserSpeechConfigurationRecord=restoredRecord;
+            this.#applySpeechPreferenceTuple(
+                this.#tupleFromSpeechProviderRoutes(rollback.routes)
+            );
+            return this.#throwAfterBrowserSpeechCandidateCleanup(
+                record,
+                finalizationFailure
+            );
+        }
+        this.#assertBrowserSpeechOperation(
+            controller,
+            generation,
+            {committed:true}
+        );
+        await this.#cleanupRetiredLegacySpeechProviders({
+            signal:controller.signal,
+            committed:true
+        });
+        this.#assertBrowserSpeechOperation(
+            controller,
+            generation,
+            {committed:true}
+        );
+        this.#publishBrowserSpeechEvent(
+            AI_BROWSER_SPEECH_EVENT_TYPES.configured,
+            normalized,
+            operationId,
+            previousRecord
+                ?AI_BROWSER_SPEECH_REASONS.configurationReplaced
+                :AI_BROWSER_SPEECH_REASONS.configurationAdded,
+            {descriptor}
+        );
+
+        for(const retiredRecord of [...this.#browserSpeechRetiredRecords]){
+            try{
+                await this.#cleanupBrowserSpeechRecord(
+                    retiredRecord,
+                    {signal:controller.signal,committed:true}
+                );
+            }catch(error){
+                if(error?.committed===true)throw error;
+                if(generation!==this.#browserSpeechGeneration
+                    ||controller.signal.aborted){
+                    throw this.#browserSpeechAbortError(
+                        controller,
+                        generation,
+                        {committed:true}
+                    );
+                }
+                throw error;
+            }
+        }
+        this.#assertBrowserSpeechOperation(
+            controller,
+            generation,
+            {committed:true}
+        );
+        return descriptor;
+    }
+
+    configureBrowserSpeech(configuration,options={}){
+        const normalized=normalizeBrowserSpeechConfiguration(configuration);
+        const operation=normalizeBrowserSpeechOperationOptions(
+            options,
+            'AI.configureBrowserSpeech'
+        );
+        if(operation.signal?.aborted){
+            return Promise.reject(aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.configurationCancelled,
+                AI_BROWSER_SPEECH_REASONS.configurationCancelled,
+                'The browser speech configuration was cancelled before admission.',
+                operation.signal.reason,
+                {name:'AbortError'}
+            ));
+        }
+        if(this.#browserSpeechConfigurationRecord?.configuration===configuration
+            &&this.#browserSpeechRecordIsActive(
+                this.#browserSpeechConfigurationRecord
+            )
+            &&this.#browserSpeechRetiredRecords.size===0
+            &&!this.#browserSpeechController){
+            return Promise.resolve(this.#browserSpeechConfigurationRecord.descriptor);
+        }
+        const operationId=this.#browserSpeechOperationId('configure-browser-speech');
+        const generation=++this.#browserSpeechGeneration;
+        const superseded=aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.configurationSuperseded,
+            AI_BROWSER_SPEECH_REASONS.configurationReplaced,
+            'The browser speech configuration was replaced by a newer configuration.',
+            undefined,
+            {name:'AbortError'}
+        );
+        this.#browserSpeechController?.abort(superseded);
+        this.#invalidateSpeechControl();
+        const controller=new AbortController();
+        this.#browserSpeechController=controller;
+        const forwardAbort=function cancelBrowserSpeechConfiguration(){
+            if(!controller.signal.aborted)controller.abort(operation.signal.reason);
+        };
+        if(operation.signal?.aborted)forwardAbort();
+        else operation.signal?.addEventListener('abort',forwardAbort,{once:true});
+        const runtime=this;
+        const scheduled=this.#browserSpeechTransition.then(
+            async function runBrowserSpeechConfiguration(){
+                try{
+                    return await runtime.#configureBrowserSpeechOperation(
+                        normalized,
+                        controller,
+                        generation,
+                        operationId
+                    );
+                }catch(error){
+                    const failure=error?.committed===true
+                        ?error
+                        :(generation!==runtime.#browserSpeechGeneration
+                            ||controller.signal.aborted)
+                            ?runtime.#browserSpeechAbortError(controller,generation)
+                            :error;
+                    runtime.#publishBrowserSpeechEvent(
+                        failure.name==='AbortError'
+                            ?AI_BROWSER_SPEECH_EVENT_TYPES.configurationCancelled
+                            :AI_BROWSER_SPEECH_EVENT_TYPES.configurationError,
+                        normalized,
+                        operationId,
+                        failure.reason
+                            ||AI_BROWSER_SPEECH_REASONS.routeCommitRejected,
+                        {error:failure}
+                    );
+                    throw failure;
+                }finally{
+                    operation.signal?.removeEventListener('abort',forwardAbort);
+                    if(runtime.#browserSpeechController===controller){
+                        runtime.#browserSpeechController=null;
+                    }
+                }
+            }
+        );
+        this.#browserSpeechTransition=scheduled.then(
+            function completeBrowserSpeechConfigurationLane(){},
+            function retainBrowserSpeechConfigurationFailure(){}
+        );
+        return scheduled;
+    }
+
+    disposeBrowserSpeech(options={}){
+        const operation=normalizeBrowserSpeechOperationOptions(
+            options,
+            'AI.disposeBrowserSpeech'
+        );
+        if(operation.signal?.aborted){
+            return Promise.reject(aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.configurationCancelled,
+                AI_BROWSER_SPEECH_REASONS.configurationCancelled,
+                'Browser speech disposal was cancelled before admission.',
+                operation.signal.reason,
+                {name:'AbortError'}
+            ));
+        }
+        const operationId=this.#browserSpeechOperationId('dispose-browser-speech');
+        const generation=++this.#browserSpeechGeneration;
+        const superseded=aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.configurationSuperseded,
+            AI_BROWSER_SPEECH_REASONS.configurationDisposed,
+            'The browser speech configuration was superseded by disposal.',
+            undefined,
+            {name:'AbortError'}
+        );
+        const invalidatesSpeech=Boolean(
+            this.#browserSpeechController
+            ||this.#browserSpeechConfigurationRecord
+            ||this.#browserSpeechRetiredRecords.size
+            ||this.#browserSpeechRetiredLegacyRecords.size
+        );
+        this.#browserSpeechController?.abort(superseded);
+        if(invalidatesSpeech)this.#invalidateSpeechControl();
+        const controller=new AbortController();
+        this.#browserSpeechController=controller;
+        const forwardAbort=function cancelBrowserSpeechDisposal(){
+            if(!controller.signal.aborted)controller.abort(operation.signal.reason);
+        };
+        if(operation.signal?.aborted)forwardAbort();
+        else operation.signal?.addEventListener('abort',forwardAbort,{once:true});
+        const runtime=this;
+        const scheduled=this.#browserSpeechTransition.then(
+            async function runBrowserSpeechDisposal(){
+                let normalized=null;
+                let descriptor=null;
+                let changed=false;
+                let committed=false;
+                try{
+                    runtime.#assertBrowserSpeechOperation(controller,generation);
+                    const activeRecord=runtime.#browserSpeechConfigurationRecord;
+                    const records=new Set(runtime.#browserSpeechRetiredRecords);
+                    if(activeRecord)records.add(activeRecord);
+                    const eventRecord=activeRecord||records.values().next().value||null;
+                    if(!eventRecord
+                        &&runtime.#browserSpeechRetiredLegacyRecords.size===0){
+                        return false;
+                    }
+                    if(eventRecord){
+                        normalized=normalizeBrowserSpeechConfiguration(
+                            eventRecord.configuration
+                        );
+                        descriptor=eventRecord.descriptor;
+                    }
+                    if(activeRecord){
+                        if(!runtime.#browserSpeechRecordIsActive(activeRecord)){
+                            throw runtime.#browserSpeechProviderRouteOwnershipError(
+                                'The configured browser speech provider or route ownership changed before disposal.'
+                            );
+                        }
+                        await runtime.#unloadSpeechProviderRolesForTransition(
+                            controller.signal,
+                            activeRecord.providers
+                        );
+                        runtime.#assertBrowserSpeechOperation(controller,generation);
+                        const removed=runtime.#providerRuntime.replaceSpeechProviders({
+                            providers:{stt:null,tts:null},
+                            routes:runtime.#emptySpeechRoutes(),
+                            expectedProviders:activeRecord.providers
+                        });
+                        runtime.#retireBrowserSpeechRegistration(activeRecord);
+                        runtime.#browserSpeechConfigurationRecord=null;
+                        changed=true;
+                        committed=true;
+                        try{
+                            runtime.#applySpeechPreferenceTuple(
+                                runtime.#tupleFromSpeechProviderRoutes(removed.routes)
+                            );
+                        }catch(error){
+                            throw aiBrowserSpeechError(
+                                AI_BROWSER_SPEECH_ERROR_CODES.routeViewUpdateRejected,
+                                AI_BROWSER_SPEECH_REASONS.routeViewUpdateRejected,
+                                'The committed browser speech removal could not update the AI speech route view.',
+                                error,
+                                {committed:true}
+                            );
+                        }
+                    }
+
+                    if(records.size)committed=true;
+                    for(const record of records){
+                        await runtime.#cleanupBrowserSpeechRecord(
+                            record,
+                            {signal:controller.signal,committed:true}
+                        );
+                        changed=true;
+                    }
+                    if(runtime.#browserSpeechRetiredLegacyRecords.size){
+                        await runtime.#cleanupRetiredLegacySpeechProviders({
+                            signal:controller.signal,
+                            committed:true
+                        });
+                        changed=true;
+                    }
+                    runtime.#assertBrowserSpeechOperation(
+                        controller,
+                        generation,
+                        {committed}
+                    );
+                    if(normalized){
+                        runtime.#publishBrowserSpeechEvent(
+                            AI_BROWSER_SPEECH_EVENT_TYPES.disposed,
+                            normalized,
+                            operationId,
+                            AI_BROWSER_SPEECH_REASONS.configurationDisposed,
+                            {descriptor}
+                        );
+                    }
+                    return changed;
+                }catch(error){
+                    const failure=error?.committed===true
+                        ?error
+                        :(generation!==runtime.#browserSpeechGeneration
+                            ||controller.signal.aborted)
+                            ?runtime.#browserSpeechAbortError(
+                                controller,
+                                generation,
+                                {committed}
+                            )
+                            :error;
+                    if(normalized){
+                        runtime.#publishBrowserSpeechEvent(
+                            failure.name==='AbortError'
+                                ?AI_BROWSER_SPEECH_EVENT_TYPES.configurationCancelled
+                                :AI_BROWSER_SPEECH_EVENT_TYPES.configurationError,
+                            normalized,
+                            operationId,
+                            failure.reason
+                                ||AI_BROWSER_SPEECH_REASONS.providerDisposalRejected,
+                            {error:failure}
+                        );
+                    }
+                    throw failure;
+                }finally{
+                    operation.signal?.removeEventListener('abort',forwardAbort);
+                    if(runtime.#browserSpeechController===controller){
+                        runtime.#browserSpeechController=null;
+                    }
+                }
+            }
+        );
+        this.#browserSpeechTransition=scheduled.then(
+            function completeBrowserSpeechDisposalLane(){},
+            function retainBrowserSpeechDisposalFailure(){}
+        );
+        return scheduled;
+    }
+
     async startProviders(options){
         const normalized=normalizeAIStartupOptions(options);
-        this.muted=normalized.startMuted;
+        const generation=++this.#speechControlGeneration;
+        this.muted=true;
         if(normalized.startMuted){
             this.stopAudio();
         }
-        return this.#providerRuntime.start(normalized);
+        const handle=await this.#providerRuntime.start(normalized);
+        if(!normalized.startMuted){
+            const runtime=this;
+            handle.settled.then(
+                function admitReadyStartupSpeech(){
+                    if(generation!==runtime.#speechControlGeneration)return;
+                    const status=runtime.#providerRuntime.status('tts');
+                    runtime.muted=!(status.state==='ready'&&status.loaded===true);
+                },
+                function retainFailClosedStartupSpeech(){
+                    if(generation===runtime.#speechControlGeneration){
+                        runtime.muted=true;
+                    }
+                }
+            );
+        }
+        return handle;
     }
 
     async setSpeechMuted(muted){
         if(typeof muted!=='boolean'){
             throw new TypeError('AI speech muted state must be a boolean.');
         }
-        this.muted=muted;
+        const generation=++this.#speechControlGeneration;
+        this.muted=true;
         if(muted){
             this.stopAudio();
         }
         if(!this.#usesProviderRuntime('tts',this.ttsService)){
+            if(generation===this.#speechControlGeneration)this.muted=muted;
             return true;
         }
         await this.#providerRuntime.setSpeechMuted(muted);
+        if(generation===this.#speechControlGeneration){
+            const status=this.#providerRuntime.status('tts');
+            this.muted=muted
+                ||status.state!=='ready'
+                ||status.loaded!==true;
+        }
         return true;
     }
 
@@ -1624,7 +3086,11 @@ class AI {
                 throw normalizeAIRequestAbort(signal.reason);
             }
             if(!response||typeof response.audioBase64!=='string'){
-                throw new TypeError('Arcane returned an invalid local speech response.');
+                const error=new TypeError(
+                    'The Arcane speech bridge returned invalid TTS audio.'
+                );
+                error.code='ARCANE_AI_TTS_NATIVE_AUDIO_INVALID';
+                throw error;
             }
             return new Blob(
                 [this.#base64ToBytes(response.audioBase64)],
@@ -1637,28 +3103,41 @@ class AI {
         }
 
         await this.#assertAndroidSpeechBridge(this.ttsService);
-        const personality=await window.user?.personality
-            ||'A behavioral health technician with a slight veteran feel on occasion.';
-        const religion=await window.user?.religion||'caring';
-        const response=await fetch(
-            this.urlTTS,
-            {
-                method:'POST',
-                credentials,
-                headers:this.#ttsHeaders[this.ttsService],
-                body:JSON.stringify({
-                    model,
-                    voice,
-                    input,
-                    speed,
-                    instructions:`${personality} and sounding a bit ${religion}`,
-                    response_format:responseFormat
-                }),
-                signal
+        let response;
+        try{
+            response=await fetch(
+                this.urlTTS,
+                {
+                    method:'POST',
+                    credentials,
+                    headers:this.#ttsHeaders[this.ttsService],
+                    body:JSON.stringify({
+                        model,
+                        voice,
+                        input,
+                        speed,
+                        response_format:responseFormat
+                    }),
+                    signal
+                }
+            );
+        }catch(error){
+            if(isAIRequestAbort(error,signal)){
+                throw normalizeAIRequestAbort(error);
             }
-        );
+            throw legacyAIProviderError(
+                'The configured TTS HTTP request failed.',
+                'ARCANE_AI_TTS_HTTP_REQUEST_FAILED',
+                error
+            );
+        }
         if(!response.ok){
-            throw new Error(`Speech synthesis failed with status ${response.status}.`);
+            const error=legacyAIProviderError(
+                `The configured TTS HTTP response was rejected with status ${response.status}.`,
+                'ARCANE_AI_TTS_HTTP_RESPONSE_REJECTED'
+            );
+            error.status=response.status;
+            throw error;
         }
         const contentType=response.headers.get('content-type')||this.audioType;
         return new Blob([await response.arrayBuffer()],{type:contentType});
@@ -3085,34 +4564,17 @@ class AI {
     }
 
     async #requestSpeechAudio(job){
-        if(this.#usesProviderRuntime('tts',this.ttsService)){
-            job.abortController=new AbortController();
-            const responseFormat=this.#providerSpeechResponseFormat();
-            const voice=this.#providerSpeechVoice();
-            const response=await this.#providerRuntime.request(
-                'tts',
-                {
-                    operation:'synthesize',
-                    payload:{
-                        model:this.#providerRuntime.selection('tts')?.modelId,
-                        input:job.text,
-                        responseFormat,
-                        ...(voice?{voice}:{}),
-                        speed:this.voiceSpeed
-                    },
-                    localOnly:false,
-                    signal:job.abortController.signal
-                }
-            );
-            return this.#normalizeProviderSpeechAudio(response);
-        }
-
         job.abortController=new AbortController();
-        const response=await this.#requestLegacySpeechSynthesis(
+        const selection=this.#providerRuntime.selection('tts');
+        const voice=selection?this.#providerSpeechVoice():null;
+        const response=await this.fetchTTS(
             {
-                model:this.modelTTS,
+                model:selection?.modelId||this.modelTTS,
                 input:job.text,
-                responseFormat:this.audioFormat,
+                ...(voice?{voice}:{}),
+                responseFormat:selection
+                    ?this.#providerSpeechResponseFormat()
+                    :this.audioFormat,
                 speed:this.voiceSpeed
             },
             job.abortController.signal
@@ -3234,7 +4696,19 @@ class AI {
             }
         }
 
-        throw new TypeError('Arcane returned an invalid provider speech response.');
+        const error=new TypeError(
+            'The selected TTS provider returned invalid playable audio.'
+        );
+        error.code='ARCANE_AI_TTS_PROVIDER_AUDIO_INVALID';
+        throw error;
+    }
+
+    async #normalizeProviderSpeechBlob(response){
+        if(response instanceof Blob){
+            return response;
+        }
+        const normalized=await this.#normalizeProviderSpeechAudio(response);
+        return new Blob(normalized.chunks,{type:normalized.type||this.audioType});
     }
 
     #getSpeechAudioContext(){
@@ -3252,33 +4726,190 @@ class AI {
         return this.audioContext;
     }
 
+    async fetchTTS(payload={},signal=null){
+        this.#assertServiceConfigured(this.ttsService,'tts');
+        if(!payload
+            ||typeof payload!=='object'
+            ||Array.isArray(payload)
+            ||![Object.prototype,null].includes(Object.getPrototypeOf(payload))){
+            const error=new TypeError('AI.fetchTTS requires a speech request object.');
+            error.code='ARCANE_AI_TTS_REQUEST_INVALID';
+            throw error;
+        }
+        const descriptors=Object.getOwnPropertyDescriptors(payload);
+        const acceptedKeys=new Set([
+            'model',
+            'voice',
+            'input',
+            'responseFormat',
+            'speed'
+        ]);
+        for(const key of Reflect.ownKeys(descriptors)){
+            if(typeof key==='symbol'
+                ||!acceptedKeys.has(key)
+                ||!Object.hasOwn(descriptors[key],'value')){
+                const error=new TypeError(
+                    'AI.fetchTTS accepts only model, voice, input, responseFormat, and speed data properties.'
+                );
+                error.code='ARCANE_AI_TTS_REQUEST_INVALID';
+                throw error;
+            }
+        }
+        if(signal&&(
+            typeof signal.aborted!=='boolean'
+            ||typeof signal.addEventListener!=='function'
+            ||typeof signal.removeEventListener!=='function'
+        )){
+            const error=new TypeError('AI.fetchTTS signal must be an AbortSignal.');
+            error.code='ARCANE_AI_TTS_SIGNAL_INVALID';
+            throw error;
+        }
+        if(signal?.aborted){
+            throw normalizeAIRequestAbort(signal.reason);
+        }
+
+        const input=descriptors.input?.value;
+        if(typeof input!=='string'||!input.trim()){
+            const error=new TypeError('AI.fetchTTS input must be nonempty text.');
+            error.code='ARCANE_AI_TTS_INPUT_INVALID';
+            throw error;
+        }
+        const selection=this.#providerRuntime.selection('tts');
+        const requestedModel=descriptors.model?.value;
+        if(requestedModel!==undefined
+            &&(typeof requestedModel!=='string'
+                ||requestedModel.trim()!==requestedModel
+                ||!requestedModel)){
+            const error=new TypeError(
+                'AI.fetchTTS model must be a nonempty trimmed string when provided.'
+            );
+            error.code='ARCANE_AI_TTS_MODEL_INVALID';
+            throw error;
+        }
+        const model=requestedModel
+            ||selection?.modelId
+            ||this.modelTTS
+            ||'';
+        if(!model){
+            const error=new TypeError('AI.fetchTTS model must be selected explicitly.');
+            error.code='ARCANE_AI_TTS_MODEL_REQUIRED';
+            throw error;
+        }
+        if(selection&&model!==selection.modelId){
+            const error=new TypeError(
+                'AI.fetchTTS model must match the admitted TTS route.'
+            );
+            error.code='ARCANE_AI_TTS_MODEL_SELECTION_MISMATCH';
+            throw error;
+        }
+        const requestedVoice=descriptors.voice?.value;
+        if(requestedVoice!==undefined
+            &&(typeof requestedVoice!=='string'
+                ||requestedVoice.trim()!==requestedVoice
+                ||!requestedVoice)){
+            const error=new TypeError(
+                'AI.fetchTTS voice must be a nonempty trimmed string when provided.'
+            );
+            error.code='ARCANE_AI_TTS_VOICE_INVALID';
+            throw error;
+        }
+        const voice=requestedVoice
+            ?requestedVoice
+            :selection
+                ?this.#providerSpeechVoice()
+                :this.#legacySpeechDefaultVoice('tts',this.ttsService);
+        if(!voice){
+            const error=new TypeError(
+                'AI.fetchTTS requires a caller- or model-catalog-admitted voice.'
+            );
+            error.code='ARCANE_AI_TTS_VOICE_REQUIRED';
+            throw error;
+        }
+        const requestedResponseFormat=descriptors.responseFormat?.value;
+        if(requestedResponseFormat!==undefined
+            &&(typeof requestedResponseFormat!=='string'
+                ||requestedResponseFormat.trim()!==requestedResponseFormat
+                ||!requestedResponseFormat)){
+            const error=new TypeError(
+                'AI.fetchTTS responseFormat must be a nonempty trimmed string when provided.'
+            );
+            error.code='ARCANE_AI_TTS_RESPONSE_FORMAT_INVALID';
+            throw error;
+        }
+        const responseFormat=requestedResponseFormat
+            ||(selection?this.#providerSpeechResponseFormat():this.audioFormat)
+            ||'';
+        if(!responseFormat){
+            const error=new TypeError('AI.fetchTTS responseFormat must be nonempty.');
+            error.code='ARCANE_AI_TTS_RESPONSE_FORMAT_INVALID';
+            throw error;
+        }
+        const speed=descriptors.speed
+            ?Number(descriptors.speed.value)
+            :this.voiceSpeed;
+        if(!Number.isFinite(speed)||speed<=0){
+            const error=new RangeError('AI.fetchTTS speed must be a positive number.');
+            error.code='ARCANE_AI_TTS_SPEED_INVALID';
+            throw error;
+        }
+
+        if(selection){
+            const response=await this.#providerRuntime.request(
+                'tts',
+                {
+                    operation:'synthesize',
+                    payload:{model,voice,input,responseFormat,speed},
+                    localOnly:false,
+                    signal
+                }
+            );
+            if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
+            const audio=await this.#normalizeProviderSpeechBlob(response);
+            if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
+            return audio;
+        }
+
+        return this.#requestLegacySpeechSynthesis(
+            {model,voice,input,responseFormat,speed},
+            signal
+        );
+    }
+
     async fetchSTT(
         audioFile,
         responseHandler=(text='')=>{},
         signal=null
     ){
         this.#assertServiceConfigured(this.sttService,'stt');
+        if(typeof responseHandler!=='function'){
+            const error=new TypeError('AI.fetchSTT responseHandler must be a function.');
+            error.code='ARCANE_AI_STT_RESPONSE_HANDLER_INVALID';
+            throw error;
+        }
         if(signal&&(
             typeof signal.aborted!=='boolean'
             ||typeof signal.addEventListener!=='function'
+            ||typeof signal.removeEventListener!=='function'
         )){
-            throw new TypeError('AI request signal must be an AbortSignal.');
+            const error=new TypeError('AI.fetchSTT signal must be an AbortSignal.');
+            error.code='ARCANE_AI_STT_SIGNAL_INVALID';
+            throw error;
         }
         if(signal?.aborted){
-            throw normalizeAIRequestAbort();
+            throw normalizeAIRequestAbort(signal.reason);
         }
 
         if(this.#usesProviderRuntime('stt',this.sttService)){
-            if(!audioFile||typeof audioFile.arrayBuffer!=='function'){
-                throw new TypeError('Speech transcription requires an audio Blob or File.');
-            }
             const response=await this.#providerRuntime.request(
                 'stt',
                 {
                     operation:'transcribe',
                     payload:{
                         audio:audioFile,
-                        mimeType:String(audioFile.type||'audio/webm'),
+                        mimeType:typeof Blob==='function'
+                            &&audioFile instanceof Blob
+                            ?String(audioFile.type||'audio/webm')
+                            :'audio/webm',
                         model:this.#providerRuntime.selection('stt')?.modelId
                     },
                     localOnly:false,
@@ -3289,11 +4920,15 @@ class AI {
                 ?response
                 :response?.text;
             if(typeof text!=='string'){
-                throw new TypeError(
+                const error=new TypeError(
                     'Arcane returned an invalid provider speech transcription.'
                 );
+                error.code='ARCANE_AI_STT_PROVIDER_TRANSCRIPT_INVALID';
+                throw error;
             }
+            if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
             await responseHandler(text);
+            if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
             return text;
         }
 
@@ -3305,7 +4940,9 @@ class AI {
             },
             signal
         );
+        if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
         await responseHandler(text);
+        if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
         return text;
     }
 
@@ -3659,13 +5296,70 @@ class AI {
     }
 }
 
-window.addEventListener(
-    'user-entity-loaded',
-    instantiateAI
-);
+installAIUserReadyRegistration();
 
-if(window.user?.ready){
-    instantiateAI();
+function installAIUserReadyRegistration(){
+    if(window.user?.ready){
+        instantiateAI();
+        return null;
+    }
+
+    const existingDescriptor=Object.getOwnPropertyDescriptor(
+        globalThis,
+        AI_USER_READY_REGISTRATION_KEY
+    );
+    if(existingDescriptor){
+        const existing=Object.hasOwn(existingDescriptor,'value')
+            ?existingDescriptor.value
+            :null;
+        if(existing?.protocol!==AI_USER_READY_REGISTRATION_PROTOCOL
+            ||typeof existing.dispose!=='function'){
+            throw aiInitializationError(
+                AI_INITIALIZATION_ERROR_CODES.userReadyRegistrationCollision,
+                AI_INITIALIZATION_REASONS.userReadyRegistrationCollision,
+                'The AI user-readiness registration collides with an incompatible realm owner.'
+            );
+        }
+        return existing;
+    }
+
+    let registration;
+    let unsubscribe=null;
+    function disposeAIUserReadyRegistration(){
+        unsubscribe?.();
+        unsubscribe=null;
+        const descriptor=Object.getOwnPropertyDescriptor(
+            globalThis,
+            AI_USER_READY_REGISTRATION_KEY
+        );
+        if(descriptor?.value===registration){
+            delete globalThis[AI_USER_READY_REGISTRATION_KEY];
+        }
+    }
+    registration=Object.freeze({
+        protocol:AI_USER_READY_REGISTRATION_PROTOCOL,
+        dispose:disposeAIUserReadyRegistration
+    });
+    unsubscribe=arcaneEvents.subscribe(
+        'user-entity-loaded',
+        function initializeAIFromCanonicalUser(event){
+            if(event?.detail?.user&&event.detail.user!==window.user)return;
+            if(!window.user?.ready)return;
+            registration.dispose();
+            instantiateAI(event);
+        }
+    );
+    Object.defineProperty(
+        globalThis,
+        AI_USER_READY_REGISTRATION_KEY,
+        {
+            value:registration,
+            configurable:true,
+            enumerable:false,
+            writable:false
+        }
+    );
+    return registration;
 }
 
 function instantiateAI(event) {
@@ -3694,13 +5388,7 @@ function instantiateAI(event) {
 
         window.ai.ready=true;
 
-        const aiReady=new CustomEvent(
-            'ai-ready', {
-                detail: { db: window.ai }
-            }
-        );
-
-        window.dispatchEvent(aiReady);
+        window.ai[AI_PUBLISH_READY]();
 
     }
 }
