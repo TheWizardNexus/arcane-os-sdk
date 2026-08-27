@@ -346,7 +346,10 @@ jobs:
           # upstream autogen.sh links NEWS through ChangeLog.md.
           ln -s CHANGELOG.md ChangeLog.md
           ./autogen.sh
-          emconfigure ./configure
+          if ! emconfigure ./configure; then
+            cat config.log
+            exit 1
+          fi
           emmake make -j1
 
           cd /work/wasm
