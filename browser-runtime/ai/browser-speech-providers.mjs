@@ -449,6 +449,7 @@ function createBrowserSpeechProvider({
     providerId,
     role,
     localOnly: true,
+    ...(role === "tts" ? { defaultVoice: authority.defaultVoice } : {}),
     repository: authority.repository,
     revision: authority.revision,
     runtime: authority.runtime,

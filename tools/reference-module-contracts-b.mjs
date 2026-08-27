@@ -55,7 +55,7 @@ console.log(report.ready, report.slots);`
         name:'LocalAIReadinessController.js',
         classification:'public-first-party',
         lifecycleSideEffects:'The factory attaches local-ai-retry to the optional status component. check() deduplicates active work, updates chat/status presentation, calls onChange, and dispatches one result event. destroy() removes the retry listener.',
-        paramsResults:'availabilityFromReport(report) returns frozen {llm,stt,tts}. createLocalAIReadinessController({chat,status?,preferences,profileHref?,onChange?,...readinessOptions}) returns frozen {check,ensure,destroy,availability,report,readyFor(name)}; check() and ensure() resolve a readiness report.',
+        paramsResults:'availabilityFromReport(report) returns frozen {llm,stt,tts}, with true only when that local slot is explicitly required and ready; missing and non-local-required slots are false and grant no provider, credential, browser-authority, or model-load readiness. createLocalAIReadinessController({chat,status?,preferences,profileHref?,onChange?,...readinessOptions}) returns frozen {check,ensure,destroy,availability,report,readyFor(name)}; check() and ensure() resolve a readiness report.',
         events:['Dispatches local-ai-readiness-change on chat with {report}; bubbles and composes.','Consumes status local-ai-retry and may await local-ai-status-ready.'],
         errors:['TypeError when chat is absent or readyFor() receives a name other than llm/stt/tts.','Readiness rejection propagates.'],
         capabilitiesCore:'No additional authority; it inherits LocalAIReadiness method admission and host behavior.',

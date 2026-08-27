@@ -719,8 +719,7 @@
         ?speech.initialMuted
         :true;
     let initialSpeechMuteListenerInstalled=false;
-    let pendingSpeechAvailability=null;
-    let speechAvailabilityListenerInstalled=false;
+    let latestAIRuntimeRoles=null;
     const hostSubmissionBarrier=new ConversationSubmissionBarrier();
     const aiRuntimeStateAbortController=new AbortController();
     let programmaticSubmissionQueue=Promise.resolve(true);
@@ -910,34 +909,30 @@
     }
 
     function setAIAvailability(input={}){
-        const explicitSpeechAvailability={};
         const availability={
-            llm:Object.prototype.hasOwnProperty.call(input,'llm')
+            llm:hasSelectedAIRuntimeRole('llm')
+                ?latestAIRuntimeRoles.llm.state==='ready'
+                :Object.prototype.hasOwnProperty.call(input,'llm')
                 ?Boolean(input.llm)
                 :host.aiAvailability.llm,
-            stt:Object.prototype.hasOwnProperty.call(input,'stt')
-                ?Boolean(input.stt)
+            stt:latestAIRuntimeRoles
+                ?latestAIRuntimeRoles.stt.state==='ready'
                 :host.aiAvailability.stt,
-            tts:Object.prototype.hasOwnProperty.call(input,'tts')
-                ?Boolean(input.tts)
+            tts:latestAIRuntimeRoles
+                ?latestAIRuntimeRoles.tts.state==='ready'
                 :host.aiAvailability.tts
         };
 
-        if(Object.prototype.hasOwnProperty.call(input,'stt')){
-            explicitSpeechAvailability.stt=availability.stt;
-        }
-        if(Object.prototype.hasOwnProperty.call(input,'tts')){
-            explicitSpeechAvailability.tts=availability.tts;
-        }
         applyAIAvailability(availability);
-        if(Object.keys(explicitSpeechAvailability).length){
-            pendingSpeechAvailability={
-                ...(pendingSpeechAvailability||{}),
-                ...explicitSpeechAvailability
-            };
-            synchronizeSpeechCompatibilityAvailability();
-        }
         return {...availability};
+    }
+
+    function hasSelectedAIRuntimeRole(role){
+        const record=latestAIRuntimeRoles?.[role];
+        return typeof record?.providerId==='string'
+            &&record.providerId.length>0
+            &&typeof record?.modelId==='string'
+            &&record.modelId.length>0;
     }
 
     function applyAIAvailability(availability){
@@ -1131,43 +1126,13 @@
     }
 
     function synchronizeAIRuntimeState(snapshot){
+        latestAIRuntimeRoles=snapshot.roles;
         aiActivationController.synchronize(snapshot.roles.llm);
         applyAIAvailability({
             llm:snapshot.roles.llm.state==='ready',
             stt:snapshot.roles.stt.state==='ready',
             tts:snapshot.roles.tts.state==='ready'
         });
-    }
-
-    function synchronizeSpeechCompatibilityAvailability(){
-        if(!pendingSpeechAvailability){
-            return;
-        }
-        if(speech.componentReady){
-            const availability=pendingSpeechAvailability;
-            pendingSpeechAvailability=null;
-            speech.setAvailability?.({...availability});
-            return;
-        }
-        if(speechAvailabilityListenerInstalled){
-            return;
-        }
-
-        speechAvailabilityListenerInstalled=true;
-        speech.addEventListener(
-            'speech-ready',
-            applyPendingSpeechAvailability,
-            {once:true}
-        );
-    }
-
-    function applyPendingSpeechAvailability(){
-        speechAvailabilityListenerInstalled=false;
-        if(pendingSpeechAvailability){
-            const availability=pendingSpeechAvailability;
-            pendingSpeechAvailability=null;
-            speech.setAvailability?.({...availability});
-        }
     }
 
     function formatConversationTime(milliseconds=0){

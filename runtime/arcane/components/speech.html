@@ -63,6 +63,13 @@
         text-align: center;
     }
 
+    #sttActivationButton {
+        grid-column: 1;
+        max-width: 8rem;
+        background: var(--arcane-action, var(--primary-color));
+        color: var(--arcane-action-text, var(--button-text-color, var(--text-color)));
+    }
+
     #recordButton:active,
     #recordButton.pressed {
         opacity: .82;
@@ -108,7 +115,8 @@
             grid-template-columns: auto minmax(0, 1fr) auto;
         }
 
-        #recordButton {
+        #recordButton,
+        #sttActivationButton {
             grid-row: 1 / span 2;
         }
 
@@ -131,6 +139,7 @@
 
 <p class="hidden">Will auto send after X seconds of silence set in code.</p>
 <button id="recordButton" type="button" aria-label="Transcription unavailable" disabled>Hold to talk</button>
+<button id="sttActivationButton" type="button" hidden disabled>Start transcription</button>
 <button id="stopButton" type="button" class="hidden" disabled>Send</button>
 <p id="speechStatus" class="speech_status" role="status" aria-live="polite"></p>
 <button id="endButton" type="button" class="end">End</button>
@@ -151,6 +160,7 @@
     const host = this;
     const shadowRoot = host.shadowRoot;
     const recordButton = shadowRoot.querySelector('#recordButton');
+    const sttActivationButton = shadowRoot.querySelector('#sttActivationButton');
     const stopButton = shadowRoot.querySelector('#stopButton');
     const endButton = shadowRoot.querySelector('#endButton');
     const muteButton = shadowRoot.querySelector('#muteButton');
@@ -167,11 +177,13 @@
     let recordingGeneration = 0;
     let transcriptionGeneration = 0;
     let transcriptionActive = false;
+    let transcriptionAbortController = null;
     let silenceTimer = null;
     let activePointerId = null;
     let keyboardRecording = false;
     let localStatus = null;
     let pendingTTSIntent = null;
+    let ttsIntentGeneration = 0;
     let destroyed = false;
 
     const initialMutedWasHydrated = typeof host.initialMuted === 'boolean';
@@ -180,6 +192,10 @@
     host.configure = configure;
     host.destroy = destroy;
     host.reportTTSError = reportTTSError;
+    host.requestSTTActivation = host.requestSTTActivation
+        || function requestSTTActivation(intent) {
+            return requestAIRuntimeIntent(intent);
+        };
     host.setAvailability = setAvailability;
     host.setMuted = setMuted;
     host.availability = {
@@ -190,6 +206,13 @@
         stt: false,
         tts: false
     };
+    const sttActivationController = createSTTActivationController(
+        {
+            host,
+            button: sttActivationButton,
+            onChange: renderSTTActivationState
+        }
+    );
 
     recordButton.addEventListener('pointerdown', handleRecordPointerDown);
     recordButton.addEventListener('pointerup', handleRecordPointerUp);
@@ -231,6 +254,191 @@
         )
     );
 
+    function createSTTActivationController({
+        host,
+        button,
+        onChange,
+        EventClass = CustomEvent
+    }) {
+        let role = null;
+        let requestPending = false;
+        let requestError = '';
+        let requestGeneration = 0;
+        let destroyed = false;
+
+        function visibleError(error, fallback) {
+            const message = typeof error?.message === 'string'
+                ? error.message.trim()
+                : '';
+            return (message || fallback).slice(0, 240);
+        }
+
+        function cancellation(error) {
+            return error?.name === 'AbortError'
+                || [
+                    'ARCANE_AI_REQUEST_ABORTED',
+                    'ARCANE_AI_OPERATION_SUPERSEDED'
+                ]
+                    .includes(error?.code);
+        }
+
+        function selected() {
+            return typeof role?.providerId === 'string'
+                && role.providerId.length > 0
+                && typeof role?.modelId === 'string'
+                && role.modelId.length > 0;
+        }
+
+        function action() {
+            if (!selected()) {
+                return null;
+            }
+            if (role.state === 'loading') {
+                return 'unload';
+            }
+            if (!role.busy && ['unloaded', 'error'].includes(role.state)) {
+                return 'load';
+            }
+            return null;
+        }
+
+        async function request(nextAction) {
+            if (destroyed || requestPending || action() !== nextAction) {
+                return false;
+            }
+            const generation = ++requestGeneration;
+            requestError = '';
+            const intent = Object.freeze(
+                {
+                    role: 'stt',
+                    action: nextAction,
+                    reason: 'user'
+                }
+            );
+            const activationRequest = Object.freeze({intent, state: role});
+            const activationEvent = new EventClass(
+                'speech-stt-activation-request',
+                {
+                    bubbles: true,
+                    composed: true,
+                    cancelable: true,
+                    detail: activationRequest
+                }
+            );
+            requestPending = true;
+            const accepted = host.dispatchEvent(activationEvent);
+            if (!accepted
+                || destroyed
+                || generation !== requestGeneration
+                || action() !== nextAction) {
+                if (!destroyed && generation === requestGeneration) {
+                    requestPending = false;
+                    onChange();
+                }
+                return false;
+            }
+            onChange();
+            try {
+                await host.requestSTTActivation(intent);
+                if (destroyed || generation !== requestGeneration) {
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                if (destroyed || generation !== requestGeneration) {
+                    return false;
+                }
+                if (nextAction === 'load'
+                    && cancellation(error)
+                    && ['unloaded', 'unloading'].includes(role?.state)) {
+                    return false;
+                }
+                const message = visibleError(
+                    error,
+                    `The transcription ${nextAction} request failed.`
+                );
+                requestError = message;
+                host.dispatchEvent(
+                    new EventClass(
+                        'speech-stt-activation-error',
+                        {
+                            bubbles: true,
+                            composed: true,
+                            detail: Object.freeze(
+                                {
+                                    request: activationRequest,
+                                    error,
+                                    message
+                                }
+                            )
+                        }
+                    )
+                );
+                return false;
+            } finally {
+                if (!destroyed && generation === requestGeneration) {
+                    requestPending = false;
+                    onChange();
+                }
+            }
+        }
+
+        function activateSelectedSTT() {
+            const nextAction = action();
+            if (nextAction) {
+                void request(nextAction);
+            }
+        }
+
+        function synchronize(nextRole) {
+            if (destroyed) {
+                return;
+            }
+            if (role?.state !== nextRole.state
+                || role?.providerId !== nextRole.providerId
+                || role?.modelId !== nextRole.modelId
+                || role?.loaded !== nextRole.loaded
+                || role?.busy !== nextRole.busy
+                || role?.operationId !== nextRole.operationId) {
+                requestGeneration += 1;
+                requestError = '';
+                requestPending = false;
+            }
+            role = nextRole;
+        }
+
+        function destroy() {
+            if (destroyed) {
+                return;
+            }
+            destroyed = true;
+            requestGeneration += 1;
+            requestPending = false;
+            button.removeEventListener('click', activateSelectedSTT);
+        }
+
+        button.addEventListener('click', activateSelectedSTT);
+        return Object.freeze(
+            {
+                get action() {
+                    return action();
+                },
+                get error() {
+                    return requestError;
+                },
+                get pending() {
+                    return requestPending;
+                },
+                get selected() {
+                    return selected();
+                },
+                request,
+                synchronize,
+                destroy
+            }
+        );
+    }
+
     function unavailableRole(role) {
         return Object.freeze(
             {
@@ -248,14 +456,11 @@
         );
     }
 
-    function compatibilityRole(role, ready) {
-        return Object.freeze(
-            {
-                ...unavailableRole(role),
-                state: ready ? 'ready' : 'unavailable',
-                loaded: ready
-            }
-        );
+    function selectedRole(role) {
+        return typeof role?.providerId === 'string'
+            && role.providerId.length > 0
+            && typeof role?.modelId === 'string'
+            && role.modelId.length > 0;
     }
 
     function configure(options = {}) {
@@ -288,11 +493,15 @@
         if (Object.prototype.hasOwnProperty.call(input, 'microphone')) {
             host.availability.microphone = Boolean(input.microphone);
         }
-        if (Object.prototype.hasOwnProperty.call(input, 'stt')) {
-            sttRole = compatibilityRole('stt', Boolean(input.stt));
+        if (Object.prototype.hasOwnProperty.call(input, 'stt')
+            && !Boolean(input.stt)
+            && !selectedRole(sttRole)) {
+            sttRole = unavailableRole('stt');
         }
-        if (Object.prototype.hasOwnProperty.call(input, 'tts')) {
-            ttsRole = compatibilityRole('tts', Boolean(input.tts));
+        if (Object.prototype.hasOwnProperty.call(input, 'tts')
+            && !Boolean(input.tts)
+            && !selectedRole(ttsRole)) {
+            ttsRole = unavailableRole('tts');
         }
 
         if (microphoneWasAvailable && !host.availability.microphone) {
@@ -337,6 +546,7 @@
     }
 
     function applyRoleTransitions(previousSTTRole, previousTTSRole) {
+        sttActivationController.synchronize(sttRole);
         const sttBecameUnready = previousSTTRole.state === 'ready'
             && sttRole.state !== 'ready';
         const ttsBecameUnready = previousTTSRole.state === 'ready'
@@ -362,6 +572,11 @@
         renderStatus();
     }
 
+    function renderSTTActivationState() {
+        renderControls();
+        renderStatus();
+    }
+
     function clearSettledTTSIntent() {
         if (!pendingTTSIntent) {
             return;
@@ -383,6 +598,11 @@
     function renderControls() {
         const transcriptionReady = sttRole.state === 'ready';
         const microphoneReady = host.availability.microphone;
+        const activationVisible = sttActivationController.selected
+            && sttRole.state !== 'ready'
+            && ['unloaded', 'loading', 'unloading', 'error']
+                .includes(sttRole.state);
+        recordButton.hidden = activationVisible;
         recordButton.disabled = !transcriptionReady
             || !microphoneReady
             || sttRole.busy
@@ -395,7 +615,60 @@
             'aria-pressed',
             String(recordingRequested || Boolean(captureSession))
         );
+        sttActivationButton.hidden = !activationVisible;
+        sttActivationButton.disabled = destroyed
+            || sttActivationController.pending
+            || sttRole.state === 'unloading'
+            || sttActivationController.action === null;
+        sttActivationButton.textContent = transcriptionActivationLabel();
+        sttActivationButton.title = transcriptionActivationTitle();
+        sttActivationButton.setAttribute(
+            'aria-label',
+            sttActivationButton.title
+        );
+        sttActivationButton.setAttribute(
+            'aria-busy',
+            String(
+                sttActivationController.pending
+                || ['loading', 'unloading'].includes(sttRole.state)
+            )
+        );
         renderTTSControl();
+    }
+
+    function transcriptionActivationLabel() {
+        if (sttActivationController.pending) {
+            return 'Requesting…';
+        }
+        if (sttRole.state === 'loading') {
+            return 'Cancel loading';
+        }
+        if (sttRole.state === 'unloading') {
+            return 'Canceling…';
+        }
+        if (sttRole.state === 'error') {
+            return 'Try again';
+        }
+        return 'Start transcription';
+    }
+
+    function transcriptionActivationTitle() {
+        if (sttActivationController.pending) {
+            return 'Requesting transcription activation.';
+        }
+        if (sttRole.state === 'loading') {
+            return 'Cancel loading the selected transcription service.';
+        }
+        if (sttRole.state === 'unloading') {
+            return 'The selected transcription service is being released.';
+        }
+        if (sttRole.state === 'error') {
+            return sttActivationController.error || visibleErrorMessage(
+                sttRole.error,
+                'Retry loading the selected transcription service.'
+            );
+        }
+        return 'Start the selected transcription service.';
     }
 
     function transcriptionButtonTitle() {
@@ -492,15 +765,23 @@
             'aria-busy',
             String(
                 sttRole.state === 'loading'
+                || sttRole.state === 'unloading'
                 || ttsRole.state === 'loading'
                 || sttRole.busy
                 || ttsRole.busy
+                || sttActivationController.pending
                 || transcriptionActive
             )
         );
     }
 
     function describeSTTRole() {
+        if (sttActivationController.error) {
+            return `Transcription activation error: ${sttActivationController.error}.`;
+        }
+        if (sttActivationController.pending) {
+            return 'Transcription activation requested.';
+        }
         if (sttRole.state === 'ready') {
             if (!host.availability.microphone) {
                 return 'Microphone unavailable.';
@@ -508,13 +789,19 @@
             return sttRole.busy ? 'Transcription busy.' : 'Transcription ready.';
         }
         if (sttRole.state === 'loading') {
-            return `Transcription ${formatRoleProgress(sttRole.progress, 'loading')}.`;
+            return `Transcription ${formatRoleProgress(sttRole.progress, 'loading')}; Cancel is available.`;
+        }
+        if (sttRole.state === 'unloading') {
+            return `Transcription ${formatRoleProgress(sttRole.progress, 'releasing')}.`;
         }
         if (sttRole.state === 'error') {
             return `Transcription error: ${visibleErrorMessage(sttRole.error, 'Unknown error')}.`;
         }
         if (sttRole.state === 'disposed') {
             return 'Transcription disposed.';
+        }
+        if (sttRole.state === 'unloaded' && sttActivationController.selected) {
+            return 'Transcription selected and waiting to load.';
         }
         return 'Transcription unavailable.';
     }
@@ -748,10 +1035,15 @@
     }
 
     function requestTTSIntent(action, reason) {
+        const generation = ++ttsIntentGeneration;
         pendingTTSIntent = action === 'load' && ttsRole.state === 'ready'
             ? null
             : action;
+        let lifecycle = null;
         try {
+            if (typeof globalThis.ai?.setSpeechMuted === 'function') {
+                lifecycle = globalThis.ai.setSpeechMuted(action === 'unload');
+            }
             requestAIRuntimeIntent(
                 {
                     role: 'tts',
@@ -761,8 +1053,27 @@
             );
         } catch (error) {
             pendingTTSIntent = null;
+            if (action === 'load') {
+                host.muted = true;
+                stopTTSPlayback();
+            }
             reportTTSLifecycleError(error, action);
+            return false;
         }
+        void Promise.resolve(lifecycle).catch(
+            function reportCurrentTTSSpeechLifecycleFailure(error) {
+                if (destroyed || generation !== ttsIntentGeneration) {
+                    return;
+                }
+                pendingTTSIntent = null;
+                if (action === 'load') {
+                    host.muted = true;
+                    stopTTSPlayback();
+                }
+                reportTTSLifecycleError(error, action);
+            }
+        );
+        return true;
     }
 
     function reportTTSLifecycleError(error, action) {
@@ -1051,6 +1362,9 @@
 
     async function transcribeAudio(audioFile) {
         const generation = ++transcriptionGeneration;
+        const controller = new AbortController();
+        transcriptionAbortController?.abort();
+        transcriptionAbortController = controller;
         transcriptionActive = true;
         localStatus = {
             message: 'Transcribing speech.',
@@ -1065,7 +1379,11 @@
                 throw new Error('The selected transcription service is unavailable.');
             }
 
-            const transcription = await aiRuntime.fetchSTT(audioFile);
+            const transcription = await aiRuntime.fetchSTT(
+                audioFile,
+                undefined,
+                controller.signal
+            );
             if (
                 generation !== transcriptionGeneration
                 || sttRole.state !== 'ready'
@@ -1086,6 +1404,9 @@
             }
             return false;
         } finally {
+            if (transcriptionAbortController === controller) {
+                transcriptionAbortController = null;
+            }
             if (generation === transcriptionGeneration) {
                 transcriptionActive = false;
                 renderControls();
@@ -1126,6 +1447,8 @@
             || transcriptionActive;
         recordingGeneration += 1;
         transcriptionGeneration += 1;
+        transcriptionAbortController?.abort();
+        transcriptionAbortController = null;
         recordingRequested = false;
         transcriptionActive = false;
         clearSilenceTimer();
@@ -1199,6 +1522,7 @@
 
         destroyed = true;
         runtimeStateAbortController.abort();
+        sttActivationController.destroy();
         window.removeEventListener('pagehide', destroy);
         microphonePermissionStatus?.removeEventListener?.(
             'change',

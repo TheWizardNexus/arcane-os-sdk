@@ -57,6 +57,7 @@ const INTENT_SUBSCRIPTION_OPTION_KEYS = Object.freeze([
 ]);
 const STARTUP_OPTION_KEYS = Object.freeze([
     'startMuted',
+    'startTranscription',
     'signal'
 ]);
 const ROLE_SET = new Set(AI_RUNTIME_ROLES);
@@ -395,6 +396,7 @@ function startupOptions(options) {
     if (options === undefined) {
         return {
             startMuted: true,
+            startTranscription: false,
             signal: null
         };
     }
@@ -403,14 +405,21 @@ function startupOptions(options) {
     const startMuted = Object.hasOwn(options, 'startMuted')
         ? options.startMuted
         : true;
+    const startTranscription = Object.hasOwn(options, 'startTranscription')
+        ? options.startTranscription
+        : false;
     const signal = Object.hasOwn(options, 'signal') ? options.signal : null;
     if (typeof startMuted !== 'boolean') {
         fail('startup options.startMuted must be a boolean.');
+    }
+    if (typeof startTranscription !== 'boolean') {
+        fail('startup options.startTranscription must be a boolean.');
     }
     assertAbortSignal(signal);
 
     return {
         startMuted,
+        startTranscription,
         signal
     };
 }
@@ -419,11 +428,11 @@ function hasAIRuntimeSelection(roleState) {
     return roleState.providerId !== null && roleState.modelId !== null;
 }
 
-function startupRequestedRoles(snapshot, startMuted) {
+function startupRequestedRoles(snapshot, startMuted, startTranscription) {
     return Object.freeze(
         {
             llm: hasAIRuntimeSelection(snapshot.roles.llm),
-            stt: hasAIRuntimeSelection(snapshot.roles.stt),
+            stt: startTranscription && hasAIRuntimeSelection(snapshot.roles.stt),
             tts: !startMuted && hasAIRuntimeSelection(snapshot.roles.tts)
         }
     );
@@ -444,13 +453,20 @@ function startupRoleReport(requested, roleState) {
     );
 }
 
-function startupReport(snapshot, startRevision, startMuted, requestedRoles) {
+function startupReport(
+    snapshot,
+    startRevision,
+    startMuted,
+    startTranscription,
+    requestedRoles
+) {
     return Object.freeze(
         {
             protocol: AI_RUNTIME_PROTOCOL,
             startRevision,
             currentRevision: snapshot.revision,
             startMuted,
+            startTranscription,
             chatReady: snapshot.roles.llm.state === 'ready',
             roles: Object.freeze(
                 {
@@ -726,6 +742,7 @@ export function startAIRuntime(options) {
             snapshot,
             startRevision,
             normalized.startMuted,
+            normalized.startTranscription,
             requestedRoles
         );
         barrierResolved = true;
@@ -747,6 +764,7 @@ export function startAIRuntime(options) {
                 snapshot,
                 startRevision,
                 normalized.startMuted,
+                normalized.startTranscription,
                 requestedRoles
             )
         );
@@ -847,7 +865,8 @@ export function startAIRuntime(options) {
     startRevision = latestSnapshot.revision;
     requestedRoles = startupRequestedRoles(
         latestSnapshot,
-        normalized.startMuted
+        normalized.startMuted,
+        normalized.startTranscription
     );
     normalized.signal?.addEventListener(
         'abort',

@@ -597,6 +597,25 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
         assert.match(chat.normalization,/destroy aborts state\/activation observation[\s\S]*returns undefined/u);
     });
 
+    await t.test('speech documents explicit selected-STT activation without hidden startup',async()=>{
+        const speech=componentInventory.artifacts.find(
+            component=>component.name==='speech.html'
+        );
+        assert.ok(speech);
+        const source=await readFile(path.join(repositoryRoot,speech.file),'utf8');
+        for(const value of [
+            "role: 'stt'",
+            "'speech-stt-activation-request'",
+            "'speech-stt-activation-error'"
+        ])assert.match(source,new RegExp(escapeRegExp(value),'u'),value);
+        assert.match(source,/cancelable: true[\s\S]*const accepted = host[.]dispatchEvent\(activationEvent\)[\s\S]*if \(!accepted/u);
+        assert.match(source,/state === 'loading'[\s\S]*return 'unload'/u);
+        assert.match(componentGuide,/Start transcription[\s\S]*Cancel loading[\s\S]*Try again/u);
+        assert.match(componentGuide,/preventDefault\(\)[\s\S]*suppresses the callback/u);
+        assert.match(componentGuide,/emits no activation request on import or state observation/u);
+        assert.match(componentGuide,/`startTranscription=false`[\s\S]*does not request STT/u);
+    });
+
     await t.test('all synchronized JavaScript and inline component scripts parse',()=>{
         assert.equal(live.parsedJavascriptCount,99);
         assert.equal(live.support.length,1);
@@ -659,7 +678,8 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
             'AIProviderRuntime.js',
             ['Overview','Public surface','Availability and normalization','Example']
         );
-        assert.match(providerRuntime,/start\(\{startMuted=true,signal=null\}=\{\}\)[\s\S]*\{barrier,settled,cancel\}/u);
+        assert.match(providerRuntime,/start\(\{startMuted=true,startTranscription=false,signal=null\}=\{\}\)[\s\S]*\{barrier,settled,cancel\}/u);
+        assert.match(providerRuntime,/latest-request-wins[\s\S]*waits for its provider promise to settle/u);
         assert.match(providerRuntime,/AI_LOCAL_MODEL_REQUIRED/u);
 
         const configuredSession=requireGuideSection(

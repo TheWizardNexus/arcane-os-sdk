@@ -176,7 +176,11 @@ function createLegacyAIStreamBridge(execute,sourceSignal){
 
 function normalizeAIStartupOptions(options){
     if(options===undefined){
-        return Object.freeze({startMuted:true,signal:null});
+        return Object.freeze({
+            startMuted:true,
+            startTranscription:false,
+            signal:null
+        });
     }
     if(!options||typeof options!=='object'||Array.isArray(options)){
         throw new TypeError('AI startup options must be a plain object.');
@@ -187,7 +191,11 @@ function normalizeAIStartupOptions(options){
     }
     const descriptors=Object.getOwnPropertyDescriptors(options);
     for(const key of Reflect.ownKeys(descriptors)){
-        if(typeof key==='symbol'||(key!=='startMuted'&&key!=='signal')){
+        if(typeof key==='symbol'||(
+            key!=='startMuted'
+            &&key!=='startTranscription'
+            &&key!=='signal'
+        )){
             throw new TypeError('AI startup options contain an unknown option.');
         }
         if(!Object.hasOwn(descriptors[key],'value')){
@@ -197,11 +205,17 @@ function normalizeAIStartupOptions(options){
     const startMuted=Object.hasOwn(descriptors,'startMuted')
         ?descriptors.startMuted.value
         :true;
+    const startTranscription=Object.hasOwn(descriptors,'startTranscription')
+        ?descriptors.startTranscription.value
+        :false;
     const signal=Object.hasOwn(descriptors,'signal')
         ?descriptors.signal.value
         :null;
     if(typeof startMuted!=='boolean'){
         throw new TypeError('AI startup startMuted must be a boolean.');
+    }
+    if(typeof startTranscription!=='boolean'){
+        throw new TypeError('AI startup startTranscription must be a boolean.');
     }
     if(signal!==null&&signal!==undefined&&(
         typeof signal!=='object'
@@ -211,7 +225,7 @@ function normalizeAIStartupOptions(options){
     )){
         throw new TypeError('AI startup signal must be an AbortSignal.');
     }
-    return Object.freeze({startMuted,signal});
+    return Object.freeze({startMuted,startTranscription,signal});
 }
 
 class AI {
@@ -352,6 +366,8 @@ class AI {
     #providerRuntime=getAIProviderRuntime();
     #legacyLLMProviders=new Map();
     #legacyLLMReadiness=Promise.resolve(null);
+    #legacySpeechProviders=new Map();
+    #legacySpeechReadiness=Promise.resolve(null);
     #preferenceTuple=Object.freeze([
         'OPENAI',
         'OPENAI',
@@ -401,6 +417,9 @@ class AI {
         this.#license=typeof value==='string' ? value.trim():'';
         this.#retainLegacyLLMReadiness(
             this.#reconcileLegacyLLMReadiness()
+        );
+        this.#retainLegacySpeechReadiness(
+            this.#reconcileLegacySpeechReadiness()
         );
         return this.#license;
     }
@@ -627,6 +646,263 @@ class AI {
         });
     }
 
+    #legacySpeechService(role){
+        return role==='stt'?this.sttService:this.ttsService;
+    }
+
+    #legacySpeechModel(role){
+        return role==='stt'?this.modelSTT:this.modelTTS;
+    }
+
+    #legacySpeechProviderKey(role,providerId){
+        return `${role}:${providerId}`;
+    }
+
+    #legacySpeechDefaultVoice(role,providerId){
+        if(role!=='tts'){
+            return null;
+        }
+        if(providerId==='OPENAI'){
+            const selected=typeof globalThis.window?.user?.AI_voice==='string'
+                ?globalThis.window.user.AI_voice.trim()
+                :'';
+            return selected||'alloy';
+        }
+        if(providerId==='LOCAL_SPEACH'){
+            return 'af_heart';
+        }
+        return null;
+    }
+
+    #legacySpeechCapability(role,providerId){
+        const service=this.#legacySpeechService(role);
+        const model=this.#legacySpeechModel(role);
+        if(service!==providerId||!model){
+            return false;
+        }
+        if(providerId==='OPENAI'){
+            return Boolean(this.license)&&typeof globalThis.fetch==='function';
+        }
+        if(providerId==='LOCAL_SPEACH'){
+            return Boolean(this.#nativeSpeech(service,role));
+        }
+        return false;
+    }
+
+    #legacySpeechInspection(role,providerId,selection){
+        const localOnly=providerId==='LOCAL_SPEACH';
+        if(!selection
+            ||selection.providerId!==providerId
+            ||selection.modelId!==this.#legacySpeechModel(role)
+            ||selection.localOnly!==localOnly
+            ||this.#legacySpeechService(role)!==providerId){
+            return Object.freeze({
+                available:false,
+                code:'ARCANE_AI_MODEL_AUTHORITY_REQUIRED',
+                message:`The selected legacy ${role.toUpperCase()} route does not match the active AI configuration.`
+            });
+        }
+        if(!this.#legacySpeechCapability(role,providerId)){
+            return Object.freeze({
+                available:false,
+                code:providerId==='LOCAL_SPEACH'
+                    ?'AI_NATIVE_LOCAL_REQUIRED'
+                    :'AI_PROVIDER_NOT_CONFIGURED',
+                message:providerId==='LOCAL_SPEACH'
+                    ?`Local ${role.toUpperCase()} requires the capability-gated Arcane API.`
+                    :'AI provider is not configured.'
+            });
+        }
+        return Object.freeze({
+            available:true,
+            authority:Object.freeze({
+                protocol:AI_MODEL_AUTHORITY_PROTOCOL,
+                providerId,
+                modelId:selection.modelId,
+                admitted:true
+            })
+        });
+    }
+
+    #createLegacySpeechProvider(role,providerId){
+        const runtime=this;
+        const localOnly=providerId==='LOCAL_SPEACH';
+        const expectedOperation=role==='stt'?'transcribe':'synthesize';
+        let state='unloaded';
+        let busy=false;
+
+        function statusLegacySpeechProvider(){
+            if(state==='ready'
+                &&!busy
+                &&!runtime.#legacySpeechCapability(role,providerId)){
+                state='unloaded';
+            }
+            return Object.freeze({
+                state,
+                loaded:state==='ready',
+                busy
+            });
+        }
+
+        function assertLegacySpeechSelection(selection){
+            const inspection=runtime.#legacySpeechInspection(
+                role,
+                providerId,
+                selection
+            );
+            if(!inspection.available){
+                throw legacyAIProviderError(
+                    inspection.message,
+                    inspection.code
+                );
+            }
+            return inspection;
+        }
+
+        function releaseLegacySpeechRequest(){
+            busy=false;
+        }
+
+        return Object.freeze({
+            protocol:AI_PROVIDER_PROTOCOL,
+            role,
+            id:providerId,
+            localOnly,
+            catalog:function catalogLegacySpeechProvider(){
+                const model=runtime.#legacySpeechModel(role);
+                if(runtime.#legacySpeechService(role)!==providerId||!model){
+                    return Object.freeze([]);
+                }
+                const defaultVoice=runtime.#legacySpeechDefaultVoice(
+                    role,
+                    providerId
+                );
+                return Object.freeze([
+                    Object.freeze({
+                        id:model,
+                        ...(defaultVoice?{defaultVoice}:{})
+                    })
+                ]);
+            },
+            inspect:function inspectLegacySpeechProvider(selection,{signal}={}){
+                if(signal?.aborted){
+                    throw normalizeAIRequestAbort(signal.reason);
+                }
+                return runtime.#legacySpeechInspection(role,providerId,selection);
+            },
+            status:statusLegacySpeechProvider,
+            load:function loadLegacySpeechProvider(context={}){
+                if(context.signal?.aborted){
+                    throw normalizeAIRequestAbort(context.signal.reason);
+                }
+                if(state==='disposed'){
+                    throw legacyAIProviderError(
+                        `The legacy ${role.toUpperCase()} provider is disposed.`,
+                        'ARCANE_AI_PROVIDER_DISPOSED'
+                    );
+                }
+                if(busy){
+                    throw legacyAIProviderError(
+                        `The legacy ${role.toUpperCase()} provider owns an active request.`,
+                        'ARCANE_AI_ROLE_BUSY'
+                    );
+                }
+                if(typeof context.progress!=='function'){
+                    throw new TypeError(
+                        `Legacy ${role.toUpperCase()} provider load progress must be a function.`
+                    );
+                }
+                const inspection=assertLegacySpeechSelection(context.selection);
+                state='loading';
+                context.progress({
+                    phase:'capability',
+                    completed:0,
+                    total:1,
+                    unit:'items',
+                    heartbeat:false
+                });
+                if(context.signal?.aborted){
+                    state='unloaded';
+                    throw normalizeAIRequestAbort(context.signal.reason);
+                }
+                state='ready';
+                context.progress({
+                    phase:'capability',
+                    completed:1,
+                    total:1,
+                    unit:'items',
+                    heartbeat:false
+                });
+                return Object.freeze({
+                    authority:inspection.authority,
+                    status:statusLegacySpeechProvider()
+                });
+            },
+            request:function requestLegacySpeechProvider(context={}){
+                if(context.signal?.aborted){
+                    throw normalizeAIRequestAbort(context.signal.reason);
+                }
+                assertLegacySpeechSelection(context.selection);
+                const current=statusLegacySpeechProvider();
+                if(current.state!=='ready'||!current.loaded){
+                    throw legacyAIProviderError(
+                        `The legacy ${role.toUpperCase()} provider is not ready.`,
+                        'ARCANE_AI_ROLE_NOT_READY'
+                    );
+                }
+                if(busy){
+                    throw legacyAIProviderError(
+                        `The legacy ${role.toUpperCase()} provider owns an active request.`,
+                        'ARCANE_AI_ROLE_BUSY'
+                    );
+                }
+                if(context.operation!==expectedOperation){
+                    throw legacyAIProviderError(
+                        `The legacy ${role.toUpperCase()} provider operation is unsupported.`,
+                        'ARCANE_AI_PROVIDER_RUNTIME_INVALID'
+                    );
+                }
+                busy=true;
+                const request=role==='stt'
+                    ?runtime.#requestLegacySpeechTranscription(
+                        context.payload,
+                        context.signal
+                    )
+                    :runtime.#requestLegacySpeechSynthesis(
+                        context.payload,
+                        context.signal
+                    );
+                return Promise.resolve(request).finally(releaseLegacySpeechRequest);
+            },
+            unload:function unloadLegacySpeechProvider(context={}){
+                if(context.signal?.aborted){
+                    throw normalizeAIRequestAbort(context.signal.reason);
+                }
+                if(busy){
+                    throw legacyAIProviderError(
+                        `The legacy ${role.toUpperCase()} provider still owns an active request.`,
+                        'ARCANE_AI_ROLE_BUSY'
+                    );
+                }
+                state='unloaded';
+                return statusLegacySpeechProvider();
+            },
+            dispose:function disposeLegacySpeechProvider(context={}){
+                if(context.signal?.aborted){
+                    throw normalizeAIRequestAbort(context.signal.reason);
+                }
+                if(busy){
+                    throw legacyAIProviderError(
+                        `The legacy ${role.toUpperCase()} provider still owns an active request.`,
+                        'ARCANE_AI_ROLE_BUSY'
+                    );
+                }
+                state='disposed';
+                return statusLegacySpeechProvider();
+            }
+        });
+    }
+
     #ensureLegacyLLMProvider(providerId){
         if(providerId!=='OPENAI'&&providerId!=='OLLAMA'){
             return false;
@@ -643,6 +919,23 @@ class AI {
         return true;
     }
 
+    #ensureLegacySpeechProvider(role,providerId){
+        if(!['stt','tts'].includes(role)
+            ||!['OPENAI','LOCAL_SPEACH'].includes(providerId)){
+            return false;
+        }
+        if(this.#providerRuntime.hasProvider(role,providerId)){
+            return false;
+        }
+        const provider=this.#createLegacySpeechProvider(role,providerId);
+        const unregister=this.#providerRuntime.register(provider);
+        this.#legacySpeechProviders.set(
+            this.#legacySpeechProviderKey(role,providerId),
+            Object.freeze({role,providerId,provider,unregister})
+        );
+        return true;
+    }
+
     #releaseInactiveLegacyLLMProviders(activeProviderId){
         for(const [providerId,record] of this.#legacyLLMProviders){
             if(providerId===activeProviderId){
@@ -650,6 +943,17 @@ class AI {
             }
             if(record.unregister()){
                 this.#legacyLLMProviders.delete(providerId);
+            }
+        }
+    }
+
+    #releaseInactiveLegacySpeechProviders(activeProviders){
+        for(const [key,record] of this.#legacySpeechProviders){
+            if(activeProviders[record.role]===record.providerId){
+                continue;
+            }
+            if(record.unregister()){
+                this.#legacySpeechProviders.delete(key);
             }
         }
     }
@@ -668,6 +972,19 @@ class AI {
         return selection;
     }
 
+    #internalLegacySpeechSelection(role,localOnly=false){
+        const selection=this.#providerRuntime.selection(role,{localOnly});
+        if(!selection
+            ||!this.#legacySpeechProviders.has(
+                this.#legacySpeechProviderKey(role,selection.providerId)
+            )
+            ||selection.providerId!==this.#legacySpeechService(role)
+            ||selection.modelId!==this.#legacySpeechModel(role)){
+            return null;
+        }
+        return selection;
+    }
+
     #retainLegacyLLMReadiness(operation){
         this.#legacyLLMReadiness=Promise.resolve(operation).catch(
             function retainLegacyLLMReadinessFailure(){
@@ -675,6 +992,15 @@ class AI {
             }
         );
         return this.#legacyLLMReadiness;
+    }
+
+    #retainLegacySpeechReadiness(operation){
+        this.#legacySpeechReadiness=Promise.resolve(operation).catch(
+            function retainLegacySpeechReadinessFailure(){
+                return null;
+            }
+        );
+        return this.#legacySpeechReadiness;
     }
 
     #reconcileLegacyLLMReadiness(){
@@ -696,6 +1022,27 @@ class AI {
             return this.#providerRuntime.unload('llm');
         }
         return Promise.resolve(status);
+    }
+
+    #reconcileLegacySpeechReadiness(){
+        const runtime=this;
+        return Promise.all(['stt','tts'].map(function reconcileLegacySpeechRole(role){
+            const selection=runtime.#internalLegacySpeechSelection(role,false);
+            if(!selection){
+                return runtime.#providerRuntime.status(role);
+            }
+            const status=runtime.#providerRuntime.status(role);
+            if(runtime.#legacySpeechCapability(role,selection.providerId)){
+                return status;
+            }
+            if(status.loaded===true
+                ||status.busy===true
+                ||status.state==='loading'
+                ||status.state==='unloading'){
+                return runtime.#providerRuntime.unload(role);
+            }
+            return status;
+        }));
     }
 
     get configured(){
@@ -720,12 +1067,19 @@ class AI {
         if(this.#usesProviderRuntime(role,service)){
             const internal=role==='llm'
                 ?this.#internalLegacyLLMSelection(false)
-                :null;
-            if(internal&&!this.#legacyLLMCapability(internal.providerId)){
-                const inspection=this.#legacyLLMInspection(
-                    internal.providerId,
-                    internal
-                );
+                :this.#internalLegacySpeechSelection(role,false);
+            const internalAvailable=!internal
+                ||(role==='llm'
+                    ?this.#legacyLLMCapability(internal.providerId)
+                    :this.#legacySpeechCapability(role,internal.providerId));
+            if(!internalAvailable){
+                const inspection=role==='llm'
+                    ?this.#legacyLLMInspection(internal.providerId,internal)
+                    :this.#legacySpeechInspection(
+                        role,
+                        internal.providerId,
+                        internal
+                    );
                 throw legacyAIProviderError(
                     inspection.message,
                     inspection.code
@@ -894,8 +1248,8 @@ class AI {
                 tuple[0],
                 this.#normalizedLLMModel(tuple[0],tuple[3])
             ],
-            stt:[tuple[1],tuple[5]],
-            tts:[tuple[2],tuple[4]]
+            stt:[tuple[1],this.#sttModels[tuple[5]]||tuple[5]],
+            tts:[tuple[2],this.#ttsModels[tuple[4]]||tuple[4]]
         };
         const selections={};
         for(const role of ['llm','stt','tts']){
@@ -990,11 +1344,20 @@ class AI {
         ]);
         this.#assertValidProviderTuple(tuple);
         this.#ensureLegacyLLMProvider(tuple[0]);
+        this.#ensureLegacySpeechProvider('stt',tuple[1]);
+        this.#ensureLegacySpeechProvider('tts',tuple[2]);
         this.#providerRuntime.configure(this.#routesFromPreferenceTuple(tuple));
         this.#applyPreferenceTuple(tuple);
         this.#releaseInactiveLegacyLLMProviders(tuple[0]);
+        this.#releaseInactiveLegacySpeechProviders({
+            stt:tuple[1],
+            tts:tuple[2]
+        });
         this.#retainLegacyLLMReadiness(
             this.#reconcileLegacyLLMReadiness()
+        );
+        this.#retainLegacySpeechReadiness(
+            this.#reconcileLegacySpeechReadiness()
         );
         return true;
     }
@@ -1004,14 +1367,29 @@ class AI {
         this.#ensureLegacyLLMProvider(
             prepared.llm.default?.providerId
         );
+        this.#ensureLegacySpeechProvider(
+            'stt',
+            prepared.stt.default?.providerId
+        );
+        this.#ensureLegacySpeechProvider(
+            'tts',
+            prepared.tts.default?.providerId
+        );
         this.#assertRegisteredLegacyRoutes(prepared);
         const configured=this.#providerRuntime.configure(prepared);
         this.#applyPreferenceTuple(this.#tupleFromProviderRoutes(configured));
         this.#releaseInactiveLegacyLLMProviders(
             configured.llm.default?.providerId
         );
+        this.#releaseInactiveLegacySpeechProviders({
+            stt:configured.stt.default?.providerId,
+            tts:configured.tts.default?.providerId
+        });
         this.#retainLegacyLLMReadiness(
             this.#reconcileLegacyLLMReadiness()
+        );
+        this.#retainLegacySpeechReadiness(
+            this.#reconcileLegacySpeechReadiness()
         );
         return configured;
     }
@@ -1036,10 +1414,17 @@ class AI {
         this.stopAudio();
         await this.#unloadProviderRolesForTransition();
         this.#ensureLegacyLLMProvider(tuple[0]);
+        this.#ensureLegacySpeechProvider('stt',tuple[1]);
+        this.#ensureLegacySpeechProvider('tts',tuple[2]);
         this.#providerRuntime.configure(this.#routesFromPreferenceTuple(tuple));
         this.#applyPreferenceTuple(tuple);
         this.#releaseInactiveLegacyLLMProviders(tuple[0]);
+        this.#releaseInactiveLegacySpeechProviders({
+            stt:tuple[1],
+            tts:tuple[2]
+        });
         await this.#reconcileLegacyLLMReadiness();
+        await this.#reconcileLegacySpeechReadiness();
         return this.#providerRuntime.status();
     }
 
@@ -1047,6 +1432,14 @@ class AI {
         const prepared=this.#providerRuntime.validateConfiguration(selections);
         this.#ensureLegacyLLMProvider(
             prepared.llm.default?.providerId
+        );
+        this.#ensureLegacySpeechProvider(
+            'stt',
+            prepared.stt.default?.providerId
+        );
+        this.#ensureLegacySpeechProvider(
+            'tts',
+            prepared.tts.default?.providerId
         );
         this.#assertRegisteredLegacyRoutes(prepared);
         this.stopAudio();
@@ -1056,7 +1449,12 @@ class AI {
         this.#releaseInactiveLegacyLLMProviders(
             configured.llm.default?.providerId
         );
+        this.#releaseInactiveLegacySpeechProviders({
+            stt:configured.stt.default?.providerId,
+            tts:configured.tts.default?.providerId
+        });
         await this.#reconcileLegacyLLMReadiness();
+        await this.#reconcileLegacySpeechReadiness();
         return configured;
     }
 
@@ -1143,6 +1541,127 @@ class AI {
             return client;
         }
         return null;
+    }
+
+    async #requestLegacySpeechTranscription(payload={},signal=null){
+        const audio=payload?.audio;
+        if(!audio||typeof audio.arrayBuffer!=='function'){
+            throw new TypeError('Speech transcription requires an audio Blob or File.');
+        }
+        if(signal?.aborted){
+            throw normalizeAIRequestAbort(signal.reason);
+        }
+        const mimeType=String(payload.mimeType||audio.type||'audio/webm');
+        const model=String(payload.model||this.modelSTT);
+        const nativeSpeech=this.#nativeSpeech(this.sttService,'stt');
+        if(nativeSpeech){
+            const audioBytes=await audio.arrayBuffer();
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort(signal.reason);
+            }
+            const response=await nativeSpeech.transcribe({
+                audioBase64:this.#arrayBufferToBase64(audioBytes),
+                mimeType,
+                model
+            });
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort(signal.reason);
+            }
+            if(!response||typeof response.text!=='string'){
+                throw new TypeError('Arcane returned an invalid local speech transcription.');
+            }
+            return response.text;
+        }
+
+        await this.#assertAndroidSpeechBridge(this.sttService);
+        const formData=new FormData();
+        formData.append('file',audio);
+        formData.append('model',model);
+        formData.append('response_format','text');
+        const response=await fetch(
+            this.urlSTT,
+            {
+                method:'POST',
+                credentials,
+                headers:this.#sttHeaders[this.sttService],
+                body:formData,
+                signal
+            }
+        );
+        if(!response.ok){
+            throw new Error(`Speech transcription failed with status ${response.status}.`);
+        }
+        return response.text();
+    }
+
+    async #requestLegacySpeechSynthesis(payload={},signal=null){
+        const input=typeof payload?.input==='string'?payload.input:'';
+        if(!input){
+            throw new TypeError('Speech synthesis requires nonempty input.');
+        }
+        if(signal?.aborted){
+            throw normalizeAIRequestAbort(signal.reason);
+        }
+        const model=String(payload.model||this.modelTTS);
+        const voice=typeof payload.voice==='string'&&payload.voice.trim()
+            ?payload.voice.trim()
+            :this.#legacySpeechDefaultVoice('tts',this.ttsService);
+        if(!voice){
+            throw new TypeError('The selected speech provider requires a voice.');
+        }
+        const responseFormat=String(payload.responseFormat||this.audioFormat);
+        const speed=Number.isFinite(payload.speed)?payload.speed:this.voiceSpeed;
+        const nativeSpeech=this.#nativeSpeech(this.ttsService,'tts');
+        if(nativeSpeech){
+            const response=await nativeSpeech.synthesize({
+                model,
+                voice,
+                input,
+                responseFormat,
+                speed
+            });
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort(signal.reason);
+            }
+            if(!response||typeof response.audioBase64!=='string'){
+                throw new TypeError('Arcane returned an invalid local speech response.');
+            }
+            return new Blob(
+                [this.#base64ToBytes(response.audioBase64)],
+                {
+                    type:typeof response.contentType==='string'
+                        ?response.contentType
+                        :this.audioType
+                }
+            );
+        }
+
+        await this.#assertAndroidSpeechBridge(this.ttsService);
+        const personality=await window.user?.personality
+            ||'A behavioral health technician with a slight veteran feel on occasion.';
+        const religion=await window.user?.religion||'caring';
+        const response=await fetch(
+            this.urlTTS,
+            {
+                method:'POST',
+                credentials,
+                headers:this.#ttsHeaders[this.ttsService],
+                body:JSON.stringify({
+                    model,
+                    voice,
+                    input,
+                    speed,
+                    instructions:`${personality} and sounding a bit ${religion}`,
+                    response_format:responseFormat
+                }),
+                signal
+            }
+        );
+        if(!response.ok){
+            throw new Error(`Speech synthesis failed with status ${response.status}.`);
+        }
+        const contentType=response.headers.get('content-type')||this.audioType;
+        return new Blob([await response.arrayBuffer()],{type:contentType});
     }
 
     async #androidNativeHost(){
@@ -2569,15 +3088,16 @@ class AI {
         if(this.#usesProviderRuntime('tts',this.ttsService)){
             job.abortController=new AbortController();
             const responseFormat=this.#providerSpeechResponseFormat();
+            const voice=this.#providerSpeechVoice();
             const response=await this.#providerRuntime.request(
                 'tts',
                 {
                     operation:'synthesize',
                     payload:{
                         model:this.#providerRuntime.selection('tts')?.modelId,
-                        voice:String(window.user?.AI_voice||'af_heart'),
                         input:job.text,
                         responseFormat,
+                        ...(voice?{voice}:{}),
                         speed:this.voiceSpeed
                     },
                     localOnly:false,
@@ -2587,83 +3107,31 @@ class AI {
             return this.#normalizeProviderSpeechAudio(response);
         }
 
-        const nativeSpeech=this.#nativeSpeech(this.ttsService,'tts');
-
-        if(nativeSpeech){
-            const response=await nativeSpeech.synthesize({
+        job.abortController=new AbortController();
+        const response=await this.#requestLegacySpeechSynthesis(
+            {
                 model:this.modelTTS,
-                voice:String(window.user?.AI_voice||'af_heart'),
                 input:job.text,
                 responseFormat:this.audioFormat,
                 speed:this.voiceSpeed
-            });
-
-            if(!response||typeof response.audioBase64!=='string'){
-                throw new TypeError('Arcane returned an invalid local speech response.');
-            }
-
-            return {
-                chunks:[this.#base64ToBytes(response.audioBase64)],
-                type:typeof response.contentType==='string'
-                    ?response.contentType
-                    :this.audioType
-            };
-        }
-
-        await this.#assertAndroidSpeechBridge(this.ttsService);
-
-        job.abortController=new AbortController();
-        const personality=await window.user?.personality
-            ||'A behavioral health technician with a slight veteran feel on occasion.';
-        const religion=await window.user?.religion||'caring';
-        const request={
-            model:this.modelTTS,
-            voice:window.user?.AI_voice,
-            input:job.text,
-            speed:this.voiceSpeed,
-            instructions:`${personality} and sounding a bit ${religion}`,
-            response_format:this.audioFormat
-        };
-        const response=await fetch(
-            this.urlTTS,
-            {
-                method:'POST',
-                credentials,
-                headers:this.#ttsHeaders[this.ttsService],
-                body:JSON.stringify(request),
-                signal:job.abortController.signal
-            }
+            },
+            job.abortController.signal
         );
+        return this.#normalizeProviderSpeechAudio(response);
+    }
 
-        if(!response.ok){
-            throw new Error(`Speech synthesis failed with status ${response.status}.`);
+    #providerSpeechVoice(){
+        const selection=this.#providerRuntime.selection('tts');
+        if(!selection){
+            return null;
         }
-
-        const reader=response.body?.getReader?.();
-
-        if(!reader){
-            throw new TypeError('Speech synthesis response body is not readable.');
-        }
-
-        const chunks=[];
-
-        try{
-            while(true){
-                const {done,value}=await reader.read();
-
-                if(done){
-                    break;
-                }
-
-                if(value){
-                    chunks.push(value);
-                }
-            }
-        }finally{
-            reader.releaseLock?.();
-        }
-
-        return {chunks,type:this.audioType};
+        const provider=this.#providerRuntime.catalog('tts').find(
+            entry=>entry.providerId===selection.providerId
+        );
+        const model=provider?.models.find(entry=>entry?.id===selection.modelId);
+        return typeof model?.defaultVoice==='string'&&model.defaultVoice.trim()
+            ?model.defaultVoice.trim()
+            :null;
     }
 
     #providerSpeechResponseFormat(){
@@ -2829,55 +3297,15 @@ class AI {
             return text;
         }
 
-        const nativeSpeech=this.#nativeSpeech(this.sttService,'stt');
-
-        if(nativeSpeech){
-            if(!audioFile||typeof audioFile.arrayBuffer!=='function'){
-                throw new TypeError('Speech transcription requires an audio Blob or File.');
-            }
-
-            const response=await nativeSpeech.transcribe({
-                audioBase64:this.#arrayBufferToBase64(await audioFile.arrayBuffer()),
-                mimeType:String(audioFile.type||'audio/webm'),
-                model:this.modelSTT
-            });
-
-            if(!response||typeof response.text!=='string'){
-                throw new TypeError('Arcane returned an invalid local speech transcription.');
-            }
-
-            await responseHandler(response.text);
-            return response.text;
-        }
-
-        await this.#assertAndroidSpeechBridge(this.sttService);
-
-        const formData = new FormData();
-        formData.append('file', audioFile);
-        formData.append('model', this.modelSTT);
-        formData.append('response_format', 'text');
-
-        const response = await fetch(
-            this.urlSTT, 
+        const text=await this.#requestLegacySpeechTranscription(
             {
-                method: 'POST',
-                credentials: credentials,
-                headers: this.#sttHeaders[this.sttService],
-                body: formData,
-                signal
-            }
+                audio:audioFile,
+                mimeType:String(audioFile?.type||'audio/webm'),
+                model:this.modelSTT
+            },
+            signal
         );
-
-        if(!response.ok){
-            throw new Error(`Speech transcription failed with status ${response.status}.`);
-        }
-
-        const text = await response.text();
-        
-        //async
         await responseHandler(text);
-
-        //sync
         return text;
     }
 

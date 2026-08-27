@@ -349,6 +349,8 @@ test("browser speech providers normalize shared AI requests at one fail-closed b
 
   const whisperCatalog = whisper.catalog();
   const kokoroCatalog = kokoro.catalog();
+  assert.equal(Object.hasOwn(whisperCatalog[0], "defaultVoice"), false);
+  assert.equal(kokoroCatalog[0].defaultVoice, "af_heart");
   assert.deepEqual(whisperCatalog[0].speech, { inputSampleRate: 16_000 });
   assert.deepEqual(kokoroCatalog[0].speech, {
     outputSampleRate: 24_000,

@@ -53,7 +53,7 @@ A component file does not register its own custom element. The `<html-import>` h
 | [`screen-capture.html`](#screen-capturehtml) | Presents image, video, or GIF display-capture workflow. | `capture()` | `screen-capture-ready`<br>`screen-capture-result` | State/result normalized; media permission/codec failures mixed |
 | [`source-code-viewer.html`](#source-code-viewerhtml) | Renders line-addressable source code with load, error, focus, and state behavior. | `configure()`<br>`load()`<br>`render()`<br>`clear()`<br>`fail()`<br>`focus()`<br>`focusLine()` | `source-code-viewer-ready`<br>`source-code-viewer-state` | Normalized source/state |
 | [`source-explanation.html`](#source-explanationhtml) | Presents an evidence finding, source selection, explanation, and save state. | `showFinding()`<br>`populate()`<br>`selectSource()`<br>`markSaved()` | `source-explanation-ready`<br>`source-explanation-save`<br>`source-explanation-source-selected` | DOM-normalized |
-| [`speech.html`](#speechhtml) | Coordinates speech controls, transcription completion, mute state, and microphone availability. | `configure()`<br>`setAvailability()`<br>`setMuted(); availability`<br>`muted`<br>`initialMuted`<br>`componentReady properties` | `speech-ready`<br>`speech-transcription-complete`<br>`speech-microphone-unavailable` | UI state normalized; AI/media behavior mixed |
+| [`speech.html`](#speechhtml) | Coordinates explicit STT activation, speech controls, transcription completion, mute state, and microphone availability. | `configure()`<br>`setAvailability()`<br>`setMuted()`<br>`requestSTTActivation()`<br>`destroy()`<br>`availability`<br>`muted`<br>`initialMuted`<br>`componentReady` | `speech-ready`<br>`speech-transcription-complete`<br>`speech-transcription-error`<br>`speech-transcription-cancelled`<br>`speech-microphone-unavailable`<br>`speech-stt-activation-request`<br>`speech-stt-activation-error`<br>`speech-tts-lifecycle-error` | Sticky runtime speech readiness, explicit STT activation, request cancellation, and TTS mute lifecycle intent normalized; provider/model authority and media behavior remain external |
 | [`summary-strip.html`](#summary-striphtml) | Displays compact selectable KPI or summary items. | `configure()`<br>`setItems()`<br>`updateItem()`<br>`clear()` | `summary-strip-ready`<br>`summary-strip-change`<br>`summary-strip-select` | DOM-normalized |
 | [`table.html`](#tablehtml) | Builds and updates a simple header/body table. | `buildHeader()`<br>`buildTable()` | `table-ready`<br>`header-update`<br>`body-update` | DOM-normalized |
 | [`task-progress.html`](#task-progresshtml) | Runs and displays a task list with started/change/complete/error state. | `configure()`<br>`setTasks()`<br>`updateTask()`<br>`runTasks()`<br>`clear()` | `task-progress-ready`<br>`task-progress-started`<br>`task-progress-change`<br>`task-progress-complete`<br>`task-progress-error` | Task state normalized; injected task results mixed |
@@ -191,6 +191,12 @@ Methods/properties: `streamMessage()`, `setMessageProgress()`,
 extension callbacks. The component installs warning-only defaults when the host
 does not supply them; applications may instead consume the corresponding
 `chat-send-message` and `chat-language-changed` events.
+
+`setAIAvailability()` remains an LLM compatibility input, but selected sticky
+`AIRuntimeState` LLM state wins over that boolean. STT and TTS readiness always
+comes from sticky runtime role state; the method never forwards compatibility
+speech booleans or synthesizes ready speech roles without an admitted, loaded
+provider.
 
 When a selected LLM route is `unloaded` or in `error`, the component exposes a
 keyboard-operable Start/Try again control while Send stays disabled. During
@@ -845,19 +851,73 @@ Events: `source-explanation-ready`, `source-explanation-save`, `source-explanati
 
 ### Overview
 
-Coordinates speech controls, transcription completion, mute state, and microphone availability.
+Coordinates explicit speech-to-text activation, speech controls, transcription
+completion, mute state, and microphone availability.
 
 ### Public surface
 
-Methods/properties: `configure()`, `setAvailability()`, `setMuted(); availability`, `muted`, `initialMuted`, `componentReady properties`.
+Methods/properties: `configure()`, `setAvailability()`, `setMuted()`,
+`requestSTTActivation()`, `destroy()`, `availability`, `muted`, `initialMuted`,
+and `componentReady`.
 
-Events: `speech-ready`, `speech-transcription-complete`, `speech-microphone-unavailable`.
+Events: `speech-ready`, `speech-transcription-complete`,
+`speech-transcription-error`, `speech-transcription-cancelled`,
+`speech-microphone-unavailable`, `speech-stt-activation-request`,
+`speech-stt-activation-error`, and `speech-tts-lifecycle-error`.
 
-Shared dependencies: [`AI.js`](runtime-modules.md#aijs), [`DBLS.js`](runtime-modules.md#dblsjs).
+Shared dependencies: [`AI.js`](runtime-modules.md#aijs),
+[`AIRuntimeState.js`](runtime-modules.md#airuntimestatejs), and
+[`DBLS.js`](runtime-modules.md#dblsjs).
+
+The Hold to talk control remains disabled unless sticky STT state is `ready`,
+the role is not busy, and microphone capture is available. For an explicitly
+selected STT route, a separate keyboard-operable control presents Start
+transcription while `unloaded`, Cancel loading while `loading`, a disabled
+Canceling state while `unloading`, and Try again with the sticky error while
+`error`. Selected-unloaded, busy, and error states are shown as distinct facts;
+none is treated as ready.
+
+The default `requestSTTActivation(intent)` forwards the frozen
+`{role:'stt',action:'load'|'unload',reason:'user'}` record to
+`requestAIRuntimeIntent()`. Before calling it, the component emits a bubbling,
+composed, cancelable `speech-stt-activation-request` event with frozen
+`{intent,state}` detail. `preventDefault()` suppresses the callback and intent.
+Callback failure emits `speech-stt-activation-error` with frozen
+`{request,error,message}` detail. Cancel loading publishes an `unload` intent;
+only subsequent sticky `unloading` or `unloaded` state confirms lifecycle
+progress, and callback return never proves provider work stopped.
+
+The component emits no activation request on import or state observation.
+Provider registration and selection remain inert, and default
+`startTranscription=false` does not request STT during runtime startup. The
+provider/runtime owner decides whether and how to execute a user intent; the
+component never selects a runtime or model, downloads artifacts, reloads after
+failure, or falls back to another provider.
+
+`setAvailability()` is compatibility-only for microphone and negative
+unselected-role reports. Positive STT/TTS booleans cannot manufacture a ready
+role, and no compatibility value can replace a selected sticky role. Hold to
+talk stays disabled without sticky ready STT, and compatibility input cannot
+enable a no-selection TTS role or bypass explicit TTS activation.
+
+Each transcription request owns an `AbortController`; its signal is passed as
+the third argument to `AI.fetchSTT()`. Cancel, a newer capture, and `destroy()`
+abort that controller and suppress late results. This proves request delivery
+was canceled, not that an uncooperative provider stopped underlying work.
+
+User Unmute calls the shared `AI.setSpeechMuted(false)` lifecycle owner before
+or with publishing the TTS load intent, so the runtime can legally load TTS.
+Mute calls `AI.setSpeechMuted(true)`, stops playback, cancels active TTS work,
+and unloads the selected TTS role. Lifecycle failures remain visible through
+`speech-tts-lifecycle-error` and sticky role state.
 
 ### Availability and normalization
 
-**Browser and supported native WebViews.** UI state normalized; AI/media behavior mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app's capabilities. [Deep protocol details](protocols.md).
+**Browser and supported native WebViews.** UI/runtime state and explicit user
+STT activation intent are normalized; provider/model authority and media
+behavior remain external. HTMLImport + DOM; injected Arcane/provider modules
+where listed. Native methods remain subject to the bound app's capabilities.
+[Deep protocol details](protocols.md).
 
 ### Example
 

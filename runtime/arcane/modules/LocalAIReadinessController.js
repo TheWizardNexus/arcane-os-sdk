@@ -9,7 +9,7 @@ function availabilityFromReport(report={}){
     const slots=report.slots||{};
     return Object.freeze(Object.fromEntries(SLOT_NAMES.map(name=>{
         const slot=slots[name]||{};
-        return [name,!slot.required||slot.ready===true];
+        return [name,slot.required===true&&slot.ready===true];
     })));
 }
 

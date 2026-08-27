@@ -41,9 +41,41 @@ import {
     AIProviderRuntime,
     getAIProviderRuntime
 } from '../runtime/arcane/modules/AIProviderRuntime.js';
+import {
+    availabilityFromReport
+} from '../runtime/arcane/modules/LocalAIReadinessController.js';
 import ConfiguredAIChatSession from '../runtime/arcane/modules/ConfiguredAIChatSession.js';
 
 const repositoryRoot=new URL('../',import.meta.url);
+
+test(
+    'local readiness availability is fail-closed and grants no provider readiness',
+    function testFailClosedLocalAIAvailability() {
+        const empty=availabilityFromReport({});
+        assert.deepEqual(empty,{llm:false,stt:false,tts:false});
+        assert.equal(Object.isFrozen(empty),true);
+        assert.deepEqual(
+            availabilityFromReport({
+                slots:{
+                    llm:{required:false,ready:true},
+                    stt:{required:false,ready:null},
+                    tts:{required:true,ready:false}
+                }
+            }),
+            {llm:false,stt:false,tts:false}
+        );
+        assert.deepEqual(
+            availabilityFromReport({
+                slots:{
+                    llm:{required:true,ready:true},
+                    stt:{required:true,ready:true},
+                    tts:{required:true,ready:true}
+                }
+            }),
+            {llm:true,stt:true,tts:true}
+        );
+    }
+);
 
 const readyEvents=[];
 const previousDispatchEvent=globalThis.dispatchEvent;
@@ -845,7 +877,27 @@ test(
 
                 const startSnapshot = getAIRuntimeState();
                 const standbyTTS = startSnapshot.roles.tts;
-                const mutedStart = startAIRuntime();
+                const deferredTranscriptionStart = startAIRuntime();
+                assert.deepEqual(
+                    startupIntents,
+                    [
+                        {
+                            role: 'llm',
+                            action: 'load',
+                            reason: 'startup'
+                        }
+                    ]
+                );
+                const deferredTranscriptionWaits = Promise.allSettled(
+                    [
+                        deferredTranscriptionStart.barrier,
+                        deferredTranscriptionStart.settled
+                    ]
+                );
+                deferredTranscriptionStart.cancel();
+                await deferredTranscriptionWaits;
+                startupIntents.length = 0;
+                const mutedStart = startAIRuntime({startTranscription: true});
                 assert.ok(Object.isFrozen(mutedStart));
                 assert.deepEqual(
                     startupIntents,
@@ -899,6 +951,7 @@ test(
                 const barrierReport = await mutedStart.barrier;
                 assert.equal(barrierReport.startRevision, startSnapshot.revision);
                 assert.equal(barrierReport.startMuted, true);
+                assert.equal(barrierReport.startTranscription, true);
                 assert.equal(barrierReport.chatReady, true);
                 assert.equal(barrierReport.roles.llm.requested, true);
                 assert.equal(barrierReport.roles.stt.requested, true);
@@ -1035,12 +1088,16 @@ test(
             let loaded = false;
             let requestError = null;
             let heldLoad = null;
+            let heldRequest = null;
+            let requestBusy = false;
+            const requests = [];
             return {
                 protocol: AI_PROVIDER_PROTOCOL,
                 role,
                 id,
                 localOnly,
                 counters,
+                requests,
                 failNextRequest: function failNextTestProviderRequest(error) {
                     requestError = error;
                 },
@@ -1055,6 +1112,26 @@ test(
                     });
                     heldLoad = {markStarted, released};
                     return {started, release};
+                },
+                holdNextRequest: function holdNextTestProviderRequest() {
+                    let markAborted;
+                    let markStarted;
+                    let release;
+                    const aborted = new Promise(function createHeldRequestAbort(resolve) {
+                        markAborted = resolve;
+                    });
+                    const started = new Promise(function createHeldRequestStart(resolve) {
+                        markStarted = resolve;
+                    });
+                    const released = new Promise(function createHeldRequestRelease(resolve) {
+                        release = resolve;
+                    });
+                    heldRequest = {
+                        markAborted,
+                        markStarted,
+                        released
+                    };
+                    return {aborted, started, release};
                 },
                 catalog: function catalogTestProvider() {
                     return [{id: `${id}-model`}];
@@ -1074,7 +1151,7 @@ test(
                     return {
                         state,
                         loaded,
-                        busy: false
+                        busy: requestBusy
                     };
                 },
                 load: async function loadTestProvider({progress, signal}) {
@@ -1122,19 +1199,51 @@ test(
                     state = 'ready';
                     loaded = true;
                 },
-                request: async function requestTestProvider({signal}) {
+                request: async function requestTestProvider({payload, signal}) {
                     counters.request += 1;
-                    if (signal.aborted) {
-                        const error = new Error('cancelled');
-                        error.name = 'AbortError';
-                        throw error;
+                    requests.push(payload);
+                    requestBusy = true;
+                    try {
+                        if (signal.aborted) {
+                            const error = new Error('cancelled');
+                            error.name = 'AbortError';
+                            throw error;
+                        }
+                        if (heldRequest) {
+                            const gate = heldRequest;
+                            heldRequest = null;
+                            function observeHeldRequestAbort() {
+                                gate.markAborted();
+                            }
+                            gate.markStarted();
+                            signal.addEventListener(
+                                'abort',
+                                observeHeldRequestAbort,
+                                {once: true}
+                            );
+                            try {
+                                await gate.released;
+                            } finally {
+                                signal.removeEventListener(
+                                    'abort',
+                                    observeHeldRequestAbort
+                                );
+                            }
+                        }
+                        if (signal.aborted) {
+                            const error = new Error('cancelled');
+                            error.name = 'AbortError';
+                            throw error;
+                        }
+                        if (requestError) {
+                            const error = requestError;
+                            requestError = null;
+                            throw error;
+                        }
+                        return response;
+                    } finally {
+                        requestBusy = false;
                     }
-                    if (requestError) {
-                        const error = requestError;
-                        requestError = null;
-                        throw error;
-                    }
-                    return response;
                 },
                 unload: async function unloadTestProvider() {
                     counters.unload += 1;
@@ -1240,20 +1349,28 @@ test(
         );
         assert.equal(runtime.status(), beforeInvalidStartup);
 
-        const startupOptions = {startMuted: true};
+        const startupOptions = {
+            startMuted: true,
+            startTranscription: false
+        };
         const startupPromise = runtime.start(startupOptions);
         startupOptions.startMuted = false;
+        startupOptions.startTranscription = true;
         const startup = await startupPromise;
         const barrier = await startup.barrier;
         const settled = await startup.settled;
         assert.equal(barrier.chatReady, true);
         assert.equal(settled.chatReady, true);
         assert.equal(settled.roles.llm.state.state, 'ready');
-        assert.equal(settled.roles.stt.state.state, 'ready');
+        assert.equal(settled.startTranscription, false);
+        assert.equal(settled.roles.stt.requested, false);
+        assert.equal(settled.roles.stt.state.state, 'unloaded');
         assert.equal(settled.roles.tts.requested, false);
         assert.equal(localLLM.counters.load, 1);
-        assert.equal(localSTT.counters.load, 1);
+        assert.equal(localSTT.counters.load, 0);
         assert.equal(localTTS.counters.load, 0);
+        await runtime.load('stt', {localOnly: true});
+        assert.equal(localSTT.counters.load, 1);
 
         assert.equal(
             await runtime.chat(
@@ -1262,6 +1379,63 @@ test(
             ),
             'local result'
         );
+        const requestsBeforeSupersession = localLLM.counters.request;
+        const heldRequest = localLLM.holdNextRequest();
+        const firstRequest = runtime.chat(
+            {messages: [], requestId: 'first'},
+            {localOnly: true}
+        );
+        const firstRejection = assert.rejects(
+            firstRequest,
+            function rejectSupersededActiveRequest(error) {
+                return error?.code === 'ARCANE_AI_REQUEST_ABORTED';
+            }
+        );
+        await heldRequest.started;
+        const intermediateRequest = runtime.chat(
+            {messages: [], requestId: 'intermediate'},
+            {localOnly: true}
+        );
+        const intermediateRejection = assert.rejects(
+            intermediateRequest,
+            function rejectIntermediateRequestAdmission(error) {
+                return error?.code === 'ARCANE_AI_OPERATION_SUPERSEDED';
+            }
+        );
+        const newestRequest = runtime.chat(
+            {messages: [], requestId: 'newest'},
+            {localOnly: true}
+        );
+        await heldRequest.aborted;
+        assert.equal(
+            localLLM.counters.request,
+            requestsBeforeSupersession + 1,
+            'The newest request must wait for the superseded provider promise.'
+        );
+        await assert.rejects(
+            runtime.load('llm', {localOnly: true}),
+            function keepLoadFailClosedDuringRequestAdmission(error) {
+                return error?.code === 'ARCANE_AI_ROLE_BUSY';
+            }
+        );
+        assert.throws(
+            function keepReconfigurationFailClosedDuringRequestAdmission() {
+                runtime.configure(localRoutes);
+            },
+            function isRequestOwnershipConfigurationGuard(error) {
+                return error?.code === 'ARCANE_AI_ROLE_BUSY';
+            }
+        );
+        heldRequest.release();
+        await Promise.all([firstRejection, intermediateRejection]);
+        assert.equal(await newestRequest, 'local result');
+        assert.equal(
+            localLLM.counters.request,
+            requestsBeforeSupersession + 2
+        );
+        assert.equal(localLLM.requests.at(-1).requestId, 'newest');
+        assert.equal(runtime.status('llm').state, 'ready');
+        assert.equal(runtime.status('llm').busy, false);
         await assert.rejects(
             runtime.request(
                 'llm',
@@ -1392,6 +1566,15 @@ test(
         const requests=[];
         globalThis.fetch=async function answerLegacyCloudRequest(url,options) {
             requests.push({url:String(url),options});
+            if(String(url).endsWith('/audio/transcriptions')){
+                return new Response('cloud transcript',{status:200});
+            }
+            if(String(url).endsWith('/audio/speech')){
+                return new Response(new Uint8Array([1,2,3,4]),{
+                    status:200,
+                    headers:{'content-type':'audio/ogg'}
+                });
+            }
             return new Response(JSON.stringify({
                 id:'cloud-response',
                 model:'gpt-5-mini',
@@ -1419,11 +1602,33 @@ test(
                 localOnly:false
             });
             assert.equal(runtime.status('llm').state,'unloaded');
+            assert.equal(runtime.status('stt').state,'unloaded');
+            assert.equal(runtime.status('tts').state,'unloaded');
+            assert.deepEqual(runtime.providerIdentity('stt','OPENAI'),{
+                protocol:AI_PROVIDER_PROTOCOL,
+                role:'stt',
+                id:'OPENAI',
+                localOnly:false
+            });
+            assert.deepEqual(runtime.providerIdentity('tts','OPENAI'),{
+                protocol:AI_PROVIDER_PROTOCOL,
+                role:'tts',
+                id:'OPENAI',
+                localOnly:false
+            });
             assert.equal(ai.configured,false);
+            await assert.rejects(
+                runtime.load('stt'),
+                error=>error?.code==='AI_PROVIDER_NOT_CONFIGURED'
+            );
 
             ai.license='test-credential';
             await runtime.load('llm');
+            await runtime.load('stt');
+            await ai.setSpeechMuted(false);
             assert.equal(runtime.status('llm').state,'ready');
+            assert.equal(runtime.status('stt').state,'ready');
+            assert.equal(runtime.status('tts').state,'ready');
             assert.equal(runtime.status('llm').loaded,true);
             assert.equal(ai.configured,true);
             assert.equal(requests.length,0,'Cloud readiness must not probe or download');
@@ -1445,13 +1650,34 @@ test(
             });
             assert.equal(publicCloud.choices[0].message.content,'cloud response');
             assert.equal(requests.length,2);
+            const cloudTranscript=await ai.fetchSTT(
+                new Blob([new Uint8Array([1,2,3])],{type:'audio/webm'})
+            );
+            assert.equal(cloudTranscript,'cloud transcript');
+            const cloudSpeech=await runtime.request('tts',{
+                operation:'synthesize',
+                payload:{
+                    model:ai.modelTTS,
+                    voice:'alloy',
+                    input:'Cloud voice.',
+                    responseFormat:'opus',
+                    speed:1
+                },
+                localOnly:false,
+                signal:null
+            });
+            assert.ok(cloudSpeech instanceof Blob);
+            assert.equal(requests.length,4);
 
+            await ai.setSpeechMuted(true);
+            await runtime.unload('stt');
             ai.license='';
             await runtime.unload('llm');
             assert.equal(runtime.status('llm').state,'unloaded');
             assert.equal(ai.configured,false);
 
             const nativeCalls=[];
+            const nativeSpeechCalls=[];
             globalThis.Arcane={
                 ollama:{
                     async chat(request,options) {
@@ -1464,10 +1690,24 @@ test(
                             eval_count:3
                         };
                     }
+                },
+                speech:{
+                    async transcribe(request){
+                        nativeSpeechCalls.push({operation:'transcribe',request});
+                        return {text:'core transcript'};
+                    },
+                    async synthesize(request){
+                        nativeSpeechCalls.push({operation:'synthesize',request});
+                        return {
+                            audioBase64:'AQIDBA==',
+                            contentType:'audio/ogg'
+                        };
+                    }
                 }
             };
             await ai.transitionAI(
-                'OLLAMA','OPENAI','OPENAI','granite3.3:8b','OPENAI','OPENAI'
+                'OLLAMA','LOCAL_SPEACH','LOCAL_SPEACH',
+                'granite3.3:8b','LOCAL_SPEACH','LOCAL_SPEACH'
             );
             assert.deepEqual(runtime.providerIdentity('llm','OLLAMA'),{
                 protocol:AI_PROVIDER_PROTOCOL,
@@ -1479,6 +1719,14 @@ test(
             assert.equal(runtime.status('llm').localOnly,true);
             assert.equal(ai.configured,true);
             assert.equal(nativeCalls.length,0,'Core readiness must not load or probe a model');
+            assert.equal(runtime.status('stt').state,'unloaded');
+            assert.equal(runtime.status('tts').state,'unloaded');
+            assert.equal(nativeSpeechCalls.length,0,'Core speech readiness must not probe');
+            await runtime.load('stt',{localOnly:true});
+            await ai.setSpeechMuted(false);
+            assert.equal(runtime.status('stt').state,'ready');
+            assert.equal(runtime.status('tts').state,'ready');
+            assert.equal(nativeSpeechCalls.length,0,'Core speech load must be capability-only');
             const directCore=await runtime.request('llm',{
                 operation:'chat',
                 payload:{messages:[{role:'user',content:'Direct core'}]},
@@ -1492,7 +1740,28 @@ test(
             });
             assert.equal(publicCore.choices[0].message.content,'core response');
             assert.equal(nativeCalls.length,2);
+            const coreTranscript=await ai.fetchSTT(
+                new Blob([new Uint8Array([5,6,7])],{type:'audio/webm'})
+            );
+            assert.equal(coreTranscript,'core transcript');
+            const coreSpeech=await runtime.request('tts',{
+                operation:'synthesize',
+                payload:{
+                    model:ai.modelTTS,
+                    input:'Core voice.',
+                    responseFormat:'opus',
+                    speed:1
+                },
+                localOnly:true,
+                signal:null
+            });
+            assert.ok(coreSpeech instanceof Blob);
+            assert.equal(nativeSpeechCalls[0].operation,'transcribe');
+            assert.equal(nativeSpeechCalls[1].operation,'synthesize');
+            assert.equal(nativeSpeechCalls[1].request.voice,'af_heart');
 
+            await ai.setSpeechMuted(true);
+            await runtime.unload('stt');
             await runtime.unload('llm');
             const ttsRequests=[];
             let ttsState='unloaded';
@@ -1504,6 +1773,7 @@ test(
                 catalog(){
                     return [{
                         id:'catalog-tts-model',
+                        defaultVoice:'provider_voice',
                         speech:{
                             outputSampleRate:24_000,
                             responseFormats:['wav'],
@@ -1547,7 +1817,7 @@ test(
                 stt:{default:null,localOnly:null},
                 tts:{default:ttsSelection,localOnly:ttsSelection}
             });
-            windowTarget.user.AI_voice='af_heart';
+            windowTarget.user.AI_voice='alloy';
             windowTarget.AudioContext=class ContractAudioContext{
                 state='running';
                 destination={};
@@ -1566,7 +1836,7 @@ test(
             assert.equal(ttsRequests.length,1);
             assert.deepEqual(ttsRequests[0],{
                 model:'catalog-tts-model',
-                voice:'af_heart',
+                voice:'provider_voice',
                 input:'Shared route synthesis.',
                 responseFormat:'wav',
                 speed:1
@@ -1767,9 +2037,307 @@ test(
             /llm:snapshot[.]roles[.]llm[.]state==='ready'/u,
             'Send availability must remain bound to the sticky ready state.'
         );
+        assert.match(
+            source,
+            /stt:latestAIRuntimeRoles[\s\S]*latestAIRuntimeRoles[.]stt[.]state==='ready'/u,
+            'Speech readiness must remain bound to sticky STT state.'
+        );
+        assert.doesNotMatch(
+            source,
+            /speech[.]setAvailability/u,
+            'Chat compatibility availability must not synthesize speech readiness.'
+        );
         assert.match(source,/<button type="button" id="ai_activation_button">/u);
         controller.destroy();
         assert.equal(button.listeners.has('click'),false);
         assert.equal(panel.hidden,true);
+    }
+);
+
+test(
+    'speech exposes explicit cancelable STT activation without hidden startup',
+    async function testSpeechSTTActivationContract() {
+        const source = await readFile(
+            new URL('runtime/arcane/components/speech.html', repositoryRoot),
+            'utf8'
+        );
+        const functionStart = source.indexOf(
+            'function createSTTActivationController('
+        );
+        const functionEnd = source.indexOf(
+            '\n    function unavailableRole',
+            functionStart
+        );
+        assert.notEqual(functionStart, -1);
+        assert.notEqual(functionEnd, -1);
+        const factorySource = source.slice(functionStart, functionEnd);
+        const createSTTActivationController = Function(
+            `'use strict';\n${factorySource}\nreturn createSTTActivationController;`
+        )();
+
+        class ActivationEvent {
+            constructor(type, options = {}) {
+                this.type = type;
+                this.detail = options.detail;
+                this.bubbles = options.bubbles === true;
+                this.composed = options.composed === true;
+                this.cancelable = options.cancelable === true;
+                this.defaultPrevented = false;
+            }
+
+            preventDefault() {
+                if (this.cancelable) {
+                    this.defaultPrevented = true;
+                }
+            }
+        }
+
+        const listeners = new Map();
+        const button = {
+            addEventListener(name, listener) {
+                listeners.set(name, listener);
+            },
+            removeEventListener(name, listener) {
+                if (listeners.get(name) === listener) {
+                    listeners.delete(name);
+                }
+            }
+        };
+        const events = [];
+        const intents = [];
+        let preventNextRequest = false;
+        let reenterNextRequest = false;
+        let reentrantRequest = null;
+        let activationFailure = null;
+        let deferredActivation = null;
+        let synchronizeNextRequest = null;
+        let controller;
+        const host = {
+            dispatchEvent(event) {
+                events.push(event);
+                if (reenterNextRequest
+                    && event.type === 'speech-stt-activation-request') {
+                    reenterNextRequest = false;
+                    reentrantRequest = controller.request(
+                        event.detail.intent.action
+                    );
+                    event.preventDefault();
+                }
+                if (preventNextRequest
+                    && event.type === 'speech-stt-activation-request') {
+                    preventNextRequest = false;
+                    event.preventDefault();
+                }
+                if (synchronizeNextRequest
+                    && event.type === 'speech-stt-activation-request') {
+                    const nextRole = synchronizeNextRequest;
+                    synchronizeNextRequest = null;
+                    controller.synchronize(nextRole);
+                }
+                return !event.defaultPrevented;
+            },
+            async requestSTTActivation(intent) {
+                intents.push(intent);
+                if (deferredActivation) {
+                    return deferredActivation.promise;
+                }
+                if (activationFailure) {
+                    const error = activationFailure;
+                    activationFailure = null;
+                    throw error;
+                }
+            }
+        };
+        controller = createSTTActivationController(
+            {
+                host,
+                button,
+                onChange: function observeSTTActivationChange() {},
+                EventClass: ActivationEvent
+            }
+        );
+        assert.ok(Object.isFrozen(controller));
+        assert.equal(intents.length, 0);
+
+        const unloaded = Object.freeze(
+            {
+                role: 'stt',
+                state: 'unloaded',
+                providerId: 'browser-stt',
+                modelId: 'selected-stt-model',
+                localOnly: true,
+                loaded: false,
+                busy: false,
+                operationId: null,
+                progress: null,
+                error: null
+            }
+        );
+        controller.synchronize(unloaded);
+        assert.equal(controller.action, 'load');
+        assert.equal(intents.length, 0, 'state observation must never load STT');
+        assert.equal(await controller.request('load'), true);
+        assert.deepEqual(
+            intents,
+            [{role: 'stt', action: 'load', reason: 'user'}]
+        );
+        assert.ok(Object.isFrozen(intents[0]));
+        const loadEvent = events.find(
+            function findSTTLoadRequest(event) {
+                return event.type === 'speech-stt-activation-request'
+                    && event.detail.intent.action === 'load';
+            }
+        );
+        assert.ok(loadEvent);
+        assert.equal(loadEvent.bubbles, true);
+        assert.equal(loadEvent.composed, true);
+        assert.equal(loadEvent.cancelable, true);
+        assert.equal(loadEvent.detail.state, unloaded);
+        assert.ok(Object.isFrozen(loadEvent.detail));
+
+        preventNextRequest = true;
+        assert.equal(await controller.request('load'), false);
+        assert.equal(intents.length, 1);
+
+        reenterNextRequest = true;
+        assert.equal(await controller.request('load'), false);
+        assert.equal(await reentrantRequest, false);
+        assert.equal(intents.length, 1, 'event reentry must not duplicate intent');
+
+        const loading = Object.freeze(
+            {
+                ...unloaded,
+                state: 'loading',
+                operationId: 'stt-load-1',
+                progress: Object.freeze(
+                    {
+                        phase: 'download',
+                        completed: 4,
+                        total: 10,
+                        unit: 'bytes',
+                        heartbeat: true
+                    }
+                )
+            }
+        );
+        controller.synchronize(loading);
+        assert.equal(controller.action, 'unload');
+        assert.equal(await controller.request('unload'), true);
+        assert.deepEqual(
+            intents.at(-1),
+            {role: 'stt', action: 'unload', reason: 'user'}
+        );
+
+        const callbackFailure = new Error('STT activation callback failed.');
+        controller.synchronize(Object.freeze({...unloaded, state: 'error'}));
+        synchronizeNextRequest = loading;
+        assert.equal(await controller.request('load'), false);
+        assert.equal(
+            intents.at(-1).action,
+            'unload',
+            'synchronous state replacement must suppress the stale load intent'
+        );
+        controller.synchronize(Object.freeze({...unloaded, state: 'error'}));
+        activationFailure = callbackFailure;
+        assert.equal(await controller.request('load'), false);
+        const errorEvent = events.at(-1);
+        assert.equal(errorEvent.type, 'speech-stt-activation-error');
+        assert.equal(errorEvent.detail.error, callbackFailure);
+        assert.ok(Object.isFrozen(errorEvent.detail));
+
+        let rejectDeferredActivation;
+        const deferredPromise = new Promise(
+            function createDeferredSTTActivation(resolve, reject) {
+                rejectDeferredActivation = reject;
+            }
+        );
+        deferredActivation = {promise: deferredPromise};
+        const staleLoad = controller.request('load');
+        controller.synchronize(loading);
+        deferredActivation = null;
+        assert.equal(await controller.request('unload'), true);
+        const errorCount = events.filter(
+            function countSTTActivationErrors(event) {
+                return event.type === 'speech-stt-activation-error';
+            }
+        ).length;
+        rejectDeferredActivation(new Error('Late stale activation failure.'));
+        assert.equal(await staleLoad, false);
+        assert.equal(
+            events.filter(
+                function countFinalSTTActivationErrors(event) {
+                    return event.type === 'speech-stt-activation-error';
+                }
+            ).length,
+            errorCount
+        );
+
+        controller.synchronize(
+            Object.freeze(
+                {
+                    ...unloaded,
+                    state: 'ready',
+                    loaded: true,
+                    busy: true,
+                    operationId: 'stt-transcribe-1'
+                }
+            )
+        );
+        assert.equal(controller.action, null);
+        assert.match(
+            source,
+            /<button id="sttActivationButton" type="button" hidden disabled>/u
+        );
+        assert.match(source, /Start transcription/u);
+        assert.match(source, /Cancel loading/u);
+        assert.match(source, /Try again/u);
+        assert.match(
+            source,
+            /fetchSTT\([\s\S]*audioFile,[\s\S]*undefined,[\s\S]*controller[.]signal/u,
+            'The shared STT request must receive its owned cancellation signal.'
+        );
+        assert.match(
+            source,
+            /function cancelSTTOperation[\s\S]*transcriptionAbortController[?][.]abort\(\)/u,
+            'Shared STT cancellation must abort the active request controller.'
+        );
+        assert.match(
+            source,
+            /globalThis[.]ai[?][.]setSpeechMuted[\s\S]*setSpeechMuted\(action === 'unload'\)[\s\S]*requestAIRuntimeIntent/u,
+            'TTS mute intent must reach the lifecycle owner before it is published.'
+        );
+        assert.match(
+            source,
+            /Object[.]prototype[.]hasOwnProperty[.]call\(input, 'stt'\)[\s\S]*!Boolean\(input[.]stt\)[\s\S]*!selectedRole\(sttRole\)/u,
+            'Speech compatibility input must neither create readiness nor replace a selected sticky STT role.'
+        );
+
+        let rejectDestroyedActivation;
+        deferredActivation = {
+            promise: new Promise(
+                function createDestroyedSTTActivation(resolve, reject) {
+                    rejectDestroyedActivation = reject;
+                }
+            )
+        };
+        controller.synchronize(Object.freeze({...unloaded, state: 'error'}));
+        const destroyedLoad = controller.request('load');
+        const errorsBeforeDestroy = events.filter(
+            function countErrorsBeforeSTTActivationDestroy(event) {
+                return event.type === 'speech-stt-activation-error';
+            }
+        ).length;
+        controller.destroy();
+        rejectDestroyedActivation(new Error('Late failure after destroy.'));
+        assert.equal(await destroyedLoad, false);
+        assert.equal(
+            events.filter(
+                function countErrorsAfterSTTActivationDestroy(event) {
+                    return event.type === 'speech-stt-activation-error';
+                }
+            ).length,
+            errorsBeforeDestroy
+        );
+        assert.equal(listeners.has('click'), false);
     }
 );

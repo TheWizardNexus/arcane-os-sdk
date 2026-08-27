@@ -213,6 +213,8 @@ AI.js TTS payload is
 `{model,input,responseFormat,voice?,speed?}`. Only `responseFormat:"wav"` is
 admitted; the provider maps it to `{text,voice,speed}` and returns frozen
 `{audio:Uint8Array,contentType:"audio/wav"}` containing 24 kHz mono PCM.
+Shared AI.js synthesis reads the selected model's catalog default and never
+replaces it with a voice saved for a different provider route.
 
 ## Lifecycle and status
 
@@ -220,7 +222,7 @@ Whisper and Kokoro use the same independent state machine:
 
 | Operation | Behavior |
 | --- | --- |
-| `catalog()` | Returns the single caller-admitted model descriptor. |
+| `catalog()` | Returns the single caller-admitted model descriptor. TTS exposes its admitted `defaultVoice`; STT has no voice field. |
 | `inspect(selection,{signal})` | Returns `{available:true,authority}` only for the exact provider/model/local selection; mismatch returns an unavailable record. |
 | `status()` | Returns `{role,providerId,modelId,state,loaded,busy,generation,errorCode,cache}`. |
 | `load(context)` | Requires `{role,selection,progress,signal?,security?}`, admits/cache-materializes artifacts, creates one role Worker, and loads the adapter. Compatible repeated loads coalesce. |

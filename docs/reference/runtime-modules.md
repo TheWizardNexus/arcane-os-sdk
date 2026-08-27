@@ -124,13 +124,30 @@ provider. `transitionAI()` and `transitionProviders()` are deliberate
 cross-role transitions: each stops queued audio, unloads the current LLM, STT,
 and TTS roles, then applies the replacement configuration. `transitionAI()`
 returns aggregate runtime status; `transitionProviders()` returns the admitted
-three-role route configuration. Selected `OPENAI` and `OLLAMA` legacy routes
-expose truthful capability-only readiness through internal provider/2 adapters
-without probing, downloading, or hiding a load. `fetchRequest()` keeps the
-selected provider's public response shape. Browser speech routes translate the
-existing AI.js STT `{audio:Blob|File,mimeType,model}` and TTS
+three-role route configuration. Selected `OPENAI` LLM/STT/TTS, `OLLAMA` LLM,
+and admitted Core `LOCAL_SPEACH` STT/TTS legacy routes expose truthful
+capability-only readiness through internal provider/2 adapters without probing,
+downloading, or hiding a load. Cloud speech admission requires the selected
+route, its model, a credential, and `fetch`; Core speech admission requires the
+exact selected `Arcane.speech.transcribe` or `synthesize` method. `fetchRequest()`
+keeps the selected provider's public response shape. Browser speech routes
+translate the existing AI.js STT `{audio:Blob|File,mimeType,model}` and TTS
 `{model,input,responseFormat,voice?,speed?}` requests at the provider boundary;
-only WAV is accepted for the shared TTS result.
+only WAV is accepted for the shared TTS result. TTS voice selection comes from
+the exact selected provider/model catalog `defaultVoice`; a saved OpenAI voice
+is used only by the selected OpenAI adapter and is never forwarded to another
+provider route.
+
+`startProviders({startMuted=true,startTranscription=false,signal=null}={})`
+starts text chat without requesting an STT load by default; it does not undo an
+already ready or independently loading role. Callers must opt into eager STT
+startup with `startTranscription:true` or publish the explicit user activation
+intent exposed by the shared speech component. `setSpeechMuted(false)` records
+the shared unmuted lifecycle preference before loading TTS, while
+`setSpeechMuted(true)` cancels active TTS work and unloads that role.
+`fetchSTT(audioFile,responseHandler,signal)` propagates the caller-owned signal;
+delivery suppression is guaranteed after abort, while underlying provider-stop
+claims remain limited to that provider's cancellation contract.
 
 Exact exports: `default`.
 
@@ -220,18 +237,34 @@ catalog and status inspection, `start()`, independent `load()`, `unload()`,
 be data-only; callbacks, accessors, symbols, cycles, and excessive nesting are
 rejected at the provider boundary.
 
-`start({startMuted=true,signal=null}={})` waits for prior speech-state and role
-unload work, applies the requested initial mute state, and returns the
-`startAIRuntime()` control handle `{barrier,settled,cancel}`. The barrier and
-settled promises describe provider-startup readiness; cancellation remains
-cooperative through the supplied signal and returned control.
+`start({startMuted=true,startTranscription=false,signal=null}={})` waits for
+prior speech-state and role unload work, applies the requested initial mute
+state, and returns the `startAIRuntime()` control handle
+`{barrier,settled,cancel}`. Startup does not request selected STT unless the
+caller explicitly opts in; it does not force an independently active STT role
+back to unloaded. The barrier and settled promises describe provider-startup
+readiness; cancellation remains cooperative through the supplied signal and
+returned control.
+
+Interactive requests are latest-request-wins per role. A newer valid request
+that reaches admission aborts the active request, waits for its provider promise
+to settle (or for bounded stream cleanup to be confirmed), and revalidates
+ready/loaded/not-busy state before it starts. Rapid intermediate requests are
+superseded, and their late results cannot restore or overwrite newer role state.
+Promise settlement proves only that the provider's exposed request promise
+completed; it does not by itself prove that underlying provider work stopped.
+Provider-specific positive cancellation acknowledgement remains
+provider-specific. Load and reconfiguration guards stay fail-closed while
+request ownership is active.
 
 ### Availability and normalization
 
-**Cross-host runtime with provider-specific execution.** SDK `0.2.1` ships the
-browser-WASM LLM and browser Whisper/Kokoro adapters. A native, Core, or cloud
-adapter may be supplied externally only when it implements the same
-`arcane-ai-provider/2` boundary; the SDK does not publish such an adapter. A
+**Cross-host runtime with provider-specific execution.** Published SDK `0.2.1`
+ships the browser-WASM LLM and browser Whisper/Kokoro adapters but predates the
+legacy speech adapters described above. Current source also supplies the narrow
+AI.js legacy OpenAI/Ollama/Core-speech adapters; other native, Core, or cloud
+adapters may be supplied externally only when they implement the same
+`arcane-ai-provider/2` boundary. A
 provider must prove a matching `arcane-ai-model-authority/1` inspection before load.
 `localOnly` routing fails closed; it never selects a cloud or non-local route as
 a fallback. Role lifecycle and stream cleanup are normalized, while the
@@ -313,9 +346,12 @@ Exact exports: `AI_RUNTIME_PROTOCOL`, `AI_RUNTIME_STATE_EVENT`,
 `subscribeAIRuntimeIntents()`, and `startAIRuntime()`.
 
 Each role record is exactly `{role,state,providerId,modelId,localOnly,loaded,
-busy,operationId,progress,error}`. `startAIRuntime({startMuted=true,signal})`
-returns `{barrier,settled,cancel}`: `barrier` settles for text chat, while
-`settled` covers every requested role; muted startup does not request TTS.
+busy,operationId,progress,error}`.
+`startAIRuntime({startMuted=true,startTranscription=false,signal})` returns
+`{barrier,settled,cancel}`: `barrier` settles for text chat, while `settled`
+covers every requested role. Muted startup does not request TTS, and STT startup
+is opt-in so selection and state observation do not begin a transcription-model
+load.
 
 ### Availability and normalization
 
@@ -1395,7 +1431,15 @@ Exact exports: `availabilityFromReport`, `createLocalAIReadinessController`.
 
 ### Availability and normalization
 
-**Browser/native hybrid.** Normalized controller state and change events. Transport: LocalAIReadiness + component events. [Deep protocol details](protocols.md).
+`availabilityFromReport()` returns `true` only for a slot whose local
+requirement is explicitly `required:true` and whose report is explicitly
+`ready:true`. Missing and non-local-required slots remain false: this projection
+does not attest provider registration, selection, credentials, browser speech
+authority, or model load state. Components must preserve selected sticky
+`AIRuntimeState` roles as the readiness authority.
+
+**Browser/native hybrid.** Normalized controller state and change events.
+Transport: LocalAIReadiness + component events. [Deep protocol details](protocols.md).
 
 ### Example
 

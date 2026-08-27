@@ -263,10 +263,13 @@ Application code should select a normalized role, not an internal protocol.
 The exported
 [`getAIProviderRuntime()` singleton](runtime-modules.md#aiproviderruntimejs)
 comes from authenticated runtime bytes and owns independent `llm`, `stt`, and
-`tts` selections. SDK `0.2.1` ships browser-WASM LLM and browser speech
-provider/2 adapters; native, Core, or cloud routes require an externally
-supplied compatible adapter. The singleton itself is not an authentication or
-capability token. It normalizes inspection, model authority,
+`tts` selections. Published SDK `0.2.1` ships browser-WASM LLM and browser
+speech provider/2 adapters but predates the legacy speech correction described
+below. Current source also adapts selected legacy OpenAI LLM/STT/TTS,
+Core-backed Ollama LLM, and admitted Core speech STT/TTS routes into provider/2;
+other native, Core, or cloud routes require an externally supplied compatible
+adapter. The singleton itself is not an authentication or capability token. It
+normalizes inspection, model authority,
 load/unload/dispose, cancellation, stream cleanup, status, and startup
 barriers. Each selected provider retains its real execution requirements.
 `localOnly` fails closed, and failure in one role never authorizes a Core,
@@ -358,6 +361,35 @@ has begun; cancellation during shared browser decoding leaves the loaded Worker
 ready. Unload always cancels active role work before releasing that role's
 execution state, and superseded late results are rejected rather than committed
 or retried through another provider.
+
+Interactive request ownership is latest-request-wins independently for each
+role. A new valid request that reaches admission aborts the active role request
+and waits for its provider promise settlement; stream replacement additionally
+requires confirmed bounded handle cleanup. Only the newest waiting request may
+start after settlement, and request-specific generations prevent superseded
+callbacks from clearing or restoring newer state. The runtime revalidates
+selected-provider readiness and never reloads, switches, or falls back
+implicitly. Generic provider-promise settlement is not a claim that underlying
+work stopped; only a provider's documented positive acknowledgement or
+destructive worker teardown can prove that stronger fact.
+
+`startAIRuntime({startTranscription:false})` is the default startup boundary for
+STT. It declines to request a startup STT load; it does not unload a role already
+started through another explicit lifecycle action. A selected unloaded
+transcription provider remains selected and unloaded until a user lifecycle
+intent or explicit `startTranscription:true` opt-in asks the provider owner to
+load it. Neither state observation nor the shared speech component imports a
+model or selects a fallback.
+
+The shared speech component owns an `AbortController` for each STT request and
+passes its signal through `AI.fetchSTT()`. Cancel, superseding capture, and
+component teardown abort that signal and suppress late delivery. Whether the
+provider's underlying computation stops remains governed by its own
+cancellation contract. User TTS unmute calls `AI.setSpeechMuted(false)` before
+or with its load intent so the runtime records the unmuted lifecycle preference;
+mute calls `AI.setSpeechMuted(true)`, cancels active synthesis, and unloads TTS.
+The selected TTS model catalog owns `defaultVoice`. AI.js uses a saved OpenAI
+voice only for the OpenAI route and never forwards it to Core or browser Kokoro.
 
 LLM tool calls are structural result data only. The SDK never executes a
 handler. The application owns schema validation, authorization, side-effect
