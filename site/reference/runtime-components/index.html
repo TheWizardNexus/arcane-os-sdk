@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../sdk-api/">API</a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane runtime component catalog</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-runtime-component-catalog">Arcane runtime component catalog</h1><p class="doc-lead">Arcane components are reusable HTML fragments loaded through the shared element. They are browser UI, so they run in an ordinary supported browser renderer…</p><div class="doc-meta"><span>SDK 0.2.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane runtime component catalog</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-runtime-component-catalog">Arcane runtime component catalog</h1><p class="doc-lead">Arcane components are reusable HTML fragments loaded through the shared element. They are browser UI, so they run in an ordinary supported browser renderer…</p><div class="doc-meta"><span>SDK 0.2.2</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="./" aria-current="page">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/runtime-components.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#basic-loading-pattern">Basic loading pattern</a><a href="#canonical-inventory">Canonical inventory</a><a href="#app-barhtml">app-bar.html</a><a href="#assistant-panelhtml">assistant-panel.html</a><a href="#calculatorhtml">calculator.html</a><a href="#charthtml">chart.html</a><a href="#chathtml">chat.html</a><a href="#conversation-viewhtml">conversation-view.html</a><a href="#dashboard-confightml">dashboard-config.html</a><a href="#data-maintenancehtml">data-maintenance.html</a><a href="#data-viewhtml">data-view.html</a><a href="#directory-pickerhtml">directory-picker.html</a><a href="#document-inspectorhtml">document-inspector.html</a><a href="#file-drophtml">file-drop.html</a><a href="#file-inspectorhtml">file-inspector.html</a><a href="#file-managerhtml">file-manager.html</a><a href="#headerhtml">header.html</a><a href="#integration-settingshtml">integration-settings.html</a><a href="#local-ai-statushtml">local-ai-status.html</a><a href="#markdown-documenthtml">markdown-document.html</a><a href="#markdown-editorhtml">markdown-editor.html</a><a href="#media-embedhtml">media-embed.html</a><a href="#modalhtml">modal.html</a><a href="#output-panelhtml">output-panel.html</a><a href="#preferences-formhtml">preferences-form.html</a><a href="#record-timelinehtml">record-timeline.html</a><a href="#relationship-boardhtml">relationship-board.html</a><a href="#screen-capturehtml">screen-capture.html</a><a href="#source-code-viewerhtml">source-code-viewer.html</a><a href="#source-explanationhtml">source-explanation.html</a><a href="#speechhtml">speech.html</a><a href="#summary-striphtml">summary-strip.html</a><a href="#tablehtml">table.html</a><a href="#task-progresshtml">task-progress.html</a><a href="#terminal-workspacehtml">terminal-workspace.html</a><a href="#theme-editorhtml">theme-editor.html</a><a href="#theme-switcherhtml">theme-switcher.html</a><a href="#unified-inboxhtml">unified-inbox.html</a><a href="#voice-transcriptionhtml">voice-transcription.html</a><a href="#weather-widgethtml">weather-widget.html</a></nav><p class="toc-more">2 additional sections remain searchable in the page.</p></details><p>Arcane components are reusable HTML fragments loaded through the shared <code>&lt;html-import&gt;</code> element. They are browser UI, so they run in an ordinary supported browser renderer and in native Arcane WebViews. They do not run in Node or as cloud services.</p>
@@ -241,10 +241,10 @@
 </tr>
 <tr>
 <td><a href="#speechhtml"><code>speech.html</code></a></td>
-<td>Coordinates speech controls, transcription completion, mute state, and microphone availability.</td>
-<td><code>configure()</code><br><code>setAvailability()</code><br><code>setMuted(); availability</code><br><code>muted</code><br><code>initialMuted</code><br><code>componentReady properties</code></td>
-<td><code>speech-ready</code><br><code>speech-transcription-complete</code><br><code>speech-microphone-unavailable</code></td>
-<td>UI state normalized; AI/media behavior mixed</td>
+<td>Coordinates explicit STT activation, speech controls, transcription completion, mute state, and microphone availability.</td>
+<td><code>configure()</code><br><code>setAvailability()</code><br><code>setMuted()</code><br><code>requestSTTActivation()</code><br><code>destroy()</code><br><code>availability</code><br><code>muted</code><br><code>initialMuted</code><br><code>componentReady</code></td>
+<td><code>speech-ready</code><br><code>speech-transcription-complete</code><br><code>speech-transcription-error</code><br><code>speech-transcription-cancelled</code><br><code>speech-microphone-unavailable</code><br><code>speech-stt-activation-request</code><br><code>speech-stt-activation-error</code><br><code>speech-tts-lifecycle-error</code></td>
+<td>Sticky runtime speech readiness, explicit STT activation, request cancellation, and TTS mute lifecycle intent normalized; provider/model authority and media behavior remain external</td>
 </tr>
 <tr>
 <td><a href="#summary-striphtml"><code>summary-strip.html</code></a></td>
@@ -391,6 +391,11 @@ speech, language, availability, and conversation-timebox surface.</p>
 extension callbacks. The component installs warning-only defaults when the host
 does not supply them; applications may instead consume the corresponding
 <code>chat-send-message</code> and <code>chat-language-changed</code> events.</p>
+<p><code>setAIAvailability()</code> remains an LLM compatibility input, but selected sticky
+<code>AIRuntimeState</code> LLM state wins over that boolean. STT and TTS readiness always
+comes from sticky runtime role state; the method never forwards compatibility
+speech booleans or synthesizes ready speech roles without an admitted, loaded
+provider.</p>
 <p>When a selected LLM route is <code>unloaded</code> or in <code>error</code>, the component exposes a
 keyboard-operable Start/Try again control while Send stays disabled. During
 <code>loading</code>, the control becomes Cancel loading and reflects sticky progress.
@@ -765,13 +770,61 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 </code></pre></div>
 <h2 id="speechhtml">speech.html</h2>
 <h3 id="overview-28">Overview</h3>
-<p>Coordinates speech controls, transcription completion, mute state, and microphone availability.</p>
+<p>Coordinates explicit speech-to-text activation, speech controls, transcription
+completion, mute state, and microphone availability.</p>
 <h3 id="public-surface-28">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>setAvailability()</code>, <code>setMuted(); availability</code>, <code>muted</code>, <code>initialMuted</code>, <code>componentReady properties</code>.</p>
-<p>Events: <code>speech-ready</code>, <code>speech-transcription-complete</code>, <code>speech-microphone-unavailable</code>.</p>
-<p>Shared dependencies: <a href="../runtime-modules/#aijs"><code>AI.js</code></a>, <a href="../runtime-modules/#dblsjs"><code>DBLS.js</code></a>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>setAvailability()</code>, <code>setMuted()</code>,
+<code>requestSTTActivation()</code>, <code>destroy()</code>, <code>availability</code>, <code>muted</code>, <code>initialMuted</code>,
+and <code>componentReady</code>.</p>
+<p>Events: <code>speech-ready</code>, <code>speech-transcription-complete</code>,
+<code>speech-transcription-error</code>, <code>speech-transcription-cancelled</code>,
+<code>speech-microphone-unavailable</code>, <code>speech-stt-activation-request</code>,
+<code>speech-stt-activation-error</code>, and <code>speech-tts-lifecycle-error</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#aijs"><code>AI.js</code></a>,
+<a href="../runtime-modules/#airuntimestatejs"><code>AIRuntimeState.js</code></a>, and
+<a href="../runtime-modules/#dblsjs"><code>DBLS.js</code></a>.</p>
+<p>The Hold to talk control remains disabled unless sticky STT state is <code>ready</code>,
+the role is not busy, and microphone capture is available. For an explicitly
+selected STT route, a separate keyboard-operable control presents Start
+transcription while <code>unloaded</code>, Cancel loading while <code>loading</code>, a disabled
+Canceling state while <code>unloading</code>, and Try again with the sticky error while
+<code>error</code>. Selected-unloaded, busy, and error states are shown as distinct facts;
+none is treated as ready.</p>
+<p>The default <code>requestSTTActivation(intent)</code> forwards the frozen
+<code>{role:&#39;stt&#39;,action:&#39;load&#39;|&#39;unload&#39;,reason:&#39;user&#39;}</code> record to
+<code>requestAIRuntimeIntent()</code>. Before calling it, the component emits a bubbling,
+composed, cancelable <code>speech-stt-activation-request</code> event with frozen
+<code>{intent,state}</code> detail. <code>preventDefault()</code> suppresses the callback and intent.
+Callback failure emits <code>speech-stt-activation-error</code> with frozen
+<code>{request,error,message}</code> detail. Cancel loading publishes an <code>unload</code> intent;
+only subsequent sticky <code>unloading</code> or <code>unloaded</code> state confirms lifecycle
+progress, and callback return never proves provider work stopped.</p>
+<p>The component emits no activation request on import or state observation.
+Provider registration and selection remain inert, and default
+<code>startTranscription=false</code> does not request STT during runtime startup. The
+provider/runtime owner decides whether and how to execute a user intent; the
+component never selects a runtime or model, downloads artifacts, reloads after
+failure, or falls back to another provider.</p>
+<p><code>setAvailability()</code> is compatibility-only for microphone and negative
+unselected-role reports. Positive STT/TTS booleans cannot manufacture a ready
+role, and no compatibility value can replace a selected sticky role. Hold to
+talk stays disabled without sticky ready STT, and compatibility input cannot
+enable a no-selection TTS role or bypass explicit TTS activation.</p>
+<p>Each transcription request owns an <code>AbortController</code>; its signal is passed as
+the third argument to <code>AI.fetchSTT()</code>. Cancel, a newer capture, and <code>destroy()</code>
+abort that controller and suppress late results. This proves request delivery
+was canceled, not that an uncooperative provider stopped underlying work.</p>
+<p>User Unmute calls the shared <code>AI.setSpeechMuted(false)</code> lifecycle owner before
+or with publishing the TTS load intent, so the runtime can legally load TTS.
+Mute calls <code>AI.setSpeechMuted(true)</code>, stops playback, cancels active TTS work,
+and unloads the selected TTS role. Lifecycle failures remain visible through
+<code>speech-tts-lifecycle-error</code> and sticky role state.</p>
 <h3 id="availability-and-normalization-28">Availability and normalization</h3>
-<p><strong>Browser and supported native WebViews.</strong> UI state normalized; AI/media behavior mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<p><strong>Browser and supported native WebViews.</strong> UI/runtime state and explicit user
+STT activation intent are normalized; provider/model authority and media
+behavior remain external. HTMLImport + DOM; injected Arcane/provider modules
+where listed. Native methods remain subject to the bound app&#39;s capabilities.
+<a href="../protocols/">Deep protocol details</a>.</p>
 <h3 id="example-28">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
   id=&quot;speech.html&quot;
@@ -928,6 +981,6 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#basic-loading-pattern">Basic loading pattern</a><a href="#canonical-inventory">Canonical inventory</a><a href="#app-barhtml">app-bar.html</a><a href="#assistant-panelhtml">assistant-panel.html</a><a href="#calculatorhtml">calculator.html</a><a href="#charthtml">chart.html</a><a href="#chathtml">chat.html</a><a href="#conversation-viewhtml">conversation-view.html</a><a href="#dashboard-confightml">dashboard-config.html</a><a href="#data-maintenancehtml">data-maintenance.html</a><a href="#data-viewhtml">data-view.html</a><a href="#directory-pickerhtml">directory-picker.html</a><a href="#document-inspectorhtml">document-inspector.html</a><a href="#file-drophtml">file-drop.html</a><a href="#file-inspectorhtml">file-inspector.html</a><a href="#file-managerhtml">file-manager.html</a><a href="#headerhtml">header.html</a><a href="#integration-settingshtml">integration-settings.html</a><a href="#local-ai-statushtml">local-ai-status.html</a><a href="#markdown-documenthtml">markdown-document.html</a><a href="#markdown-editorhtml">markdown-editor.html</a><a href="#media-embedhtml">media-embed.html</a><a href="#modalhtml">modal.html</a><a href="#output-panelhtml">output-panel.html</a><a href="#preferences-formhtml">preferences-form.html</a><a href="#record-timelinehtml">record-timeline.html</a><a href="#relationship-boardhtml">relationship-board.html</a><a href="#screen-capturehtml">screen-capture.html</a><a href="#source-code-viewerhtml">source-code-viewer.html</a><a href="#source-explanationhtml">source-explanation.html</a><a href="#speechhtml">speech.html</a><a href="#summary-striphtml">summary-strip.html</a><a href="#tablehtml">table.html</a><a href="#task-progresshtml">task-progress.html</a><a href="#terminal-workspacehtml">terminal-workspace.html</a><a href="#theme-editorhtml">theme-editor.html</a><a href="#theme-switcherhtml">theme-switcher.html</a><a href="#unified-inboxhtml">unified-inbox.html</a><a href="#voice-transcriptionhtml">voice-transcription.html</a><a href="#weather-widgethtml">weather-widget.html</a></nav><p class="toc-more">2 additional sections remain searchable in the page.</p></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.2.1, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.2.2, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>

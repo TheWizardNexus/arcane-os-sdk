@@ -49,10 +49,10 @@ const sdkBehaviorEvidence=(commit,sourcePath,sourceBlob,testPath,testBlob)=>Obje
 
 export const behaviorExampleEvidence=Object.freeze({
     'AI.js':sdkBehaviorEvidence(
-        '36fbe1418af3d5c343d105ee7c9456360c57785d',
+        'd5326d206bf0bec6ad82d53605e666841aa79899',
         'runtime/arcane/modules/AI.js',
-        '5abab7283e36e4433780ffde933f954d178c97bb',
-        'test/runtime-api-behavior.test.mjs','d355359f207d88fce94c34a4c6940e859ebb9c18'
+        '3a6569e0e44d343595c2e7cb88bb798a2d5b1b5a',
+        'test/runtime-api-behavior.test.mjs','526b691dcbd8b1eae96d6fce7b3a86d59605f983'
     ),
     'AnsiText.js':upstreamBehaviorEvidence('AnsiText.js',
         '097512451032ffbbceecdc3b02e3af6453e89e90',
@@ -104,28 +104,32 @@ export const behaviorExampleEvidence=Object.freeze({
     )
 });
 
-const sdkReferenceBehaviorEvidence=(scope,sourcePath,sourceBlob,tests)=>Object.freeze({
+const sdkReferenceBehaviorEvidence=(scope,sources,tests)=>Object.freeze({
     scope:Object.freeze([...scope]),
     repository:'TheWizardNexus/arcane-os-sdk',
-    commit:'36fbe1418af3d5c343d105ee7c9456360c57785d',
-    sources:Object.freeze([Object.freeze({path:sourcePath,blob:sourceBlob})]),
+    commit:'d5326d206bf0bec6ad82d53605e666841aa79899',
+    sources:Object.freeze(sources.map(record=>Object.freeze({...record}))),
     tests:Object.freeze(tests.map(record=>Object.freeze({...record})))
 });
 
 export const referenceGuideBehaviorEvidence=Object.freeze({
     'docs/reference/ai/browser-speech.md':sdkReferenceBehaviorEvidence(
         ['browser speech provider lifecycle, request normalization, and cancellation'],
-        'browser-runtime/ai/browser-speech-providers.mjs',
-        '36e016305f48c8285a702a0ade11a0a64b0c66ea',
+        [{
+            path:'browser-runtime/ai/browser-speech-providers.mjs',
+            blob:'6cfa347508881f06f5b061b76ac92f5ddbd7e468'
+        }],
         [{
             path:'test/browser-speech-providers.test.mjs',
-            blob:'6c8b7f51730359b13e41515e794b5076185ccd2f'
+            blob:'7ab8312d4ee0354f7ab7daca85510baadd74ac10'
         }]
     ),
     'docs/reference/cli.md':sdkReferenceBehaviorEvidence(
         ['import-map generation and multi-document targeting'],
-        'src/import-map.mjs',
-        '87bc41b65c1499c38907fbe151e17d247d2fc3c1',
+        [{
+            path:'src/import-map.mjs',
+            blob:'87bc41b65c1499c38907fbe151e17d247d2fc3c1'
+        }],
         [{
             path:'test/import-map.test.mjs',
             blob:'a70de7b52087d9f8c05e8ece48d32a7a75b0152b'
@@ -138,12 +142,20 @@ export const referenceGuideBehaviorEvidence=Object.freeze({
         }]
     ),
     'docs/reference/runtime-components.md':sdkReferenceBehaviorEvidence(
-        ['chat.html selected-unloaded AI activation control, callbacks, and public events'],
-        'runtime/arcane/components/chat.html',
-        'f4402222fb0185df8a5fb721a54febbb0db54c0d',
+        [
+            'chat.html selected-unloaded AI activation control, callbacks, and public events',
+            'speech.html explicit STT activation, request cancellation, and TTS lifecycle'
+        ],
+        [{
+            path:'runtime/arcane/components/chat.html',
+            blob:'91af4460229d49ea7ec691607651ccf3ffb0c6eb'
+        },{
+            path:'runtime/arcane/components/speech.html',
+            blob:'6062a0f20f036f0245cfb031871254c11386a289'
+        }],
         [{
             path:'test/runtime-api-behavior.test.mjs',
-            blob:'d355359f207d88fce94c34a4c6940e859ebb9c18'
+            blob:'526b691dcbd8b1eae96d6fce7b3a86d59605f983'
         }]
     )
 });
@@ -237,9 +249,9 @@ export function createReferenceModuleContractMap(records){
         if(!source.startsWith('docs/reference/')
             ||evidence.repository!=='TheWizardNexus/arcane-os-sdk'
             ||!/^[0-9a-f]{40}$/u.test(evidence.commit)
-            ||!Array.isArray(evidence.scope)||evidence.scope.length!==1
+            ||!Array.isArray(evidence.scope)||evidence.scope.length<1
             ||!evidence.scope.every(value=>typeof value==='string'&&value.trim()!=='')
-            ||!Array.isArray(evidence.sources)||evidence.sources.length!==1
+            ||!Array.isArray(evidence.sources)||evidence.sources.length<1
             ||!Array.isArray(evidence.tests)||evidence.tests.length<1
             ||![...evidence.sources,...evidence.tests].every(record=>
                 typeof record.path==='string'

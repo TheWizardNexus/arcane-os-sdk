@@ -185,7 +185,7 @@ identical executable alias.
 The generated artifact is
 `apps/<id>/modules/arcane.importmap.json`. Its exact JSON is also installed in
 the app entry as `<script type="importmap" data-arcane-import-map>` before
-module loading. In SDK `0.2.1`, the complete authenticated physical-v1 runtime
+module loading. In SDK `0.2.2`, the complete authenticated physical-v1 runtime
 produces 91 entries and intentionally has no package-root mapping. That count
 describes the shipped SDK closure; the command receipt remains authoritative
 for the exact map written to the selected application.
@@ -573,8 +573,8 @@ Success returns:
 ```javascript
 {
     packageName:'arcane-os',
-    currentVersion:'0.2.0',
-    registryVersion:'0.2.1',
+    currentVersion:'0.2.1',
+    registryVersion:'0.2.2',
     tag:'latest',
     status:'update-available', // or 'current' or 'ahead'
     updateAvailable:true,

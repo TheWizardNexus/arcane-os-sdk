@@ -259,11 +259,10 @@ request ownership is active.
 
 ### Availability and normalization
 
-**Cross-host runtime with provider-specific execution.** Published SDK `0.2.1`
-ships the browser-WASM LLM and browser Whisper/Kokoro adapters but predates the
-legacy speech adapters described above. Current source also supplies the narrow
-AI.js legacy OpenAI/Ollama/Core-speech adapters; other native, Core, or cloud
-adapters may be supplied externally only when they implement the same
+**Cross-host runtime with provider-specific execution.** Published SDK `0.2.2`
+ships the browser-WASM LLM and browser Whisper/Kokoro adapters and supplies the
+narrow AI.js legacy OpenAI/Ollama/Core-speech adapters; other native, Core, or
+cloud adapters may be supplied externally only when they implement the same
 `arcane-ai-provider/2` boundary. A
 provider must prove a matching `arcane-ai-model-authority/1` inspection before load.
 `localOnly` routing fails closed; it never selects a cloud or non-local route as
@@ -1083,7 +1082,7 @@ source body as implicit authority, and never persists a caller-owned body.
 **Browser or compatible host with an injected DBOPFS adapter.** The adapter
 keeps the existing `get`, `set`, `getAllKeys`, and `delete` method names; Node
 can use the same class only through an explicitly imported runtime module and a
-compatible storage adapter; SDK `0.2.1` publishes no Node package subpath or
+compatible storage adapter; SDK `0.2.2` publishes no Node package subpath or
 Node storage implementation for it. Bootstrap uses a bounded concurrent
 generation, commits its manifest last, cleans partial data on failure, and
 rejects case-colliding IDs. Search

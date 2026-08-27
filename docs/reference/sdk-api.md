@@ -17,7 +17,7 @@ This table is the Node `package.json#exports` map: it defines package
 entrypoints for SDK/tooling code. It is distinct from the generated browser
 import map that resolves application-facing `arcane/*` modules and the focused
 EventManager entry. See [browser runtime delivery](protocols.md#browser-runtime-delivery)
-for that 91-entry physical-runtime contract in SDK `0.2.1`.
+for that 91-entry physical-runtime contract in SDK `0.2.2`.
 
 | Specifier | Purpose |
 | --- | --- |
@@ -47,7 +47,7 @@ Protocol mechanics are intentionally kept in the [deep protocol guide](protocols
 
 ## Canonical member inventory
 
-SDK `0.2.1` exports exactly 169 distinct JavaScript members across 13
+SDK `0.2.2` exports exactly 169 distinct JavaScript members across 13
 JavaScript entrypoints. The complete export map has 23 subpaths: the other 10
 are the runtime manifest, eight JSON Schemas, and package metadata. Runtime
 projection modules in the managed browser map are cataloged separately in
@@ -814,7 +814,7 @@ same deterministic map. The package root also contains the public
 {
   schemaVersion: 1,
   kind: 'arcane-app-runtime-projection',
-  sdkVersion: '0.2.1',
+  sdkVersion: '0.2.2',
   pathPrefix: 'arcane/',
   fileCount,
   totalBytes,
@@ -2698,7 +2698,7 @@ The import-map operation also reports the stable operation-specific strings
 `ARCANE_IMPORT_MAP_COLLISION`; package assembly can additionally report
 `ARCANE_IMPORT_MAP_CLEANUP_FAILED`. They are normalized `ArcaneError.code`
 values, but are not properties added to this frozen general registry in SDK
-`0.2.1`.
+`0.2.2`.
 
 ### Value and import
 
@@ -3364,7 +3364,7 @@ workspace it additionally returns the exact installed package authority:
     packageSource,
     canonicalPackageRoot,
     packageName: 'arcane-os',
-    packageVersion: '0.2.1',
+    packageVersion: '0.2.2',
     runtimeRoot,
     browserRuntimeRoot,
     runtimeManifest,
@@ -3374,9 +3374,9 @@ workspace it additionally returns the exact installed package authority:
 ```
 
 The dependency can be named `arcane-os` or be one exact npm alias for
-`npm:arcane-os@0.2.1`. The selected installation must still be one direct,
+`npm:arcane-os@0.2.2`. The selected installation must still be one direct,
 physical, non-link package directory whose manifest identifies exactly as
-`arcane-os@0.2.1`; duplicate canonical/alias declarations fail closed.
+`arcane-os@0.2.2`; duplicate canonical/alias declarations fail closed.
 `allowMissingManagedImportMap` is an internal packaging/development seam. An
 ordinary caller should leave it `false`.
 
@@ -3553,7 +3553,7 @@ const toolchain = createToolchain({
 
 // Only this explicit call refreshes the managed map and configured HTML entry.
 const result = await toolchain.importMap();
-console.log(result.importMap.entryCount); // 91 in SDK 0.2.1
+console.log(result.importMap.entryCount); // 91 in SDK 0.2.2
 console.log(result.importMap.documentPaths, result.importMap.documentCount);
 ```
 

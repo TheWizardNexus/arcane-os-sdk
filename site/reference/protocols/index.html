@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../sdk-api/">API</a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Protocol and host architecture</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="protocol-and-host-architecture">Protocol and host architecture</h1><p class="doc-lead">This is the deep reference behind the compact availability notes elsewhere. Application developers should start with the availability and normalization guid…</p><div class="doc-meta"><span>SDK 0.2.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Protocol and host architecture</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="protocol-and-host-architecture">Protocol and host architecture</h1><p class="doc-lead">This is the deep reference behind the compact availability notes elsewhere. Application developers should start with the availability and normalization guid…</p><div class="doc-meta"><span>SDK 0.2.2</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="./" aria-current="page">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/protocols.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#layer-map">Layer map</a><a href="#sdk-package-and-cli-protocols">SDK package and CLI protocols</a><a href="#central-events-and-time-travel-data">Central events and time-travel data</a><a href="#browser-runtime-delivery">Browser runtime delivery</a><a href="#portable-ai-provider-runtime">Portable AI provider runtime</a><a href="#arcane-application-protocol">Arcane application protocol</a><a href="#native-host-transports">Native host transports</a><a href="#development-and-remote-http-transport">Development and remote HTTP transport</a><a href="#core-dispatch-and-capability-admission">Core dispatch and capability admission</a><a href="#arcane-ollama-protocol-path">Arcane Ollama protocol path</a><a href="#explicit-cloud-provider-path">Explicit cloud provider path</a><a href="#events-streaming-and-cancellation">Events, streaming, and cancellation</a><a href="#cross-kernel-normalization-boundary">Cross-kernel normalization boundary</a><a href="#receipt-and-generation-boundaries">Receipt and generation boundaries</a></nav></details><p>This is the deep reference behind the compact availability notes elsewhere.
@@ -98,7 +98,7 @@ imports such as:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import ollama from &#39;arcane/Ollama&#39;;
 </code></pre></div>
 <p>The authenticated physical-v1 tree lives entirely beneath <code>arcane/</code>. SDK
-<code>0.2.1</code> projects it from two canonical release receipts:</p>
+<code>0.2.2</code> projects it from two canonical release receipts:</p>
 <div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
 <tr>
@@ -110,12 +110,12 @@ imports such as:</p>
 <tbody><tr>
 <td><code>runtime/ARCANE_RUNTIME_RELEASE.json</code></td>
 <td><code>sdk-canonical</code>; <code>arcane/1</code>; builder <code>arcane-sdk-runtime-v1</code></td>
-<td>160 files; 3,605,154 bytes; content SHA-256 <code>5b921d50b6a0cf36a13f7a7dedf96cd3a68104a322e5139136fd4197aa1ca7cb</code></td>
+<td>160 files; 3,643,083 bytes; content SHA-256 <code>0b09b1fd548152416f583d5e117197c7886b5a9e63071e43493577b4090e4a8c</code></td>
 </tr>
 <tr>
 <td><code>browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json</code></td>
 <td><code>arcane-os-sdk</code>; <code>arcane-sdk-browser-runtime/1</code>; builder <code>arcane-sdk-browser-runtime-v1</code></td>
-<td>25 files; 9,279,974 bytes; content SHA-256 <code>a9715c4b3aef70ec4042e4738089568d6588877b29582e0f758ed83897b6814f</code></td>
+<td>25 files; 9,280,047 bytes; content SHA-256 <code>3c82ed11b24c7b7b91b62f6dc52e0b1dcd444112a29cd48413eedc008380eb61</code></td>
 </tr>
 </tbody></table>
 </div>
@@ -130,7 +130,7 @@ browser receipt binds <code>event-pubsub</code> <code>6.1.0</code>, <code>strong
 versions from aliasing one another.</p>
 <p>Those two receipt inventories contain 185 entries in total. That sum is a
 release-inventory fact, not an import-map entry count and not an assertion about
-one maintained example. The <code>0.2.1</code> map deterministically roots every admitted
+one maintained example. The <code>0.2.2</code> map deterministically roots every admitted
 top-level runtime ESM plus the authenticated SDK browser roots, then follows
 those roots for runtime entities and dependency compatibility. Application
 source imports do not select the 91 entries. Its public operation receipt is the
@@ -208,8 +208,8 @@ authority with exactly <code>dependencyName</code>, <code>packageSource</code>,
 <code>canonicalPackageRoot</code>, <code>packageName</code>, <code>packageVersion</code>, <code>runtimeRoot</code>,
 <code>browserRuntimeRoot</code>, <code>runtimeManifest</code>, and <code>browserRuntimeManifest</code>. A
 workspace may use the canonical dependency name or one exact npm alias such as
-<code>npm:arcane-os@0.2.1</code>; the physical package manifest must still identify
-exactly as <code>arcane-os@0.2.1</code>. Canonical-plus-alias duplicates, multiple aliases,
+<code>npm:arcane-os@0.2.2</code>; the physical package manifest must still identify
+exactly as <code>arcane-os@0.2.2</code>. Canonical-plus-alias duplicates, multiple aliases,
 links/junctions, indirect package roots, or version drift fail closed.</p>
 <p>The imported module can be pure browser logic, standard-Web-API logic, or a
 client of <code>globalThis.Arcane</code>. Import-map resolution is not a new Arcane wire
@@ -235,16 +235,16 @@ for both files and not a durable crash journal.</p>
 <p>No app watches, polls, downloads, or self-updates this map. An active operation&#39;s
 heartbeat is event telemetry only and never regenerates browser state.</p>
 </details>
-<details><summary>SDK 0.2.1 browser-runtime admission and exact receipt fields</summary>
+<details><summary>SDK 0.2.2 browser-runtime admission and exact receipt fields</summary>
 <p><code>arcane.lock.json.sdkBrowserRuntime</code> persists the trusted manifest path,
 <code>manifestSha256</code>, <code>contentSha256</code>, <code>builder</code>, <code>sdkVersion</code>, and <code>source</code> record.
-For SDK <code>0.2.1</code>, the manifest itself records:</p>
+For SDK <code>0.2.2</code>, the manifest itself records:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">manifest: node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json
 fileCount: 25
-totalBytes: 9279974
-contentSha256: a9715c4b3aef70ec4042e4738089568d6588877b29582e0f758ed83897b6814f
+totalBytes: 9280047
+contentSha256: 3c82ed11b24c7b7b91b62f6dc52e0b1dcd444112a29cd48413eedc008380eb61
 builder: arcane-sdk-browser-runtime-v1
-sdkVersion: 0.2.1
+sdkVersion: 0.2.2
 source.protocol: arcane-sdk-browser-runtime/1
 source.browserEntry: arcane-os/event-manager
 </code></pre></div>
@@ -266,10 +266,12 @@ does not recreate authority.</p>
 The exported
 <a href="../runtime-modules/#aiproviderruntimejs"><code>getAIProviderRuntime()</code> singleton</a>
 comes from authenticated runtime bytes and owns independent <code>llm</code>, <code>stt</code>, and
-<code>tts</code> selections. SDK <code>0.2.1</code> ships browser-WASM LLM and browser speech
-provider/2 adapters; native, Core, or cloud routes require an externally
-supplied compatible adapter. The singleton itself is not an authentication or
-capability token. It normalizes inspection, model authority,
+<code>tts</code> selections. Published SDK <code>0.2.2</code> ships browser-WASM LLM and browser
+speech provider/2 adapters and also adapts selected legacy OpenAI LLM/STT/TTS,
+Core-backed Ollama LLM, and admitted Core speech STT/TTS routes into provider/2;
+other native, Core, or cloud routes require an externally supplied compatible
+adapter. The singleton itself is not an authentication or capability token. It
+normalizes inspection, model authority,
 load/unload/dispose, cancellation, stream cleanup, status, and startup
 barriers. Each selected provider retains its real execution requirements.
 <code>localOnly</code> fails closed, and failure in one role never authorizes a Core,
@@ -296,7 +298,7 @@ HTTPS sources; <code>offline:true</code> performs no model request and admits on
 compatible completed cache, otherwise it rejects with
 <code>ARCANE_AI_MODEL_OFFLINE_MISS</code>. Unload releases the active Wllama session but
 does not silently delete the app-owned cache.</p>
-<p>SDK <code>0.2.1</code> requires WebGPU. Load requests full offload with exactly 99,999 GPU
+<p>SDK <code>0.2.2</code> requires WebGPU. Load requests full offload with exactly 99,999 GPU
 layers and admits the model only after observing an adapter, full layer offload,
 buffer and queue work, and a settled fence. <code>navigator.gpu</code> presence alone is
 not readiness. There is no CPU fallback, partial-offload success mode, or
@@ -348,6 +350,32 @@ has begun; cancellation during shared browser decoding leaves the loaded Worker
 ready. Unload always cancels active role work before releasing that role&#39;s
 execution state, and superseded late results are rejected rather than committed
 or retried through another provider.</p>
+<p>Interactive request ownership is latest-request-wins independently for each
+role. A new valid request that reaches admission aborts the active role request
+and waits for its provider promise settlement; stream replacement additionally
+requires confirmed bounded handle cleanup. Only the newest waiting request may
+start after settlement, and request-specific generations prevent superseded
+callbacks from clearing or restoring newer state. The runtime revalidates
+selected-provider readiness and never reloads, switches, or falls back
+implicitly. Generic provider-promise settlement is not a claim that underlying
+work stopped; only a provider&#39;s documented positive acknowledgement or
+destructive worker teardown can prove that stronger fact.</p>
+<p><code>startAIRuntime({startTranscription:false})</code> is the default startup boundary for
+STT. It declines to request a startup STT load; it does not unload a role already
+started through another explicit lifecycle action. A selected unloaded
+transcription provider remains selected and unloaded until a user lifecycle
+intent or explicit <code>startTranscription:true</code> opt-in asks the provider owner to
+load it. Neither state observation nor the shared speech component imports a
+model or selects a fallback.</p>
+<p>The shared speech component owns an <code>AbortController</code> for each STT request and
+passes its signal through <code>AI.fetchSTT()</code>. Cancel, superseding capture, and
+component teardown abort that signal and suppress late delivery. Whether the
+provider&#39;s underlying computation stops remains governed by its own
+cancellation contract. User TTS unmute calls <code>AI.setSpeechMuted(false)</code> before
+or with its load intent so the runtime records the unmuted lifecycle preference;
+mute calls <code>AI.setSpeechMuted(true)</code>, cancels active synthesis, and unloads TTS.
+The selected TTS model catalog owns <code>defaultVoice</code>. AI.js uses a saved OpenAI
+voice only for the OpenAI route and never forwards it to Core or browser Kokoro.</p>
 <p>LLM tool calls are structural result data only. The SDK never executes a
 handler. The application owns schema validation, authorization, side-effect
 policy, dispatch, and the matching tool-result turn.</p>
@@ -481,6 +509,6 @@ broker with retained handles and peer-process/generation binding.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#layer-map">Layer map</a><a href="#sdk-package-and-cli-protocols">SDK package and CLI protocols</a><a href="#central-events-and-time-travel-data">Central events and time-travel data</a><a href="#browser-runtime-delivery">Browser runtime delivery</a><a href="#portable-ai-provider-runtime">Portable AI provider runtime</a><a href="#arcane-application-protocol">Arcane application protocol</a><a href="#native-host-transports">Native host transports</a><a href="#development-and-remote-http-transport">Development and remote HTTP transport</a><a href="#core-dispatch-and-capability-admission">Core dispatch and capability admission</a><a href="#arcane-ollama-protocol-path">Arcane Ollama protocol path</a><a href="#explicit-cloud-provider-path">Explicit cloud provider path</a><a href="#events-streaming-and-cancellation">Events, streaming, and cancellation</a><a href="#cross-kernel-normalization-boundary">Cross-kernel normalization boundary</a><a href="#receipt-and-generation-boundaries">Receipt and generation boundaries</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.2.1, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.2.2, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>

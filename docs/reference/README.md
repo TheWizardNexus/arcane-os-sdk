@@ -39,9 +39,9 @@ This repository contains explicitly versioned surfaces with different owners:
 
 | Surface | Source identity | Meaning |
 | --- | --- | --- |
-| SDK and CLI | `arcane-os` `0.2.1` | The Node.js toolchain plus the browser-only `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints in this checkout. |
-| Browser runtime | SDK source commit `36fbe1418af3d5c343d105ee7c9456360c57785d`, SDK `0.2.1`, protocol `arcane/1` | The SDK-canonical exact 160-file runtime shipped under `runtime/`; Arcane OS commit `c540014afe69f14cf5ae60493b7295f36dbcec64` is legacy projection provenance, not a second source authority. |
-| Browser SDK runtime | SDK source commit `36fbe1418af3d5c343d105ee7c9456360c57785d`, SDK `0.2.1` | The exact 25-file authenticated browser closure: EventManager/DOM instrumentation and pinned event dependencies, Wllama runtime assets, and SDK browser speech provider/store/Worker mechanisms. It contains no model weights or speech adapter/model bytes. |
+| SDK and CLI | `arcane-os` `0.2.2` | The Node.js toolchain plus the browser-only `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints in this checkout. |
+| Browser runtime | SDK source commit `d5326d206bf0bec6ad82d53605e666841aa79899`, SDK `0.2.2`, protocol `arcane/1` | The SDK-canonical exact 160-file runtime shipped under `runtime/`; Arcane OS commit `c540014afe69f14cf5ae60493b7295f36dbcec64` is legacy projection provenance, not a second source authority. |
+| Browser SDK runtime | SDK source commit `d5326d206bf0bec6ad82d53605e666841aa79899`, SDK `0.2.2` | The exact 25-file authenticated browser closure: EventManager/DOM instrumentation and pinned event dependencies, Wllama runtime assets, and SDK browser speech provider/store/Worker mechanisms. It contains no model weights or speech adapter/model bytes. |
 | Core reference snapshot | Arcane OS commit `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, protocol `arcane/1` | The application-facing Core contract derived into `docs/reference/core/`. Canonical inventory and focused-member content was verified unchanged at Arcane OS `main` commit `13f3ce0ae34f77a3495331c8b4c30b1bb105f8ed`; SDK-local provenance, link, and package-boundary annotations are added explicitly. |
 
 The SDK runtime receipt and Core reference are distinct evidence and have
@@ -58,26 +58,20 @@ See [Core reference provenance](core/README.md) for the imported inventory and
 the exact distinction between a documentation snapshot and shipped runtime
 bytes.
 
-## Published 0.2.1
+## Published 0.2.2
 
-The published package is exactly `arcane-os@0.2.1` from source commit
-`36fbe1418af3d5c343d105ee7c9456360c57785d`. The npm `latest` dist-tag resolves
-to `0.2.1`; the separate `dev` dist-tag remains `0.1.0-dev.5`.
-
-The provider supersession, legacy speech readiness, fail-closed compatibility,
-explicit STT activation/cancellation, TTS lifecycle, and route-owned voice
-corrections documented below are newer canonical source. They are not package
-authority in `0.2.1`; consumers require a fresh numeric publication before
-relying on them.
+The published package is exactly `arcane-os@0.2.2` from source commit
+`d5326d206bf0bec6ad82d53605e666841aa79899`. The npm `latest` dist-tag resolves
+to `0.2.2`; the separate `dev` dist-tag remains `0.1.0-dev.5`.
 
 | Evidence | Exact value |
 | --- | --- |
-| npm integrity | `sha512-FJ7zCFvQVZEMLQ8kn9IqddnFkfw397S87tENfLULwt0bN5hYn22wmN2zU50BqYC4zDKI/fdf4Rcl5G6A6KwlCg==` |
-| npm shasum | `9b21aea206582e367b8220ad45475ce69af5365a` |
-| Immutable release tarball | `arcane-os-0.2.1.manifest.json`; artifact `9623565709`; 6,951,752 bytes; SHA-256 `c9ebe6d5c0f8f808707a00ca055ef1fe142a3a51715df43f7da427be31c95808` |
-| GitHub release | [`0.2.1`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.2.1) (tag and title are both exactly `0.2.1`) |
-| Hosted source/artifact gate | [Check run 33013624030](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33013624030) |
-| Trusted publication | [Run 33013804158](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33013804158) |
+| npm integrity | `sha512-JnLzZ4+FqX9tMgRv8HMcaCPSFx3xNNRf8BF8T03fD2ymg2g8cIGZRdD/3Tbd9PLtpx1PIKCpxz6nCP6ztnu1Nw==` |
+| npm shasum | `0b0d314acce48dcb5518470cd45a54221589d4d4` |
+| Immutable release tarball | `arcane-os-0.2.2.manifest.json`; artifact `9631659213`; 6,993,999 bytes; SHA-256 `e0fe1a556b603f67f5e3c142be7154b433312d3c0f3b58632df2e7fc43cc0ca7` |
+| GitHub release | [`0.2.2`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.2.2) (tag and title are both exactly `0.2.2`) |
+| Hosted source/artifact gate | [Check run 33034955277](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33034955277) |
+| Trusted publication | [Run 33035086265](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33035086265) |
 
 The npm SLSA provenance binds the published package to that exact source commit
 and `.github/workflows/publish-dev.yml`. Hashes prove byte identity or

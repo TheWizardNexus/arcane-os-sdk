@@ -24,7 +24,7 @@ const referenceSourceRoot=path.join(repositoryRoot,'docs','reference');
 const referenceOutputRoot=path.join(repositoryRoot,'site','reference');
 const canonicalRoot='https://thewizardnexus.github.io/arcane-os-sdk/';
 const publishedVersions=Object.freeze({
-    sdk:'0.2.1',
+    sdk:'0.2.2',
     runtime:'0.8.12',
     protocol:'arcane/1'
 });
@@ -52,18 +52,18 @@ const expectedRuntimeContractSummary=Object.freeze({
     publicMemberCount:456
 });
 const publishedReleaseMarkdown=[
-    '## Published 0.2.1',
+    '## Published 0.2.2',
     '',
-    'The published package is exactly `arcane-os@0.2.1` from source commit `36fbe1418af3d5c343d105ee7c9456360c57785d`. The npm `latest` dist-tag resolves to `0.2.1`; the separate `dev` dist-tag remains `0.1.0-dev.5`.',
+    'The published package is exactly `arcane-os@0.2.2` from source commit `d5326d206bf0bec6ad82d53605e666841aa79899`. The npm `latest` dist-tag resolves to `0.2.2`; the separate `dev` dist-tag remains `0.1.0-dev.5`.',
     '',
     '| Evidence | Exact value |',
     '| --- | --- |',
-    '| npm integrity | `sha512-FJ7zCFvQVZEMLQ8kn9IqddnFkfw397S87tENfLULwt0bN5hYn22wmN2zU50BqYC4zDKI/fdf4Rcl5G6A6KwlCg==` |',
-    '| npm shasum | `9b21aea206582e367b8220ad45475ce69af5365a` |',
-    '| Immutable release tarball | `arcane-os-0.2.1.manifest.json`; artifact `9623565709`; 6,951,752 bytes; SHA-256 `c9ebe6d5c0f8f808707a00ca055ef1fe142a3a51715df43f7da427be31c95808` |',
-    '| GitHub release | [`0.2.1`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.2.1) (tag and title are both exactly `0.2.1`) |',
-    '| Hosted source/artifact gate | [Check run 33013624030](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33013624030) |',
-    '| Trusted publication | [Run 33013804158](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33013804158) |',
+    '| npm integrity | `sha512-JnLzZ4+FqX9tMgRv8HMcaCPSFx3xNNRf8BF8T03fD2ymg2g8cIGZRdD/3Tbd9PLtpx1PIKCpxz6nCP6ztnu1Nw==` |',
+    '| npm shasum | `0b0d314acce48dcb5518470cd45a54221589d4d4` |',
+    '| Immutable release tarball | `arcane-os-0.2.2.manifest.json`; artifact `9631659213`; 6,993,999 bytes; SHA-256 `e0fe1a556b603f67f5e3c142be7154b433312d3c0f3b58632df2e7fc43cc0ca7` |',
+    '| GitHub release | [`0.2.2`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.2.2) (tag and title are both exactly `0.2.2`) |',
+    '| Hosted source/artifact gate | [Check run 33034955277](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33034955277) |',
+    '| Trusted publication | [Run 33035086265](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33035086265) |',
     '',
     'The npm SLSA provenance binds the published package to that exact source commit and `.github/workflows/publish-dev.yml`. Hashes prove byte identity or consistency; provenance establishes the recorded source/workflow relationship. Neither claim alone proves browser hardware support, native admission, or a particular application\'s provider/model policy.'
 ].join('\n');
@@ -1033,7 +1033,7 @@ function publicReferenceMarkdown(markdown,source){
     if(source==='docs/reference/README.md'){
         output=output.replace(
             /\n## Version scope and provenance[\s\S]*?\n## MDN-style page contract/u,
-            '\n## Version scope\n\nThis site documents SDK `0.2.1`, runtime bundle `0.8.12`, and protocol `arcane/1`. Native availability still depends on the selected Core satisfying the current build plan\'s feature, capability, method, provider, and application-identity checks. A matching protocol label alone is not authority or compatibility.\n\n'
+            '\n## Version scope\n\nThis site documents SDK `0.2.2`, runtime bundle `0.8.12`, and protocol `arcane/1`. Native availability still depends on the selected Core satisfying the current build plan\'s feature, capability, method, provider, and application-identity checks. A matching protocol label alone is not authority or compatibility.\n\n'
                 +publishedReleaseMarkdown
                 +'\n\n## MDN-style page contract'
         );

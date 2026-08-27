@@ -3,9 +3,9 @@
   "source": {
     "authority": "sdk-canonical",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
-    "commit": "36fbe1418af3d5c343d105ee7c9456360c57785d",
+    "commit": "d5326d206bf0bec6ad82d53605e666841aa79899",
     "path": "runtime/arcane/components",
-    "sdkVersion": "0.2.1",
+    "sdkVersion": "0.2.2",
     "legacyProjection": {
       "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
       "commit": "c540014afe69f14cf5ae60493b7295f36dbcec64",
@@ -689,28 +689,37 @@
     {
       "file": "runtime/arcane/components/speech.html",
       "name": "speech.html",
-      "purpose": "Coordinates speech controls, transcription completion, mute state, and microphone availability.",
+      "purpose": "Coordinates explicit speech-to-text activation, request cancellation, speech controls, transcription completion, mute state, and microphone availability.",
       "methods": [
         "configure()",
         "setAvailability()",
-        "setMuted(); availability",
+        "setMuted()",
+        "requestSTTActivation()",
+        "destroy()",
+        "availability",
         "muted",
         "initialMuted",
-        "componentReady properties"
+        "componentReady"
       ],
       "events": [
         "speech-ready",
         "speech-transcription-complete",
-        "speech-microphone-unavailable"
+        "speech-transcription-error",
+        "speech-transcription-cancelled",
+        "speech-microphone-unavailable",
+        "speech-stt-activation-request",
+        "speech-stt-activation-error",
+        "speech-tts-lifecycle-error"
       ],
       "slots": [],
       "dependencies": [
         "AI.js",
+        "AIRuntimeState.js",
         "DBLS.js"
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "UI state normalized; AI/media behavior mixed"
+      "normalization": "UI/runtime state, explicit STT activation intent, and request-owned cancellation are normalized; positive compatibility booleans cannot manufacture provider readiness; provider/model authority and media behavior remain external"
     },
     {
       "file": "runtime/arcane/components/summary-strip.html",

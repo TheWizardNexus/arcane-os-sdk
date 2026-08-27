@@ -17,7 +17,7 @@ with the [normalized AI guide](../README.md#normalized-ai) and
 | --- | --- | --- |
 | Browser | Shipped | Requires DBOPFS/OPFS, Web Locks, Workers, Fetch or an injected fetch function, Blob/File, and object URLs. |
 | Native WebView | Conditional | Works only when the WebView exposes the same browser APIs and the application admits every artifact. This does not invoke Core speech. |
-| Node | Importable, execution unavailable | The ESM subpath is exported, but `0.2.1` publishes no Node speech storage, Worker, audio-decoder, or execution adapter. |
+| Node | Importable, execution unavailable | The ESM subpath is exported, but `0.2.2` publishes no Node speech storage, Worker, audio-decoder, or execution adapter. |
 | Cloud | Not provided | A cloud speech provider can implement `arcane-ai-provider/2`, but this package never selects one. |
 
 Browser speech is independent from `arcane-os/ai/browser-wasm`: the Wllama
