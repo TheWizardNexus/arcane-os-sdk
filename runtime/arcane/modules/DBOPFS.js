@@ -1,6 +1,17 @@
 import Is from "../../node_modules/strong-type/index.js";
 import {openApplicationDataDirectory} from './AppDataScope.js';
+import {
+    createArcaneEventSource,
+    projectArcaneDOMEvent
+} from 'arcane-os/event-manager';
 const is=new Is(false);
+
+export const DBOPFS_EVENT_TYPES=Object.freeze({
+    ready:'dbopfs-ready'
+});
+export const DBOPFS_REASONS=Object.freeze({
+    ready:'opfs-database-ready'
+});
 
 const DEFAULT_TABLE_DIRECTORIES=Object.freeze({
     users:'users',
@@ -93,6 +104,8 @@ if(navigator.storage?.persist){
  *     const user=await dbopfs.get('users','alex')
  */
 class DBOPFS {
+
+    #events;
 
     /** @type {FileSystemDirectoryHandle|Object} */
     #db={}
@@ -270,6 +283,10 @@ class DBOPFS {
             return window.dbopfs;
         }
 
+        this.#events=createArcaneEventSource(this,{
+            source:'dbopfs',
+            eventTypes:Object.freeze(Object.values(DBOPFS_EVENT_TYPES))
+        });
         this.readyPromise=this.#init(options);
     }
 
@@ -294,18 +311,25 @@ class DBOPFS {
 
         this.ready=true;
 
-        window.dispatchEvent(
-            new CustomEvent(
-                'dbopfs-ready',
-                {
-                    detail:{
-                        dbopfs:this,
-                        applicationId:this.#applicationId,
-                        storagePath:this.#storagePath
-                    }
-                }
-            )
+        const {occurrence}=this.#events.dispatch(
+            DBOPFS_EVENT_TYPES.ready,
+            Object.freeze({
+                dbopfs:this,
+                applicationId:this.#applicationId,
+                storagePath:this.#storagePath,
+                reason:DBOPFS_REASONS.ready
+            }),
+            {
+                operationId:`dbopfs-ready-${this.#events.instanceId}`,
+                publicDetail:Object.freeze({
+                    applicationId:this.#applicationId,
+                    ready:true,
+                    reason:DBOPFS_REASONS.ready,
+                    storagePath:this.#storagePath
+                })
+            }
         );
+        projectArcaneDOMEvent(window,occurrence);
     }
 
     async #createDefaultTables(){

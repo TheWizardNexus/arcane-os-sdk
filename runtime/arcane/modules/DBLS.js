@@ -2,8 +2,22 @@ import {
     APP_LOCAL_STORAGE_PREFIX,
     resolveBrowserApplicationId
 } from './AppDataScope.js';
+import {
+    createArcaneEventSource,
+    projectArcaneDOMEvent
+} from 'arcane-os/event-manager';
+
+const PUBLISH_DBLS_READY=Symbol('publish-dbls-ready');
+export const DBLS_EVENT_TYPES=Object.freeze({
+    ready:'dbls-ready'
+});
+export const DBLS_REASONS=Object.freeze({
+    ready:'local-storage-adapter-ready'
+});
 
 class DBLS {
+    #events;
+
     constructor({
         applicationId=null,
         documentObject=globalThis.document,
@@ -27,6 +41,10 @@ class DBLS {
         });
         this.storage=storage;
         this.storagePrefix=`${APP_LOCAL_STORAGE_PREFIX}${this.applicationId}:`;
+        this.#events=createArcaneEventSource(this,{
+            source:'dbls',
+            eventTypes:Object.freeze(Object.values(DBLS_EVENT_TYPES))
+        });
     }
 
     ready=false;
@@ -153,19 +171,34 @@ class DBLS {
     count() {
         return this.logicalKeys().length;
     }
+
+    [PUBLISH_DBLS_READY](){
+        const detail=Object.freeze({
+            dbls:this,
+            applicationId:this.applicationId,
+            reason:DBLS_REASONS.ready
+        });
+        const {occurrence}=this.#events.dispatch(
+            DBLS_EVENT_TYPES.ready,
+            detail,
+            {
+                operationId:`dbls-ready-${this.#events.instanceId}`,
+                publicDetail:Object.freeze({
+                    applicationId:this.applicationId,
+                    ready:true,
+                    reason:DBLS_REASONS.ready
+                })
+            }
+        );
+        projectArcaneDOMEvent(window,occurrence);
+    }
 }
 
 if(typeof window.dbls?.get !== "function"){
     window.dbls=new DBLS();
     window.dbls.ready=true;
 
-    const dblsReady=new CustomEvent(
-        'dbls-ready', {
-            detail: { dbls: window.dbls }
-        }
-    );
-
-    window.dispatchEvent(dblsReady);
+    window.dbls[PUBLISH_DBLS_READY]();
 }
 
 export default DBLS;
