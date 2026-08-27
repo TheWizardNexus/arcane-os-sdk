@@ -208,6 +208,36 @@ jobs:
           }
           EOF
 
+          cat > "$inputs/apply-source-patches.py" <<'PY'
+          import hashlib
+          import sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          target = root / "src/include/compat/wctype.h"
+          original = target.read_bytes()
+          original_sha256 = hashlib.sha256(original).hexdigest()
+          if original_sha256 != "1f70c90c9ba2ef7fef4d2d2e1734f047b1af697c0b0b0ed1d808491a92dc4ed1":
+              raise SystemExit(f"Unexpected wctype.h input: {original_sha256}")
+          open_guard = b"#include <ucd/ucd.h>\n"
+          close_guard = b"#define iswxdigit ucd_isxdigit\n"
+          if original.count(open_guard) != 1 or original.count(close_guard) != 1:
+              raise SystemExit("The authenticated Emscripten compatibility patch did not match exactly once.")
+          patched = original.replace(open_guard, b"#ifndef __EMSCRIPTEN__\n" + open_guard)
+          patched = patched.replace(close_guard, close_guard + b"#endif\n")
+          patched_sha256 = hashlib.sha256(patched).hexdigest()
+          if patched_sha256 != "398855e24fd0435ee626cf3274985409fd3d9d52b2b439ecb4132fcff90d3c12":
+              raise SystemExit(f"Unexpected wctype.h output: {patched_sha256}")
+          target.write_bytes(patched)
+          print(f"wctype.h {original_sha256} -> {patched_sha256}")
+          PY
+
+          printf 'export default null;\n' > "$inputs/arcane-browser-node-unavailable.mjs"
+          test "$(stat -c '%s' "$inputs/arcane-browser-node-unavailable.mjs")" = 21
+          printf '%s  %s\n' \
+            fabf6997a3adf11e45d11e3c4d58d0634ab98f9d72f3116f3694123818ccd457 \
+            "$inputs/arcane-browser-node-unavailable.mjs" | sha256sum --check --strict
+
           cat > "$inputs/arcane-espeak-phonemizer.mjs" <<'EOF'
           import createArcaneEspeakModule from "./arcane-espeak-ng.mjs";
 
@@ -316,6 +346,7 @@ jobs:
             --strip-components 1 --no-same-owner --no-same-permissions
           tar --extract --gzip --file /inputs/espeak-ng.tar.gz --directory /work/wasm \
             --strip-components 1 --no-same-owner --no-same-permissions
+          python3 /inputs/apply-source-patches.py /work/wasm
 
           common_configure=(
             --prefix=/usr
@@ -344,22 +375,14 @@ jobs:
           install -D -m 0644 espeak-ng-data/lang/gmw/en /work/selected-data/lang/gmw/en
           install -D -m 0644 espeak-ng-data/lang/gmw/en-US /work/selected-data/lang/gmw/en-US
 
-          cd /work/wasm/src/ucd-tools
-          # This pinned archive spells the file CHANGELOG.md while the pinned
-          # upstream autogen.sh links NEWS through ChangeLog.md.
-          ln -s CHANGELOG.md ChangeLog.md
-          ./autogen.sh
-          if ! emconfigure ./configure; then
-            cat config.log
-            exit 1
-          fi
-          emmake make -j1
-
           cd /work/wasm
           ./autogen.sh
           CFLAGS="$deterministic_flags" CXXFLAGS="$deterministic_flags" \
             emconfigure ./configure "${common_configure[@]}" \
-              --disable-shared --enable-static
+              --disable-shared --enable-static || {
+                cat config.log
+                exit 1
+              }
           emmake make -j1 src/libespeak-ng.la
           test -f src/.libs/libespeak-ng.a
 
@@ -384,11 +407,14 @@ jobs:
             -o /out/arcane-espeak-ng.mjs
           install -m 0644 /inputs/arcane-espeak-phonemizer.mjs \
             /out/arcane-espeak-phonemizer.mjs
+          install -m 0644 /inputs/arcane-browser-node-unavailable.mjs \
+            /out/arcane-browser-node-unavailable.mjs
           test -s /out/arcane-espeak-ng.mjs
           test -s /out/arcane-espeak-ng.wasm
           test -s /out/arcane-espeak-ng.data
           test -s /out/arcane-espeak-phonemizer.mjs
-          test "$(find /out -maxdepth 1 -type f | wc -l)" = 4
+          test -s /out/arcane-browser-node-unavailable.mjs
+          test "$(find /out -maxdepth 1 -type f | wc -l)" = 5
           touch --date="@$SOURCE_DATE_EPOCH" /out/*
           EOF
           chmod 0755 "$inputs/build.sh"
@@ -473,6 +499,8 @@ jobs:
           cp "$INPUTS/espeak-ng.tar.gz" "$corresponding/"
           cp "$INPUTS/arcane_espeak_phonemes.c" "$corresponding/"
           cp "$INPUTS/arcane-espeak-phonemizer.mjs" "$corresponding/"
+          cp "$INPUTS/arcane-browser-node-unavailable.mjs" "$corresponding/"
+          cp "$INPUTS/apply-source-patches.py" "$corresponding/"
           cp "$INPUTS/build.sh" "$corresponding/"
           cp "$INPUTS/Dockerfile" "$corresponding/"
           cp "$INPUTS/dependencies.tsv" "$corresponding/"
@@ -528,6 +556,14 @@ jobs:
                   "archiveBytes": int(os.environ["ESPEAK_SOURCE_BYTES"]),
                   "archiveSha256": os.environ["ESPEAK_SOURCE_SHA256"],
                   "sourceDateEpoch": int(os.environ["SOURCE_DATE_EPOCH"]),
+                  "compatibilityPatch": {
+                      "path": "src/include/compat/wctype.h",
+                      "purpose": "apply the exact upstream Emscripten compatibility guard without later unrelated source changes",
+                      "upstreamCommit": "690ee601ff8fb91c2eb6b37cce746d4d0913fcd3",
+                      "upstreamParent": "724808c5a83f9ef95fdd0db886ba7ba537ff224a",
+                      "inputSha256": "1f70c90c9ba2ef7fef4d2d2e1734f047b1af697c0b0b0ed1d808491a92dc4ed1",
+                      "outputSha256": "398855e24fd0435ee626cf3274985409fd3d9d52b2b439ecb4132fcff90d3c12",
+                  },
               },
               "toolchain": {
                   "container": os.environ["TOOLCHAIN_IMAGE"],
