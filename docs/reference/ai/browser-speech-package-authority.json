@@ -1,0 +1,460 @@
+{
+  "schema": "arcane.browser-speech-package-authority/1",
+  "purpose": "Pre-download supply-chain metadata authority for the caller-selected Arcane SDK browser speech runtime artifacts used by Whisper STT and Kokoro TTS.",
+  "status": "browser-speech-package-authority-pre-download-metadata-recorded",
+  "auditedOn": "2026-08-27",
+  "evidenceBoundary": {
+    "packageCodeDownloaded": false,
+    "packageCodeInstalled": false,
+    "packageCodeExecuted": false,
+    "registryTarballsVerified": false,
+    "candidateFileDigestsAuthenticatedByRegistryTarballs": false,
+    "description": "Package metadata came from committed manifests and lock data plus npm registry metadata. Candidate file byte lengths and SHA-256 values came from exact-version jsDelivr metadata and no-redirect HTTP metadata. They remain consistency evidence until the registry-integrity-verified tarballs are extracted and matched byte-for-byte."
+  },
+  "selectedBrowserDependencyClosure": {
+    "root": "kokoro-js@1.2.1",
+    "nodeCount": 23,
+    "nodes": [
+      {
+        "id": "kokoro-js@1.2.1",
+        "name": "kokoro-js",
+        "version": "1.2.1",
+        "publisher": "xenova",
+        "license": "Apache-2.0",
+        "registryTarballUrl": "https://registry.npmjs.org/kokoro-js/-/kokoro-js-1.2.1.tgz",
+        "integritySha512": "sha512-oq0HZJWis3t8lERkMJh84WLU86dpYD0EuBPtqYnLlQzyFP1OkyBRDcweAqCfhNOpltyN9j/azp1H6uuC47gShw==",
+        "shasumSha1": "a6a9b0ffc1ab354fa3f9cb71ee95b6e9f0a13527",
+        "purpose": "Kokoro TTS browser runtime, voice catalog and voice-loading surface."
+      },
+      {
+        "id": "@huggingface/transformers@3.5.1",
+        "name": "@huggingface/transformers",
+        "version": "3.5.1",
+        "publisher": "xenova",
+        "license": "Apache-2.0",
+        "registryTarballUrl": "https://registry.npmjs.org/@huggingface/transformers/-/transformers-3.5.1.tgz",
+        "integritySha512": "sha512-qWsPoJMBPYcrGuzRMVL//3dwcLXED9r+j+Hzw+hZpBfrMPdyq57ehNs7lew0D34Paj0DO0E0kZQjOZcIVN17hQ==",
+        "shasumSha1": "8022b616ed8f1ec88d8e56def06d5b0ef5c7a1ee",
+        "purpose": "Browser model, tokenizer and processor loading plus Whisper pipeline and ONNX Runtime Web integration used by both selected speech providers."
+      },
+      {
+        "id": "@huggingface/jinja@0.4.1",
+        "name": "@huggingface/jinja",
+        "version": "0.4.1",
+        "publisher": "coyotte508",
+        "license": "MIT",
+        "registryTarballUrl": "https://registry.npmjs.org/@huggingface/jinja/-/jinja-0.4.1.tgz",
+        "integritySha512": "sha512-3WXbMFaPkk03LRCM0z0sylmn8ddDm4ubjU7X+Hg4M2GOuMklwoGAFXp9V2keq7vltoB/c7McE5aHUVVddAewsw==",
+        "shasumSha1": "a71deab443c4badb6498d28e784ea1cd5eb369e2",
+        "purpose": "Jinja template rendering imported by Transformers tokenizer support."
+      },
+      {
+        "id": "onnxruntime-web@1.22.0-dev.20250409-89f8206ba4",
+        "name": "onnxruntime-web",
+        "version": "1.22.0-dev.20250409-89f8206ba4",
+        "publisher": "onnxruntime",
+        "license": "MIT",
+        "registryTarballUrl": "https://registry.npmjs.org/onnxruntime-web/-/onnxruntime-web-1.22.0-dev.20250409-89f8206ba4.tgz",
+        "integritySha512": "sha512-0uS76OPgH0hWCPrFKlL8kYVV7ckM7t/36HfbgoFw6Nd0CZVVbQC4PkrR8mBX8LtNUFZO25IQBqV2Hx2ho3FlbQ==",
+        "shasumSha1": "d1e3a04e03dfee392b41d420ef547b6a0351b06b",
+        "purpose": "Browser ONNX inference runtime and JSEP WebAssembly module host."
+      },
+      {
+        "id": "onnxruntime-common@1.22.0-dev.20250409-89f8206ba4",
+        "name": "onnxruntime-common",
+        "version": "1.22.0-dev.20250409-89f8206ba4",
+        "publisher": "onnxruntime",
+        "license": "MIT",
+        "registryTarballUrl": "https://registry.npmjs.org/onnxruntime-common/-/onnxruntime-common-1.22.0-dev.20250409-89f8206ba4.tgz",
+        "integritySha512": "sha512-vDJMkfCfb0b1A836rgHj+ORuZf4B4+cc2bASQtpeoJLueuFc5DuYwjIZUBrSvx/fO5IrLjLz+oTrB3pcGlhovQ==",
+        "shasumSha1": "3d4a39563b93db3d0428b5527cba58a3c8f826c2",
+        "purpose": "Shared ONNX environment, tensor and inference-session contract used by ONNX Runtime Web."
+      },
+      {
+        "id": "flatbuffers@25.2.10",
+        "name": "flatbuffers",
+        "version": "25.2.10",
+        "publisher": "dbaileychess",
+        "license": "Apache-2.0",
+        "registryTarballUrl": "https://registry.npmjs.org/flatbuffers/-/flatbuffers-25.2.10.tgz",
+        "integritySha512": "sha512-7JlN9ZvLDG1McO3kbX0k4v+SUAg48L1rIwEvN6ZQl/eCtgJz9UylTMzE9wrmYrcorgxm3CX/3T/w5VAub99UUw==",
+        "shasumSha1": "308b750545f62db670ca4c9d7dbc66161420a95e",
+        "purpose": "FlatBuffers serialization support required by ONNX Runtime Web."
+      },
+      {
+        "id": "guid-typescript@1.0.9",
+        "name": "guid-typescript",
+        "version": "1.0.9",
+        "publisher": "nicolas.developer",
+        "license": "ISC",
+        "registryTarballUrl": "https://registry.npmjs.org/guid-typescript/-/guid-typescript-1.0.9.tgz",
+        "integritySha512": "sha512-Y8T4vYhEfwJOTbouREvG+3XDsjr8E3kIr7uf+JZ0BYloFsttiHU0WfvANVsR7TxNUJa/WpCnw/Ino/p+DeBhBQ==",
+        "shasumSha1": "e35f77003535b0297ea08548f5ace6adb1480ddc",
+        "purpose": "GUID helper required by ONNX Runtime Web."
+      },
+      {
+        "id": "long@5.3.2",
+        "name": "long",
+        "version": "5.3.2",
+        "publisher": "dcode",
+        "license": "Apache-2.0",
+        "registryTarballUrl": "https://registry.npmjs.org/long/-/long-5.3.2.tgz",
+        "integritySha512": "sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==",
+        "shasumSha1": "1d84463095999262d7d7b7f8bfd4a8cc55167f83",
+        "purpose": "64-bit integer support shared by ONNX Runtime Web and protobufjs."
+      },
+      {
+        "id": "platform@1.3.6",
+        "name": "platform",
+        "version": "1.3.6",
+        "publisher": "d10",
+        "license": "MIT",
+        "registryTarballUrl": "https://registry.npmjs.org/platform/-/platform-1.3.6.tgz",
+        "integritySha512": "sha512-fnWVljUchTro6RiCFvCXBbNhJc2NijN7oIQxbwsyL0buWJPG85v81ehlHI9fXrJsMNgTofEoWIQeClKpgxFLrg==",
+        "shasumSha1": "48b4ce983164b209c2d45a107adb31f473a6e7a7",
+        "purpose": "Runtime platform detection required by ONNX Runtime Web."
+      },
+      {
+        "id": "protobufjs@7.5.0",
+        "name": "protobufjs",
+        "version": "7.5.0",
+        "publisher": "google-wombot",
+        "license": "BSD-3-Clause",
+        "registryTarballUrl": "https://registry.npmjs.org/protobufjs/-/protobufjs-7.5.0.tgz",
+        "integritySha512": "sha512-Z2E/kOY1QjoMlCytmexzYfDm/w5fKAiRwpSzGtdnXW1zC88Z2yXazHHrOtwCzn+7wSxyE8PYM4rvVcMphF9sOA==",
+        "shasumSha1": "a317ad80713e9db43c8e55afa8636a9aa76bb630",
+        "purpose": "Protocol Buffers serialization support required by ONNX Runtime Web."
+      },
+      {
+        "id": "@protobufjs/aspromise@1.1.2",
+        "name": "@protobufjs/aspromise",
+        "version": "1.1.2",
+        "publisher": "dcode",
+        "license": "BSD-3-Clause",
+        "registryTarballUrl": "https://registry.npmjs.org/@protobufjs/aspromise/-/aspromise-1.1.2.tgz",
+        "integritySha512": "sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ==",
+        "shasumSha1": "9b8b0cc663d669a7d8f6f5d0893a14d348f30fbf",
+        "purpose": "Promise adaptation helper in the protobufjs support tree."
+      },
+      {
+        "id": "@protobufjs/base64@1.1.2",
+        "name": "@protobufjs/base64",
+        "version": "1.1.2",
+        "publisher": "dcode",
+        "license": "BSD-3-Clause",
+        "registryTarballUrl": "https://registry.npmjs.org/@protobufjs/base64/-/base64-1.1.2.tgz",
+        "integritySha512": "sha512-AZkcAA5vnN/v4PDqKyMR5lx7hZttPDgClv83E//FMNhR2TMcLUhfRUBHCmSl0oi9zMgDDqRUJkSxO3wm85+XLg==",
+        "shasumSha1": "4c85730e59b9a1f1f349047dbf24296034bb2735",
+        "purpose": "Base64 codec in the protobufjs support tree."
+      },
+      {
+        "id": "@protobufjs/codegen@2.0.4",
+        "name": "@protobufjs/codegen",
+        "version": "2.0.4",
+        "publisher": "dcode",
+        "license": "BSD-3-Clause",
+        "registryTarballUrl": "https://registry.npmjs.org/@protobufjs/codegen/-/codegen-2.0.4.tgz",
+        "integritySha512": "sha512-YyFaikqM5sH0ziFZCN3xDC7zeGaB/d0IUb9CATugHWbd1FRFwWwt4ld4OYMPWu5a3Xe01mGAULCdqhMlPl29Jg==",
+        "shasumSha1": "7ef37f0d010fb028ad1ad59722e506d9262815cb",
+        "purpose": "Runtime code-generation helper in the protobufjs support tree."
+      },
+      {
+        "id": "@protobufjs/eventemitter@1.1.0",
+        "name": "@protobufjs/eventemitter",
+        "version": "1.1.0",
+        "publisher": "dcode",
+        "license": "BSD-3-Clause",
+        "registryTarballUrl": "https://registry.npmjs.org/@protobufjs/eventemitter/-/eventemitter-1.1.0.tgz",
+        "integritySha512": "sha512-j9ednRT81vYJ9OfVuXG6ERSTdEL1xVsNgqpkxMsbIabzSo3goCjDIveeGv5d03om39ML71RdmrGNjG5SReBP/Q==",
+        "shasumSha1": "355cbc98bafad5978f9ed095f397621f1d066b70",
+        "purpose": "Event-emitter helper in the protobufjs support tree."
+      },
+      {
+        "id": "@protobufjs/fetch@1.1.0",
+        "name": "@protobufjs/fetch",
+        "version": "1.1.0",
+        "publisher": "dcode",
+        "license": "BSD-3-Clause",
+        "registryTarballUrl": "https://registry.npmjs.org/@protobufjs/fetch/-/fetch-1.1.0.tgz",
+        "integritySha512": "sha512-lljVXpqXebpsijW71PZaCYeIcE5on1w5DlQy5WH6GLbFryLUrBD4932W/E2BSpfRJWseIL4v/KPgBFxDOIdKpQ==",
+        "shasumSha1": "ba99fb598614af65700c1619ff06d454b0d84c45",
+        "purpose": "Resource-fetch helper in the protobufjs support tree."
+      },
+      {
+        "id": "@protobufjs/float@1.0.2",
+        "name": "@protobufjs/float",
+        "version": "1.0.2",
+        "publisher": "dcode",
+        "license": "BSD-3-Clause",
+        "registryTarballUrl": "https://registry.npmjs.org/@protobufjs/float/-/float-1.0.2.tgz",
+        "integritySha512": "sha512-Ddb+kVXlXst9d+R9PfTIxh1EdNkgoRe5tOX6t01f1lYWOvJnSPDBlG241QLzcyPdoNTsblLUdujGSE4RzrTZGQ==",
+        "shasumSha1": "5e9e1abdcb73fc0a7cb8b291df78c8cbd97b87d1",
+        "purpose": "Floating-point codec in the protobufjs support tree."
+      },
+      {
+        "id": "@protobufjs/inquire@1.1.0",
+        "name": "@protobufjs/inquire",
+        "version": "1.1.0",
+        "publisher": "dcode",
+        "license": "BSD-3-Clause",
+        "registryTarballUrl": "https://registry.npmjs.org/@protobufjs/inquire/-/inquire-1.1.0.tgz",
+        "integritySha512": "sha512-kdSefcPdruJiFMVSbn801t4vFK7KB/5gd2fYvrxhuJYg8ILrmn9SKSX2tZdV6V+ksulWqS7aXjBcRXl3wHoD9Q==",
+        "shasumSha1": "ff200e3e7cf2429e2dcafc1140828e8cc638f089",
+        "purpose": "Optional module-inquiry helper in the protobufjs support tree."
+      },
+      {
+        "id": "@protobufjs/path@1.1.2",
+        "name": "@protobufjs/path",
+        "version": "1.1.2",
+        "publisher": "dcode",
+        "license": "BSD-3-Clause",
+        "registryTarballUrl": "https://registry.npmjs.org/@protobufjs/path/-/path-1.1.2.tgz",
+        "integritySha512": "sha512-6JOcJ5Tm08dOHAbdR3GrvP+yUUfkjG5ePsHYczMFLq3ZmMkAD98cDgcT2iA1lJ9NVwFd4tH/iSSoe44YWkltEA==",
+        "shasumSha1": "6cc2b20c5c9ad6ad0dccfd21ca7673d8d7fbf68d",
+        "purpose": "Path helper in the protobufjs support tree."
+      },
+      {
+        "id": "@protobufjs/pool@1.1.0",
+        "name": "@protobufjs/pool",
+        "version": "1.1.0",
+        "publisher": "dcode",
+        "license": "BSD-3-Clause",
+        "registryTarballUrl": "https://registry.npmjs.org/@protobufjs/pool/-/pool-1.1.0.tgz",
+        "integritySha512": "sha512-0kELaGSIDBKvcgS4zkjz1PeddatrjYcmMWOlAuAPwAeccUrPHdUqo/J6LiymHHEiJT5NrF1UVwxY14f+fy4WQw==",
+        "shasumSha1": "09fd15f2d6d3abfa9b65bc366506d6ad7846ff54",
+        "purpose": "Allocation-pool helper in the protobufjs support tree."
+      },
+      {
+        "id": "@protobufjs/utf8@1.1.0",
+        "name": "@protobufjs/utf8",
+        "version": "1.1.0",
+        "publisher": "dcode",
+        "license": "BSD-3-Clause",
+        "registryTarballUrl": "https://registry.npmjs.org/@protobufjs/utf8/-/utf8-1.1.0.tgz",
+        "integritySha512": "sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw==",
+        "shasumSha1": "a777360b5b39a1a2e5106f8e858f2fd2d060c570",
+        "purpose": "UTF-8 codec in the protobufjs support tree."
+      },
+      {
+        "id": "@types/node@22.10.6",
+        "name": "@types/node",
+        "version": "22.10.6",
+        "publisher": "types",
+        "license": "MIT",
+        "registryTarballUrl": "https://registry.npmjs.org/@types/node/-/node-22.10.6.tgz",
+        "integritySha512": "sha512-qNiuwC4ZDAUNcY47xgaSuS92cjf8JbSUoaKS77bmLG1rU7MlATVSiw/IlrjtIyyskXBZ8KkNfjK/P5na7rgXbQ==",
+        "shasumSha1": "5c6795e71635876039f853cbccd59f523d9e4239",
+        "purpose": "Node type declarations required by protobufjs package metadata; not browser-executable."
+      },
+      {
+        "id": "undici-types@6.20.0",
+        "name": "undici-types",
+        "version": "6.20.0",
+        "publisher": "matteo.collina",
+        "license": "MIT",
+        "registryTarballUrl": "https://registry.npmjs.org/undici-types/-/undici-types-6.20.0.tgz",
+        "integritySha512": "sha512-Ny6QZ2Nju20vw1SRHe3d9jVu6gJ+4e3+MMpqu7pqE5HT6WsTSlce++GQmK5UXS8mzV8DSYHrQH+Xrf2jVcuKNg==",
+        "shasumSha1": "8171bf22c1f588d1554d55bf204bc624af388433",
+        "purpose": "Undici and Fetch type declarations required by @types/node; not browser-executable."
+      },
+      {
+        "id": "phonemizer@1.2.1",
+        "name": "phonemizer",
+        "version": "1.2.1",
+        "publisher": "xenova",
+        "license": "Apache-2.0",
+        "registryTarballUrl": "https://registry.npmjs.org/phonemizer/-/phonemizer-1.2.1.tgz",
+        "integritySha512": "sha512-v0KJ4mi2T4Q7eJQ0W15Xd4G9k4kICSXE8bpDeJ8jisL4RyJhNWsweKTOi88QXFc4r4LZlz5jVL5lCHhkpdT71A==",
+        "shasumSha1": "175aed7034b49b9169fc6adf13c16134374d238d",
+        "purpose": "Bundled eSpeak-NG-based text-to-phoneme conversion used by Kokoro."
+      }
+    ],
+    "dependencyEdges": [
+      { "from": "kokoro-js@1.2.1", "to": "@huggingface/transformers@3.5.1" },
+      { "from": "kokoro-js@1.2.1", "to": "phonemizer@1.2.1" },
+      { "from": "@huggingface/transformers@3.5.1", "to": "@huggingface/jinja@0.4.1" },
+      { "from": "@huggingface/transformers@3.5.1", "to": "onnxruntime-web@1.22.0-dev.20250409-89f8206ba4" },
+      { "from": "onnxruntime-web@1.22.0-dev.20250409-89f8206ba4", "to": "flatbuffers@25.2.10" },
+      { "from": "onnxruntime-web@1.22.0-dev.20250409-89f8206ba4", "to": "guid-typescript@1.0.9" },
+      { "from": "onnxruntime-web@1.22.0-dev.20250409-89f8206ba4", "to": "long@5.3.2" },
+      { "from": "onnxruntime-web@1.22.0-dev.20250409-89f8206ba4", "to": "onnxruntime-common@1.22.0-dev.20250409-89f8206ba4" },
+      { "from": "onnxruntime-web@1.22.0-dev.20250409-89f8206ba4", "to": "platform@1.3.6" },
+      { "from": "onnxruntime-web@1.22.0-dev.20250409-89f8206ba4", "to": "protobufjs@7.5.0" },
+      { "from": "protobufjs@7.5.0", "to": "@protobufjs/aspromise@1.1.2" },
+      { "from": "protobufjs@7.5.0", "to": "@protobufjs/base64@1.1.2" },
+      { "from": "protobufjs@7.5.0", "to": "@protobufjs/codegen@2.0.4" },
+      { "from": "protobufjs@7.5.0", "to": "@protobufjs/eventemitter@1.1.0" },
+      { "from": "protobufjs@7.5.0", "to": "@protobufjs/fetch@1.1.0" },
+      { "from": "protobufjs@7.5.0", "to": "@protobufjs/float@1.0.2" },
+      { "from": "protobufjs@7.5.0", "to": "@protobufjs/inquire@1.1.0" },
+      { "from": "protobufjs@7.5.0", "to": "@protobufjs/path@1.1.2" },
+      { "from": "protobufjs@7.5.0", "to": "@protobufjs/pool@1.1.0" },
+      { "from": "protobufjs@7.5.0", "to": "@protobufjs/utf8@1.1.0" },
+      { "from": "protobufjs@7.5.0", "to": "@types/node@22.10.6" },
+      { "from": "protobufjs@7.5.0", "to": "long@5.3.2" },
+      { "from": "@protobufjs/fetch@1.1.0", "to": "@protobufjs/aspromise@1.1.2" },
+      { "from": "@protobufjs/fetch@1.1.0", "to": "@protobufjs/inquire@1.1.0" },
+      { "from": "@types/node@22.10.6", "to": "undici-types@6.20.0" }
+    ],
+    "selectedClosureOptionalDependencyEdges": [],
+    "selectedClosurePeerDependencyEdges": []
+  },
+  "coreSourceRevisions": [
+    {
+      "package": "kokoro-js@1.2.1",
+      "repository": "https://github.com/hexgrad/kokoro",
+      "commit": "664c76a704021239ba59c84dcbaa4d3dece01fe9",
+      "immutableSourceUrl": "https://github.com/hexgrad/kokoro/tree/664c76a704021239ba59c84dcbaa4d3dece01fe9/kokoro.js"
+    },
+    {
+      "package": "@huggingface/transformers@3.5.1",
+      "repository": "https://github.com/huggingface/transformers.js",
+      "commit": "746c8c25bf27c5e0684a20f76889b4bb8d23e295",
+      "immutableSourceUrl": "https://github.com/huggingface/transformers.js/tree/746c8c25bf27c5e0684a20f76889b4bb8d23e295"
+    },
+    {
+      "package": "phonemizer@1.2.1",
+      "repository": "https://github.com/xenova/phonemizer.js",
+      "commit": "6835144b7ee9043129222549c1ed2f6a27216278",
+      "immutableSourceUrl": "https://github.com/xenova/phonemizer.js/tree/6835144b7ee9043129222549c1ed2f6a27216278"
+    },
+    {
+      "package": "onnxruntime-web@1.22.0-dev.20250409-89f8206ba4",
+      "repository": "https://github.com/microsoft/onnxruntime",
+      "commit": "89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0",
+      "immutableSourceUrl": "https://github.com/microsoft/onnxruntime/tree/89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0/js/web"
+    }
+  ],
+  "candidateArtifacts": [
+    {
+      "id": "kokoro-js-browser-entry",
+      "package": "kokoro-js@1.2.1",
+      "path": "dist/kokoro.web.js",
+      "role": "kokoro-tts-browser-entrypoint",
+      "bytes": 2135146,
+      "sha256": "6067712fe4c43cdb36c762f860a5ab8d96ea1d9c8882466438eb9f3d0d20be8f",
+      "mediaType": "application/javascript",
+      "sourceUrl": "https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js",
+      "sourceRevision": "664c76a704021239ba59c84dcbaa4d3dece01fe9",
+      "declaredPackageLicense": "Apache-2.0",
+      "fileLicenseVerificationStatus": "bundle-license-and-notice-audit-pending-registry-tarball-verification",
+      "digestEvidence": "exact-version-jsdelivr-metadata-not-yet-registry-tarball-authenticated"
+    },
+    {
+      "id": "transformers-whisper-browser-entry",
+      "package": "@huggingface/transformers@3.5.1",
+      "path": "dist/transformers.js",
+      "role": "transformers-whisper-browser-entrypoint-with-bundled-onnx-runtime-javascript",
+      "bytes": 2141070,
+      "sha256": "730d42f06974f547e1f6a5f5b7313fc731ff21a3d3ac4c8e47d1f69b0a375547",
+      "mediaType": "application/javascript",
+      "sourceUrl": "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/transformers.js",
+      "sourceRevision": "746c8c25bf27c5e0684a20f76889b4bb8d23e295",
+      "declaredPackageLicense": "Apache-2.0",
+      "fileLicenseVerificationStatus": "bundle-license-and-notice-audit-pending-registry-tarball-verification",
+      "digestEvidence": "exact-version-jsdelivr-metadata-not-yet-registry-tarball-authenticated"
+    },
+    {
+      "id": "onnx-runtime-jsep-module",
+      "package": "@huggingface/transformers@3.5.1",
+      "upstreamPackage": "onnxruntime-web@1.22.0-dev.20250409-89f8206ba4",
+      "path": "dist/ort-wasm-simd-threaded.jsep.mjs",
+      "role": "onnx-runtime-jsep-esm-and-pthread-worker-module",
+      "bytes": 44484,
+      "sha256": "08fb86ec433c78bfb032c5d84a68b8e8e5a8d81268fa39e24314179a5767a5b9",
+      "mediaType": "application/javascript",
+      "sourceUrl": "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/ort-wasm-simd-threaded.jsep.mjs",
+      "packagingRevision": "746c8c25bf27c5e0684a20f76889b4bb8d23e295",
+      "upstreamSourceRevision": "89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0",
+      "declaredPackageLicense": "MIT",
+      "fileLicenseVerificationStatus": "onnx-license-and-third-party-notice-audit-pending-registry-tarball-verification",
+      "digestEvidence": "exact-version-jsdelivr-metadata-not-yet-registry-tarball-authenticated"
+    },
+    {
+      "id": "onnx-runtime-jsep-wasm",
+      "package": "@huggingface/transformers@3.5.1",
+      "upstreamPackage": "onnxruntime-web@1.22.0-dev.20250409-89f8206ba4",
+      "path": "dist/ort-wasm-simd-threaded.jsep.wasm",
+      "role": "onnx-runtime-jsep-webassembly-binary",
+      "bytes": 21596019,
+      "sha256": "c46655e8a94afc45338d4cb2b840475f88e5012d524509916e505079c00bfa39",
+      "mediaType": "application/wasm",
+      "sourceUrl": "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/ort-wasm-simd-threaded.jsep.wasm",
+      "packagingRevision": "746c8c25bf27c5e0684a20f76889b4bb8d23e295",
+      "upstreamSourceRevision": "89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0",
+      "declaredPackageLicense": "MIT",
+      "fileLicenseVerificationStatus": "onnx-license-and-third-party-notice-audit-pending-registry-tarball-verification",
+      "digestEvidence": "exact-version-jsdelivr-metadata-not-yet-registry-tarball-authenticated"
+    }
+  ],
+  "exclusions": {
+    "selectedBrowserClosureContainsOptionalDependencyEdges": false,
+    "selectedBrowserClosureContainsPeerDependencyEdges": false,
+    "excludedPackageTrees": [
+      {
+        "root": "onnxruntime-node@1.21.0",
+        "reason": "Transformers Node and native inference dependency; not part of the selected browser artifact graph."
+      },
+      {
+        "root": "sharp@0.34.1",
+        "reason": "Transformers Node and native image-processing dependency; not part of the selected browser artifact graph."
+      }
+    ],
+    "excludedArtifactsAndAuthorities": [
+      {
+        "subject": "dist/transformers.web.js",
+        "reason": "This package export retains bare onnxruntime-common and onnxruntime-web imports; the selected unminified bundled entry is dist/transformers.js."
+      },
+      {
+        "subject": "dist/transformers.min.js",
+        "reason": "Operational bundled sibling not selected by this authority; the selected unminified entry preserves inspectable license headers."
+      },
+      {
+        "subject": "ort-wasm-simd-threaded.mjs and ort-wasm-simd-threaded.wasm",
+        "reason": "Non-JSEP ONNX pair; the selected Transformers and Kokoro browser graph uses the JSEP pair."
+      },
+      {
+        "subject": "model weights and Kokoro voice binaries",
+        "reason": "Caller-owned model, revision, dtype and voice authority; this package metadata record does not select or bundle them."
+      },
+      {
+        "subject": "mutable CDN loaders and network fallbacks",
+        "reason": "Runtime execution must use only caller-declared, authenticated local graph nodes and must fail closed on undeclared edges."
+      }
+    ]
+  },
+  "registryProvenance": {
+    "checkedPackages": [
+      "kokoro-js@1.2.1",
+      "@huggingface/transformers@3.5.1",
+      "phonemizer@1.2.1",
+      "onnxruntime-web@1.22.0-dev.20250409-89f8206ba4"
+    ],
+    "distAttestations": null,
+    "sigstoreProvenanceClaim": false,
+    "description": "The checked core npm metadata exposes no dist attestations. This authority makes no Sigstore or npm provenance claim. Registry integrity and signatures are not substitutes for selected-file verification."
+  },
+  "plannedVerification": {
+    "status": "browser-speech-package-verification-pending-authenticated-tarball-download",
+    "sequence": [
+      "fetch-exact-registry-tarballs-without-installing-or-executing-package-code",
+      "verify-each-registry-tarball-against-recorded-sha512-before-extraction",
+      "extract-verified-tarballs-into-a-read-only-nonrepository-temporary-export-with-path-traversal-and-symlink-rejection",
+      "compare-selected-artifact-byte-length-and-sha256-against-this-metadata-record",
+      "verify-exact-source-http-media-type-no-redirect-behavior-and-final-url-identity",
+      "audit-every-selected-file-license-header-package-license-and-third-party-notice-obligation",
+      "lex-every-selected-javascript-and-esm-file-without-evaluation-and-inventory-static-import-dynamic-import-fetch-cache-worker-wasm-and-platform-conditional-edges",
+      "bind-the-canonical-runtime-graph-identity-to-entrypoint-files-revisions-source-urls-media-types-byte-lengths-sha256-values-licenses-and-declared-edges",
+      "add-caller-owned-model-dtype-revision-voice-and-external-data-nodes-without-selecting-fallbacks-or-downloading-hidden-assets",
+      "record-an-authenticated-verification-receipt-and-delete-the-read-only-temporary-export",
+      "permit-browser-runtime-execution-only-after-every-prior-verification-boundary-succeeds"
+    ]
+  },
+  "omittedUntilVerified": [
+    "Authenticated per-file derivation from registry-integrity-verified tarballs.",
+    "Final composite SPDX license expressions for the bundled JavaScript entrypoints.",
+    "Final ONNX Runtime ThirdPartyNotices obligations for the selected MJS and WASM bytes.",
+    "Caller-selected immutable model, tokenizer, processor, external-data and Kokoro voice artifact inventories.",
+    "Sigstore provenance for the checked core packages because npm dist attestations were absent."
+  ]
+}
