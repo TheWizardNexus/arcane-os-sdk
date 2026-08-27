@@ -825,6 +825,48 @@ test('source dispatch preserves already-frozen compatibility detail identity',()
     }
 });
 
+test('one owner has one active source and may register again after disposal',()=>{
+    const owner={};
+    const type='sdk.test.source-owner-lifecycle';
+    const first=createArcaneEventSource(owner,{
+        source:'sdk.test.source-owner-lifecycle',
+        eventTypes:[type]
+    });
+    const firstInstanceId=first.instanceId;
+    try{
+        assert.throws(
+            function rejectSecondActiveSource(){
+                createArcaneEventSource(owner,{
+                    source:'sdk.test.source-owner-lifecycle-duplicate',
+                    eventTypes:[type]
+                });
+            },
+            function isActiveSourceCollision(error){
+                return error?.code==='ARCANE_EVENT_SOURCE_ALREADY_REGISTERED';
+            }
+        );
+    }finally{
+        first.dispose();
+    }
+
+    const replacement=createArcaneEventSource(owner,{
+        source:'sdk.test.source-owner-lifecycle',
+        eventTypes:[type]
+    });
+    try{
+        assert.notEqual(replacement.instanceId,firstInstanceId);
+        const publication=replacement.dispatch(
+            type,
+            Object.freeze({generation:'replacement'}),
+            {publicDetail:{generation:'replacement'}}
+        );
+        assert.equal(publication.accepted,true);
+        assert.equal(publication.occurrence.instanceId,replacement.instanceId);
+    }finally{
+        replacement.dispose();
+    }
+});
+
 test('canonical cancellation and one-way DOM projection share one occurrence',()=>{
     const restoreCustomEvent=installTestCustomEvent();
     const cancelType='sdk.test.cancellation';

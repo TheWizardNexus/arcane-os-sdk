@@ -367,6 +367,12 @@ nothing; later abort marks the listener inactive synchronously and removes it
 without corrupting an in-progress dispatch. `'*'` is not a canonical subscription
 type.
 
+`createSource(owner,{source,eventTypes,onListenerError?})` is the authority
+method used by the exported
+`createArcaneEventSource(owner,{source,eventTypes,onListenerError?})` wrapper.
+Both return the same frozen singleton-backed source handle; neither constructs
+an EventManager, EventTarget, or component-local bus.
+
 `addEventListener()` and `removeEventListener()` expose EventTarget-shaped
 canonical registration, including function/EventListener-object callbacks,
 type/listener/capture deduplication, `once`, and `signal`. They return
@@ -404,14 +410,18 @@ at most 128 characters matching
 `^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`. `eventTypes` contains 1 through 256 unique
 declared types. A second active source for the same owner fails closed.
 
-### Signature and value
+### Signature and result
+
+```text
+createArcaneEventSource(owner, options)
+```
 
 ```javascript
 const source=createArcaneEventSource(owner,{
     source:'sdk.document-store',
     eventTypes:['document.saved'],
     onListenerError(error,errorOccurrence){
-        reportOwnerLocalFailure(error,errorOccurrence.occurrenceId);
+        reportOwnerLocalFailure(error,errorOccurrence?.occurrenceId??null);
     }
 });
 ```
@@ -421,6 +431,13 @@ The returned handle and its descriptor are frozen. The descriptor identifies
 `arcane-source-<base36>` instance id, and the declared event types plus the final
 `arcane.event.source.disposed` event. IDs are unique only during one authority's
 lifetime in one realm.
+
+The authority descriptor is exactly
+`{kind:'arcane-event-authority',protocol:'arcane-event-authority/1',realm:'current'}`.
+The source descriptor is exactly
+`{kind:'arcane-event-source',protocol:'arcane-event-source/1',source,instanceId,
+eventTypes}`; `eventTypes` is frozen and includes the declared types followed by
+`arcane.event.source.disposed`.
 
 ### Dispatch
 
@@ -467,8 +484,18 @@ nonrecursive, privacy-safe `arcane.event.listener.error` occurrence and are
 reported through `reportError` or `console.error`; committed source dispatch does
 not throw because an observer failed. `onListenerError(error,errorOccurrence)`
 is invoked synchronously only at the source-owner boundary after canonical error
-publication and platform reporting. If that callback throws, its failure is
-reported directly without another listener-error occurrence.
+publication and platform reporting. Its second argument is the canonical
+listener-error occurrence, or `null` only if that secondary publication could
+not be constructed. If the callback throws, its failure is reported directly
+without another listener-error occurrence. The listener-error public detail is
+exactly `{code:'ARCANE_EVENT_LISTENER_CALLBACK_FAILED',reason:'listener-threw',
+eventType,occurrenceId,source,instanceId,operationId}`.
+
+Canonical publication never awaits a listener return value and exposes no
+Promise-returning publication API. Domain promises and `createEventQueue()` own
+asynchronous work, ordered callback backpressure, and async failure. Synchronous
+source generation, occurrence creation, sticky state commits, subscription
+installation, and cancellation admission stay on the authority call stack.
 
 `on(type,handler,{once=false,signal}={})` and `subscribe()` on the source are
 aliases returning an idempotent disposable unsubscribe. `once()` is the
@@ -483,7 +510,9 @@ a new canonical occurrence rather than the raw input.
 `arcane.event.source.disposed` occurrence, removes source-owned registrations,
 and returns `true`; reentrant or later calls return `false`. Dispatch or new
 registration after disposal fails with `ARCANE_EVENT_SOURCE_DISPOSED`. The owner
-may register a new source after disposal. `destroy()` aliases `dispose()`.
+may register a new source after disposal. Its compatibility detail is
+`{source,instanceId,reason:'source-disposed'}` and its public detail is
+`{reason:'source-disposed'}`. `destroy()` aliases `dispose()`.
 
 Already-frozen compatibility detail retains its identity. Other rich
 compatibility detail is shallow-copied and frozen when it is a plain record or
@@ -491,6 +520,25 @@ array; host objects such as DOM nodes, `File`, or `Error` remain local and are
 not recursively frozen. Compatibility detail never enters canonical
 EventPubSub/time-travel payloads. Only privacy-admitted `publicDetail` enters the
 occurrence and optional diagnostics.
+
+### Availability and normalization
+
+**Node and browser/bundler, within the current JavaScript realm.** This wrapper
+reuses `globalThis.arcaneEvents`; it creates no second bus or asynchronous work
+owner. Admission, publication, cancellation, and teardown remain synchronous.
+
+### Example
+
+```javascript
+import {createArcaneEventSource} from 'arcane-os/event-manager';
+
+const source=createArcaneEventSource({}, {
+    source:'sdk.example',
+    eventTypes:['sdk.example.completed']
+});
+source.dispatch('sdk.example.completed',{}, {publicDetail:{status:'completed'}});
+source.dispose();
+```
 
 ## `projectArcaneDOMEvent()`
 
@@ -500,7 +548,11 @@ Projects one authority-created occurrence to one `CustomEvent`. This is a
 one-way compatibility boundary; DOM dispatch never republishes into
 `arcaneEvents`.
 
-### Signature
+### Signature and result
+
+```text
+projectArcaneDOMEvent(target, occurrence, options)
+```
 
 ```javascript
 projectArcaneDOMEvent(target,occurrence,{
@@ -522,26 +574,286 @@ the function skips DOM dispatch and returns `false`. Otherwise it dispatches
 exactly one event, propagates DOM cancellation to a cancelable occurrence, and
 returns the combined acceptance result.
 
+### Availability and normalization
+
+**Browser DOM or a DOM-compatible host with `CustomEvent` and
+`dispatchEvent`.** Only an occurrence created by this realm's authority is
+accepted. Projection is synchronous and one-way and creates no listener state.
+
+### Example
+
+```javascript
+import {projectArcaneDOMEvent} from 'arcane-os/event-manager';
+
+projectArcaneDOMEvent(button,publication.occurrence,{bubbles:true});
+```
+
 ## `isArcaneEventOccurrence()`
+
+### Overview
 
 Returns `true` only for a canonical occurrence or source compatibility view
 created by the current realm's authority. It does not authenticate hostile
 same-realm code; the brand and protocol are compatibility boundaries.
 
-## Authority protocols and constants
+### Signature and result
 
-- `ARCANE_EVENT_AUTHORITY_PROTOCOL` is exactly `arcane-event-authority/1`.
-- `ARCANE_EVENT_OCCURRENCE_PROTOCOL` is exactly `arcane-event-occurrence/1`.
-- `ARCANE_EVENT_SOURCE_PROTOCOL` is exactly `arcane-event-source/1`.
-- `ARCANE_EVENT_AUTHORITY_BRAND` is
-  `Symbol.for('arcane-os.arcane-events-authority')`.
-- `ARCANE_EVENT_AUTHORITY_KIND` and `ARCANE_EVENT_SOURCE_KIND` identify frozen
-  descriptors.
-- `ARCANE_EVENT_LISTENER_ERROR_EVENT` is
-  `arcane.event.listener.error`.
-- `ARCANE_EVENT_SOURCE_DISPOSED_EVENT` is
-  `arcane.event.source.disposed`.
-- `ARCANE_EVENT_ERROR_CODES` maps each stable authority error code to itself.
+```text
+isArcaneEventOccurrence(value)
+```
+
+Returns a boolean; a structurally similar foreign value returns `false`.
+
+### Availability and normalization
+
+**Node and browser/bundler, within the current JavaScript realm.** Recognition
+is synchronous and identity-based, with no parsing, cloning, or transport.
+
+### Example
+
+```javascript
+import {isArcaneEventOccurrence} from 'arcane-os/event-manager';
+
+console.log(isArcaneEventOccurrence(publication.occurrence));
+```
+
+## `ARCANE_EVENT_AUTHORITY_BRAND`
+
+### Overview
+
+Global registry symbol that brands the one compatible authority in a realm.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_AUTHORITY_BRAND
+```
+
+Its exact value is `Symbol.for('arcane-os.arcane-events-authority')`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** The brand property is an immutable,
+non-enumerable compatibility marker, not cross-realm transport or authenticity.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_AUTHORITY_BRAND,arcaneEvents} from 'arcane-os/event-manager';
+console.log(arcaneEvents[ARCANE_EVENT_AUTHORITY_BRAND]);
+```
+
+## `ARCANE_EVENT_AUTHORITY_KIND`
+
+### Overview
+
+Stable kind discriminator for the frozen authority descriptor.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_AUTHORITY_KIND
+```
+
+Its exact value is `arcane-event-authority`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** Reading it creates no authority or listener.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_AUTHORITY_KIND,arcaneEvents} from 'arcane-os/event-manager';
+console.log(arcaneEvents.descriptor.kind===ARCANE_EVENT_AUTHORITY_KIND);
+```
+
+## `ARCANE_EVENT_AUTHORITY_PROTOCOL`
+
+### Overview
+
+Stable protocol discriminator for compatible per-realm authorities.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_AUTHORITY_PROTOCOL
+```
+
+Its exact value is `arcane-event-authority/1`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** An incompatible installed protocol fails closed
+and is never replaced or wrapped.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_AUTHORITY_PROTOCOL,arcaneEvents} from 'arcane-os/event-manager';
+console.log(arcaneEvents.protocol===ARCANE_EVENT_AUTHORITY_PROTOCOL);
+```
+
+## `ARCANE_EVENT_ERROR_CODES`
+
+### Overview
+
+Frozen registry of every stable event-authority failure code.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_ERROR_CODES
+```
+
+Every key maps to its identical string value; thrown authority failures expose
+the matching value as `error.code`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** The registry has no mutable registration surface
+or vague fallback code.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_ERROR_CODES} from 'arcane-os/event-manager';
+console.log(ARCANE_EVENT_ERROR_CODES.ARCANE_EVENT_SOURCE_DISPOSED);
+```
+
+## `ARCANE_EVENT_LISTENER_ERROR_EVENT`
+
+### Overview
+
+Canonical observational event emitted when an event listener throws.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_LISTENER_ERROR_EVENT
+```
+
+Its exact value is `arcane.event.listener.error`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** Its frozen public detail carries the exact failure
+code and source occurrence identifiers, never the raw error. Its shape is
+exactly `{code:'ARCANE_EVENT_LISTENER_CALLBACK_FAILED',reason:'listener-threw',
+eventType,occurrenceId,source,instanceId,operationId}`. Publication is
+synchronous and nonrecursive.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_LISTENER_ERROR_EVENT,arcaneEvents} from 'arcane-os/event-manager';
+const unsubscribe=arcaneEvents.subscribe(ARCANE_EVENT_LISTENER_ERROR_EVENT,console.log);
+```
+
+## `ARCANE_EVENT_OCCURRENCE_PROTOCOL`
+
+### Overview
+
+Stable protocol discriminator for immutable canonical occurrences.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_OCCURRENCE_PROTOCOL
+```
+
+Its exact value is `arcane-event-occurrence/1`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** Occurrences are realm-owned identity values with
+deeply frozen public detail and synchronous cancellation state.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_OCCURRENCE_PROTOCOL} from 'arcane-os/event-manager';
+console.log(publication.occurrence.protocol===ARCANE_EVENT_OCCURRENCE_PROTOCOL);
+```
+
+## `ARCANE_EVENT_SOURCE_DISPOSED_EVENT`
+
+### Overview
+
+Final noncancelable occurrence published during a source's first disposal.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_SOURCE_DISPOSED_EVENT
+```
+
+Its exact value is `arcane.event.source.disposed`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** Public detail is exactly
+`{reason:'source-disposed'}`. Delivery precedes source-listener cleanup;
+reentrant or later disposal publishes nothing and returns `false`.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_SOURCE_DISPOSED_EVENT} from 'arcane-os/event-manager';
+source.once(ARCANE_EVENT_SOURCE_DISPOSED_EVENT,console.log);
+source.dispose();
+```
+
+## `ARCANE_EVENT_SOURCE_KIND`
+
+### Overview
+
+Stable kind discriminator for frozen source descriptors.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_SOURCE_KIND
+```
+
+Its exact value is `arcane-event-source`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** Reading it does not register or dispose a source.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_SOURCE_KIND} from 'arcane-os/event-manager';
+console.log(source.descriptor.kind===ARCANE_EVENT_SOURCE_KIND);
+```
+
+## `ARCANE_EVENT_SOURCE_PROTOCOL`
+
+### Overview
+
+Stable protocol discriminator for frozen source handles and descriptors.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_SOURCE_PROTOCOL
+```
+
+Its exact value is `arcane-event-source/1`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** One handle belongs to one active owner in one
+realm and declares every publishable type before use.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_SOURCE_PROTOCOL} from 'arcane-os/event-manager';
+console.log(source.protocol===ARCANE_EVENT_SOURCE_PROTOCOL);
+```
 
 ## `parseEventStack()`
 
@@ -1145,9 +1457,13 @@ kernel/application snapshot.
 | Realm source sequence exhausted | `ARCANE_EVENT_SOURCE_SEQUENCE_EXHAUSTED` | Start a new JavaScript realm |
 | Compatibility detail cannot be safely admitted | `ARCANE_EVENT_COMPATIBILITY_DETAIL_INVALID` | Use a host object directly or a plain/array value with data properties only |
 | Canonical listener throws | `ARCANE_EVENT_LISTENER_CALLBACK_FAILED` in a listener-error occurrence | Fix the observer; committed domain dispatch remains successful |
-| Subscription type/handler/options/signal invalid | `ARCANE_EVENT_SUBSCRIPTION_*` | Use an exact declared name, callable/EventListener object, data options, and AbortSignal |
+| Subscription type invalid | `ARCANE_EVENT_SUBSCRIPTION_TYPE_INVALID` | Use a nonempty trimmed name matching the authority event-name grammar; canonical wildcard subscription is not admitted |
+| Subscription handler invalid | `ARCANE_EVENT_SUBSCRIPTION_HANDLER_INVALID` | Use a function or EventListener object |
+| Subscription options invalid | `ARCANE_EVENT_SUBSCRIPTION_OPTIONS_INVALID` | Use a data-only `{once?,signal?}` record with a boolean `once` value |
+| Subscription signal invalid | `ARCANE_EVENT_SUBSCRIPTION_SIGNAL_INVALID` | Pass an AbortSignal-compatible value or omit `signal` |
 | EventTarget adapter input lacks a valid type or data detail | `ARCANE_EVENT_DISPATCH_EVENT_INVALID` | Pass an Event or an Event-like data object; do not use accessors |
-| DOM target/options invalid | `ARCANE_EVENT_DOM_TARGET_INVALID` / `ARCANE_EVENT_DOM_OPTIONS_INVALID` | Supply `CustomEvent` support, `dispatchEvent`, and boolean projection flags |
+| DOM target invalid | `ARCANE_EVENT_DOM_TARGET_INVALID` | Supply a target with `dispatchEvent` in a realm with `CustomEvent` support |
+| DOM options invalid | `ARCANE_EVENT_DOM_OPTIONS_INVALID` | Use only `type`, `bubbles`, `composed`, and `cancelable`, with boolean flags |
 | DOM detail conflicts with authority identifiers | `ARCANE_EVENT_DOM_DETAIL_COLLISION` | Remove conflicting `occurrenceId`, `arcaneSource`, `instanceId`, or `operationId` fields; compatibility `source` is preserved |
 | Constructor flags, clocks, or session id invalid | `TypeError` | Correct types; keep session id non-empty and at most 256 characters |
 | Constructor/import retention or snapshot limits invalid | `RangeError` | Use positive safe integers and keep `maxSnapshotStringLength` at least 64 |

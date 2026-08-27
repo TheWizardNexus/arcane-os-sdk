@@ -34,7 +34,7 @@ release acceptance.
 | Surface | Minimum behavior proved locally | Heavier evidence boundary |
 | --- | --- | --- |
 | Package entrypoints | Every declared JavaScript export imports; documented names match; constants and synchronous validators preserve their public contracts. | None for import itself. Operations that invoke tools use the matching boundary below. |
-| EventManager and event stacks | Live pub/sub ordering and payload identity, nested causation, immutable/redacted snapshots, strict import, bounded overflow, seek, all playback modes/lifecycle outcomes, cancellation, and DOM start/stop/privacy behavior. | Real user journeys and browser layout belong in a browser harness; event-stack review never proves that external side effects can be replayed. |
+| Canonical events, EventManager, and event stacks | One branded/versioned `globalThis.arcaneEvents` per realm, fail-closed collision admission, duplicate-module reuse, declared source ownership, canonical/source delivery order, frozen occurrence metadata, exact cancellation, AbortSignal cleanup, disposable subscriptions, source teardown/re-registration, observational listener failure, EventTarget compatibility, one-way DOM projection, deprecated state-free `aiRuntimeEvents`, live isolated-bus pub/sub, nested causation, immutable/redacted stacks, strict import, bounded overflow, seek, playback, and DOM privacy/lifecycle. | Real user journeys and browser layout belong in a browser harness; an occurrence, EventTarget/DOM projection, or event-stack review never proves that external side effects stopped, completed, or can be replayed. |
 | CLI | Commands parse, acknowledge, select one scope, produce normalized human/JSON/NDJSON output, propagate cancellation/failure, and reject invalid cardinality. | Native build/run requires the selected real provider and host. |
 | Browser runtime modules | Every shipped ESM module parses and its export inventory matches the catalog; pure helpers run focused success/error cases. | DOM, OPFS, media, and Web Component journeys use a browser harness. |
 | Provider-neutral AI runtime and chat/speech activation | Provider/2 registration, closed three-role configuration, opt-in STT startup, legacy Cloud/Core speech readiness, independent LLM/STT/TTS load/unload/status, latest-request-wins settlement, owned STT signals, TTS mute lifecycle, route-owned voice defaults, sticky-state-only readiness for both speech components, shared selected-unloaded activation request/cancellation/error behavior, fail-closed programmatic voice recording, public transcript-replacement supersession of late transcribe/save/complete settlement, `AI.fetchSTT` callback-position compatibility, stale-callback suppression, and absence of silent provider fallback are exercised against bounded providers and host callbacks. | Real model/runtime admission remains the selected provider's evidence boundary; provider-promise settlement, state, an abort signal, or an activation event does not by itself prove underlying provider work stopped or native, cloud, or browser-model availability. |
@@ -100,10 +100,33 @@ continued unrecorded live delivery, rejection when re-enabling before
 DOM cases assert that private values, credentials, sensitive attributes, URLs,
 and markup remain redacted under every capture-option combination.
 
+The focused singleton contract also owns these cases in
+`test/event-manager.test.mjs`: global property/brand/protocol/API descriptor
+admission; same-object reuse across duplicate module URLs and package
+entrypoints; exact `subscribe(type,handler,{once,signal})` behavior; idempotent
+`unsubscribe()`/`unsubscribe.dispose()`; one active
+`createSource(owner,{source,eventTypes,onListenerError})` handle; immutable
+`arcane-event-occurrence/1` values and privacy separation; synchronous
+cancellation; dispatch-safe removal and reentry; final source disposal;
+EventTarget deduplication/admission; one-way `CustomEvent` projection; and
+nonrecursive listener-error publication. Runtime behavior tests own the
+`aiRuntimeEvents` compatibility view and each migrated module/component's
+instance-scoped projection and cleanup. Reference-completeness tests own the
+public export names and exact focused-guide coverage.
+
+Canonical event publication itself is deliberately synchronous and
+observational. Tests must not await listener return values or present
+`arcaneEvents` as backpressure. Promise settlement, async callback failure, and
+ordered delivery belong to the operation promise or `createEventQueue()` test
+that owns that work. Abort-driven listener removal proves cleanup only; it does
+not prove already-started host, provider, worker, or queue work stopped.
+
 ## Test ownership
 
-The SDK owns package, CLI, synchronized renderer, documentation, and injected
-provider-boundary behavior. Arcane OS owns live Core dispatch, native host
+The SDK owns the singleton authority, its per-realm source adapters, package and
+managed-browser projections, focused event/source/DOM contracts, runtime
+compatibility views, package, CLI, synchronized renderer, documentation, and
+injected provider-boundary behavior. Arcane OS owns live Core dispatch, native host
 bridges, capability policy, host service adapters, and real ArcaneOllama
 integration. A change that crosses both repositories needs focused tests at both
 owners; copying a Core test into this package would not make the SDK the Core

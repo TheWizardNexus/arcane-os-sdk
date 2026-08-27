@@ -56,6 +56,40 @@ function sorted(values){
     return [...values].sort();
 }
 
+async function livePackageExportGraph(packageDocument){
+    const graph=[];
+    for(const [key,target] of Object.entries(packageDocument.exports)){
+        if(typeof target!=='string'||!target.endsWith('.mjs'))continue;
+        const entrypoint=packageEntrypointName(key);
+        const namespace=await import(pathToFileURL(
+            path.join(repositoryRoot,target)
+        ).href);
+        for(const name of Object.keys(namespace)){
+            const value=namespace[name];
+            let node=graph.find(candidate=>
+                candidate.name===name&&Object.is(candidate.value,value)
+            );
+            if(!node){
+                node={name,value,entrypoints:new Set()};
+                graph.push(node);
+            }
+            node.entrypoints.add(entrypoint);
+        }
+    }
+    return graph.map(node=>({
+        name:node.name,
+        entrypoints:sorted(node.entrypoints)
+    })).sort((left,right)=>{
+        if(left.name<right.name)return -1;
+        if(left.name>right.name)return 1;
+        const leftEntrypoints=left.entrypoints.join('\u0000');
+        const rightEntrypoints=right.entrypoints.join('\u0000');
+        return leftEntrypoints<rightEntrypoints
+            ?-1
+            :leftEntrypoints>rightEntrypoints?1:0;
+    });
+}
+
 async function markdownFiles(directory){
     const files=[];
     for(const entry of await readdir(directory,{withFileTypes:true})){
@@ -125,11 +159,12 @@ test('the public package API inventory matches every JavaScript export and MDN e
         textFile('ai','browser-wasm.md'),
         textFile('ai','browser-speech.md')
     ]);
+    const exportGraph=await livePackageExportGraph(packageDocument);
 
     await t.test('the inventory has stable unique records',()=>{
         assert.equal(packageDocument.version,'0.2.3');
         assert.equal(inventory.sdkVersion,packageDocument.version);
-        assert.equal(inventory.memberCount,169);
+        assert.equal(inventory.memberCount,exportGraph.length);
         assert.equal(inventory.members.length,inventory.memberCount);
         assert.equal(new Set(inventory.members.map(member=>member.id)).size,inventory.memberCount);
         assert.equal(
@@ -145,6 +180,18 @@ test('the public package API inventory matches every JavaScript export and MDN e
                 assert.notEqual(member[field].trim(),'');
             }
             assert.ok(Array.isArray(member.entrypoints)&&member.entrypoints.length>0);
+        }
+        for(const node of exportGraph){
+            const matches=inventory.members.filter(member=>
+                member.name===node.name
+                &&JSON.stringify(sorted(member.entrypoints))
+                    ===JSON.stringify(node.entrypoints)
+            );
+            assert.equal(
+                matches.length,
+                1,
+                `${node.name} at ${node.entrypoints.join(', ')} must have exactly one inventory record.`
+            );
         }
         assert.equal(
             inventory.members.some(member=>[
@@ -190,8 +237,10 @@ test('the public package API inventory matches every JavaScript export and MDN e
             './browser-runtime/ai/browser-speech.mjs'
         );
         const browserSpeechSignatures=new Map([
+            ['BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL','const BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL'],
             ['BROWSER_SPEECH_ARTIFACT_PROTOCOL','const BROWSER_SPEECH_ARTIFACT_PROTOCOL'],
             ['createBrowserKokoroProvider','createBrowserKokoroProvider(options={})'],
+            ['createBrowserSpeechArtifactGraph',"createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', identitySha256, providerId=null, role, model, runtime, files, edges, transforms }={})"],
             ['createBrowserSpeechAuthority','createBrowserSpeechAuthority({ providerId, role, model, runtime, security }={})'],
             ['createBrowserWhisperProvider','createBrowserWhisperProvider(options={})'],
             ['createDbopfsSpeechArtifactStore',"createDbopfsSpeechArtifactStore({ dbopfs, tableName='arcane_ai_browser_speech', fetchImpl=null, objectUrlFactory=null }={})"]
@@ -209,7 +258,10 @@ test('the public package API inventory matches every JavaScript export and MDN e
             assert.equal(member.signature,browserSpeechSignatures.get(member.name));
             assert.equal(
                 member.kind,
-                member.name==='BROWSER_SPEECH_ARTIFACT_PROTOCOL'?'constant':'function'
+                member.name==='BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL'
+                    ||member.name==='BROWSER_SPEECH_ARTIFACT_PROTOCOL'
+                    ?'constant'
+                    :'function'
             );
             assert.match(member.availability,/\bBrowser\b/u);
             assert.doesNotMatch(member.availability,/\b(?:Node|Cloud)\b/u);
@@ -225,11 +277,11 @@ test('the public package API inventory matches every JavaScript export and MDN e
                     .filter(member=>member.entrypoints.includes(entrypoint))
                     .map(member=>member.name)
             ));
-            const namespace=await import(pathToFileURL(
-                path.join(repositoryRoot,target)
-            ).href);
+            const actual=sorted(exportGraph
+                .filter(node=>node.entrypoints.includes(entrypoint))
+                .map(node=>node.name));
             assert.deepEqual(
-                sorted(Object.keys(namespace)),
+                actual,
                 expected,
                 `${entrypoint} export drifted from the canonical inventory.`
             );
@@ -367,19 +419,24 @@ test('the public package API inventory matches every JavaScript export and MDN e
         const sdkSections=sectionsByHeading(guide);
         assert.deepEqual([...focusedSections.keys()],[
             'Availability',
-            'Import',
-            'BROWSER_SPEECH_ARTIFACT_PROTOCOL',
-            'createBrowserSpeechAuthority()',
+            'Public exports',
+            'Protocol and enum registry',
+            'createBrowserSpeechArtifactGraph()',
             'createDbopfsSpeechArtifactStore()',
-            'createBrowserWhisperProvider()',
-            'createBrowserKokoroProvider()',
-            'Lifecycle and status',
-            'Errors',
-            'Security and ownership',
+            'Authenticated Worker host',
+            'Providers',
+            'Lifecycle, progress, cancellation, and cleanup',
+            'Stable errors and reasons',
+            '`createBrowserSpeechAuthority()` legacy compatibility',
+            'Security and ownership summary',
             'Related'
         ]);
         for(const member of records){
-            assert.ok(focusedSections.has(member.displayName),member.displayName);
+            assert.match(
+                browserSpeechGuide,
+                new RegExp(escapeRegExp(member.name),'u'),
+                `${member.name} is absent from the focused browser-speech guide.`
+            );
             const required=member.kind==='constant'
                 ?['Overview','Value and import','Availability and normalization','Example']
                 :['Overview','Signature and result','Availability and normalization','Example'];
@@ -393,15 +450,13 @@ test('the public package API inventory matches every JavaScript export and MDN e
         for(const value of [
             'arcane-os/ai/browser-speech',
             'arcane-ai-browser-speech-artifacts/1',
-            'arcane.ai.browser-speech.assets.v1',
+            'arcane.ai.browser-speech.authenticated-artifact-graph.v1',
             'arcane-ai-provider/2',
             'transformers-whisper',
             'kokoro-js',
             'transcribe',
             'synthesize',
             'Float32Array',
-            '16,000',
-            '24000',
             'mimeType',
             'responseFormat',
             'audio/wav',
@@ -412,17 +467,13 @@ test('the public package API inventory matches every JavaScript export and MDN e
             'ARCANE_AI_AUDIO_DECODE_FAILED',
             'ARCANE_AI_UNSUPPORTED_RESPONSE_FORMAT',
             'ARCANE_AI_INVALID_PROVIDER_RESULT',
-            'secure:false',
             'appSecurity',
-            'load({security})',
-            'checks.byteLength',
-            'checks.sha256',
             'AIProviderRuntime',
             'AIRuntimeState'
         ])assert.match(browserSpeechGuide,new RegExp(escapeRegExp(value),'u'),value);
-        assert.match(browserSpeechGuide,/before Worker use[\s\S]*provider stays `ready`/u);
-        assert.match(browserSpeechGuide,/does not ship model weights, runtime adapter bytes/u);
-        assert.match(browserSpeechGuide,/never selects one/u);
+        assert.match(browserSpeechGuide,/contains no speech runtime, model, or voice payload[\s\S]*never downloads one before explicit `load\(\)`/u);
+        assert.match(browserSpeechGuide,/Runtime\/model\/sample-rate\/default-voice\/voice inventory[\s\S]*remain caller authority/u);
+        assert.match(browserSpeechGuide,/No hardware heuristic,[\s\S]*hidden fallback,[\s\S]*startup download/u);
         assert.doesNotMatch(browserSpeechGuide,/automatically (?:downloads|selects) (?:a )?(?:model|voice|provider)/iu);
     });
 });
@@ -449,9 +500,20 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
         const actualPaths=sorted((await filesUnder(
             path.join(repositoryRoot,'runtime','arcane','modules')
         )).map(file=>path.relative(repositoryRoot,file).split(path.sep).join('/')));
-        assert.equal(moduleInventory.artifactCount,85);
-        assert.equal(moduleInventory.javascriptArtifactCount,83);
-        assert.equal(moduleInventory.esmExportCount,319);
+        const javascriptArtifacts=moduleInventory.artifacts.filter(artifact=>
+            artifact.file.endsWith('.js')||artifact.file.endsWith('.mjs')
+        );
+        const liveEsmExportCount=live.modules.reduce(
+            (count,module)=>count+new Set(module.exports).size,
+            0
+        );
+        assert.equal(moduleInventory.artifactCount,actualPaths.length);
+        assert.equal(
+            moduleInventory.javascriptArtifactCount,
+            javascriptArtifacts.length
+        );
+        assert.equal(moduleInventory.javascriptArtifactCount,live.modules.length);
+        assert.equal(moduleInventory.esmExportCount,liveEsmExportCount);
         assert.deepEqual(
             sorted(moduleInventory.artifacts.map(artifact=>artifact.file)),
             actualPaths
@@ -608,9 +670,9 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
             "'chat-ai-activation-error'"
         ])assert.match(source,new RegExp(escapeRegExp(value),'u'),value);
         assert.match(source,/action==='load'[\s\S]*\['unloaded','error'\][\s\S]*action==='unload'[\s\S]*role[.]state==='loading'/u);
-        assert.match(source,/cancelable:true[\s\S]*if\(!host[.]dispatchEvent\(activationEvent\)\)/u);
+        assert.match(source,/cancelable:true[\s\S]*if\(!accepted\|\|destroyed/u);
         assert.match(componentGuide,/keyboard-operable Start\/Try again[\s\S]*Cancel loading/u);
-        assert.match(componentGuide,/preventDefault\(\) suppresses the callback/u);
+        assert.match(componentGuide,/preventDefault\(\)` suppresses the callback/u);
         assert.match(componentGuide,/emits no\s+activation request on import or startup/u);
         assert.match(componentGuide,/provider\/runtime owner decides whether and\s+how to execute/u);
         assert.match(componentGuide,/destroy\(\)[\s\S]*aborts the component's AI-runtime-state subscription[\s\S]*sets `ready` to `false`[\s\S]*returns\s+`undefined`/u);
@@ -648,7 +710,7 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
             "'speech-stt-activation-request'",
             "'speech-stt-activation-error'"
         ])assert.match(contractSource,new RegExp(escapeRegExp(value),'u'),value);
-        assert.match(contractSource,/cancelable:true[\s\S]*const accepted=host[.]dispatchEvent\(activationEvent\)[\s\S]*if\(!accepted/u);
+        assert.match(contractSource,/cancelable:true[\s\S]*if\(!publication[.]accepted[\s\S]*!projectSTTActivationEvent/u);
         assert.match(contractSource,/role[.]state==='loading'[\s\S]*return 'unload'/u);
         for(const source of [speechSource,voiceSource]){
             assert.match(source,/createSTTActivationController/u);
@@ -656,7 +718,7 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
         }
         assert.match(voiceSource,/canStartVoiceRecording\(sttRole,state,destroyed\)/u);
         assert.match(voiceSource,/fetchSTT\(file,undefined,signal\)/u);
-        assert.match(componentGuide,/Start transcription[\s\S]*Cancel loading[\s\S]*Try again/u);
+        assert.match(componentGuide,/Start\s+transcription[\s\S]*Cancel\s+loading[\s\S]*Try\s+again/u);
         assert.match(componentGuide,/preventDefault\(\)[\s\S]*suppresses the callback/u);
         assert.match(componentGuide,/emits no activation request on import or state observation/u);
         assert.match(componentGuide,/`startTranscription=false`[\s\S]*does not request STT/u);
@@ -669,7 +731,10 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
     });
 
     await t.test('all synchronized JavaScript and inline component scripts parse',()=>{
-        assert.equal(live.parsedJavascriptCount,99);
+        assert.equal(
+            live.parsedJavascriptCount,
+            live.modules.length+live.entities.length+live.support.length
+        );
         assert.equal(live.support.length,1);
         assert.deepEqual(live.support[0].exports,['Is','default']);
     });
@@ -730,8 +795,8 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
             'AIProviderRuntime.js',
             ['Overview','Public surface','Availability and normalization','Example']
         );
-        assert.match(providerRuntime,/start\(\{startMuted=true,startTranscription=false,signal=null\}=\{\}\)[\s\S]*\{barrier,settled,cancel\}/u);
-        assert.match(providerRuntime,/latest-request-wins[\s\S]*waits for its provider promise to settle/u);
+        assert.match(providerRuntime,/start\(options\)[\s\S]*\{startMuted=true,startTranscription=false,signal=null\}[\s\S]*\{barrier,settled,cancel\}/u);
+        assert.match(providerRuntime,/latest-request-wins[\s\S]*waits for its provider promise\s+to settle/u);
         assert.match(providerRuntime,/AI_LOCAL_MODEL_REQUIRED/u);
 
         const configuredSession=requireGuideSection(

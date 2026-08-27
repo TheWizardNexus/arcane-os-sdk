@@ -11,6 +11,15 @@ module URLs. It is not a cross-frame, worker, process, native-host, or cloud bus
 failure propagates to that publisher. Use `arcaneEvents.subscribe()` and
 `createArcaneEventSource()` for canonical SDK semantic events instead.
 
+The installed global is an own, non-enumerable, non-writable, non-configurable
+data property. Its authority brand is
+`Symbol.for('arcane-os.arcane-events-authority')`, and both the brand value and
+public `protocol` are exactly `arcane-event-authority/1`. A later import reuses
+the object only when its property, brand, protocol, and required callable API
+descriptors are compatible. An inherited value, accessor, unbranded value,
+mutable descriptor, incompatible protocol, incomplete API, or failed install is
+rejected; the SDK never replaces or wraps a competing global.
+
 Import the dedicated host-neutral entry point:
 
 ```javascript
@@ -51,6 +60,13 @@ projectArcaneDOMEvent(editorElement,publication.occurrence);
 unsubscribe();
 ```
 
+`createArcaneEventSource(owner,options)` is the public wrapper for
+`arcaneEvents.createSource(owner,options)`. `options` is the closed record
+`{source,eventTypes,onListenerError?}`. Each non-null object or function owner
+may have one active source, and the returned frozen handle exposes
+`{protocol,descriptor,source,instanceId,eventTypes,disposed,subscribe,on,once,
+addEventListener,removeEventListener,dispatch,dispatchEvent,dispose,destroy}`.
+
 `dispatch()` synchronously delivers one immutable `arcane-event-occurrence/1`
 to exact-type canonical subscribers, then an EventTarget-compatible view to the
 source's own listeners. The occurrence contains `occurrenceId`, `type`, `source`,
@@ -74,9 +90,16 @@ order. A listener failure publishes one privacy-safe
 `arcane.event.listener.error` occurrence and is reported through `reportError`
 or `console.error`; it does not undo committed domain work or make
 `dispatch()` throw. An optional source `onListenerError(error,errorOccurrence)`
-callback receives the raw failure only at that owner-local boundary. Subscriber
+callback receives the raw failure and its canonical listener-error occurrence
+only at that owner-local boundary; `errorOccurrence` is `null` only when the
+secondary error occurrence itself could not be constructed. Subscriber
 promises are not awaited, so keep completion, backpressure, and asynchronous
-failure in the SDK-owned queue or operation that owns them.
+failure in the SDK-owned queue or operation that owns them. There is no second
+Promise-returning publication bus: `dispatch()`, cancellation admission, sticky
+state commits, and listener installation remain synchronous. Owned promises and
+`createEventQueue()` own asynchronous work, ordering, failure, and backpressure;
+an `AbortSignal` removes a subscription but does not claim that already-started
+provider, host, or queue work stopped.
 
 `arcaneEvents.subscribe(type,handler,{once=false,signal}={})` returns an
 idempotent unsubscribe function whose `.dispose` property is the same function.
@@ -103,6 +126,51 @@ are separate from canonical `subscribe()` registrations; `off()` and `reset()`
 cannot remove canonical or source-owned registrations. New SDK publishers must
 use source handles. Authority-level `dispatchEvent()` exists only as a deprecated
 EventTarget admission adapter for older `aiRuntimeEvents` callers.
+
+`aiRuntimeEvents` is itself deprecated. It is a frozen, state-free
+EventTarget-compatible view over the `AIRuntimeState` source registered with
+this authority; it has no listener registry, `EventTarget`, or lifecycle state
+of its own. New consumers use the focused AIRuntimeState subscription helpers
+or `arcaneEvents.subscribe()`.
+
+## Stable authority failures
+
+`ARCANE_EVENT_ERROR_CODES` is frozen and maps every key below to the identical
+string value. Thrown authority errors expose that value as `error.code`:
+
+```text
+ARCANE_EVENT_AUTHORITY_ACCESSOR_COLLISION
+ARCANE_EVENT_AUTHORITY_VALUE_COLLISION
+ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH
+ARCANE_EVENT_AUTHORITY_PROTOCOL_MISMATCH
+ARCANE_EVENT_AUTHORITY_API_MISMATCH
+ARCANE_EVENT_AUTHORITY_INSTALL_FAILED
+ARCANE_EVENT_SOURCE_INVALID
+ARCANE_EVENT_SOURCE_ALREADY_REGISTERED
+ARCANE_EVENT_SOURCE_DISPOSED
+ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED
+ARCANE_EVENT_COMPATIBILITY_DETAIL_INVALID
+ARCANE_EVENT_OCCURRENCE_INVALID
+ARCANE_EVENT_OCCURRENCE_SEQUENCE_EXHAUSTED
+ARCANE_EVENT_SOURCE_SEQUENCE_EXHAUSTED
+ARCANE_EVENT_LISTENER_CALLBACK_FAILED
+ARCANE_EVENT_DOM_DETAIL_COLLISION
+ARCANE_EVENT_DOM_TARGET_INVALID
+ARCANE_EVENT_DOM_OPTIONS_INVALID
+ARCANE_EVENT_SUBSCRIPTION_TYPE_INVALID
+ARCANE_EVENT_SUBSCRIPTION_HANDLER_INVALID
+ARCANE_EVENT_SUBSCRIPTION_OPTIONS_INVALID
+ARCANE_EVENT_SUBSCRIPTION_SIGNAL_INVALID
+ARCANE_EVENT_DISPATCH_EVENT_INVALID
+```
+
+Listener callback failure is observational: it appears as
+`ARCANE_EVENT_LISTENER_CALLBACK_FAILED` inside the frozen
+`arcane.event.listener.error` occurrence. Its frozen public detail is
+`{code:'ARCANE_EVENT_LISTENER_CALLBACK_FAILED',reason:'listener-threw',
+eventType,occurrenceId,source,instanceId,operationId}`. Source disposal publishes
+`arcane.event.source.disposed` with public detail
+`{reason:'source-disposed'}` rather than throwing from committed source dispatch.
 
 ## Enable a bounded, complete event stack
 

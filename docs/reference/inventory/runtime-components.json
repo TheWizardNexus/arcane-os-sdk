@@ -3,7 +3,7 @@
   "source": {
     "authority": "sdk-canonical",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
-    "commit": "f97ac4f2e7cc92a00a3a466c38a67446dd112acf",
+    "commit": "75b01e7ddcd751f7970d8c1aaf18bfff05b706b7",
     "path": "runtime/arcane/components",
     "sdkVersion": "0.2.3",
     "legacyProjection": {
@@ -23,7 +23,8 @@
         "setNavigation()",
         "setActiveRoute()",
         "setStatus()",
-        "refresh()"
+        "refresh()",
+        "destroy()"
       ],
       "events": [
         "app-bar-ready"
@@ -52,10 +53,13 @@
         "clear()",
         "setState()",
         "focusComposer()",
-        "scrollToEnd()"
+        "scrollToEnd()",
+        "destroy()"
       ],
       "events": [
         "assistant-ready",
+        "assistant-opened",
+        "assistant-closed",
         "assistant-send",
         "assistant-clear"
       ],
@@ -82,7 +86,8 @@
       "name": "calculator.html",
       "purpose": "Calculator keypad and result/error event surface backed by CalculatorEngine.",
       "methods": [
-        "calculate()"
+        "calculate()",
+        "destroy()"
       ],
       "events": [
         "calculator-ready",
@@ -144,9 +149,12 @@
         "chat-send-message",
         "chat-send-error",
         "chat-file-uploaded",
+        "chat-file-upload-error",
         "chat-language-changed",
+        "chat-language-change-error",
         "chat-ai-activation-request",
         "chat-ai-activation-error",
+        "chat-speech-synthesis-error",
         "conversation-timebox-error"
       ],
       "slots": [],
@@ -168,7 +176,8 @@
         "setConversation()",
         "setBusy()",
         "setStatus()",
-        "clearComposer()"
+        "clearComposer()",
+        "destroy()"
       ],
       "events": [
         "conversation-view-ready",
@@ -192,7 +201,8 @@
         "getChartOptions()",
         "getEffectiveVisibility()",
         "open()",
-        "close()"
+        "close()",
+        "destroy()"
       ],
       "events": [
         "dashboard-config-ready",
@@ -214,7 +224,8 @@
       "name": "data-maintenance.html",
       "purpose": "Runs destructive cleanup of empty chats and memories inside the current app data scope.",
       "methods": [
-        "open()"
+        "open()",
+        "destroy()"
       ],
       "events": [
         "data-maintenance-ready",
@@ -235,7 +246,8 @@
       "purpose": "Opens a generic modal-style data view around an injected provider.",
       "methods": [
         "beforeOpen()",
-        "open()"
+        "open()",
+        "destroy()"
       ],
       "events": [
         "data-view-ready"
@@ -255,7 +267,8 @@
       "methods": [
         "configure()",
         "focus()",
-        "select()"
+        "select()",
+        "destroy()"
       ],
       "events": [
         "directory-picker-ready",
@@ -278,7 +291,8 @@
       "methods": [
         "loadDocument()",
         "selectView()",
-        "markSaved()"
+        "markSaved()",
+        "destroy()"
       ],
       "events": [
         "document-inspector-ready",
@@ -302,7 +316,8 @@
         "clear()",
         "setBusy()",
         "setError()",
-        "setProgress()"
+        "setProgress()",
+        "destroy()"
       ],
       "events": [
         "file-drop-ready",
@@ -328,7 +343,8 @@
         "setActions()",
         "setBusy()",
         "setError()",
-        "setPreview()"
+        "setPreview()",
+        "destroy()"
       ],
       "events": [
         "file-inspector-ready",
@@ -357,7 +373,8 @@
         "loadAll()",
         "setFilter()",
         "select()",
-        "clearSelection()"
+        "clearSelection()",
+        "destroy()"
       ],
       "events": [
         "file-manager-ready",
@@ -394,7 +411,8 @@
       "methods": [
         "configure()",
         "getValues()",
-        "setStatus()"
+        "setStatus()",
+        "destroy()"
       ],
       "events": [
         "integration-settings-ready",
@@ -415,7 +433,9 @@
       "methods": [
         "configure()",
         "begin()",
-        "present(); hidden property"
+        "present()",
+        "destroy()",
+        "hidden property"
       ],
       "events": [
         "local-ai-status-ready",
@@ -441,11 +461,16 @@
         "clear()",
         "fail()",
         "focus()",
-        "focusFragment()"
+        "focusFragment()",
+        "destroy()"
       ],
       "events": [
         "markdown-document-ready",
         "markdown-document-state",
+        "markdown-document-loading",
+        "markdown-document-rendered",
+        "markdown-document-empty",
+        "markdown-document-error",
         "markdown-document-navigate"
       ],
       "slots": [],
@@ -464,7 +489,8 @@
         "configure()",
         "focus()",
         "clear()",
-        "saveEntry()"
+        "saveEntry()",
+        "destroy()"
       ],
       "events": [
         "markdown-editor-ready",
@@ -486,7 +512,8 @@
       "purpose": "Loads a validated YouTube video or playlist embed and exposes external-platform action.",
       "methods": [
         "configure()",
-        "load()"
+        "load()",
+        "destroy()"
       ],
       "events": [
         "media-embed-ready",
@@ -510,7 +537,8 @@
         "populate()",
         "open()",
         "close()",
-        "runTasks()"
+        "runTasks()",
+        "destroy()"
       ],
       "events": [
         "modal-ready",
@@ -541,7 +569,8 @@
         "setPending()",
         "setStatus()",
         "setError()",
-        "clear()"
+        "clear()",
+        "destroy()"
       ],
       "events": [
         "output-panel-ready",
@@ -572,7 +601,8 @@
         "getValues()",
         "setValues()",
         "setBusy()",
-        "setStatus()"
+        "setStatus()",
+        "destroy()"
       ],
       "events": [
         "preferences-form-ready",
@@ -592,7 +622,8 @@
       "purpose": "Displays chronological records/evidence and emits open actions.",
       "methods": [
         "setItems()",
-        "populate()"
+        "populate()",
+        "destroy()"
       ],
       "events": [
         "record-timeline-ready",
@@ -610,7 +641,8 @@
       "purpose": "Displays normalized relationship nodes/edges in graph and list forms.",
       "methods": [
         "setGraph()",
-        "populate()"
+        "populate()",
+        "destroy()"
       ],
       "events": [
         "relationship-board-ready",
@@ -628,7 +660,8 @@
       "name": "screen-capture.html",
       "purpose": "Presents image, video, or GIF display-capture workflow.",
       "methods": [
-        "capture()"
+        "capture property (ScreenCapture instance)",
+        "destroy()"
       ],
       "events": [
         "screen-capture-ready",
@@ -653,11 +686,16 @@
         "clear()",
         "fail()",
         "focus()",
-        "focusLine()"
+        "focusLine()",
+        "destroy()"
       ],
       "events": [
         "source-code-viewer-ready",
-        "source-code-viewer-state"
+        "source-code-viewer-state",
+        "source-code-viewer-state-loading",
+        "source-code-viewer-state-ready",
+        "source-code-viewer-state-empty",
+        "source-code-viewer-state-error"
       ],
       "slots": [],
       "dependencies": [],
@@ -673,7 +711,8 @@
         "showFinding()",
         "populate()",
         "selectSource()",
-        "markSaved()"
+        "markSaved()",
+        "destroy()"
       ],
       "events": [
         "source-explanation-ready",
@@ -694,6 +733,7 @@
         "configure()",
         "setAvailability()",
         "setMuted()",
+        "reportTTSError()",
         "requestSTTActivation()",
         "destroy()",
         "availability",
@@ -709,7 +749,8 @@
         "speech-microphone-unavailable",
         "speech-stt-activation-request",
         "speech-stt-activation-error",
-        "speech-tts-lifecycle-error"
+        "speech-tts-lifecycle-error",
+        "speech-synthesis-error"
       ],
       "slots": [],
       "dependencies": [
@@ -730,7 +771,8 @@
         "configure()",
         "setItems()",
         "updateItem()",
-        "clear()"
+        "clear()",
+        "destroy()"
       ],
       "events": [
         "summary-strip-ready",
@@ -749,7 +791,8 @@
       "purpose": "Builds and updates a simple header/body table.",
       "methods": [
         "buildHeader()",
-        "buildTable()"
+        "buildTable()",
+        "destroy()"
       ],
       "events": [
         "table-ready",
@@ -771,7 +814,8 @@
         "setTasks()",
         "updateTask()",
         "runTasks()",
-        "clear()"
+        "clear()",
+        "destroy()"
       ],
       "events": [
         "task-progress-ready",
@@ -799,7 +843,8 @@
         "clear()",
         "setState()",
         "setTheme()",
-        "focus()"
+        "focus()",
+        "destroy()"
       ],
       "events": [
         "terminal-workspace-ready",
@@ -828,7 +873,8 @@
         "getTheme()",
         "setTheme()",
         "setBusy()",
-        "setStatus()"
+        "setStatus()",
+        "destroy()"
       ],
       "events": [
         "theme-editor-ready",
@@ -869,7 +915,8 @@
         "configure()",
         "setThreads()",
         "setActive()",
-        "setLoading()"
+        "setLoading()",
+        "destroy()"
       ],
       "events": [
         "unified-inbox-ready",
@@ -925,7 +972,8 @@
       "purpose": "Displays normalized current and daily weather with refresh intent.",
       "methods": [
         "setWeather()",
-        "clear()"
+        "clear()",
+        "destroy()"
       ],
       "events": [
         "weather-widget-ready",
@@ -944,7 +992,8 @@
       "methods": [
         "configure()",
         "navigate()",
-        "currentUrl()"
+        "currentUrl()",
+        "destroy()"
       ],
       "events": [
         "web-navigator-ready",

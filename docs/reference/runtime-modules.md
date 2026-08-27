@@ -13,6 +13,29 @@ Apps import renderer ESM from `/arcane/modules/<file>`. Classic scripts, the OPF
 - **Cloud** means the module can call an explicitly configured remote provider; it never implies automatic local-to-cloud fallback.
 - **Node**, **worker**, and **vendor** identify specialized runtimes.
 
+## Runtime semantic events and teardown
+
+SDK runtime modules publish semantic state and lifecycle occurrences through the
+one branded, versioned `globalThis.arcaneEvents` authority in each JavaScript
+realm. A class can retain its existing `EventTarget` or `on()` compatibility
+surface, but that surface delegates to a `createArcaneEventSource()` view scoped
+by the module's source and instance identifiers; it does not own a second event
+bus, listener `Map`, or listener `Set`. Every canonical occurrence and every
+one-way DOM compatibility projection carries an occurrence ID. DOM input events
+remain local UI/platform input, and projected DOM `CustomEvent`s must not be
+mirrored back into the canonical source.
+
+`arcaneEvents.subscribe(type,handler,{once,signal})` and source-scoped
+`subscribe()`/`on()` registrations return one idempotent unsubscribe function
+(also exposed as `.dispose`). The singleton's legacy `on()`/`once()` methods are
+chainable compatibility APIs that return the manager; lifecycle-owned consumers
+use `subscribe()`. Instance `dispose()`/`destroy()` methods remove owned
+listeners, abort owned work, suppress stale settlement, and dispose the instance
+source. Module-lifetime singleton sources instead expose a focused module
+teardown function where teardown is supported. Event publication is synchronous
+and observational; promises, `AbortSignal`, and `createEventQueue` continue to
+own asynchronous work, cancellation, and backpressure.
+
 ## Canonical inventory
 
 | Module | Kind | Capability | Availability | Normalization |
@@ -64,6 +87,7 @@ Apps import renderer ESM from `/arcane/modules/<file>`. Classic scripts, the OPF
 | [`LocalAIReadiness.js`](#localaireadinessjs) | esm | Derives selected AI requirements and returns a frozen readiness/recovery report across browser, desktop, and Android modes. | Browser/native hybrid | Fully normalized report and stable error codes; browsers never probe Ollama. |
 | [`LocalAIReadinessController.js`](#localaireadinesscontrollerjs) | esm | Coordinates local-AI status component checks, ensured recovery, availability projection, and teardown. | Browser/native hybrid | Normalized controller state and change events. |
 | [`Mail.js`](#mailjs) | esm | Builds bounded reports and prefers the native mail capability with an explicit HTTP transport fallback. | Browser/native hybrid + cloud | Mail inputs/results normalized; transport failures mixed. |
+| [`MailOutbox.mjs`](#mailoutboxmjs) | esm | Persists bounded mail reports before delivery and normalizes idempotent enqueue, retry, reconciliation, and invalid-record maintenance. | Browser/native WebView or compatible injected host | Frozen records, bounded work, cancellation, and lifecycle states normalized; storage, lock, and delivery failures coded. |
 | [`MailTransport.mjs`](#mailtransportmjs) | esm | Sends one bounded mail report to a normalized HTTP(S) endpoint with timeout and response-size limits. | Browser/server with fetch + cloud | Normalized endpoint/timeout/size errors; remote detail bounded. |
 | [`Marked.min.js`](#markedminjs) | esm | Vendored Marked 18.0.5 Markdown lexer, parser, renderer, extension, and walk-token API. | Cross-host vendor module | Vendor-native Marked contract. |
 | [`MD.js`](#mdjs) | esm | Renders Markdown with Marked and exposes a DOM-sanitized projection. | Browser / native WebView | Raw Marked behavior plus Arcane sanitization; parse errors vendor-native. |
@@ -111,10 +135,13 @@ Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structur
 
 ### Public surface
 
-default `AI`; read-only `providerRuntime`; `setAI()`, `configureProviders()`, `transitionAI()`,
-`transitionProviders()`, `startProviders()`, `setSpeechMuted()`,
+default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and
+`browserSpeechDescriptor`; `configureBrowserSpeech(configuration,{signal})`,
+`disposeBrowserSpeech({signal})`, `setAI()`, `configureProviders()`,
+`configureSpeechProviders()`, `transitionAI()`, `transitionProviders()`,
+`transitionSpeechProviders()`, `startProviders()`, `setSpeechMuted()`,
 `streamRequest()`, `streamMessage()`, `fetchRequest()`, `fetch()`,
-`streamTTS()`, `finishTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`,
+`streamTTS()`, `finishTTS()`, `fetchTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`,
 `playAudio()`; consumes `user-entity-loaded` and `arcane-ollama-ready`,
 installs `window.ai`, and emits `ai-ready`.
 
@@ -138,18 +165,175 @@ the exact selected provider/model catalog `defaultVoice`; a saved OpenAI voice
 is used only by the selected OpenAI adapter and is never forwarded to another
 provider route.
 
+`configureSpeechProviders({stt,tts})` commits only the two speech routes and
+leaves the current LLM route and sticky lifecycle record unchanged. Both speech
+roles must be unloaded and own no request, load, unload, or dispose operation.
+`transitionSpeechProviders({stt,tts})` stops queued audio, explicitly unloads
+only STT and TTS, then commits that same closed speech route record. Neither
+method loads a model, selects a fallback, or changes caller-owned model or voice
+policy.
+
 `startProviders({startMuted=true,startTranscription=false,signal=null}={})`
 starts text chat without requesting an STT load by default; it does not undo an
-already ready or independently loading role. Callers must opt into eager STT
-startup with `startTranscription:true` or publish the explicit user activation
-intent exposed by the shared speech component. `setSpeechMuted(false)` records
-the shared unmuted lifecycle preference before loading TTS, while
+already ready or independently loading LLM or STT role. Its default
+`startMuted:true` path cancels active TTS work and unloads TTS. Callers must opt
+into eager STT startup with `startTranscription:true` or publish the explicit
+user activation intent exposed by the shared speech component.
+`setSpeechMuted(false)` records the public unmuted state only after the selected
+TTS route reaches ready; a failed load leaves the public state muted. In contrast,
 `setSpeechMuted(true)` cancels active TTS work and unloads that role.
+`fetchTTS({model,voice,input,responseFormat,speed},signal)` accepts the public
+provider-neutral synthesis shape, requires any explicit model to match the
+admitted route, and admits an omitted voice only from the selected model
+catalog's `defaultVoice`. An omitted response format preserves the instance's
+existing `audioFormat` for a compatibility-only catalog. When the selected model
+declares `speech.responseFormats`, that setting is used only when admitted; if
+the setting is the legacy `opus` default and the model rejects it, the catalog's
+`speech.defaultResponseFormat` is used, while any other unsupported setting is
+rejected. It propagates the caller-owned signal and returns a playable `Blob`;
+it does not independently choose a provider, cloud fallback, model, runtime, or
+voice policy for the application. Existing `streamTTS()` and `finishTTS()` use
+this same request boundary.
 `fetchSTT(audioFile,responseHandler,signal)` propagates the caller-owned signal;
+provider routes accept a `Blob` or `File` directly and leave media decoding,
+PCM normalization, and WAV construction to the selected shared provider;
 delivery suppression is guaranteed after abort, while underlying provider-stop
 claims remain limited to that provider's cancellation contract.
 
-Exact exports: `default`.
+#### One-time browser speech configuration
+
+The caller constructs one frozen authority record and retains ownership of it:
+
+```javascript
+import AI, {
+  AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL
+} from '/arcane/modules/AI.js';
+
+const speechConfiguration = Object.freeze({
+  protocol: AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+  id: 'app-speech-authority',
+  dbopfs,
+  tableName: 'browser-speech-artifacts', // optional
+  stt: Object.freeze({
+    providerId: 'app-whisper',
+    graph: sttGraph,
+    offline: false
+  }),
+  tts: Object.freeze({
+    providerId: 'app-kokoro',
+    graph: ttsGraph,
+    offline: false
+  })
+});
+
+const ai = new AI(/* existing application AI preferences */);
+const descriptor = await ai.configureBrowserSpeech(
+  speechConfiguration,
+  {signal}
+);
+
+// Configuration does not load either role. Activate only from an explicit UI.
+await ai.providerRuntime.load('stt', {signal});
+await ai.setSpeechMuted(false); // loads the selected TTS role, then unmutes
+
+// Teardown unloads, unregisters, and disposes only this SDK-owned configuration.
+await ai.disposeBrowserSpeech({signal});
+```
+
+The record must be a frozen plain data record with exactly
+`{protocol,id,dbopfs,tableName?,stt,tts}`. Each frozen role is exactly
+`{providerId,graph,offline}`; `providerId` and `id` are trimmed 1-128 character
+strings, `graph` is the role-matching frozen graph returned by the SDK browser
+speech artifact API, and `offline` is boolean. The application chooses every
+artifact, immutable graph, model/runtime, provider ID, offline policy, sample
+rate, and TTS default voice. `configureBrowserSpeech()` imports the shared
+browser-speech module, creates one DBOPFS store, constructs and registers the
+Whisper and Kokoro provider/2 instances, atomically replaces only STT/TTS
+routes, and returns a frozen descriptor. Applications do not register those
+providers, decode `Blob`/`File` data into PCM, construct WAV, select Worker URLs,
+or reproduce DBOPFS cache or artifact verification logic.
+
+The returned descriptor is exactly
+`{protocol,configurationId,stt,tts}`. STT is
+`{role:'stt',providerId,modelId,artifactGraphId,offline}`; TTS adds
+`defaultVoice`. `browserSpeechConfiguration` returns the exact caller-owned
+record only while the SDK still owns its providers and routes;
+`browserSpeechDescriptor` returns that descriptor on the same condition.
+Configuration never loads a role, auto-downloads, selects an alternative
+provider/model/runtime/voice, or falls back to cloud/browser speech.
+
+Calling `configureBrowserSpeech()` again with the same active record is an
+idempotent descriptor read. A different call is serialized, aborts the prior
+owned operation, unloads the old speech roles, atomically replaces provider
+ownership/routes, and suppresses stale settlement. The caller's signal is
+forwarded and detached on settlement. Cancellation proves delivery suppression,
+not that provider work stopped beyond the provider's own cancellation contract.
+Once SDK-owned browser speech is active, synchronous route mutation fails with
+`ARCANE_AI_BROWSER_SPEECH_ASYNC_TRANSITION_REQUIRED`; use an asynchronous
+transition method or await `disposeBrowserSpeech()`.
+
+Browser speech publishes these exact event values through the AI instance's
+canonical event source. Public consumers use
+`arcaneEvents.subscribe(type,handler,{signal})`; `handler(occurrence)` receives
+the frozen canonical occurrence and can correlate `source:'ai'`, `instanceId`,
+and `operationId`:
+
+| Constant member | Stable value |
+| --- | --- |
+| `configurationStarted` | `ai-browser-speech-configuration-started` |
+| `configured` | `ai-browser-speech-configured` |
+| `configurationCancelled` | `ai-browser-speech-configuration-cancelled` |
+| `configurationError` | `ai-browser-speech-configuration-error` |
+| `disposed` | `ai-browser-speech-disposed` |
+
+Canonical public details are frozen and contain `configurationId`, optional
+`descriptor`, optional exact `code`, and `reason`. The private source-local
+compatibility view also carries the caller-owned configuration and optional
+error, but `AI` does not expose that source handle and the global occurrence
+does not publish those private values. Reasons are exactly `speech-configuration-added`,
+`speech-configuration-replaced`, `speech-configuration-cancelled`,
+`speech-configuration-disposed`, `speech-configuration-contract-mismatch`,
+`speech-configuration-async-transition-required`,
+`speech-operation-options-contract-mismatch`,
+`speech-operation-sequence-exhausted`, `speech-module-import-rejected`,
+`speech-artifact-store-construction-rejected`,
+`speech-provider-construction-rejected`, `speech-provider-disposal-rejected`,
+`speech-provider-route-ownership-mismatch`,
+`speech-provider-unregistration-rejected`, `speech-route-commit-rejected`,
+`speech-route-rollback-rejected`, and `speech-route-view-update-rejected`.
+Their corresponding exact public codes are the values of
+`AI_BROWSER_SPEECH_ERROR_CODES`: `ARCANE_AI_BROWSER_SPEECH_CONFIGURATION_CANCELLED`,
+`ARCANE_AI_BROWSER_SPEECH_CONFIGURATION_SUPERSEDED`,
+`ARCANE_AI_BROWSER_SPEECH_CONFIGURATION_CONTRACT_MISMATCH`,
+`ARCANE_AI_BROWSER_SPEECH_ASYNC_TRANSITION_REQUIRED`,
+`ARCANE_AI_BROWSER_SPEECH_OPERATION_OPTIONS_CONTRACT_MISMATCH`,
+`ARCANE_AI_BROWSER_SPEECH_OPERATION_SEQUENCE_EXHAUSTED`,
+`ARCANE_AI_BROWSER_SPEECH_MODULE_IMPORT_REJECTED`,
+`ARCANE_AI_BROWSER_SPEECH_ARTIFACT_STORE_CONSTRUCTION_REJECTED`,
+`ARCANE_AI_BROWSER_SPEECH_PROVIDER_CONSTRUCTION_REJECTED`,
+`ARCANE_AI_BROWSER_SPEECH_PROVIDER_DISPOSAL_REJECTED`,
+`ARCANE_AI_BROWSER_SPEECH_PROVIDER_ROUTE_OWNERSHIP_MISMATCH`,
+`ARCANE_AI_BROWSER_SPEECH_PROVIDER_UNREGISTRATION_REJECTED`,
+`ARCANE_AI_BROWSER_SPEECH_ROUTE_COMMIT_REJECTED`,
+`ARCANE_AI_BROWSER_SPEECH_ROUTE_ROLLBACK_REJECTED`, and
+`ARCANE_AI_BROWSER_SPEECH_ROUTE_VIEW_UPDATE_REJECTED`.
+
+`fetchTTS()` rejects malformed request/signal/input/model/voice/format/speed
+boundaries with `ARCANE_AI_TTS_REQUEST_INVALID`,
+`ARCANE_AI_TTS_SIGNAL_INVALID`, `ARCANE_AI_TTS_INPUT_INVALID`,
+`ARCANE_AI_TTS_MODEL_INVALID`, `ARCANE_AI_TTS_MODEL_REQUIRED`,
+`ARCANE_AI_TTS_MODEL_SELECTION_MISMATCH`, `ARCANE_AI_TTS_VOICE_INVALID`,
+`ARCANE_AI_TTS_VOICE_REQUIRED`, `ARCANE_AI_TTS_RESPONSE_FORMAT_INVALID`, or
+`ARCANE_AI_TTS_SPEED_INVALID`; a non-playable provider result is
+`ARCANE_AI_TTS_PROVIDER_AUDIO_INVALID`. `fetchSTT()` uses
+`ARCANE_AI_STT_RESPONSE_HANDLER_INVALID`, `ARCANE_AI_STT_SIGNAL_INVALID`, and
+`ARCANE_AI_STT_PROVIDER_TRANSCRIPT_INVALID` at those exact boundaries. Owned
+request abortion is `ARCANE_AI_REQUEST_ABORTED`.
+
+Exact exports: `AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL`,
+`AI_BROWSER_SPEECH_ERROR_CODES`, `AI_BROWSER_SPEECH_EVENT_TYPES`,
+`AI_BROWSER_SPEECH_REASONS`, `AI_INITIALIZATION_ERROR_CODES`,
+`AI_INITIALIZATION_REASONS`, `AI_READY_EVENT`, and `default`.
 
 ### Availability and normalization
 
@@ -160,11 +344,7 @@ Arcane.speech, and the Android WebView bridge. [Deep protocol details](protocols
 
 ### Example
 
-```javascript
-import * as module from '/arcane/modules/AI.js';
-
-console.log(Object.keys(module));
-```
+The configuration example above is the minimal one-time application flow.
 
 ## AIPreferenceRuntime.js
 
@@ -226,33 +406,63 @@ shape, but application code uses the exported singleton returned by
 
 ### Public surface
 
-Exact exports: `AI_PROVIDER_PROTOCOL`, `AI_PROVIDER_RUNTIME_PROTOCOL`,
-`AI_MODEL_AUTHORITY_PROTOCOL`, `AIProviderRuntime`, `aiProviderRuntime`, and
+Exact exports: `AI_MODEL_AUTHORITY_PROTOCOL`, `AI_PROVIDER_PROTOCOL`,
+`AI_PROVIDER_RUNTIME_PROTOCOL`, `AIProviderRuntime`, `aiProviderRuntime`, and
 `getAIProviderRuntime`.
 
-The singleton exposes provider registration, closed three-role configuration,
-closed STT/TTS-only `validateSpeechConfiguration()` and `configureSpeech()`
-that preserve the LLM route and sticky LLM record,
-catalog and status inspection, `start()`, independent `load()`, `unload()`,
-`dispose()`, and `cancel()` operations, plus `chat()`, `stream()`,
-`transcribe()`, `synthesize()`, and `setSpeechMuted()`. Provider payloads must
+The singleton exposes read-only `protocol`, `configured`, and `speechMuted`;
+`register(provider)`; `unregister(role,providerId,expectedProvider=null)`;
+`hasProvider(role,providerId)`; `ownsProvider(role,expectedProvider)`;
+`providerIdentity(role,providerId)`; `selection(role,options={})`;
+`ownsSelection(role,providerId,options={})`;
+`validateConfiguration(value)`; `validateSpeechConfiguration(value)`;
+`configure(value)`; `configureSpeech(value)`;
+`replaceSpeechProviders(value)`; `configureFromTuple(tuple)`;
+`status(role=null)`; `catalog(role)`;
+`inspect(role,options={})`; `start(options)`; `load(role,options={})`;
+`unload(role,options={})`; `dispose(role,options={})`;
+`disposeAll(options={})`; `cancel(role)`; `request(role,options={})`;
+`chat(payload,options={})`; `stream(payload,options={})`;
+`transcribe(payload,options={})`; `synthesize(payload,options={})`; and
+`setSpeechMuted(muted)`. Provider payloads must
 be data-only; callbacks, accessors, symbols, cycles, and excessive nesting are
 rejected at the provider boundary.
 
-`validateSpeechConfiguration({stt,tts})` returns one frozen two-role selection
-record without committing it. `configureSpeech({stt,tts})` accepts the same
-closed record, requires both speech roles to own no ready/load/unload/dispose or
-request work, commits only STT/TTS, restores muted speech admission, and returns
-the frozen selection record. The current LLM routes, selection, readiness,
-operation generation, and sticky state remain unchanged. A malformed top-level,
-route, or selection record preserves the compatibility code
+Selection options admit `localOnly=false`; inspection admits
+`{localOnly=false,signal=null}`; startup admits
+`{startMuted=true,startTranscription=false,signal=null}` (including an omitted
+`options` value); load admits `{signal=null,localOnly=false}`; unload, dispose,
+and dispose-all admit `{signal=null}`. Request requires the exact
+`{operation,payload,localOnly,signal}` options record; the four role-specific
+request helpers admit `{localOnly=false,signal=null}`. Configuration `value`
+records are the closed `{llm,stt,tts}`, `{stt,tts}`, or
+`{providers,routes,expectedProviders}` shapes described below.
+`configureFromTuple()` accepts exactly six provider/model preference entries.
+
+`register()` returns the provider's single unregister closure; caller-
+registered providers remain caller-owned. The high-level
+`AI.configureBrowserSpeech()` boundary is different: AI constructs, registers,
+atomically replaces, unregisters, and disposes those two SDK-owned providers.
+`status()` is the sticky frozen AIRuntimeState snapshot (or one role record),
+while `catalog()` synchronously returns frozen provider/model admissions and
+never loads or downloads a model. `load()` forwards provider progress into the
+sticky role record; `unload()` and `dispose()` abort owned work, await exposed
+settlement, and verify provider status before publishing terminal state.
+
+`validateSpeechConfiguration(value)` returns one frozen two-role selection
+record without committing it, where `value` is the closed `{stt,tts}` record.
+`configureSpeech(value)` accepts the same record, requires both speech roles to
+own no ready/load/unload/dispose or request work, commits only STT/TTS, restores
+muted speech admission, and returns the frozen selection record. The current LLM
+routes, selection, readiness, operation generation, and sticky state remain
+unchanged. A malformed top-level, route, or selection record preserves the
+compatibility code
 `ARCANE_AI_PROVIDER_RUNTIME_INVALID` and adds exact reason
 `speech-configuration-contract-mismatch`; runtime-disposed, reentrant,
 role-busy, and provider-locality failures retain their existing exact codes.
 
-`start({startMuted=true,startTranscription=false,signal=null}={})` waits for
-prior speech-state and role unload work, applies the requested initial mute
-state, and returns the `startAIRuntime()` control handle
+`start(options)` waits for prior speech-state and role unload work, applies the
+requested initial mute state, and returns the `startAIRuntime()` control handle
 `{barrier,settled,cancel}`. Startup does not request selected STT unless the
 caller explicitly opts in; it does not force an independently active STT role
 back to unloaded. The barrier and settled promises describe provider-startup
@@ -272,14 +482,16 @@ request ownership is active.
 
 ### Availability and normalization
 
-**Cross-host runtime with provider-specific execution.** Published SDK `0.2.2`
-ships the browser-WASM LLM and browser Whisper/Kokoro adapters and supplies the
+**Cross-host runtime with provider-specific execution.** The SDK source ships
+the browser-WASM LLM and browser Whisper/Kokoro adapters and supplies the
 narrow AI.js legacy OpenAI/Ollama/Core-speech adapters; other native, Core, or
 cloud adapters may be supplied externally only when they implement the same
 `arcane-ai-provider/2` boundary. A
 provider must prove a matching `arcane-ai-model-authority/1` inspection before load.
 `localOnly` routing fails closed; it never selects a cloud or non-local route as
-a fallback. Role lifecycle and stream cleanup are normalized, while the
+a fallback. A missing or mismatched explicit local-only route rejects load or
+request admission with `AI_LOCAL_MODEL_REQUIRED`. Role lifecycle and stream
+cleanup are normalized, while the
 selected provider retains its own capability, permission, download, and model
 requirements. [Deep protocol details](protocols.md#portable-ai-provider-runtime).
 
@@ -350,15 +562,21 @@ observable without exposing provider transports in application code.
 
 ### Public surface
 
-Exact exports: `AI_RUNTIME_PROTOCOL`, `AI_RUNTIME_STATE_EVENT`,
-`AI_RUNTIME_INTENT_EVENT`, `AI_RUNTIME_STARTUP_EVENT`, `AI_RUNTIME_ROLES`,
-`AI_RUNTIME_STATES`, `aiRuntimeEvents`, `getAIRuntimeState()`,
-`subscribeAIRuntimeState()`, `publishAIRuntimeRoleState()`,
-`publishAIRuntimeRolesState()`, `requestAIRuntimeIntent()`,
-`subscribeAIRuntimeIntents()`, and `startAIRuntime()`.
+Exact exports: `AI_RUNTIME_INTENT_EVENT`, `AI_RUNTIME_PROTOCOL`,
+`AI_RUNTIME_ROLES`, `AI_RUNTIME_STARTUP_EVENT`, `AI_RUNTIME_STATES`,
+`AI_RUNTIME_STATE_EVENT`, `aiRuntimeEvents`, `getAIRuntimeState`,
+`publishAIRuntimeRoleState`, `publishAIRuntimeRolesState`,
+`requestAIRuntimeIntent`, `startAIRuntime`, `subscribeAIRuntimeIntents`, and
+`subscribeAIRuntimeState`.
 
 Each role record is exactly `{role,state,providerId,modelId,localOnly,loaded,
 busy,operationId,progress,error}`.
+`subscribeAIRuntimeState(listener,{signal=null,emitCurrent=true})` installs its
+subscription and synchronously replays the current frozen snapshot by default;
+`subscribeAIRuntimeIntents(listener,{signal=null})` is future-only. Both return
+one idempotent unsubscribe/dispose closure. `aiRuntimeEvents` is a deprecated,
+state-free EventTarget compatibility view over the same canonical source; it is
+not a second authority and owns no listener registry.
 `startAIRuntime({startMuted=true,startTranscription=false,signal})` returns
 `{barrier,settled,cancel}`: `barrier` settles for text chat, while `settled`
 covers every requested role. Muted startup does not request TTS, and STT startup
@@ -375,6 +593,11 @@ does not grant a native capability, prove browser support, or load a provider.
 `arcane-ai-runtime-startup-settled` reports the LLM/text-chat `barrier`.
 Await the returned `handle.settled` promise for every role requested by that
 startup; the all-role settlement has no separate public event.
+Intent records are exactly `{role,action,reason}` where roles are `llm`, `stt`,
+or `tts`; actions are `load`, `unload`, or `dispose`; and reasons are `startup`,
+`user`, or `teardown`. Invalid closed records fail with the stable prefix
+`ARCANE_AI_RUNTIME_STATE_INVALID`; startup cancellation is an `AbortError` with
+code `ARCANE_AI_REQUEST_ABORTED`.
 
 ### Example
 
@@ -425,7 +648,8 @@ Fetches an injectable HTTP JSON model with parser, cache, redacted public endpoi
 
 default `ApiModelDatabase`; `setEndpoint()`, `fetch()`, `cached()`; emits `api-model-request`, `api-model-success`, and `api-model-error`.
 
-Exact exports: `appendParameters`, `default`, `publicEndpoint`.
+Exact exports: `API_MODEL_ERRORS`, `API_MODEL_EVENTS`, `appendParameters`,
+`default`, `publicEndpoint`.
 
 ### Availability and normalization
 
@@ -593,7 +817,9 @@ Runs a fixed sequential browser test list with cooperative abort, per-test timeo
 
 default `BrowserTestSuite`; `list()`, `run()`; emits suite/test start/result/complete events.
 
-Exact exports: `assertionError`, `default`, `skipError`.
+Exact exports: `BROWSER_TEST_SUITE_ERROR_CODES`,
+`BROWSER_TEST_SUITE_EVENT_TYPES`, `BROWSER_TEST_SUITE_REASONS`,
+`assertionError`, `default`, `skipError`.
 
 ### Availability and normalization
 
@@ -741,7 +967,7 @@ Binds shared inbox, conversation, settings, theme, and provider workflows into o
 
 default controller with `start()`, `bind()`, `configure()`, `refresh()`, `select()`, `send()`, and settings actions.
 
-Exact exports: `default`.
+Exact exports: `COMMUNICATION_APP_CONTROLLER_ERROR_CODES`, `default`.
 
 ### Availability and normalization
 
@@ -765,7 +991,9 @@ Fans out provider refresh/send operations and aggregates normalized threads/mess
 
 default `CommunicationHub`; provider enablement, `refresh()`, `messages()`, and `send()`.
 
-Exact exports: `default`.
+Exact exports: `COMMUNICATION_HUB_ERROR_CODES`, `COMMUNICATION_HUB_EVENTS`,
+`COMMUNICATION_HUB_REFRESH_REASONS`, `COMMUNICATION_HUB_REFRESH_STATES`, and
+`default`.
 
 ### Availability and normalization
 
@@ -856,7 +1084,15 @@ sticky state only changes the controller's observation and presentation; it
 never emits a lifecycle intent, chooses a provider, or starts a download.
 `destroy()` removes its button listener and suppresses late callback effects.
 
-Exact exports: `CHART_LABELS`, `DASHBOARD_LABELS`, `MARKDOWN_FORMATS`, `MARKDOWN_LABELS`, `VOICE_LABELS`, `VOICE_MESSAGES`, `appendTranscription`, `applyMarkdownFormat`, `createSTTActivationController`, `effectiveDashboardVisibility`, `normalizeChartOptions`, `normalizeChartRows`, `normalizeDashboardDefinitions`, `normalizeDashboardOptions`, `normalizeDashboardVisibility`, `normalizeMarkdownFormats`, `normalizeMarkdownOptions`, `normalizeVoiceOptions`.
+Exact exports: `CHART_LABELS`, `DASHBOARD_LABELS`, `MARKDOWN_FORMATS`,
+`MARKDOWN_LABELS`, `STT_ACTIVATION_ERROR_CODES`,
+`STT_ACTIVATION_EVENT_TYPES`, `STT_ACTIVATION_REASONS`, `VOICE_LABELS`,
+`VOICE_MESSAGES`, `appendTranscription`, `applyMarkdownFormat`,
+`createSTTActivationController`, `effectiveDashboardVisibility`,
+`normalizeChartOptions`, `normalizeChartRows`, `normalizeDashboardDefinitions`,
+`normalizeDashboardOptions`, `normalizeDashboardVisibility`,
+`normalizeMarkdownFormats`, `normalizeMarkdownOptions`, and
+`normalizeVoiceOptions`.
 
 ### Availability and normalization
 
@@ -999,7 +1235,15 @@ Owns conversation limits, control messages, submission barriers, elapsed formatt
 
 default `ConversationTimebox`, `ConversationSubmissionBarrier`, constants and control helpers.
 
-Exact exports: `CONVERSATION_TIMEBOX_LIMIT_MESSAGE`, `CONVERSATION_TIMEBOX_OPENING_INSTRUCTION`, `CONVERSATION_TIMEBOX_TOOL_NAME`, `ConversationSubmissionBarrier`, `appendConversationTimeboxOpeningInstruction`, `consumeConversationTimeboxCall`, `conversationTimeboxSubmissionKey`, `conversationTimeboxTool`, `createConversationTimeboxControlMessage`, `default`, `formatConversationElapsed`, `normalizeConversationTimeboxCommand`, `requireConversationTimeboxDelivery`.
+Exact exports: `CONVERSATION_TIMEBOX_ERROR_CODES`,
+`CONVERSATION_TIMEBOX_EVENT_TYPES`, `CONVERSATION_TIMEBOX_LIMIT_MESSAGE`,
+`CONVERSATION_TIMEBOX_OPENING_INSTRUCTION`, `CONVERSATION_TIMEBOX_REASONS`,
+`CONVERSATION_TIMEBOX_TOOL_NAME`, `ConversationSubmissionBarrier`,
+`appendConversationTimeboxOpeningInstruction`, `consumeConversationTimeboxCall`,
+`conversationTimeboxSubmissionKey`, `conversationTimeboxTool`,
+`createConversationTimeboxControlMessage`, `default`,
+`formatConversationElapsed`, `normalizeConversationTimeboxCommand`, and
+`requireConversationTimeboxDelivery`.
 
 ### Availability and normalization
 
@@ -1071,7 +1315,7 @@ Provides app-scoped localStorage tables, batch reads/writes, filtering, deletion
 
 default `DBLS`; installs `window.dbls`, emits `dbls-ready`; CRUD/batch/key APIs.
 
-Exact exports: `default`.
+Exact exports: `DBLS_EVENT_TYPES`, `DBLS_REASONS`, `default`.
 
 ### Availability and normalization
 
@@ -1095,7 +1339,7 @@ Provides app-scoped OPFS tables, worker I/O, backup/restore, compression, and CR
 
 default `DBOPFS`; installs `window.dbopfs`, emits `dbopfs-ready`; table/file/backup APIs.
 
-Exact exports: `default`.
+Exact exports: `DBOPFS_EVENT_TYPES`, `DBOPFS_REASONS`, `default`.
 
 ### Availability and normalization
 
@@ -1120,8 +1364,8 @@ or search; applications call `bootstrap()` deliberately.
 
 ### Public surface
 
-Exact exports: default and named `DBOPFSDocumentLibrary`,
-`createDBOPFSDocumentLibrary()`, and `normalizeDBOPFSDocumentSchema()`.
+Exact exports: `DBOPFSDocumentLibrary`, `createDBOPFSDocumentLibrary`,
+`default`, and `normalizeDBOPFSDocumentSchema`.
 
 `new DBOPFSDocumentLibrary({concurrency,db,maxCorpusCharacters,
 maxDocumentCharacters,maxSearchCharacters,schema})` exposes `schema`,
@@ -1278,11 +1522,10 @@ context excerpts for caller-owned document records.
 
 ### Public surface
 
-Exact exports: `DOCUMENT_SEARCH_FIELD_ORDER`, default and named
-`DocumentLexicalSearch`, `createDocumentLexicalIndex()`,
-`documentContextExcerpt()`, `documentSearchTokens()`,
-`normalizedDocumentSearchText()`, `scoreDocumentBody()`, and
-`scoreDocumentLexicalIndex()`.
+Exact exports: `DOCUMENT_SEARCH_FIELD_ORDER`, `DocumentLexicalSearch`,
+`createDocumentLexicalIndex`, `default`, `documentContextExcerpt`,
+`documentSearchTokens`, `normalizedDocumentSearchText`, `scoreDocumentBody`,
+and `scoreDocumentLexicalIndex`.
 
 `new DocumentLexicalSearch(records,{maxResults=20})` exposes
 `rank(query,{kinds,tags})` and `search(query,{kinds,limit,tags})`.
@@ -1345,7 +1588,9 @@ Normalizes global errors/rejections, fingerprints and deduplicates incidents, pe
 
 default `Errors`; event normalizers/fingerprint plus lifecycle, capture, delivery and teardown methods.
 
-Exact exports: `default`, `fingerprintIncident`, `normalizeErrorEvent`, `normalizeRejectionEvent`.
+Exact exports: `GLOBAL_ERROR_EVENT_CODES`, `GLOBAL_ERROR_EVENT_TYPES`,
+`GLOBAL_ERROR_REASONS`, `default`, `fingerprintIncident`,
+`normalizeErrorEvent`, and `normalizeRejectionEvent`.
 
 ### Availability and normalization
 
@@ -1489,7 +1734,10 @@ Coordinates local-AI status component checks, ensured recovery, availability pro
 
 `createLocalAIReadinessController()`, `availabilityFromReport()`.
 
-Exact exports: `availabilityFromReport`, `createLocalAIReadinessController`.
+Exact exports: `LOCAL_AI_READINESS_CONTROLLER_ERROR_CODES`,
+`LOCAL_AI_READINESS_CONTROLLER_EVENT_TYPES`,
+`LOCAL_AI_READINESS_CONTROLLER_REASONS`, `availabilityFromReport`, and
+`createLocalAIReadinessController`.
 
 ### Availability and normalization
 
@@ -1535,6 +1783,115 @@ import * as module from '/arcane/modules/Mail.js';
 console.log(Object.keys(module));
 ```
 
+## MailOutbox.mjs
+
+### Overview
+
+Persists each bounded provider-neutral mail report before delivery and owns its
+idempotent enqueue, FIFO drain, retry-window, terminal-state, reconciliation,
+and explicit invalid-record maintenance lifecycle. It selects no mail provider,
+recipient, retention policy, retry timer, or transport fallback.
+
+### Public surface
+
+Exact exports: `MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES`,
+`MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS`, `MAIL_OUTBOX_PROTOCOL`,
+`MAIL_OUTBOX_STATES`, `MAIL_OUTBOX_TABLE`, `MailOutbox`, `createMailOutbox`, and
+`default`.
+
+```text
+new MailOutbox({
+  storage,
+  deliver,
+  clock=Date.now,
+  isOnline=()=>globalThis.navigator?.onLine!==false,
+  lockManager=undefined,
+  onlineTarget=typeof globalThis.addEventListener==='function'?globalThis:null,
+  onRecordCommitted=null,
+  maxAttemptsPerDrain=16,
+  maxInvalidRecords=128,
+  maxRecords=512,
+  maxReportBytes=786432,
+  quarantineTable='mail_outbox_quarantine',
+  table=MAIL_OUTBOX_TABLE
+}={})
+```
+
+`storage` must expose `get()`, `set()`, and `getAllKeys()`; explicit deletion or
+quarantine additionally requires `delete()`. `lockManager` must expose the Web
+Locks-compatible `request()` contract. The injected
+`deliver({report,reportKey,serializedReport,signal})` callback receives the
+frozen parsed report, its stable idempotency key, the exact stored JSON string,
+and the caller-owned signal. Omitted `lockManager` resolves first from storage
+and then from `navigator.locks`. A delivery result must identify a valid
+`requestId` and one of `accepted`, `delivery_uncertain`,
+`temporarily_rejected`, `permanently_rejected`, or `partially_accepted`;
+accepted results additionally require a provider ID or the admitted
+`arcane-core-mail-send-v1` acceptance authority.
+
+Read-only getters are `started`, `invalidRecords`, and `lastBackgroundError`.
+Methods are `get(key)`, `list()`, `audit()`, `deleteInvalid(fileName)`,
+`repairInvalid(fileName,replacement)`,
+`quarantineInvalid({limit=64}={})`,
+`enqueue({report,reportKey}={}, {attempt=true,signal=null}={})`,
+`drain({reason='manual',signal=null}={})`, `start({signal=null}={})`, and
+`stop()`. `createMailOutbox(options)` returns `new MailOutbox(options)`.
+
+Every returned durable record is deeply frozen and contains exactly
+`{protocol,reportKey,serializedReport,state,createdAt,updatedAt,firstAttemptAt,
+lastAttemptAt,nextAttemptAt,attempts,result,failure}`. Protocol is
+`arcane-mail-outbox/1`; the default table is `mail_outbox`; the idempotency
+window is 86,400,000 milliseconds. States are exactly `queued`, `sending`,
+`retry_wait`, `accepted`, `failed`, and `reconciliation_required`. Accepted
+means provider or admitted Core acceptance, not inbox delivery.
+
+`enqueue()` serializes same-instance persistence and binds one report key to one
+exact serialized body. `drain()` runs or joins one bounded instance drain under
+an exclusive shared lock and attempts at most 16 records by default. Startup,
+an owned `online` listener, or an explicit call may trigger work; there is no
+polling or retry timer. Abort before the delivery call prevents that call, and a
+caller joining an existing drain may stop waiting without cancelling the shared
+drain. Once an accepted result is committed, it outranks a racing cancellation;
+cancellation never claims an admitted provider attempt stopped. An interrupted
+or ambiguous attempt remains a same-key retry inside the 24-hour window and
+becomes `reconciliation_required` when automatic retry would risk a duplicate.
+`stop()` aborts only the owned online drain, removes its listener, preserves
+durable records, and returns the instance.
+
+`audit()` reports valid records plus bounded invalid-file metadata. Repair,
+deletion, and quarantine are explicit, revalidate the selected file under the
+table lock, and never infer destructive authority from a storage read failure.
+`onRecordCommitted(record)` is an observational callback after each durable
+write; callback failure cannot change the committed operation result.
+
+### Availability and normalization
+
+**Browser/native WebView or compatible injected host.** The default application
+integration uses DBOPFS-compatible durable storage and `navigator.locks`; an
+alternate adapter owns its own durability claim and must provide equivalent
+storage and shared-lock semantics. Frozen records, bounds, state transitions,
+retry/reconciliation classification, invalid-record maintenance, and
+AbortSignal admission/join cancellation are normalized. Storage, lock,
+online-check, and injected-delivery failures remain visible through concrete
+`MAIL_OUTBOX_*` codes. Transport: injected durable storage, Web Locks,
+AbortSignal, optional online EventTarget, and an injected delivery callback.
+[Deep protocol details](mail.md#durable-send-semantics).
+
+### Example
+
+```javascript
+import {createMailOutbox} from '/arcane/modules/MailOutbox.mjs';
+
+const outbox = createMailOutbox({storage, deliver});
+await outbox.start({signal});
+const record = await outbox.enqueue(
+  {report, reportKey: 'report-20260827-001'},
+  {attempt: true, signal}
+);
+console.log(record.state);
+outbox.stop();
+```
+
 ## MailTransport.mjs
 
 ### Overview
@@ -1543,9 +1900,12 @@ Sends one bounded mail report to a normalized HTTP(S) endpoint with timeout and 
 
 ### Public surface
 
-Timeout/size constants, `normalizeMailEndpoint()`, `sendMailReport()`.
+Timeout/size constants, `MailTransportError`, `normalizeMailEndpoint()`,
+`serializeMailReport()`, and `sendMailReport()`.
 
-Exact exports: `DEFAULT_MAIL_REQUEST_TIMEOUT_MS`, `MAX_MAIL_RESPONSE_BYTES`, `normalizeMailEndpoint`, `sendMailReport`.
+Exact exports: `DEFAULT_MAIL_REQUEST_TIMEOUT_MS`, `MAX_MAIL_RESPONSE_BYTES`,
+`MailTransportError`, `normalizeMailEndpoint`, `serializeMailReport`,
+`sendMailReport`.
 
 ### Availability and normalization
 
@@ -1689,7 +2049,8 @@ Provides the first-class Arcane Ollama client without direct access to localhost
 
 `Ollama`, singleton/default `ollama`; 24 methods; installs `globalThis.arcaneOllama`, emits `arcane-ollama-ready`.
 
-Exact exports: `Ollama`, `default`, `ollama`.
+Exact exports: `OLLAMA_EVENT_TYPES`, `OLLAMA_REASONS`, `Ollama`, `default`,
+and `ollama`.
 
 ### Availability and normalization
 
@@ -1761,7 +2122,8 @@ Searches and loads Open-Meteo data into frozen Arcane weather entities.
 
 Endpoint constants, default provider, `mapForecast()`; search/load methods and lifecycle events.
 
-Exact exports: `OPEN_METEO_ENDPOINTS`, `default`, `mapForecast`.
+Exact exports: `OPEN_METEO_ENDPOINTS`, `OPEN_METEO_WEATHER_ERRORS`,
+`OPEN_METEO_WEATHER_EVENTS`, `default`, and `mapForecast`.
 
 ### Availability and normalization
 
@@ -1786,8 +2148,8 @@ semantics; it does not define a new storage protocol.
 
 ### Public surface
 
-Exact exports: default and named `PersistentAIChatSession` plus
-`createPersistentAIChatSession()`.
+Exact exports: `PersistentAIChatSession`, `createPersistentAIChatSession`, and
+`default`.
 
 Constructor and factory options are `{chat,chatEntity,chatFileName,
 contextBuilder,loadExisting,maxContextCharacters,maxMessageCharacters,
@@ -1843,7 +2205,9 @@ Loads and updates schema-defined app preferences through native storage with a n
 
 default `PreferenceStore`, re-exported `Preference`/schema; load/set/reset APIs and events.
 
-Exact exports: `Preference`, `default`, `preferenceSchema`.
+Exact exports: `PREFERENCE_STORE_ERROR_CODES`,
+`PREFERENCE_STORE_EVENT_TYPES`, `Preference`, `default`, and
+`preferenceSchema`.
 
 ### Availability and normalization
 
@@ -1961,7 +2325,9 @@ Stores normalized record-review decisions through native storage or app-scoped l
 
 default store, record/review normalizers; `load()`, `get()`, `set()`, `snapshot()`, change event.
 
-Exact exports: `default`, `normalizeRecordId`, `normalizeReview`.
+Exact exports: `RECORD_REVIEW_STORE_ERROR_CODES`,
+`RECORD_REVIEW_STORE_EVENT_TYPES`, `default`, `normalizeRecordId`, and
+`normalizeReview`.
 
 ### Availability and normalization
 
@@ -2081,7 +2447,9 @@ Captures a display surface as image, video, or GIF with explicit lifecycle event
 
 default `ScreenCapture`; acquire/capture/start/stop/reset methods.
 
-Exact exports: `default`.
+Exact exports: `SCREEN_CAPTURE_ERROR_CODES`, `SCREEN_CAPTURE_ERRORS`,
+`SCREEN_CAPTURE_EVENT_TYPES`, `SCREEN_CAPTURE_IMAGE_TYPE_FALLBACK`,
+`SCREEN_CAPTURE_REASONS`, `SCREEN_CAPTURE_STATUSES`, and `default`.
 
 ### Availability and normalization
 
@@ -2103,13 +2471,75 @@ Segments bounded text, queues latest-request speech synthesis, and controls look
 
 ### Public surface
 
-SpeechPlayback class/default, voice/limit constants, `splitSpeechText()`, playback lifecycle APIs.
+`SpeechPlayback` class/default, voice/limit compatibility constants,
+`SPEECH_PLAYBACK_STATE_EVENT`, `splitSpeechText()`, and playback lifecycle APIs.
 
-Exact exports: `MAX_SPEECH_CHARACTERS`, `MAX_SPEECH_CHUNKS`, `MAX_SPEECH_INPUT`, `PREFERRED_STREAM_SEGMENT`, `SPEECH_VOICE_ALIASES`, `SPEECH_VOICE_OPTIONS`, `SpeechPlayback`, `default`, `splitSpeechText`.
+Exact exports: `MAX_SPEECH_CHARACTERS`, `MAX_SPEECH_CHUNKS`,
+`MAX_SPEECH_INPUT`, `PREFERRED_STREAM_SEGMENT`, `SPEECH_PLAYBACK_STATE_EVENT`,
+`SPEECH_VOICE_ALIASES`, `SPEECH_VOICE_OPTIONS`, `SpeechPlayback`, `default`,
+and `splitSpeechText`.
+
+```text
+new SpeechPlayback({
+  audio,
+  speech=globalThis.Arcane?.speech,
+  model=null,
+  voice=null,
+  responseFormat=null,
+  speed=1,
+  onState=()=>{},
+  createObjectURL,
+  revokeObjectURL,
+  delay,
+  messages={}
+})
+```
+
+`speech` must expose either `fetchTTS(payload, signal)` or
+`synthesize(payload, {signal})`. `prepare({key,parts,model,voice,responseFormat,
+speed,autoplay=true})` uses only caller-supplied model, voice, and response-format
+values; those three omitted values remain omitted so the selected AI/model
+catalog may admit its documented defaults. Speed defaults to `1`, is normalized
+as a positive number, and is always sent. The legacy voice constants remain
+exported for compatibility but are not selected by the class. There is no
+hard-coded model, response format, voice, or cloud/browser fallback.
+
+Every preparation owns an operation ID and one AbortController for each active
+synthesis segment or playback delay. Replacement,
+`stop()`, `cancel()`, and `destroy()` abort their owned signals, suppress stale
+settlement, release Blob URLs, and publish synchronous
+`speech-playback-state` occurrences through `globalThis.arcaneEvents` before
+calling the compatibility `onState(frozenDetail)` callback. The detail contains
+`state`, `message`, `key`, `index`, `total`, `producing`, `buffered`, `hasAudio`,
+`operationId`, `code`, and `reason`; the canonical public occurrence omits
+provider response/error bodies. `destroy()` also removes every audio listener
+and disposes its per-instance canonical source handle; repeated destroy returns
+`false`. Signal abortion proves delivery suppression; whether provider work
+actually stops remains the selected provider's cancellation boundary.
+
+Stable error codes are `ARCANE_SPEECH_PLAYBACK_DESTROYED`,
+`ARCANE_SPEECH_PLAYBACK_OPERATION_SEQUENCE_EXHAUSTED`,
+`ARCANE_SPEECH_PLAYBACK_SYNTHESIZER_UNAVAILABLE`,
+`ARCANE_SPEECH_PLAYBACK_SYNTHESIZED_AUDIO_CONTRACT_MISMATCH`,
+`ARCANE_SPEECH_PLAYBACK_AUDIO_PLAYBACK_REJECTED`,
+`ARCANE_SPEECH_PLAYBACK_REQUEST_CONTRACT_MISMATCH`, and
+`ARCANE_SPEECH_PLAYBACK_SYNTHESIS_REQUEST_REJECTED`, plus propagated
+`ARCANE_AI_OPERATION_SUPERSEDED` and `ARCANE_AI_REQUEST_ABORTED`.
+Exact lifecycle reasons are `playback-replaced`, `playback-stopped`,
+`playback-destroyed`, `speech-playback-cancelled`,
+`speech-synthesis-superseded`, `speech-synthesis-cancelled`,
+`speech-synthesizer-unavailable`, `synthesized-audio-contract-mismatch`,
+`audio-playback-rejected`, `audio-autoplay-rejected`,
+`speech-playback-request-contract-mismatch`, and
+`speech-synthesis-rejected`, as applicable to the emitted state.
 
 ### Availability and normalization
 
-**Browser + native bridge.** State/limits normalized; provider/media failures mixed. Transport: Arcane.speech.synthesize, Blob URLs, audio element. [Deep protocol details](protocols.md).
+**Browser + admitted AI/native bridge.** State, cancellation, lifecycle, and
+playable Blob normalization are shared. Provider/model/runtime/voice admission
+remains caller- and catalog-owned. Transport: `AI.fetchTTS`, compatible
+`Arcane.speech.synthesize`, Blob URLs, audio element, and the singleton event
+authority. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -2118,7 +2548,13 @@ import SpeechPlayback from '/arcane/modules/SpeechPlayback.js';
 
 const audio = document.body.appendChild(document.createElement('audio'));
 audio.controls = true;
-const speech = new SpeechPlayback({audio});
+const speech = new SpeechPlayback({
+  audio,
+  speech: globalThis.ai,
+  model: 'caller-selected-model',
+  voice: 'caller-selected-voice',
+  responseFormat: 'wav'
+});
 const speakButton = document.body.appendChild(document.createElement('button'));
 speakButton.type = 'button';
 speakButton.textContent = 'Speak';
@@ -2235,7 +2671,8 @@ Maps native terminal sessions and Arcane events into an EventTarget client.
 
 default `TerminalClient`; start/write/resize/signal/close/receive/destroy APIs and terminal events.
 
-Exact exports: `default`.
+Exact exports: `TERMINAL_CLIENT_ERROR_CODES`, `TERMINAL_CLIENT_EVENT_TYPES`,
+`TERMINAL_CLIENT_REASONS`, and `default`.
 
 ### Availability and normalization
 
@@ -2283,7 +2720,8 @@ Performs import-time Arcane theme loading and subscribes to native appearance ch
 
 `bootstrapArcaneTheme()`, `arcaneThemeReady`, default ready promise.
 
-Exact exports: `arcaneThemeReady`, `bootstrapArcaneTheme`, `default`.
+Exact exports: `arcaneThemeReady`, `bootstrapArcaneTheme`, `default`, and
+`disposeArcaneThemeBootstrap`.
 
 ### Availability and normalization
 
@@ -2441,7 +2879,8 @@ Waits for a component property, method, or readiness event with optional error e
 
 default `waitForComponent()`.
 
-Exact exports: `default`.
+Exact exports: `COMPONENT_WAIT_ERROR_CODES`, `COMPONENT_WAIT_REASONS`, and
+`default`.
 
 ### Availability and normalization
 

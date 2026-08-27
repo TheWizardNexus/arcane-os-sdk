@@ -47,11 +47,14 @@ Protocol mechanics are intentionally kept in the [deep protocol guide](protocols
 
 ## Canonical member inventory
 
-SDK `0.2.2` exports exactly 169 distinct JavaScript members across 13
-JavaScript entrypoints. The complete export map has 23 subpaths: the other 10
-are the runtime manifest, eight JSON Schemas, and package metadata. Runtime
-projection modules in the managed browser map are cataloged separately in
-[Runtime modules](runtime-modules.md).
+The current JavaScript member total is derived mechanically from every `.mjs`
+entrypoint in `package.json#exports`. Records are grouped by export name and
+`Object.is()` binding identity, then retain the sorted entrypoints that expose
+that binding; `memberCount` in
+[`inventory/package-api.json`](inventory/package-api.json) is the resulting
+graph-node count. The remaining data-only subpaths are the runtime manifest,
+JSON Schemas, and package metadata. Runtime projection modules in the managed
+browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 
 | Member | Kind | Import | Group | Availability |
 | --- | --- | --- | --- | --- |
@@ -90,6 +93,7 @@ projection modules in the managed browser map are cataloged separately in
 | `authenticateSharedPayloadSnapshot()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `buildApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `buildTarget()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
+| `BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL` | constant | `arcane-os/ai/browser-speech` | Browser speech providers | Browser metadata; graph construction starts no fetch, cache, Worker, provider, or event operation |
 | `BROWSER_SPEECH_ARTIFACT_PROTOCOL` | constant | `arcane-os/ai/browser-speech` | Browser speech providers | Browser metadata; model/runtime use requires DBOPFS, Web Locks, Workers, and caller-supplied immutable artifacts |
 | `BROWSER_WASM_RUNTIME_AUTHORITY` | constant | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser metadata; no model or DBOPFS required to inspect |
 | `bumpVersion()` | function | `arcane-os/packager` | Packaging and release bundles | Node |
@@ -102,6 +106,7 @@ projection modules in the managed browser map are cataloged separately in
 | `createAppReleaseBundle()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `createBrowserKokoroProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with DBOPFS, Web Locks, Workers, object URLs, and caller-admitted Kokoro runtime/model artifacts |
 | `createBrowserModelSource()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser Fetch with a readable response body |
+| `createBrowserSpeechArtifactGraph()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser metadata; construction starts no fetch, cache, Worker, provider, or event operation |
 | `createBrowserSpeechAuthority()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser descriptor construction; use requires the selected storage and provider Web APIs |
 | `createBrowserWasmLlmProvider()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser secure context with WebAssembly, OPFS/DBOPFS, WebGPU, and admitted full-offload evidence; no CPU fallback |
 | `createBrowserWhisperProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with DBOPFS, Web Locks, Workers, object URLs, and caller-admitted Whisper runtime/model artifacts |
@@ -204,6 +209,15 @@ projection modules in the managed browser map are cataloged separately in
 | `compareSdkVersions()` | function | `arcane-os` | Explicit SDK update checks | Node; on-demand CLI or maintainer check only |
 | `updateTagForVersion()` | function | `arcane-os` | Explicit SDK update checks | Node; on-demand CLI or maintainer check only |
 | `validateUpdateRegistry()` | function | `arcane-os` | Explicit SDK update checks | Node; on-demand CLI or maintainer check only |
+| `ARCANE_EVENT_AUTHORITY_BRAND` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
+| `ARCANE_EVENT_AUTHORITY_KIND` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
+| `ARCANE_EVENT_AUTHORITY_PROTOCOL` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
+| `ARCANE_EVENT_ERROR_CODES` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
+| `ARCANE_EVENT_LISTENER_ERROR_EVENT` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
+| `ARCANE_EVENT_OCCURRENCE_PROTOCOL` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
+| `ARCANE_EVENT_SOURCE_DISPOSED_EVENT` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
+| `ARCANE_EVENT_SOURCE_KIND` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
+| `ARCANE_EVENT_SOURCE_PROTOCOL` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `ARCANE_EVENT_STACK_PROTOCOL` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `DEFAULT_DOM_EVENT_TYPES` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler; meaningful to browser DOM instrumentation |
 | `DOM_INTERACTION_EVENT` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Browser DOM or a DOM-compatible test host; constant imports in Node |
@@ -219,11 +233,14 @@ projection modules in the managed browser map are cataloged separately in
 | `TIME_TRAVEL_OVERFLOW_EVENT` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `TIME_TRAVEL_SEEK_EVENT` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `arcaneEvents` | singleton | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler; DOM capture requires a compatible DOM |
+| `createArcaneEventSource()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `createDOMInstrumentation()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Browser DOM or a DOM-compatible test host |
 | `createEventManager()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler; DOM capture requires a compatible DOM |
 | `describeDOMTarget()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Browser DOM or DOM-compatible objects; importable in Node |
 | `domSelector()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Browser DOM or DOM-compatible objects; importable in Node |
+| `isArcaneEventOccurrence()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `parseEventStack()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
+| `projectArcaneDOMEvent()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Browser DOM or a DOM-compatible test host |
 
 # Packaging and release bundles
 
@@ -4851,28 +4868,467 @@ arcaneEvents.on(TIME_TRAVEL_SEEK_EVENT, ({sequence}) => {
 
 ### Overview
 
-The package-scoped EventManager singleton exposed from both the package root and `arcane-os/event-manager`. It provides one shared bus when explicit per-subsystem ownership is unnecessary.
+The one SDK-owned synchronous semantic event authority in the current
+JavaScript realm. Module evaluation installs or reuses the exact branded value
+at `globalThis.arcaneEvents`; duplicate module URLs do not create another bus.
+Window, frame, worker, Node realm, and process boundaries remain distinct and
+have no automatic transport between them.
 
 ### Value and use
 
 ```text
-const arcaneEvents = new EventManager()
+globalThis.arcaneEvents === arcaneEvents
+arcaneEvents.protocol === 'arcane-event-authority/1'
+arcaneEvents[Symbol.for('arcane-os.arcane-events-authority')]
+    === 'arcane-event-authority/1'
 ```
 
-The singleton starts with time travel disabled and no DOM instrumentation. Its listeners and history are process/module state, so tests should remove handlers and clear history they create. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
+The global is an own, non-enumerable, non-writable, non-configurable data
+property. Its brand and public protocol descriptors are immutable. An accessor,
+inherited or unbranded value, mismatched descriptor/protocol, incomplete API,
+or failed installation is rejected with its exact
+`ARCANE_EVENT_AUTHORITY_*` code; the SDK never replaces the collision.
+
+Canonical subscription is
+`arcaneEvents.subscribe(type,handler,{once=false,signal}={})`. It returns an
+idempotent `unsubscribe` function with
+`unsubscribe.dispose === unsubscribe`. An already-aborted signal installs
+nothing; later abort removes the registration synchronously. `handler` receives
+one frozen `arcane-event-occurrence/1`, and wildcard subscription is not
+admitted.
+
+The source factory signatures are:
+
+```text
+arcaneEvents.createSource(owner,{source,eventTypes,onListenerError?})
+createArcaneEventSource(owner,{source,eventTypes,onListenerError?})
+```
+
+The exported wrapper calls the authority method and returns the same frozen
+handle. One owner may have one active source. The handle exposes
+`protocol`, `descriptor`, `source`, `instanceId`, `eventTypes`, `disposed`,
+`subscribe`, `on`, `once`, `addEventListener`, `removeEventListener`,
+`dispatch`, `dispatchEvent`, `dispose`, and `destroy`.
+`onListenerError(error,errorOccurrence)` receives the raw listener failure and
+the canonical listener-error occurrence at the owner-local boundary;
+`errorOccurrence` is `null` only when that secondary publication could not be
+constructed.
+
+`source.dispatch(type,compatibilityDetail,{operationId=null,publicDetail={},
+cancelable=false}={})` synchronously returns the frozen
+`{occurrence,accepted}` publication. The occurrence contains immutable
+`protocol`, `occurrenceId`, `type`, `source`, `instanceId`, `operationId`,
+privacy-admitted deeply frozen `detail`, `cancelable`, live
+`defaultPrevented`, and `preventDefault()`. Canonical listeners run before the
+source's EventTarget-compatible listeners. Cancellation is synchronous and only
+sets acceptance; the publisher decides whether to begin or continue domain work.
+
+Listener promises are not awaited. The authority is not an async queue:
+operation-owned promises and `createEventQueue()` own async ordering,
+backpressure, cancellation, and failure. Listener exceptions are observational;
+they publish one privacy-safe `arcane.event.listener.error` occurrence with code
+`ARCANE_EVENT_LISTENER_CALLBACK_FAILED` and do not throw from committed source
+dispatch.
+
+`ARCANE_EVENT_ERROR_CODES` is frozen and maps each stable key to that identical
+string value: `ARCANE_EVENT_AUTHORITY_ACCESSOR_COLLISION`,
+`ARCANE_EVENT_AUTHORITY_VALUE_COLLISION`,
+`ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH`,
+`ARCANE_EVENT_AUTHORITY_PROTOCOL_MISMATCH`,
+`ARCANE_EVENT_AUTHORITY_API_MISMATCH`,
+`ARCANE_EVENT_AUTHORITY_INSTALL_FAILED`, `ARCANE_EVENT_SOURCE_INVALID`,
+`ARCANE_EVENT_SOURCE_ALREADY_REGISTERED`, `ARCANE_EVENT_SOURCE_DISPOSED`,
+`ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED`,
+`ARCANE_EVENT_COMPATIBILITY_DETAIL_INVALID`, `ARCANE_EVENT_OCCURRENCE_INVALID`,
+`ARCANE_EVENT_OCCURRENCE_SEQUENCE_EXHAUSTED`,
+`ARCANE_EVENT_SOURCE_SEQUENCE_EXHAUSTED`,
+`ARCANE_EVENT_LISTENER_CALLBACK_FAILED`, `ARCANE_EVENT_DOM_DETAIL_COLLISION`,
+`ARCANE_EVENT_DOM_TARGET_INVALID`, `ARCANE_EVENT_DOM_OPTIONS_INVALID`,
+`ARCANE_EVENT_SUBSCRIPTION_TYPE_INVALID`,
+`ARCANE_EVENT_SUBSCRIPTION_HANDLER_INVALID`,
+`ARCANE_EVENT_SUBSCRIPTION_OPTIONS_INVALID`,
+`ARCANE_EVENT_SUBSCRIPTION_SIGNAL_INVALID`, and
+`ARCANE_EVENT_DISPATCH_EVENT_INVALID`. Thrown authority failures expose the
+matching value as `error.code`; the listener callback code is carried by its
+observational error occurrence.
+
+`projectArcaneDOMEvent(target,occurrence,{type,bubbles=false,composed=false,
+cancelable=occurrence.cancelable}={})` is a one-way compatibility projection.
+Its frozen detail carries `occurrenceId`, `arcaneSource`, `instanceId`, and
+`operationId`; it never republishes the DOM event. DOM cancellation propagates
+back to a cancelable occurrence. `isArcaneEventOccurrence(value)` recognizes
+only canonical occurrences and source compatibility views created by this
+realm's authority.
+
+The first `source.dispose()`/`destroy()` publishes the final noncancelable
+`arcane.event.source.disposed` occurrence, removes source-owned listeners, frees
+the owner for a new source, and returns `true`; later or reentrant calls return
+`false`. The deprecated `aiRuntimeEvents` export is a frozen, state-free
+EventTarget compatibility view over the AIRuntimeState source, not another event
+owner.
 
 ### Availability and normalization
 
-**Node and browser/bundler; DOM capture requires a compatible DOM.** It is the same ESM singleton across documented entrypoints in one module graph.
+**Node and browser/bundler, once per JavaScript realm; DOM projection requires
+`CustomEvent` and a target with `dispatchEvent`.** Canonical public detail is
+defensively snapshotted and deeply frozen. Rich compatibility detail remains
+owner-local and is shallow-frozen only when it is a plain record or array.
 
 ### Example
 
 ```javascript
-import {arcaneEvents} from 'arcane-os/event-manager';
+import {arcaneEvents, createArcaneEventSource} from 'arcane-os/event-manager';
 
-const handler = value => console.log(value);
-arcaneEvents.on('status', handler).emit('status', 'ready');
-arcaneEvents.off('status', handler);
+const owner = {};
+const source = createArcaneEventSource(owner, {
+    source:'sdk.operation',
+    eventTypes:['sdk.operation.completed']
+});
+const unsubscribe = arcaneEvents.subscribe(
+    'sdk.operation.completed',
+    occurrence => console.log(occurrence.detail.operationId)
+);
+source.dispatch(
+    'sdk.operation.completed',
+    Object.freeze({operationId:'operation-1'}),
+    {operationId:'operation-1', publicDetail:{operationId:'operation-1'}}
+);
+unsubscribe.dispose();
+source.dispose();
+```
+
+## ARCANE_EVENT_AUTHORITY_BRAND
+
+### Overview
+
+Global registry symbol that brands the one compatible Arcane event authority in
+a JavaScript realm.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_AUTHORITY_BRAND
+```
+
+Its exact value is `Symbol.for('arcane-os.arcane-events-authority')`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** The brand property is immutable and
+non-enumerable. It is a compatibility marker, not transport or authenticity.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_AUTHORITY_BRAND,arcaneEvents} from 'arcane-os/event-manager';
+console.log(arcaneEvents[ARCANE_EVENT_AUTHORITY_BRAND]);
+```
+
+## ARCANE_EVENT_AUTHORITY_KIND
+
+### Overview
+
+Stable kind discriminator for the frozen authority descriptor.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_AUTHORITY_KIND
+```
+
+Its exact value is `arcane-event-authority`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** Reading it creates no authority or listener.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_AUTHORITY_KIND,arcaneEvents} from 'arcane-os/event-manager';
+console.log(arcaneEvents.descriptor.kind===ARCANE_EVENT_AUTHORITY_KIND);
+```
+
+## ARCANE_EVENT_AUTHORITY_PROTOCOL
+
+### Overview
+
+Stable protocol discriminator for compatible per-realm event authorities.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_AUTHORITY_PROTOCOL
+```
+
+Its exact value is `arcane-event-authority/1`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** An incompatible installed protocol fails closed
+and is never replaced or wrapped.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_AUTHORITY_PROTOCOL,arcaneEvents} from 'arcane-os/event-manager';
+console.log(arcaneEvents.protocol===ARCANE_EVENT_AUTHORITY_PROTOCOL);
+```
+
+## ARCANE_EVENT_ERROR_CODES
+
+### Overview
+
+Frozen registry of every stable canonical event-authority failure code.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_ERROR_CODES
+```
+
+Every key maps to its identical string value; thrown authority failures expose
+the matching value as `error.code`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** The registry contains no mutable registration API
+or vague fallback code.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_ERROR_CODES} from 'arcane-os/event-manager';
+console.log(ARCANE_EVENT_ERROR_CODES.ARCANE_EVENT_SOURCE_DISPOSED);
+```
+
+## ARCANE_EVENT_LISTENER_ERROR_EVENT
+
+### Overview
+
+Canonical observational event emitted when an event listener throws.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_LISTENER_ERROR_EVENT
+```
+
+Its exact value is `arcane.event.listener.error`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** Frozen public detail carries the exact failure code
+and source occurrence identifiers, never the raw error. Its shape is exactly
+`{code:'ARCANE_EVENT_LISTENER_CALLBACK_FAILED',reason:'listener-threw',
+eventType,occurrenceId,source,instanceId,operationId}`. Publication is
+synchronous and nonrecursive.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_LISTENER_ERROR_EVENT,arcaneEvents} from 'arcane-os/event-manager';
+const unsubscribe=arcaneEvents.subscribe(ARCANE_EVENT_LISTENER_ERROR_EVENT,console.log);
+```
+
+## ARCANE_EVENT_OCCURRENCE_PROTOCOL
+
+### Overview
+
+Stable protocol discriminator for immutable canonical occurrences.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_OCCURRENCE_PROTOCOL
+```
+
+Its exact value is `arcane-event-occurrence/1`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** Occurrences are realm-owned identity values with
+deeply frozen public detail and synchronous cancellation state.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_OCCURRENCE_PROTOCOL} from 'arcane-os/event-manager';
+console.log(publication.occurrence.protocol===ARCANE_EVENT_OCCURRENCE_PROTOCOL);
+```
+
+## ARCANE_EVENT_SOURCE_DISPOSED_EVENT
+
+### Overview
+
+Final noncancelable occurrence published during a source's first disposal.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_SOURCE_DISPOSED_EVENT
+```
+
+Its exact value is `arcane.event.source.disposed`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** Public detail is exactly
+`{reason:'source-disposed'}`. Delivery precedes source-listener cleanup;
+reentrant or later disposal publishes nothing and returns `false`.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_SOURCE_DISPOSED_EVENT} from 'arcane-os/event-manager';
+source.once(ARCANE_EVENT_SOURCE_DISPOSED_EVENT,console.log);
+source.dispose();
+```
+
+## ARCANE_EVENT_SOURCE_KIND
+
+### Overview
+
+Stable kind discriminator for frozen source descriptors.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_SOURCE_KIND
+```
+
+Its exact value is `arcane-event-source`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** Reading it does not register or dispose a source.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_SOURCE_KIND} from 'arcane-os/event-manager';
+console.log(source.descriptor.kind===ARCANE_EVENT_SOURCE_KIND);
+```
+
+## ARCANE_EVENT_SOURCE_PROTOCOL
+
+### Overview
+
+Stable protocol discriminator for frozen source handles and descriptors.
+
+### Value and import
+
+```text
+const ARCANE_EVENT_SOURCE_PROTOCOL
+```
+
+Its exact value is `arcane-event-source/1`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** One handle belongs to one active owner in one
+realm and declares every publishable type before use.
+
+### Example
+
+```javascript
+import {ARCANE_EVENT_SOURCE_PROTOCOL} from 'arcane-os/event-manager';
+console.log(source.protocol===ARCANE_EVENT_SOURCE_PROTOCOL);
+```
+
+## createArcaneEventSource()
+
+### Overview
+
+Registers one active declared semantic source for a non-null object or function
+owner on the installed per-realm authority.
+
+### Signature and result
+
+```text
+createArcaneEventSource(owner, options)
+```
+
+`options` is the closed data record `{source,eventTypes,onListenerError?}`. The
+result is one frozen `arcane-event-source/1` handle with synchronous
+subscription, publication, cancellation admission, EventTarget compatibility,
+and idempotent disposal. A second active source for the same owner fails with
+`ARCANE_EVENT_SOURCE_ALREADY_REGISTERED`.
+
+### Availability and normalization
+
+**Node and browser/bundler, within the current JavaScript realm.** The wrapper
+reuses `globalThis.arcaneEvents`; it creates no second bus, queue, Worker, or
+transport. Provider or host work remains owned by its own promise and signal.
+
+### Example
+
+```javascript
+import {createArcaneEventSource} from 'arcane-os/event-manager';
+const source=createArcaneEventSource({}, {
+    source:'sdk.example',
+    eventTypes:['sdk.example.completed']
+});
+source.dispose();
+```
+
+## isArcaneEventOccurrence()
+
+### Overview
+
+Recognizes canonical occurrences and source compatibility views created by the
+current realm's authority.
+
+### Signature and result
+
+```text
+isArcaneEventOccurrence(value)
+```
+
+Returns a boolean. Structurally similar or protocol-shaped foreign values return
+`false`.
+
+### Availability and normalization
+
+**Node and browser/bundler, within the current JavaScript realm.** Recognition
+is synchronous and identity-based, with no parsing, cloning, or transport.
+
+### Example
+
+```javascript
+import {isArcaneEventOccurrence} from 'arcane-os/event-manager';
+console.log(isArcaneEventOccurrence(publication.occurrence));
+```
+
+## projectArcaneDOMEvent()
+
+### Overview
+
+Projects one authority-created occurrence to one `CustomEvent` without
+republishing the DOM event into the canonical authority.
+
+### Signature and result
+
+```text
+projectArcaneDOMEvent(target, occurrence, options)
+```
+
+The result is the combined DOM/canonical acceptance boolean. Frozen projection
+detail adds the occurrence, canonical source, source instance, and operation
+identifiers while preserving a caller-owned compatibility `source`. A
+pre-cancelled occurrence skips DOM dispatch; DOM cancellation propagates only
+to a cancelable occurrence.
+
+### Availability and normalization
+
+**Browser DOM or a DOM-compatible host with `CustomEvent` and
+`dispatchEvent`.** Projection is synchronous, state-free, and one-way.
+
+### Example
+
+```javascript
+import {projectArcaneDOMEvent} from 'arcane-os/event-manager';
+projectArcaneDOMEvent(button,publication.occurrence,{bubbles:true});
 ```
 
 ## createDOMInstrumentation()
@@ -5387,13 +5843,48 @@ releaseProvider();
 
 # Browser speech providers
 
-`arcane-os/ai/browser-speech` exports exactly the five package members below.
+`arcane-os/ai/browser-speech` exports exactly the seven package members below.
 It ships provider, authority, artifact-store, and Worker mechanisms but no
 Whisper/Kokoro model weights, adapter runtime bytes, voices, download URLs,
 default catalog, CDN loader, native bridge, or cloud fallback. The providers
 implement `arcane-ai-provider/2`; the managed `arcane/AIProviderRuntime` and
 `arcane/AIRuntimeState` projection modules can normalize their independent
 role lifecycle and observation, but are not exports of this package subpath.
+
+## BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL
+
+### Overview
+
+Stable protocol identifier for an SDK-created authenticated browser speech
+artifact graph. It identifies one complete caller-owned runtime, model, and
+voice dependency graph; it grants no provider, model, runtime, voice, network,
+or license authority.
+
+### Value and import
+
+```text
+const BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL
+```
+
+Its exact value is `arcane-ai-browser-speech-artifact-graph/1`, and it is
+exported only by `arcane-os/ai/browser-speech`.
+
+### Availability and normalization
+
+**Browser metadata; the ESM binding is importable in Node.** Reading the
+constant starts no fetch, cache, Worker, provider, or event operation. Actual
+artifact preparation and provider use require the selected browser storage and
+Worker capabilities.
+
+### Example
+
+```javascript
+import {
+    BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL
+} from 'arcane-os/ai/browser-speech';
+
+console.log(BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL);
+```
 
 ## BROWSER_SPEECH_ARTIFACT_PROTOCOL
 
@@ -5426,6 +5917,61 @@ import {
 } from 'arcane-os/ai/browser-speech';
 
 console.log(BROWSER_SPEECH_ARTIFACT_PROTOCOL);
+```
+
+## createBrowserSpeechArtifactGraph()
+
+### Overview
+
+Validates, canonicalizes, identifies, and freezes one complete caller-owned
+browser speech artifact graph. The caller declares every executable, WASM,
+model, and voice byte together with its immutable source identity, byte length,
+SHA-256 digest, license declaration, runtime route, dependency edge, transform,
+model/runtime identity, sample rate, and TTS default voice where applicable.
+The SDK selects none of those values.
+
+### Signature and result
+
+```text
+createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', identitySha256, providerId=null, role, model, runtime, files, edges, transforms }={})
+```
+
+`role` is exactly `stt` or `tts`; its model and runtime adapter fields must
+match that role. Every non-entry file must be reachable through the declared
+runtime, model, voice, or edge graph. Files are normalized into one unique
+path/source inventory with exact media types, positive byte lengths, lowercase
+SHA-256 values, immutable revisions, and explicitly admitted runtime routes.
+Unknown graph kinds, roles, adapters, paths, identities, files, edges,
+transforms, runtime routes, or voice policy fail closed with a concrete
+`artifact-graph-*` reason.
+
+The result is one frozen
+`arcane-ai-browser-speech-artifact-graph/1` record containing
+`{kind,providerId,role,model,runtime,files,edges,transforms,identitySha256,
+artifactGraphStatus}`. `kind` and `runtime.moduleGraph` are exactly
+`browser-speech-authenticated-artifact-graph`; `artifactGraphStatus` is exactly
+`artifact-graph-descriptor-verified`. The SDK computes `identitySha256` from a
+canonical JSON projection. A supplied `identitySha256` is an assertion and must
+equal that computed value.
+
+### Availability and normalization
+
+**Browser metadata; the ESM subpath is importable in Node.** Construction is
+synchronous and starts no fetch, cache, Worker, provider, or event operation.
+The graph is authority only because it was created and retained by this SDK
+realm; a structurally similar object is not admitted. Preparing and executing
+the graph requires the selected DBOPFS, Web Locks, Fetch, object URL, and Worker
+capabilities.
+
+### Example
+
+```javascript
+import {
+    createBrowserSpeechArtifactGraph
+} from 'arcane-os/ai/browser-speech';
+
+const graph = createBrowserSpeechArtifactGraph(callerOwnedGraphDescriptor);
+console.log(graph.identitySha256, graph.artifactGraphStatus);
 ```
 
 ## createBrowserSpeechAuthority()

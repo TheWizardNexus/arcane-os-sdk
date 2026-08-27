@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 169,
+  "memberCount": 183,
   "members": [
     {
       "id": "root:APP_BUNDLE_DESCRIPTOR_NAME",
@@ -2176,6 +2176,159 @@
       "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
     },
     {
+      "id": "root:ARCANE_EVENT_AUTHORITY_BRAND",
+      "name": "ARCANE_EVENT_AUTHORITY_BRAND",
+      "displayName": "ARCANE_EVENT_AUTHORITY_BRAND",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_AUTHORITY_BRAND",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Global registry symbol that brands the canonical per-realm Arcane event authority.",
+      "availability": "Node and browser/bundler",
+      "protocol": "Symbol.for('arcane-os.arcane-events-authority') with arcane-event-authority/1",
+      "normalization": "Exact global symbol key; the authority brand descriptor is non-enumerable, non-writable, and non-configurable"
+    },
+    {
+      "id": "root:ARCANE_EVENT_AUTHORITY_KIND",
+      "name": "ARCANE_EVENT_AUTHORITY_KIND",
+      "displayName": "ARCANE_EVENT_AUTHORITY_KIND",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_AUTHORITY_KIND",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Identifies the frozen canonical authority descriptor kind.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-authority",
+      "normalization": "Exact immutable descriptor-kind discriminator"
+    },
+    {
+      "id": "root:ARCANE_EVENT_AUTHORITY_PROTOCOL",
+      "name": "ARCANE_EVENT_AUTHORITY_PROTOCOL",
+      "displayName": "ARCANE_EVENT_AUTHORITY_PROTOCOL",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_AUTHORITY_PROTOCOL",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Identifies compatible canonical Arcane event authorities.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-authority/1",
+      "normalization": "Exact authority protocol discriminator; incompatible globals fail closed"
+    },
+    {
+      "id": "root:ARCANE_EVENT_ERROR_CODES",
+      "name": "ARCANE_EVENT_ERROR_CODES",
+      "displayName": "ARCANE_EVENT_ERROR_CODES",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_ERROR_CODES",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Frozen map of every stable event-authority error code to its identical string value.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-authority/1 failures",
+      "normalization": "Exact frozen string-to-itself code map"
+    },
+    {
+      "id": "root:ARCANE_EVENT_LISTENER_ERROR_EVENT",
+      "name": "ARCANE_EVENT_LISTENER_ERROR_EVENT",
+      "displayName": "ARCANE_EVENT_LISTENER_ERROR_EVENT",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_LISTENER_ERROR_EVENT",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Canonical observational event emitted for a privacy-safe listener failure.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane.event.listener.error over arcane-event-authority/1",
+      "normalization": "Frozen public failure detail; raw listener errors remain at the owner-local reporting boundary"
+    },
+    {
+      "id": "root:ARCANE_EVENT_OCCURRENCE_PROTOCOL",
+      "name": "ARCANE_EVENT_OCCURRENCE_PROTOCOL",
+      "displayName": "ARCANE_EVENT_OCCURRENCE_PROTOCOL",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_OCCURRENCE_PROTOCOL",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Identifies immutable canonical event occurrences.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-occurrence/1",
+      "normalization": "Exact occurrence protocol discriminator; public detail is privacy-admitted and deeply frozen"
+    },
+    {
+      "id": "root:ARCANE_EVENT_SOURCE_DISPOSED_EVENT",
+      "name": "ARCANE_EVENT_SOURCE_DISPOSED_EVENT",
+      "displayName": "ARCANE_EVENT_SOURCE_DISPOSED_EVENT",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_SOURCE_DISPOSED_EVENT",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Final noncancelable canonical occurrence published when a source is disposed.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane.event.source.disposed over arcane-event-authority/1",
+      "normalization": "Frozen public detail with exact source-disposed reason before source listener cleanup"
+    },
+    {
+      "id": "root:ARCANE_EVENT_SOURCE_KIND",
+      "name": "ARCANE_EVENT_SOURCE_KIND",
+      "displayName": "ARCANE_EVENT_SOURCE_KIND",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_SOURCE_KIND",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Identifies the frozen canonical source descriptor kind.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-source",
+      "normalization": "Exact immutable descriptor-kind discriminator"
+    },
+    {
+      "id": "root:ARCANE_EVENT_SOURCE_PROTOCOL",
+      "name": "ARCANE_EVENT_SOURCE_PROTOCOL",
+      "displayName": "ARCANE_EVENT_SOURCE_PROTOCOL",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_SOURCE_PROTOCOL",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Identifies frozen canonical event source handles and descriptors.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-source/1",
+      "normalization": "Exact source protocol discriminator with declared event types and one realm-local instance id"
+    },
+    {
       "id": "root:ARCANE_EVENT_STACK_PROTOCOL",
       "name": "ARCANE_EVENT_STACK_PROTOCOL",
       "displayName": "ARCANE_EVENT_STACK_PROTOCOL",
@@ -2431,6 +2584,23 @@
       "normalization": "Same module singleton through root and focused subpath; time travel starts disabled"
     },
     {
+      "id": "root:createArcaneEventSource",
+      "name": "createArcaneEventSource",
+      "displayName": "createArcaneEventSource()",
+      "kind": "function",
+      "signature": "createArcaneEventSource(owner, options)",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Registers one declared semantic event source for a non-null object or function owner.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-source/1 over the per-realm arcane-event-authority/1 singleton",
+      "normalization": "Returns one frozen source handle with declared event types, a realm-local instance id, synchronous publication, and deterministic disposal"
+    },
+    {
       "id": "root:createDOMInstrumentation",
       "name": "createDOMInstrumentation",
       "displayName": "createDOMInstrumentation()",
@@ -2499,6 +2669,23 @@
       "normalization": "Returns a best-effort selector or null; triple-chevron separates open shadow boundaries"
     },
     {
+      "id": "root:isArcaneEventOccurrence",
+      "name": "isArcaneEventOccurrence",
+      "displayName": "isArcaneEventOccurrence()",
+      "kind": "function",
+      "signature": "isArcaneEventOccurrence(value)",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Recognizes canonical occurrences and compatibility views created by the current realm authority.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-occurrence/1 realm-local recognition",
+      "normalization": "Returns a boolean from authority-owned identity records; protocol-shaped foreign objects are not admitted"
+    },
+    {
       "id": "root:parseEventStack",
       "name": "parseEventStack",
       "displayName": "parseEventStack()",
@@ -2514,6 +2701,23 @@
       "availability": "Node and browser/bundler",
       "protocol": "arcane-event-stack/1",
       "normalization": "Rejects extra keys, invalid bounds, malformed nesting, unsafe values, and nonterminal overflow; returns a deeply frozen canonical document"
+    },
+    {
+      "id": "root:projectArcaneDOMEvent",
+      "name": "projectArcaneDOMEvent",
+      "displayName": "projectArcaneDOMEvent()",
+      "kind": "function",
+      "signature": "projectArcaneDOMEvent(target, occurrence, options)",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Projects one canonical occurrence to one CustomEvent without republishing it into the authority.",
+      "availability": "Browser DOM or a DOM-compatible test host",
+      "protocol": "One-way arcane-event-occurrence/1 to CustomEvent compatibility projection",
+      "normalization": "Adds immutable occurrence, source, instance, and operation identifiers; DOM cancellation propagates only to a cancelable occurrence"
     },
     {
       "id": "root:SDK_UPDATE_REGISTRY",
@@ -2725,6 +2929,22 @@
       "normalization": "Returns cached or installed receipts with observed byte count and per-check outcomes; disabled expected-length and SHA-256 checks do not compare or hash, while enabled checks fail closed"
     },
     {
+      "id": "browser-speech:BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL",
+      "name": "BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL",
+      "displayName": "BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL",
+      "kind": "constant",
+      "signature": "const BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL",
+      "entrypoints": [
+        "arcane-os/ai/browser-speech"
+      ],
+      "primaryImport": "arcane-os/ai/browser-speech",
+      "group": "Browser speech providers",
+      "summary": "Stable protocol identifier for a complete caller-owned authenticated browser speech artifact graph.",
+      "availability": "Browser metadata; graph construction is side-effect free and provider use requires the selected browser storage and Worker capabilities",
+      "protocol": "arcane-ai-browser-speech-artifact-graph/1",
+      "normalization": "Exact immutable protocol value for one closed runtime, model, and voice dependency graph; it selects no artifacts or policy"
+    },
+    {
       "id": "browser-speech:BROWSER_SPEECH_ARTIFACT_PROTOCOL",
       "name": "BROWSER_SPEECH_ARTIFACT_PROTOCOL",
       "displayName": "BROWSER_SPEECH_ARTIFACT_PROTOCOL",
@@ -2755,6 +2975,22 @@
       "availability": "Browser with DBOPFS, Web Locks, Workers, object URLs, and a caller-admitted self-contained kokoro-js runtime/model closure",
       "protocol": "arcane-ai-provider/2 tts/synthesize",
       "normalization": "Independent load, status, request, unload, cancellation, and disposal; provider-native requests return 24000 Hz Float32Array PCM, while shared AI.js requests admit only wav and return frozen Uint8Array audio/wav data; never selects a cloud fallback"
+    },
+    {
+      "id": "browser-speech:createBrowserSpeechArtifactGraph",
+      "name": "createBrowserSpeechArtifactGraph",
+      "displayName": "createBrowserSpeechArtifactGraph()",
+      "kind": "function",
+      "signature": "createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', identitySha256, providerId=null, role, model, runtime, files, edges, transforms }={})",
+      "entrypoints": [
+        "arcane-os/ai/browser-speech"
+      ],
+      "primaryImport": "arcane-os/ai/browser-speech",
+      "group": "Browser speech providers",
+      "summary": "Validates, canonicalizes, identifies, and freezes one complete caller-owned browser speech artifact graph.",
+      "availability": "Browser metadata; construction starts no fetch, cache, Worker, provider, or event operation",
+      "protocol": "arcane-ai-browser-speech-artifact-graph/1",
+      "normalization": "Returns one closed graph with lexically normalized inventories, a canonical SHA-256 identity, declared runtime edges, explicit STT/TTS model policy, and no SDK-selected artifacts"
     },
     {
       "id": "browser-speech:createBrowserSpeechAuthority",

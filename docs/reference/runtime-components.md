@@ -21,49 +21,82 @@ A component file does not register its own custom element. The `<html-import>` h
 </script>
 ```
 
+## Shared semantic-event and lifecycle contract
+
+Except for the legacy `header.html` and platform-owned `theme-switcher.html`,
+each component owns exactly one source created through
+`createArcaneEventSource(host,{source:'arcane.component.<name>',eventTypes})`.
+That source publishes synchronously to the realm's branded
+`globalThis.arcaneEvents` authority. Component DOM events are one-way
+compatibility projections of the same canonical occurrence; they are never
+republished into the authority. Every projected detail has the canonical
+`occurrenceId`, `arcaneSource`, `instanceId`, and `operationId` fields and a
+frozen outer record. A compatibility payload's existing `source` field remains
+source-local and may differ from `arcaneSource`; the payload may additionally
+retain source-local browser or provider objects.
+
+When a component uses a cancelable event as an admission gate, cancellation on
+either the canonical occurrence or its DOM projection makes the publication
+unaccepted, and the component does not continue the guarded operation. A
+cancelable compatibility notification emitted after committed work does not
+roll that work back unless its component section explicitly says otherwise.
+Asynchronous work keeps its own `AbortSignal`, operation generation, and
+promise ownership; canonical publication is synchronous and does not become an
+async queue.
+
+Every singleton-backed component publishes its ready event only after its host
+members are installed. Its idempotent `destroy()` (unless a more specific
+return is documented) disposes the canonical source and marks the host
+unready. Cleanup of owned listeners, pending work, nested subscriptions, and
+controllers is component-specific and is stated below where it forms part of
+that component's public contract. Removing an `<html-import>` host calls an
+imported component's `destroy()` through `HTMLImport`; callers that invoke
+`destroy()` directly retain responsibility for removing the element when
+appropriate.
+
 ## Canonical inventory
 
 | Component | Capability | Principal methods | Events | Normalization |
 | --- | --- | --- | --- | --- |
-| [`app-bar.html`](#app-barhtml) | Responsive application navigation, route state, status, and trailing actions. | `setNavigation()`<br>`setActiveRoute()`<br>`setStatus()`<br>`refresh()` | `app-bar-ready` | DOM-normalized |
-| [`assistant-panel.html`](#assistant-panelhtml) | Reusable assistant drawer, message area, composer, pending/streaming/empty/error state, and actions. | `open()`<br>`close()`<br>`toggle()`<br>`send()`<br>`clear()`<br>`setState()`<br>`focusComposer()`<br>`scrollToEnd()` | `assistant-ready`<br>`assistant-send`<br>`assistant-clear` | DOM-normalized; caller/provider results remain external |
-| [`calculator.html`](#calculatorhtml) | Calculator keypad and result/error event surface backed by CalculatorEngine. | `calculate()` | `calculator-ready`<br>`calculation-complete`<br>`calculation-error` | Normalized Calculation/error events |
+| [`app-bar.html`](#app-barhtml) | Responsive application navigation, route state, status, and trailing actions. | `setNavigation()`<br>`setActiveRoute()`<br>`setStatus()`<br>`refresh()`<br>`destroy()` | `app-bar-ready` | DOM-normalized |
+| [`assistant-panel.html`](#assistant-panelhtml) | Reusable assistant drawer, message area, composer, pending/streaming/empty/error state, and actions. | `open()`<br>`close()`<br>`toggle()`<br>`send()`<br>`clear()`<br>`setState()`<br>`focusComposer()`<br>`scrollToEnd()`<br>`destroy()` | `assistant-ready`<br>`assistant-opened`<br>`assistant-closed`<br>`assistant-send`<br>`assistant-clear` | DOM-normalized; caller/provider results remain external |
+| [`calculator.html`](#calculatorhtml) | Calculator keypad and result/error event surface backed by CalculatorEngine. | `calculate()`<br>`destroy()` | `calculator-ready`<br>`calculation-complete`<br>`calculation-error` | Normalized Calculation/error events |
 | [`chart.html`](#charthtml) | Accessible uPlot line, area, or point chart with normalized options and rows. | `configure()`<br>`populate()`<br>`setData()`<br>`addData()`<br>`update()`<br>`destroy()` | `chart-ready`<br>`chart-remove` | Options/rows normalized; uPlot rendering is vendor-native |
-| [`chat.html`](#chathtml) | Shared chat, visible selected-model activation request, file upload, streaming, speech, language, availability, and conversation-timebox surface. | `streamMessage()`<br>`setMessageProgress()`<br>`setAIAvailability()`<br>`setInitialSpeechMuted()`<br>`setConversationComplete()`<br>`bindConversationTimebox()`<br>`submitMessage()`<br>`sendMessage()`<br>`languageChanged()`<br>`requestAIActivation()`<br>`destroy()` | `chat-ready`<br>`chat-send-message`<br>`chat-send-error`<br>`chat-file-uploaded`<br>`chat-language-changed`<br>`chat-ai-activation-request`<br>`chat-ai-activation-error`<br>`conversation-timebox-error` | UI/runtime state and explicit user activation intent normalized; AI/storage/media behavior mixed |
-| [`conversation-view.html`](#conversation-viewhtml) | Provider-neutral conversation display, advisory actions, composer, busy state, and status. | `setConversation()`<br>`setBusy()`<br>`setStatus()`<br>`clearComposer()` | `conversation-view-ready`<br>`communication-send`<br>`communication-advisory-action` | DOM-normalized |
-| [`dashboard-config.html`](#dashboard-confightml) | Selects which normalized chart definitions are visible on a dashboard. | `configure()`<br>`setDefinitions()`<br>`setVisibility()`<br>`getChartOptions()`<br>`getEffectiveVisibility()`<br>`open()`<br>`close()` | `dashboard-config-ready`<br>`dashboard-config-opened`<br>`dashboard-config-closed`<br>`dashboard-config-change` | Fully normalized definitions and visibility |
-| [`data-maintenance.html`](#data-maintenancehtml) | Runs destructive cleanup of empty chats and memories inside the current app data scope. | `open()` | `data-maintenance-ready`<br>`data-maintenance-complete` | Normalized counts; DBOPFS failures mixed |
-| [`data-view.html`](#data-viewhtml) | Opens a generic modal-style data view around an injected provider. | `beforeOpen()`<br>`open()` | `data-view-ready` | DOM-native result |
-| [`directory-picker.html`](#directory-pickerhtml) | Presents the provider-owned OS directory chooser with change/cancel/error states. | `configure()`<br>`focus()`<br>`select()` | `directory-picker-ready`<br>`directory-picker-change`<br>`directory-picker-cancel`<br>`directory-picker-error` | Strict normalized native selection/error |
-| [`document-inspector.html`](#document-inspectorhtml) | Inspects PDF, text, or source documents and records review state. | `loadDocument()`<br>`selectView()`<br>`markSaved()` | `document-inspector-ready`<br>`document-review-change` | Document state normalized; browser document APIs mixed |
-| [`file-drop.html`](#file-drophtml) | Acquires files by drag/drop or picker and presents busy, progress, error, and cleared state. | `configure()`<br>`openPicker()`<br>`clear()`<br>`setBusy()`<br>`setError()`<br>`setProgress()` | `file-drop-ready`<br>`file-drop-selected`<br>`file-drop-progress`<br>`file-drop-state`<br>`file-drop-error` | State normalized; browser File/drop errors mixed |
-| [`file-inspector.html`](#file-inspectorhtml) | Displays file metadata, preview, busy/error state, and caller-defined actions. | `configure()`<br>`show()`<br>`clear()`<br>`setActions()`<br>`setBusy()`<br>`setError()`<br>`setPreview()` | `file-inspector-ready`<br>`file-inspector-action`<br>`file-inspector-change`<br>`file-inspector-cleared`<br>`file-inspector-error` | State normalized; preview/provider behavior mixed |
-| [`file-manager.html`](#file-managerhtml) | Browses, filters, selects, opens, and acts on app-scoped files. | `setProvider()`<br>`loadAll()`<br>`setFilter()`<br>`select()`<br>`clearSelection()` | `file-manager-ready`<br>`file-manager-select`<br>`file-manager-open`<br>`file-manager-action` | Selection/filter state normalized; storage/provider behavior mixed |
+| [`chat.html`](#chathtml) | Shared chat, visible selected-model activation request, file upload, streaming, speech, language, availability, and conversation-timebox surface. | `streamMessage()`<br>`setMessageProgress()`<br>`setAIAvailability()`<br>`setInitialSpeechMuted()`<br>`setConversationComplete()`<br>`bindConversationTimebox()`<br>`submitMessage()`<br>`sendMessage()`<br>`languageChanged()`<br>`requestAIActivation()`<br>`destroy()` | `chat-ready`<br>`chat-send-message`<br>`chat-send-error`<br>`chat-file-uploaded`<br>`chat-file-upload-error`<br>`chat-language-changed`<br>`chat-language-change-error`<br>`chat-ai-activation-request`<br>`chat-ai-activation-error`<br>`chat-speech-synthesis-error`<br>`conversation-timebox-error` | UI/runtime state and explicit user activation intent normalized; AI/storage/media behavior mixed |
+| [`conversation-view.html`](#conversation-viewhtml) | Provider-neutral conversation display, advisory actions, composer, busy state, and status. | `setConversation()`<br>`setBusy()`<br>`setStatus()`<br>`clearComposer()`<br>`destroy()` | `conversation-view-ready`<br>`communication-send`<br>`communication-advisory-action` | DOM-normalized |
+| [`dashboard-config.html`](#dashboard-confightml) | Selects which normalized chart definitions are visible on a dashboard. | `configure()`<br>`setDefinitions()`<br>`setVisibility()`<br>`getChartOptions()`<br>`getEffectiveVisibility()`<br>`open()`<br>`close()`<br>`destroy()` | `dashboard-config-ready`<br>`dashboard-config-opened`<br>`dashboard-config-closed`<br>`dashboard-config-change` | Fully normalized definitions and visibility |
+| [`data-maintenance.html`](#data-maintenancehtml) | Runs destructive cleanup of empty chats and memories inside the current app data scope. | `open()`<br>`destroy()` | `data-maintenance-ready`<br>`data-maintenance-complete` | Normalized counts; DBOPFS failures mixed |
+| [`data-view.html`](#data-viewhtml) | Opens a generic modal-style data view around an injected provider. | `beforeOpen()`<br>`open()`<br>`destroy()` | `data-view-ready` | DOM-native result |
+| [`directory-picker.html`](#directory-pickerhtml) | Presents the provider-owned OS directory chooser with change/cancel/error states. | `configure()`<br>`focus()`<br>`select()`<br>`destroy()` | `directory-picker-ready`<br>`directory-picker-change`<br>`directory-picker-cancel`<br>`directory-picker-error` | Strict normalized native selection/error |
+| [`document-inspector.html`](#document-inspectorhtml) | Inspects PDF, text, or source documents and records review state. | `loadDocument()`<br>`selectView()`<br>`markSaved()`<br>`destroy()` | `document-inspector-ready`<br>`document-review-change` | Document state normalized; browser document APIs mixed |
+| [`file-drop.html`](#file-drophtml) | Acquires files by drag/drop or picker and presents busy, progress, error, and cleared state. | `configure()`<br>`openPicker()`<br>`clear()`<br>`setBusy()`<br>`setError()`<br>`setProgress()`<br>`destroy()` | `file-drop-ready`<br>`file-drop-selected`<br>`file-drop-progress`<br>`file-drop-state`<br>`file-drop-error` | State normalized; browser File/drop errors mixed |
+| [`file-inspector.html`](#file-inspectorhtml) | Displays file metadata, preview, busy/error state, and caller-defined actions. | `configure()`<br>`show()`<br>`clear()`<br>`setActions()`<br>`setBusy()`<br>`setError()`<br>`setPreview()`<br>`destroy()` | `file-inspector-ready`<br>`file-inspector-action`<br>`file-inspector-change`<br>`file-inspector-cleared`<br>`file-inspector-error` | State normalized; preview/provider behavior mixed |
+| [`file-manager.html`](#file-managerhtml) | Browses, filters, selects, opens, and acts on app-scoped files. | `setProvider()`<br>`loadAll()`<br>`setFilter()`<br>`select()`<br>`clearSelection()`<br>`destroy()` | `file-manager-ready`<br>`file-manager-select`<br>`file-manager-open`<br>`file-manager-action` | Selection/filter state normalized; storage/provider behavior mixed |
 | [`header.html`](#headerhtml) | Legacy title bar with history, reload, online marker, presentation labels, and 988 link. | None | No component-specific event | Browser/platform-native behavior; no component-ready contract |
-| [`integration-settings.html`](#integration-settingshtml) | Edits non-secret communication service configuration and service actions. | `configure()`<br>`getValues()`<br>`setStatus()` | `integration-settings-ready`<br>`integration-settings-save`<br>`integration-settings-close`<br>`integration-action` | Normalized non-secret values |
-| [`local-ai-status.html`](#local-ai-statushtml) | Presents local-AI standby, failure, recovery, guidance, retry, and dismissal states. | `configure()`<br>`begin()`<br>`present(); hidden property` | `local-ai-status-ready`<br>`local-ai-status-dismissed`<br>`local-ai-retry` | Fully normalized LocalAIReadiness report |
-| [`markdown-document.html`](#markdown-documenthtml) | Safely renders and navigates a Markdown document with focusable fragments. | `configure()`<br>`load()`<br>`render()`<br>`clear()`<br>`fail()`<br>`focus()`<br>`focusFragment()` | `markdown-document-ready`<br>`markdown-document-state`<br>`markdown-document-navigate` | State/sanitized output normalized; Marked/DOM failures mixed |
-| [`markdown-editor.html`](#markdown-editorhtml) | Configurable Markdown authoring, toolbar, preview, title, and save surface. | `configure()`<br>`focus()`<br>`clear()`<br>`saveEntry()` | `markdown-editor-ready`<br>`markdown-editor-change`<br>`markdown-editor-saved` | Editor values normalized; injected save result mixed |
-| [`media-embed.html`](#media-embedhtml) | Loads a validated YouTube video or playlist embed and exposes external-platform action. | `configure()`<br>`load()` | `media-embed-ready`<br>`media-load`<br>`media-error`<br>`media-open-platform` | URL/error normalized; iframe/platform behavior native |
-| [`modal.html`](#modalhtml) | Generic modal with population, open/close, actions, and sequential task execution. | `populate()`<br>`open()`<br>`close()`<br>`runTasks()` | `modal-ready`<br>`modal-opened`<br>`modal-closed`<br>`modal-action` | Modal state normalized; injected task results mixed |
-| [`output-panel.html`](#output-panelhtml) | Presents status, output, body, coverage, actions, pending, error, and cleared states. | `configure()`<br>`setOutput()`<br>`setBody()`<br>`setCoverage()`<br>`setActions()`<br>`setPending()`<br>`setStatus()`<br>`setError()`<br>`clear()` | `output-panel-ready`<br>`output-panel-state`<br>`output-panel-change`<br>`output-panel-action`<br>`output-panel-error`<br>`output-panel-cleared` | DOM-normalized |
-| [`preferences-form.html`](#preferences-formhtml) | Builds a schema-driven preferences form with submit, reset, busy, and status behavior. | `configure()`<br>`getValues()`<br>`setValues()`<br>`setBusy()`<br>`setStatus()` | `preferences-form-ready`<br>`preferences-change`<br>`preferences-submit`<br>`preferences-reset` | Normalized form values |
-| [`record-timeline.html`](#record-timelinehtml) | Displays chronological records/evidence and emits open actions. | `setItems()`<br>`populate()` | `record-timeline-ready`<br>`record-timeline-open` | DOM-normalized |
-| [`relationship-board.html`](#relationship-boardhtml) | Displays normalized relationship nodes/edges in graph and list forms. | `setGraph()`<br>`populate()` | `relationship-board-ready`<br>`relationship-node-open`<br>`relationship-edge-open` | DOM-normalized |
-| [`screen-capture.html`](#screen-capturehtml) | Presents image, video, or GIF display-capture workflow. | `capture()` | `screen-capture-ready`<br>`screen-capture-result` | State/result normalized; media permission/codec failures mixed |
-| [`source-code-viewer.html`](#source-code-viewerhtml) | Renders line-addressable source code with load, error, focus, and state behavior. | `configure()`<br>`load()`<br>`render()`<br>`clear()`<br>`fail()`<br>`focus()`<br>`focusLine()` | `source-code-viewer-ready`<br>`source-code-viewer-state` | Normalized source/state |
-| [`source-explanation.html`](#source-explanationhtml) | Presents an evidence finding, source selection, explanation, and save state. | `showFinding()`<br>`populate()`<br>`selectSource()`<br>`markSaved()` | `source-explanation-ready`<br>`source-explanation-save`<br>`source-explanation-source-selected` | DOM-normalized |
-| [`speech.html`](#speechhtml) | Coordinates explicit STT activation, speech controls, transcription completion, mute state, and microphone availability. | `configure()`<br>`setAvailability()`<br>`setMuted()`<br>`requestSTTActivation()`<br>`destroy()`<br>`availability`<br>`muted`<br>`initialMuted`<br>`componentReady` | `speech-ready`<br>`speech-transcription-complete`<br>`speech-transcription-error`<br>`speech-transcription-cancelled`<br>`speech-microphone-unavailable`<br>`speech-stt-activation-request`<br>`speech-stt-activation-error`<br>`speech-tts-lifecycle-error` | Sticky runtime speech readiness, explicit STT activation, request cancellation, and TTS mute lifecycle intent normalized; provider/model authority and media behavior remain external |
-| [`summary-strip.html`](#summary-striphtml) | Displays compact selectable KPI or summary items. | `configure()`<br>`setItems()`<br>`updateItem()`<br>`clear()` | `summary-strip-ready`<br>`summary-strip-change`<br>`summary-strip-select` | DOM-normalized |
-| [`table.html`](#tablehtml) | Builds and updates a simple header/body table. | `buildHeader()`<br>`buildTable()` | `table-ready`<br>`header-update`<br>`body-update` | DOM-normalized |
-| [`task-progress.html`](#task-progresshtml) | Runs and displays a task list with started/change/complete/error state. | `configure()`<br>`setTasks()`<br>`updateTask()`<br>`runTasks()`<br>`clear()` | `task-progress-ready`<br>`task-progress-started`<br>`task-progress-change`<br>`task-progress-complete`<br>`task-progress-error` | Task state normalized; injected task results mixed |
-| [`terminal-workspace.html`](#terminal-workspacehtml) | Presents multiple terminal sessions, output, active selection, theme, and terminal actions. | `configure()`<br>`addSession()`<br>`removeSession()`<br>`activateSession()`<br>`append()`<br>`clear()`<br>`setState()`<br>`setTheme()`<br>`focus()` | `terminal-workspace-ready`<br>`terminal-submit`<br>`terminal-interrupt`<br>`terminal-clear`<br>`terminal-session-new`<br>`terminal-session-close`<br>`terminal-session-select`<br>`terminal-settings` | UI/session state normalized; native command results supplied externally |
-| [`theme-editor.html`](#theme-editorhtml) | Edits, previews, saves, and resets semantic custom theme tokens. | `configure()`<br>`getTheme()`<br>`setTheme()`<br>`setBusy()`<br>`setStatus()` | `theme-editor-ready`<br>`theme-preview`<br>`theme-save`<br>`theme-reset` | Fully normalized Theme values |
+| [`integration-settings.html`](#integration-settingshtml) | Edits non-secret communication service configuration and service actions. | `configure()`<br>`getValues()`<br>`setStatus()`<br>`destroy()` | `integration-settings-ready`<br>`integration-settings-save`<br>`integration-settings-close`<br>`integration-action` | Normalized non-secret values |
+| [`local-ai-status.html`](#local-ai-statushtml) | Presents local-AI standby, failure, recovery, guidance, retry, and dismissal states. | `configure()`<br>`begin()`<br>`present()`<br>`destroy()`<br>`hidden` | `local-ai-status-ready`<br>`local-ai-status-dismissed`<br>`local-ai-retry` | Fully normalized LocalAIReadiness report |
+| [`markdown-document.html`](#markdown-documenthtml) | Safely renders and navigates a Markdown document with focusable fragments. | `configure()`<br>`load()`<br>`render()`<br>`clear()`<br>`fail()`<br>`focus()`<br>`focusFragment()`<br>`destroy()` | `markdown-document-ready`<br>`markdown-document-state`<br>`markdown-document-loading`<br>`markdown-document-rendered`<br>`markdown-document-empty`<br>`markdown-document-error`<br>`markdown-document-navigate` | State/sanitized output normalized; Marked/DOM failures mixed |
+| [`markdown-editor.html`](#markdown-editorhtml) | Configurable Markdown authoring, toolbar, preview, title, and save surface. | `configure()`<br>`focus()`<br>`clear()`<br>`saveEntry()`<br>`destroy()` | `markdown-editor-ready`<br>`markdown-editor-change`<br>`markdown-editor-saved` | Editor values normalized; injected save result mixed |
+| [`media-embed.html`](#media-embedhtml) | Loads a validated YouTube video or playlist embed and exposes external-platform action. | `configure()`<br>`load()`<br>`destroy()` | `media-embed-ready`<br>`media-load`<br>`media-error`<br>`media-open-platform` | URL/error normalized; iframe/platform behavior native |
+| [`modal.html`](#modalhtml) | Generic modal with population, open/close, actions, and sequential task execution. | `populate()`<br>`open()`<br>`close()`<br>`runTasks()`<br>`destroy()` | `modal-ready`<br>`modal-opened`<br>`modal-closed`<br>`modal-action` | Modal state normalized; injected task results mixed |
+| [`output-panel.html`](#output-panelhtml) | Presents status, output, body, coverage, actions, pending, error, and cleared states. | `configure()`<br>`setOutput()`<br>`setBody()`<br>`setCoverage()`<br>`setActions()`<br>`setPending()`<br>`setStatus()`<br>`setError()`<br>`clear()`<br>`destroy()` | `output-panel-ready`<br>`output-panel-state`<br>`output-panel-change`<br>`output-panel-action`<br>`output-panel-error`<br>`output-panel-cleared` | DOM-normalized |
+| [`preferences-form.html`](#preferences-formhtml) | Builds a schema-driven preferences form with submit, reset, busy, and status behavior. | `configure()`<br>`getValues()`<br>`setValues()`<br>`setBusy()`<br>`setStatus()`<br>`destroy()` | `preferences-form-ready`<br>`preferences-change`<br>`preferences-submit`<br>`preferences-reset` | Normalized form values |
+| [`record-timeline.html`](#record-timelinehtml) | Displays chronological records/evidence and emits open actions. | `setItems()`<br>`populate()`<br>`destroy()` | `record-timeline-ready`<br>`record-timeline-open` | DOM-normalized |
+| [`relationship-board.html`](#relationship-boardhtml) | Displays normalized relationship nodes/edges in graph and list forms. | `setGraph()`<br>`populate()`<br>`destroy()` | `relationship-board-ready`<br>`relationship-node-open`<br>`relationship-edge-open` | DOM-normalized |
+| [`screen-capture.html`](#screen-capturehtml) | Presents image, video, or GIF display-capture workflow. | `capture` (`ScreenCapture` instance)<br>`destroy()` | `screen-capture-ready`<br>`screen-capture-result` | State/result normalized; media permission/codec failures mixed |
+| [`source-code-viewer.html`](#source-code-viewerhtml) | Renders line-addressable source code with load, error, focus, and state behavior. | `configure()`<br>`load()`<br>`render()`<br>`clear()`<br>`fail()`<br>`focus()`<br>`focusLine()`<br>`destroy()` | `source-code-viewer-ready`<br>`source-code-viewer-state`<br>`source-code-viewer-state-loading`<br>`source-code-viewer-state-ready`<br>`source-code-viewer-state-empty`<br>`source-code-viewer-state-error` | Normalized source/state |
+| [`source-explanation.html`](#source-explanationhtml) | Presents an evidence finding, source selection, explanation, and save state. | `showFinding()`<br>`populate()`<br>`selectSource()`<br>`markSaved()`<br>`destroy()` | `source-explanation-ready`<br>`source-explanation-save`<br>`source-explanation-source-selected` | DOM-normalized |
+| [`speech.html`](#speechhtml) | Coordinates explicit STT activation, speech controls, transcription completion, mute state, and microphone availability. | `configure()`<br>`setAvailability()`<br>`setMuted()`<br>`reportTTSError()`<br>`requestSTTActivation()`<br>`destroy()`<br>`availability`<br>`muted`<br>`initialMuted`<br>`componentReady` | `speech-ready`<br>`speech-transcription-complete`<br>`speech-transcription-error`<br>`speech-transcription-cancelled`<br>`speech-microphone-unavailable`<br>`speech-stt-activation-request`<br>`speech-stt-activation-error`<br>`speech-tts-lifecycle-error`<br>`speech-synthesis-error` | Sticky runtime speech readiness, explicit STT activation, request cancellation, and TTS mute lifecycle intent normalized; provider/model authority and media behavior remain external |
+| [`summary-strip.html`](#summary-striphtml) | Displays compact selectable KPI or summary items. | `configure()`<br>`setItems()`<br>`updateItem()`<br>`clear()`<br>`destroy()` | `summary-strip-ready`<br>`summary-strip-change`<br>`summary-strip-select` | DOM-normalized |
+| [`table.html`](#tablehtml) | Builds and updates a simple header/body table. | `buildHeader()`<br>`buildTable()`<br>`destroy()` | `table-ready`<br>`header-update`<br>`body-update` | DOM-normalized |
+| [`task-progress.html`](#task-progresshtml) | Runs and displays a task list with started/change/complete/error state. | `configure()`<br>`setTasks()`<br>`updateTask()`<br>`runTasks()`<br>`clear()`<br>`destroy()` | `task-progress-ready`<br>`task-progress-started`<br>`task-progress-change`<br>`task-progress-complete`<br>`task-progress-error` | Task state normalized; injected task results mixed |
+| [`terminal-workspace.html`](#terminal-workspacehtml) | Presents multiple terminal sessions, output, active selection, theme, and terminal actions. | `configure()`<br>`addSession()`<br>`removeSession()`<br>`activateSession()`<br>`append()`<br>`clear()`<br>`setState()`<br>`setTheme()`<br>`focus()`<br>`destroy()` | `terminal-workspace-ready`<br>`terminal-submit`<br>`terminal-interrupt`<br>`terminal-clear`<br>`terminal-session-new`<br>`terminal-session-close`<br>`terminal-session-select`<br>`terminal-settings` | UI/session state normalized; native command results supplied externally |
+| [`theme-editor.html`](#theme-editorhtml) | Edits, previews, saves, and resets semantic custom theme tokens. | `configure()`<br>`getTheme()`<br>`setTheme()`<br>`setBusy()`<br>`setStatus()`<br>`destroy()` | `theme-editor-ready`<br>`theme-preview`<br>`theme-save`<br>`theme-reset` | Fully normalized Theme values |
 | [`theme-switcher.html`](#theme-switcherhtml) | Selects and refreshes system, light, dark, or custom theme mode. | `setMode()`<br>`refresh()` | No component-specific event | Preference/native appearance behavior mixed; no component-ready contract |
-| [`unified-inbox.html`](#unified-inboxhtml) | Displays provider-neutral communication threads with active/loading state. | `configure()`<br>`setThreads()`<br>`setActive()`<br>`setLoading()` | `unified-inbox-ready`<br>`inbox-refresh`<br>`thread-select` | DOM-normalized |
+| [`unified-inbox.html`](#unified-inboxhtml) | Displays provider-neutral communication threads with active/loading state. | `configure()`<br>`setThreads()`<br>`setActive()`<br>`setLoading()`<br>`destroy()` | `unified-inbox-ready`<br>`inbox-refresh`<br>`thread-select` | DOM-normalized |
 | [`voice-transcription.html`](#voice-transcriptionhtml) | Records segmented microphone audio only after authoritative STT admission, exposes explicit selected-STT activation, transcribes with cancellation, persists, and completes a combined transcript. | `configure()`<br>`requestSTTActivation()`<br>`startRecording()`<br>`stopRecording()`<br>`save()`<br>`completeTranscription()/complete()`<br>`clear()`<br>`reset()`<br>`destroy()` | `voice-transcription-ready`<br>`voice-transcription-state`<br>`voice-transcription-segment`<br>`voice-transcription-change`<br>`voice-transcription-complete`<br>`speech-transcription-complete`<br>`speech-transcription-cancelled`<br>`speech-stt-activation-request`<br>`speech-stt-activation-error` | Sticky runtime STT readiness, explicit activation, request cancellation, and state/text are normalized; media/provider behavior remains external |
-| [`weather-widget.html`](#weather-widgethtml) | Displays normalized current and daily weather with refresh intent. | `setWeather()`<br>`clear()` | `weather-widget-ready`<br>`weather-refresh` | Display normalized; provider supplied externally |
-| [`web-navigator.html`](#web-navigatorhtml) | Guards embedded/external navigation and surfaces allow/block/open intents. | `configure()`<br>`navigate()`<br>`currentUrl()` | `web-navigator-ready`<br>`web-navigate`<br>`web-navigation-blocked`<br>`web-open-external` | Navigation intent/decision normalized; browser navigation result platform-native |
+| [`weather-widget.html`](#weather-widgethtml) | Displays normalized current and daily weather with refresh intent. | `setWeather()`<br>`clear()`<br>`destroy()` | `weather-widget-ready`<br>`weather-refresh` | Display normalized; provider supplied externally |
+| [`web-navigator.html`](#web-navigatorhtml) | Guards embedded/external navigation and surfaces allow/block/open intents. | `configure()`<br>`navigate()`<br>`currentUrl()`<br>`destroy()` | `web-navigator-ready`<br>`web-navigate`<br>`web-navigation-blocked`<br>`web-open-external` | Navigation intent/decision normalized; browser navigation result platform-native |
 
 ## app-bar.html
 
@@ -73,7 +106,7 @@ Responsive application navigation, route state, status, and trailing actions.
 
 ### Public surface
 
-Methods/properties: `setNavigation()`, `setActiveRoute()`, `setStatus()`, `refresh()`.
+Methods/properties: `setNavigation()`, `setActiveRoute()`, `setStatus()`, `refresh()`, `destroy()`.
 
 Events: `app-bar-ready`.
 
@@ -100,9 +133,10 @@ Reusable assistant drawer, message area, composer, pending/streaming/empty/error
 
 ### Public surface
 
-Methods/properties: `open()`, `close()`, `toggle()`, `send()`, `clear()`, `setState()`, `focusComposer()`, `scrollToEnd()`.
+Methods/properties: `open()`, `close()`, `toggle()`, `send()`, `clear()`, `setState()`, `focusComposer()`, `scrollToEnd()`, `destroy()`.
 
-Events: `assistant-ready`, `assistant-send`, `assistant-clear`.
+Events: `assistant-ready`, `assistant-opened`, `assistant-closed`,
+`assistant-send`, `assistant-clear`.
 
 Slots: `title`, `subtitle`, `identity`, `messages/message`, `composer`, `actions`, `pending`, `streaming`, `empty`, `error`, `footer`.
 
@@ -127,7 +161,7 @@ Calculator keypad and result/error event surface backed by CalculatorEngine.
 
 ### Public surface
 
-Methods/properties: `calculate()`.
+Methods/properties: `calculate()`, `destroy()`.
 
 Events: `calculator-ready`, `calculation-complete`, `calculation-error`.
 
@@ -192,6 +226,17 @@ extension callbacks. The component installs warning-only defaults when the host
 does not supply them; applications may instead consume the corresponding
 `chat-send-message` and `chat-language-changed` events.
 
+`submitMessage(textOverride='',context={})` returns `Promise<boolean>`.
+`context` accepts `source`, `preserveDraft`, `synthetic`, an optional exact
+`operationId`, and an optional caller-owned `AbortSignal`. The component owns a
+derived signal for each submission, supplies it in the frozen compatibility
+`{message,context}` detail, and aborts it on canonical/DOM cancellation,
+component destruction, or caller cancellation. `chat-send-message` is
+cancelable and is the gate before `sendMessage(text,context)`; a canceled event
+never reaches the host callback. Rejected host promises are observed as
+`chat-send-error`, and stale settlement after abort or destruction is
+suppressed.
+
 `setAIAvailability()` remains an LLM compatibility input, but selected sticky
 `AIRuntimeState` LLM state wins over that boolean. STT and TTS readiness always
 comes from sticky runtime role state; the method never forwards compatibility
@@ -218,9 +263,37 @@ speech controller's `destroy()`, sets `ready` to `false`, and returns
 `undefined`. It does not initiate a provider load or unload.
 
 Events: `chat-ready`, `chat-send-message`, `chat-send-error`,
-`chat-file-uploaded`, `chat-language-changed`,
-`chat-ai-activation-request`, `chat-ai-activation-error`, and
+`chat-file-uploaded`, `chat-file-upload-error`, `chat-language-changed`,
+`chat-language-change-error`, `chat-ai-activation-request`,
+`chat-ai-activation-error`, `chat-speech-synthesis-error`, and
 `conversation-timebox-error`.
+
+All chat operation ids have the form
+`<component-instance-id>:<kind>:<sequence>`. The stable public reasons are
+`chat-ready`, `message-submission-requested`,
+`message-submission-cancelled`, `caller-signal-aborted`,
+`component-destroyed`, `host-message-submission-rejected`,
+`file-storage-completed`, `file-storage-rejected`,
+`language-change-requested`, `language-change-callback-rejected`,
+`language-model-activation-requested`,
+`language-model-activation-rejected`, `speech-synthesis-rejected`, and
+`conversation-timebox-delivery-rejected`.
+
+The stable chat boundary codes are:
+
+- `ARCANE_CHAT_MESSAGE_SUBMISSION_ABORTED` for the owned submission signal;
+- `ARCANE_CHAT_LANGUAGE_MODEL_ACTIVATION_REQUEST_REJECTED`;
+- `ARCANE_CHAT_HOST_MESSAGE_SUBMISSION_REJECTED`;
+- `ARCANE_CHAT_FILE_STORAGE_REJECTED`;
+- `ARCANE_CHAT_LANGUAGE_CHANGE_CALLBACK_REJECTED`;
+- `ARCANE_CHAT_SPEECH_SYNTHESIS_REQUEST_REJECTED`;
+- `ARCANE_CHAT_CONVERSATION_TIMEBOX_DELIVERY_REJECTED`.
+
+Error projections expose the boundary `code` and include `causeCode` only when
+the rejected dependency supplies a distinct code. File projections expose only
+size/type metadata canonically while retaining the live `File` locally.
+Language and LLM activation request projections are cancelable gates before
+their host callbacks. Every public detail is frozen by the canonical authority.
 
 Shared dependencies: [`MD.js`](runtime-modules.md#mdjs), [`File.js`](runtime-entities.md#filejs), [`ConversationTimebox.js`](runtime-modules.md#conversationtimeboxjs), [`AIRuntimeState.js`](runtime-modules.md#airuntimestatejs).
 
@@ -252,7 +325,7 @@ Provider-neutral conversation display, advisory actions, composer, busy state, a
 
 ### Public surface
 
-Methods/properties: `setConversation()`, `setBusy()`, `setStatus()`, `clearComposer()`.
+Methods/properties: `setConversation()`, `setBusy()`, `setStatus()`, `clearComposer()`, `destroy()`.
 
 Events: `conversation-view-ready`, `communication-send`, `communication-advisory-action`.
 
@@ -277,7 +350,7 @@ Selects which normalized chart definitions are visible on a dashboard.
 
 ### Public surface
 
-Methods/properties: `configure()`, `setDefinitions()`, `setVisibility()`, `getChartOptions()`, `getEffectiveVisibility()`, `open()`, `close()`.
+Methods/properties: `configure()`, `setDefinitions()`, `setVisibility()`, `getChartOptions()`, `getEffectiveVisibility()`, `open()`, `close()`, `destroy()`.
 
 Events: `dashboard-config-ready`, `dashboard-config-opened`, `dashboard-config-closed`, `dashboard-config-change`.
 
@@ -304,7 +377,7 @@ Runs destructive cleanup of empty chats and memories inside the current app data
 
 ### Public surface
 
-Methods/properties: `open()`.
+Methods/properties: `open()`, `destroy()`.
 
 Events: `data-maintenance-ready`, `data-maintenance-complete`.
 
@@ -331,7 +404,7 @@ Opens a generic modal-style data view around an injected provider.
 
 ### Public surface
 
-Methods/properties: `beforeOpen()`, `open()`.
+Methods/properties: `beforeOpen()`, `open()`, `destroy()`.
 
 Events: `data-view-ready`.
 
@@ -358,7 +431,7 @@ Presents the provider-owned OS directory chooser with change/cancel/error states
 
 ### Public surface
 
-Methods/properties: `configure()`, `focus()`, `select()`.
+Methods/properties: `configure()`, `focus()`, `select()`, `destroy()`.
 
 Events: `directory-picker-ready`, `directory-picker-change`, `directory-picker-cancel`, `directory-picker-error`.
 
@@ -385,7 +458,7 @@ Inspects PDF, text, or source documents and records review state.
 
 ### Public surface
 
-Methods/properties: `loadDocument()`, `selectView()`, `markSaved()`.
+Methods/properties: `loadDocument()`, `selectView()`, `markSaved()`, `destroy()`.
 
 Events: `document-inspector-ready`, `document-review-change`.
 
@@ -412,7 +485,7 @@ Acquires files by drag/drop or picker and presents busy, progress, error, and cl
 
 ### Public surface
 
-Methods/properties: `configure()`, `openPicker()`, `clear()`, `setBusy()`, `setError()`, `setProgress()`.
+Methods/properties: `configure()`, `openPicker()`, `clear()`, `setBusy()`, `setError()`, `setProgress()`, `destroy()`.
 
 Events: `file-drop-ready`, `file-drop-selected`, `file-drop-progress`, `file-drop-state`, `file-drop-error`.
 
@@ -437,7 +510,7 @@ Displays file metadata, preview, busy/error state, and caller-defined actions.
 
 ### Public surface
 
-Methods/properties: `configure()`, `show()`, `clear()`, `setActions()`, `setBusy()`, `setError()`, `setPreview()`.
+Methods/properties: `configure()`, `show()`, `clear()`, `setActions()`, `setBusy()`, `setError()`, `setPreview()`, `destroy()`.
 
 Events: `file-inspector-ready`, `file-inspector-action`, `file-inspector-change`, `file-inspector-cleared`, `file-inspector-error`.
 
@@ -464,7 +537,7 @@ Browses, filters, selects, opens, and acts on app-scoped files.
 
 ### Public surface
 
-Methods/properties: `setProvider()`, `loadAll()`, `setFilter()`, `select()`, `clearSelection()`.
+Methods/properties: `setProvider()`, `loadAll()`, `setFilter()`, `select()`, `clearSelection()`, `destroy()`.
 
 Events: `file-manager-ready`, `file-manager-select`, `file-manager-open`, `file-manager-action`.
 
@@ -516,7 +589,7 @@ Edits non-secret communication service configuration and service actions.
 
 ### Public surface
 
-Methods/properties: `configure()`, `getValues()`, `setStatus()`.
+Methods/properties: `configure()`, `getValues()`, `setStatus()`, `destroy()`.
 
 Events: `integration-settings-ready`, `integration-settings-save`, `integration-settings-close`, `integration-action`.
 
@@ -541,7 +614,7 @@ Presents local-AI standby, failure, recovery, guidance, retry, and dismissal sta
 
 ### Public surface
 
-Methods/properties: `configure()`, `begin()`, `present(); hidden property`.
+Methods/properties: `configure()`, `begin()`, `present()`, `destroy()`, and the `hidden` property.
 
 Events: `local-ai-status-ready`, `local-ai-status-dismissed`, `local-ai-retry`.
 
@@ -568,9 +641,12 @@ Safely renders and navigates a Markdown document with focusable fragments.
 
 ### Public surface
 
-Methods/properties: `configure()`, `load()`, `render()`, `clear()`, `fail()`, `focus()`, `focusFragment()`.
+Methods/properties: `configure()`, `load()`, `render()`, `clear()`, `fail()`, `focus()`, `focusFragment()`, `destroy()`.
 
-Events: `markdown-document-ready`, `markdown-document-state`, `markdown-document-navigate`.
+Events: `markdown-document-ready`, `markdown-document-state`,
+`markdown-document-loading`, `markdown-document-rendered`,
+`markdown-document-empty`, `markdown-document-error`, and
+`markdown-document-navigate`.
 
 Shared dependencies: [`MD.js`](runtime-modules.md#mdjs).
 
@@ -595,7 +671,7 @@ Configurable Markdown authoring, toolbar, preview, title, and save surface.
 
 ### Public surface
 
-Methods/properties: `configure()`, `focus()`, `clear()`, `saveEntry()`.
+Methods/properties: `configure()`, `focus()`, `clear()`, `saveEntry()`, `destroy()`.
 
 Events: `markdown-editor-ready`, `markdown-editor-change`, `markdown-editor-saved`.
 
@@ -622,7 +698,7 @@ Loads a validated YouTube video or playlist embed and exposes external-platform 
 
 ### Public surface
 
-Methods/properties: `configure()`, `load()`.
+Methods/properties: `configure()`, `load()`, `destroy()`.
 
 Events: `media-embed-ready`, `media-load`, `media-error`, `media-open-platform`.
 
@@ -649,7 +725,7 @@ Generic modal with population, open/close, actions, and sequential task executio
 
 ### Public surface
 
-Methods/properties: `populate()`, `open()`, `close()`, `runTasks()`.
+Methods/properties: `populate()`, `open()`, `close()`, `runTasks()`, `destroy()`.
 
 Events: `modal-ready`, `modal-opened`, `modal-closed`, `modal-action`.
 
@@ -676,7 +752,7 @@ Presents status, output, body, coverage, actions, pending, error, and cleared st
 
 ### Public surface
 
-Methods/properties: `configure()`, `setOutput()`, `setBody()`, `setCoverage()`, `setActions()`, `setPending()`, `setStatus()`, `setError()`, `clear()`.
+Methods/properties: `configure()`, `setOutput()`, `setBody()`, `setCoverage()`, `setActions()`, `setPending()`, `setStatus()`, `setError()`, `clear()`, `destroy()`.
 
 Events: `output-panel-ready`, `output-panel-state`, `output-panel-change`, `output-panel-action`, `output-panel-error`, `output-panel-cleared`.
 
@@ -703,7 +779,7 @@ Builds a schema-driven preferences form with submit, reset, busy, and status beh
 
 ### Public surface
 
-Methods/properties: `configure()`, `getValues()`, `setValues()`, `setBusy()`, `setStatus()`.
+Methods/properties: `configure()`, `getValues()`, `setValues()`, `setBusy()`, `setStatus()`, `destroy()`.
 
 Events: `preferences-form-ready`, `preferences-change`, `preferences-submit`, `preferences-reset`.
 
@@ -728,7 +804,7 @@ Displays chronological records/evidence and emits open actions.
 
 ### Public surface
 
-Methods/properties: `setItems()`, `populate()`.
+Methods/properties: `setItems()`, `populate()`, `destroy()`.
 
 Events: `record-timeline-ready`, `record-timeline-open`.
 
@@ -753,7 +829,7 @@ Displays normalized relationship nodes/edges in graph and list forms.
 
 ### Public surface
 
-Methods/properties: `setGraph()`, `populate()`.
+Methods/properties: `setGraph()`, `populate()`, `destroy()`.
 
 Events: `relationship-board-ready`, `relationship-node-open`, `relationship-edge-open`.
 
@@ -778,9 +854,15 @@ Presents image, video, or GIF display-capture workflow.
 
 ### Public surface
 
-Methods/properties: `capture()`.
+Methods/properties: `capture` (the component-owned `ScreenCapture` instance) and `destroy()`.
 
 Events: `screen-capture-ready`, `screen-capture-result`.
+
+Ready uses operation id `screen-capture-ready-<component-instance-id>`;
+capture results use the current instance-owned generation. `destroy()`
+invalidates that generation, aborts UI listeners, revokes the preview URL,
+destroys the `ScreenCapture` instance, disposes the source, marks the host
+unready, and returns `true`; repeated calls return `false`.
 
 Shared dependencies: [`ScreenCapture.js`](runtime-modules.md#screencapturejs).
 
@@ -805,9 +887,11 @@ Renders line-addressable source code with load, error, focus, and state behavior
 
 ### Public surface
 
-Methods/properties: `configure()`, `load()`, `render()`, `clear()`, `fail()`, `focus()`, `focusLine()`.
+Methods/properties: `configure()`, `load()`, `render()`, `clear()`, `fail()`, `focus()`, `focusLine()`, `destroy()`.
 
-Events: `source-code-viewer-ready`, `source-code-viewer-state`.
+Events: `source-code-viewer-ready`, `source-code-viewer-state`,
+`source-code-viewer-state-loading`, `source-code-viewer-state-ready`,
+`source-code-viewer-state-empty`, and `source-code-viewer-state-error`.
 
 ### Availability and normalization
 
@@ -830,7 +914,7 @@ Presents an evidence finding, source selection, explanation, and save state.
 
 ### Public surface
 
-Methods/properties: `showFinding()`, `populate()`, `selectSource()`, `markSaved()`.
+Methods/properties: `showFinding()`, `populate()`, `selectSource()`, `markSaved()`, `destroy()`.
 
 Events: `source-explanation-ready`, `source-explanation-save`, `source-explanation-source-selected`.
 
@@ -857,13 +941,14 @@ completion, mute state, and microphone availability.
 ### Public surface
 
 Methods/properties: `configure()`, `setAvailability()`, `setMuted()`,
-`requestSTTActivation()`, `destroy()`, `availability`, `muted`, `initialMuted`,
-and `componentReady`.
+`reportTTSError(error,boundary='synthesis')`, `requestSTTActivation()`,
+`destroy()`, `availability`, `muted`, `initialMuted`, and `componentReady`.
 
 Events: `speech-ready`, `speech-transcription-complete`,
 `speech-transcription-error`, `speech-transcription-cancelled`,
 `speech-microphone-unavailable`, `speech-stt-activation-request`,
-`speech-stt-activation-error`, and `speech-tts-lifecycle-error`.
+`speech-stt-activation-error`, `speech-tts-lifecycle-error`, and
+`speech-synthesis-error`.
 
 Shared dependencies: [`AI.js`](runtime-modules.md#aijs),
 [`AIRuntimeState.js`](runtime-modules.md#airuntimestatejs),
@@ -912,6 +997,29 @@ Mute calls `AI.setSpeechMuted(true)`, stops playback, cancels active TTS work,
 and unloads the selected TTS role. Lifecycle failures remain visible through
 `speech-tts-lifecycle-error` and sticky role state.
 
+Speech operation ids are
+`<component-instance-id>:<kind>:<sequence>`. Canonical cancellation reasons are
+`stt-role-unready`, `stt-provider-transcription-cancelled`, `stt-role-busy`,
+`microphone-unavailable`, `component-destroyed`, and
+`stt-transcription-cancelled`. Microphone capture-failure reasons are
+`microphone-input-missing`, `microphone-input-unavailable`,
+`microphone-capture-denied`, and `microphone-capture-rejected`. Component
+boundary codes are `ARCANE_SPEECH_MICROPHONE_CAPTURE_REJECTED`,
+`ARCANE_SPEECH_STT_TRANSCRIPTION_REQUEST_REJECTED`,
+`ARCANE_SPEECH_TTS_LOAD_REJECTED`, `ARCANE_SPEECH_TTS_UNLOAD_REJECTED`,
+`ARCANE_SPEECH_TTS_SYNTHESIS_REQUEST_REJECTED`, and
+`ARCANE_SPEECH_TTS_PLAYBACK_RESUME_REJECTED`. Each of those component-boundary
+public projections keeps the exact boundary in `code` and preserves a distinct
+string code from the browser, runtime, or provider additively as `causeCode`.
+A missing STT method therefore uses boundary
+`ARCANE_SPEECH_STT_TRANSCRIPTION_REQUEST_REJECTED` with
+`causeCode:'ARCANE_SPEECH_STT_RUNTIME_METHOD_UNAVAILABLE'`.
+
+Stable rejection reasons are `stt-transcription-rejected`,
+`tts-load-rejected`, `tts-unload-rejected`, `tts-synthesis-rejected`, and
+`tts-playback-resume-rejected`. Shared activation rejection uses
+`ARCANE_STT_ACTIVATION_REQUEST_REJECTED` and `activation-request-rejected`.
+
 ### Availability and normalization
 
 **Browser and supported native WebViews.** UI/runtime state and explicit user
@@ -937,7 +1045,7 @@ Displays compact selectable KPI or summary items.
 
 ### Public surface
 
-Methods/properties: `configure()`, `setItems()`, `updateItem()`, `clear()`.
+Methods/properties: `configure()`, `setItems()`, `updateItem()`, `clear()`, `destroy()`.
 
 Events: `summary-strip-ready`, `summary-strip-change`, `summary-strip-select`.
 
@@ -962,7 +1070,7 @@ Builds and updates a simple header/body table.
 
 ### Public surface
 
-Methods/properties: `buildHeader()`, `buildTable()`.
+Methods/properties: `buildHeader()`, `buildTable()`, `destroy()`.
 
 Events: `table-ready`, `header-update`, `body-update`.
 
@@ -987,7 +1095,7 @@ Runs and displays a task list with started/change/complete/error state.
 
 ### Public surface
 
-Methods/properties: `configure()`, `setTasks()`, `updateTask()`, `runTasks()`, `clear()`.
+Methods/properties: `configure()`, `setTasks()`, `updateTask()`, `runTasks()`, `clear()`, `destroy()`.
 
 Events: `task-progress-ready`, `task-progress-started`, `task-progress-change`, `task-progress-complete`, `task-progress-error`.
 
@@ -1012,7 +1120,7 @@ Presents multiple terminal sessions, output, active selection, theme, and termin
 
 ### Public surface
 
-Methods/properties: `configure()`, `addSession()`, `removeSession()`, `activateSession()`, `append()`, `clear()`, `setState()`, `setTheme()`, `focus()`.
+Methods/properties: `configure()`, `addSession()`, `removeSession()`, `activateSession()`, `append()`, `clear()`, `setState()`, `setTheme()`, `focus()`, `destroy()`.
 
 Events: `terminal-workspace-ready`, `terminal-submit`, `terminal-interrupt`, `terminal-clear`, `terminal-session-new`, `terminal-session-close`, `terminal-session-select`, `terminal-settings`.
 
@@ -1039,7 +1147,7 @@ Edits, previews, saves, and resets semantic custom theme tokens.
 
 ### Public surface
 
-Methods/properties: `configure()`, `getTheme()`, `setTheme()`, `setBusy()`, `setStatus()`.
+Methods/properties: `configure()`, `getTheme()`, `setTheme()`, `setBusy()`, `setStatus()`, `destroy()`.
 
 Events: `theme-editor-ready`, `theme-preview`, `theme-save`, `theme-reset`.
 
@@ -1093,7 +1201,7 @@ Displays provider-neutral communication threads with active/loading state.
 
 ### Public surface
 
-Methods/properties: `configure()`, `setThreads()`, `setActive()`, `setLoading()`.
+Methods/properties: `configure()`, `setThreads()`, `setActive()`, `setLoading()`, `destroy()`.
 
 Events: `unified-inbox-ready`, `inbox-refresh`, `thread-select`.
 
@@ -1160,10 +1268,14 @@ state observation emit no activation request and never begin a model download.
 If sticky readiness is lost during microphone acquisition, capture, or the STT
 request, the component invalidates the session, aborts the owned request signal,
 releases media, discards late completion, and emits
-`speech-transcription-cancelled` with frozen `{reason:'runtime-unready'}`. A
-current provider cancellation returns the component workflow to `idle` and
-emits the same event with `reason:'stt-provider-request-cancelled'`; destroying
-an active capture or transcription emits `reason:'component-destroyed'`.
+`speech-transcription-cancelled`. Its local compatibility reason is
+`runtime-unready`, while its canonical/public reason is `stt-role-unready`. A
+busy role uses `stt-role-busy` in both views. A current provider cancellation
+returns the component workflow to `idle` with local
+`stt-provider-request-cancelled` and canonical/public
+`stt-provider-transcription-cancelled`; destruction uses
+`component-destroyed` in both views. Replacing configuration without an
+`initialValue` during active work uses `configuration-replaced` in both views.
 Stale teardown results remain suppressed. A
 current save failure, including `AbortError`, enters the visible `error` state.
 Readiness loss after transcription has finished does not invalidate an already
@@ -1207,7 +1319,7 @@ Displays normalized current and daily weather with refresh intent.
 
 ### Public surface
 
-Methods/properties: `setWeather()`, `clear()`.
+Methods/properties: `setWeather()`, `clear()`, `destroy()`.
 
 Events: `weather-widget-ready`, `weather-refresh`.
 
@@ -1232,7 +1344,7 @@ Guards embedded/external navigation and surfaces allow/block/open intents.
 
 ### Public surface
 
-Methods/properties: `configure()`, `navigate()`, `currentUrl()`.
+Methods/properties: `configure()`, `navigate()`, `currentUrl()`, `destroy()`.
 
 Events: `web-navigator-ready`, `web-navigate`, `web-navigation-blocked`, `web-open-external`.
 
