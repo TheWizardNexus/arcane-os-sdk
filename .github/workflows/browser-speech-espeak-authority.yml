@@ -69,12 +69,9 @@ jobs:
           libtool_2.4.6-15build2_all.deb	163940	fb994bc0152f4e77a791b51bc54fd5e38963aa6473e60c45369ef373b6119124	pool/main/libt/libtool/libtool_2.4.6-15build2_all.deb
           m4_1.4.18-5ubuntu2_amd64.deb	198836	572a544d2c18bf49d25c465720c570cd8e6e38731386ac9c0a7f29bed2486f3e	pool/main/m/m4/m4_1.4.18-5ubuntu2_amd64.deb
           libsigsegv2_2.13-1ubuntu3_amd64.deb	14612	894fcb0804df54dca59edbd0860d6f3eeac25d1555aebd3fa99d80665969f891	pool/main/libs/libsigsegv/libsigsegv2_2.13-1ubuntu3_amd64.deb
-          pkg-config_0.29.2-1ubuntu3_amd64.deb	48218	69da4190d948d0bf7444ead040791b7924bd1a08a10ec13cd7f0bb9baab09c53	pool/main/p/pkg-config/pkg-config_0.29.2-1ubuntu3_amd64.deb
           file_5.41-3ubuntu0.1_amd64.deb	21524	b63b48e8b32c6f0fce5ad37d5ec3269cbbdc8feed13170aae1f416a43ebe898b	pool/main/f/file/file_5.41-3ubuntu0.1_amd64.deb
           libmagic1_5.41-3ubuntu0.1_amd64.deb	87242	344d0cc65fea4175ca1ab222c20b5b95fb1357acafea6b016add9988760829d0	pool/main/f/file/libmagic1_5.41-3ubuntu0.1_amd64.deb
           libmagic-mgc_5.41-3ubuntu0.1_amd64.deb	257310	23fcefb8b9ee73eb74e127fc230330918a8f81e127fa54015f191cfd34726b3c	pool/main/f/file/libmagic-mgc_5.41-3ubuntu0.1_amd64.deb
-          libglib2.0-0_2.72.4-0ubuntu2.4_amd64.deb	1465352	b4017c697176219dbd0f66183f4e173f725794744ddf8504a26f2580d2a51492	pool/main/g/glib2.0/libglib2.0-0_2.72.4-0ubuntu2.4_amd64.deb
-          libpcre3_8.39-13ubuntu0.22.04.1_amd64.deb	245530	0d1eb051047eb0c637c893f618f45e1d419863bfa3bc821897ee05ad418ba22e	pool/main/p/pcre3/libpcre3_8.39-13ubuntu0.22.04.1_amd64.deb
           EOF
 
           total_bytes=0
@@ -83,7 +80,7 @@ jobs:
               "$UBUNTU_SNAPSHOT/$pool_path"
             total_bytes=$((total_bytes + bytes))
           done < "$inputs/dependencies.tsv"
-          test "$total_bytes" = 3442994
+          test "$total_bytes" = 1683894
 
           cat > "$inputs/Dockerfile" <<'EOF'
           ARG BASE_IMAGE
@@ -101,12 +98,9 @@ jobs:
               test "$(dpkg-query -W -f='${Version}' libtool)" = 2.4.6-15build2; \
               test "$(dpkg-query -W -f='${Version}' m4)" = 1.4.18-5ubuntu2; \
               test "$(dpkg-query -W -f='${Version}' libsigsegv2)" = 2.13-1ubuntu3; \
-              test "$(dpkg-query -W -f='${Version}' pkg-config)" = 0.29.2-1ubuntu3; \
               test "$(dpkg-query -W -f='${Version}' file)" = 1:5.41-3ubuntu0.1; \
               test "$(dpkg-query -W -f='${Version}' libmagic1)" = 1:5.41-3ubuntu0.1; \
-              test "$(dpkg-query -W -f='${Version}' libmagic-mgc)" = 1:5.41-3ubuntu0.1; \
-              test "$(dpkg-query -W -f='${Version}' libglib2.0-0)" = 2.72.4-0ubuntu2.4; \
-              test "$(dpkg-query -W -f='${Version}' libpcre3)" = 2:8.39-13ubuntu0.22.04.1
+              test "$(dpkg-query -W -f='${Version}' libmagic-mgc)" = 1:5.41-3ubuntu0.1
           EOF
 
           cat > "$inputs/arcane_espeak_phonemes.c" <<'EOF'
