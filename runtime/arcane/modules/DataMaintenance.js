@@ -1,6 +1,7 @@
 import './DBOPFS.js';
 import {hasUserEntry} from './ChatRecords.js';
 import {hasMemoryContent} from './MemoryRecords.js';
+import {arcaneEvents} from 'arcane-os/event-manager';
 
 async function clearEmptyChatsAndMemories(){
     await waitForDBOPFS();
@@ -70,12 +71,21 @@ function waitForDBOPFS(){
 
     return new Promise(
         function waitForDBOPFSPromise(resolve){
+            let settled=false;
+            let unsubscribe;
             function ready(){
-                window.removeEventListener('dbopfs-ready',ready);
+                if(settled||window.dbopfs?.ready!==true){
+                    return;
+                }
+                settled=true;
+                unsubscribe?.();
                 resolve(window.dbopfs);
             }
 
-            window.addEventListener('dbopfs-ready',ready);
+            unsubscribe=arcaneEvents.subscribe(
+                'dbopfs-ready',
+                ready
+            );
 
             if(window.dbopfs?.ready){
                 ready();
