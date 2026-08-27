@@ -1,3 +1,5 @@
+import {createArcaneEventSource} from 'arcane-os/event-manager';
+
 const MAX_SPEECH_INPUT=3900;
 const MAX_SPEECH_CHUNKS=32;
 const MAX_SPEECH_CHARACTERS=MAX_SPEECH_INPUT*MAX_SPEECH_CHUNKS;
@@ -15,6 +17,20 @@ const SPEECH_VOICE_OPTIONS=Object.freeze([
     Object.freeze({value:'shimmer',label:'Shimmer'})
 ]);
 const SUPERSEDED=Object.freeze({superseded:true});
+const SPEECH_PLAYBACK_STATE_EVENT='speech-playback-state';
+const SPEECH_PLAYBACK_FAILURE_REASONS=Object.freeze({
+    ARCANE_AI_OPERATION_SUPERSEDED:'speech-synthesis-superseded',
+    ARCANE_AI_REQUEST_ABORTED:'speech-synthesis-cancelled',
+    ARCANE_SPEECH_PLAYBACK_AUDIO_PLAYBACK_REJECTED:'audio-playback-rejected',
+    ARCANE_SPEECH_PLAYBACK_SYNTHESIZED_AUDIO_CONTRACT_MISMATCH:'synthesized-audio-contract-mismatch',
+    ARCANE_SPEECH_PLAYBACK_SYNTHESIZER_UNAVAILABLE:'speech-synthesizer-unavailable'
+});
+const WAV_AUDIO_CONTENT_TYPES=Object.freeze(new Set([
+    'audio/vnd.wave',
+    'audio/wav',
+    'audio/wave',
+    'audio/x-wav'
+]));
 const queuesBySpeechClient=new WeakMap();
 
 class ReadonlyAliasSet{
@@ -103,7 +119,7 @@ function splitSpeechText(
     return chunks;
 }
 
-function normalizeParts(parts,defaultVoice='alloy',defaultSpeed=1){
+function normalizeParts(parts,defaultVoice=null,defaultSpeed=1){
     if(!Array.isArray(parts)||!parts.length){
         throw new TypeError('Narration text cannot be blank. The full visual content remains available.');
     }
@@ -121,9 +137,14 @@ function normalizeParts(parts,defaultVoice='alloy',defaultSpeed=1){
         if(!Number.isFinite(pauseAfterMs)||pauseAfterMs<0||pauseAfterMs>60_000){
             throw new RangeError('Speech segment pauses must be between 0 and 60,000 milliseconds.');
         }
-        const voice=String(candidate?.voice??defaultVoice).trim();
+        const voiceValue=candidate?.voice??defaultVoice;
+        const voice=voiceValue===null||voiceValue===undefined
+            ?null
+            :String(voiceValue).trim();
         const speed=Number(candidate?.speed??defaultSpeed);
-        if(!voice)throw new TypeError('Every speech segment requires a voice.');
+        if(voiceValue!==null&&voiceValue!==undefined&&!voice){
+            throw new TypeError('Speech segment voice cannot be blank.');
+        }
         if(!Number.isFinite(speed)||speed<=0)throw new RangeError('Every speech segment requires a positive speech speed.');
         return Object.freeze({
             input,
@@ -140,6 +161,179 @@ function base64Bytes(value=''){
     const bytes=new Uint8Array(binary.length);
     for(let index=0;index<binary.length;index+=1)bytes[index]=binary.charCodeAt(index);
     return bytes;
+}
+
+function synthesizedAudioContractError(cause=null){
+    const error=new TypeError('Arcane returned invalid synthesized audio.');
+    error.code='ARCANE_SPEECH_PLAYBACK_SYNTHESIZED_AUDIO_CONTRACT_MISMATCH';
+    if(cause!==null)error.cause=cause;
+    return error;
+}
+
+function normalizeAudioContentType(value,fallback=null){
+    const candidate=value===undefined||value===null?fallback:value;
+    if(typeof candidate!=='string'||!candidate.trim()){
+        throw synthesizedAudioContractError();
+    }
+    const contentType=candidate.split(';',1)[0].trim().toLowerCase();
+    if(!/^audio\/[a-z0-9][a-z0-9!#$&^_.+-]*$/u.test(contentType)){
+        throw synthesizedAudioContractError();
+    }
+    return contentType;
+}
+
+function audioContentTypesAgree(first,second){
+    return first===second
+        ||(WAV_AUDIO_CONTENT_TYPES.has(first)&&WAV_AUDIO_CONTENT_TYPES.has(second));
+}
+
+function speechAudioBytes(value){
+    if(value instanceof ArrayBuffer){
+        return new Uint8Array(value.slice(0));
+    }
+    if(ArrayBuffer.isView(value)){
+        return new Uint8Array(
+            value.buffer.slice(
+                value.byteOffset,
+                value.byteOffset+value.byteLength
+            )
+        );
+    }
+    throw synthesizedAudioContractError();
+}
+
+function bytesMatchASCII(bytes,offset,value){
+    if(offset+value.length>bytes.byteLength)return false;
+    for(let index=0;index<value.length;index+=1){
+        if(bytes[offset+index]!==value.charCodeAt(index))return false;
+    }
+    return true;
+}
+
+function assertPlayableWav(bytes){
+    if(bytes.byteLength<44
+        ||!bytesMatchASCII(bytes,0,'RIFF')
+        ||!bytesMatchASCII(bytes,8,'WAVE')){
+        throw synthesizedAudioContractError();
+    }
+    const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+    if(view.getUint32(4,true)+8!==bytes.byteLength){
+        throw synthesizedAudioContractError();
+    }
+    let offset=12;
+    let formatFound=false;
+    let audioFound=false;
+    while(offset+8<=bytes.byteLength){
+        const chunkBytes=view.getUint32(offset+4,true);
+        const chunkStart=offset+8;
+        const chunkEnd=chunkStart+chunkBytes;
+        if(chunkEnd>bytes.byteLength){
+            throw synthesizedAudioContractError();
+        }
+        if(bytesMatchASCII(bytes,offset,'fmt ')){
+            if(chunkBytes<16
+                ||view.getUint16(chunkStart,true)===0
+                ||view.getUint16(chunkStart+2,true)===0
+                ||view.getUint32(chunkStart+4,true)===0
+                ||view.getUint32(chunkStart+8,true)===0
+                ||view.getUint16(chunkStart+12,true)===0
+                ||view.getUint16(chunkStart+14,true)===0){
+                throw synthesizedAudioContractError();
+            }
+            formatFound=true;
+        }else if(bytesMatchASCII(bytes,offset,'data')){
+            if(chunkBytes===0)throw synthesizedAudioContractError();
+            audioFound=true;
+        }
+        offset=chunkEnd+(chunkBytes%2);
+    }
+    if(offset!==bytes.byteLength||!formatFound||!audioFound){
+        throw synthesizedAudioContractError();
+    }
+}
+
+async function validatedSpeechBlob(blob,declaredContentType=null){
+    if(!(blob instanceof Blob)||blob.size===0){
+        throw synthesizedAudioContractError();
+    }
+    const blobContentType=blob.type
+        ?normalizeAudioContentType(blob.type)
+        :null;
+    const declared=declaredContentType===undefined||declaredContentType===null
+        ?null
+        :normalizeAudioContentType(declaredContentType);
+    if(blobContentType&&declared
+        &&!audioContentTypesAgree(blobContentType,declared)){
+        throw synthesizedAudioContractError();
+    }
+    const contentType=declared||blobContentType;
+    if(!contentType)throw synthesizedAudioContractError();
+    if(WAV_AUDIO_CONTENT_TYPES.has(contentType)){
+        assertPlayableWav(new Uint8Array(await blob.arrayBuffer()));
+    }
+    return blobContentType===contentType
+        ?blob
+        :new Blob([blob],{type:contentType});
+}
+
+async function validatedSpeechBytes(bytes,contentType='audio/wav'){
+    const normalizedContentType=normalizeAudioContentType(
+        contentType,
+        'audio/wav'
+    );
+    if(bytes.byteLength===0)throw synthesizedAudioContractError();
+    if(WAV_AUDIO_CONTENT_TYPES.has(normalizedContentType)){
+        assertPlayableWav(bytes);
+    }
+    return new Blob([bytes],{type:normalizedContentType});
+}
+
+async function playableSpeechBlob(response){
+    try{
+        if(response instanceof Blob)return validatedSpeechBlob(response);
+        if(response instanceof ArrayBuffer||ArrayBuffer.isView(response)){
+            return validatedSpeechBytes(speechAudioBytes(response));
+        }
+        if(response&&typeof response==='object'){
+            if(response.audio instanceof Blob){
+                return validatedSpeechBlob(
+                    response.audio,
+                    response.contentType
+                );
+            }
+            if(response.audio instanceof ArrayBuffer||ArrayBuffer.isView(response.audio)){
+                return validatedSpeechBytes(
+                    speechAudioBytes(response.audio),
+                    response.contentType
+                );
+            }
+            if(typeof response.audioBase64==='string'&&response.audioBase64){
+                return validatedSpeechBytes(
+                    base64Bytes(response.audioBase64),
+                    response.contentType
+                );
+            }
+        }
+    }catch(error){
+        if(error?.code
+            ==='ARCANE_SPEECH_PLAYBACK_SYNTHESIZED_AUDIO_CONTRACT_MISMATCH'){
+            throw error;
+        }
+        throw synthesizedAudioContractError(error);
+    }
+    throw synthesizedAudioContractError();
+}
+
+function speechPlaybackFailureReason(error){
+    if(error?.name==='AbortError')return 'speech-synthesis-cancelled';
+    if(typeof error?.code==='string'
+        &&Object.hasOwn(SPEECH_PLAYBACK_FAILURE_REASONS,error.code)){
+        return SPEECH_PLAYBACK_FAILURE_REASONS[error.code];
+    }
+    if(error instanceof TypeError||error instanceof RangeError){
+        return 'speech-playback-request-contract-mismatch';
+    }
+    return 'speech-synthesis-rejected';
 }
 
 class LatestSpeechQueue{
@@ -224,6 +418,10 @@ class SpeechPlayback{
     constructor({
         audio,
         speech=globalThis.Arcane?.speech,
+        model=null,
+        voice=null,
+        responseFormat=null,
+        speed=1,
         onState=function noop(){},
         createObjectURL,
         revokeObjectURL,
@@ -233,13 +431,37 @@ class SpeechPlayback{
         if(!audio||typeof audio.addEventListener!=='function'){
             throw new TypeError('SpeechPlayback requires an audio element.');
         }
+        const normalizedSpeed=Number(speed);
+        if(!Number.isFinite(normalizedSpeed)||normalizedSpeed<=0){
+            throw new RangeError('SpeechPlayback speed must be a positive number.');
+        }
         this.audio=audio;
         this.speech=speech;
+        this.events=createArcaneEventSource(
+            this,
+            {
+                source:'speech-playback',
+                eventTypes:Object.freeze([SPEECH_PLAYBACK_STATE_EVENT])
+            }
+        );
         this.onState=onState;
         this.createObjectURL=createObjectURL||function createAudioURL(blob){return URL.createObjectURL(blob);};
         this.revokeObjectURL=revokeObjectURL||function revokeAudioURL(url){URL.revokeObjectURL(url);};
-        this.delay=delay||function playbackDelay(duration){
-            return new Promise(function wait(resolve){globalThis.setTimeout(resolve,duration);});
+        this.delay=delay||function playbackDelay(duration,signal){
+            return new Promise(function wait(resolve){
+                let timer=null;
+                const finish=()=>{
+                    globalThis.clearTimeout(timer);
+                    signal?.removeEventListener('abort',finish);
+                    resolve();
+                };
+                signal?.addEventListener('abort',finish,{once:true});
+                if(signal?.aborted){
+                    finish();
+                    return;
+                }
+                timer=globalThis.setTimeout(finish,duration);
+            });
         };
         this.messages=Object.freeze({...DEFAULT_MESSAGES,...messages});
         this.urls=[];
@@ -249,10 +471,18 @@ class SpeechPlayback{
         this.pendingGenerations=new Set();
         this.lookahead=null;
         this.lookaheadError=null;
-        this.voice='alloy';
-        this.speed=1;
+        this.model=model===null||model===undefined?null:String(model).trim()||null;
+        this.voice=voice===null||voice===undefined?null:String(voice).trim()||null;
+        this.responseFormat=responseFormat===null||responseFormat===undefined
+            ?null
+            :String(responseFormat).trim()||null;
+        this.speed=normalizedSpeed;
         this.key='';
         this.state='idle';
+        this.operationSequence=0;
+        this.operationId=null;
+        this.abortControllers=new Set();
+        this.destroyed=false;
         this.boundEnded=this.handleEnded.bind(this);
         this.boundPlay=this.handlePlay.bind(this);
         this.boundPause=this.handlePause.bind(this);
@@ -270,9 +500,19 @@ class SpeechPlayback{
         return String(typeof value==='function'?value(details):value||'');
     }
 
-    emit(state,message,key=this.key){
+    nextOperationId(){
+        if(this.operationSequence===Number.MAX_SAFE_INTEGER){
+            const error=new RangeError('SpeechPlayback operation sequence is exhausted.');
+            error.code='ARCANE_SPEECH_PLAYBACK_OPERATION_SEQUENCE_EXHAUSTED';
+            throw error;
+        }
+        this.operationSequence+=1;
+        return `${this.events.descriptor.instanceId}:playback:${this.operationSequence.toString(36)}`;
+    }
+
+    emit(state,message,key=this.key,{code=null,reason=null}={}){
         this.state=state;
-        this.onState({
+        const detail=Object.freeze({
             state,
             message,
             key,
@@ -280,11 +520,49 @@ class SpeechPlayback{
             total:this.parts.length||this.urls.filter(Boolean).length,
             producing:this.synthesisInFlight,
             buffered:this.urls.filter(Boolean).length,
-            hasAudio:this.hasAudio()
+            hasAudio:this.hasAudio(),
+            operationId:this.operationId,
+            code,
+            reason
         });
+        if(!this.destroyed){
+            this.events.dispatch(
+                SPEECH_PLAYBACK_STATE_EVENT,
+                detail,
+                {
+                    operationId:this.operationId,
+                    publicDetail:{
+                        state,
+                        key,
+                        index:detail.index,
+                        total:detail.total,
+                        producing:detail.producing,
+                        buffered:detail.buffered,
+                        hasAudio:detail.hasAudio,
+                        code,
+                        reason
+                    }
+                }
+            );
+        }
+        try{
+            this.onState(detail);
+        }catch(error){
+            if(typeof globalThis.reportError==='function')globalThis.reportError(error);
+            else console.error(error);
+        }
+        return detail;
     }
 
-    available(){return Boolean(this.speech&&typeof this.speech.synthesize==='function');}
+    available(){
+        return Boolean(
+            this.speech
+            &&(
+                typeof this.speech.fetchTTS==='function'
+                ||typeof this.speech.synthesize==='function'
+            )
+        );
+    }
 
     hasAudio(key=this.key){return Boolean(this.urls.some(Boolean)&&(!key||key===this.key));}
 
@@ -300,9 +578,14 @@ class SpeechPlayback{
 
     releaseUrls(){this.releaseURLs();}
 
-    cancel(message=this.message('idle')){
+    cancel(
+        message=this.message('idle'),
+        reason='speech-playback-cancelled'
+    ){
         const cancelledKey=this.key;
         this.generation+=1;
+        for(const controller of this.abortControllers)controller.abort();
+        this.abortControllers.clear();
         this.audio.pause();
         this.audio.removeAttribute?.('src');
         this.audio.load?.();
@@ -310,44 +593,68 @@ class SpeechPlayback{
         this.releaseURLs();
         this.index=0;
         this.key='';
-        this.emit('idle',message,cancelledKey);
+        this.emit('idle',message,cancelledKey,{reason});
+    }
+
+    async requestSpeech(part,signal){
+        const payload={
+            input:part.input,
+            speed:part.speed,
+            ...(this.model?{model:this.model}:{}),
+            ...(part.voice?{voice:part.voice}:{}),
+            ...(this.responseFormat?{responseFormat:this.responseFormat}:{})
+        };
+        if(typeof this.speech?.fetchTTS==='function'){
+            return playableSpeechBlob(
+                await this.speech.fetchTTS(payload,signal)
+            );
+        }
+        if(typeof this.speech?.synthesize==='function'){
+            return playableSpeechBlob(
+                await this.speech.synthesize(payload,{signal})
+            );
+        }
+        const error=new Error(this.message('unavailable'));
+        error.code='ARCANE_SPEECH_PLAYBACK_SYNTHESIZER_UNAVAILABLE';
+        throw error;
     }
 
     async synthesizeSegment(index,generation,announce=false){
         const playback=this;
-        const token=Object.freeze({generation,index});
+        const controller=new AbortController();
+        const token=Object.freeze({generation,index,controller});
         const queue=queueFor(this.speech);
         this.pendingGenerations.add(token);
+        this.abortControllers.add(controller);
         try{
             return await queue.enqueue(async function synthesizeQueuedSegment(){
                 const part=playback.parts[index];
-                if(generation!==playback.generation||!part)return SUPERSEDED;
+                if(generation!==playback.generation||!part){
+                    controller.abort();
+                    return SUPERSEDED;
+                }
                 if(announce){
                     playback.emit('synthesizing',playback.message('preparing',{count:playback.parts.length}));
                 }
-                const response=await playback.speech.synthesize({
-                    model:'kokoro',
-                    input:part.input,
-                    voice:part.voice,
-                    responseFormat:'opus',
-                    speed:part.speed
-                });
-                if(generation!==playback.generation)return SUPERSEDED;
-                if(!response||typeof response.audioBase64!=='string'||!response.audioBase64){
-                    throw new TypeError(playback.message('invalidAudio'));
+                const audio=await playback.requestSpeech(
+                    part,
+                    controller.signal
+                );
+                if(generation!==playback.generation){
+                    controller.abort();
+                    return SUPERSEDED;
                 }
-                const contentType=typeof response.contentType==='string'&&response.contentType
-                    ?response.contentType
-                    :'audio/ogg';
-                const url=playback.createObjectURL(new Blob([base64Bytes(response.audioBase64)],{type:contentType}));
+                const url=playback.createObjectURL(audio);
                 if(generation!==playback.generation){
                     playback.revokeObjectURL(url);
+                    controller.abort();
                     return SUPERSEDED;
                 }
                 return {url};
             },{speculative:!announce});
         }finally{
             this.pendingGenerations.delete(token);
+            this.abortControllers.delete(controller);
         }
     }
 
@@ -407,20 +714,70 @@ class SpeechPlayback{
         return generation===this.generation&&result.ready===true&&Boolean(this.urls[index]);
     }
 
-    async prepare({key,parts,voice='alloy',speed=1,autoplay=true}={}){
-        this.cancel();
+    async waitForPause(duration,generation){
+        const controller=new AbortController();
+        this.abortControllers.add(controller);
+        try{
+            await this.delay(duration,controller.signal);
+            return !controller.signal.aborted&&generation===this.generation;
+        }catch(error){
+            if(controller.signal.aborted||generation!==this.generation)return false;
+            throw error;
+        }finally{
+            this.abortControllers.delete(controller);
+        }
+    }
+
+    async prepare({
+        key,
+        parts,
+        model=this.model,
+        voice=this.voice,
+        responseFormat=this.responseFormat,
+        speed=this.speed,
+        autoplay=true
+    }={}){
+        if(this.destroyed){
+            const error=new Error('SpeechPlayback is destroyed.');
+            error.code='ARCANE_SPEECH_PLAYBACK_DESTROYED';
+            throw error;
+        }
+        this.cancel(this.message('idle'),'playback-replaced');
         const generation=this.generation;
+        this.operationId=this.nextOperationId();
         this.key=String(key||'narration');
         const requestKey=this.key;
         let normalized;
         try{
-            if(!this.available())throw new Error(this.message('unavailable'));
+            if(!this.available()){
+                const error=new Error(this.message('unavailable'));
+                error.code='ARCANE_SPEECH_PLAYBACK_SYNTHESIZER_UNAVAILABLE';
+                throw error;
+            }
             const numericSpeed=Number(speed);
             if(!Number.isFinite(numericSpeed)||numericSpeed<=0)throw new RangeError('Speech speed must be a positive number.');
-            const selectedVoice=String(voice).trim();
-            if(!selectedVoice)throw new TypeError('Speech voice cannot be blank.');
+            const selectedModel=model===null||model===undefined
+                ?null
+                :String(model).trim();
+            const selectedVoice=voice===null||voice===undefined
+                ?null
+                :String(voice).trim();
+            const selectedResponseFormat=responseFormat===null||responseFormat===undefined
+                ?null
+                :String(responseFormat).trim();
+            if(model!==null&&model!==undefined&&!selectedModel){
+                throw new TypeError('Speech model cannot be blank.');
+            }
+            if(voice!==null&&voice!==undefined&&!selectedVoice){
+                throw new TypeError('Speech voice cannot be blank.');
+            }
+            if(responseFormat!==null&&responseFormat!==undefined&&!selectedResponseFormat){
+                throw new TypeError('Speech response format cannot be blank.');
+            }
             this.speed=numericSpeed;
+            this.model=selectedModel;
             this.voice=selectedVoice;
+            this.responseFormat=selectedResponseFormat;
             normalized=normalizeParts(
                 typeof parts==='function'?parts():parts,
                 selectedVoice,
@@ -474,8 +831,13 @@ class SpeechPlayback{
         try{
             await this.audio.play();
             return true;
-        }catch{
-            this.emit('ready',this.message('autoplayBlocked'));
+        }catch(error){
+            this.emit(
+                'ready',
+                this.message('autoplayBlocked'),
+                this.key,
+                {reason:'audio-autoplay-rejected'}
+            );
             return false;
         }
     }
@@ -507,7 +869,10 @@ class SpeechPlayback{
     stop(){
         const hasAudio=this.hasAudio();
         if(!this.synthesisInFlight&&!hasAudio)return;
-        this.cancel(this.message(hasAudio?'stopped':'preparationStopped'));
+        this.cancel(
+            this.message(hasAudio?'stopped':'preparationStopped'),
+            'playback-stopped'
+        );
     }
 
     async advance(){
@@ -520,8 +885,9 @@ class SpeechPlayback{
         const pauseAfterMs=this.parts[this.index]?.pauseAfterMs||0;
         if(pauseAfterMs>0){
             this.emit('pausing',this.message('pausing',{duration:pauseAfterMs}));
-            await this.delay(pauseAfterMs);
-            if(generation!==this.generation||!this.hasAudio())return false;
+            if(!await this.waitForPause(pauseAfterMs,generation)||!this.hasAudio()){
+                return false;
+            }
         }
         const nextIndex=this.index+1;
         if(!this.urls[nextIndex]){
@@ -563,9 +929,39 @@ class SpeechPlayback{
         }
     }
 
-    handleError(){this.fail(new Error(this.message('playbackError')));}
+    handleError(){
+        const error=new Error(this.message('playbackError'));
+        error.code='ARCANE_SPEECH_PLAYBACK_AUDIO_PLAYBACK_REJECTED';
+        this.fail(error);
+    }
 
-    fail(error){this.emit('error',String(error?.message||this.message('fallbackError')));}
+    fail(error){
+        const reason=speechPlaybackFailureReason(error);
+        const code=typeof error?.code==='string'&&error.code.trim()
+            ?error.code.trim()
+            :reason==='speech-playback-request-contract-mismatch'
+                ?'ARCANE_SPEECH_PLAYBACK_REQUEST_CONTRACT_MISMATCH'
+                :'ARCANE_SPEECH_PLAYBACK_SYNTHESIS_REQUEST_REJECTED';
+        return this.emit(
+            'error',
+            String(error?.message||this.message('fallbackError')),
+            this.key,
+            {code,reason}
+        );
+    }
+
+    destroy(){
+        if(this.destroyed)return false;
+        this.cancel(this.message('idle'),'playback-destroyed');
+        this.audio.removeEventListener('ended',this.boundEnded);
+        this.audio.removeEventListener('play',this.boundPlay);
+        this.audio.removeEventListener('pause',this.boundPause);
+        this.audio.removeEventListener('error',this.boundError);
+        this.destroyed=true;
+        this.events.dispose();
+        this.onState=function destroyedSpeechPlaybackStateObserver(){};
+        return true;
+    }
 }
 
 export {
@@ -575,6 +971,7 @@ export {
     PREFERRED_STREAM_SEGMENT,
     SPEECH_VOICE_ALIASES,
     SPEECH_VOICE_OPTIONS,
+    SPEECH_PLAYBACK_STATE_EVENT,
     SpeechPlayback,
     splitSpeechText
 };

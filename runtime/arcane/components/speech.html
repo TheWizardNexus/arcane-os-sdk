@@ -146,12 +146,17 @@
 <button id="muteButton" type="button" class="mute" aria-pressed="true" aria-label="Voice unavailable" disabled>Voice unavailable</button>
 
 <script type="module">
+    const {
+        createArcaneEventSource,
+        projectArcaneDOMEvent
+    } = await import('arcane-os/event-manager');
+
     void import('../modules/DBLS.js').catch(
         function reportDBLSImportFailure(error) {
             console.error('The shared database runtime could not load.');
         }
     );
-    const aiModuleImport = import('../modules/AI.js?v=7');
+    const aiModuleImport = import('../modules/AI.js');
     const {
         requestAIRuntimeIntent,
         subscribeAIRuntimeState
@@ -161,6 +166,23 @@
     } = await import('../modules/ComponentContracts.js');
 
     const host = this;
+    const events = createArcaneEventSource(
+        host,
+        {
+            source: 'arcane.component.speech',
+            eventTypes: [
+                'speech-ready',
+                'speech-transcription-complete',
+                'speech-transcription-error',
+                'speech-transcription-cancelled',
+                'speech-microphone-unavailable',
+                'speech-stt-activation-request',
+                'speech-stt-activation-error',
+                'speech-tts-lifecycle-error',
+                'speech-synthesis-error'
+            ]
+        }
+    );
     const shadowRoot = host.shadowRoot;
     const recordButton = shadowRoot.querySelector('#recordButton');
     const sttActivationButton = shadowRoot.querySelector('#sttActivationButton');
@@ -186,12 +208,88 @@
     let keyboardRecording = false;
     let localStatus = null;
     let pendingTTSIntent = null;
+    let activeTTSIntent = null;
+    let pendingUnmute = false;
     let ttsIntentGeneration = 0;
+    let eventOperationSequence = 0;
+    let transcriptionOperationId = null;
+    let ttsOperationId = null;
     let destroyed = false;
+
+    function nextSpeechOperationId(kind) {
+        eventOperationSequence += 1;
+        return `${events.descriptor.instanceId}:${kind}:${eventOperationSequence}`;
+    }
+
+    function dispatchSpeechEvent(
+        type,
+        compatibilityDetail = {},
+        {
+            publicDetail = {},
+            operationId = null,
+            bubbles = false,
+            composed = false,
+            cancelable = false
+        } = {}
+    ) {
+        if (destroyed && type !== 'speech-transcription-cancelled') {
+            return false;
+        }
+        const publication = events.dispatch(
+            type,
+            compatibilityDetail,
+            {
+                publicDetail,
+                operationId,
+                cancelable
+            }
+        );
+        if (!publication.accepted) {
+            return false;
+        }
+        return projectArcaneDOMEvent(
+            host,
+            publication.occurrence,
+            {
+                bubbles,
+                composed,
+                cancelable
+            }
+        );
+    }
+
+    function publicSpeechErrorCode(error, fallback) {
+        return typeof error?.code === 'string' && error.code
+            ? error.code
+            : fallback;
+    }
+
+    function microphoneFailureReason(error) {
+        if (error?.name === 'NotFoundError') {
+            return 'microphone-input-missing';
+        }
+        if (error?.name === 'NotReadableError') {
+            return 'microphone-input-unavailable';
+        }
+        if (['NotAllowedError', 'SecurityError'].includes(error?.name)) {
+            return 'microphone-capture-denied';
+        }
+        return 'microphone-capture-rejected';
+    }
+
+    function canonicalSTTCancellationReason(reason) {
+        if (reason === 'runtime-unready') {
+            return 'stt-role-unready';
+        }
+        if (reason === 'stt-provider-request-cancelled') {
+            return 'stt-provider-transcription-cancelled';
+        }
+        return String(reason || 'stt-transcription-cancelled');
+    }
 
     const initialMutedWasHydrated = typeof host.initialMuted === 'boolean';
     host.initialMuted = initialMutedWasHydrated ? host.initialMuted : true;
-    host.muted = host.initialMuted;
+    host.muted = true;
     host.configure = configure;
     host.destroy = destroy;
     host.reportTTSError = reportTTSError;
@@ -213,20 +311,29 @@
         {
             host,
             button: sttActivationButton,
-            onChange: renderSTTActivationState
+            onChange: renderSTTActivationState,
+            eventSource: events
         }
     );
 
-    recordButton.addEventListener('pointerdown', handleRecordPointerDown);
-    recordButton.addEventListener('pointerup', handleRecordPointerUp);
-    recordButton.addEventListener('pointercancel', handleRecordPointerCancel);
-    recordButton.addEventListener('lostpointercapture', handleLostPointerCapture);
-    recordButton.addEventListener('keydown', handleRecordKeyDown);
-    recordButton.addEventListener('keyup', handleRecordKeyUp);
-    recordButton.addEventListener('blur', handleRecordBlur);
-    muteButton.addEventListener('click', muteToggle);
-    endButton.addEventListener('click', submitCompletionCommand);
-    window.addEventListener('pagehide', destroy, { once: true });
+    const lifecycleListenerOptions = Object.freeze(
+        { signal: runtimeStateAbortController.signal }
+    );
+    recordButton.addEventListener('pointerdown', handleRecordPointerDown, lifecycleListenerOptions);
+    recordButton.addEventListener('pointerup', handleRecordPointerUp, lifecycleListenerOptions);
+    recordButton.addEventListener('pointercancel', handleRecordPointerCancel, lifecycleListenerOptions);
+    recordButton.addEventListener('lostpointercapture', handleLostPointerCapture, lifecycleListenerOptions);
+    recordButton.addEventListener('keydown', handleRecordKeyDown, lifecycleListenerOptions);
+    recordButton.addEventListener('keyup', handleRecordKeyUp, lifecycleListenerOptions);
+    recordButton.addEventListener('blur', handleRecordBlur, lifecycleListenerOptions);
+    stopButton.addEventListener('click', stop, lifecycleListenerOptions);
+    muteButton.addEventListener('click', muteToggle, lifecycleListenerOptions);
+    endButton.addEventListener('click', submitCompletionCommand, lifecycleListenerOptions);
+    window.addEventListener(
+        'pagehide',
+        destroy,
+        { once: true, signal: runtimeStateAbortController.signal }
+    );
 
     subscribeAIRuntimeState(
         synchronizeAIRuntimeState,
@@ -234,27 +341,36 @@
             signal: runtimeStateAbortController.signal
         }
     );
+    if (!host.initialMuted && ttsRole.state === 'ready') {
+        host.muted = false;
+    }
     synchronizeAIMutedState();
     renderControls();
     renderStatus();
     void observeMicrophonePermission();
     void aiModuleImport.then(
-        synchronizeAIMutedState,
+        function synchronizeMutedStateAfterAIImport() {
+            if (!destroyed) {
+                synchronizeAIMutedState();
+            }
+        },
         function reportAIModuleImportFailure(error) {
+            if (destroyed) {
+                return;
+            }
             console.error('The shared AI runtime could not load.');
         }
     );
 
     host.componentReady = true;
-    host.dispatchEvent(
-        new CustomEvent(
-            'speech-ready',
-            {
-                bubbles: true,
-                composed: true,
-                detail: { speech: host }
-            }
-        )
+    dispatchSpeechEvent(
+        'speech-ready',
+        { speech: host },
+        {
+            bubbles: true,
+            composed: true,
+            publicDetail: { ready: true }
+        }
     );
 
     function unavailableRole(role) {
@@ -282,6 +398,9 @@
     }
 
     function configure(options = {}) {
+        if (destroyed) {
+            return host;
+        }
         if (Object.prototype.hasOwnProperty.call(options, 'initialMuted')) {
             const configuredMuted = typeof options.initialMuted === 'boolean'
                 ? options.initialMuted
@@ -302,6 +421,9 @@
     }
 
     function setAvailability(input = {}) {
+        if (destroyed) {
+            return { ...host.availability };
+        }
         // Compatibility-only explicit adapter report. Canonical consumers use
         // the sticky AIRuntimeState role records instead of this wrapper.
         const previousSTTRole = sttRole;
@@ -330,6 +452,9 @@
     }
 
     function setMuted(muted) {
+        if (destroyed) {
+            return host;
+        }
         if (typeof muted !== 'boolean') {
             throw new TypeError('muted must be boolean');
         }
@@ -343,11 +468,11 @@
     }
 
     function applyConfiguredMutedState(muted) {
-        host.muted = muted;
-        pendingTTSIntent = null;
         if (muted) {
-            stopTTSPlayback();
+            requestUserMute();
         } else {
+            pendingUnmute = false;
+            host.muted = ttsRole.state !== 'ready';
             synchronizeAIMutedState();
         }
         renderControls();
@@ -377,13 +502,17 @@
             cancelSTTOperation('runtime-unready');
         }
         if (ttsBecameUnready) {
+            pendingUnmute = false;
             host.muted = true;
             stopTTSPlayback();
         }
-        if (ttsRole.state === 'error' && !host.muted) {
+        if (ttsRole.state === 'error' && (pendingUnmute || !host.muted)) {
+            pendingUnmute = false;
             host.muted = true;
             stopTTSPlayback();
         }
+
+        settleSuccessfulUnmute();
 
         synchronizeAIMutedState();
         renderControls();
@@ -415,7 +544,9 @@
 
     function renderControls() {
         const transcriptionReady = sttRole.state === 'ready';
-        const microphoneReady = host.availability.microphone;
+        const microphoneReady = host.availability.microphone
+            && typeof globalThis.MediaRecorder === 'function'
+            && typeof navigator.mediaDevices?.getUserMedia === 'function';
         const activationVisible = sttActivationController.visible;
         recordButton.hidden = activationVisible;
         recordButton.disabled = !transcriptionReady
@@ -423,7 +554,10 @@
             || sttRole.busy
             || transcriptionActive
             || destroyed;
-        stopButton.disabled = recordButton.disabled;
+        stopButton.disabled = destroyed
+            || !transcriptionReady
+            || sttRole.busy
+            || captureSession?.recorder.state !== 'recording';
         recordButton.title = transcriptionButtonTitle();
         recordButton.setAttribute('aria-label', recordButton.title);
         recordButton.setAttribute(
@@ -618,13 +752,18 @@
         }
 
         try {
-            microphonePermissionStatus = await navigator.permissions.query(
+            const permissionStatus = await navigator.permissions.query(
                 { name: 'microphone' }
             );
+            if (destroyed) {
+                return;
+            }
+            microphonePermissionStatus = permissionStatus;
             microphonePermissionListener = synchronizeMicrophonePermission;
             microphonePermissionStatus.addEventListener?.(
                 'change',
-                microphonePermissionListener
+                microphonePermissionListener,
+                { signal: runtimeStateAbortController.signal }
             );
             synchronizeMicrophonePermission();
         } catch (error) {
@@ -634,6 +773,9 @@
     }
 
     function synchronizeMicrophonePermission() {
+        if (destroyed) {
+            return;
+        }
         setAvailability(
             {
                 microphone: microphonePermissionStatus?.state !== 'denied'
@@ -739,27 +881,49 @@
         }
 
         if (host.muted) {
-            requestUserUnmute();
+            void requestUserUnmute();
         } else {
             requestUserMute();
         }
     }
 
     function requestUserMute() {
+        if (destroyed) {
+            return false;
+        }
+        if (host.muted && activeTTSIntent?.action === 'unload') {
+            return false;
+        }
         const wasMuted = host.muted;
+        pendingUnmute = false;
         const shouldUnload = !wasMuted
             || pendingTTSIntent === 'load'
             || ['loading', 'ready', 'error'].includes(ttsRole.state);
         host.muted = true;
         stopTTSPlayback();
         if (shouldUnload) {
-            requestTTSIntent('unload', 'user');
+            void requestTTSIntent('unload', 'user');
         }
         renderControls();
         renderStatus();
     }
 
-    function requestUserUnmute() {
+    async function requestUserUnmute() {
+        if (destroyed) {
+            return false;
+        }
+        if (!host.muted && ttsRole.state === 'ready') {
+            return true;
+        }
+        if (activeTTSIntent?.action === 'load') {
+            return false;
+        }
+        if (
+            pendingUnmute
+            && (pendingTTSIntent === 'load' || ttsRole.state === 'loading')
+        ) {
+            return false;
+        }
         const providerSelected = typeof ttsRole.providerId === 'string'
             && ttsRole.providerId.length > 0
             && typeof ttsRole.modelId === 'string'
@@ -779,60 +943,93 @@
             return false;
         }
 
-        host.muted = false;
-        synchronizeAIMutedState();
-        requestTTSIntent('load', 'user');
-        if (ttsRole.state === 'ready') {
-            resumeTTSPlayback();
+        pendingUnmute = true;
+        const requested = await requestTTSIntent('load', 'user');
+        if (!requested || destroyed) {
+            pendingUnmute = false;
+            host.muted = true;
+            stopTTSPlayback();
+            renderControls();
+            renderStatus();
+            return false;
         }
+        settleSuccessfulUnmute();
         renderControls();
         renderStatus();
+        return host.muted === false;
+    }
+
+    function settleSuccessfulUnmute() {
+        if (!pendingUnmute || ttsRole.state !== 'ready' || destroyed) {
+            return false;
+        }
+        pendingUnmute = false;
+        pendingTTSIntent = null;
+        host.muted = false;
+        synchronizeAIMutedState();
+        resumeTTSPlayback();
         return true;
     }
 
-    function requestTTSIntent(action, reason) {
+    async function requestTTSIntent(action, reason) {
+        if (destroyed) {
+            return false;
+        }
+        if (activeTTSIntent?.action === action) {
+            return false;
+        }
         const generation = ++ttsIntentGeneration;
+        const operationId = nextSpeechOperationId(`tts-${action}`);
+        const intent = Object.freeze({ action, generation, operationId });
+        activeTTSIntent = intent;
+        ttsOperationId = operationId;
         pendingTTSIntent = action === 'load' && ttsRole.state === 'ready'
             ? null
             : action;
-        let lifecycle = null;
+        let lifecycle;
         try {
             if (typeof globalThis.ai?.setSpeechMuted === 'function') {
                 lifecycle = globalThis.ai.setSpeechMuted(action === 'unload');
+            } else {
+                lifecycle = requestAIRuntimeIntent(
+                    {
+                        role: 'tts',
+                        action,
+                        reason
+                    }
+                );
             }
-            requestAIRuntimeIntent(
-                {
-                    role: 'tts',
-                    action,
-                    reason
-                }
-            );
+            await lifecycle;
         } catch (error) {
+            if (destroyed || generation !== ttsIntentGeneration) {
+                return false;
+            }
             pendingTTSIntent = null;
             if (action === 'load') {
+                pendingUnmute = false;
                 host.muted = true;
                 stopTTSPlayback();
             }
-            reportTTSLifecycleError(error, action);
+            reportTTSLifecycleError(error, action, operationId);
+            return false;
+        } finally {
+            if (activeTTSIntent === intent) {
+                activeTTSIntent = null;
+            }
+        }
+        if (destroyed || generation !== ttsIntentGeneration) {
             return false;
         }
-        void Promise.resolve(lifecycle).catch(
-            function reportCurrentTTSSpeechLifecycleFailure(error) {
-                if (destroyed || generation !== ttsIntentGeneration) {
-                    return;
-                }
-                pendingTTSIntent = null;
-                if (action === 'load') {
-                    host.muted = true;
-                    stopTTSPlayback();
-                }
-                reportTTSLifecycleError(error, action);
-            }
-        );
+        if (action === 'load') {
+            settleSuccessfulUnmute();
+        }
         return true;
     }
 
-    function reportTTSLifecycleError(error, action) {
+    function reportTTSLifecycleError(error, action, operationId = null) {
+        if (destroyed) {
+            return false;
+        }
         const message = visibleErrorMessage(
             error,
             `The voice ${action} request failed.`
@@ -841,47 +1038,80 @@
             message,
             tone: 'error'
         };
-        host.dispatchEvent(
-            new CustomEvent(
-                'speech-tts-lifecycle-error',
-                {
-                    bubbles: true,
-                    composed: true,
-                    detail: {
-                        action,
-                        error,
-                        message
-                    }
+        const code = publicSpeechErrorCode(
+            error,
+            `ARCANE_SPEECH_TTS_${action.toUpperCase()}_REJECTED`
+        );
+        const reason = `tts-${action}-rejected`;
+        dispatchSpeechEvent(
+            'speech-tts-lifecycle-error',
+            {
+                action,
+                code,
+                error,
+                message,
+                reason
+            },
+            {
+                bubbles: true,
+                composed: true,
+                operationId: operationId || ttsOperationId
+                    || nextSpeechOperationId(`tts-${action}`),
+                publicDetail: {
+                    action,
+                    code,
+                    reason
                 }
-            )
+            }
         );
         renderControls();
         renderStatus();
+        return false;
     }
 
-    function reportTTSError(error) {
+    function reportTTSError(error, boundary = 'synthesis') {
+        if (destroyed) {
+            return false;
+        }
+        const playbackRejected = boundary === 'playback';
         const message = visibleErrorMessage(
             error,
-            'Speech synthesis failed.'
+            playbackRejected
+                ? 'Speech playback failed.'
+                : 'Speech synthesis failed.'
         );
         host.muted = true;
         stopTTSPlayback();
         localStatus = {
-            message: `Speech synthesis failed: ${message}`,
+            message: `${playbackRejected ? 'Speech playback' : 'Speech synthesis'} failed: ${message}`,
             tone: 'error'
         };
-        host.dispatchEvent(
-            new CustomEvent(
-                'speech-synthesis-error',
-                {
-                    bubbles: true,
-                    composed: true,
-                    detail: {
-                        error,
-                        message
-                    }
+        const code = publicSpeechErrorCode(
+            error,
+            playbackRejected
+                ? 'ARCANE_SPEECH_TTS_PLAYBACK_RESUME_REJECTED'
+                : 'ARCANE_SPEECH_TTS_SYNTHESIS_REQUEST_REJECTED'
+        );
+        const reason = playbackRejected
+            ? 'tts-playback-resume-rejected'
+            : 'tts-synthesis-rejected';
+        dispatchSpeechEvent(
+            'speech-synthesis-error',
+            {
+                code,
+                error,
+                message,
+                reason
+            },
+            {
+                bubbles: true,
+                composed: true,
+                operationId: nextSpeechOperationId('synthesis'),
+                publicDetail: {
+                    code,
+                    reason
                 }
-            )
+            }
         );
         renderControls();
         renderStatus();
@@ -915,20 +1145,26 @@
 
         void Promise.resolve(aiRuntime.resumeAudio()).catch(
             function reportTTSResumeFailure(error) {
-                reportTTSError(error);
+                reportTTSError(error, 'playback');
             }
         );
     }
 
     async function transcribe(transcription = '') {
-        host.dispatchEvent(
-            new CustomEvent(
-                'speech-transcription-complete',
-                {
-                    detail: { text: transcription }
+        const operationId = transcriptionOperationId
+            || nextSpeechOperationId('transcription');
+        const accepted = dispatchSpeechEvent(
+            'speech-transcription-complete',
+            { text: transcription },
+            {
+                operationId,
+                publicDetail: {
+                    characterCount: transcription.length
                 }
-            )
+            }
         );
+        transcriptionOperationId = null;
+        return accepted;
     }
 
     async function record() {
@@ -937,6 +1173,8 @@
             || sttRole.state !== 'ready'
             || sttRole.busy
             || !host.availability.microphone
+            || typeof globalThis.MediaRecorder !== 'function'
+            || typeof navigator.mediaDevices?.getUserMedia !== 'function'
             || recordingRequested
             || captureSession
             || transcriptionActive
@@ -946,6 +1184,7 @@
         }
 
         const generation = ++recordingGeneration;
+        transcriptionOperationId = nextSpeechOperationId('transcription');
         recordingRequested = true;
         localStatus = {
             message: 'Recording. Release to transcribe.',
@@ -969,16 +1208,23 @@
                     message: 'Microphone access is unavailable. Text chat is still available.',
                     tone: 'error'
                 };
-                host.dispatchEvent(
-                    new CustomEvent(
-                        'speech-microphone-unavailable',
-                        {
-                            bubbles: true,
-                            composed: true,
-                            detail: { reason: error.name }
+                dispatchSpeechEvent(
+                    'speech-microphone-unavailable',
+                    { reason: error.name },
+                    {
+                        bubbles: true,
+                        composed: true,
+                        operationId: transcriptionOperationId,
+                        publicDetail: {
+                            code: publicSpeechErrorCode(
+                                error,
+                                'ARCANE_SPEECH_MICROPHONE_CAPTURE_REJECTED'
+                            ),
+                            reason: microphoneFailureReason(error)
                         }
-                    )
+                    }
                 );
+                transcriptionOperationId = null;
             } else {
                 reportTranscriptionError(error);
             }
@@ -991,6 +1237,7 @@
             !recordingRequested
             || generation !== recordingGeneration
             || sttRole.state !== 'ready'
+            || sttRole.busy
             || destroyed
         ) {
             stopMediaStream(stream);
@@ -1097,6 +1344,7 @@
             session.cancelled
             || session.generation !== recordingGeneration
             || sttRole.state !== 'ready'
+            || sttRole.busy
             || destroyed
         ) {
             renderControls();
@@ -1118,6 +1366,8 @@
 
     async function transcribeAudio(audioFile) {
         const generation = ++transcriptionGeneration;
+        transcriptionOperationId = transcriptionOperationId
+            || nextSpeechOperationId('transcription');
         const controller = new AbortController();
         transcriptionAbortController?.abort();
         transcriptionAbortController = controller;
@@ -1131,8 +1381,19 @@
 
         try {
             const aiRuntime = globalThis.ai;
-            if (sttRole.state !== 'ready' || typeof aiRuntime?.fetchSTT !== 'function') {
-                throw new Error('The selected transcription service is unavailable.');
+            if (sttRole.state !== 'ready' || sttRole.busy) {
+                reportTranscriptionCancellation(
+                    sttRole.busy ? 'stt-role-busy' : 'runtime-unready',
+                    sttRole.busy
+                        ? 'Transcription stopped because the selected service is busy.'
+                        : 'Transcription stopped because the selected service became unavailable.'
+                );
+                return false;
+            }
+            if (typeof aiRuntime?.fetchSTT !== 'function') {
+                const error = new Error('The selected transcription service is unavailable.');
+                error.code = 'ARCANE_SPEECH_STT_RUNTIME_METHOD_UNAVAILABLE';
+                throw error;
             }
 
             const transcription = await aiRuntime.fetchSTT(
@@ -1156,7 +1417,14 @@
             return true;
         } catch (error) {
             if (generation === transcriptionGeneration && !destroyed) {
-                reportTranscriptionError(error);
+                if (isTranscriptionCancellation(error, controller)) {
+                    reportTranscriptionCancellation(
+                        'stt-provider-request-cancelled',
+                        'The selected transcription request was cancelled.'
+                    );
+                } else {
+                    reportTranscriptionError(error);
+                }
             }
             return false;
         } finally {
@@ -1180,21 +1448,70 @@
             message: `Transcription failed: ${message}`,
             tone: 'error'
         };
-        host.dispatchEvent(
-            new CustomEvent(
-                'speech-transcription-error',
-                {
-                    bubbles: true,
-                    composed: true,
-                    detail: {
-                        error,
-                        message
-                    }
-                }
-            )
+        const operationId = transcriptionOperationId
+            || nextSpeechOperationId('transcription');
+        const code = publicSpeechErrorCode(
+            error,
+            'ARCANE_SPEECH_STT_TRANSCRIPTION_REQUEST_REJECTED'
         );
+        const reason = 'stt-transcription-rejected';
+        dispatchSpeechEvent(
+            'speech-transcription-error',
+            {
+                code,
+                error,
+                message,
+                reason
+            },
+            {
+                bubbles: true,
+                composed: true,
+                operationId,
+                publicDetail: {
+                    code,
+                    reason
+                }
+            }
+        );
+        transcriptionOperationId = null;
         renderControls();
         renderStatus();
+    }
+
+    function isTranscriptionCancellation(error, controller) {
+        return controller.signal.aborted
+            || error?.name === 'AbortError'
+            || [
+                'ARCANE_AI_REQUEST_ABORTED',
+                'ARCANE_AI_OPERATION_SUPERSEDED'
+            ].includes(error?.code);
+    }
+
+    function reportTranscriptionCancellation(reason, message) {
+        const operationId = transcriptionOperationId
+            || nextSpeechOperationId('transcription');
+        localStatus = {
+            message,
+            tone: ''
+        };
+        const accepted = dispatchSpeechEvent(
+            'speech-transcription-cancelled',
+            { reason },
+            {
+                bubbles: true,
+                composed: true,
+                operationId,
+                publicDetail: {
+                    reason: canonicalSTTCancellationReason(reason)
+                }
+            }
+        );
+        transcriptionOperationId = null;
+        if (!destroyed) {
+            renderControls();
+            renderStatus();
+        }
+        return accepted;
     }
 
     function cancelSTTOperation(reason) {
@@ -1221,21 +1538,14 @@
         }
 
         if (hadActiveOperation) {
-            localStatus = {
-                message: 'Transcription stopped because the selected service became unavailable.',
-                tone: 'error'
-            };
-            host.dispatchEvent(
-                new CustomEvent(
-                    'speech-transcription-cancelled',
-                    {
-                        bubbles: true,
-                        composed: true,
-                        detail: { reason }
-                    }
-                )
+            reportTranscriptionCancellation(
+                String(reason || 'stt-transcription-cancelled'),
+                reason === 'component-destroyed'
+                    ? 'Transcription stopped because the speech component was destroyed.'
+                    : 'Transcription stopped because the selected service became unavailable.'
             );
         }
+        transcriptionOperationId = null;
     }
 
     function releaseCaptureSession(session) {
@@ -1286,6 +1596,7 @@
         );
         cancelSTTOperation('component-destroyed');
         stopTTSPlayback();
+        events.dispose();
         host.componentReady = false;
         renderControls();
         renderStatus();

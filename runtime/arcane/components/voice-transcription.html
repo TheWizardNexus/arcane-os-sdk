@@ -60,7 +60,29 @@
 </section>
 
 <script type="module">
+    const {
+        createArcaneEventSource,
+        projectArcaneDOMEvent
+    }=await import('arcane-os/event-manager');
+
     const host=this;
+    const events=createArcaneEventSource(
+        host,
+        {
+            source:'arcane.component.voice-transcription',
+            eventTypes:[
+                'voice-transcription-ready',
+                'voice-transcription-state',
+                'voice-transcription-segment',
+                'voice-transcription-change',
+                'voice-transcription-complete',
+                'speech-transcription-complete',
+                'speech-transcription-cancelled',
+                'speech-stt-activation-request',
+                'speech-stt-activation-error'
+            ]
+        }
+    );
     const componentURL=new URL(
         host.getAttribute('href')||'./arcane/components/voice-transcription.html',
         document.baseURI
@@ -94,8 +116,71 @@
     let transcript='';
     let sessionGeneration=0;
     let transcriptionAbortController=null;
+    let eventOperationSequence=0;
+    let voiceOperationId=null;
     let destroyed=false;
     let options=normalizeVoiceOptions(optionsFromDataset());
+
+    function nextVoiceOperationId(kind){
+        eventOperationSequence+=1;
+        return `${events.descriptor.instanceId}:${kind}:${eventOperationSequence}`;
+    }
+
+    function currentVoiceOperationId(kind='transcription'){
+        voiceOperationId=voiceOperationId||nextVoiceOperationId(kind);
+        return voiceOperationId;
+    }
+
+    function canonicalSTTCancellationReason(reason){
+        if(reason==='runtime-unready'){
+            return 'stt-role-unready';
+        }
+        if(reason==='stt-provider-request-cancelled'){
+            return 'stt-provider-transcription-cancelled';
+        }
+        return String(reason||'stt-transcription-cancelled');
+    }
+
+    function dispatchVoiceEvent(
+        type,
+        compatibilityDetail={},
+        {
+            publicDetail={},
+            operationId=null,
+            beginOperation=null,
+            bubbles=false,
+            composed=false,
+            cancelable=false
+        }={}
+    ){
+        if(destroyed&&type!=='speech-transcription-cancelled'){
+            return false;
+        }
+        if(beginOperation!==null){
+            voiceOperationId=nextVoiceOperationId(beginOperation);
+        }
+        const publication=events.dispatch(
+            type,
+            compatibilityDetail,
+            {
+                publicDetail,
+                operationId:operationId||currentVoiceOperationId(),
+                cancelable
+            }
+        );
+        if(!publication.accepted){
+            return false;
+        }
+        return projectArcaneDOMEvent(
+            host,
+            publication.occurrence,
+            {
+                bubbles,
+                composed,
+                cancelable
+            }
+        );
+    }
 
     host.clear=clear;
     host.completeTranscription=completeStream;
@@ -118,16 +203,24 @@
         }
     );
 
-    startButton.addEventListener('click',startRecording);
-    stopButton.addEventListener('click',stopRecording);
-    completeButton.addEventListener('click',completeStream);
-    window.addEventListener('pagehide',destroy,{once:true});
+    const lifecycleListenerOptions=Object.freeze(
+        {signal:runtimeStateAbortController.signal}
+    );
+    startButton.addEventListener('click',startRecording,lifecycleListenerOptions);
+    stopButton.addEventListener('click',stopRecording,lifecycleListenerOptions);
+    completeButton.addEventListener('click',completeStream,lifecycleListenerOptions);
+    window.addEventListener(
+        'pagehide',
+        destroy,
+        {once:true,signal:runtimeStateAbortController.signal}
+    );
 
     const sttActivationController=createSTTActivationController(
         {
             host,
             button:sttActivationButton,
-            onChange:renderState
+            onChange:renderState,
+            eventSource:events
         }
     );
 
@@ -178,8 +271,20 @@
     }
 
     function configure(input={}){
+        if(destroyed){
+            return getOptions();
+        }
         const setInitial=Object.prototype.hasOwnProperty.call(input||{},'initialValue');
-        options=normalizeVoiceOptions(input,options);
+        const nextOptions=normalizeVoiceOptions(input,options);
+        if(!setInitial){
+            if(supersedeForConfigurationReplacement()){
+                reportSTTCancellation(
+                    'configuration-replaced',
+                    'Transcription configuration replaced.'
+                );
+            }
+        }
+        options=nextOptions;
         renderOptions();
         if(setInitial){
             setValue(options.initialValue);
@@ -203,7 +308,9 @@
 
         const generation=++sessionGeneration;
         chunks=[];
-        setState('starting',options.messages.requesting);
+        setState('starting',options.messages.requesting,{
+            beginOperation:'transcription'
+        });
         if(!recordingStartIsCurrent(generation,'starting')){
             return rejectRecordingStart(generation);
         }
@@ -293,7 +400,7 @@
     }
 
     function stopRecording(){
-        if(state!=='recording'||recorder?.state!=='recording'){
+        if(destroyed||state!=='recording'||recorder?.state!=='recording'){
             return false;
         }
         const generation=sessionGeneration;
@@ -321,6 +428,15 @@
             setState('error',options.messages.emptyAudio);
             return false;
         }
+        if(sttRole.state!=='ready'||sttRole.busy){
+            reportSTTCancellation(
+                sttRole.busy?'stt-role-busy':'runtime-unready',
+                sttRole.busy
+                    ?'Transcription stopped because the selected service is busy.'
+                    :'Transcription stopped because the selected service became unavailable.'
+            );
+            return false;
+        }
 
         try{
             controller=new AbortController();
@@ -345,6 +461,7 @@
             if(controller.signal.aborted
                 ||generation!==sessionGeneration
                 ||sttRole.state!=='ready'
+                ||sttRole.busy
                 ||destroyed){
                 return false;
             }
@@ -393,7 +510,8 @@
                 detail,
                 options.persist
                     ?options.messages.saved
-                    :options.messages.transcribed
+                    :options.messages.transcribed,
+                currentVoiceOperationId()
             );
         }catch(error){
             if(generation!==sessionGeneration||destroyed){
@@ -419,25 +537,40 @@
         generation,
         expectedState,
         detail,
-        message
+        message,
+        operationId=null
     ){
         if(!isCurrentVoiceOperation(generation,expectedState)){
             return false;
         }
-        host.dispatchEvent(
-            new CustomEvent(
-                'speech-transcription-complete',
-                {bubbles:true,composed:true,detail}
-            )
+        dispatchVoiceEvent(
+            'speech-transcription-complete',
+            detail,
+            {
+                bubbles:true,
+                composed:true,
+                operationId,
+                publicDetail:{
+                    segmentCharacterCount:detail.text.length,
+                    transcriptCharacterCount:detail.transcript.length
+                }
+            }
         );
         if(!isCurrentVoiceOperation(generation,expectedState)){
             return false;
         }
-        host.dispatchEvent(
-            new CustomEvent(
-                'voice-transcription-segment',
-                {bubbles:true,composed:true,detail}
-            )
+        dispatchVoiceEvent(
+            'voice-transcription-segment',
+            detail,
+            {
+                bubbles:true,
+                composed:true,
+                operationId,
+                publicDetail:{
+                    segmentCharacterCount:detail.text.length,
+                    transcriptCharacterCount:detail.transcript.length
+                }
+            }
         );
         if(!isCurrentVoiceOperation(generation,expectedState)){
             return false;
@@ -459,10 +592,12 @@
             return options.transcribe(file,context);
         }
         if(typeof globalThis.ai?.fetchSTT!=='function'){
-            await import(moduleURL('AI.js?v=7'));
+            await import(moduleURL('AI.js'));
         }
         if(typeof globalThis.ai?.fetchSTT!=='function'){
-            throw new Error('Speech transcription is not configured.');
+            const error=new Error('Speech transcription is not configured.');
+            error.code='ARCANE_VOICE_TRANSCRIPTION_STT_RUNTIME_METHOD_UNAVAILABLE';
+            throw error;
         }
         return globalThis.ai.fetchSTT(file,undefined,signal);
     }
@@ -510,7 +645,9 @@
         const complete=options.onComplete||(
             typeof host.complete==='function'?host.complete.bind(host):null
         );
-        setState('completing',options.messages.completing);
+        setState('completing',options.messages.completing,{
+            beginOperation:'completion'
+        });
         if(!isCurrentVoiceOperation(generation,'completing')){
             return false;
         }
@@ -521,15 +658,16 @@
             if(!isCurrentVoiceOperation(generation,'completing')){
                 return false;
             }
-            host.dispatchEvent(
-                new CustomEvent(
-                    'voice-transcription-complete',
-                    {
-                        bubbles:true,
-                        composed:true,
-                        detail:{transcript:completionTranscript}
+            dispatchVoiceEvent(
+                'voice-transcription-complete',
+                {transcript:completionTranscript},
+                {
+                    bubbles:true,
+                    composed:true,
+                    publicDetail:{
+                        transcriptCharacterCount:completionTranscript.length
                     }
-                )
+                }
             );
             if(!isCurrentVoiceOperation(generation,'completing')){
                 return false;
@@ -563,7 +701,28 @@
         return true;
     }
 
+    function supersedeForConfigurationReplacement(){
+        const hadActiveOperation=[
+            'starting',
+            'recording',
+            'transcribing',
+            'saving',
+            'completing'
+        ].includes(state)||Boolean(transcriptionAbortController);
+        if(!hadActiveOperation){
+            return false;
+        }
+        sessionGeneration+=1;
+        transcriptionAbortController?.abort();
+        transcriptionAbortController=null;
+        releaseMicrophone();
+        return true;
+    }
+
     function setValue(value=''){
+        if(destroyed){
+            return transcript;
+        }
         const operationSuperseded=
             supersedeForTranscriptReplacement();
         transcript=`${value??''}`;
@@ -576,24 +735,23 @@
         }else if(state!=='recording'){
             setState('idle',options.messages.ready);
         }
-        if(destroyed){
-            return transcript;
-        }
-        host.dispatchEvent(
-            new CustomEvent(
-                'voice-transcription-change',
-                {
-                    bubbles:true,
-                    composed:true,
-                    detail:{transcript}
+        dispatchVoiceEvent(
+            'voice-transcription-change',
+            {transcript},
+            {
+                beginOperation:'transcript-change',
+                bubbles:true,
+                composed:true,
+                publicDetail:{
+                    transcriptCharacterCount:transcript.length
                 }
-            )
+            }
         );
         return transcript;
     }
 
     function clear(){
-        if(!['complete','error','idle'].includes(state)){
+        if(destroyed||!['complete','error','idle'].includes(state)){
             return false;
         }
         transcript='';
@@ -646,10 +804,17 @@
         }
     }
 
-    function setState(nextState,message=''){
+    function setState(nextState,message='',{beginOperation=null}={}){
+        if(destroyed){
+            return false;
+        }
+        if(beginOperation!==null){
+            voiceOperationId=nextVoiceOperationId(beginOperation);
+        }
         state=nextState;
         stateMessage=message||nextState;
         renderState();
+        return true;
     }
 
     function synchronizeAIRuntimeState(snapshot){
@@ -683,18 +848,18 @@
         return true;
     }
 
-    function reportSTTCancellation(reason,message){
+    function reportSTTCancellation(reason,message,operationId=null){
         state='idle';
         stateMessage=message;
-        host.dispatchEvent(
-            new CustomEvent(
-                'speech-transcription-cancelled',
-                {
-                    bubbles:true,
-                    composed:true,
-                    detail:Object.freeze({reason})
-                }
-            )
+        dispatchVoiceEvent(
+            'speech-transcription-cancelled',
+            Object.freeze({reason}),
+            {
+                bubbles:true,
+                composed:true,
+                operationId:operationId||currentVoiceOperationId(),
+                publicDetail:{reason:canonicalSTTCancellationReason(reason)}
+            }
         );
         if(!destroyed){
             renderState();
@@ -738,21 +903,23 @@
                 ||['loading','unloading'].includes(sttRole.state)
             )
         );
-        host.dispatchEvent(
-            new CustomEvent(
-                'voice-transcription-state',
+        dispatchVoiceEvent(
+            'voice-transcription-state',
+            Object.freeze(
                 {
-                    bubbles:true,
-                    composed:true,
-                    detail:Object.freeze(
-                        {
-                            message:status.innerText,
-                            state,
-                            stt:sttRole
-                        }
-                    )
+                    message:status.innerText,
+                    state,
+                    stt:sttRole
                 }
-            )
+            ),
+            {
+                bubbles:true,
+                composed:true,
+                publicDetail:{
+                    state,
+                    sttState:sttRole.state
+                }
+            }
         );
     }
 
@@ -820,6 +987,7 @@
         stateMessage='Transcription unavailable.';
         host.ready=false;
         renderState();
+        events.dispose();
         return true;
     }
 
@@ -835,11 +1003,15 @@
     }
     if(!destroyed){
         host.ready=true;
-        host.dispatchEvent(
-            new CustomEvent(
-                'voice-transcription-ready',
-                {bubbles:true,composed:true}
-            )
+        dispatchVoiceEvent(
+            'voice-transcription-ready',
+            {},
+            {
+                beginOperation:'ready',
+                bubbles:true,
+                composed:true,
+                publicDetail:{ready:true}
+            }
         );
     }
 </script>
