@@ -3,6 +3,7 @@ import {Readable,Writable} from 'node:stream';
 import test from '../src/testing.mjs';
 import {runCli} from '../src/cli/main.mjs';
 import {executeMailCommand} from '../src/mail.mjs';
+import {executeOperation} from '../src/toolchain.mjs';
 
 function memoryStream(){
     let value='';
@@ -118,6 +119,46 @@ test('mail CLI never reports accidental positional or unknown-option secrets',as
     }
 });
 
+test('mail serve rejects --app-key-stdin on a TTY before reading',async function ttyAppKeyStdin(){
+    const secret='synthetic-mail-gateway-app-key-must-not-echo';
+    const stdin=Readable.from([`${secret}\n`]);
+    const stdout=memoryStream();
+    const stderr=memoryStream();
+    let resumed=false;
+    const resume=stdin.resume.bind(stdin);
+    stdin.isTTY=true;
+    stdin.resume=function observeUnexpectedAppKeyRead(){
+        resumed=true;
+        return resume();
+    };
+
+    const exitCode=await runCli([
+        'mail','serve',
+        '--profile','arcane-dev',
+        '--from','sender@example.com',
+        '--app','mail-test',
+        '--origin','http://127.0.0.1:8000',
+        '--allow-to','recipient@example.com',
+        '--app-key-stdin',
+        '--output','ndjson'
+    ],{
+        stdin,
+        stdout:stdout.stream,
+        stderr:stderr.stream,
+        execute:async function attemptTtyMailServe(command,options){
+            assert.equal(command,'mail');
+            await options.readAppKey();
+        }
+    });
+
+    assert.equal(exitCode,1);
+    assert.equal(resumed,false);
+    assert.equal(stdout.read().includes(secret),false);
+    assert.equal(stderr.read().includes(secret),false);
+    const events=parseNdjson(stdout.read());
+    assert.match(events.at(-1).data.error.message,/--app-key-stdin requires redirected/u);
+});
+
 test('mail key status dispatches a sanitized profile operation',async function mailKeyStatus(){
     const stdout=memoryStream();
     const stderr=memoryStream();
@@ -143,6 +184,28 @@ test('mail key status dispatches a sanitized profile operation',async function m
     assert.equal(invocation.options.action,'key-status');
     assert.equal(invocation.options.profile,'arcane-dev');
     assert.equal(Object.hasOwn(invocation.options,'readSecret'),false);
+});
+
+test('headless toolchain dispatches the mail operation without exposing credentials',async function toolchainMail(){
+    const result=await executeOperation('mail',{
+        action:'key-status',
+        profile:'arcane-dev',
+        getCredentialStatus:async function readSyntheticCredentialStatus(options){
+            return {
+                profile:options.profile,
+                provider:'resend',
+                storage:'windows-credential-manager',
+                exists:true
+            };
+        }
+    });
+
+    assert.deepEqual(result,{
+        profile:'arcane-dev',
+        provider:'resend',
+        storage:'windows-credential-manager',
+        exists:true
+    });
 });
 
 test('mail serve admits exact loopback gateway options and reports its lifecycle',async function mailServe(){
@@ -175,6 +238,7 @@ test('mail serve admits exact loopback gateway options and reports its lifecycle
                 host:'127.0.0.1',
                 port:8123,
                 url:'http://127.0.0.1:8123/v1/mail',
+                callerAuthentication:'app-key',
                 lifecycle:Promise.resolve(),
                 close:async function closeMailServer(){}
             };
@@ -193,7 +257,13 @@ test('mail serve admits exact loopback gateway options and reports its lifecycle
     assert.equal(invocation.options.requestTimeout,45_000);
     const events=parseNdjson(stdout.read());
     assert.equal(events.some(function isReady(event){return event.type==='server.ready';}),true);
+    assert.equal(
+        events.find(function isReady(event){return event.type==='server.ready';})
+            .data.callerAuthentication,
+        'app-key'
+    );
     assert.equal(events.at(-1).data.result.target,'mail');
+    assert.equal(events.at(-1).data.result.callerAuthentication,'app-key');
 });
 
 test('mail serve fails before execution when a required boundary is missing',async function invalidMailServe(){

@@ -719,6 +719,9 @@ function serverSummary(result){
         host:result.host,
         port:result.port,
         url:result.url,
+        ...(result.callerAuthentication
+            ?{callerAuthentication:result.callerAuthentication}
+            :{}),
         ...(result.runtimeMode?{runtimeMode:result.runtimeMode}:{}),
         ...(result.runtime?{runtime:result.runtime}:{}),
         ...(result.verified?{verified:result.verified}:{})

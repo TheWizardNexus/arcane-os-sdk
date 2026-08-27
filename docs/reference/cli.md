@@ -31,6 +31,8 @@ and exits nonzero on failure. Machine output is defined by
 | `arcane update-check` | Performs one explicit, read-only npm dist-tag query for the installed SDK version. |
 | `arcane targets` | Lists target ids, declared status, formats, architectures, signing profiles, methods, and pairing reason. |
 | `arcane repo status\|pull\|push` | Runs one selected repository operation for the current app workspace. |
+| `arcane mail key set\|status\|delete` | Manages one server-only Resend API-key profile in Windows Credential Manager. |
+| `arcane mail serve` | Starts one authenticated numeric-loopback Arcane-to-Resend gateway with exact app, Origin, and recipient admission. |
 
 ## Parser-wide options
 
@@ -42,21 +44,28 @@ meaning and cardinality rules:
 | `--path` | directory | `new` |
 | `--display-name` | string | `new`, `init` |
 | `--workspace` | directory | Commands that select an external or integrated workspace; defaults to `.`. |
-| `--app` | app id | Workspace/app operations except shared scope and `verify-bundle`. |
+| `--app` | app id | Workspace/app operations except shared scope and `verify-bundle`; also the exact `mail serve` caller id. |
 | `--arcane-root` | directory | `doctor`, native `build`/`run`, `native-doctor`, `native-prepare` |
-| `--host` / `--port` | host / integer 0–65535 | Browser `dev` and `run`; defaults to `127.0.0.1:8000`. |
+| `--host` / `--port` | host / integer 0–65535 | Browser `dev`/`run` default to `127.0.0.1:8000`; `mail serve` defaults to `127.0.0.1:8025` and admits numeric loopback only. |
 | `--target` | target id | `new`, `init`, native diagnostics, `build`, `run` |
 | `--format` / `--signing` | target-supported values | Native diagnostics, `build`, `run` |
 | `--output-root` | directory | Native `build` and `run` |
 | `--scope` | `app` or `shared` | `test`, `check`; defaults to `app`. |
 | `--test-file` | repository-relative `.test.mjs` | `test --scope shared` only |
 | `--artifact` | bundle path | `bundle`, `verify-bundle` |
+| `--profile` | credential profile id | `mail serve` |
+| `--from` | verified sender | `mail serve` |
+| `--origin` | exact browser origin | `mail serve` |
+| `--allow-to` | one to 50 comma-separated addresses | `mail serve` |
+| `--request-timeout` | integer 1000–600000 ms | `mail serve` |
 | `--output` | `human`, `json`, `ndjson` | Every invocation; the final occurrence wins. |
 | `--git` | flag | `new` |
 | `--skip-tests` | flag | `check --scope app` |
 | `--dry-run` | flag | `package`; parser-supported on `build` with the boundary below |
 | `--require-local-ai` | flag | `doctor` |
 | `--overwrite` | flag | `bundle` only |
+| `--secret-stdin` | flag | `mail key set`; requires redirected input |
+| `--app-key-stdin` | flag | `mail serve`; requires redirected input |
 | `--help`, `-h` | flag | Prints help and exits zero. |
 | `--version`, `-v` | flag | Prints the exact SDK version and exits zero. |
 
@@ -647,6 +656,59 @@ loop across workspaces.
 ```bash
 npm exec -- arcane repo status
 ```
+
+## `arcane mail`
+
+### Resend credential profiles
+
+The credential subcommands select one local profile:
+
+```text
+arcane mail key set <profile> [--secret-stdin]
+arcane mail key status <profile>
+arcane mail key delete <profile>
+```
+
+`key set` reads the Resend API key from a hidden terminal prompt. The
+`--secret-stdin` form is for deliberately redirected non-interactive input and
+rejects a TTY before reading. The key is sent to the Windows Credential Manager
+helper over child-process stdin, never argv, and no plaintext fallback is
+created. Status reports only whether the profile exists. Delete returns the
+selected profile with `exists:false`; it intentionally does not distinguish a
+new deletion from an already-absent profile. Non-Windows hosts fail closed.
+
+Machine output for `key set` requires `--secret-stdin`. Raw CLI arguments are
+not included in acceptance events, and usage errors do not echo unknown option
+or positional values.
+
+### Authenticated local gateway
+
+`mail serve` starts one owned Node HTTP gateway:
+
+```text
+arcane mail serve --profile <profile> --from <verified-sender> --app <id> --origin <exact-origin> --allow-to <addresses> [--app-key-stdin] [--host 127.0.0.1] [--port 8025] [--request-timeout <ms>]
+```
+
+The selected credential profile supplies only the server-side Resend API key.
+A separate local mail app key is read through a hidden prompt. Structured
+output requires `--app-key-stdin` with redirected input; the app key is never an
+argv value or part of the server result. The browser must use the same value as
+`arcane.config.mail.appKey`.
+
+The CLI admits only numeric loopback host values accepted by the gateway. The
+gateway also binds the exact app id, Origin, sender, and recipient allowlist,
+and it requires the separate app key by default. `--allow-to` accepts one to 50
+comma-separated unique recipients. `--request-timeout` is the one provider
+attempt timeout in milliseconds and defaults to `30000`.
+
+After binding, `server.ready` reports only sanitized lifecycle fields such as
+protocol, app id, loopback address, port, URL, and caller-authentication mode.
+The command owns the server until its lifecycle ends or `SIGINT`/`SIGTERM`
+cancels it. Neither Resend nor local app credentials, sender/recipient policy,
+or message content appear in the result or observer events.
+
+See [Mail gateway and durable outbox](mail.md) for request, retry,
+idempotency, DBOPFS, and provider-acceptance semantics.
 
 ## Machine output
 
