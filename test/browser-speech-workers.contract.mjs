@@ -3,6 +3,9 @@ import { SPEECH_WORKER_PROTOCOL } from "../browser-runtime/ai/speech-worker-runt
 export function createSpeechWorkerContract({ role, holdUse = false } = {}) {
   const listeners = new Map();
   let terminated = false;
+  let privatePort = null;
+  let privatePortTransferred = false;
+  let configuration = null;
   const posted = [];
 
   function emit(type, data) {
@@ -11,6 +14,35 @@ export function createSpeechWorkerContract({ role, holdUse = false } = {}) {
 
   function emitEvent(type, event) {
     for (const listener of listeners.get(type) ?? []) listener(event);
+  }
+
+  function handleMessage(message, reply) {
+    posted.push(message);
+    if (holdUse && message.op === "use") return;
+    queueMicrotask(() => {
+      if (terminated) return;
+      let result;
+      if (message.op === "load") {
+        configuration = message.payload?.configuration ?? null;
+        result = { state: "ready", loaded: true, busy: false };
+      } else if (message.op === "use" && role === "stt") {
+        result = { text: "hello from whisper" };
+      } else if (message.op === "use") {
+        result = {
+          audio: new Float32Array([0, 0.25, -0.25]),
+          sampleRate: configuration?.model?.outputSampleRate ?? 24_000,
+          voice: message.payload.voice,
+        };
+      } else {
+        result = { state: "unloaded", loaded: false, busy: false };
+      }
+      reply({
+        protocol: SPEECH_WORKER_PROTOCOL,
+        id: message.id,
+        ok: true,
+        result,
+      });
+    });
   }
 
   const worker = {
@@ -22,35 +54,28 @@ export function createSpeechWorkerContract({ role, holdUse = false } = {}) {
     removeEventListener(type, listener) {
       listeners.get(type)?.delete(listener);
     },
-    postMessage(message) {
-      posted.push(message);
-      if (holdUse && message.op === "use") return;
-      queueMicrotask(() => {
-        if (terminated) return;
-        let result;
-        if (message.op === "load") {
-          result = { state: "ready", loaded: true, busy: false };
-        } else if (message.op === "use" && role === "stt") {
-          result = { text: "hello from whisper" };
-        } else if (message.op === "use") {
-          result = {
-            audio: new Float32Array([0, 0.25, -0.25]),
-            sampleRate: 24_000,
-            voice: message.payload.voice,
-          };
-        } else {
-          result = { state: "unloaded", loaded: false, busy: false };
+    postMessage(message, transfers = []) {
+      if (message.privatePort) {
+        if (!Array.isArray(transfers) || !transfers.includes(message.privatePort)) {
+          throw new TypeError("The private speech MessagePort was not transferred.");
         }
-        emit("message", {
-          protocol: SPEECH_WORKER_PROTOCOL,
-          id: message.id,
-          ok: true,
-          result,
+        privatePortTransferred = true;
+        privatePort = message.privatePort;
+        privatePort.addEventListener("message", (event) => {
+          handleMessage(event.data, (response) => privatePort.postMessage(response));
         });
-      });
+        privatePort.start?.();
+        const { privatePort: ignored, ...request } = message;
+        void ignored;
+        handleMessage(request, (response) => privatePort.postMessage(response));
+        return;
+      }
+      handleMessage(message, (response) => emit("message", response));
     },
     terminate() {
       terminated = true;
+      privatePort?.close();
+      privatePort = null;
     },
   };
 
@@ -59,6 +84,12 @@ export function createSpeechWorkerContract({ role, holdUse = false } = {}) {
     posted,
     get terminated() {
       return terminated;
+    },
+    get privateTransport() {
+      return privatePort !== null;
+    },
+    get privatePortTransferred() {
+      return privatePortTransferred;
     },
     crash() {
       if (terminated) return;

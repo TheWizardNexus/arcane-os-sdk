@@ -17,12 +17,14 @@
         "moduleWorkerConstructorSites": 2,
         "xmlHttpRequestConstructorSites": 4,
         "functionReturnThisSites": 1,
+        "typedArrayConstructorSites": 10,
         "webAssemblyStreamingInstantiationSites": 1
       },
       "requiredLocalRoutes": [
         {
           "requestPattern": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/voices/${voice}.bin",
           "authority": "caller-declared-authenticated-voice-file",
+          "localDisposition": "authenticated-graph-route-served",
           "networkDisposition": "mutable-network-request-rejected"
         },
         {
@@ -47,9 +49,10 @@
         "moduleWorkerConstructorSites": 2,
         "xmlHttpRequestConstructorSites": 2,
         "functionReturnThisSites": 1,
+        "typedArrayConstructorSites": 10,
         "webAssemblyStreamingInstantiationSites": 1
       },
-      "requiredEnvironmentShape": "transformers-onnx-wasm-paths"
+      "requiredEnvironmentShape": "transformers-env-backends-onnx-wasm"
     },
     {
       "id": "onnx-runtime-jsep-module",
@@ -65,6 +68,7 @@
         "selfModuleWorkerConstructorSites": 1,
         "xmlHttpRequestConstructorSites": 2,
         "functionReturnThisSites": 1,
+        "typedArrayConstructorSites": 0,
         "webAssemblyStreamingInstantiationSites": 1
       },
       "browserInactiveEdges": [
@@ -74,13 +78,17 @@
     }
   ],
   "admissionRequirements": [
-    "every-runtime-import-fetch-cache-and-worker-edge-declared",
+    "every-runtime-import-fetch-and-worker-edge-declared",
     "every-declared-edge-matches-one-observed-call-site",
+    "every-runtime-cache-route-bound-to-one-authenticated-graph-file",
     "mutable-request-url-used-only-as-local-authenticated-route-alias",
     "cache-storage-projected-as-read-only-authenticated-graph",
     "xml-http-request-and-undeclared-transports-rejected",
     "exact-function-return-this-site-rewritten-to-global-this",
+    "exact-typed-array-constructor-sites-bound-to-intrinsic-prototypes",
+    "function-family-constructor-properties-replaced-before-import",
     "all-other-dynamic-code-capabilities-rejected",
+    "indexeddb-and-opfs-boundaries-unavailable-to-runtime-modules",
     "nested-onnx-module-workers-reuse-authenticated-graph-routes",
     "caller-model-revision-dtype-sample-rate-and-voice-authority-preserved"
   ]

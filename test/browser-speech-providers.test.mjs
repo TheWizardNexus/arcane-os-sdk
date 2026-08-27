@@ -3,11 +3,17 @@ import { createHash } from "node:crypto";
 
 import test from "../src/testing.mjs";
 import {
+  BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL,
   createBrowserKokoroProvider,
+  createBrowserSpeechArtifactGraph,
   createBrowserSpeechAuthority,
   createBrowserWhisperProvider,
   createDbopfsSpeechArtifactStore,
 } from "../browser-runtime/ai/browser-speech.mjs";
+import {
+  createSpeechWorkerRuntime,
+  SPEECH_WORKER_PROTOCOL,
+} from "../browser-runtime/ai/speech-worker-runtime.mjs";
 import { createSpeechWorkerContract } from "./browser-speech-workers.contract.mjs";
 
 function digest(bytes) {
@@ -126,6 +132,229 @@ function providerOptions(role, store) {
   };
 }
 
+function artifactGraphFixture(role) {
+  const encoder = new TextEncoder();
+  const runtimeRevision = "runtime-release-commit";
+  const onnxRevision = "onnx-release-commit";
+  const modelRevision = "model-release-commit";
+  const modelRequestUrl = `https://speech-runtime.example/${modelRevision}/request/config.json`;
+  const wasmRequestUrl = `https://speech-runtime.example/${onnxRevision}/request/ort.wasm`;
+  const mutableWasmFallback =
+    "https://cdn.jsdelivr.net/npm/onnxruntime-web@latest/dist/ort-wasm-simd-threaded.wasm";
+  const voiceRequestUrl = role === "tts"
+    ? "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/voices/af_caller.bin"
+    : null;
+  const entryBytes = encoder.encode(`
+    export async function loadRuntime() {
+      const runtime = await import("./ort.mjs");
+      ${role === "tts" ? `
+      const voiceCache = await caches.open("kokoro-voices");
+      await voiceCache.match(${JSON.stringify(voiceRequestUrl)});` : ""}
+      await fetch(${JSON.stringify(modelRequestUrl)});
+      await fetch(${JSON.stringify(mutableWasmFallback)});
+      return runtime;
+    }
+  `);
+  const onnxBytes = encoder.encode(`
+    const seed = new Uint8Array([1]);
+    export const copiedSeed = new seed.constructor(seed.length);
+    export async function startRuntime() {
+      await fetch(${JSON.stringify(wasmRequestUrl)});
+      return new Worker(import.meta.url, { type: "module" });
+    }
+  `);
+  const wasmBytes = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]);
+  const modelBytes = encoder.encode('{"model_type":"synthetic-speech"}\n');
+  const voiceBytes = new Uint8Array([7, 11, 13, 17]);
+  const sources = new Map();
+
+  function declaredFile({
+    kind,
+    path,
+    revision,
+    license,
+    mediaType,
+    body,
+    runtimeRequestUrls = [],
+  }) {
+    const sha256 = digest(body);
+    const sourceUrl = `https://speech.example/${revision}/${sha256}/${path}`;
+    const descriptor = Object.freeze({
+      kind,
+      path,
+      sourceUrl,
+      revision,
+      license,
+      mediaType,
+      bytes: body.byteLength,
+      sha256,
+      runtimeRequestUrls,
+    });
+    sources.set(sourceUrl, Object.freeze({ body, mediaType }));
+    return descriptor;
+  }
+
+  const files = [
+    declaredFile({
+      kind: "runtime-entrypoint-javascript",
+      path: "runtime/entry.mjs",
+      revision: runtimeRevision,
+      license: "Apache-2.0",
+      mediaType: "text/javascript",
+      body: entryBytes,
+    }),
+    declaredFile({
+      kind: "runtime-auxiliary-javascript",
+      path: "runtime/ort.mjs",
+      revision: onnxRevision,
+      license: "MIT",
+      mediaType: "text/javascript",
+      body: onnxBytes,
+    }),
+    declaredFile({
+      kind: "runtime-wasm-binary",
+      path: "runtime/ort.wasm",
+      revision: onnxRevision,
+      license: "MIT",
+      mediaType: "application/wasm",
+      body: wasmBytes,
+      runtimeRequestUrls: [wasmRequestUrl],
+    }),
+    declaredFile({
+      kind: "model-configuration-json",
+      path: "model/config.json",
+      revision: modelRevision,
+      license: "Apache-2.0",
+      mediaType: "application/json",
+      body: modelBytes,
+      runtimeRequestUrls: [modelRequestUrl],
+    }),
+  ];
+  if (role === "tts") {
+    files.push(declaredFile({
+      kind: "voice-style-binary",
+      path: "voices/af_caller.bin",
+      revision: modelRevision,
+      license: "Apache-2.0",
+      mediaType: "application/octet-stream",
+      body: voiceBytes,
+      runtimeRequestUrls: [voiceRequestUrl],
+    }));
+  }
+  const descriptor = {
+    providerId: role === "stt" ? "graph-whisper" : "graph-kokoro",
+    role,
+    model: {
+      id: role === "stt" ? "caller-whisper" : "caller-kokoro",
+      repository: role === "stt" ? "example/caller-whisper" : "example/caller-kokoro",
+      revision: modelRevision,
+      dtype: "q8",
+      ...(role === "stt"
+        ? { inputSampleRate: 22_050 }
+        : {
+          outputSampleRate: 22_050,
+          defaultVoice: "af_caller",
+          voices: [{ id: "af_caller", path: "voices/af_caller.bin" }],
+        }),
+    },
+    runtime: {
+      adapter: role === "stt" ? "transformers-whisper" : "kokoro-js",
+      version: role === "stt" ? "3.5.1" : "1.2.1",
+      revision: runtimeRevision,
+      entrypoint: "runtime/entry.mjs",
+      onnxWasm: {
+        namespace: role === "stt"
+          ? "transformers-env-backends-onnx-wasm"
+          : "kokoro-env-wasm-paths",
+        mjsPath: "runtime/ort.mjs",
+        wasmPath: "runtime/ort.wasm",
+        ...(role === "stt" ? { numThreads: 2 } : {}),
+      },
+      negativeRuntimeRequestUrls: [mutableWasmFallback],
+    },
+    files,
+    edges: {
+      staticImports: [],
+      cacheOpens: role === "tts" ? [{
+        modulePath: "runtime/entry.mjs",
+        occurrence: 1,
+        edgePolicy: "artifact-targets-admitted",
+        cacheName: "kokoro-voices",
+        targetPaths: ["voices/af_caller.bin"],
+      }] : [],
+      dynamicImports: [{
+        modulePath: "runtime/entry.mjs",
+        occurrence: 1,
+        edgePolicy: "artifact-targets-admitted",
+        targets: [{
+          match: "exact-runtime-specifier",
+          targetPath: "runtime/ort.mjs",
+          exactSpecifier: "./ort.mjs",
+        }],
+      }],
+      moduleWorkers: [{
+        modulePath: "runtime/ort.mjs",
+        occurrence: 1,
+        edgePolicy: "artifact-targets-admitted",
+        targets: [{
+          match: "self-module-url",
+          targetPath: "runtime/ort.mjs",
+        }],
+      }],
+      fetches: [{
+        modulePath: "runtime/entry.mjs",
+        occurrence: 1,
+        edgePolicy: "artifact-targets-admitted",
+        targetPaths: ["model/config.json"],
+      }, {
+        modulePath: "runtime/entry.mjs",
+        occurrence: 2,
+        edgePolicy: "artifact-targets-admitted",
+        negativeRuntimeRequestUrls: [mutableWasmFallback],
+      }, {
+        modulePath: "runtime/ort.mjs",
+        occurrence: 1,
+        edgePolicy: "artifact-targets-admitted",
+        targetPaths: ["runtime/ort.wasm"],
+      }],
+    },
+    transforms: [{
+      kind: "typed-array-constructor",
+      modulePath: "runtime/ort.mjs",
+      occurrence: 1,
+    }],
+  };
+  return Object.freeze({
+    descriptor,
+    graph: createBrowserSpeechArtifactGraph(descriptor),
+    sources,
+    requests: Object.freeze({ modelRequestUrl, mutableWasmFallback, voiceRequestUrl, wasmRequestUrl }),
+  });
+}
+
+function graphStore(dbopfs, sources, {
+  fetchAttempt = () => undefined,
+  objectUrlFactory,
+} = {}) {
+  return createDbopfsSpeechArtifactStore({
+    dbopfs,
+    fetchImpl: async (url) => {
+      fetchAttempt(String(url));
+      const source = sources.get(String(url));
+      return source
+        ? responseAt(url, source.body, {
+          status: 200,
+          headers: {
+            "content-length": String(source.body.byteLength),
+            "content-type": source.mediaType,
+          },
+        })
+        : responseAt(url, null, { status: 404 });
+    },
+    ...(objectUrlFactory ? { objectUrlFactory } : {}),
+  });
+}
+
 function installContractWorker(t, createContract) {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");
   Object.defineProperty(globalThis, "Worker", {
@@ -145,9 +374,569 @@ function selection(provider) {
   return Object.freeze({
     providerId: provider.id,
     modelId: provider.catalog()[0].id,
+    role: provider.role,
     localOnly: true,
   });
 }
+
+function directGraphWorkerConfiguration(source, {
+  cache = true,
+  transforms = true,
+} = {}) {
+  const capability = "a".repeat(64);
+  const graphId = "b".repeat(64);
+  const modelRoute = "https://speech.example/model-revision/model/config.json";
+  const entryModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(source
+    .replaceAll("__CAPABILITY__", capability)
+    .replaceAll("__MODEL_ROUTE__", modelRoute))}`;
+  const auxiliaryModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent("export const runtime = true;")}`;
+  const wasmModuleUrl = "data:application/wasm;base64,AGFzbQEAAAA=";
+  const modelModuleUrl = `data:application/json;charset=utf-8,${encodeURIComponent('{"model_type":"speech"}')}`;
+  const materialized = (path, moduleUrl, mediaType, runtimeRequestUrls = []) => ({
+    path,
+    sourceUrl: `https://speech.example/immutable-revision/${path}`,
+    revision: "immutable-revision",
+    license: "Apache-2.0",
+    moduleUrl,
+    mediaType,
+    bytes: 1,
+    sha256: "c".repeat(64),
+    runtimeRequestUrls,
+  });
+  return Object.freeze({
+    role: "stt",
+    runtime: Object.freeze({
+      adapter: "transformers-whisper",
+      moduleGraph: "browser-speech-authenticated-artifact-graph",
+      entry: "runtime/entry.mjs",
+      artifactGraphId: graphId,
+      artifactGraphAdmission: "artifact-graph-network-dbopfs-verified",
+      guardCapability: capability,
+      onnxWasm: Object.freeze({
+        namespace: "transformers-env-backends-onnx-wasm",
+        mjsPath: "runtime/ort.mjs",
+        wasmPath: "runtime/ort.wasm",
+        numThreads: 1,
+      }),
+      negativeRuntimeRequestUrls: Object.freeze([]),
+      files: Object.freeze([
+        materialized("runtime/entry.mjs", entryModuleUrl, "text/javascript"),
+        materialized("runtime/ort.mjs", auxiliaryModuleUrl, "text/javascript"),
+        materialized("runtime/ort.wasm", wasmModuleUrl, "application/wasm"),
+      ]),
+      edges: Object.freeze({
+        staticImports: Object.freeze([]),
+        dynamicImports: Object.freeze([]),
+        moduleWorkers: Object.freeze([]),
+        fetches: Object.freeze([]),
+        cacheOpens: Object.freeze(cache ? [{
+          modulePath: "runtime/entry.mjs",
+          occurrence: 1,
+          edgePolicy: "artifact-targets-admitted",
+          cacheName: "transformers-cache",
+          targetPaths: Object.freeze(["model/config.json"]),
+        }] : []),
+      }),
+      transforms: Object.freeze(transforms ? [{
+        kind: "typed-array-constructor",
+        modulePath: "runtime/entry.mjs",
+        occurrence: 1,
+      }] : []),
+    }),
+    model: Object.freeze({
+      id: "direct-worker-whisper",
+      repository: "example/direct-worker-whisper",
+      revision: "model-revision",
+      dtype: "q8",
+      inputSampleRate: 16_000,
+      files: Object.freeze([
+        materialized(
+          "model/config.json",
+          modelModuleUrl,
+          "application/json",
+          [modelRoute],
+        ),
+      ]),
+    }),
+  });
+}
+
+test("browser speech artifact graphs bind one deterministic closed authority", () => {
+  const stt = artifactGraphFixture("stt");
+  assert.equal(stt.graph.protocol, BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL);
+  assert.equal(stt.graph.kind, "browser-speech-authenticated-artifact-graph");
+  assert.equal(stt.graph.runtime.moduleGraph, "browser-speech-authenticated-artifact-graph");
+  assert.equal(stt.graph.artifactGraphStatus, "artifact-graph-descriptor-verified");
+  assert.match(stt.graph.identitySha256, /^[a-f0-9]{64}$/u);
+  assert.equal(Object.isFrozen(stt.graph), true);
+  assert.deepEqual(
+    stt.graph.files.map(({ path }) => path),
+    [...stt.graph.files.map(({ path }) => path)].sort(),
+  );
+
+  const reordered = createBrowserSpeechArtifactGraph({
+    ...stt.descriptor,
+    files: [...stt.descriptor.files].reverse(),
+    edges: {
+      staticImports: [...stt.descriptor.edges.staticImports].reverse(),
+      dynamicImports: [...stt.descriptor.edges.dynamicImports].reverse(),
+      moduleWorkers: [...stt.descriptor.edges.moduleWorkers].reverse(),
+      fetches: [...stt.descriptor.edges.fetches].reverse(),
+    },
+    transforms: [...stt.descriptor.transforms].reverse(),
+  });
+  assert.equal(reordered.identitySha256, stt.graph.identitySha256);
+  assert.throws(
+    () => createBrowserSpeechArtifactGraph({
+      ...stt.descriptor,
+      identitySha256: "0".repeat(64),
+    }),
+    (error) => error?.reason === "artifact-graph-identity-sha256-mismatch",
+  );
+
+  const tts = artifactGraphFixture("tts");
+  assert.throws(
+    () => createBrowserSpeechArtifactGraph({
+      ...tts.descriptor,
+      runtime: {
+        ...tts.descriptor.runtime,
+        onnxWasm: { ...tts.descriptor.runtime.onnxWasm, numThreads: 2 },
+      },
+    }),
+    (error) => error?.reason === "kokoro-env-num-threads-unsupported",
+  );
+  const [entrypoint, ...remaining] = stt.descriptor.files;
+  assert.throws(
+    () => createBrowserSpeechArtifactGraph({
+      ...stt.descriptor,
+      identitySha256: stt.graph.identitySha256,
+      files: [{ ...entrypoint, license: "MIT" }, ...remaining],
+    }),
+    (error) => error?.reason === "artifact-graph-identity-sha256-mismatch",
+  );
+  assert.throws(
+    () => createBrowserSpeechArtifactGraph({
+      ...stt.descriptor,
+      files: [{ ...entrypoint, license: " Apache-2.0 " }, ...remaining],
+    }),
+    (error) => error?.reason === "artifact-graph-file-license-invalid",
+  );
+  assert.throws(
+    () => createBrowserSpeechArtifactGraph({
+      ...stt.descriptor,
+      files: [{ ...entrypoint, revision: "another-runtime-revision" }, ...remaining],
+    }),
+    (error) => error?.reason === "artifact-graph-entrypoint-revision-mismatch",
+  );
+  assert.throws(
+    () => createBrowserSpeechArtifactGraph({
+      ...stt.descriptor,
+      files: [{
+        ...entrypoint,
+        sourceUrl: `https://speech.example/resolve/main/${entrypoint.revision}/${entrypoint.sha256}`,
+      }, ...remaining],
+    }),
+    (error) => error?.reason === "artifact-graph-source-url-mutable",
+  );
+});
+
+test("authenticated graph Worker executes only declared cache and typed-array capabilities", async () => {
+  const source = `
+    const guard = globalThis.__arcaneBrowserSpeechArtifactGraphGuardsV1;
+    const seed = new Uint8Array([1]);
+    const copy = new (guard.typedArrayConstructor(
+      "__CAPABILITY__", "runtime/entry.mjs", 1, seed
+    ))(seed.length);
+    const cache = await guard.openCache(
+      "__CAPABILITY__", "runtime/entry.mjs", 1, "transformers-cache"
+    );
+    const cached = await cache.match("__MODEL_ROUTE__");
+    const cachedBytes = new Uint8Array(await cached.arrayBuffer());
+    export const env = {
+      allowLocalModels: true,
+      allowRemoteModels: false,
+      useBrowserCache: true,
+      useFSCache: true,
+      useCustomCache: false,
+      customCache: null,
+      backends: { onnx: { wasm: {} } },
+    };
+    export async function pipeline() {
+      const transcriber = async () => ({
+        text: \`authenticated-\${copy.length}-\${cachedBytes.byteLength}\`,
+      });
+      transcriber.dispose = async () => undefined;
+      return transcriber;
+    }
+  `;
+  const messages = [];
+  const fetched = [];
+  const originalFetch = globalThis.fetch;
+  const originalFunctionConstructor = (() => {}).constructor;
+  Object.defineProperty(globalThis, "fetch", {
+    configurable: true,
+    writable: true,
+    value: async (url, options) => {
+      fetched.push(String(url));
+      return originalFetch(url, options);
+    },
+  });
+  const runtime = createSpeechWorkerRuntime({
+    role: "stt",
+    send: (message) => messages.push(message),
+  });
+  let loaded = false;
+  try {
+    const configuration = directGraphWorkerConfiguration(source);
+    const status = await runtime.handleMessage({
+      protocol: SPEECH_WORKER_PROTOCOL,
+      id: 1,
+      op: "load",
+      payload: { configuration },
+    });
+    loaded = true;
+    assert.equal(status.lifecycleStatus, "stt-worker-ready");
+    assert.equal(status.lifecycleReason, "stt-load-completed");
+    const result = await runtime.handleMessage({
+      protocol: SPEECH_WORKER_PROTOCOL,
+      id: 2,
+      op: "use",
+      payload: { audio: new Float32Array([0]), sampleRate: 16_000 },
+    });
+    assert.deepEqual(result, { text: "authenticated-1-23" });
+    assert.equal(fetched.length, 1);
+    assert.match(fetched[0], /^data:application\/json/u);
+    assert.ok(messages.filter((message) => message.event === "progress").every((message) =>
+      Object.keys(message.progress).sort().join(",")
+        === "completed,heartbeat,phase,total,unit"));
+  } finally {
+    if (loaded) {
+      await runtime.handleMessage({
+        protocol: SPEECH_WORKER_PROTOCOL,
+        id: 3,
+        op: "unload",
+        payload: null,
+      }).catch(() => undefined);
+    }
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      writable: true,
+      value: originalFetch,
+    });
+  }
+  assert.equal(globalThis.__arcaneBrowserSpeechArtifactGraphGuardsV1, undefined);
+  assert.equal((() => {}).constructor, originalFunctionConstructor);
+});
+
+test("authenticated graph Worker rejects detached dynamic-code constructors", async () => {
+  const source = `
+    const DynamicFunction = (() => {}).constructor;
+    DynamicFunction("return globalThis")();
+    export const env = {};
+  `;
+  const runtime = createSpeechWorkerRuntime({ role: "stt", send: () => undefined });
+  await assert.rejects(
+    runtime.handleMessage({
+      protocol: SPEECH_WORKER_PROTOCOL,
+      id: 1,
+      op: "load",
+      payload: {
+        configuration: directGraphWorkerConfiguration(source, {
+          cache: false,
+          transforms: false,
+        }),
+      },
+    }),
+    (error) => error?.reason === "artifact-graph-dynamic-code-constructor-rejected",
+  );
+  assert.equal(
+    runtime.status().lifecycleReason,
+    "artifact-graph-dynamic-code-constructor-rejected",
+  );
+  assert.equal(globalThis.__arcaneBrowserSpeechArtifactGraphGuardsV1, undefined);
+});
+
+test("artifact graph DBOPFS admission proves cold, warm, and zero-network offline closure", async () => {
+  const fixture = artifactGraphFixture("stt");
+  const dbopfs = createMemoryDbopfs();
+  let fetches = 0;
+  let objectUrlSubstitutions = 0;
+  const phases = [];
+  const store = graphStore(dbopfs, fixture.sources, {
+    fetchAttempt: () => {
+      fetches += 1;
+    },
+    objectUrlFactory: {
+      create: () => {
+        objectUrlSubstitutions += 1;
+        return "https://untrusted.example/runtime.mjs";
+      },
+      revoke: () => undefined,
+    },
+  });
+  const cold = await store.prepare(fixture.graph, {
+    onProgress: ({ phase }) => phases.push(phase),
+    security: { secure: true, checks: { byteLength: true, sha256: true } },
+  });
+  assert.equal(cold.artifactGraphId, fixture.graph.identitySha256);
+  assert.equal(cold.cache, "artifact-graph-network-dbopfs-verified");
+  assert.equal(cold.artifactGraphAdmission, "artifact-graph-network-dbopfs-verified");
+  assert.equal(fetches, fixture.sources.size);
+  assert.equal(objectUrlSubstitutions, 0);
+  assert.ok([
+    ...cold.runtime.files,
+    ...cold.model.files,
+  ].every((file) => file.moduleUrl.startsWith("blob:")));
+  assert.equal(dbopfs.mutations.at(-1).name.endsWith(".complete.json"), true);
+  assert.ok(phases.includes("artifact-graph-network-download"));
+  assert.ok(phases.includes("artifact-graph-dbopfs-persisted-rehash"));
+  cold.release();
+
+  const warm = await store.prepare(fixture.graph, {
+    onProgress: ({ phase }) => phases.push(phase),
+  });
+  assert.equal(warm.cache, "artifact-graph-dbopfs-cache-verified");
+  assert.equal(fetches, fixture.sources.size);
+  assert.ok(phases.includes("artifact-graph-dbopfs-cache-rehash"));
+  warm.release();
+
+  let offlineFetches = 0;
+  const offlineStore = graphStore(dbopfs, fixture.sources, {
+    fetchAttempt: () => {
+      offlineFetches += 1;
+      throw new Error("offline admission must not call fetch");
+    },
+  });
+  const offline = await offlineStore.prepare(fixture.graph, { offline: true });
+  assert.equal(offline.cache, "artifact-graph-offline-dbopfs-cache-verified");
+  assert.equal(offlineFetches, 0);
+  offline.release();
+
+  const persistedFileName = [...dbopfs.entries.keys()].find((name) =>
+    name.endsWith(".artifact"));
+  dbopfs.entries.set(persistedFileName, new Blob([new Uint8Array([9, 9, 9])]));
+  await assert.rejects(
+    offlineStore.prepare(fixture.graph, { offline: true }),
+    (error) => error?.reason === "artifact-graph-offline-cache-miss",
+  );
+  assert.equal(offlineFetches, 0);
+  assert.equal(
+    [...dbopfs.entries.keys()].some((name) => name.endsWith(".complete.json")),
+    false,
+  );
+});
+
+test("artifact graph materialization rewrites exact cache and typed-array sites", async () => {
+  const fixture = artifactGraphFixture("tts");
+  const prepared = await graphStore(createMemoryDbopfs(), fixture.sources)
+    .prepare(fixture.graph);
+  try {
+    const entry = prepared.runtime.files.find((file) =>
+      file.path === "runtime/entry.mjs");
+    const auxiliary = prepared.runtime.files.find((file) =>
+      file.path === "runtime/ort.mjs");
+    const entrySource = await (await fetch(entry.moduleUrl)).text();
+    const auxiliarySource = await (await fetch(auxiliary.moduleUrl)).text();
+    assert.match(entrySource, /\.openCache\("[a-f0-9]{64}","runtime\/entry\.mjs",1,/u);
+    assert.doesNotMatch(entrySource, /\bcaches\.open\s*\(/u);
+    assert.match(
+      auxiliarySource,
+      /new \(globalThis\.__arcaneBrowserSpeechArtifactGraphGuardsV1\.typedArrayConstructor\("[a-f0-9]{64}","runtime\/ort\.mjs",1,seed\)\)\(seed\.length\)/u,
+    );
+    assert.doesNotMatch(auxiliarySource, /new seed\.constructor\s*\(/u);
+  } finally {
+    prepared.release();
+  }
+});
+
+test("artifact graph source verification propagates exact failed boundaries", async () => {
+  const fixture = artifactGraphFixture("stt");
+  const entrypoint = fixture.graph.files.find((file) =>
+    file.kind === "runtime-entrypoint-javascript");
+  const original = fixture.sources.get(entrypoint.sourceUrl);
+
+  const wrongMediaSources = new Map(fixture.sources);
+  wrongMediaSources.set(entrypoint.sourceUrl, Object.freeze({
+    ...original,
+    mediaType: "application/javascript",
+  }));
+  await assert.rejects(
+    graphStore(createMemoryDbopfs(), wrongMediaSources).prepare(fixture.graph),
+    (error) => error?.reason === "artifact-graph-entrypoint-media-type-mismatch",
+  );
+
+  const shortSources = new Map(fixture.sources);
+  shortSources.set(entrypoint.sourceUrl, Object.freeze({
+    ...original,
+    body: original.body.slice(0, original.body.byteLength - 1),
+  }));
+  await assert.rejects(
+    graphStore(createMemoryDbopfs(), shortSources).prepare(fixture.graph),
+    (error) => error?.reason === "artifact-graph-entrypoint-byte-length-mismatch",
+  );
+
+  const changedBytes = new Uint8Array(original.body);
+  changedBytes[0] ^= 0xff;
+  const changedSources = new Map(fixture.sources);
+  changedSources.set(entrypoint.sourceUrl, Object.freeze({
+    ...original,
+    body: changedBytes,
+  }));
+  await assert.rejects(
+    graphStore(createMemoryDbopfs(), changedSources).prepare(fixture.graph),
+    (error) => error?.reason === "artifact-graph-entrypoint-sha256-mismatch",
+  );
+
+  const redirectedStore = createDbopfsSpeechArtifactStore({
+    dbopfs: createMemoryDbopfs(),
+    fetchImpl: async (url) => {
+      const source = fixture.sources.get(String(url));
+      return responseAt(`https://redirected.example/${encodeURIComponent(String(url))}`, source.body, {
+        status: 200,
+        redirected: true,
+        headers: {
+          "content-length": String(source.body.byteLength),
+          "content-type": source.mediaType,
+        },
+      });
+    },
+    objectUrlFactory: { create: () => "blob:redirect-never", revoke: () => undefined },
+  });
+  await assert.rejects(
+    redirectedStore.prepare(fixture.graph),
+    (error) => error?.reason === "artifact-graph-source-redirected",
+  );
+});
+
+test("graph Kokoro uses caller voice and sample-rate authority over a private Worker channel", async (t) => {
+  const fixture = artifactGraphFixture("tts");
+  const dbopfs = createMemoryDbopfs();
+  const store = graphStore(dbopfs, fixture.sources);
+  const contracts = [];
+  installContractWorker(t, () => {
+    const contract = createSpeechWorkerContract({ role: "tts" });
+    contracts.push(contract);
+    return contract;
+  });
+
+  const weakened = createBrowserKokoroProvider({
+    id: fixture.graph.providerId,
+    graph: fixture.graph,
+    store,
+    appSecurity: { secure: false },
+  });
+  await assert.rejects(
+    weakened.load({
+      role: "tts",
+      selection: selection(weakened),
+      progress: () => undefined,
+    }),
+    (error) => error?.reason === "artifact-graph-security-weakening-rejected",
+  );
+  assert.equal(contracts.length, 0);
+
+  const kokoro = createBrowserKokoroProvider({
+    id: fixture.graph.providerId,
+    graph: fixture.graph,
+    store,
+  });
+  const [catalog] = kokoro.catalog();
+  assert.deepEqual(catalog.speech, {
+    outputSampleRate: 22_050,
+    responseFormats: ["wav"],
+    defaultResponseFormat: "wav",
+  });
+  assert.equal(catalog.defaultVoice, "af_caller");
+  assert.deepEqual(catalog.voices, [{ id: "af_caller", path: "voices/af_caller.bin" }]);
+  assert.equal(kokoro.status().lifecycleStatus, "tts-provider-unloaded");
+  assert.equal(kokoro.status().lifecycleReason, "tts-provider-created");
+
+  await kokoro.load({
+    role: "tts",
+    selection: selection(kokoro),
+    progress: () => undefined,
+    security: { secure: true, checks: { byteLength: true, sha256: true } },
+  });
+  assert.equal(contracts.length, 1);
+  assert.equal(contracts[0].privateTransport, true);
+  assert.equal(contracts[0].privatePortTransferred, true);
+  assert.equal(kokoro.status().lifecycleStatus, "tts-provider-ready");
+  assert.equal(kokoro.status().lifecycleReason, "tts-load-completed");
+  assert.equal(kokoro.status().artifactGraphId, fixture.graph.identitySha256);
+  assert.equal(
+    kokoro.status().artifactGraphAdmission,
+    "artifact-graph-network-dbopfs-verified",
+  );
+
+  const speech = await kokoro.request({
+    role: "tts",
+    operation: "synthesize",
+    payload: { text: "Caller authority" },
+  });
+  assert.equal(speech.sampleRate, 22_050);
+  assert.equal(speech.voice, "af_caller");
+  assert.equal(kokoro.status().lifecycleReason, "tts-synthesis-completed");
+  await assert.rejects(
+    kokoro.request({
+      role: "tts",
+      operation: "synthesize",
+      payload: { text: "Unknown voice", voice: "af_hidden" },
+    }),
+    (error) => error?.reason === "tts-synthesis-voice-not-declared",
+  );
+
+  await kokoro.unload();
+  assert.equal(kokoro.status().lifecycleStatus, "tts-provider-unloaded");
+  assert.equal(kokoro.status().lifecycleReason, "tts-unload-completed");
+  assert.equal(contracts[0].terminated, true);
+  assert.equal(contracts[0].privateTransport, false);
+});
+
+test("graph Whisper uses caller sample-rate authority over a private Worker channel", async (t) => {
+  const fixture = artifactGraphFixture("stt");
+  const contract = createSpeechWorkerContract({ role: "stt" });
+  installContractWorker(t, () => contract);
+  const whisper = createBrowserWhisperProvider({
+    id: fixture.graph.providerId,
+    graph: fixture.graph,
+    store: graphStore(createMemoryDbopfs(), fixture.sources),
+  });
+  assert.deepEqual(
+    whisper.inspect({ ...selection(whisper), role: "tts" }),
+    {
+      available: false,
+      code: "ARCANE_AI_MODEL_AUTHORITY_REQUIRED",
+      message: "The selected browser speech model does not match this provider authority.",
+      reason: "stt-provider-inspection-selection-authority-mismatch",
+    },
+  );
+  await whisper.load({
+    role: "stt",
+    selection: selection(whisper),
+    progress: () => undefined,
+  });
+  assert.equal(contract.privatePortTransferred, true);
+  assert.equal(
+    contract.posted.find((message) => message.op === "load")
+      ?.payload?.configuration?.runtime?.onnxWasm?.namespace,
+    "transformers-env-backends-onnx-wasm",
+  );
+  assert.deepEqual(await whisper.request({
+    role: "stt",
+    operation: "transcribe",
+    payload: { audio: new Float32Array([0]), sampleRate: 22_050 },
+  }), { text: "hello from whisper" });
+  await assert.rejects(
+    whisper.request({
+      role: "stt",
+      operation: "transcribe",
+      payload: { audio: new Float32Array([0]), sampleRate: 16_000 },
+    }),
+    (error) => error?.reason === "stt-transcription-sample-rate-mismatch",
+  );
+  await whisper.unload();
+  assert.equal(contract.terminated, true);
+});
 
 test("browser Whisper and Kokoro expose independent provider-v2 workers", async (t) => {
   const dbopfs = createMemoryDbopfs();
@@ -237,7 +1026,8 @@ test("browser Whisper and Kokoro expose independent provider-v2 workers", async 
     operation: "transcribe",
     payload: { audio: new Float32Array([0]), sampleRate: 16_000 },
     signal: alreadyAborted.signal,
-  }), (error) => error?.code === "ARCANE_AI_REQUEST_ABORTED");
+  }), (error) => error?.code === "ARCANE_AI_REQUEST_ABORTED"
+    && error?.reason === "stt-transcription-cancelled");
   assert.equal(whisper.status().state, "ready");
   assert.equal(workers.stt[0].terminated, false);
 
@@ -577,7 +1367,8 @@ test("browser speech providers normalize shared AI requests at one fail-closed b
   controller.abort();
   await assert.rejects(
     pendingRequest,
-    (error) => error?.code === "ARCANE_AI_REQUEST_ABORTED",
+    (error) => error?.code === "ARCANE_AI_REQUEST_ABORTED"
+      && error?.reason === "stt-transcription-cancelled",
   );
   assert.equal(whisper.status().busy, false);
   assert.equal(whisper.status().state, "ready");
@@ -587,6 +1378,104 @@ test("browser speech providers normalize shared AI requests at one fail-closed b
 
   await whisper.dispose();
   await kokoro.dispose();
+});
+
+test("coalesced speech loads preserve each caller's progress and cancellation", async (t) => {
+  const options = providerOptions("stt", null);
+  const sources = new Map([
+    [options.runtime.files[0].url, new TextEncoder().encode("export const pipeline=()=>{};")],
+    [options.model.files[0].url, new Uint8Array([1, 2, 3])],
+  ]);
+  let releaseFetch;
+  const fetchGate = new Promise((resolve) => {
+    releaseFetch = resolve;
+  });
+  const store = createDbopfsSpeechArtifactStore({
+    dbopfs: createMemoryDbopfs(),
+    fetchImpl: async (url) => {
+      await fetchGate;
+      return responseAt(url, sources.get(String(url)), { status: 200 });
+    },
+    objectUrlFactory: {
+      create: (() => {
+        let id = 0;
+        return () => `blob:coalesced-load-${String(++id)}`;
+      })(),
+      revoke: () => undefined,
+    },
+  });
+  const contract = createSpeechWorkerContract({ role: "stt" });
+  installContractWorker(t, () => contract);
+  const whisper = createBrowserWhisperProvider(providerOptions("stt", store));
+  const firstProgress = [];
+  const secondProgress = [];
+  const first = whisper.load({
+    role: "stt",
+    selection: selection(whisper),
+    progress: (value) => firstProgress.push(value),
+  });
+  const second = whisper.load({
+    role: "stt",
+    selection: selection(whisper),
+    progress: (value) => secondProgress.push(value),
+  });
+  const cancelledController = new AbortController();
+  const cancelled = whisper.load({
+    role: "stt",
+    selection: selection(whisper),
+    signal: cancelledController.signal,
+    progress: () => undefined,
+  });
+  cancelledController.abort("caller-private-abort-text");
+  await assert.rejects(
+    cancelled,
+    (error) => error?.code === "ARCANE_AI_REQUEST_ABORTED"
+      && error?.reason === "stt-load-cancelled"
+      && error?.cause === "caller-private-abort-text",
+  );
+  releaseFetch();
+  const [firstStatus, secondStatus] = await Promise.all([first, second]);
+  assert.equal(firstStatus.lifecycleStatus, "stt-provider-ready");
+  assert.deepEqual(secondStatus, firstStatus);
+  assert.ok(firstProgress.length > 0);
+  assert.deepEqual(secondProgress, firstProgress);
+  await whisper.unload({ role: "stt", selection: selection(whisper) });
+});
+
+test("unload preserves exact supersession during artifact preparation", async () => {
+  const options = providerOptions("stt", null);
+  let fetchStarted;
+  const started = new Promise((resolve) => {
+    fetchStarted = resolve;
+  });
+  const store = createDbopfsSpeechArtifactStore({
+    dbopfs: createMemoryDbopfs(),
+    fetchImpl: async (_url, { signal }) => {
+      fetchStarted();
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener("abort", () => {
+          const error = new Error("artifact fetch cancelled");
+          error.name = "AbortError";
+          reject(error);
+        }, { once: true });
+      });
+    },
+    objectUrlFactory: { create: () => "blob:never", revoke: () => undefined },
+  });
+  const whisper = createBrowserWhisperProvider(providerOptions("stt", store));
+  const loading = whisper.load({
+    role: "stt",
+    selection: selection(whisper),
+    progress: () => undefined,
+  });
+  await started;
+  const unloading = whisper.unload({ role: "stt", selection: selection(whisper) });
+  await assert.rejects(
+    loading,
+    (error) => error?.code === "ARCANE_AI_REQUEST_ABORTED"
+      && error?.reason === "stt-load-superseded-by-unload",
+  );
+  assert.equal((await unloading).lifecycleReason, "stt-unload-completed");
 });
 
 test("speech request cancellation terminates only the affected role Worker", async (t) => {
@@ -624,10 +1513,90 @@ test("speech request cancellation terminates only the affected role Worker", asy
     payload: { audio: new Float32Array([0]), sampleRate: 16_000 },
     signal: controller.signal,
   });
+  for (let attempt = 0; attempt < 10
+    && !contract.posted.some((message) => message.op === "use"); attempt += 1) {
+    await Promise.resolve();
+  }
+  assert.equal(contract.posted.some((message) => message.op === "use"), true);
   controller.abort();
-  await assert.rejects(request, (error) => error?.code === "ARCANE_AI_REQUEST_ABORTED");
+  await assert.rejects(
+    request,
+    (error) => error?.code === "ARCANE_AI_REQUEST_ABORTED"
+      && error?.reason === "stt-transcription-cancelled",
+  );
   assert.equal(contract.terminated, true);
   assert.equal(whisper.status().state, "unloaded");
+  assert.equal(whisper.status().lifecycleStatus, "stt-provider-unloaded");
+  assert.equal(whisper.status().lifecycleReason, "stt-transcription-cancelled");
+});
+
+test("unload preserves exact supersession during pre-Worker audio decoding", async (t) => {
+  const options = providerOptions("stt", null);
+  const sources = new Map([
+    [options.runtime.files[0].url, new TextEncoder().encode("export const pipeline=()=>{};")],
+    [options.model.files[0].url, new Uint8Array([1, 2, 3])],
+  ]);
+  const store = createDbopfsSpeechArtifactStore({
+    dbopfs: createMemoryDbopfs(),
+    fetchImpl: async (url) => responseAt(url, sources.get(String(url)), { status: 200 }),
+    objectUrlFactory: {
+      create: (() => {
+        let id = 0;
+        return () => `blob:unload-decode-${String(++id)}`;
+      })(),
+      revoke: () => undefined,
+    },
+  });
+  const contract = createSpeechWorkerContract({ role: "stt" });
+  installContractWorker(t, () => contract);
+  const decoderDescriptor = Object.getOwnPropertyDescriptor(globalThis, "OfflineAudioContext");
+  let decodingStarted;
+  const started = new Promise((resolve) => {
+    decodingStarted = resolve;
+  });
+  Object.defineProperty(globalThis, "OfflineAudioContext", {
+    configurable: true,
+    writable: true,
+    value: function PendingSpeechDecoder() {
+      this.decodeAudioData = () => {
+        decodingStarted();
+        return new Promise(() => undefined);
+      };
+    },
+  });
+  t.after(() => {
+    if (decoderDescriptor) {
+      Object.defineProperty(globalThis, "OfflineAudioContext", decoderDescriptor);
+    } else {
+      delete globalThis.OfflineAudioContext;
+    }
+  });
+  const whisper = createBrowserWhisperProvider(providerOptions("stt", store));
+  await whisper.load({
+    role: "stt",
+    selection: selection(whisper),
+    progress: () => undefined,
+  });
+  const request = whisper.request({
+    role: "stt",
+    operation: "transcribe",
+    selection: selection(whisper),
+    payload: {
+      audio: new Blob([new Uint8Array([1, 2, 3])], { type: "audio/wav" }),
+      mimeType: "audio/wav",
+      model: whisper.catalog()[0].id,
+    },
+  });
+  await started;
+  const unloading = whisper.unload({ role: "stt", selection: selection(whisper) });
+  await assert.rejects(
+    request,
+    (error) => error?.code === "ARCANE_AI_REQUEST_ABORTED"
+      && error?.reason === "transcription-superseded-by-unload",
+  );
+  const status = await unloading;
+  assert.equal(status.lifecycleStatus, "stt-provider-unloaded");
+  assert.equal(status.lifecycleReason, "stt-unload-completed");
 });
 
 test("secure speech admission rejects altered bytes before creating a Worker", async (t) => {
