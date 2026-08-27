@@ -660,6 +660,12 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
         assert.match(componentGuide,/preventDefault\(\)[\s\S]*suppresses the callback/u);
         assert.match(componentGuide,/emits no activation request on import or state observation/u);
         assert.match(componentGuide,/`startTranscription=false`[\s\S]*does not request STT/u);
+        for(const reason of [
+            'runtime-unready',
+            'stt-provider-request-cancelled',
+            'component-destroyed',
+            'transcript-replaced'
+        ])assert.match(componentGuide,new RegExp(escapeRegExp(reason),'u'),reason);
     });
 
     await t.test('all synchronized JavaScript and inline component scripts parse',()=>{

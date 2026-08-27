@@ -1160,10 +1160,11 @@ state observation emit no activation request and never begin a model download.
 If sticky readiness is lost during microphone acquisition, capture, or the STT
 request, the component invalidates the session, aborts the owned request signal,
 releases media, discards late completion, and emits
-`speech-transcription-cancelled` with frozen `{reason}`. A current provider
-cancellation returns the component workflow to `idle` and emits the same event
-with `reason:'stt-provider-request-cancelled'`; stale teardown results remain
-suppressed. A
+`speech-transcription-cancelled` with frozen `{reason:'runtime-unready'}`. A
+current provider cancellation returns the component workflow to `idle` and
+emits the same event with `reason:'stt-provider-request-cancelled'`; destroying
+an active capture or transcription emits `reason:'component-destroyed'`.
+Stale teardown results remain suppressed. A
 current save failure, including `AbortError`, enters the visible `error` state.
 Readiness loss after transcription has finished does not invalidate an already
 pending application save or completion callback: its settlement remains
