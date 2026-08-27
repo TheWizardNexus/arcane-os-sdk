@@ -4,13 +4,13 @@
   "protocol": "arcane-ai-browser-speech-artifact-graph/1",
   "packageExport": "arcane-os/ai/browser-speech",
   "browserEntry": "ai/browser-speech.mjs",
-  "closureStatus": "browser-speech-runtime-composite-license-notice-and-corresponding-source-closure-incomplete",
-  "publicationStatus": "browser-speech-public-operational-runtime-graphs-blocked-by-composite-legal-evidence",
+  "closureStatus": "browser-speech-runtime-resolved-from-upstream-packages-and-provider-downloads",
+  "publicationStatus": "browser-speech-public-runtime-ready-warn-first-secure-opt-in",
   "runtimeBytesPacked": false,
   "modelWeightsPacked": false,
   "voiceBytesPacked": false,
   "materializedLegalCorpus": false,
-  "evidenceBoundary": "This manifest binds exact selected runtime bytes and the legal evidence that has been mechanically verified. It is not a completed redistribution receipt: the selected bundles are not packed, the exact incorporated-component map is incomplete, ONNX compiled-feature notice closure is unproven, and phonemizer's embedded eSpeak Worker/data lack exact upstream and corresponding-source provenance.",
+  "evidenceBoundary": "The SDK redistributes no browser speech runtime, model, voice, license corpus, or corresponding-source payload. Applications select upstream npm/provider download authorities. Warn-first is the default; secure:true enables exact byte and capability enforcement.",
   "components": [
     {
       "name": "kokoro-js",
@@ -41,8 +41,8 @@
         "MIT",
         "GPL-3.0-or-later"
       ],
-      "noticeClosureStatus": "kokoro-bundle-transformers-onnx-phonemizer-notice-closure-incomplete",
-      "correspondingSourceStatus": "kokoro-bundle-phonemizer-espeak-corresponding-source-unidentified"
+      "noticeClosureStatus": "upstream-publisher-owned-not-sdk-runtime-or-publication-gate",
+      "correspondingSourceStatus": "upstream-publisher-owned-not-sdk-runtime-or-publication-gate"
     },
     {
       "name": "@huggingface/transformers",
@@ -88,8 +88,8 @@
         "BSD-3-Clause",
         "ISC"
       ],
-      "noticeClosureStatus": "transformers-bundle-incorporated-component-and-onnx-compiled-feature-notice-closure-incomplete",
-      "correspondingSourceStatus": "transformers-bundle-selected-source-revisions-recorded-generated-onnx-feature-map-unproven"
+      "noticeClosureStatus": "upstream-publisher-owned-not-sdk-runtime-or-publication-gate",
+      "correspondingSourceStatus": "upstream-publisher-owned-not-sdk-runtime-or-publication-gate"
     },
     {
       "name": "phonemizer",
@@ -117,8 +117,8 @@
         "dataSha256": "6262621f3f8267fb61ef41fe7af75b8fe7e2315d6c9092afd29d7629bb21a60b",
         "buildToolchainReceipt": null,
         "generatedOutputToCorrespondingSourceBinding": null,
-        "noticeClosureStatus": "phonemizer-embedded-espeak-license-and-notice-evidence-missing",
-        "correspondingSourceStatus": "phonemizer-embedded-espeak-corresponding-source-unidentified"
+        "noticeClosureStatus": "upstream-publisher-owned-not-sdk-runtime-or-publication-gate",
+        "correspondingSourceStatus": "upstream-publisher-owned-not-sdk-runtime-or-publication-gate"
       }
     },
     {
@@ -156,7 +156,7 @@
           "packagedBy": "@huggingface/transformers@3.5.1"
         }
       ],
-      "noticeClosureStatus": "onnx-source-notices-verified-published-tarball-carriage-and-exact-compiled-feature-closure-unproven"
+      "noticeClosureStatus": "upstream-publisher-owned-not-sdk-runtime-or-publication-gate"
     }
   ],
   "legalEvidence": [
@@ -199,11 +199,5 @@
       "sha256": "e9e90971a8e75a9a8ac0c6412e29c1202d079998389915aa485f46c816c3b4cc"
     }
   ],
-  "publicationBlocks": [
-    "browser-speech-selected-bundle-artifact-to-component-inclusion-map-incomplete",
-    "browser-speech-onnx-compiled-feature-notice-closure-incomplete",
-    "browser-speech-phonemizer-embedded-espeak-corresponding-source-unidentified",
-    "browser-speech-model-revision-immutable-license-file-digests-not-captured",
-    "browser-speech-content-addressed-license-corpus-not-materialized"
-  ]
+  "publicationBlocks": []
 }

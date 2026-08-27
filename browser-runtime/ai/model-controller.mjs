@@ -85,7 +85,8 @@ export function resolveModelSecurity({ app, binding, load } = {}) {
 }
 
 export function sameModelSecurity(left, right) {
-  return left?.checks?.byteLength === right?.checks?.byteLength
+  return left?.secure === right?.secure
+    && left?.checks?.byteLength === right?.checks?.byteLength
     && left?.checks?.sha256 === right?.checks?.sha256;
 }
 

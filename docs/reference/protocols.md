@@ -309,16 +309,19 @@ silent switch to native/Core/cloud inference.
 ### Browser speech lifecycle
 
 The browser-speech package contains plain-JavaScript authority, DBOPFS store,
-provider, client, and Worker machinery. It supplies no Whisper or Kokoro
-runtime adapter bytes, model weights, voice bytes, download URL, catalog, or
-cloud fallback. New operational integrations use
-`createBrowserSpeechArtifactGraph()` to declare one caller-selected immutable
-closure with an explicit entrypoint and every auxiliary ESM, WASM, model, data,
-and voice file bound by canonical path, materialized media type, optional source
-media type, byte length, SHA-256, immutable starting source/revision, optional
-redirect-final-origin inventory, license declaration, and canonical graph identity.
-The published single-self-contained-module authority remains available only as
-an additive compatibility path.
+provider, client, and Worker machinery. It redistributes no Whisper, Kokoro,
+ONNX, model, voice, third-party license, or corresponding-source payload.
+Default warn-first integrations use `createBrowserSpeechAuthority()` with a
+version-pinned npm/package runtime entry and optional upstream `wasmPaths`;
+the selected runtime then downloads models and voices through its normal
+provider fetch and browser cache behavior after explicit `load()`.
+
+`createBrowserSpeechArtifactGraph()` remains the explicit secure/offline option.
+It declares one caller-selected immutable closure with an explicit entrypoint
+and every auxiliary ESM, WASM, model, data, and voice file bound by canonical
+path, materialized media type, optional source media type, byte length, SHA-256,
+immutable starting source/revision, optional redirect-final-origin inventory,
+license declaration, and canonical graph identity.
 
 Graph construction rejects ambiguous paths and routes, mutable source
 authorities, undeclared or unmatched static imports, dynamic imports, fetches,
@@ -358,9 +361,9 @@ execution. A fresh cryptographic guard capability binds every rewritten graph
 call for that materialization; it is not caller input, persisted authority, or
 part of the graph identity.
 
-The graph Worker establishes a private `MessageChannel` on its first load and
+The speech Worker establishes a private `MessageChannel` on its first load and
 routes subsequent request, progress, and cancellation settlement through that
-port. Scanned runtime edges are rewritten through one authenticated guard.
+port. In secure graph mode, scanned runtime edges are rewritten through one authenticated guard.
 Fetch and each declared cache-open edge can read only exact graph routes backed
 by already verified object URLs; raw fetch/cache calls and cache writes reject.
 The Worker also denies Function-family constructor escape, string timers,
@@ -368,7 +371,9 @@ IndexedDB, OPFS, and raw `BroadcastChannel`, `EventSource`, `RTCPeerConnection`,
 `ShadowRealm`, `SharedWorker`, `WebSocket`, `WebSocketStream`, `WebTransport`,
 `Worker`, `XMLHttpRequest`, `eval`, and `importScripts` capability. Declared
 nested module Workers start through the SDK role Worker and receive the same
-authenticated graph. An exact runtime request alias, including Kokoro's audited
+authenticated graph. In default warn-first mode these capability restrictions
+are not installed; the pinned upstream runtime keeps ordinary browser
+fetch/cache behavior. An exact secure-graph runtime request alias, including Kokoro's audited
 mutable voice request, is a local route to caller-authenticated bytes and is
 never a source or network authority.
 
@@ -393,9 +398,11 @@ The exact redirect and source-media error registry is published in the
 errors retain the mechanical exact code pairing
 `ARCANE_AI_` plus the uppercased, underscore-normalized reason.
 
-Kokoro is configured only through `namespace.env.wasmPaths`; Transformers is
-configured only through `namespace.env.backends.onnx.wasm.wasmPaths` plus its
-verified outer cache fields. Optional `numThreads` is caller-owned and
+Kokoro is configured through `namespace.env.wasmPaths`; Transformers is
+configured through `namespace.env.backends.onnx.wasm.wasmPaths`. Warn-first
+mode may use a caller-selected version-pinned upstream directory and preserves
+the runtime's browser cache. Secure graph mode uses materialized runtime files
+and its verified outer cache fields. Optional `numThreads` is caller-owned and
 Transformers-STT-only; a Kokoro declaration rejects with
 `ARCANE_AI_KOKORO_ENV_NUM_THREADS_FIELD_NOT_EXPOSED` /
 `kokoro-env-num-threads-field-not-exposed`. Missing or rejected namespace
@@ -405,15 +412,10 @@ substitutes a different namespace. The caller also owns dtype, STT input sample
 rate, TTS output sample rate, default voice, and the complete voice inventory;
 the SDK selects no hardware default, runtime, model, or fallback.
 
-Network isolation is not license closure. The Transformers/ONNX STT composite
-record lacks an exact selected-JSEP compiled-feature-to-notice map, so public
-STT graph release/admission remains blocked. The Kokoro/phonemizer composite
-notice and corresponding-source record for the embedded eSpeak/Emscripten
-Worker is also incomplete, so public Kokoro graph release/admission must remain
-blocked until exact immutable source, build/toolchain provenance, effective
-license, notices, and corresponding source are mechanically bound. The
-fail-closed component record is
-`browser-runtime/ai/ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json`.
+The SDK is not the distributor of the selected upstream speech packages or
+provider assets and does not republish their legal/source payloads. The
+component record at `browser-runtime/ai/ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json`
+documents resolution only; it is not an execution or publication gate.
 
 Whisper `stt` and Kokoro `tts` each own catalog, inspect, status, load, request,
 unload, and dispose state. They load, cancel, unload, fail, and recover

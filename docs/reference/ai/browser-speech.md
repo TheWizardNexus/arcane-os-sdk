@@ -239,11 +239,12 @@ the authenticated graph above and an SDK-created legacy authority.
 ignores it and uses module-captured native Blob URL creation, revocation, and
 fetch so a caller cannot substitute the executable materialization boundary.
 
-For a graph, `prepare(graph,{signal,onProgress,offline=false,security})` always
-uses effective `{secure:true,checks:{byteLength:true,sha256:true}}`. Explicitly
-disabling any graph check is rejected with code
-`ARCANE_AI_ARTIFACT_GRAPH_SECURITY_WEAKENING_REJECTED` and reason
-`artifact-graph-security-weakening-rejected`.
+For a graph, `prepare(graph,{signal,onProgress,offline=false,security})` follows
+the shared model-security flag. Omitted security or `secure:false` is the
+default warn-first mode: the declared runtime remains functional and capability
+warnings are observable without imposing byte-length or SHA-256 checks.
+`secure:true` enables strict byte-length, SHA-256, and undeclared-capability
+enforcement. Either check may also be selected explicitly through `checks`.
 
 ### Cold admission
 
@@ -435,21 +436,13 @@ from verified local voice bytes; it never opens Kokoro's private durable cache.
 If the graph does not prove those exact edges, Kokoro fails closed before the
 mutable request can reach the network.
 
-That operational network closure does not establish a releasable public Kokoro
-artifact graph. The Kokoro/phonemizer composite notice and corresponding-source
-closure remains incomplete because the exact embedded eSpeak/Emscripten Worker
-has not been bound to immutable preferred source, build/toolchain provenance,
-the effective composite license, and its required notices and corresponding
-source. Public Kokoro graph release and admission must remain blocked until
-that evidence is mechanically bound. A graph file's `license` value remains an
-identity-bound declaration only and cannot satisfy this hold.
-
-The selected Transformers/ONNX Runtime STT graph has a separate public-release
-hold. The immutable ONNX Runtime source revision's MIT license and
-ThirdPartyNotices are authenticated, but the npm tarball omits them and the
-exact selected JSEP compiled-feature-to-notice map is not proven. Public STT
-graph release/admission remains blocked until that artifact-specific composite
-notice boundary is mechanically closed.
+That graph closure is an optional caller-owned secure/offline configuration,
+not the public runtime's default and not a publication gate. In warn-first mode
+the SDK loads the caller-selected version-pinned upstream package and provider
+assets from their publishers. The SDK neither republishes those bytes nor
+requires their optional provenance or legal metadata before the provider can
+operate. When `secure:true` is selected, incomplete graph metadata rejects that
+specific secure load without disabling ordinary warn-first operation.
 
 ## Providers
 
@@ -768,7 +761,6 @@ public authority.
 | `ARCANE_AI_WORKER_MESSAGE_REJECTED` | `stt-worker-error-envelope-rejected`, `tts-worker-error-envelope-rejected` when the provider rejects a foreign or missing SDK error brand |
 | `ARCANE_AI_UNDECLARED_ARTIFACT` | `speech-worker-artifact-request-method-rejected`, `speech-worker-artifact-request-undeclared`, `speech-worker-cache-open-rejected`, `speech-worker-cache-match-rejected`, `artifact-graph-cache-write-rejected`, `artifact-graph-runtime-request-url-malformed` |
 | `ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID` | The exact Worker graph-configuration reasons enumerated below. |
-| `ARCANE_AI_ARTIFACT_GRAPH_SECURITY_WEAKENING_REJECTED` | `artifact-graph-security-weakening-rejected` |
 | `ARCANE_AI_ARTIFACT_GRAPH_FETCH_EDGE_UNDECLARED` | `artifact-graph-fetch-edge-undeclared`, `artifact-graph-fetch-edge-undeclared-inactive-runtime-branch-entered`, `artifact-graph-fetch-method-undeclared`, `artifact-graph-fetch-target-undeclared`, `artifact-graph-fetch-guard-bypassed` |
 | `ARCANE_AI_ARTIFACT_GRAPH_IMPORT_EDGE_UNDECLARED` | `artifact-graph-dynamic-import-edge-undeclared`, `artifact-graph-dynamic-import-edge-undeclared-inactive-runtime-branch-entered`, `artifact-graph-dynamic-import-target-undeclared` |
 | `ARCANE_AI_ARTIFACT_GRAPH_CACHE_EDGE_UNDECLARED` | `artifact-graph-cache-open-edge-undeclared`, `artifact-graph-cache-open-edge-undeclared-inactive-runtime-branch-entered`, `artifact-graph-cache-name-mismatch`, `artifact-graph-cache-read-target-undeclared`, `artifact-graph-cache-open-guard-bypassed`, `artifact-graph-cache-match-guard-bypassed` |
@@ -1132,7 +1124,6 @@ Runtime scan and materialization reasons:
 Source, cache, and security reasons:
 
 - `artifact-graph-load-security-contract-rejected`,
-  `artifact-graph-security-weakening-rejected`,
   `artifact-graph-source-fetch-rejected`,
   `artifact-graph-source-http-response-rejected`,
   `artifact-graph-source-redirected`,
@@ -1186,20 +1177,23 @@ exactly `broadcastchannel`, `eventsource`, `function`, `rtcpeerconnection`,
 `shadowrealm`, `sharedworker`, `websocket`, `websocketstream`, `webtransport`,
 `worker`, `xmlhttprequest`, `eval`, or `importscripts`.
 
-## `createBrowserSpeechAuthority()` legacy compatibility
+## `createBrowserSpeechAuthority()` upstream package mode
 
 `BROWSER_SPEECH_ARTIFACT_PROTOCOL` remains exactly
 `arcane-ai-browser-speech-artifacts/1`, and
 `createBrowserSpeechAuthority({providerId,role,model,runtime,security})`
-preserves the published single-self-contained-module authority. Its optional
-byte/SHA checks still resolve independently from SDK default to app, provider,
-and load scopes. Its cache values remain `installed` and `cached`, and its
-offline miss remains `ARCANE_AI_ARTIFACT_OFFLINE_MISS`.
+loads a caller-selected browser bundle from npm or another upstream package
+authority. The SDK stores only the downloaded application-selected entrypoint;
+the runtime uses its normal provider fetch and browser cache behavior. Its
+optional byte/SHA checks still resolve independently from SDK default to app,
+provider, and load scopes. Its cache values remain `installed` and `cached`,
+and its offline miss remains `ARCANE_AI_ARTIFACT_OFFLINE_MISS`.
 
-The legacy model descriptor is
-`{id,repository,revision,defaultVoice?,files}`; `defaultVoice` is required only
-for `tts`. The runtime descriptor is
-`{adapter,version,revision,entry,files}` and its adapter is exactly
+The model descriptor is
+`{id,repository,revision,defaultVoice?,files?}`; `defaultVoice` is required only
+for `tts`. In default warn-first mode `files` may be omitted so the selected
+provider downloads its own model and voice assets. The runtime descriptor is
+`{adapter,version,revision,entry,wasmPaths?,files}` and its adapter is exactly
 `transformers-whisper` for `stt` or `kokoro-js` for `tts`. Every legacy file is
 `{path,url,bytes?,sha256?,mediaType?}` with a normalized relative path, a
 unique immutable URL containing the descriptor revision or SHA-256 identity,
@@ -1209,16 +1203,20 @@ name the one `text/javascript` `.js` or `.mjs` runtime file. The frozen result
 is
 `{protocol,providerId,modelId,admitted,role,repository,revision,defaultVoice,runtime,files,security}`.
 
-This path is compatibility for already published descriptors. It cannot
-declare an auxiliary ESM/WASM graph, nested Worker, or immutable caller voice
-inventory and is not the operational Kokoro/ONNX graph authority. New real
-Whisper/Kokoro integrations should pass an SDK-created `graph` to the provider
-and keep all graph checks enabled.
+`runtime.wasmPaths` may name a version-pinned upstream npm CDN directory in
+warn-first mode. `secure:true` rejects remote `wasmPaths`, requires explicit
+model files, applies the closed-module scan, and replaces ordinary fetch/cache
+access with the admitted file map. The authenticated artifact graph remains an
+advanced strict-control option; it is not required for normal speech use.
 
 ## Security and ownership summary
 
-- The SDK contains no speech runtime, model, or voice payload in this
-  entrypoint and never downloads one before explicit `load()`.
+- The SDK redistributes no speech runtime, model, voice, third-party license,
+  or corresponding-source payload. Explicit `load()` resolves them from the
+  caller-selected npm/package/provider authorities.
+- Default operation is warn-first and preserves ordinary upstream fetch/cache
+  behavior. `secure:true` opts into strict graph/file verification and
+  capability isolation.
 - Every graph byte is caller-selected, immutable, exact-length, SHA-256 bound,
   revision bound, media-type bound, license-declaration bound, and reachable
   through one closed graph identity.
@@ -1233,16 +1231,12 @@ and keep all graph checks enabled.
   hidden fallback, startup download, native/Core call, or cloud retry is added.
 - A completion manifest and SHA-256 prove consistency with the caller's graph;
   they are not independent publisher authenticity or complete license evidence.
-- Public Kokoro graph release/admission remains blocked while the exact
-  phonemizer eSpeak/Emscripten composite notice and corresponding-source
-  provenance is incomplete.
-- Public Transformers/ONNX STT graph release/admission remains blocked while
-  the exact selected JSEP compiled-feature notice mapping is incomplete.
-- The fail-closed component evidence authority is
+- The component resolution record is
   `browser-runtime/ai/ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json`; the detailed
   package/model audit is `docs/reference/ai/browser-speech-package-authority.json`.
-- The application owns provenance, licenses/notices, user disclosure, selected
-  model/voice policy, and integration with the one shared SDK state/event owner.
+- Upstream publishers remain responsible for their distributed package and
+  provider assets. Applications own selected model/voice policy and integration
+  with the one shared SDK state/event owner.
 
 ## Related
 

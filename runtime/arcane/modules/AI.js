@@ -384,21 +384,52 @@ function normalizeBrowserSpeechRole(value,role){
     const label=`AI browser speech ${role}`;
     const descriptors=frozenClosedRecord(
         value,
-        ['providerId','graph','offline'],
-        ['providerId','graph','offline'],
+        ['providerId','graph','model','runtime','security','offline'],
+        ['providerId','offline'],
         label
     );
     const providerId=browserSpeechIdentifier(
         descriptors.providerId.value,
         `${label}.providerId`
     );
-    const graph=descriptors.graph.value;
-    if(!graph||typeof graph!=='object'||!Object.isFrozen(graph)){
+    const hasGraph=Object.hasOwn(descriptors,'graph');
+    const hasModel=Object.hasOwn(descriptors,'model');
+    const hasRuntime=Object.hasOwn(descriptors,'runtime');
+    const hasSecurity=Object.hasOwn(descriptors,'security');
+    if(hasGraph&&(hasModel||hasRuntime||hasSecurity)){
         throw aiBrowserSpeechError(
             AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
             AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
-            `${label}.graph must be an SDK-created frozen artifact graph.`
+            `${label}.graph is mutually exclusive with model, runtime, and security.`
         );
+    }
+    if(!hasGraph&&(!hasModel||!hasRuntime)){
+        throw aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+            AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+            `${label} must provide graph or both model and runtime.`
+        );
+    }
+    if(hasGraph){
+        const graph=descriptors.graph.value;
+        if(!graph||typeof graph!=='object'||!Object.isFrozen(graph)){
+            throw aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+                AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+                `${label}.graph must be an SDK-created frozen artifact graph.`
+            );
+        }
+    }else{
+        for(const key of ['model','runtime']){
+            const descriptor=descriptors[key].value;
+            if(!descriptor||typeof descriptor!=='object'||Array.isArray(descriptor)){
+                throw aiBrowserSpeechError(
+                    AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+                    AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+                    `${label}.${key} must be a browser speech authority descriptor.`
+                );
+            }
+        }
     }
     if(typeof descriptors.offline.value!=='boolean'){
         throw aiBrowserSpeechError(
@@ -409,7 +440,13 @@ function normalizeBrowserSpeechRole(value,role){
     }
     return Object.freeze({
         providerId,
-        graph,
+        ...(hasGraph
+            ?{graph:descriptors.graph.value}
+            :{
+                model:descriptors.model.value,
+                runtime:descriptors.runtime.value,
+                ...(hasSecurity?{security:descriptors.security.value}:{})
+            }),
         offline:descriptors.offline.value
     });
 }
@@ -418,7 +455,7 @@ function normalizeBrowserSpeechConfiguration(value){
     const descriptors=frozenClosedRecord(
         value,
         ['protocol','id','dbopfs','tableName','stt','tts'],
-        ['protocol','id','dbopfs','stt','tts'],
+        ['protocol','id','dbopfs'],
         'AI browser speech configuration'
     );
     if(descriptors.protocol.value!==AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL){
@@ -446,13 +483,24 @@ function normalizeBrowserSpeechConfiguration(value){
             'AI browser speech configuration.tableName'
         )
         :undefined;
+    const roles=['stt','tts'].filter(role=>Object.hasOwn(descriptors,role));
+    if(roles.length===0){
+        throw aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+            AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+            'AI browser speech configuration must provide stt, tts, or both.'
+        );
+    }
     return Object.freeze({
         configuration:value,
         id,
         dbopfs,
         ...(tableName?{tableName}:{}),
-        stt:normalizeBrowserSpeechRole(descriptors.stt.value,'stt'),
-        tts:normalizeBrowserSpeechRole(descriptors.tts.value,'tts')
+        roles:Object.freeze(roles),
+        ...Object.fromEntries(roles.map(role=>[
+            role,
+            normalizeBrowserSpeechRole(descriptors[role].value,role)
+        ]))
     });
 }
 
@@ -641,6 +689,7 @@ class AI {
     #events=null;
     #browserSpeechConfigurationRecord=null;
     #browserSpeechController=null;
+    #browserSpeechControllerRoles=Object.freeze([]);
     #browserSpeechGeneration=0;
     #browserSpeechModulePromise=null;
     #browserSpeechOperationSequence=0;
@@ -1655,11 +1704,12 @@ class AI {
 
     async #unloadSpeechProviderRolesForTransition(
         signal=null,
-        expectedProviders=null
+        expectedProviders=null,
+        roles=['stt','tts']
     ){
         const runtime=this;
         const settlements=await Promise.allSettled(
-            ['stt','tts'].map(async function unloadSpeechProviderRole(role){
+            roles.map(async function unloadSpeechProviderRole(role){
                 if(expectedProviders?.[role]
                     &&!runtime.#providerRuntime.ownsProvider(
                         role,
@@ -1669,7 +1719,9 @@ class AI {
                         `The ${role} browser speech provider identity changed before unload.`
                     );
                 }
-                return runtime.#providerRuntime.unload(role,{signal});
+                return role==='tts'
+                    ?runtime.#providerRuntime.setSpeechMuted(true)
+                    :runtime.#providerRuntime.unload(role,{signal});
             })
         );
         const failure=settlements.find(function findAISpeechTransitionCleanupFailure(result){
@@ -1957,8 +2009,8 @@ class AI {
             &&left.localOnly===right.localOnly;
     }
 
-    #sameBrowserSpeechRoutes(left,right){
-        return ['stt','tts'].every(role=>
+    #sameBrowserSpeechRoutes(left,right,roles=['stt','tts']){
+        return roles.every(role=>
             ['default','localOnly'].every(routeName=>
                 this.#sameBrowserSpeechSelection(
                     left?.[role]?.[routeName]??null,
@@ -1969,8 +2021,8 @@ class AI {
     }
 
     #browserSpeechRecordOwnsProviders(record){
-        if(!record)return false;
-        return ['stt','tts'].every(role=>{
+        if(!record||record.managedRoles.length===0)return false;
+        return record.managedRoles.every(role=>{
             if(record.registrationState?.[role]===false)return false;
             return this.#providerRuntime.ownsProvider(
                 role,
@@ -1983,7 +2035,8 @@ class AI {
         return this.#browserSpeechRecordOwnsProviders(record)
             &&this.#sameBrowserSpeechRoutes(
                 this.#currentSpeechRoutes(),
-                record.routes
+                record.routes,
+                record.managedRoles
             );
     }
 
@@ -1995,16 +2048,14 @@ class AI {
         );
     }
 
-    #browserSpeechReplacementBoundary(previousRecord){
-        if(previousRecord){
-            return Object.freeze({
-                expectedProviders:previousRecord.providers,
-                legacyRecords:Object.freeze([])
-            });
-        }
-        const expectedProviders={};
+    #browserSpeechReplacementBoundary(previousRecord,roles){
+        const expectedProviders={stt:null,tts:null};
         const legacyRecords=[];
-        for(const role of ['stt','tts']){
+        for(const role of roles){
+            if(previousRecord?.managedRoles.includes(role)){
+                expectedProviders[role]=previousRecord.providers[role];
+                continue;
+            }
             const selection=this.#providerRuntime.selection(role);
             if(!selection){
                 expectedProviders[role]=null;
@@ -2021,11 +2072,6 @@ class AI {
             }
             expectedProviders[role]=record.provider;
             legacyRecords.push(record);
-        }
-        if(Boolean(expectedProviders.stt)!==Boolean(expectedProviders.tts)){
-            throw this.#browserSpeechProviderRouteOwnershipError(
-                'Browser speech configuration requires an exact replaceable STT/TTS provider pair or two empty speech routes.'
-            );
         }
         return Object.freeze({
             expectedProviders:Object.freeze(expectedProviders),
@@ -2120,19 +2166,7 @@ class AI {
         );
     }
 
-    #browserSpeechRoutes(sttProvider,ttsProvider){
-        const sttCatalog=sttProvider.catalog();
-        const ttsCatalog=ttsProvider.catalog();
-        if(sttCatalog.length!==1
-            ||ttsCatalog.length!==1
-            ||typeof sttCatalog[0]?.id!=='string'
-            ||typeof ttsCatalog[0]?.id!=='string'){
-            throw aiBrowserSpeechError(
-                AI_BROWSER_SPEECH_ERROR_CODES.providerConstructionRejected,
-                AI_BROWSER_SPEECH_REASONS.providerConstructionRejected,
-                'Browser speech providers must expose one admitted model each.'
-            );
-        }
+    #browserSpeechRoutes(normalized,providers,previousRecord){
         function roleRoutes(provider,catalog){
             const selection=Object.freeze({
                 providerId:provider.id,
@@ -2141,32 +2175,90 @@ class AI {
             });
             return Object.freeze({default:selection,localOnly:selection});
         }
+        const currentRoutes=this.#currentSpeechRoutes();
+        const routes={};
+        const catalogs={};
+        for(const role of ['stt','tts']){
+            if(!normalized.roles.includes(role)){
+                routes[role]=previousRecord?.managedRoles.includes(role)
+                    ?previousRecord.routes[role]
+                    :currentRoutes[role];
+                catalogs[role]=null;
+                continue;
+            }
+            const catalog=providers[role].catalog();
+            if(catalog.length!==1||typeof catalog[0]?.id!=='string'){
+                throw aiBrowserSpeechError(
+                    AI_BROWSER_SPEECH_ERROR_CODES.providerConstructionRejected,
+                    AI_BROWSER_SPEECH_REASONS.providerConstructionRejected,
+                    `The browser speech ${role} provider must expose one admitted model.`
+                );
+            }
+            catalogs[role]=catalog[0];
+            routes[role]=roleRoutes(providers[role],catalog[0]);
+        }
         return Object.freeze({
-            routes:Object.freeze({
-                stt:roleRoutes(sttProvider,sttCatalog[0]),
-                tts:roleRoutes(ttsProvider,ttsCatalog[0])
-            }),
-            sttCatalog:sttCatalog[0],
-            ttsCatalog:ttsCatalog[0]
+            routes:Object.freeze(routes),
+            catalogs:Object.freeze(catalogs)
         });
     }
 
-    #browserSpeechDescriptor(normalized,sttCatalog,ttsCatalog){
+    #browserSpeechDescriptor(normalized,catalogs,previousRecord){
         function roleDescriptor(role,configured,catalog){
             return Object.freeze({
                 role,
                 providerId:configured.providerId,
                 modelId:catalog.id,
-                artifactGraphId:catalog.artifactGraphId,
+                ...(configured.graph
+                    ?{artifactGraphId:catalog.artifactGraphId}
+                    :{}),
                 offline:configured.offline,
                 ...(role==='tts'?{defaultVoice:catalog.defaultVoice}:{})
             });
         }
+        const roles={};
+        for(const role of ['stt','tts']){
+            roles[role]=normalized.roles.includes(role)
+                ?roleDescriptor(role,normalized[role],catalogs[role])
+                :previousRecord?.descriptor[role]??null;
+        }
         return Object.freeze({
             protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
             configurationId:normalized.id,
-            stt:roleDescriptor('stt',normalized.stt,sttCatalog),
-            tts:roleDescriptor('tts',normalized.tts,ttsCatalog)
+            ...roles
+        });
+    }
+
+    #browserSpeechConfiguration(normalized,previousRecord){
+        if(!previousRecord)return normalized.configuration;
+        if(normalized.roles.length===2)return normalized.configuration;
+        if(normalized.dbopfs!==previousRecord.dbopfs
+            ||normalized.tableName!==previousRecord.tableName){
+            throw aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+                AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+                'A partial browser speech replacement must retain the active DBOPFS store and tableName.'
+            );
+        }
+        const carriedRoles=previousRecord.managedRoles.filter(
+            role=>!normalized.roles.includes(role)
+        );
+        if(carriedRoles.length===0)return normalized.configuration;
+        return Object.freeze({
+            protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+            id:normalized.id,
+            dbopfs:normalized.dbopfs,
+            ...(normalized.tableName?{tableName:normalized.tableName}:{}),
+            ...(normalized.roles.includes('stt')
+                ?{stt:normalized.configuration.stt}
+                :previousRecord.managedRoles.includes('stt')
+                    ?{stt:previousRecord.configuration.stt}
+                    :{}),
+            ...(normalized.roles.includes('tts')
+                ?{tts:normalized.configuration.tts}
+                :previousRecord.managedRoles.includes('tts')
+                    ?{tts:previousRecord.configuration.tts}
+                    :{})
         });
     }
 
@@ -2204,9 +2296,10 @@ class AI {
     }
 
     #assertBrowserSpeechGraphs(normalized,module){
-        for(const role of ['stt','tts']){
+        for(const role of normalized.roles){
             const configured=normalized[role];
             const graph=configured.graph;
+            if(!graph)continue;
             if(graph.protocol!==module.BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL
                 ||graph.role!==role
                 ||(graph.providerId!==null
@@ -2221,47 +2314,88 @@ class AI {
         }
     }
 
-    #browserSpeechCandidate(normalized,descriptor,providers,routes){
+    #browserSpeechCandidate(
+        normalized,
+        configuration,
+        descriptor,
+        providers,
+        routes,
+        previousRecord
+    ){
+        const configurationByRole={};
+        const managedRoles=Object.freeze(['stt','tts'].filter(role=>
+            normalized.roles.includes(role)
+            ||previousRecord?.managedRoles.includes(role)
+        ));
+        for(const role of ['stt','tts']){
+            configurationByRole[role]=normalized.roles.includes(role)
+                ?normalized.configuration
+                :previousRecord?.configurationByRole[role]??null;
+        }
         return {
-            configuration:normalized.configuration,
+            configuration,
+            configurationByRole:Object.freeze(configurationByRole),
+            dbopfs:normalized.dbopfs,
+            tableName:normalized.tableName,
             descriptor,
             providers,
             routes,
+            managedRoles,
+            candidateRoles:normalized.roles,
             unregisters:{stt:null,tts:null},
-            registrationState:{stt:false,tts:false}
+            registrationState:{stt:false,tts:false},
+            retirementState:{stt:false,tts:false}
         };
     }
 
     #freezeBrowserSpeechRecord(record){
         record.unregisters=Object.freeze({...record.unregisters});
         Object.seal(record.registrationState);
+        Object.seal(record.retirementState);
         return Object.freeze(record);
     }
 
     #browserSpeechRecordFromReplacement(record,replacement){
         return this.#freezeBrowserSpeechRecord({
             configuration:record.configuration,
+            configurationByRole:record.configurationByRole,
+            dbopfs:record.dbopfs,
+            tableName:record.tableName,
             descriptor:record.descriptor,
             providers:record.providers,
             routes:replacement.routes,
+            managedRoles:record.managedRoles,
+            candidateRoles:record.candidateRoles,
             unregisters:{
                 stt:replacement.unregisters.stt,
                 tts:replacement.unregisters.tts
             },
-            registrationState:{stt:true,tts:true}
+            registrationState:{
+                stt:record.managedRoles.includes('stt'),
+                tts:record.managedRoles.includes('tts')
+            },
+            retirementState:{stt:false,tts:false}
         });
     }
 
-    #retireBrowserSpeechRegistration(record){
+    #retireBrowserSpeechRegistration(record,roles=['stt','tts']){
         if(!record)return;
-        record.registrationState.stt=false;
-        record.registrationState.tts=false;
-        this.#browserSpeechRetiredRecords.add(record);
+        let retired=false;
+        for(const role of roles){
+            if(record.registrationState[role]===false)continue;
+            record.registrationState[role]=false;
+            record.retirementState[role]=true;
+            retired=true;
+        }
+        if(retired)this.#browserSpeechRetiredRecords.add(record);
     }
 
-    #unregisterBrowserSpeechRecord(record,{committed=false}={}){
+    #unregisterBrowserSpeechRecord(
+        record,
+        {roles=['stt','tts'],committed=false}={}
+    ){
         const failures=[];
-        for(const role of ['tts','stt']){
+        for(const role of ['tts','stt'].filter(role=>roles.includes(role))){
             if(record.registrationState?.[role]===false)continue;
             const unregister=record.unregisters?.[role];
             if(typeof unregister!=='function'){
@@ -2303,11 +2437,14 @@ class AI {
         }
     }
 
-    async #disposeBrowserSpeechProviders(record,{signal=null}={}){
+    async #disposeBrowserSpeechProviders(
+        record,
+        {roles=['stt','tts'],signal=null}={}
+    ){
         if(!record)return;
-        const roles=['stt','tts'].filter(role=>record.providers?.[role]);
+        const disposableRoles=roles.filter(role=>record.providers?.[role]);
         const settlements=await Promise.allSettled(
-            roles.map(function disposeBrowserSpeechProvider(role){
+            disposableRoles.map(function disposeBrowserSpeechProvider(role){
                 return record.providers[role].dispose({
                     role,
                     selection:record.routes[role].default,
@@ -2333,10 +2470,14 @@ class AI {
         {signal=null,committed=false}={}
     ){
         if(!record)return false;
+        const retiredRoles=['stt','tts'].filter(
+            role=>record.retirementState?.[role]===true
+        );
+        const roles=retiredRoles.length?retiredRoles:record.candidateRoles;
         this.#browserSpeechRetiredRecords.add(record);
-        this.#unregisterBrowserSpeechRecord(record,{committed});
+        this.#unregisterBrowserSpeechRecord(record,{roles,committed});
         try{
-            await this.#disposeBrowserSpeechProviders(record,{signal});
+            await this.#disposeBrowserSpeechProviders(record,{roles,signal});
         }catch(error){
             throw aiBrowserSpeechError(
                 AI_BROWSER_SPEECH_ERROR_CODES.providerDisposalRejected,
@@ -2371,6 +2512,16 @@ class AI {
 
     async #configureBrowserSpeechOperation(normalized,controller,generation,operationId){
         this.#assertBrowserSpeechOperation(controller,generation);
+        const previousRecord=this.#browserSpeechConfigurationRecord;
+        if(previousRecord&&!this.#browserSpeechRecordIsActive(previousRecord)){
+            throw this.#browserSpeechProviderRouteOwnershipError(
+                'The prior browser speech provider or route ownership changed before replacement.'
+            );
+        }
+        const configuration=this.#browserSpeechConfiguration(
+            normalized,
+            previousRecord
+        );
         this.#publishBrowserSpeechEvent(
             AI_BROWSER_SPEECH_EVENT_TYPES.configurationStarted,
             normalized,
@@ -2395,7 +2546,6 @@ class AI {
         }
         this.#assertBrowserSpeechOperation(controller,generation);
         this.#assertBrowserSpeechGraphs(normalized,module);
-        const previousRecord=this.#browserSpeechConfigurationRecord;
 
         let store;
         try{
@@ -2412,25 +2562,40 @@ class AI {
             );
         }
 
-        let sttProvider=null;
-        let ttsProvider=null;
+        const candidateProviders={
+            stt:previousRecord?.providers.stt??null,
+            tts:previousRecord?.providers.tts??null
+        };
+        for(const role of normalized.roles)candidateProviders[role]=null;
         let providers=null;
         let prepared=null;
         try{
-            sttProvider=module.createBrowserWhisperProvider({
-                id:normalized.stt.providerId,
-                graph:normalized.stt.graph,
-                store,
-                offline:normalized.stt.offline
-            });
-            ttsProvider=module.createBrowserKokoroProvider({
-                id:normalized.tts.providerId,
-                graph:normalized.tts.graph,
-                store,
-                offline:normalized.tts.offline
-            });
-            providers=Object.freeze({stt:sttProvider,tts:ttsProvider});
-            prepared=this.#browserSpeechRoutes(sttProvider,ttsProvider);
+            for(const role of normalized.roles){
+                const factory=role==='stt'
+                    ?module.createBrowserWhisperProvider
+                    :module.createBrowserKokoroProvider;
+                const configured=normalized[role];
+                candidateProviders[role]=factory({
+                    id:configured.providerId,
+                    ...(configured.graph
+                        ?{graph:configured.graph}
+                        :{
+                            model:configured.model,
+                            runtime:configured.runtime,
+                            ...(Object.hasOwn(configured,'security')
+                                ?{security:configured.security}
+                                :{})
+                        }),
+                    store,
+                    offline:configured.offline
+                });
+            }
+            providers=Object.freeze({...candidateProviders});
+            prepared=this.#browserSpeechRoutes(
+                normalized,
+                providers,
+                previousRecord
+            );
         }catch(error){
             const failure=error?.code===AI_BROWSER_SPEECH_ERROR_CODES.providerConstructionRejected
                 ?error
@@ -2439,29 +2604,34 @@ class AI {
                     AI_BROWSER_SPEECH_REASONS.providerConstructionRejected,
                     'The browser speech providers could not be constructed.',
                     error
-                );
-            const partialProviders={stt:sttProvider,tts:ttsProvider};
-            if(sttProvider||ttsProvider){
+            );
+            if(normalized.roles.some(role=>candidateProviders[role])){
+                const currentRoutes=this.#currentSpeechRoutes();
                 const partialRoutes={};
                 for(const role of ['stt','tts']){
-                    const provider=partialProviders[role];
-                    const selection=provider
+                    const provider=candidateProviders[role];
+                    const changed=normalized.roles.includes(role);
+                    const selection=changed&&provider
                         ?Object.freeze({
                             providerId:provider.id,
-                            modelId:normalized[role].graph.model.id,
+                            modelId:normalized[role].graph?.model.id
+                                ??normalized[role].model.id,
                             localOnly:true
                         })
                         :null;
-                    partialRoutes[role]=Object.freeze({
-                        default:selection,
-                        localOnly:selection
-                    });
+                    partialRoutes[role]=changed
+                        ?Object.freeze({default:selection,localOnly:selection})
+                        :previousRecord?.managedRoles.includes(role)
+                            ?previousRecord.routes[role]
+                            :currentRoutes[role];
                 }
                 const partial=this.#browserSpeechCandidate(
                     normalized,
+                    configuration,
                     null,
-                    partialProviders,
-                    Object.freeze(partialRoutes)
+                    Object.freeze({...candidateProviders}),
+                    Object.freeze(partialRoutes),
+                    previousRecord
                 );
                 return this.#throwAfterBrowserSpeechCandidateCleanup(
                     partial,
@@ -2472,27 +2642,22 @@ class AI {
         }
         const descriptor=this.#browserSpeechDescriptor(
             normalized,
-            prepared.sttCatalog,
-            prepared.ttsCatalog
+            prepared.catalogs,
+            previousRecord
         );
         const candidate=this.#browserSpeechCandidate(
             normalized,
+            configuration,
             descriptor,
             providers,
-            prepared.routes
+            prepared.routes,
+            previousRecord
         );
-        if(previousRecord&&!this.#browserSpeechRecordIsActive(previousRecord)){
-            return this.#throwAfterBrowserSpeechCandidateCleanup(
-                candidate,
-                this.#browserSpeechProviderRouteOwnershipError(
-                    'The prior browser speech provider or route ownership changed before replacement.'
-                )
-            );
-        }
         let replacementBoundary;
         try{
             replacementBoundary=this.#browserSpeechReplacementBoundary(
-                previousRecord
+                previousRecord,
+                normalized.roles
             );
         }catch(error){
             return this.#throwAfterBrowserSpeechCandidateCleanup(
@@ -2503,7 +2668,8 @@ class AI {
         try{
             await this.#unloadSpeechProviderRolesForTransition(
                 controller.signal,
-                replacementBoundary.expectedProviders
+                replacementBoundary.expectedProviders,
+                normalized.roles
             );
             this.#assertBrowserSpeechOperation(controller,generation);
         }catch(error){
@@ -2512,11 +2678,34 @@ class AI {
 
         let replacement;
         try{
-            replacement=this.#providerRuntime.replaceSpeechProviders({
-                providers,
-                routes:prepared.routes,
-                expectedProviders:replacementBoundary.expectedProviders
-            });
+            if(normalized.roles.length===2){
+                replacement=this.#providerRuntime.replaceSpeechProviders({
+                    providers,
+                    routes:prepared.routes,
+                    expectedProviders:replacementBoundary.expectedProviders
+                });
+            }else{
+                const role=normalized.roles[0];
+                const roleReplacement=this.#providerRuntime.replaceSpeechProvider(
+                    role,
+                    {
+                        provider:providers[role],
+                        routes:prepared.routes[role],
+                        expectedProvider:replacementBoundary.expectedProviders[role]
+                    }
+                );
+                replacement=Object.freeze({
+                    routes:prepared.routes,
+                    unregisters:Object.freeze({
+                        stt:role==='stt'
+                            ?roleReplacement.unregister
+                            :previousRecord?.unregisters.stt??null,
+                        tts:role==='tts'
+                            ?roleReplacement.unregister
+                            :previousRecord?.unregisters.tts??null
+                    })
+                });
+            }
         }catch(error){
             const commitFailure=aiBrowserSpeechError(
                 AI_BROWSER_SPEECH_ERROR_CODES.routeCommitRejected,
@@ -2537,7 +2726,12 @@ class AI {
         for(const legacyRecord of replacementBoundary.legacyRecords){
             this.#browserSpeechRetiredLegacyRecords.add(legacyRecord);
         }
-        if(previousRecord)this.#retireBrowserSpeechRegistration(previousRecord);
+        if(previousRecord){
+            this.#retireBrowserSpeechRegistration(
+                previousRecord,
+                normalized.roles
+            );
+        }
         this.#browserSpeechConfigurationRecord=record;
         try{
             this.#applySpeechPreferenceTuple(
@@ -2550,18 +2744,44 @@ class AI {
                 'The committed browser speech replacement could not update the AI speech route view.',
                 error
             );
-            if(!previousRecord){
+            if(!previousRecord
+                ||normalized.roles.some(
+                    role=>!previousRecord.managedRoles.includes(role)
+                )){
                 finalizationFailure.committed=true;
                 throw finalizationFailure;
             }
 
             let rollback;
             try{
-                rollback=this.#providerRuntime.replaceSpeechProviders({
-                    providers:previousRecord.providers,
-                    routes:previousRecord.routes,
-                    expectedProviders:record.providers
-                });
+                if(normalized.roles.length===2){
+                    rollback=this.#providerRuntime.replaceSpeechProviders({
+                        providers:previousRecord.providers,
+                        routes:previousRecord.routes,
+                        expectedProviders:record.providers
+                    });
+                }else{
+                    const role=normalized.roles[0];
+                    const roleRollback=this.#providerRuntime.replaceSpeechProvider(
+                        role,
+                        {
+                            provider:previousRecord.providers[role],
+                            routes:previousRecord.routes[role],
+                            expectedProvider:record.providers[role]
+                        }
+                    );
+                    rollback=Object.freeze({
+                        routes:previousRecord.routes,
+                        unregisters:Object.freeze({
+                            stt:role==='stt'
+                                ?roleRollback.unregister
+                                :previousRecord.unregisters.stt,
+                            tts:role==='tts'
+                                ?roleRollback.unregister
+                                :previousRecord.unregisters.tts
+                        })
+                    });
+                }
             }catch(rollbackError){
                 const candidateCommitted=this.#browserSpeechRecordIsActive(record);
                 if(!candidateCommitted){
@@ -2580,7 +2800,7 @@ class AI {
                 );
             }
 
-            this.#retireBrowserSpeechRegistration(record);
+            this.#retireBrowserSpeechRegistration(record,normalized.roles);
             const restoredRecord=this.#browserSpeechRecordFromReplacement(
                 previousRecord,
                 rollback
@@ -2661,7 +2881,11 @@ class AI {
                 {name:'AbortError'}
             ));
         }
-        if(this.#browserSpeechConfigurationRecord?.configuration===configuration
+        if(this.#browserSpeechConfigurationRecord
+            &&normalized.roles.every(role=>
+                this.#browserSpeechConfigurationRecord.configurationByRole[role]
+                    ===configuration
+            )
             &&this.#browserSpeechRecordIsActive(
                 this.#browserSpeechConfigurationRecord
             )
@@ -2679,9 +2903,10 @@ class AI {
             {name:'AbortError'}
         );
         this.#browserSpeechController?.abort(superseded);
-        this.#invalidateSpeechControl();
+        if(normalized.roles.includes('tts'))this.#invalidateSpeechControl();
         const controller=new AbortController();
         this.#browserSpeechController=controller;
+        this.#browserSpeechControllerRoles=normalized.roles;
         const forwardAbort=function cancelBrowserSpeechConfiguration(){
             if(!controller.signal.aborted)controller.abort(operation.signal.reason);
         };
@@ -2719,6 +2944,7 @@ class AI {
                     operation.signal?.removeEventListener('abort',forwardAbort);
                     if(runtime.#browserSpeechController===controller){
                         runtime.#browserSpeechController=null;
+                        runtime.#browserSpeechControllerRoles=Object.freeze([]);
                     }
                 }
             }
@@ -2754,15 +2980,21 @@ class AI {
             {name:'AbortError'}
         );
         const invalidatesSpeech=Boolean(
-            this.#browserSpeechController
-            ||this.#browserSpeechConfigurationRecord
-            ||this.#browserSpeechRetiredRecords.size
-            ||this.#browserSpeechRetiredLegacyRecords.size
+            this.#browserSpeechControllerRoles.includes('tts')
+            ||this.#browserSpeechConfigurationRecord?.managedRoles.includes('tts')
+            ||[...this.#browserSpeechRetiredRecords].some(record=>
+                record.managedRoles.includes('tts')
+                ||record.candidateRoles.includes('tts')
+            )
+            ||[...this.#browserSpeechRetiredLegacyRecords].some(
+                record=>record.role==='tts'
+            )
         );
         this.#browserSpeechController?.abort(superseded);
         if(invalidatesSpeech)this.#invalidateSpeechControl();
         const controller=new AbortController();
         this.#browserSpeechController=controller;
+        this.#browserSpeechControllerRoles=Object.freeze([]);
         const forwardAbort=function cancelBrowserSpeechDisposal(){
             if(!controller.signal.aborted)controller.abort(operation.signal.reason);
         };
@@ -2799,15 +3031,47 @@ class AI {
                         }
                         await runtime.#unloadSpeechProviderRolesForTransition(
                             controller.signal,
-                            activeRecord.providers
+                            activeRecord.providers,
+                            activeRecord.managedRoles
                         );
                         runtime.#assertBrowserSpeechOperation(controller,generation);
-                        const removed=runtime.#providerRuntime.replaceSpeechProviders({
-                            providers:{stt:null,tts:null},
-                            routes:runtime.#emptySpeechRoutes(),
-                            expectedProviders:activeRecord.providers
-                        });
-                        runtime.#retireBrowserSpeechRegistration(activeRecord);
+                        let removed;
+                        if(activeRecord.managedRoles.length===2){
+                            removed=runtime.#providerRuntime.replaceSpeechProviders({
+                                providers:{stt:null,tts:null},
+                                routes:runtime.#emptySpeechRoutes(),
+                                expectedProviders:activeRecord.providers
+                            });
+                        }else{
+                            const role=activeRecord.managedRoles[0];
+                            const currentRoutes=runtime.#currentSpeechRoutes();
+                            const emptyRoleRoutes=Object.freeze({
+                                default:null,
+                                localOnly:null
+                            });
+                            runtime.#providerRuntime.replaceSpeechProvider(
+                                role,
+                                {
+                                    provider:null,
+                                    routes:emptyRoleRoutes,
+                                    expectedProvider:activeRecord.providers[role]
+                                }
+                            );
+                            removed=Object.freeze({
+                                routes:Object.freeze({
+                                    stt:role==='stt'
+                                        ?emptyRoleRoutes
+                                        :currentRoutes.stt,
+                                    tts:role==='tts'
+                                        ?emptyRoleRoutes
+                                        :currentRoutes.tts
+                                })
+                            });
+                        }
+                        runtime.#retireBrowserSpeechRegistration(
+                            activeRecord,
+                            activeRecord.managedRoles
+                        );
                         runtime.#browserSpeechConfigurationRecord=null;
                         changed=true;
                         committed=true;
@@ -2884,6 +3148,7 @@ class AI {
                     operation.signal?.removeEventListener('abort',forwardAbort);
                     if(runtime.#browserSpeechController===controller){
                         runtime.#browserSpeechController=null;
+                        runtime.#browserSpeechControllerRoles=Object.freeze([]);
                     }
                 }
             }

@@ -524,9 +524,13 @@ function normalizeFile(value, kind, index, revision) {
   });
 }
 
-function uniqueFiles(files, label, kind, revision) {
-  if (!Array.isArray(files) || files.length < 1) {
-    throw new TypeError(`${label} requires a nonempty files array.`);
+function uniqueFiles(files, label, kind, revision, { allowEmpty = false } = {}) {
+  if (!Array.isArray(files) || (!allowEmpty && files.length < 1)) {
+    throw new TypeError(
+      allowEmpty
+        ? `${label} files must be an array.`
+        : `${label} requires a nonempty files array.`,
+    );
   }
   const paths = new Set();
   const urls = new Set();
@@ -1669,10 +1673,11 @@ export function createBrowserSpeechAuthority({
   const modelRevision = identifier(model.revision, "Browser speech model revision");
   const repository = identifier(model.repository, "Browser speech model repository");
   const modelFiles = uniqueFiles(
-    model.files,
+    model.files ?? [],
     "Browser speech model",
     "model",
     modelRevision,
+    { allowEmpty: normalizedSecurity.secure !== true },
   );
   const runtimeAdapter = requiredText(runtime.adapter, "Browser speech runtime adapter");
   const expectedAdapter = role === "stt"
@@ -1689,6 +1694,14 @@ export function createBrowserSpeechAuthority({
     "runtime",
     runtimeRevision,
   );
+  const wasmPaths = runtime.wasmPaths === undefined
+    ? null
+    : immutableUrl(runtime.wasmPaths, "Browser speech runtime wasmPaths");
+  if (normalizedSecurity.secure === true && wasmPaths !== null) {
+    throw new TypeError(
+      "Secure browser speech must materialize its ONNX runtime files instead of using remote wasmPaths.",
+    );
+  }
   const entry = requiredText(runtime.entry, "Browser speech runtime entry");
   const entryFile = runtimeFiles.find((file) => file.path === entry);
   if (!entryFile) {
@@ -1711,6 +1724,7 @@ export function createBrowserSpeechAuthority({
     version: runtimeVersion,
     revision: runtimeRevision,
     entry,
+    ...(wasmPaths === null ? {} : { wasmPaths }),
     files: runtimeFiles,
   });
   const files = Object.freeze([...runtimeFiles, ...modelFiles]);
@@ -1737,6 +1751,7 @@ export function createBrowserSpeechAuthority({
       version: normalizedRuntime.version,
       revision: normalizedRuntime.revision,
       entry: normalizedRuntime.entry,
+      ...(wasmPaths === null ? {} : { wasmPaths }),
       files: Object.freeze(runtimeFiles.map(publicFile)),
     }),
     files: Object.freeze(modelFiles.map(publicFile)),
@@ -2171,7 +2186,7 @@ function assertSelfContainedModuleSource(source, label) {
   assertStaticLiteralChains();
 }
 
-async function assertSelfContainedRuntime(admitted, metadata) {
+async function assertSelfContainedRuntime(admitted, metadata, security) {
   const javascriptFiles = admitted.files.filter(({ descriptor }) =>
     descriptor.kind === "runtime" && descriptor.mediaType === "text/javascript");
   if (
@@ -2184,7 +2199,9 @@ async function assertSelfContainedRuntime(admitted, metadata) {
     );
   }
   const [{ descriptor, file }] = javascriptFiles;
-  assertSelfContainedModuleSource(await file.text(), descriptor.path);
+  if (security?.secure === true) {
+    assertSelfContainedModuleSource(await file.text(), descriptor.path);
+  }
 }
 
 function tokenizeArtifactGraphModule(source, modulePath) {
@@ -2443,7 +2460,9 @@ function assertArtifactGraphOccurrences(observed, declared, modulePath, subject)
   }
 }
 
-function inspectArtifactGraphModuleSource(source, modulePath, metadata) {
+function inspectArtifactGraphModuleSource(source, modulePath, metadata, {
+  strict = false,
+} = {}) {
   const tokens = tokenizeArtifactGraphModule(source, modulePath);
   const staticImports = [];
   const dynamicImports = [];
@@ -2452,6 +2471,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata) {
   const cacheOpens = [];
   const returnThisTransforms = [];
   const typedArrayConstructors = [];
+  const warnings = new Set();
   const forbiddenDynamicCode = new Set([
     "AsyncFunction",
     "AsyncGeneratorFunction",
@@ -2553,17 +2573,25 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata) {
       && previous(index)?.value === "["
       && next(index)?.value === "]"
     ) {
-      throw artifactGraphError(
-        "artifact-graph-runtime-computed-dynamic-code-undeclared",
-        `${modulePath} contains computed access to dynamic code capability ${token.value}.`,
-      );
+      if (strict) {
+        throw artifactGraphError(
+          "artifact-graph-runtime-computed-dynamic-code-undeclared",
+          `${modulePath} contains computed access to dynamic code capability ${token.value}.`,
+        );
+      }
+      warnings.add(token.value);
+      continue;
     }
     if (token.type !== "identifier") continue;
     if (forbiddenDynamicCode.has(token.value)) {
-      throw artifactGraphError(
-        "artifact-graph-runtime-dynamic-code-undeclared",
-        `${modulePath} contains dynamic code capability ${token.value}, which is not admitted.`,
-      );
+      if (strict) {
+        throw artifactGraphError(
+          "artifact-graph-runtime-dynamic-code-undeclared",
+          `${modulePath} contains dynamic code capability ${token.value}, which is not admitted.`,
+        );
+      }
+      warnings.add(token.value);
+      continue;
     }
     if (token.value === "Function") {
       const sequence = [
@@ -2583,10 +2611,14 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata) {
         || sequence[3] !== "("
         || sequence[4] !== ")"
       ) {
-        throw artifactGraphError(
-          "artifact-graph-runtime-dynamic-code-undeclared",
-          `${modulePath} contains a Function constructor outside the sole supported global-object transform.`,
-        );
+        if (strict) {
+          throw artifactGraphError(
+            "artifact-graph-runtime-dynamic-code-undeclared",
+            `${modulePath} contains a Function constructor outside the sole supported global-object transform.`,
+          );
+        }
+        warnings.add("Function");
+        continue;
       }
       returnThisTransforms.push(Object.freeze({
         start: token.start,
@@ -2695,20 +2727,28 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata) {
     if (token.value === "Worker") {
       const opening = next(index);
       if (opening?.value !== "(") {
-        throw artifactGraphError(
-          "artifact-graph-runtime-worker-constructor-call-required",
-          `${modulePath} references Worker outside an admitted constructor boundary.`,
-        );
+        if (strict) {
+          throw artifactGraphError(
+            "artifact-graph-runtime-worker-constructor-call-required",
+            `${modulePath} references Worker outside an admitted constructor boundary.`,
+          );
+        }
+        warnings.add("Worker");
+        continue;
       }
       let start = token.start;
       if (previous(index)?.value === "new") {
         start = previous(index).start;
       } else if (previous(index)?.value === ".") {
         if (!["globalThis", "self"].includes(previous(index, 2)?.value)) {
-          throw artifactGraphError(
-            "artifact-graph-runtime-worker-receiver-not-global",
-            `${modulePath} constructs Worker through a non-global receiver.`,
-          );
+          if (strict) {
+            throw artifactGraphError(
+              "artifact-graph-runtime-worker-receiver-not-global",
+              `${modulePath} constructs Worker through a non-global receiver.`,
+            );
+          }
+          warnings.add("Worker");
+          continue;
         }
         start = previous(index, 2).start;
         if (previous(index, 3)?.value === "new") start = previous(index, 3).start;
@@ -2789,6 +2829,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata) {
     cacheOpens: Object.freeze(cacheOpens),
     returnThisTransforms: Object.freeze(returnThisTransforms),
     typedArrayConstructors: Object.freeze(typedArrayConstructors),
+    warnings: Object.freeze([...warnings].sort()),
     declarations,
   });
 }
@@ -2821,7 +2862,7 @@ function assertArtifactGraphStaticImportClosure(metadata) {
   return Object.freeze(order);
 }
 
-async function inspectArtifactGraphRuntime(admitted, metadata, signal) {
+async function inspectArtifactGraphRuntime(admitted, metadata, signal, security) {
   const admittedByPath = new Map(admitted.files.map((entry) => [entry.descriptor.path, entry]));
   const plans = new Map();
   for (const descriptor of metadata.runtimeFiles) {
@@ -2847,12 +2888,21 @@ async function inspectArtifactGraphRuntime(admitted, metadata, signal) {
     }
     plans.set(
       descriptor.path,
-      inspectArtifactGraphModuleSource(source, descriptor.path, metadata),
+      inspectArtifactGraphModuleSource(source, descriptor.path, metadata, {
+        strict: security?.secure === true,
+      }),
     );
   }
   const order = assertArtifactGraphStaticImportClosure(metadata);
+  const warnings = [...new Set([...plans.values()].flatMap((plan) => plan.warnings))]
+    .sort();
+  if (security?.secure !== true && warnings.length > 0) {
+    globalThis.console?.warn?.(
+      `Arcane browser speech warn-first mode allowed runtime capabilities: ${warnings.join(", ")}.`,
+    );
+  }
   throwIfAborted(signal);
-  return Object.freeze({ plans, order });
+  return Object.freeze({ plans, order, warnings: Object.freeze(warnings) });
 }
 
 function applyArtifactGraphModuleTransforms(plan, materializedByPath, guardCapability) {
@@ -3355,8 +3405,8 @@ export function createDbopfsSpeechArtifactStore({
     }
     try {
       const inspection = graph
-        ? await inspectArtifactGraphRuntime({ files }, metadata, signal)
-        : (await assertSelfContainedRuntime({ files }, metadata), null);
+        ? await inspectArtifactGraphRuntime({ files }, metadata, signal, security)
+        : (await assertSelfContainedRuntime({ files }, metadata, security), null);
       throwIfAborted(signal);
       return Object.freeze({
         files: Object.freeze(files),
@@ -3647,8 +3697,8 @@ export function createDbopfsSpeechArtifactStore({
         installed.push({ descriptor, file });
       }
       const inspection = graph
-        ? await inspectArtifactGraphRuntime({ files: installed }, metadata, signal)
-        : (await assertSelfContainedRuntime({ files: installed }, metadata), null);
+        ? await inspectArtifactGraphRuntime({ files: installed }, metadata, signal, security)
+        : (await assertSelfContainedRuntime({ files: installed }, metadata, security), null);
       throwIfAborted(signal);
       const manifest = Object.freeze({
         schema: graph ? ARTIFACT_GRAPH_MANIFEST_SCHEMA : MANIFEST_SCHEMA,
@@ -3685,37 +3735,19 @@ export function createDbopfsSpeechArtifactStore({
     }
     throwIfAborted(signal);
     const graph = ARTIFACT_GRAPHS.has(authority);
-    if (graph && security !== undefined) {
-      let requestedSecurity;
-      try {
-        requestedSecurity = normalizeModelSecurity(
-          security,
-          "Browser speech artifact graph load security",
-        );
-      } catch (error) {
+    let effectiveSecurity;
+    try {
+      effectiveSecurity = resolveModelSecurity({ load: security });
+    } catch (error) {
+      if (graph) {
         throw artifactGraphTypeError(
           "artifact-graph-load-security-contract-rejected",
           "Browser speech artifact graph load security does not satisfy the required contract.",
           error,
         );
       }
-      if (
-        requestedSecurity.secure === false
-        || requestedSecurity.checks.byteLength === false
-        || requestedSecurity.checks.sha256 === false
-      ) {
-        throw artifactGraphTypeError(
-          "artifact-graph-security-weakening-rejected",
-          "Artifact graph preparation cannot disable byte-length or SHA-256 verification.",
-        );
-      }
+      throw error;
     }
-    const effectiveSecurity = graph
-      ? Object.freeze({
-        secure: true,
-        checks: Object.freeze({ byteLength: true, sha256: true }),
-      })
-      : resolveModelSecurity({ load: security });
     const metadata = artifactMetadata(authority);
     assertSecurityDescriptors(metadata.files, effectiveSecurity);
     const cached = await openCached(authority, {
@@ -3784,6 +3816,9 @@ export function createDbopfsSpeechArtifactStore({
         version: metadata.runtime.version,
         revision: metadata.runtime.revision,
         entry: metadata.runtime.entry,
+        ...(metadata.runtime.wasmPaths === undefined
+          ? {}
+          : { wasmPaths: metadata.runtime.wasmPaths }),
         moduleGraph: "self-contained",
         files: Object.freeze(runtimeFiles),
       }),

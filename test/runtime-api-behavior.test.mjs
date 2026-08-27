@@ -1465,6 +1465,110 @@ test(
         await runtime.setSpeechMuted(false);
         assert.equal(localTTS.counters.load, 1);
         assert.equal(runtime.status('tts').state, 'ready');
+        const replacementSTT = createProvider(
+            'stt',
+            'replacement-stt',
+            true,
+            {text: 'replacement'}
+        );
+        const replacementTTS = createProvider(
+            'tts',
+            'replacement-tts',
+            true,
+            new Uint8Array([2])
+        );
+        const originalSpeechRoutes = {
+            stt: {
+                default: selection('local-stt', 'local-stt-model', true),
+                localOnly: selection('local-stt', 'local-stt-model', true)
+            },
+            tts: {
+                default: selection('local-tts', 'local-tts-model', true),
+                localOnly: selection('local-tts', 'local-tts-model', true)
+            }
+        };
+        const retainedTTSState = runtime.status('tts');
+        const retainedTTSSelection = runtime.selection('tts');
+        const retainedTTSLoadCount = localTTS.counters.load;
+        const retainedTTSUnloadCount = localTTS.counters.unload;
+        await runtime.unload('stt');
+        const replacedSTT = runtime.replaceSpeechProvider(
+            'stt',
+            {
+                provider: replacementSTT,
+                routes: {
+                    default: selection(
+                        'replacement-stt',
+                        'replacement-stt-model',
+                        true
+                    ),
+                    localOnly: selection(
+                        'replacement-stt',
+                        'replacement-stt-model',
+                        true
+                    )
+                },
+                expectedProvider: localSTT
+            }
+        );
+        assert.ok(Object.isFrozen(replacedSTT));
+        assert.equal(runtime.status('tts'), retainedTTSState);
+        assert.equal(runtime.selection('tts'), retainedTTSSelection);
+        assert.equal(runtime.ownsProvider('tts', localTTS), true);
+        assert.equal(localTTS.counters.load, retainedTTSLoadCount);
+        assert.equal(localTTS.counters.unload, retainedTTSUnloadCount);
+        assert.equal(runtime.speechMuted, false);
+        await runtime.load('stt', {localOnly: true});
+        assert.equal(runtime.status('stt').state, 'ready');
+
+        const retainedSTTState = runtime.status('stt');
+        const retainedSTTSelection = runtime.selection('stt');
+        const retainedSTTLoadCount = replacementSTT.counters.load;
+        const retainedSTTUnloadCount = replacementSTT.counters.unload;
+        await runtime.unload('tts');
+        const mutedBeforeTTSReplacement = runtime.speechMuted;
+        const replacedTTS = runtime.replaceSpeechProvider(
+            'tts',
+            {
+                provider: replacementTTS,
+                routes: {
+                    default: selection(
+                        'replacement-tts',
+                        'replacement-tts-model',
+                        true
+                    ),
+                    localOnly: selection(
+                        'replacement-tts',
+                        'replacement-tts-model',
+                        true
+                    )
+                },
+                expectedProvider: localTTS
+            }
+        );
+        assert.ok(Object.isFrozen(replacedTTS));
+        assert.equal(runtime.status('stt'), retainedSTTState);
+        assert.equal(runtime.selection('stt'), retainedSTTSelection);
+        assert.equal(runtime.ownsProvider('stt', replacementSTT), true);
+        assert.equal(replacementSTT.counters.load, retainedSTTLoadCount);
+        assert.equal(replacementSTT.counters.unload, retainedSTTUnloadCount);
+        assert.equal(runtime.speechMuted, mutedBeforeTTSReplacement);
+
+        await runtime.unload('stt');
+        runtime.replaceSpeechProviders({
+            providers: {stt: localSTT, tts: localTTS},
+            routes: originalSpeechRoutes,
+            expectedProviders: {
+                stt: replacementSTT,
+                tts: replacementTTS
+            }
+        });
+        await replacementSTT.dispose({signal: null});
+        await replacementTTS.dispose({signal: null});
+        await runtime.load('stt', {localOnly: true});
+        await runtime.setSpeechMuted(false);
+        assert.equal(runtime.status('stt').state, 'ready');
+        assert.equal(runtime.status('tts').state, 'ready');
         const rapidMute = runtime.setSpeechMuted(true);
         const rapidUnmute = runtime.setSpeechMuted(false);
         await Promise.all([rapidMute, rapidUnmute]);
@@ -1950,6 +2054,332 @@ test(
             else globalThis.Arcane=previousArcane;
             if(previousFetch===undefined)delete globalThis.fetch;
             else globalThis.fetch=previousFetch;
+            if(previousLocalStorage===undefined)delete globalThis.localStorage;
+            else globalThis.localStorage=previousLocalStorage;
+            if(previousDocument===undefined)delete globalThis.document;
+            else globalThis.document=previousDocument;
+        }
+    }
+);
+
+test(
+    'browser speech replaces one configured role without replacing or disposing the other',
+    async function testIndependentBrowserSpeechConfiguration() {
+        const previousWindow=globalThis.window;
+        const previousLocalStorage=globalThis.localStorage;
+        const previousDocument=globalThis.document;
+        const dbopfsReads=[];
+        const dbopfs=Object.freeze({
+            readyPromise:Promise.resolve(),
+            async getTableHandle(tableName){
+                dbopfsReads.push(tableName);
+                throw new Error('Browser speech configuration must not load artifacts.');
+            }
+        });
+        const localStorage={
+            getItem(){return null;},
+            setItem(){},
+            removeItem(){},
+            clear(){}
+        };
+        const documentObject={
+            documentElement:{dataset:{arcaneAppId:'browser-speech-role-contract'}},
+            querySelector(){return null;}
+        };
+        const windowTarget=new EventTarget();
+        windowTarget.dbopfs=dbopfs;
+        windowTarget.user={ready:false};
+        windowTarget.localStorage=localStorage;
+        windowTarget.document=documentObject;
+        globalThis.window=windowTarget;
+        globalThis.localStorage=localStorage;
+        globalThis.document=documentObject;
+
+        function graphFile(index,kind,path,revision,mediaType,runtimeRequestUrls=[]){
+            const sha256=(index+1).toString(16).repeat(64);
+            return {
+                kind,
+                path,
+                sourceUrl:`https://speech.example/${revision}/${sha256}/${path}`,
+                revision,
+                license:'Apache-2.0',
+                mediaType,
+                bytes:1,
+                sha256,
+                runtimeRequestUrls
+            };
+        }
+
+        function browserSpeechGraph(createBrowserSpeechArtifactGraph,role,providerId,suffix){
+            const runtimeRevision=`${role}-runtime-${suffix}`;
+            const modelRevision=`${role}-model-${suffix}`;
+            const modelRoute=`https://speech.example/${modelRevision}/request/config.json`;
+            const voiceRoute=role==='tts'
+                ?`https://speech.example/${modelRevision}/request/voice.bin`
+                :null;
+            const files=[
+                graphFile(
+                    0,
+                    'runtime-entrypoint-javascript',
+                    'runtime/entry.mjs',
+                    runtimeRevision,
+                    'text/javascript'
+                ),
+                graphFile(
+                    1,
+                    'runtime-auxiliary-javascript',
+                    'runtime/ort.mjs',
+                    runtimeRevision,
+                    'text/javascript'
+                ),
+                graphFile(
+                    2,
+                    'runtime-wasm-binary',
+                    'runtime/ort.wasm',
+                    runtimeRevision,
+                    'application/wasm'
+                ),
+                graphFile(
+                    3,
+                    'model-configuration-json',
+                    'model/config.json',
+                    modelRevision,
+                    'application/json',
+                    [modelRoute]
+                )
+            ];
+            if(role==='tts'){
+                files.push(graphFile(
+                    4,
+                    'voice-style-binary',
+                    'voices/af_contract.bin',
+                    modelRevision,
+                    'application/octet-stream',
+                    [voiceRoute]
+                ));
+            }
+            return createBrowserSpeechArtifactGraph({
+                providerId,
+                role,
+                model:{
+                    id:`${role}-model-${suffix}`,
+                    repository:`example/${role}-${suffix}`,
+                    revision:modelRevision,
+                    dtype:'q8',
+                    ...(role==='stt'
+                        ?{inputSampleRate:16_000}
+                        :{
+                            outputSampleRate:24_000,
+                            defaultVoice:'af_contract',
+                            voices:[{id:'af_contract',path:'voices/af_contract.bin'}]
+                        })
+                },
+                runtime:{
+                    adapter:role==='stt'?'transformers-whisper':'kokoro-js',
+                    version:'1.0.0',
+                    revision:runtimeRevision,
+                    entrypoint:'runtime/entry.mjs',
+                    onnxWasm:{
+                        namespace:role==='stt'
+                            ?'transformers-env-backends-onnx-wasm'
+                            :'kokoro-env-wasm-paths',
+                        mjsPath:'runtime/ort.mjs',
+                        wasmPath:'runtime/ort.wasm',
+                        ...(role==='stt'?{numThreads:1}:{})
+                    },
+                    negativeRuntimeRequestUrls:[]
+                },
+                files,
+                edges:{
+                    staticImports:[],
+                    dynamicImports:[],
+                    moduleWorkers:[],
+                    fetches:[{
+                        modulePath:'runtime/entry.mjs',
+                        occurrence:1,
+                        edgePolicy:'artifact-targets-admitted',
+                        targetPaths:['model/config.json']
+                    }],
+                    cacheOpens:role==='tts'?[{
+                        modulePath:'runtime/entry.mjs',
+                        occurrence:1,
+                        edgePolicy:'artifact-targets-admitted',
+                        cacheName:'kokoro-voices',
+                        targetPaths:['voices/af_contract.bin']
+                    }]:[]
+                },
+                transforms:[]
+            });
+        }
+
+        let ai=null;
+        try{
+            const [{
+                default:AI,
+                AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL
+            },{
+                createBrowserSpeechArtifactGraph
+            }]=await Promise.all([
+                import('../runtime/arcane/modules/AI.js?browser-speech-role-contract'),
+                import('../browser-runtime/ai/browser-speech.mjs')
+            ]);
+            ai=new AI('OPENAI','OPENAI','OPENAI','OPENAI','OPENAI','OPENAI');
+            const runtime=ai.providerRuntime;
+            const role=function browserSpeechRole(role,providerId,suffix){
+                return Object.freeze({
+                    providerId,
+                    graph:browserSpeechGraph(
+                        createBrowserSpeechArtifactGraph,
+                        role,
+                        providerId,
+                        suffix
+                    ),
+                    offline:false
+                });
+            };
+            const directSTTRole=function directBrowserSpeechSTTRole(providerId){
+                const runtimeVersion='3.5.1';
+                return Object.freeze({
+                    providerId,
+                    model:Object.freeze({
+                        id:'whisper-tiny-en-direct',
+                        repository:'onnx-community/whisper-tiny.en',
+                        revision:'0123456789abcdef0123456789abcdef01234567',
+                        files:Object.freeze([])
+                    }),
+                    runtime:Object.freeze({
+                        adapter:'transformers-whisper',
+                        version:runtimeVersion,
+                        revision:runtimeVersion,
+                        entry:'runtime/transformers.js',
+                        wasmPaths:'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/',
+                        files:Object.freeze([Object.freeze({
+                            path:'runtime/transformers.js',
+                            url:'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/transformers.js',
+                            mediaType:'text/javascript'
+                        })])
+                    }),
+                    offline:false
+                });
+            };
+            const externalTTSIdentity=runtime.providerIdentity('tts','OPENAI');
+            const externalTTSSelection=runtime.selection('tts');
+            const externalTTSStatus=runtime.status('tts');
+            const initialSTTOnly=Object.freeze({
+                protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+                id:'browser-speech-initial-stt-only',
+                dbopfs,
+                stt:directSTTRole('boss-stt-direct')
+            });
+            const initialSTTDescriptor=await ai.configureBrowserSpeech(
+                initialSTTOnly
+            );
+            assert.equal(ai.browserSpeechConfiguration,initialSTTOnly);
+            assert.equal(initialSTTDescriptor.stt.providerId,'boss-stt-direct');
+            assert.equal(initialSTTDescriptor.stt.modelId,'whisper-tiny-en-direct');
+            assert.equal(
+                Object.hasOwn(initialSTTDescriptor.stt,'artifactGraphId'),
+                false
+            );
+            assert.equal(initialSTTDescriptor.tts,null);
+            assert.deepEqual(
+                runtime.providerIdentity('tts','OPENAI'),
+                externalTTSIdentity
+            );
+            assert.equal(runtime.selection('tts'),externalTTSSelection);
+            assert.equal(runtime.status('tts'),externalTTSStatus);
+            assert.equal(await ai.disposeBrowserSpeech(),true);
+            assert.equal(runtime.selection('stt'),null);
+            assert.equal(runtime.selection('tts'),externalTTSSelection);
+            assert.equal(runtime.status('tts'),externalTTSStatus);
+
+            const initial=Object.freeze({
+                protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+                id:'browser-speech-both-a',
+                dbopfs,
+                stt:role('stt','boss-stt-a','a'),
+                tts:role('tts','boss-tts-a','a')
+            });
+            const initialDescriptor=await ai.configureBrowserSpeech(initial);
+            assert.equal(ai.browserSpeechConfiguration,initial);
+            assert.equal(initialDescriptor.stt.providerId,'boss-stt-a');
+            assert.equal(initialDescriptor.tts.providerId,'boss-tts-a');
+            assert.equal(Object.hasOwn(initialDescriptor.stt,'artifactGraphId'),true);
+            assert.equal(Object.hasOwn(initialDescriptor.tts,'artifactGraphId'),true);
+            assert.equal(runtime.selection('stt').providerId,'boss-stt-a');
+            assert.equal(runtime.selection('tts').providerId,'boss-tts-a');
+            assert.equal(runtime.status('stt').state,'unloaded');
+            assert.equal(runtime.status('tts').state,'unloaded');
+            assert.equal(ai.muted,true);
+            assert.deepEqual(dbopfsReads,[]);
+
+            const retainedTTSIdentity=runtime.providerIdentity('tts','boss-tts-a');
+            const retainedTTSSelection=runtime.selection('tts');
+            const retainedTTSStatus=runtime.status('tts');
+            const retainedTTSDescriptor=initialDescriptor.tts;
+            const sttOnly=Object.freeze({
+                protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+                id:'browser-speech-stt-b',
+                dbopfs,
+                stt:role('stt','boss-stt-b','b')
+            });
+            const sttDescriptor=await ai.configureBrowserSpeech(sttOnly);
+            assert.equal(sttDescriptor.stt.providerId,'boss-stt-b');
+            assert.equal(Object.hasOwn(sttDescriptor.stt,'artifactGraphId'),true);
+            assert.equal(sttDescriptor.tts,retainedTTSDescriptor);
+            assert.deepEqual(
+                runtime.providerIdentity('tts','boss-tts-a'),
+                retainedTTSIdentity
+            );
+            assert.deepEqual(runtime.selection('tts'),retainedTTSSelection);
+            assert.equal(runtime.status('tts'),retainedTTSStatus);
+            assert.equal(ai.muted,true);
+            assert.equal(runtime.providerIdentity('stt','boss-stt-a'),null);
+            assert.equal(ai.browserSpeechConfiguration.stt,sttOnly.stt);
+            assert.equal(ai.browserSpeechConfiguration.tts,initial.tts);
+            assert.equal(Object.isFrozen(ai.browserSpeechConfiguration),true);
+            assert.equal(await ai.configureBrowserSpeech(sttOnly),sttDescriptor);
+
+            const retainedSTTIdentity=runtime.providerIdentity('stt','boss-stt-b');
+            const retainedSTTSelection=runtime.selection('stt');
+            const retainedSTTStatus=runtime.status('stt');
+            const retainedSTTDescriptor=sttDescriptor.stt;
+            const ttsOnly=Object.freeze({
+                protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+                id:'browser-speech-tts-b',
+                dbopfs,
+                tts:role('tts','boss-tts-b','b')
+            });
+            const ttsDescriptor=await ai.configureBrowserSpeech(ttsOnly);
+            assert.equal(ttsDescriptor.stt,retainedSTTDescriptor);
+            assert.equal(ttsDescriptor.tts.providerId,'boss-tts-b');
+            assert.deepEqual(
+                runtime.providerIdentity('stt','boss-stt-b'),
+                retainedSTTIdentity
+            );
+            assert.deepEqual(runtime.selection('stt'),retainedSTTSelection);
+            assert.equal(runtime.status('stt'),retainedSTTStatus);
+            assert.equal(runtime.providerIdentity('tts','boss-tts-a'),null);
+            assert.equal(ai.browserSpeechConfiguration.stt,sttOnly.stt);
+            assert.equal(ai.browserSpeechConfiguration.tts,ttsOnly.tts);
+            assert.equal(runtime.status('stt').state,'unloaded');
+            assert.equal(runtime.status('tts').state,'unloaded');
+            assert.deepEqual(dbopfsReads,[]);
+
+            assert.equal(await ai.disposeBrowserSpeech(),true);
+            assert.equal(runtime.selection('stt'),null);
+            assert.equal(runtime.selection('tts'),null);
+            assert.equal(runtime.providerIdentity('stt','boss-stt-b'),null);
+            assert.equal(runtime.providerIdentity('tts','boss-tts-b'),null);
+            assert.deepEqual(dbopfsReads,[]);
+            ai.configureProviders({
+                llm:{default:null,localOnly:null},
+                stt:{default:null,localOnly:null},
+                tts:{default:null,localOnly:null}
+            });
+        }finally{
+            if(previousWindow===undefined)delete globalThis.window;
+            else globalThis.window=previousWindow;
             if(previousLocalStorage===undefined)delete globalThis.localStorage;
             else globalThis.localStorage=previousLocalStorage;
             if(previousDocument===undefined)delete globalThis.document;

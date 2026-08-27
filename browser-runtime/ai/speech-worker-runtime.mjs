@@ -1631,6 +1631,7 @@ function installStringTimerIsolation(scope, name) {
 function installArtifactGraphEnvironment(scope, configuration, role) {
   const originalFetch = scope.fetch?.bind(scope);
   const originalWorker = scope.Worker;
+  const strictSecurity = configuration.security?.secure === true;
   if (typeof originalFetch !== "function") {
     throw workerError(
       "ARCANE_AI_PROVIDER_UNAVAILABLE",
@@ -1657,25 +1658,27 @@ function installArtifactGraphEnvironment(scope, configuration, role) {
   );
   const restores = [];
   try {
-    restores.push(installDynamicCodeConstructorIsolation());
-    restores.push(installStringTimerIsolation(scope, "setInterval"));
-    restores.push(installStringTimerIsolation(scope, "setTimeout"));
-    if ("indexedDB" in scope) {
-      restores.push(installScopeValue(
-        scope,
-        "indexedDB",
-        undefined,
-        "artifact-graph-indexeddb-isolation-unavailable",
-      ));
-    }
-    if (scope.navigator && "storage" in scope.navigator) {
-      restores.push(installObjectValue(
-        scope.navigator,
-        "storage",
-        undefined,
-        "WorkerNavigator.storage",
-        "artifact-graph-opfs-isolation-unavailable",
-      ));
+    if (strictSecurity) {
+      restores.push(installDynamicCodeConstructorIsolation());
+      restores.push(installStringTimerIsolation(scope, "setInterval"));
+      restores.push(installStringTimerIsolation(scope, "setTimeout"));
+      if ("indexedDB" in scope) {
+        restores.push(installScopeValue(
+          scope,
+          "indexedDB",
+          undefined,
+          "artifact-graph-indexeddb-isolation-unavailable",
+        ));
+      }
+      if (scope.navigator && "storage" in scope.navigator) {
+        restores.push(installObjectValue(
+          scope.navigator,
+          "storage",
+          undefined,
+          "WorkerNavigator.storage",
+          "artifact-graph-opfs-isolation-unavailable",
+        ));
+      }
     }
     restores.push(installScopeValue(
       scope,
@@ -1683,83 +1686,85 @@ function installArtifactGraphEnvironment(scope, configuration, role) {
       graphGuard.guard,
       "artifact-graph-guard-global-definition-rejected",
     ));
-    restores.push(installScopeValue(
-      scope,
-      "fetch",
-      async function rejectUntransformedArtifactGraphFetch() {
-        throw workerError(
-          "ARCANE_AI_ARTIFACT_GRAPH_FETCH_EDGE_UNDECLARED",
-          "Artifact graph fetch must use its declared transformed edge.",
-          undefined,
-          "artifact-graph-fetch-guard-bypassed",
-        );
-      },
-      "artifact-graph-fetch-isolation-unavailable",
-    ));
-    const cacheStorage = Object.freeze({
-      async open() {
-        throw workerError(
-          "ARCANE_AI_ARTIFACT_GRAPH_CACHE_EDGE_UNDECLARED",
-          "Artifact graph CacheStorage.open must use its declared transformed edge.",
-          undefined,
-          "artifact-graph-cache-open-guard-bypassed",
-        );
-      },
-      async match() {
-        throw workerError(
-          "ARCANE_AI_ARTIFACT_GRAPH_CACHE_EDGE_UNDECLARED",
-          "Artifact graph CacheStorage.match requires a declared cache-open edge.",
-          undefined,
-          "artifact-graph-cache-match-guard-bypassed",
-        );
-      },
-      async has() {
-        return true;
-      },
-      async keys() {
-        return Object.freeze([]);
-      },
-      async delete() {
-        return false;
-      },
-    });
-    restores.push(installScopeValue(
-      scope,
-      "caches",
-      cacheStorage,
-      "artifact-graph-cache-isolation-unavailable",
-    ));
-
-    const deniedCapabilities = [
-      "BroadcastChannel",
-      "EventSource",
-      "Function",
-      "RTCPeerConnection",
-      "ShadowRealm",
-      "SharedWorker",
-      "WebSocket",
-      "WebSocketStream",
-      "WebTransport",
-      "Worker",
-      "XMLHttpRequest",
-      "eval",
-      "importScripts",
-    ];
-    for (const name of deniedCapabilities) {
-      if (!(name in scope)) continue;
+    if (strictSecurity) {
       restores.push(installScopeValue(
         scope,
-        name,
-        function rejectUndeclaredArtifactGraphCapability() {
+        "fetch",
+        async function rejectUntransformedArtifactGraphFetch() {
           throw workerError(
-            "ARCANE_AI_ARTIFACT_GRAPH_ISOLATION_UNAVAILABLE",
-            `The authenticated artifact graph denied raw ${name} access.`,
+            "ARCANE_AI_ARTIFACT_GRAPH_FETCH_EDGE_UNDECLARED",
+            "Artifact graph fetch must use its declared transformed edge.",
             undefined,
-            `artifact-graph-${name.toLowerCase()}-capability-undeclared`,
+            "artifact-graph-fetch-guard-bypassed",
           );
         },
-        `artifact-graph-${name.toLowerCase()}-isolation-unavailable`,
+        "artifact-graph-fetch-isolation-unavailable",
       ));
+      const cacheStorage = Object.freeze({
+        async open() {
+          throw workerError(
+            "ARCANE_AI_ARTIFACT_GRAPH_CACHE_EDGE_UNDECLARED",
+            "Artifact graph CacheStorage.open must use its declared transformed edge.",
+            undefined,
+            "artifact-graph-cache-open-guard-bypassed",
+          );
+        },
+        async match() {
+          throw workerError(
+            "ARCANE_AI_ARTIFACT_GRAPH_CACHE_EDGE_UNDECLARED",
+            "Artifact graph CacheStorage.match requires a declared cache-open edge.",
+            undefined,
+            "artifact-graph-cache-match-guard-bypassed",
+          );
+        },
+        async has() {
+          return true;
+        },
+        async keys() {
+          return Object.freeze([]);
+        },
+        async delete() {
+          return false;
+        },
+      });
+      restores.push(installScopeValue(
+        scope,
+        "caches",
+        cacheStorage,
+        "artifact-graph-cache-isolation-unavailable",
+      ));
+
+      const deniedCapabilities = [
+        "BroadcastChannel",
+        "EventSource",
+        "Function",
+        "RTCPeerConnection",
+        "ShadowRealm",
+        "SharedWorker",
+        "WebSocket",
+        "WebSocketStream",
+        "WebTransport",
+        "Worker",
+        "XMLHttpRequest",
+        "eval",
+        "importScripts",
+      ];
+      for (const name of deniedCapabilities) {
+        if (!(name in scope)) continue;
+        restores.push(installScopeValue(
+          scope,
+          name,
+          function rejectUndeclaredArtifactGraphCapability() {
+            throw workerError(
+              "ARCANE_AI_ARTIFACT_GRAPH_ISOLATION_UNAVAILABLE",
+              `The authenticated artifact graph denied raw ${name} access.`,
+              undefined,
+              `artifact-graph-${name.toLowerCase()}-capability-undeclared`,
+            );
+          },
+          `artifact-graph-${name.toLowerCase()}-isolation-unavailable`,
+        ));
+      }
     }
   } catch (error) {
     restoreScopeValues(restores);
@@ -1831,6 +1836,17 @@ function assignSetting(object, name, value, cleanup, {
 }
 
 function configuredWasmPaths(configuration) {
+  if (configuration.runtime.wasmPaths !== undefined) {
+    if (configuration.security?.secure === true) {
+      throw workerError(
+        "ARCANE_AI_INVALID_REQUEST",
+        "Secure browser speech cannot use remote wasmPaths.",
+        undefined,
+        "speech-worker-secure-remote-wasm-paths-rejected",
+      );
+    }
+    return configuration.runtime.wasmPaths;
+  }
   const byPath = new Map(configuration.runtime.files.map((file) => [file.path, file]));
   const declared = configuration.runtime.onnxWasm;
   let mjs = declared ? byPath.get(declared.mjsPath) : null;
@@ -1854,6 +1870,7 @@ function configuredWasmPaths(configuration) {
 
 function configureRuntimeNamespace(namespace, configuration, role, cache) {
   const cleanup = [];
+  const strictSecurity = configuration.security?.secure === true;
   const restoreSettings = () => {
     for (const restore of cleanup.splice(0).reverse()) {
       try {
@@ -1913,22 +1930,24 @@ function configureRuntimeNamespace(namespace, configuration, role, cache) {
       assignmentRejectedReason: "transformers-env-allow-remote-models-assignment-rejected",
       unavailableReason: "transformers-env-allow-remote-models-unavailable",
     });
-    assignSetting(env, "useBrowserCache", false, cleanup, {
-      assignmentRejectedReason: "transformers-env-browser-cache-assignment-rejected",
-      unavailableReason: "transformers-env-browser-cache-unavailable",
-    });
-    assignSetting(env, "useFSCache", false, cleanup, {
-      assignmentRejectedReason: "transformers-env-fs-cache-assignment-rejected",
-      unavailableReason: "transformers-env-fs-cache-unavailable",
-    });
-    assignSetting(env, "useCustomCache", cache !== null, cleanup, {
-      assignmentRejectedReason: "transformers-env-custom-cache-toggle-assignment-rejected",
-      unavailableReason: "transformers-env-custom-cache-toggle-unavailable",
-    });
-    assignSetting(env, "customCache", cache, cleanup, {
-      assignmentRejectedReason: "transformers-env-custom-cache-assignment-rejected",
-      unavailableReason: "transformers-env-custom-cache-unavailable",
-    });
+    if (strictSecurity) {
+      assignSetting(env, "useBrowserCache", false, cleanup, {
+        assignmentRejectedReason: "transformers-env-browser-cache-assignment-rejected",
+        unavailableReason: "transformers-env-browser-cache-unavailable",
+      });
+      assignSetting(env, "useFSCache", false, cleanup, {
+        assignmentRejectedReason: "transformers-env-fs-cache-assignment-rejected",
+        unavailableReason: "transformers-env-fs-cache-unavailable",
+      });
+      assignSetting(env, "useCustomCache", cache !== null, cleanup, {
+        assignmentRejectedReason: "transformers-env-custom-cache-toggle-assignment-rejected",
+        unavailableReason: "transformers-env-custom-cache-toggle-unavailable",
+      });
+      assignSetting(env, "customCache", cache, cleanup, {
+        assignmentRejectedReason: "transformers-env-custom-cache-assignment-rejected",
+        unavailableReason: "transformers-env-custom-cache-unavailable",
+      });
+    }
     if (paths) {
       assignSetting(
         wasm,
@@ -2257,7 +2276,7 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
         file.path === configuration.runtime.entry);
       if (graphConfiguration(configuration)) {
         environment = installArtifactGraphEnvironment(scope, configuration, role);
-      } else {
+      } else if (configuration.security?.secure === true) {
         const legacyFetch = installLegacyAuthorizedFetch(scope, configuration);
         try {
           const restoreCaches = installDeniedCacheIsolation(scope);
@@ -2275,6 +2294,11 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
           legacyFetch.cleanup();
           throw error;
         }
+      } else {
+        environment = Object.freeze({
+          cache: null,
+          cleanup() {},
+        });
       }
       workerProgress(send, role, request.id, `${role}-runtime-import-started`);
       loadFailureReason = `${role}-worker-runtime-import-rejected`;

@@ -200,9 +200,10 @@ PCM normalization, and WAV construction to the selected shared provider;
 delivery suppression is guaranteed after abort, while underlying provider-stop
 claims remain limited to that provider's cancellation contract.
 
-#### One-time browser speech configuration
+#### Browser speech configuration
 
-The caller constructs one frozen authority record and retains ownership of it:
+The caller constructs a frozen authority record for one or both roles and
+retains ownership of it. This example configures both:
 
 ```javascript
 import AI, {
@@ -241,31 +242,52 @@ await ai.disposeBrowserSpeech({signal});
 ```
 
 The record must be a frozen plain data record with exactly
-`{protocol,id,dbopfs,tableName?,stt,tts}`. Each frozen role is exactly
-`{providerId,graph,offline}`; `providerId` and `id` are trimmed 1-128 character
+`{protocol,id,dbopfs,tableName?,stt?,tts?}` and at least one role. Each supplied
+frozen role is exactly `{providerId,graph,offline}` or
+`{providerId,model,runtime,security?,offline}`. The graph and direct authority
+forms are mutually exclusive; `providerId` and `id` are trimmed 1-128 character
 strings, `graph` is the role-matching frozen graph returned by the SDK browser
-speech artifact API, and `offline` is boolean. The application chooses every
-artifact, immutable graph, model/runtime, provider ID, offline policy, sample
-rate, and TTS default voice. `configureBrowserSpeech()` imports the shared
+speech artifact API, and `offline` is boolean. The direct form forwards its
+caller-selected model, runtime, and optional security descriptors to the shared
+provider. In warn-first mode it may use an empty `model.files` inventory and a
+version-pinned upstream `runtime.wasmPaths`; secure graph mode remains the
+closed, content-addressed path. The application chooses every artifact,
+immutable graph or direct model/runtime authority, provider ID, offline policy,
+sample rate, and TTS default voice. `configureBrowserSpeech()` imports the shared
 browser-speech module, creates one DBOPFS store, constructs and registers the
-Whisper and Kokoro provider/2 instances, atomically replaces only STT/TTS
-routes, and returns a frozen descriptor. Applications do not register those
+supplied Whisper and/or Kokoro provider/2 instances, atomically replaces only
+the supplied STT/TTS routes, and returns a frozen descriptor. An initial or
+later call may supply only `stt` or only `tts`; the omitted external Cloud/Core
+role remains unchanged and is not claimed as SDK browser-provider ownership.
+A partial replacement of an existing browser-managed record retains the same
+`dbopfs` and `tableName`, carries every omitted managed browser provider and
+route unchanged, and unregisters and disposes only the replaced provider after
+commit. Supplying both roles remains one atomic replacement. Applications do not register those
 providers, decode `Blob`/`File` data into PCM, construct WAV, select Worker URLs,
 or reproduce DBOPFS cache or artifact verification logic.
 
-The returned descriptor is exactly
-`{protocol,configurationId,stt,tts}`. STT is
-`{role:'stt',providerId,modelId,artifactGraphId,offline}`; TTS adds
-`defaultVoice`. `browserSpeechConfiguration` returns the exact caller-owned
-record only while the SDK still owns its providers and routes;
+The returned descriptor is exactly `{protocol,configurationId,stt,tts}`; an
+external, unmanaged role is `null`. A managed STT descriptor is
+`{role:'stt',providerId,modelId,artifactGraphId?,offline}`; TTS adds
+`defaultVoice`. `artifactGraphId` is present only for the graph form.
+`browserSpeechConfiguration` returns the exact caller-owned record when no
+managed role is carried. After a partial replacement that carries another
+managed role, it returns a frozen merged record with the replacement call's
+`id` and the carried role's unchanged authority. It is non-null only while the
+SDK still owns every represented browser provider and route;
 `browserSpeechDescriptor` returns that descriptor on the same condition.
 Configuration never loads a role, auto-downloads, selects an alternative
 provider/model/runtime/voice, or falls back to cloud/browser speech.
 
-Calling `configureBrowserSpeech()` again with the same active record is an
-idempotent descriptor read. A different call is serialized, aborts the prior
-owned operation, unloads the old speech roles, atomically replaces provider
-ownership/routes, and suppresses stale settlement. The caller's signal is
+Calling `configureBrowserSpeech()` again with the same active record for every
+supplied role is an idempotent descriptor read. A different call is serialized,
+aborts the prior owned operation, unloads only the replaced speech roles, atomically
+replaces provider ownership/routes, and suppresses stale settlement. A
+single-role replacement does not reconstruct, unregister, dispose, or reroute
+the omitted role or change its ready/selected state, provider identity,
+operation generation, or lifecycle. STT-only replacement also preserves TTS
+mute and playback state; TTS replacement invalidates current TTS speech control
+before replacing that role. The caller's signal is
 forwarded and detached on settlement. Cancellation proves delivery suppression,
 not that provider work stopped beyond the provider's own cancellation contract.
 Once SDK-owned browser speech is active, synchronous route mutation fails with
@@ -417,7 +439,8 @@ The singleton exposes read-only `protocol`, `configured`, and `speechMuted`;
 `ownsSelection(role,providerId,options={})`;
 `validateConfiguration(value)`; `validateSpeechConfiguration(value)`;
 `configure(value)`; `configureSpeech(value)`;
-`replaceSpeechProviders(value)`; `configureFromTuple(tuple)`;
+`replaceSpeechProvider(role,value)`; `replaceSpeechProviders(value)`;
+`configureFromTuple(tuple)`;
 `status(role=null)`; `catalog(role)`;
 `inspect(role,options={})`; `start(options)`; `load(role,options={})`;
 `unload(role,options={})`; `dispose(role,options={})`;
@@ -436,6 +459,7 @@ and dispose-all admit `{signal=null}`. Request requires the exact
 `{operation,payload,localOnly,signal}` options record; the four role-specific
 request helpers admit `{localOnly=false,signal=null}`. Configuration `value`
 records are the closed `{llm,stt,tts}`, `{stt,tts}`, or
+`{provider,routes,expectedProvider}` and
 `{providers,routes,expectedProviders}` shapes described below.
 `configureFromTuple()` accepts exactly six provider/model preference entries.
 
@@ -460,6 +484,14 @@ compatibility code
 `ARCANE_AI_PROVIDER_RUNTIME_INVALID` and adds exact reason
 `speech-configuration-contract-mismatch`; runtime-disposed, reentrant,
 role-busy, and provider-locality failures retain their existing exact codes.
+
+`replaceSpeechProvider(role,value)` accepts only `stt` or `tts` and atomically
+replaces exactly that unloaded role using the closed
+`{provider,routes,expectedProvider}` record. A null `provider` with empty routes
+removes that role and requires its exact non-null expected provider. The method preserves the omitted role's
+provider registration, routes, selection, readiness, generation, sticky state,
+owned lifecycle work, and TTS mute state. `replaceSpeechProviders(value)` keeps
+the existing atomic two-role boundary for a coordinated STT/TTS replacement.
 
 `start(options)` waits for prior speech-state and role unload work, applies the
 requested initial mute state, and returns the `startAIRuntime()` control handle

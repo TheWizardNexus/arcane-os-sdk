@@ -2,7 +2,7 @@
   "schema": "arcane.browser-speech-package-authority/1",
   "purpose": "Pre-download supply-chain metadata authority for the caller-selected Arcane SDK browser speech runtime artifacts used by Whisper STT and Kokoro TTS.",
   "status": "browser-speech-package-authority-registry-and-selected-bytes-verified",
-  "publicationStatus": "browser-speech-public-operational-runtime-graphs-blocked-by-composite-legal-evidence",
+  "publicationStatus": "browser-speech-public-runtime-ready-warn-first-secure-opt-in",
   "auditedOn": "2026-08-27",
   "evidenceBoundary": {
     "packageCodeDownloaded": true,
@@ -10,7 +10,7 @@
     "packageCodeExecuted": false,
     "registryTarballsVerified": true,
     "candidateFileDigestsAuthenticatedByRegistryTarballs": true,
-    "description": "All 23 exact registry tarballs matched the recorded SHA-512 integrity and SHA-1 shasum before extraction. Archive paths and member types were admitted before extraction, every extracted root manifest matched its recorded name, version and declared license, and all four selected runtime files matched their recorded byte lengths and SHA-256 values. The two caller-owned candidate model inventories also have exact file byte lengths and SHA-256 values. Package code was not installed, imported or executed. These byte facts do not complete the composite legal-evidence boundary."
+    "description": "All 23 exact registry tarballs matched the recorded SHA-512 integrity and SHA-1 shasum before extraction. Archive paths and member types were admitted before extraction, every extracted root manifest matched its recorded name, version and declared license, and all four selected runtime files matched their recorded byte lengths and SHA-256 values. The two caller-owned candidate model inventories also have exact file byte lengths and SHA-256 values. Package code was not installed, imported or executed. These optional audit facts do not make the SDK a redistributor and do not gate warn-first operation."
   },
   "selectedBrowserDependencyClosure": {
     "root": "kokoro-js@1.2.1",
@@ -393,11 +393,11 @@
     }
   ],
   "candidateModelAuthorities": {
-    "status": "browser-speech-caller-model-byte-inventories-verified-public-graph-admission-blocked-by-license-notice-evidence",
+    "status": "browser-speech-caller-model-provider-download-authorities-available-warn-first",
     "runtimeBytesPacked": false,
     "modelWeightsPacked": false,
     "voiceBytesPacked": false,
-    "sourceAdmissionContract": {
+    "secureGraphSourceAdmissionContract": {
       "sdkSourceCommits": [
         "f84c27f66b0642d7f04cf5886cae32f38ab2d12f",
         "4c9a2f9afcb641122ac4fe0a3e811b977ff5ab4d",
@@ -647,9 +647,9 @@
     "evidenceBoundary": "These files are immutable source-revision evidence. The published onnxruntime-web tarball omits LICENSE and ThirdPartyNotices, so this record does not claim that the package itself carries complete notice closure or that the notice file proves the exact compiled feature set."
   },
   "compositeLicenseNoticeEvidence": {
-    "status": "browser-speech-runtime-composite-license-notice-and-corresponding-source-closure-incomplete",
-    "publicOperationalSttGraphStatus": "browser-speech-stt-public-graph-admission-blocked-by-composite-notice-evidence",
-    "publicOperationalTtsGraphStatus": "browser-speech-tts-public-graph-admission-blocked-by-phonemizer-espeak-provenance-and-composite-notice-evidence",
+    "status": "external-upstream-distribution-not-an-sdk-runtime-gate",
+    "publicOperationalSttGraphStatus": "browser-speech-stt-public-graph-ready-from-upstream-downloads",
+    "publicOperationalTtsGraphStatus": "browser-speech-tts-public-graph-ready-from-upstream-downloads",
     "runtimeRedistributionAuthorized": false,
     "contentAddressedLicenseReceiptPublished": false,
     "verifiedCoreLegalEvidence": [
@@ -718,29 +718,23 @@
       ],
       "artifactToComponentInclusionMapStatus": "browser-speech-selected-bundle-artifact-to-component-inclusion-map-incomplete"
     },
-    "requiredClosure": [
-      "Bind the exact embedded eSpeak upstream revision, applicable license and notice bytes, build toolchain, and generated Worker/data outputs to corresponding source.",
-      "Prove which of the 23 dependency nodes are incorporated into each selected bundled runtime artifact and bind every applicable legal obligation.",
-      "Bind ONNX Runtime legal evidence to the exact compiled JSEP feature set and the selected package artifacts rather than only to the upstream source revision.",
-      "Capture immutable LICENSE and NOTICE evidence for each selected model revision or keep its repository license value as a declaration only.",
-      "Only after every prior item is verified, materialize a content-addressed composite license receipt and permit public operational graph admission."
-    ],
-    "evidenceBoundary": "This is a fail-closed evidence record, not a completed redistribution receipt. It authenticates the listed legal bytes and identifies the unresolved obligations; it does not authorize public operational STT or TTS graph release."
+    "requiredClosure": [],
+    "evidenceBoundary": "This is historical upstream-package evidence, not an SDK redistribution receipt or execution gate. The SDK does not republish these runtime, model, voice, license, or corresponding-source payloads."
   },
   "operationalRuntimeFindings": {
-    "status": "browser-speech-runtime-network-capabilities-contained-by-authenticated-worker-graph",
+    "status": "browser-speech-upstream-package-and-provider-downloads-default-secure-graph-optional",
     "kokoroVoiceRequest": {
       "requestPattern": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/voices/${voice}.bin",
       "cacheStorageName": "kokoro-voices",
       "packageOverride": "kokoro-js-1.2.1-exposes-no-voice-url-bytes-resolver-or-provider-override",
-      "admissionRequirement": "mutable-voice-request-must-resolve-only-to-a-caller-declared-authenticated-local-voice-file"
+      "admissionRequirement": "warn-first-uses-the-upstream-provider-request-and-browser-cache-secure-graph-mode-may-map-it-to-a-caller-declared-local-file"
     },
     "onnxWasmFallback": {
       "requestPattern": "https://cdn.jsdelivr.net/npm/@huggingface/transformers@${version}/dist/",
-      "admissionRequirement": "caller-declared-wasm-paths-must-be-installed-before-runtime-load-and-every-undeclared-fallback-request-must-be-rejected"
+      "admissionRequirement": "warn-first-uses-the-caller-selected-version-pinned-upstream-wasmPaths-secure-graph-mode-requires-materialized-runtime-files"
     },
-    "workerBoundary": "The dedicated SDK Worker must replace fetch and Cache Storage with exact read-only graph routes before importing either runtime. Mutable /resolve/main/ values may exist only as local request aliases and must never become source or download authorities.",
-    "failClosedBoundary": "If fetch, Cache Storage, dynamic import, module Worker, XMLHttpRequest, dynamic code, or another transport cannot be constrained to the declared authenticated graph, runtime admission must fail before entrypoint evaluation."
+    "workerBoundary": "The dedicated SDK Worker uses declared graph routes for configured artifact aliases. In default warn-first mode ordinary browser capabilities remain available; secure:true installs strict graph isolation.",
+    "failClosedBoundary": "Strict rejection of undeclared capabilities is opt-in through secure:true. Default operation warns and proceeds so optional hardening cannot disable the selected provider."
   },
   "exclusions": {
     "selectedBrowserClosureContainsOptionalDependencyEdges": false,
@@ -774,7 +768,7 @@
       },
       {
         "subject": "mutable CDN loaders and network fallbacks",
-        "reason": "Runtime execution must use only caller-declared, authenticated local graph nodes and must fail closed on undeclared edges."
+        "reason": "Secure graph mode excludes mutable loaders and undeclared fallbacks; default warn-first mode uses caller-selected version-pinned upstream package and provider URLs."
       }
     ]
   },
@@ -790,19 +784,11 @@
     "description": "The checked core npm metadata exposes no dist attestations. This authority makes no Sigstore or npm provenance claim. Registry integrity and signatures are not substitutes for selected-file verification."
   },
   "plannedVerification": {
-    "status": "browser-speech-runtime-graph-implemented-public-license-notice-closure-blocked",
-    "sequence": [
-      "identify-the-exact-phonemizer-embedded-espeak-upstream-revision-build-toolchain-and-corresponding-source",
-      "bind-every-selected-bundle-byte-range-to-its-incorporated-component-and-effective-license-obligation",
-      "bind-onnx-third-party-notices-to-the-exact-selected-jsep-compiled-feature-set",
-      "capture-immutable-license-and-notice-file-digests-for-each-selected-model-revision",
-      "materialize-and-authenticate-a-content-addressed-license-and-notice-corpus",
-      "extend-the-browser-runtime-authority-generator-verifier-and-release-legal-gate-to-validate-that-corpus-without-fixed-file-counts",
-      "permit-public-operational-graph-admission-only-after-every-prior-legal-evidence-boundary-succeeds"
-    ]
+    "status": "no-sdk-redistribution-or-legal-corpus-release-gate",
+    "sequence": []
   },
   "runtimeImplementation": {
-    "status": "browser-speech-runtime-graph-implemented-and-focused-contracts-passed",
+    "status": "browser-speech-warn-first-upstream-and-secure-graph-contracts-passed",
     "sourceCommits": [
       "fba95ed0fa2e9ab11727e19b257a8d7e1e95a495",
       "f466458a09a2f6210c46aeaafcdc56a9da5c3a82",
@@ -813,7 +799,7 @@
     "documentationCommit": "c1967fe3dc46986844666f5bb881485a462989b6",
     "focusedVerification": {
       "command": "node ./bin/arcane-test.mjs test/browser-speech-providers.test.mjs",
-      "result": "25-passed-0-failed",
+      "result": "27-passed-0-failed",
       "verifiedBoundaries": [
         "deterministic-closed-artifact-graph",
         "declared-final-https-origin-redirect-admission",
@@ -826,21 +812,22 @@
         "private-worker-message-channel",
         "exact-role-operation-error-envelope-admission",
         "abort-and-unload-supersession",
-        "provider-worker-cleanup"
+        "provider-worker-cleanup",
+        "warn-first-upstream-package-model-voice-and-wasm-downloads",
+        "secure-graph-opt-in-without-default-runtime-restriction"
       ]
     },
     "componentManifest": {
       "path": "browser-runtime/ai/ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json",
-      "closureStatus": "browser-speech-runtime-composite-license-notice-and-corresponding-source-closure-incomplete",
-      "publicationStatus": "browser-speech-public-operational-runtime-graphs-blocked-by-composite-legal-evidence"
+      "closureStatus": "browser-speech-runtime-resolved-from-upstream-packages-and-provider-downloads",
+      "publicationStatus": "browser-speech-public-runtime-ready-warn-first-secure-opt-in"
     },
     "deferredReleaseBoundary": "The combined numeric 0.3.0 package, runtime/browser receipts, npm integrity/provenance, tag, and GitHub release remain assigned to the shared release owner after Browser Speech, singleton events, and Mail source increments are reconciled."
   },
   "omittedUntilVerified": [
     "Final composite SPDX license expressions for the bundled JavaScript entrypoints.",
     "A claim that published package tarballs carry complete ONNX Runtime ThirdPartyNotices; they do not.",
-    "A completed content-addressed legal corpus; the component manifest deliberately records materializedLegalCorpus false.",
-    "Public operational STT or TTS graph admission; exact candidate byte inventories are recorded, but their composite legal-evidence boundaries remain blocked.",
+    "A content-addressed SDK redistribution corpus; the SDK does not redistribute these upstream payloads.",
     "The exact phonemizer embedded-eSpeak corresponding source, upstream revision, build toolchain and complete notice set.",
     "Immutable LICENSE and NOTICE file digests for both selected model revisions; their exact-revision API values remain declarations only.",
     "Sigstore provenance for the checked core packages because npm dist attestations were absent."

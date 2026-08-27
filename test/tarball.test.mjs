@@ -36,6 +36,8 @@ const DEBUG_MODEL_PATH_PRESENT=Object.hasOwn(
 );
 const FORBIDDEN_PACKED_ASSET_EXTENSION=
     /\.(?:gguf|ggml|safetensors|onnx|ort|tflite|mlmodel|pb|pt|pth|bin|data|exe|dll|so|dylib|node|a|lib|wav|flac|mp3|ogg|opus)$/iu;
+const FORBIDDEN_SPEECH_REDISTRIBUTION_PATH=
+    /^(?:browser-runtime\/ai\/browser-speech-licenses\/|node_modules\/(?:kokoro-js|phonemizer|onnxruntime-web)\/|node_modules\/@huggingface\/transformers\/)|(?:^|\/)(?:arcane-espeak-ng|arcane-espeak-phonemizer|.*corresponding-source)/iu;
 const PACKED_WASM_ALLOWLIST=Object.freeze(
     SDK_BROWSER_RUNTIME_FILES
         .filter(file=>file.toLowerCase().endsWith('.wasm'))
@@ -189,6 +191,11 @@ test('packed npm artifact installs and drives an external repository end to end'
             'The npm artifact contains model, native, or speech payload bytes.'
         );
         assert.deepEqual(
+            packedPaths.filter(file=>FORBIDDEN_SPEECH_REDISTRIBUTION_PATH.test(file)),
+            [],
+            'The npm artifact redistributes an upstream speech runtime or legal/source payload.'
+        );
+        assert.deepEqual(
             packedPaths.filter(file=>file.toLowerCase().endsWith('.wasm')).sort(),
             PACKED_WASM_ALLOWLIST,
             'The npm artifact contains an unadmitted WASM asset.'
@@ -291,11 +298,11 @@ test('packed npm artifact installs and drives an external repository end to end'
         assert.equal(speechComponents.packageExport,'arcane-os/ai/browser-speech');
         assert.equal(
             speechComponents.closureStatus,
-            'browser-speech-runtime-composite-license-notice-and-corresponding-source-closure-incomplete'
+            'browser-speech-runtime-resolved-from-upstream-packages-and-provider-downloads'
         );
         assert.equal(
             speechComponents.publicationStatus,
-            'browser-speech-public-operational-runtime-graphs-blocked-by-composite-legal-evidence'
+            'browser-speech-public-runtime-ready-warn-first-secure-opt-in'
         );
         assert.equal(speechComponents.runtimeBytesPacked,false);
         assert.equal(speechComponents.modelWeightsPacked,false);

@@ -390,6 +390,7 @@ function selection(provider) {
 
 function directGraphWorkerConfiguration(source, {
   cache = true,
+  secure = true,
   transforms = true,
 } = {}) {
   const capability = "a".repeat(64);
@@ -414,6 +415,10 @@ function directGraphWorkerConfiguration(source, {
   });
   return Object.freeze({
     role: "stt",
+    security: Object.freeze({
+      secure,
+      checks: Object.freeze({ byteLength: secure, sha256: secure }),
+    }),
     runtime: Object.freeze({
       adapter: "transformers-whisper",
       moduleGraph: "browser-speech-authenticated-artifact-graph",
@@ -469,6 +474,93 @@ function directGraphWorkerConfiguration(source, {
     }),
   });
 }
+
+test("warn-first authorities use upstream package and provider downloads", async () => {
+  const runtimeBytes = new TextEncoder().encode("export const marker=true;");
+  const authority = createBrowserSpeechAuthority({
+    providerId: "upstream-whisper",
+    role: "stt",
+    security: { secure: false },
+    runtime: {
+      adapter: "transformers-whisper",
+      version: "3.5.1",
+      revision: "transformers-3.5.1",
+      entry: "transformers.js",
+      wasmPaths: "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/",
+      files: [file("transformers.js", runtimeBytes)],
+    },
+    model: {
+      id: "whisper-small",
+      repository: "Xenova/whisper-small",
+      revision: "provider-selected-revision",
+    },
+  });
+  assert.deepEqual(authority.files, []);
+  assert.equal(
+    authority.runtime.wasmPaths,
+    "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/",
+  );
+
+  const source = `
+    export const env = {
+      allowLocalModels: true,
+      allowRemoteModels: false,
+      useBrowserCache: true,
+      useFSCache: false,
+      useCustomCache: false,
+      customCache: null,
+      backends: { onnx: { wasm: {} } },
+    };
+    export async function pipeline() {
+      const runtimeGlobal = Function("return globalThis")();
+      const transcriber = async () => ({
+        text: runtimeGlobal === globalThis && env.useBrowserCache
+          ? "upstream-downloads-enabled"
+          : "upstream-downloads-disabled",
+      });
+      transcriber.dispose = async () => undefined;
+      return transcriber;
+    }
+  `;
+  const moduleUrl = `data:text/javascript,${encodeURIComponent(source)}`;
+  const runtime = createSpeechWorkerRuntime({ role: "stt", send: () => undefined });
+  await runtime.handleMessage({
+    protocol: SPEECH_WORKER_PROTOCOL,
+    id: 1,
+    op: "load",
+    payload: {
+      configuration: {
+        role: "stt",
+        security: { secure: false, checks: { byteLength: false, sha256: false } },
+        runtime: {
+          adapter: "transformers-whisper",
+          moduleGraph: "self-contained",
+          entry: "transformers.js",
+          wasmPaths: authority.runtime.wasmPaths,
+          files: [{ path: "transformers.js", moduleUrl }],
+        },
+        model: {
+          id: "whisper-small",
+          repository: "Xenova/whisper-small",
+          revision: "provider-selected-revision",
+          files: [],
+        },
+      },
+    },
+  });
+  assert.deepEqual(await runtime.handleMessage({
+    protocol: SPEECH_WORKER_PROTOCOL,
+    id: 2,
+    op: "use",
+    payload: { audio: new Float32Array([0]), sampleRate: 16_000 },
+  }), { text: "upstream-downloads-enabled" });
+  await runtime.handleMessage({
+    protocol: SPEECH_WORKER_PROTOCOL,
+    id: 3,
+    op: "unload",
+    payload: null,
+  });
+});
 
 test("browser speech artifact graphs bind one deterministic closed authority", () => {
   const stt = artifactGraphFixture("stt");
@@ -759,6 +851,53 @@ test("authenticated graph Worker rejects detached dynamic-code constructors", as
     runtime.status().lifecycleReason,
     "artifact-graph-dynamic-code-constructor-rejected",
   );
+  assert.equal(globalThis.__arcaneBrowserSpeechArtifactGraphGuardsV1, undefined);
+});
+
+test("warn-first graph Worker preserves ordinary runtime capabilities", async () => {
+  const source = `
+    const runtimeGlobal = Function("return globalThis")();
+    export const env = {
+      allowLocalModels: true,
+      allowRemoteModels: true,
+      useBrowserCache: true,
+      useFSCache: true,
+      useCustomCache: false,
+      customCache: null,
+      backends: { onnx: { wasm: {} } },
+    };
+    export async function pipeline() {
+      const transcriber = async () => ({
+        text: runtimeGlobal === globalThis ? "warn-first" : "wrong-global",
+      });
+      transcriber.dispose = async () => undefined;
+      return transcriber;
+    }
+  `;
+  const runtime = createSpeechWorkerRuntime({ role: "stt", send: () => undefined });
+  const configuration = directGraphWorkerConfiguration(source, {
+    cache: false,
+    secure: false,
+    transforms: false,
+  });
+  await runtime.handleMessage({
+    protocol: SPEECH_WORKER_PROTOCOL,
+    id: 1,
+    op: "load",
+    payload: { configuration },
+  });
+  assert.deepEqual(await runtime.handleMessage({
+    protocol: SPEECH_WORKER_PROTOCOL,
+    id: 2,
+    op: "use",
+    payload: { audio: new Float32Array([0]), sampleRate: 16_000 },
+  }), { text: "warn-first" });
+  await runtime.handleMessage({
+    protocol: SPEECH_WORKER_PROTOCOL,
+    id: 3,
+    op: "unload",
+    payload: null,
+  });
   assert.equal(globalThis.__arcaneBrowserSpeechArtifactGraphGuardsV1, undefined);
 });
 
@@ -1090,7 +1229,9 @@ test("artifact graph source verification propagates exact rejection boundaries",
     body: original.body.slice(0, original.body.byteLength - 1),
   }));
   await assert.rejects(
-    graphStore(createMemoryDbopfs(), shortSources).prepare(fixture.graph),
+    graphStore(createMemoryDbopfs(), shortSources).prepare(fixture.graph, {
+      security: { secure: true },
+    }),
     (error) => error?.reason === "artifact-graph-entrypoint-byte-length-mismatch",
   );
 
@@ -1102,7 +1243,9 @@ test("artifact graph source verification propagates exact rejection boundaries",
     body: changedBytes,
   }));
   await assert.rejects(
-    graphStore(createMemoryDbopfs(), changedSources).prepare(fixture.graph),
+    graphStore(createMemoryDbopfs(), changedSources).prepare(fixture.graph, {
+      security: { secure: true },
+    }),
     (error) => error?.reason === "artifact-graph-entrypoint-sha256-mismatch",
   );
 
@@ -1280,12 +1423,12 @@ test("artifact graph cold redirects require declared final origin and source med
   await assert.rejects(
     redirectFailureStore("https://huggingface.co/xet/model", {
       body: sources.get(target.sourceUrl).body.slice(0, 1),
-    }).prepare(graph),
+    }).prepare(graph, { security: { secure: true } }),
     (error) => error?.reason === "artifact-graph-model-configuration-json-byte-length-mismatch",
   );
 });
 
-test("graph Kokoro uses caller voice and sample-rate authority over a private Worker channel", async (t) => {
+test("graph Kokoro defaults to warn-first and supports explicit secure admission", async (t) => {
   const fixture = artifactGraphFixture("tts");
   const dbopfs = createMemoryDbopfs();
   const store = graphStore(dbopfs, fixture.sources);
@@ -1296,21 +1439,21 @@ test("graph Kokoro uses caller voice and sample-rate authority over a private Wo
     return contract;
   });
 
-  const weakened = createBrowserKokoroProvider({
+  const warnFirst = createBrowserKokoroProvider({
     id: fixture.graph.providerId,
     graph: fixture.graph,
     store,
     appSecurity: { secure: false },
   });
-  await assert.rejects(
-    weakened.load({
-      role: "tts",
-      selection: selection(weakened),
-      progress: () => undefined,
-    }),
-    (error) => error?.reason === "artifact-graph-security-weakening-rejected",
-  );
-  assert.equal(contracts.length, 0);
+  await warnFirst.load({
+    role: "tts",
+    selection: selection(warnFirst),
+    progress: () => undefined,
+  });
+  assert.equal(contracts.length, 1);
+  assert.equal(warnFirst.status().state, "ready");
+  await warnFirst.dispose();
+  contracts.length = 0;
 
   const kokoro = createBrowserKokoroProvider({
     id: fixture.graph.providerId,
@@ -1342,7 +1485,7 @@ test("graph Kokoro uses caller voice and sample-rate authority over a private Wo
   assert.equal(kokoro.status().artifactGraphId, fixture.graph.identitySha256);
   assert.equal(
     kokoro.status().artifactGraphAdmission,
-    "artifact-graph-network-dbopfs-verified",
+    "artifact-graph-dbopfs-cache-verified",
   );
 
   const speech = await kokoro.request({

@@ -22,10 +22,6 @@ const ROLE_OPERATION = Object.freeze({ stt: "transcribe", tts: "synthesize" });
 const STT_SAMPLE_RATE = 16_000;
 const TTS_SAMPLE_RATE = 24_000;
 const TTS_RESPONSE_FORMAT = "wav";
-const ARTIFACT_GRAPH_SECURITY = Object.freeze({
-  secure: true,
-  checks: Object.freeze({ byteLength: true, sha256: true }),
-});
 const ROLE_REQUEST_REASON = Object.freeze({
   stt: "stt-transcription-cancelled",
   tts: "tts-synthesis-cancelled",
@@ -299,20 +295,7 @@ function providerContext(context, role, operation) {
 }
 
 function graphSecurity(scope, label) {
-  const normalized = normalizeModelSecurity(scope, label);
-  if ((Object.hasOwn(normalized, "secure") && normalized.secure === false)
-    || (Object.hasOwn(normalized.checks, "byteLength")
-      && normalized.checks.byteLength === false)
-    || (Object.hasOwn(normalized.checks, "sha256")
-      && normalized.checks.sha256 === false)) {
-    throw providerError(
-      "ARCANE_AI_ARTIFACT_GRAPH_SECURITY_WEAKENING_REJECTED",
-      "Authenticated artifact graph verification cannot be disabled.",
-      undefined,
-      "artifact-graph-security-weakening-rejected",
-    );
-  }
-  return normalized;
+  return normalizeModelSecurity(scope, label);
 }
 
 function publicStatus({
@@ -1266,10 +1249,20 @@ function createBrowserSpeechProvider({
       let effectiveSecurity;
       try {
         if (authority.graph) {
-          graphSecurity(configuredAppSecurity, "Browser speech graph app security");
-          graphSecurity(configuredProviderSecurity, "Browser speech graph provider security");
-          graphSecurity(context.security, "Browser speech graph load security");
-          effectiveSecurity = ARTIFACT_GRAPH_SECURITY;
+          effectiveSecurity = resolveModelSecurity({
+            app: graphSecurity(
+              configuredAppSecurity,
+              "Browser speech graph app security",
+            ),
+            binding: graphSecurity(
+              configuredProviderSecurity,
+              "Browser speech graph provider security",
+            ),
+            load: graphSecurity(
+              context.security,
+              "Browser speech graph load security",
+            ),
+          });
         } else {
           effectiveSecurity = resolveModelSecurity({
             app: configuredAppSecurity,
@@ -1404,6 +1397,7 @@ function createBrowserSpeechProvider({
             role,
             runtime: prepared.runtime,
             model: prepared.model,
+            security: effectiveSecurity,
             ...(authority.graph ? {
               artifactGraphId: authority.artifactGraphId,
               artifactGraphProtocol: authority.graph.protocol,
