@@ -15,6 +15,14 @@ const missingStrongTypePath=path.join(
     'strong-type',
     'index.js'
 );
+const runtimePackageImports=new Map([
+    ['arcane-os/event-manager',path.join(repositoryRoot,'src','event-manager.mjs')],
+    [
+        'arcane-os/ai/browser-speech',
+        path.join(repositoryRoot,'browser-runtime','ai','browser-speech.mjs')
+    ]
+]);
+const runtimeExternalImports=new Set(['event-pubsub']);
 function portablePath(filePath){
     return path.relative(repositoryRoot,filePath).split(path.sep).join('/');
 }
@@ -104,6 +112,10 @@ export async function inspectRuntimeApi(){
 
     const linker=async(specifier,referencingModule)=>{
         if(specifier.startsWith('node:'))return builtinModule(specifier);
+        if(runtimeExternalImports.has(specifier))return builtinModule(specifier);
+        if(runtimePackageImports.has(specifier)){
+            return (await moduleRecord(runtimePackageImports.get(specifier))).module;
+        }
         if(!specifier.startsWith('.')&&!specifier.startsWith('/')){
             throw new Error(
                 `Unsupported runtime import ${JSON.stringify(specifier)} from ${referencingModule.identifier}.`

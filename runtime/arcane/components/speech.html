@@ -258,10 +258,21 @@
         );
     }
 
-    function publicSpeechErrorCode(error, fallback) {
-        return typeof error?.code === 'string' && error.code
-            ? error.code
-            : fallback;
+    function publicSpeechErrorFields(error, boundaryCode) {
+        let causeCode = '';
+        try {
+            causeCode = typeof error?.code === 'string'
+                ? error.code.trim()
+                : '';
+        } catch {}
+        return Object.freeze(
+            {
+                code: boundaryCode,
+                ...(causeCode && causeCode !== boundaryCode
+                    ? { causeCode }
+                    : {})
+            }
+        );
     }
 
     function microphoneFailureReason(error) {
@@ -1038,7 +1049,7 @@
             message,
             tone: 'error'
         };
-        const code = publicSpeechErrorCode(
+        const errorFields = publicSpeechErrorFields(
             error,
             `ARCANE_SPEECH_TTS_${action.toUpperCase()}_REJECTED`
         );
@@ -1047,7 +1058,7 @@
             'speech-tts-lifecycle-error',
             {
                 action,
-                code,
+                ...errorFields,
                 error,
                 message,
                 reason
@@ -1059,7 +1070,7 @@
                     || nextSpeechOperationId(`tts-${action}`),
                 publicDetail: {
                     action,
-                    code,
+                    ...errorFields,
                     reason
                 }
             }
@@ -1086,7 +1097,7 @@
             message: `${playbackRejected ? 'Speech playback' : 'Speech synthesis'} failed: ${message}`,
             tone: 'error'
         };
-        const code = publicSpeechErrorCode(
+        const errorFields = publicSpeechErrorFields(
             error,
             playbackRejected
                 ? 'ARCANE_SPEECH_TTS_PLAYBACK_RESUME_REJECTED'
@@ -1098,7 +1109,7 @@
         dispatchSpeechEvent(
             'speech-synthesis-error',
             {
-                code,
+                ...errorFields,
                 error,
                 message,
                 reason
@@ -1108,7 +1119,7 @@
                 composed: true,
                 operationId: nextSpeechOperationId('synthesis'),
                 publicDetail: {
-                    code,
+                    ...errorFields,
                     reason
                 }
             }
@@ -1216,7 +1227,7 @@
                         composed: true,
                         operationId: transcriptionOperationId,
                         publicDetail: {
-                            code: publicSpeechErrorCode(
+                            ...publicSpeechErrorFields(
                                 error,
                                 'ARCANE_SPEECH_MICROPHONE_CAPTURE_REJECTED'
                             ),
@@ -1450,7 +1461,7 @@
         };
         const operationId = transcriptionOperationId
             || nextSpeechOperationId('transcription');
-        const code = publicSpeechErrorCode(
+        const errorFields = publicSpeechErrorFields(
             error,
             'ARCANE_SPEECH_STT_TRANSCRIPTION_REQUEST_REJECTED'
         );
@@ -1458,7 +1469,7 @@
         dispatchSpeechEvent(
             'speech-transcription-error',
             {
-                code,
+                ...errorFields,
                 error,
                 message,
                 reason
@@ -1468,7 +1479,7 @@
                 composed: true,
                 operationId,
                 publicDetail: {
-                    code,
+                    ...errorFields,
                     reason
                 }
             }

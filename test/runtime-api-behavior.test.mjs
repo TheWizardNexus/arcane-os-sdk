@@ -2811,6 +2811,47 @@ test(
             /globalThis[.]ai[?][.]setSpeechMuted[\s\S]*setSpeechMuted\(action === 'unload'\)[\s\S]*requestAIRuntimeIntent/u,
             'TTS mute intent must reach the lifecycle owner before it is published.'
         );
+        const errorFieldsStart = source.indexOf(
+            'function publicSpeechErrorFields('
+        );
+        const errorFieldsEnd = source.indexOf(
+            '\n\n    function microphoneFailureReason',
+            errorFieldsStart
+        );
+        assert.notEqual(errorFieldsStart, -1);
+        assert.notEqual(errorFieldsEnd, -1);
+        const publicSpeechErrorFields = Function(
+            `'use strict';\n${source.slice(errorFieldsStart, errorFieldsEnd)}\nreturn publicSpeechErrorFields;`
+        )();
+        const providerFailure = new Error('Provider synthesis failed.');
+        providerFailure.code = 'ARCANE_AI_BROWSER_SPEECH_TTS_SYNTHESIS_REJECTED';
+        const speechFailure = publicSpeechErrorFields(
+            providerFailure,
+            'ARCANE_SPEECH_TTS_SYNTHESIS_REQUEST_REJECTED'
+        );
+        assert.deepEqual(
+            speechFailure,
+            {
+                code: 'ARCANE_SPEECH_TTS_SYNTHESIS_REQUEST_REJECTED',
+                causeCode: 'ARCANE_AI_BROWSER_SPEECH_TTS_SYNTHESIS_REJECTED'
+            }
+        );
+        assert.ok(Object.isFrozen(speechFailure));
+        assert.deepEqual(
+            publicSpeechErrorFields(
+                Object.assign(
+                    new Error('Boundary failure.'),
+                    {code: 'ARCANE_SPEECH_TTS_SYNTHESIS_REQUEST_REJECTED'}
+                ),
+                'ARCANE_SPEECH_TTS_SYNTHESIS_REQUEST_REJECTED'
+            ),
+            {code: 'ARCANE_SPEECH_TTS_SYNTHESIS_REQUEST_REJECTED'}
+        );
+        assert.equal(
+            source.match(/publicSpeechErrorFields\(/gu)?.length,
+            5,
+            'Every speech error projection must use the shared boundary/cause fields.'
+        );
         assert.match(
             source,
             /Object[.]prototype[.]hasOwnProperty[.]call\(input, 'stt'\)[\s\S]*!Boolean\(input[.]stt\)[\s\S]*!selectedRole\(sttRole\)/u,
