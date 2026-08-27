@@ -1,3 +1,5 @@
+import { createArcaneEventSource } from "arcane-os/event-manager";
+
 export const ARCANE_AI_ADAPTER_PROTOCOL = "arcane-ai-adapter/1";
 
 const SECURITY_KEYS = Object.freeze(["secure", "checks"]);
@@ -150,6 +152,122 @@ function copyError(error) {
   });
 }
 
+function invalidStatus(cause) {
+  return new ArcaneAIError(
+    "ARCANE_AI_PROVIDER_STATUS_INVALID",
+    "The LLM provider returned an invalid status record.",
+    { cause, operation: "status" },
+  );
+}
+
+function copyProviderStatus(value) {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== "object" || Array.isArray(value)) throw invalidStatus();
+  try {
+    const copy = {};
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key !== "string") throw invalidStatus();
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !("value" in descriptor)) throw invalidStatus();
+      Object.defineProperty(copy, key, {
+        value: descriptor.value,
+        enumerable: descriptor.enumerable,
+        configurable: true,
+        writable: true,
+      });
+    }
+    return copy;
+  } catch (error) {
+    if (error instanceof ArcaneAIError) throw error;
+    throw invalidStatus(error);
+  }
+}
+
+const MAX_PROGRESS_DEPTH = 8;
+const MAX_PROGRESS_ENTRIES = 256;
+
+function invalidProgress(cause) {
+  return new ArcaneAIError(
+    "ARCANE_AI_PROVIDER_PROGRESS_INVALID",
+    "The LLM provider returned an invalid progress record.",
+    { cause, operation: "load" },
+  );
+}
+
+function copyProgressValue(value, state, depth = 0) {
+  if (value === null || typeof value !== "object") return value;
+  if (depth > MAX_PROGRESS_DEPTH || state.seen.has(value)) {
+    throw invalidProgress();
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) {
+    throw invalidProgress();
+  }
+  state.seen.add(value);
+  const copy = Array.isArray(value) ? [] : prototype === null ? Object.create(null) : {};
+  try {
+    for (const key of Reflect.ownKeys(value)) {
+      if (Array.isArray(value) && key === "length") continue;
+      state.entries += 1;
+      if (state.entries > MAX_PROGRESS_ENTRIES || typeof key !== "string") {
+        throw invalidProgress();
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !("value" in descriptor)) throw invalidProgress();
+      Object.defineProperty(copy, key, {
+        value: copyProgressValue(descriptor.value, state, depth + 1),
+        enumerable: descriptor.enumerable,
+        configurable: false,
+        writable: false,
+      });
+    }
+    return Object.freeze(copy);
+  } finally {
+    state.seen.delete(value);
+  }
+}
+
+function copyProgress(progress) {
+  if (progress === undefined || progress === null) return null;
+  if (typeof progress !== "object" || Array.isArray(progress)) {
+    throw invalidProgress();
+  }
+  try {
+    return copyProgressValue(progress, { seen: new WeakSet(), entries: 0 });
+  } catch (error) {
+    if (error instanceof ArcaneAIError) throw error;
+    throw invalidProgress(error);
+  }
+}
+
+function publicProgress(progress) {
+  if (!progress || typeof progress !== "object") return null;
+  const file = progress.file && typeof progress.file === "object"
+    ? Object.freeze({
+      ...(Number.isSafeInteger(progress.file.index) ? { index: progress.file.index } : {}),
+      ...(Number.isSafeInteger(progress.file.count) ? { count: progress.file.count } : {}),
+      ...(typeof progress.file.name === "string" ? { name: progress.file.name } : {}),
+      ...(Number.isSafeInteger(progress.file.loaded) ? { loaded: progress.file.loaded } : {}),
+      ...(progress.file.total === null || Number.isSafeInteger(progress.file.total)
+        ? { total: progress.file.total }
+        : {}),
+    })
+    : null;
+  return Object.freeze({
+    ...(typeof progress.modelId === "string" ? { modelId: progress.modelId } : {}),
+    ...(typeof progress.phase === "string" ? { phase: progress.phase } : {}),
+    ...(Number.isSafeInteger(progress.loaded) ? { loaded: progress.loaded } : {}),
+    ...(progress.total === null || Number.isSafeInteger(progress.total)
+      ? { total: progress.total }
+      : {}),
+    ...(progress.percent === null
+      || (typeof progress.percent === "number" && Number.isFinite(progress.percent))
+      ? { percent: progress.percent }
+      : {}),
+    ...(file ? { file } : {}),
+  });
+}
+
 function localRequirement(options, provider) {
   if (options?.localOnly !== undefined && typeof options.localOnly !== "boolean") {
     throw new TypeError("localOnly must be a boolean when provided.");
@@ -180,15 +298,6 @@ function fireAndForget(callback, ...args) {
     Promise.resolve(callback(...args)).catch(() => undefined);
   } catch {
     // Observational callbacks cannot alter the local-inference decision.
-  }
-}
-
-class ControllerEvent {
-  constructor(type, detail, target) {
-    this.type = type;
-    this.detail = detail;
-    this.target = target;
-    this.currentTarget = target;
   }
 }
 
@@ -225,7 +334,7 @@ export class ModelController {
   #provider;
   #loadPolicy;
   #security;
-  #listeners = new Map();
+  #events;
   #loadPromise = null;
   #readyPolicyResolved = false;
   #unloadPromise = null;
@@ -233,6 +342,7 @@ export class ModelController {
   #operationGeneration = 0;
   #disposing = false;
   #disposed = false;
+  #disposeUnloadAdmission = false;
   #activeStreams = new Set();
   #fallbackState = "unloaded";
   #progress = null;
@@ -258,47 +368,55 @@ export class ModelController {
     this.#provider = provider;
     this.#loadPolicy = loadPolicy;
     this.#security = normalizeModelSecurity(security, "app security");
+    this.#events = createArcaneEventSource(this, {
+      source: "ai-model-controller",
+      eventTypes: Object.freeze(["statechange", "progress"]),
+    });
   }
 
   status() {
-    const providerStatus = providerMethod(this.#provider, "status")?.(
-      Object.freeze({ security: this.#security }),
-    ) ?? {};
+    const providerStatus = copyProviderStatus(
+      providerMethod(this.#provider, "status")?.(
+        Object.freeze({ security: this.#security }),
+      ),
+    );
+    const progress = copyProgress(providerStatus.progress ?? this.#progress);
     return Object.freeze({
       ...providerStatus,
       kind: "llm",
       state: providerStatus.state ?? this.#fallbackState,
-      progress: providerStatus.progress ?? this.#progress,
-      error: providerStatus.error ?? copyError(this.#error),
+      progress,
+      error: copyError(providerStatus.error ?? this.#error),
     });
   }
 
-  addEventListener(type, listener) {
-    if (typeof listener !== "function" && typeof listener?.handleEvent !== "function") return;
-    const listeners = this.#listeners.get(type) ?? new Set();
-    listeners.add(listener);
-    this.#listeners.set(type, listeners);
+  addEventListener(type, listener, options) {
+    return this.#events.addEventListener(type, listener, options);
   }
 
-  removeEventListener(type, listener) {
-    this.#listeners.get(type)?.delete(listener);
+  removeEventListener(type, listener, options) {
+    return this.#events.removeEventListener(type, listener, options);
   }
 
   on(type, listener) {
     this.addEventListener(type, listener);
-    return () => this.removeEventListener(type, listener);
+    const controller = this;
+    return function unsubscribeModelControllerEvent() {
+      controller.removeEventListener(type, listener);
+    };
   }
 
-  #emit(type) {
-    const event = new ControllerEvent(type, this.status(), this);
-    for (const listener of [...(this.#listeners.get(type) ?? [])]) {
-      try {
-        if (typeof listener === "function") listener.call(this, event);
-        else listener.handleEvent(event);
-      } catch {
-        // UI observers cannot alter lifecycle state.
-      }
-    }
+  #emit(type, operationId) {
+    const status = this.status();
+    const progress = type === "progress" ? publicProgress(status.progress) : null;
+    this.#events.dispatch(type, status, {
+      operationId,
+      publicDetail: Object.freeze({
+        ...(typeof status.state === "string" ? { state: status.state } : {}),
+        ...(progress ? { progress } : {}),
+        ...(typeof status.error?.code === "string" ? { code: status.error.code } : {}),
+      }),
+    });
   }
 
   #assertOperational() {
@@ -345,60 +463,71 @@ export class ModelController {
     }
     const wasReady = state === "ready";
     const operationGeneration = ++this.#operationGeneration;
+    const operationId = `${this.#events.instanceId}:load:${operationGeneration.toString(36)}`;
+    let resolveOperation;
+    let rejectOperation;
+    const operation = new Promise(function createModelLoadOperation(resolve, reject) {
+      resolveOperation = resolve;
+      rejectOperation = reject;
+    });
+    this.#loadPromise = operation;
     if (!wasReady) {
       this.#fallbackState = "loading";
       this.#progress = null;
       this.#error = null;
-      this.#emit("statechange");
+      this.#emit("statechange", operationId);
     }
-    this.#loadPromise = (async () => {
+    const controller = this;
+    function reportModelLoadProgress(progress) {
+      if (
+        operationGeneration !== controller.#operationGeneration
+        || controller.#disposing
+        || controller.#disposed
+      ) return;
+      controller.#progress = copyProgress(progress);
+      controller.#emit("progress", operationId);
+    }
+    async function executeModelLoad() {
       try {
         await load(options, Object.freeze({
           protocol: ARCANE_AI_ADAPTER_PROTOCOL,
           kind: "llm",
           operation: "load",
           signal,
-          security: this.#security,
-          reportProgress: (progress) => {
-            if (
-              operationGeneration !== this.#operationGeneration
-              || this.#disposing
-              || this.#disposed
-            ) return;
-            this.#progress = progress;
-            this.#emit("progress");
-          },
+          security: controller.#security,
+          reportProgress: reportModelLoadProgress,
         }));
         if (
-          operationGeneration !== this.#operationGeneration
-          || this.#disposing
-          || this.#disposed
-        ) return this.status();
-        this.#readyPolicyResolved = true;
+          operationGeneration !== controller.#operationGeneration
+          || controller.#disposing
+          || controller.#disposed
+        ) return controller.status();
+        controller.#readyPolicyResolved = true;
         if (!wasReady) {
-          this.#fallbackState = "ready";
-          this.#progress = null;
-          this.#emit("statechange");
+          controller.#fallbackState = "ready";
+          controller.#progress = null;
+          controller.#emit("statechange", operationId);
         }
-        return this.status();
+        return controller.status();
       } catch (error) {
         const normalized = normalizeArcaneAIError(error, { operation: "load", signal });
         if (
-          operationGeneration === this.#operationGeneration
-          && !this.#disposing
-          && !this.#disposed
+          operationGeneration === controller.#operationGeneration
+          && !controller.#disposing
+          && !controller.#disposed
           && !wasReady
         ) {
-          this.#fallbackState = "error";
-          this.#error = normalized;
-          this.#emit("statechange");
+          controller.#fallbackState = "error";
+          controller.#error = normalized;
+          controller.#emit("statechange", operationId);
         }
         throw normalized;
       } finally {
-        this.#loadPromise = null;
+        if (controller.#loadPromise === operation) controller.#loadPromise = null;
       }
-    })();
-    return this.#loadPromise;
+    }
+    void executeModelLoad().then(resolveOperation, rejectOperation);
+    return operation;
   }
 
   async #ready(loadOptions = {}) {
@@ -427,53 +556,66 @@ export class ModelController {
   }
 
   async unload(options = {}) {
+    if ((this.#disposed || this.#disposing) && !this.#disposeUnloadAdmission) {
+      this.#assertOperational();
+    }
     if (this.#unloadPromise) return this.#unloadPromise;
     const unload = providerMethod(this.#provider, "unload");
     if (!unload) throw new ArcaneAIError("ARCANE_AI_UNAVAILABLE", "The LLM provider cannot unload.");
     const signal = options.signal ?? null;
     const inFlightLoad = this.#loadPromise;
     const operationGeneration = ++this.#operationGeneration;
+    const operationId = `${this.#events.instanceId}:unload:${operationGeneration.toString(36)}`;
     const context = Object.freeze({
       protocol: ARCANE_AI_ADAPTER_PROTOCOL,
       kind: "llm",
       operation: "unload",
       signal,
     });
+    let resolveOperation;
+    let rejectOperation;
+    const operation = new Promise(function createModelUnloadOperation(resolve, reject) {
+      resolveOperation = resolve;
+      rejectOperation = reject;
+    });
+    this.#unloadPromise = operation;
     this.#fallbackState = "unloading";
-    this.#emit("statechange");
-    this.#unloadPromise = (async () => {
+    this.#emit("statechange", operationId);
+    const controller = this;
+    async function executeModelUnload() {
       try {
-        await this.#closeStreams("The browser-WASM model is unloading.");
+        await controller.#closeStreams("The browser-WASM model is unloading.");
         // The first call asks the provider to cancel its in-flight load. A
         // provider owns its public status, so wait for the captured load and
         // reassert unload afterward; a late provider-owned `ready` state can
         // otherwise outlive this controller's generation guard.
         await unload(options, context);
         if (inFlightLoad) {
-          await inFlightLoad.catch(() => undefined);
+          await inFlightLoad.catch(function ignoreSupersededModelLoad() {});
           await unload(options, context);
         }
-        if (operationGeneration === this.#operationGeneration) {
-          this.#fallbackState = "unloaded";
-          this.#readyPolicyResolved = false;
-          this.#progress = null;
-          this.#error = null;
-          this.#emit("statechange");
+        if (operationGeneration === controller.#operationGeneration) {
+          controller.#fallbackState = "unloaded";
+          controller.#readyPolicyResolved = false;
+          controller.#progress = null;
+          controller.#error = null;
+          controller.#emit("statechange", operationId);
         }
-        return this.status();
+        return controller.status();
       } catch (error) {
         const normalized = normalizeArcaneAIError(error, { operation: "unload", signal });
-        if (operationGeneration === this.#operationGeneration) {
-          this.#fallbackState = "error";
-          this.#error = normalized;
-          this.#emit("statechange");
+        if (operationGeneration === controller.#operationGeneration) {
+          controller.#fallbackState = "error";
+          controller.#error = normalized;
+          controller.#emit("statechange", operationId);
         }
         throw normalized;
       } finally {
-        this.#unloadPromise = null;
+        if (controller.#unloadPromise === operation) controller.#unloadPromise = null;
       }
-    })();
-    return this.#unloadPromise;
+    }
+    void executeModelUnload().then(resolveOperation, rejectOperation);
+    return operation;
   }
 
   async chat(request = {}) {
@@ -673,30 +815,40 @@ export class ModelController {
     this.#operationGeneration += 1;
     let resolveOperation;
     let rejectOperation;
-    const operation = new Promise((resolve, reject) => {
+    const operation = new Promise(function createModelDisposeOperation(resolve, reject) {
       resolveOperation = resolve;
       rejectOperation = reject;
     });
     this.#disposePromise = operation;
-    (async () => {
+    const controller = this;
+    async function executeModelDispose() {
       try {
-        await this.unload(options);
-        const dispose = providerMethod(this.#provider, "dispose");
+        let unloadOperation;
+        try {
+          controller.#disposeUnloadAdmission = true;
+          unloadOperation = controller.unload(options);
+        } finally {
+          controller.#disposeUnloadAdmission = false;
+        }
+        await unloadOperation;
+        const dispose = providerMethod(controller.#provider, "dispose");
         if (dispose) await dispose(options);
-        this.#disposed = true;
-        this.#listeners.clear();
-        return this.status();
+        controller.#disposed = true;
+        const status = controller.status();
+        controller.#events.dispose();
+        return status;
       } catch (error) {
         throw normalizeArcaneAIError(error, {
           operation: "dispose",
           signal: options.signal,
         });
       } finally {
-        this.#disposing = false;
+        controller.#disposing = false;
       }
-    })().then(resolveOperation, rejectOperation);
-    operation.catch(() => {
-      if (this.#disposePromise === operation) this.#disposePromise = null;
+    }
+    void executeModelDispose().then(resolveOperation, rejectOperation);
+    operation.catch(function resetFailedModelDispose() {
+      if (controller.#disposePromise === operation) controller.#disposePromise = null;
     });
     return operation;
   }

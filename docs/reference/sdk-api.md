@@ -5120,6 +5120,23 @@ visibility. It neither selects a provider fallback nor executes an application
 tool. Persistent sessions additionally require ChatEntity/DBOPFS in the
 managed browser runtime.
 
+`ai.llm.addEventListener(type,listener,options)` and
+`removeEventListener(type,listener,options)` are EventTarget compatibility
+views over `globalThis.arcaneEvents`; null or non-listener callbacks are no-ops.
+`ai.llm.on(type,listener)` installs through that same view and returns
+one removal closure. The controller exposes no public `dispatchEvent()` and
+therefore does not let consumers forge lifecycle occurrences. Compatibility
+listeners receive the frozen full status as `event.detail` with the controller
+as `this`, `target`, and `currentTarget`. Canonical `statechange` and `progress`
+occurrences use source `ai-model-controller`; every load or unload owns one
+non-null operation ID shared by its state and progress occurrences. Public
+progress retains the exact admitted `modelId`, `phase`, `loaded`, `total`,
+`percent`, and nested file-progress field names rather
+than relabeling byte counts. Accessor-bearing provider status and malformed
+progress fail at admission with `ARCANE_AI_PROVIDER_STATUS_INVALID` and
+`ARCANE_AI_PROVIDER_PROGRESS_INVALID`. After disposal, lifecycle operations fail with
+`ARCANE_AI_DISPOSED`.
+
 ### Example
 
 ```javascript
