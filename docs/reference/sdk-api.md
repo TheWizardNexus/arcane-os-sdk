@@ -5122,9 +5122,11 @@ managed browser runtime.
 
 `ai.llm.addEventListener(type,listener,options)` and
 `removeEventListener(type,listener,options)` are EventTarget compatibility
-views over `globalThis.arcaneEvents`; null or non-listener callbacks are no-ops.
+views over `globalThis.arcaneEvents`; null/non-listener callbacks and event names
+other than `statechange` or `progress` are compatibility no-ops.
 `ai.llm.on(type,listener)` installs through that same view and returns
-one removal closure. The controller exposes no public `dispatchEvent()` and
+one idempotent removal closure whose `.dispose` property is that same closure.
+The controller exposes no public `dispatchEvent()` and
 therefore does not let consumers forge lifecycle occurrences. Compatibility
 listeners receive the frozen full status as `event.detail` with the controller
 as `this`, `target`, and `currentTarget`. Canonical `statechange` and `progress`

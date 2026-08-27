@@ -6,6 +6,8 @@ const SECURITY_KEYS = Object.freeze(["secure", "checks"]);
 const SECURITY_CHECK_KEYS = Object.freeze(["byteLength", "sha256"]);
 const EMPTY_SECURITY_CHECKS = Object.freeze({});
 const EMPTY_MODEL_SECURITY = Object.freeze({ checks: EMPTY_SECURITY_CHECKS });
+const MODEL_CONTROLLER_EVENT_TYPES = Object.freeze(["statechange", "progress"]);
+const MODEL_CONTROLLER_EVENT_TYPE_SET = new Set(MODEL_CONTROLLER_EVENT_TYPES);
 
 function closedSecurityRecord(value, keys, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -144,20 +146,42 @@ function providerMethod(provider, name) {
   return typeof provider?.[name] === "function" ? provider[name].bind(provider) : null;
 }
 
-function copyError(error) {
-  if (!error) return null;
-  return Object.freeze({
-    code: String(error.code ?? "ARCANE_AI_REQUEST_FAILED"),
-    message: String(error.message ?? "The Arcane AI operation failed."),
-  });
-}
-
 function invalidStatus(cause) {
   return new ArcaneAIError(
     "ARCANE_AI_PROVIDER_STATUS_INVALID",
     "The LLM provider returned an invalid status record.",
     { cause, operation: "status" },
   );
+}
+
+function copyError(error) {
+  if (!error) return null;
+  let code;
+  let message;
+  if (typeof error === "object" || typeof error === "function") {
+    try {
+      const codeDescriptor = Object.getOwnPropertyDescriptor(error, "code");
+      const messageDescriptor = Object.getOwnPropertyDescriptor(error, "message");
+      if ((codeDescriptor && !("value" in codeDescriptor))
+        || (messageDescriptor && !("value" in messageDescriptor))) {
+        throw invalidStatus();
+      }
+      code = codeDescriptor?.value;
+      message = messageDescriptor?.value;
+    } catch (copyErrorFailure) {
+      if (copyErrorFailure instanceof ArcaneAIError) throw copyErrorFailure;
+      throw invalidStatus(copyErrorFailure);
+    }
+  }
+  return Object.freeze({
+    code: String(code ?? "ARCANE_AI_REQUEST_FAILED"),
+    message: String(message ?? "The Arcane AI operation failed."),
+  });
+}
+
+function isModelControllerListener(value) {
+  return typeof value === "function"
+    || Boolean(value && typeof value === "object" && typeof value.handleEvent === "function");
 }
 
 function copyProviderStatus(value) {
@@ -370,7 +394,7 @@ export class ModelController {
     this.#security = normalizeModelSecurity(security, "app security");
     this.#events = createArcaneEventSource(this, {
       source: "ai-model-controller",
-      eventTypes: Object.freeze(["statechange", "progress"]),
+      eventTypes: MODEL_CONTROLLER_EVENT_TYPES,
     });
   }
 
@@ -391,19 +415,32 @@ export class ModelController {
   }
 
   addEventListener(type, listener, options) {
+    if (!MODEL_CONTROLLER_EVENT_TYPE_SET.has(type) || !isModelControllerListener(listener)) return;
     return this.#events.addEventListener(type, listener, options);
   }
 
   removeEventListener(type, listener, options) {
+    if (!MODEL_CONTROLLER_EVENT_TYPE_SET.has(type) || !isModelControllerListener(listener)) return;
     return this.#events.removeEventListener(type, listener, options);
   }
 
   on(type, listener) {
     this.addEventListener(type, listener);
     const controller = this;
-    return function unsubscribeModelControllerEvent() {
+    let active = true;
+    function unsubscribeModelControllerEvent() {
+      if (!active) return false;
+      active = false;
       controller.removeEventListener(type, listener);
-    };
+      return true;
+    }
+    Object.defineProperty(unsubscribeModelControllerEvent, "dispose", {
+      value: unsubscribeModelControllerEvent,
+      enumerable: false,
+      configurable: false,
+      writable: false,
+    });
+    return unsubscribeModelControllerEvent;
   }
 
   #emit(type, operationId) {
