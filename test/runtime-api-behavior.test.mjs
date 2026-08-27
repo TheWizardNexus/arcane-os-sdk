@@ -1598,10 +1598,32 @@ test(
         const previousWindow=globalThis.window;
         const previousArcane=globalThis.Arcane;
         const previousFetch=globalThis.fetch;
+        const previousLocalStorage=globalThis.localStorage;
+        const previousDocument=globalThis.document;
         const windowTarget=new EventTarget();
         windowTarget.dbopfs={ready:false,get:function ignoreDBOPFSRead(){}};
         windowTarget.user={ready:false};
+        const documentObject={
+            documentElement:{dataset:{arcaneAppId:'runtime-api-contract'}},
+            querySelector(){return null;}
+        };
+        const storedValues=new Map();
+        const localStorage={
+            getItem(key){
+                const normalizedKey=String(key);
+                return storedValues.has(normalizedKey)
+                    ? storedValues.get(normalizedKey)
+                    : null;
+            },
+            setItem(key,value){storedValues.set(String(key),String(value));},
+            removeItem(key){storedValues.delete(String(key));},
+            clear(){storedValues.clear();}
+        };
+        windowTarget.localStorage=localStorage;
+        windowTarget.document=documentObject;
         globalThis.window=windowTarget;
+        globalThis.localStorage=localStorage;
+        globalThis.document=documentObject;
         const requests=[];
         globalThis.fetch=async function answerLegacyCloudRequest(url,options) {
             requests.push({url:String(url),options});
@@ -1693,17 +1715,12 @@ test(
                 new Blob([new Uint8Array([1,2,3])],{type:'audio/webm'})
             );
             assert.equal(cloudTranscript,'cloud transcript');
-            const cloudSpeech=await runtime.request('tts',{
-                operation:'synthesize',
-                payload:{
-                    model:ai.modelTTS,
-                    voice:'alloy',
-                    input:'Cloud voice.',
-                    responseFormat:'opus',
-                    speed:1
-                },
-                localOnly:false,
-                signal:null
+            const cloudSpeech=await ai.fetchTTS({
+                model:ai.modelTTS,
+                voice:'alloy',
+                input:'Cloud voice.',
+                responseFormat:'opus',
+                speed:1
             });
             assert.ok(cloudSpeech instanceof Blob);
             assert.equal(requests.length,4);
@@ -1783,16 +1800,11 @@ test(
                 new Blob([new Uint8Array([5,6,7])],{type:'audio/webm'})
             );
             assert.equal(coreTranscript,'core transcript');
-            const coreSpeech=await runtime.request('tts',{
-                operation:'synthesize',
-                payload:{
-                    model:ai.modelTTS,
-                    input:'Core voice.',
-                    responseFormat:'opus',
-                    speed:1
-                },
-                localOnly:true,
-                signal:null
+            const coreSpeech=await ai.fetchTTS({
+                model:ai.modelTTS,
+                input:'Core voice.',
+                responseFormat:'opus',
+                speed:1
             });
             assert.ok(coreSpeech instanceof Blob);
             assert.equal(nativeSpeechCalls[0].operation,'transcribe');
@@ -1803,6 +1815,7 @@ test(
             await runtime.unload('stt');
             await runtime.unload('llm');
             const ttsRequests=[];
+            const ttsSignals=[];
             let ttsState='unloaded';
             const ttsProvider={
                 protocol:AI_PROVIDER_PROTOCOL,
@@ -1842,6 +1855,7 @@ test(
                 },
                 async request(context){
                     ttsRequests.push(context.payload);
+                    ttsSignals.push(context.signal);
                     return {audio:new Uint8Array([1,2,3,4]),contentType:'audio/wav'};
                 },
                 async unload(){ttsState='unloaded';},
@@ -1871,9 +1885,48 @@ test(
                 }
             };
             await ai.setSpeechMuted(false);
-            assert.equal(await ai.streamTTS('Shared route synthesis.',true),true);
-            assert.equal(ttsRequests.length,1);
+            assert.equal(ai.muted,false);
+            const synthesisController=new AbortController();
+            const directCatalogSpeech=await ai.fetchTTS({
+                model:'catalog-tts-model',
+                input:'Direct shared route synthesis.',
+                responseFormat:'wav',
+                speed:1
+            },synthesisController.signal);
+            assert.ok(directCatalogSpeech instanceof Blob);
+            assert.equal(directCatalogSpeech.type,'audio/wav');
+            assert.notEqual(ttsSignals[0],synthesisController.signal);
+            assert.equal(ttsSignals[0]?.aborted,false);
+            assert.equal(typeof ttsSignals[0]?.addEventListener,'function');
             assert.deepEqual(ttsRequests[0],{
+                model:'catalog-tts-model',
+                voice:'provider_voice',
+                input:'Direct shared route synthesis.',
+                responseFormat:'wav',
+                speed:1
+            });
+            await assert.rejects(
+                ai.fetchTTS({
+                    model:'different-tts-model',
+                    input:'Rejected model.',
+                    responseFormat:'wav',
+                    speed:1
+                }),
+                error=>error?.code==='ARCANE_AI_TTS_MODEL_SELECTION_MISMATCH'
+            );
+            await assert.rejects(
+                ai.fetchTTS({
+                    model:'catalog-tts-model',
+                    voice:7,
+                    input:'Rejected voice.',
+                    responseFormat:'wav',
+                    speed:1
+                }),
+                error=>error?.code==='ARCANE_AI_TTS_VOICE_INVALID'
+            );
+            assert.equal(await ai.streamTTS('Shared route synthesis.',true),true);
+            assert.equal(ttsRequests.length,2);
+            assert.deepEqual(ttsRequests[1],{
                 model:'catalog-tts-model',
                 voice:'provider_voice',
                 input:'Shared route synthesis.',
@@ -1897,6 +1950,10 @@ test(
             else globalThis.Arcane=previousArcane;
             if(previousFetch===undefined)delete globalThis.fetch;
             else globalThis.fetch=previousFetch;
+            if(previousLocalStorage===undefined)delete globalThis.localStorage;
+            else globalThis.localStorage=previousLocalStorage;
+            if(previousDocument===undefined)delete globalThis.document;
+            else globalThis.document=previousDocument;
         }
     }
 );
@@ -1967,6 +2024,7 @@ test(
         const intents=[];
         let preventNextRequest=false;
         let activationFailure=null;
+        let activationResult=null;
         const host={
             dispatchEvent(event) {
                 events.push(event);
@@ -1978,6 +2036,11 @@ test(
             },
             async requestAIActivation(intent) {
                 intents.push(intent);
+                if(activationResult){
+                    const result=activationResult;
+                    activationResult=null;
+                    return result;
+                }
                 if(activationFailure){
                     const error=activationFailure;
                     activationFailure=null;
@@ -1985,8 +2048,45 @@ test(
                 }
             }
         };
+        const activationReasons=Object.freeze({
+            languageModelActivationRequested:'language-model-activation-requested',
+            languageModelActivationRejected:'language-model-activation-rejected'
+        });
+        const activationErrorCodes=Object.freeze({
+            languageModelActivationRejected:'ARCANE_CHAT_LANGUAGE_MODEL_ACTIVATION_REQUEST_REJECTED'
+        });
+        let operationSequence=0;
+        function publishActivation(type,detail,options={}){
+            const event=new ActivationEvent(type,{
+                detail,
+                bubbles:options.bubbles,
+                composed:options.composed,
+                cancelable:options.cancelable
+            });
+            event.operationId=options.operationId??null;
+            event.publicDetail=Object.freeze({...options.publicDetail});
+            return host.dispatchEvent(event);
+        }
         const controller=createAIActivationController({
-            host,panel,title,status,button,EventClass:ActivationEvent
+            host,
+            panel,
+            title,
+            status,
+            button,
+            publish:publishActivation,
+            createOperationId(){
+                operationSequence+=1;
+                return `chat-test:llm-activation:${operationSequence}`;
+            },
+            readErrorFields(error,boundaryCode){
+                const causeCode=typeof error?.code==='string'?error.code.trim():'';
+                return Object.freeze({
+                    code:boundaryCode,
+                    ...(causeCode&&causeCode!==boundaryCode?{causeCode}:{})
+                });
+            },
+            reasons:activationReasons,
+            errorCodes:activationErrorCodes
         });
         assert.ok(Object.isFrozen(controller));
         assert.equal(intents.length,0);
@@ -2021,6 +2121,11 @@ test(
         assert.equal(loadEvent.bubbles,true);
         assert.equal(loadEvent.composed,true);
         assert.equal(loadEvent.cancelable,true);
+        assert.equal(
+            loadEvent.publicDetail.reason,
+            activationReasons.languageModelActivationRequested
+        );
+        assert.match(loadEvent.operationId,/^chat-test:llm-activation:/u);
         assert.equal(loadEvent.detail.state,unloaded);
         assert.ok(Object.isFrozen(loadEvent.detail));
 
@@ -2058,6 +2163,7 @@ test(
         assert.equal(button.textContent,'Try again');
 
         const callbackFailure=new Error('Activation callback failed.');
+        callbackFailure.code='ARCANE_AI_RUNTIME_ACTIVATION_REJECTED';
         activationFailure=callbackFailure;
         assert.equal(await controller.request('load'),false);
         const errorEvent=events.at(-1);
@@ -2067,7 +2173,50 @@ test(
         assert.equal(errorEvent.detail.error,callbackFailure);
         assert.equal(errorEvent.detail.message,callbackFailure.message);
         assert.equal(errorEvent.detail.request.intent.action,'load');
+        assert.equal(
+            errorEvent.publicDetail.code,
+            activationErrorCodes.languageModelActivationRejected
+        );
+        assert.equal(
+            errorEvent.publicDetail.causeCode,
+            callbackFailure.code
+        );
+        assert.equal(
+            errorEvent.publicDetail.reason,
+            activationReasons.languageModelActivationRejected
+        );
         assert.ok(Object.isFrozen(errorEvent.detail));
+        assert.ok(Object.isFrozen(errorEvent.publicDetail));
+
+        let rejectSupersededActivation;
+        activationResult=new Promise(
+            function createSupersededActivation(resolve,reject){
+                rejectSupersededActivation=reject;
+            }
+        );
+        controller.synchronize(Object.freeze({...unloaded,state:'error'}));
+        const supersededActivation=controller.request('load');
+        await Promise.resolve();
+        const activationErrorsBeforeSupersession=events.filter(
+            event=>event.type==='chat-ai-activation-error'
+        ).length;
+        controller.synchronize(Object.freeze({
+            ...unloaded,
+            state:'loading',
+            operationId:'replacement-llm-operation'
+        }));
+        rejectSupersededActivation(
+            Object.assign(
+                new Error('The superseded activation settled late.'),
+                {code:'ARCANE_AI_RUNTIME_ACTIVATION_REJECTED'}
+            )
+        );
+        assert.equal(await supersededActivation,false);
+        assert.equal(
+            events.filter(event=>event.type==='chat-ai-activation-error').length,
+            activationErrorsBeforeSupersession,
+            'sticky role supersession must suppress stale activation failure settlement'
+        );
 
         controller.synchronize(Object.freeze({...unloaded,state:'ready'}));
         assert.equal(panel.hidden,true);
@@ -2086,6 +2235,213 @@ test(
             /speech[.]setAvailability/u,
             'Chat compatibility availability must not synthesize speech readiness.'
         );
+        const dispatchStart=source.indexOf('function dispatchChatEvent(');
+        const dispatchEnd=source.indexOf('\n\n    function publicErrorFields',dispatchStart);
+        const ownershipStart=source.indexOf('function isAbortSignal(value)');
+        const ownershipEnd=source.indexOf('\n\n    host.sendMessage=',ownershipStart);
+        const submissionStart=source.indexOf('function observeHostSubmission(');
+        const submissionEnd=source.indexOf(
+            '\n\n    async function receivedMessage',
+            submissionStart
+        );
+        for(const boundary of [
+            dispatchStart,
+            dispatchEnd,
+            ownershipStart,
+            ownershipEnd,
+            submissionStart,
+            submissionEnd
+        ]){
+            assert.notEqual(boundary,-1);
+        }
+        const createChatSubmissionHarness=Function(
+            'ActivationEvent',
+            `'use strict';
+            return function createChatSubmissionHarness({cancelProjection=false}={}){
+                const aiRuntimeStateAbortController=new AbortController();
+                const activeSubmissionOwnerships=new Set();
+                const chatReasons=Object.freeze({
+                    messageSubmissionRequested:'message-submission-requested',
+                    messageSubmissionCancelled:'message-submission-cancelled',
+                    callerSignalAborted:'caller-signal-aborted',
+                    componentDestroyed:'component-destroyed',
+                    hostMessageSubmissionRejected:'host-message-submission-rejected'
+                });
+                const chatErrorCodes=Object.freeze({
+                    messageSubmissionAborted:'ARCANE_CHAT_MESSAGE_SUBMISSION_ABORTED',
+                    hostMessageSubmissionRejected:'ARCANE_CHAT_HOST_MESSAGE_SUBMISSION_REJECTED'
+                });
+                let destroyed=false;
+                let eventOperationSequence=0;
+                let hostSubmissionGeneration=0;
+                let canonicalDispatchCount=0;
+                let projectionCount=0;
+                let projectedEvent=null;
+                let resolveHost;
+                let rejectHost;
+                const hostResult=new Promise(function createHostResult(resolve,reject){
+                    resolveHost=resolve;
+                    rejectHost=reject;
+                });
+                const sent=[];
+                const host={
+                    name:'User',
+                    conversationComplete:false,
+                    aiAvailability:{llm:true,tts:false},
+                    dispatchEvent(event){
+                        projectedEvent=event;
+                        if(cancelProjection){
+                            event.preventDefault();
+                        }
+                        return !event.defaultPrevented;
+                    },
+                    sendMessage(text,context){
+                        sent.push({text,context,argumentCount:arguments.length});
+                        return hostResult;
+                    }
+                };
+                const events={
+                    descriptor:Object.freeze({instanceId:'chat-contract'}),
+                    dispatch(type,detail,options={}){
+                        canonicalDispatchCount+=1;
+                        return Object.freeze({
+                            accepted:true,
+                            occurrence:Object.freeze({
+                                type,
+                                detail:Object.freeze({...detail}),
+                                operationId:options.operationId??null,
+                                publicDetail:Object.freeze({...options.publicDetail}),
+                                cancelable:options.cancelable===true
+                            })
+                        });
+                    }
+                };
+                function projectArcaneDOMEvent(target,occurrence,options={}){
+                    projectionCount+=1;
+                    const event=new ActivationEvent(occurrence.type,{
+                        detail:occurrence.detail,
+                        bubbles:options.bubbles,
+                        composed:options.composed,
+                        cancelable:options.cancelable
+                    });
+                    event.operationId=occurrence.operationId;
+                    event.publicDetail=occurrence.publicDetail;
+                    target.dispatchEvent(event);
+                    return !event.defaultPrevented;
+                }
+                function nextChatOperationId(kind){
+                    eventOperationSequence+=1;
+                    return \`chat-contract:\${kind}:\${eventOperationSequence}\`;
+                }
+                function getMilTime(){return '00:00';}
+                class MD{
+                    constructor(text){this.rendered=text;}
+                }
+                const textArea={value:'Cancel this message.'};
+                const chatOutput={innerHTML:'',scrollTop:0,scrollHeight:0};
+                const speech={muted:true};
+                const hostSubmissionBarrier={
+                    track(value){return Promise.resolve(value);}
+                };
+                ${source.slice(ownershipStart,ownershipEnd)}
+                ${source.slice(dispatchStart,dispatchEnd)}
+                ${source.slice(submissionStart,submissionEnd)}
+                const callerController=new AbortController();
+                const submission=submitMessage('',{
+                    source:'user',
+                    signal:callerController.signal
+                });
+                return Object.freeze({
+                    submission,
+                    callerController,
+                    resolveHost,
+                    rejectHost,
+                    destroy(){
+                        if(destroyed)return;
+                        destroyed=true;
+                        const reason=createChatSubmissionAbort(
+                            chatReasons.componentDestroyed,
+                            'The chat component was destroyed before message submission settled.'
+                        );
+                        for(const ownership of [...activeSubmissionOwnerships]){
+                            ownership.abort(reason);
+                        }
+                        aiRuntimeStateAbortController.abort(reason);
+                    },
+                    state(){
+                        return Object.freeze({
+                            sent:[...sent],
+                            canonicalDispatchCount,
+                            projectionCount,
+                            projectedEvent,
+                            activeSubmissionCount:activeSubmissionOwnerships.size
+                        });
+                    }
+                });
+            };`
+        )(ActivationEvent);
+
+        const cancelledSubmission=createChatSubmissionHarness({cancelProjection:true});
+        assert.equal(await cancelledSubmission.submission,false);
+        const cancelledState=cancelledSubmission.state();
+        assert.equal(cancelledState.canonicalDispatchCount,1);
+        assert.equal(cancelledState.projectionCount,1);
+        assert.equal(cancelledState.sent.length,0);
+        assert.equal(cancelledState.projectedEvent.defaultPrevented,true);
+        assert.equal(cancelledState.projectedEvent.operationId,'chat-contract:message:1');
+        assert.ok(Object.isFrozen(cancelledState.projectedEvent.detail.context));
+        assert.equal(cancelledState.projectedEvent.detail.context.signal.aborted,true);
+        assert.equal(
+            cancelledState.projectedEvent.detail.context.signal.reason.code,
+            'ARCANE_CHAT_MESSAGE_SUBMISSION_ABORTED'
+        );
+        assert.equal(cancelledState.activeSubmissionCount,0);
+
+        const callerCancelledSubmission=createChatSubmissionHarness();
+        const callerCancelledState=callerCancelledSubmission.state();
+        assert.equal(callerCancelledState.sent.length,1);
+        assert.equal(callerCancelledState.sent[0].argumentCount,2);
+        assert.notEqual(
+            callerCancelledState.sent[0].context.signal,
+            callerCancelledSubmission.callerController.signal
+        );
+        const callerAbortReason=new Error('Caller canceled the submission.');
+        callerCancelledSubmission.callerController.abort(callerAbortReason);
+        assert.equal(callerCancelledState.sent[0].context.signal.aborted,true);
+        assert.equal(callerCancelledState.sent[0].context.signal.reason,callerAbortReason);
+        callerCancelledSubmission.resolveHost(true);
+        assert.equal(await callerCancelledSubmission.submission,false);
+        assert.equal(callerCancelledSubmission.state().activeSubmissionCount,0);
+
+        const destroyedSubmission=createChatSubmissionHarness();
+        const destroyedContext=destroyedSubmission.state().sent[0].context;
+        destroyedSubmission.destroy();
+        assert.equal(destroyedContext.signal.aborted,true);
+        assert.equal(
+            destroyedContext.signal.reason.code,
+            'ARCANE_CHAT_MESSAGE_SUBMISSION_ABORTED'
+        );
+        assert.equal(destroyedContext.signal.reason.reason,'component-destroyed');
+        destroyedSubmission.rejectHost(new Error('Late host rejection.'));
+        assert.equal(await destroyedSubmission.submission,false);
+        assert.equal(destroyedSubmission.state().activeSubmissionCount,0);
+
+        const retryStart=source.indexOf('function waitForConversationTimeboxRetry(');
+        const retryEnd=source.indexOf('\n\n    host.ready=true',retryStart);
+        assert.notEqual(retryStart,-1);
+        assert.notEqual(retryEnd,-1);
+        const retryHarness=Function(
+            `'use strict';
+            const aiRuntimeStateAbortController=new AbortController();
+            ${source.slice(retryStart,retryEnd)}
+            return Object.freeze({
+                controller:aiRuntimeStateAbortController,
+                wait:waitForConversationTimeboxRetry
+            });`
+        )();
+        const retryWait=retryHarness.wait(100);
+        retryHarness.controller.abort();
+        assert.equal(await retryWait,false);
         assert.match(source,/<button type="button" id="ai_activation_button">/u);
         controller.destroy();
         assert.equal(button.listeners.has('click'),false);
@@ -2827,6 +3183,11 @@ test(
                     cancellations.push({reason,message});
                     state='idle';
                 }
+                function dispatchVoiceEvent(type,compatibilityDetail){
+                    const event=new CustomEvent(type,{detail:compatibilityDetail});
+                    host.dispatchEvent(event);
+                    return true;
+                }
                 function setState(nextState){
                     state=nextState;
                     transitions.push(nextState);
@@ -3106,6 +3467,11 @@ test(
                         this.type=type;
                         this.detail=detail;
                     }
+                }
+                function dispatchVoiceEvent(type,compatibilityDetail){
+                    const event=new CustomEvent(type,{detail:compatibilityDetail});
+                    host.dispatchEvent(event);
+                    return true;
                 }
                 function isCurrentVoiceOperation(generation,expectedState){
                     return !destroyed

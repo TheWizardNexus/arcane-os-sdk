@@ -1691,7 +1691,11 @@ export class AIProviderRuntime {
             && !providerOwned
             && (!provider || providerStatus)) {
             slot.ready = false;
-            return Promise.resolve(before);
+            publishAIRuntimeRoleState(
+                role,
+                roleRecord(role, slot.selection)
+            );
+            return Promise.resolve(this.status(role));
         }
 
         slot.generation += 1;
