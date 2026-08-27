@@ -33,7 +33,7 @@ const ARCANE_EVENT_TARGET_COMPATIBILITY_SOURCE='event-target-compatibility';
 const ARCANE_EVENT_NAME_PATTERN=/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/u;
 const ARCANE_EVENT_CHANNEL_PREFIX='arcane.event.authority.internal:';
 const ARCANE_EVENT_PROJECTION_KEYS=Object.freeze([
-    'occurrenceId','source','instanceId','operationId'
+    'occurrenceId','arcaneSource','instanceId','operationId'
 ]);
 const ARCANE_EVENT_REQUIRED_AUTHORITY_API=Object.freeze([
     'on','once','off','reset','emit','instrument','forward','subscribe','createSource',
@@ -1722,7 +1722,7 @@ function createArcaneEventAuthority(){
         return occurrence;
     }
 
-    function compatibilityView(occurrence,detail){
+    function compatibilityView(occurrence,detail,target=null){
         const view={};
         Object.defineProperties(view,{
             protocol:{value:occurrence.protocol,enumerable:true},
@@ -1732,6 +1732,8 @@ function createArcaneEventAuthority(){
             instanceId:{value:occurrence.instanceId,enumerable:true},
             operationId:{value:occurrence.operationId,enumerable:true},
             detail:{value:detail,enumerable:true},
+            target:{value:target,enumerable:true},
+            currentTarget:{value:target,enumerable:true},
             cancelable:{value:occurrence.cancelable,enumerable:true},
             defaultPrevented:{get(){return occurrence.defaultPrevented;},enumerable:true},
             preventDefault:{value:()=>occurrence.preventDefault(),enumerable:true}
@@ -1873,7 +1875,11 @@ function createArcaneEventAuthority(){
             cancelable,
             defaultPrevented
         });
-        const view=compatibilityView(occurrence,admittedCompatibility);
+        const view=compatibilityView(
+            occurrence,
+            admittedCompatibility,
+            sourceRecord?.owner??null
+        );
         compatibilityByOccurrence.set(occurrence,admittedCompatibility);
         if(sourceRecord)sourceRecordByOccurrence.set(occurrence,sourceRecord);
         dispatchChannel(globalChannel(admittedType),occurrence,{
@@ -2006,6 +2012,7 @@ function createArcaneEventAuthority(){
             throw eventAuthorityError('ARCANE_EVENT_SOURCE_ALREADY_REGISTERED');
         }
         const record={
+            owner,
             source,
             instanceId:nextSourceId(),
             eventTypes:new Set(eventTypes),
@@ -2034,7 +2041,7 @@ function createArcaneEventAuthority(){
                 handler,
                 subscribeOptions,
                 {
-                    thisArg:record.handle,
+                    thisArg:record.owner,
                     sourceRecord:record,
                     onRemove(){record.subscriptions.delete(unsubscribe);}
                 }
@@ -2199,7 +2206,7 @@ function createArcaneEventAuthority(){
         }
         const metadata={
             occurrenceId:occurrence.occurrenceId,
-            source:occurrence.source,
+            arcaneSource:occurrence.source,
             instanceId:occurrence.instanceId,
             operationId:occurrence.operationId
         };
@@ -2209,6 +2216,14 @@ function createArcaneEventAuthority(){
             }
             Object.defineProperty(detail,key,{
                 value:metadata[key],
+                enumerable:true,
+                configurable:false,
+                writable:false
+            });
+        }
+        if(!Object.hasOwn(detail,'source')){
+            Object.defineProperty(detail,'source',{
+                value:metadata.arcaneSource,
                 enumerable:true,
                 configurable:false,
                 writable:false

@@ -440,7 +440,9 @@ const {occurrence,accepted}=source.dispatch(
 registration order, followed by this source's exact `on()`/EventListener
 registrations in registration order. Source listeners receive one frozen
 EventTarget-compatible view whose `detail` is the locally held compatibility
-detail and whose cancellation state is shared with the occurrence. The public
+detail, whose `target` and `currentTarget` are the source owner, and whose
+cancellation state is shared with the occurrence. Function listeners also
+receive that owner as `this`. The public
 occurrence contains:
 
 ```javascript
@@ -508,7 +510,10 @@ projectArcaneDOMEvent(target,occurrence,{
 
 The authority retrieves the centrally held compatibility detail, creates a
 frozen outer projection detail, and additively supplies `occurrenceId`, `source`,
-`instanceId`, and `operationId`. A conflicting caller-owned metadata value fails
+`arcaneSource`, `instanceId`, and `operationId`. `arcaneSource` is always the
+canonical emitter identity. A caller-owned compatibility `source` value is
+preserved; when absent, `source` is added as an alias of `arcaneSource`. A
+conflicting caller-owned reserved metadata value fails
 with `ARCANE_EVENT_DOM_DETAIL_COLLISION`. If the occurrence is already canceled,
 the function skips DOM dispatch and returns `false`. Otherwise it dispatches
 exactly one event, propagates DOM cancellation to a cancelable occurrence, and
@@ -1140,7 +1145,7 @@ kernel/application snapshot.
 | Subscription type/handler/options/signal invalid | `ARCANE_EVENT_SUBSCRIPTION_*` | Use an exact declared name, callable/EventListener object, data options, and AbortSignal |
 | EventTarget adapter input lacks a valid type or data detail | `ARCANE_EVENT_DISPATCH_EVENT_INVALID` | Pass an Event or an Event-like data object; do not use accessors |
 | DOM target/options invalid | `ARCANE_EVENT_DOM_TARGET_INVALID` / `ARCANE_EVENT_DOM_OPTIONS_INVALID` | Supply `CustomEvent` support, `dispatchEvent`, and boolean projection flags |
-| DOM detail conflicts with authority identifiers | `ARCANE_EVENT_DOM_DETAIL_COLLISION` | Remove conflicting `occurrenceId`, `source`, `instanceId`, or `operationId` fields |
+| DOM detail conflicts with authority identifiers | `ARCANE_EVENT_DOM_DETAIL_COLLISION` | Remove conflicting `occurrenceId`, `arcaneSource`, `instanceId`, or `operationId` fields; compatibility `source` is preserved |
 | Constructor flags, clocks, or session id invalid | `TypeError` | Correct types; keep session id non-empty and at most 256 characters |
 | Constructor/import retention or snapshot limits invalid | `RangeError` | Use positive safe integers and keep `maxSnapshotStringLength` at least 64 |
 | Clock returns invalid timestamp or monotonic value | `TypeError` | Supply a valid UTC-compatible clock and finite non-negative monotonic clock |

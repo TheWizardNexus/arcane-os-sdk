@@ -738,6 +738,7 @@ test('source dispatch preserves canonical order, privacy, and rich local compati
     const publicDetail={availability:{state:'ready'},count:1};
     const legacy=[];
     const owner={};
+    let sourceListenerThis=null;
     const source=createArcaneEventSource(owner,{
         source:'sdk.test.source-privacy',
         eventTypes:[type]
@@ -754,6 +755,7 @@ test('source dispatch preserves canonical order, privacy, and rich local compati
         function observeCanonicalSecond(){order.push('central-two');}
     );
     const unsubscribeSourceOne=source.on(type,function observeCompatibilityFirst(event){
+        sourceListenerThis=this;
         order.push('source-one');
         scoped.push(event);
     });
@@ -774,6 +776,9 @@ test('source dispatch preserves canonical order, privacy, and rich local compati
         assert.deepEqual(order,['central-one','central-two','source-one','source-two']);
         assert.equal(central[0],publication.occurrence);
         assert.equal(scoped[0].type,type);
+        assert.equal(sourceListenerThis,owner);
+        assert.equal(scoped[0].target,owner);
+        assert.equal(scoped[0].currentTarget,owner);
         assert.notEqual(scoped[0].detail,richCompatibility);
         assert.equal(Object.isFrozen(scoped[0].detail),true);
         assert.equal(scoped[0].detail.host,host);
@@ -860,6 +865,7 @@ test('canonical cancellation and one-way DOM projection share one occurrence',()
         assert.equal(publication.occurrence.defaultPrevented,true);
         assert.equal(projected.detail.message,'projected');
         assert.equal(projected.detail.occurrenceId,publication.occurrence.occurrenceId);
+        assert.equal(projected.detail.arcaneSource,source.source);
         assert.equal(projected.detail.source,source.source);
         assert.equal(projected.detail.instanceId,source.instanceId);
         assert.equal(projected.detail.operationId,'operation-projection');
@@ -882,6 +888,16 @@ test('canonical cancellation and one-way DOM projection share one occurrence',()
                 return error?.code==='ARCANE_EVENT_DOM_DETAIL_COLLISION';
             }
         );
+
+        const legacySource=source.dispatch(
+            projectType,
+            {message:'legacy source',source:'picker'},
+            {publicDetail:{},cancelable:false}
+        );
+        const acceptingTarget={dispatchEvent(event){projected=event;return true;}};
+        assert.equal(projectArcaneDOMEvent(acceptingTarget,legacySource.occurrence),true);
+        assert.equal(projected.detail.source,'picker');
+        assert.equal(projected.detail.arcaneSource,source.source);
     }finally{
         unsubscribeCancel();
         unsubscribeFollowing();

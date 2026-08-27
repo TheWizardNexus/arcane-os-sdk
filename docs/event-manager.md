@@ -60,6 +60,10 @@ compatibility detail remains local to the authority for source listeners and
 optional DOM projection; it is not placed on the canonical bus or in time-travel
 history.
 
+Source listeners retain EventTarget compatibility: function listeners receive
+the source owner as `this`, and the frozen compatibility view exposes that owner
+as both `target` and `currentTarget`.
+
 Canonical delivery is observational. Every active listener runs in registration
 order. A listener failure publishes one privacy-safe
 `arcane.event.listener.error` occurrence and is reported through `reportError`
@@ -83,8 +87,9 @@ canonical or source listeners may call `preventDefault()`; `dispatch()` then
 returns `{occurrence,accepted:false}`. Callers decide whether cancellation gates
 their domain operation. `projectArcaneDOMEvent()` is a one-way compatibility
 projection: it creates one `CustomEvent`, adds the canonical identifiers to a
-frozen outer detail object, propagates DOM cancellation back to the occurrence,
-and never republishes the DOM event into the authority. It returns `false`
+frozen outer detail object, preserves any compatibility `source` value, exposes
+the canonical emitter as `arcaneSource`, propagates DOM cancellation back to the
+occurrence, and never republishes the DOM event into the authority. It returns `false`
 without dispatching when the occurrence is already canceled.
 
 The authority also retains `on`, `once`, `off`, `reset`, `emit`, `instrument`,
