@@ -18,25 +18,43 @@
     const openButton=host.shadowRoot.querySelector('#openData');
     const dataModal=host.shadowRoot.querySelector('#dataModal');
     const {default:waitForComponent}=await import('../modules/WaitForComponent.js');
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.data-view',eventTypes:['data-view-ready']});
+    const lifecycleController=new AbortController();
 
     let content=null;
     let fileManager=null;
+    let operationGeneration=0;
+    let destroyed=false;
 
     host.beforeOpen=typeof host.beforeOpen==='function'
         ?host.beforeOpen
         :async function beforeOpen(){};
     host.open=openData;
+    host.destroy=destroy;
 
     openButton.innerText=host.dataset.button||'View Data';
     openButton.addEventListener(
         'click',
         ()=>openData().catch(
-            error=>console.error('Unable to open data view:',error)
-        )
+            error=>{
+                if(!destroyed){
+                    console.error('Unable to open data view:',error);
+                }
+            }
+        ),
+        {signal:lifecycleController.signal}
     );
 
     async function openData(){
+        if(destroyed){
+            return false;
+        }
+        const generation=++operationGeneration;
         await host.beforeOpen();
+        if(destroyed||generation!==operationGeneration){
+            return false;
+        }
 
         const reload=Boolean(content);
 
@@ -45,9 +63,13 @@
             {
                 methods:['populate','open'],
                 property:'ready',
-                event:'modal-ready'
+                event:'modal-ready',
+                signal:lifecycleController.signal
             }
         );
+        if(destroyed||generation!==operationGeneration){
+            return false;
+        }
 
         if(!content){
             content=document.createElement('section');
@@ -67,6 +89,9 @@
 
             content.append(heading,fileManager);
             await modal.populate(content,false);
+            if(destroyed||generation!==operationGeneration){
+                return false;
+            }
         }
 
         const manager=await waitForComponent(
@@ -74,19 +99,40 @@
             {
                 methods:['loadAll'],
                 property:'ready',
-                event:'file-manager-ready'
+                event:'file-manager-ready',
+                signal:lifecycleController.signal
             }
         );
+        if(destroyed||generation!==operationGeneration){
+            return false;
+        }
 
         if(reload){
             await manager.loadAll();
+            if(destroyed||generation!==operationGeneration){
+                return false;
+            }
         }
 
         modal.open();
+        return true;
+    }
+
+    function destroy(){
+        if(destroyed){
+            return false;
+        }
+        destroyed=true;
+        operationGeneration+=1;
+        lifecycleController.abort('data-view-destroyed');
+        fileManager?.destroy?.();
+        dataModal.destroy?.();
+        events.dispose();
+        host.ready=false;
+        return true;
     }
 
     host.ready=true;
-    host.dispatchEvent(
-        new CustomEvent('data-view-ready')
-    );
+    const readyPublication=events.dispatch('data-view-ready',{}, {publicDetail:{ready:true}});
+    projectArcaneDOMEvent(host,readyPublication.occurrence);
 </script>

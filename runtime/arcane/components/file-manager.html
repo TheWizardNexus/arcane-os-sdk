@@ -353,6 +353,9 @@
 
     const host=this;
     const {default:waitForComponent}=await import('../modules/WaitForComponent.js');
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.file-manager',eventTypes:['file-manager-action','file-manager-select','file-manager-open','file-manager-ready']});
+    const lifecycleController=new AbortController();
 
     const fileManager=host.shadowRoot.querySelector('.file-manager');
     const componentStyles=host.shadowRoot.querySelector('style');
@@ -377,6 +380,16 @@
     let selectedPath='';
     let treeItems=new Map();
     let treeLoadSequence=0;
+    let gridLoadSequence=0;
+    let providerGeneration=0;
+    let filterGeneration=0;
+    let treeOpenGeneration=0;
+    let directoryOpenGeneration=0;
+    let fileOpenGeneration=0;
+    let deleteGeneration=0;
+    let selectionGeneration=0;
+    let operationSequence=0;
+    let destroyed=false;
 
     host.ready=false;
     host.loadAll=loadAll;
@@ -384,6 +397,7 @@
     host.setFilter=setFilter;
     host.select=select;
     host.clearSelection=clearSelection;
+    host.destroy=destroy;
 
     Object.defineProperty(
         host,
@@ -440,7 +454,7 @@
     window.addEventListener(
         'dbopfs-ready',
         init,
-        {once:true}
+        {once:true,signal:lifecycleController.signal}
     );
 
     if(window.dbopfs?.ready){
@@ -450,8 +464,13 @@
     fileUpload.addEventListener(
         'change',
         ()=>uploadFiles().catch(
-            error=>console.error('Unable to upload files:',error)
-        )
+            error=>{
+                if(!destroyed){
+                    console.error('Unable to upload files:',error);
+                }
+            }
+        ),
+        {signal:lifecycleController.signal}
     );
 
     fileManager.addEventListener(
@@ -465,7 +484,11 @@
 
                 if(layout==='grid'){
                     openDirectory(directoryElement.dataset.directory).catch(
-                        error=>console.error('Unable to open directory:',error)
+                        error=>{
+                            if(!destroyed){
+                                console.error('Unable to open directory:',error);
+                            }
+                        }
                     );
                     return;
                 }
@@ -474,26 +497,53 @@
                 return;
             }
 
-        }
+        },
+        {signal:lifecycleController.signal}
     );
 
-    fileManager.addEventListener('keydown',onTreeKeydown);
+    fileManager.addEventListener(
+        'keydown',
+        onTreeKeydown,
+        {signal:lifecycleController.signal}
+    );
 
-    function emit(name,detail={},cancelable=false){
-        return host.dispatchEvent(
-            new CustomEvent(
-                name,
-                {
-                    bubbles:true,
-                    cancelable:cancelable,
-                    composed:true,
-                    detail:detail
-                }
-            )
-        );
+    function nextOperationId(action='operation'){
+        operationSequence+=1;
+        return `${events.descriptor.instanceId}:${action}:${operationSequence}`;
     }
 
-    function emitAction(action,entry={},detail={},cancelable=false){
+    function publicEventDetail(name,detail={}){
+        if(name==='file-manager-action'){
+            const publicDetail={action:String(detail.action||''),kind:String(detail.entry?.kind||''),hasEntry:Boolean(detail.path)};
+            if(detail.code){
+                publicDetail.code=String(detail.code);
+            }
+            if(detail.reason){
+                publicDetail.reason=String(detail.reason);
+            }
+            return publicDetail;
+        }
+        if(name==='file-manager-open'){
+            return {trigger:String(detail.trigger||''),kind:String(detail.entry?.kind||''),hasEntry:Boolean(detail.path)};
+        }
+        if(name==='file-manager-select'){
+            return {selected:Boolean(detail.path),kind:String(detail.entry?.kind||'')};
+        }
+        return {};
+    }
+
+    function emit(name,detail={},cancelable=false,operationId=null){
+        if(destroyed){
+            return false;
+        }
+        const publication=events.dispatch(name,detail,{publicDetail:publicEventDetail(name,detail),cancelable,operationId});
+        if(cancelable&&!publication.accepted){
+            return false;
+        }
+        return projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,cancelable,composed:true});
+    }
+
+    function emitAction(action,entry={},detail={},cancelable=false,operationId=null){
         return emit(
             'file-manager-action',
             {
@@ -502,15 +552,20 @@
                 entry:entry,
                 ...detail
             },
-            cancelable
+            cancelable,
+            operationId
         );
     }
 
     async function setProvider(nextProvider=null){
+        if(destroyed){
+            return null;
+        }
         if(nextProvider!==null&&typeof nextProvider?.list!=='function'){
             throw new TypeError('File manager providers must expose list(path).');
         }
 
+        const generation=++providerGeneration;
         provider=nextProvider;
 
         if(layout==='tree'){
@@ -521,21 +576,25 @@
             }
         }
 
-        return provider;
+        return destroyed||generation!==providerGeneration?null:provider;
     }
 
     async function setFilter(nextFilter=null){
+        if(destroyed){
+            return null;
+        }
         if(nextFilter!==null&&typeof nextFilter!=='function'){
             throw new TypeError('File manager filters must be functions or null.');
         }
 
+        const generation=++filterGeneration;
         filter=nextFilter;
 
         if(initialized){
             await loadAll();
         }
 
-        return filter;
+        return destroyed||generation!==filterGeneration?null:filter;
     }
 
     function normalizeProviderPath(path=''){
@@ -709,13 +768,17 @@
             }
 
             if(restoredPath){
-                const restored=await select(
+                const restoration=select(
                     restoredPath,
                     {emit:false,focus:false}
                 );
+                const restorationGeneration=selectionGeneration;
+                const restored=await restoration;
 
-                if(!restored){
-                    selectedPath='';
+                if(!restored
+                    &&selectionGeneration===restorationGeneration
+                    &&selectedPath===restoredPath){
+                    clearSelection({emit:false});
                 }
             }
 
@@ -729,7 +792,17 @@
             message.className='tree-error';
             message.innerText='Unable to list files.';
             fileManager.append(message);
-            emitAction('error',{}, {error:error});
+            emitAction(
+                'error',
+                {},
+                {
+                    error,
+                    code:String(error?.code||'ARCANE_FILE_MANAGER_ROOT_LIST_FAILED'),
+                    reason:'file-root-list-failed'
+                },
+                false,
+                nextOperationId('root-list-error')
+            );
             throw error;
         }finally{
             if(sequence===treeLoadSequence){
@@ -800,20 +873,35 @@
             item.dataset.fileCount='0';
         }
 
-        row.addEventListener('click',async()=>{
-            await select(entry.path,{entry:entry,focus:true});
+        row.addEventListener(
+            'click',
+            async()=>{
+                const selected=await select(entry.path,{entry:entry,focus:true});
+                if(!selected||destroyed){
+                    return;
+                }
 
-            if(entry.kind==='directory'){
-                await toggleTreeItem(item);
-            }
-        });
-        row.addEventListener('dblclick',async event=>{
-            if(entry.kind==='file'){
-                event.preventDefault();
-                await openTreeItem(item,'double-click');
-            }
-        });
-        item.addEventListener('focus',()=>setRovingTreeItem(item,false));
+                if(entry.kind==='directory'){
+                    await toggleTreeItem(item);
+                }
+            },
+            {signal:lifecycleController.signal}
+        );
+        row.addEventListener(
+            'dblclick',
+            async event=>{
+                if(entry.kind==='file'){
+                    event.preventDefault();
+                    await openTreeItem(item,'double-click');
+                }
+            },
+            {signal:lifecycleController.signal}
+        );
+        item.addEventListener(
+            'focus',
+            ()=>setRovingTreeItem(item,false),
+            {signal:lifecycleController.signal}
+        );
 
         return item;
     }
@@ -857,7 +945,7 @@
     }
 
     async function expandTreeItem(item,{emitEvent=true}={}){
-        if(!item||item.dataset.kind!=='directory'){
+        if(destroyed||!item||item.dataset.kind!=='directory'){
             return false;
         }
 
@@ -896,16 +984,33 @@
                 item.dataset.loaded='true';
                 updateTreeCounts(item);
             }catch(error){
+                if(destroyed||sequence!==treeLoadSequence||!fileManager.contains(item)){
+                    return false;
+                }
                 group.replaceChildren();
                 const message=document.createElement('li');
                 message.className='tree-error';
                 message.setAttribute('role','none');
                 message.innerText='Unable to list this folder.';
                 group.append(message);
-                emitAction('error',entry,{error:error});
+                emitAction(
+                    'error',
+                    entry,
+                    {
+                        error,
+                        code:String(error?.code||'ARCANE_FILE_MANAGER_DIRECTORY_LIST_FAILED'),
+                        reason:'directory-list-failed'
+                    },
+                    false,
+                    nextOperationId('directory-list-error')
+                );
                 return false;
             }finally{
-                item.removeAttribute('aria-busy');
+                if(!destroyed
+                    &&sequence===treeLoadSequence
+                    &&fileManager.contains(item)){
+                    item.removeAttribute('aria-busy');
+                }
             }
         }
 
@@ -920,6 +1025,9 @@
     }
 
     function collapseTreeItem(item,{emitEvent=true}={}){
+        if(destroyed){
+            return false;
+        }
         const group=item?.querySelector(':scope>.tree-group');
 
         if(!group){
@@ -937,6 +1045,9 @@
     }
 
     async function toggleTreeItem(item){
+        if(destroyed){
+            return false;
+        }
         if(item?.getAttribute('aria-expanded')==='true'){
             return collapseTreeItem(item);
         }
@@ -994,6 +1105,10 @@
     }
 
     async function select(path='',options={}){
+        if(destroyed){
+            return false;
+        }
+        const generation=++selectionGeneration;
         const normalizedPath=normalizeProviderPath(path);
 
         if(!normalizedPath){
@@ -1005,6 +1120,10 @@
 
         if(layout==='tree'){
             item=await revealTreePath(normalizedPath);
+
+            if(destroyed||generation!==selectionGeneration){
+                return false;
+            }
 
             if(!item){
                 return false;
@@ -1040,6 +1159,10 @@
     }
 
     function clearSelection(options={}){
+        if(destroyed){
+            return false;
+        }
+        selectionGeneration+=1;
         const changed=Boolean(selectedPath);
         selectedPath='';
 
@@ -1061,16 +1184,24 @@
     }
 
     async function openTreeItem(item,trigger='open'){
+        if(destroyed){
+            return false;
+        }
+        const generation=++treeOpenGeneration;
         const entry=item?._fileManagerEntry;
 
         if(!entry||entry.kind!=='file'){
             return false;
         }
 
-        await select(entry.path,{entry:entry,focus:true});
+        const selected=await select(entry.path,{entry:entry,focus:true});
+        if(!selected||destroyed||generation!==treeOpenGeneration){
+            return false;
+        }
         const detail={path:entry.path,entry:entry,trigger:trigger};
-        const openAllowed=emit('file-manager-open',detail,true);
-        const actionAllowed=emitAction('open',entry,{trigger:trigger},true);
+        const operationId=nextOperationId('open');
+        const openAllowed=emit('file-manager-open',detail,true,operationId);
+        const actionAllowed=emitAction('open',entry,{trigger:trigger},true,operationId);
 
         if(!openAllowed||!actionAllowed||openMode==='event'){
             return true;
@@ -1079,9 +1210,24 @@
         if(typeof activeTreeProvider().open==='function'){
             try{
                 await activeTreeProvider().open(entry);
+                if(destroyed||generation!==treeOpenGeneration){
+                    return false;
+                }
             }catch(error){
-                emitAction('error',entry,{error:error});
-                console.error('Unable to open file:',error);
+                if(!destroyed&&generation===treeOpenGeneration){
+                    emitAction(
+                        'error',
+                        entry,
+                        {
+                            error,
+                            code:String(error?.code||'ARCANE_FILE_MANAGER_ENTRY_OPEN_FAILED'),
+                            reason:'file-open-failed'
+                        },
+                        false,
+                        nextOperationId('open-error')
+                    );
+                    console.error('Unable to open file:',error);
+                }
                 return false;
             }
         }
@@ -1169,18 +1315,34 @@
     }
 
     async function openDirectory(directory=''){
+        if(destroyed){
+            return false;
+        }
+        const generation=++directoryOpenGeneration;
         const modal=await waitForComponent(
             directoryModal,
             {
                 methods:['populate','open'],
                 property:'ready',
-                event:'modal-ready'
-            }
+                event:'modal-ready',
+                signal:lifecycleController.signal
+            },
+            {signal:lifecycleController.signal}
         );
-        const files=(await dbopfs.getAllKeys(directory))
+        if(destroyed||generation!==directoryOpenGeneration){
+            return false;
+        }
+        const keys=await dbopfs.getAllKeys(directory);
+        if(destroyed||generation!==directoryOpenGeneration){
+            return false;
+        }
+        const files=keys
             .filter(isVisibleFileName)
             .sort();
         const metadata=await getFilesMetadata(directory,files);
+        if(destroyed||generation!==directoryOpenGeneration){
+            return false;
+        }
         const content=document.createElement('section');
         const styles=componentStyles.cloneNode(true);
         const heading=document.createElement('h1');
@@ -1195,7 +1357,8 @@
         uploadButton.innerText='Upload Files';
         uploadButton.addEventListener(
             'click',
-            ()=>selectFiles(directory)
+            ()=>selectFiles(directory),
+            {signal:lifecycleController.signal}
         );
         list.className='directory-file-list';
         list.dataset.layout='files';
@@ -1222,18 +1385,31 @@
         }
 
         await modal.populate(content,false);
+        if(destroyed||generation!==directoryOpenGeneration){
+            return false;
+        }
         modal.open();
+        return true;
     }
 
     async function openFile(directory='',fileName=''){
+        if(destroyed){
+            return false;
+        }
+        const generation=++fileOpenGeneration;
         const modal=await waitForComponent(
             fileModal,
             {
                 methods:['populate','open'],
                 property:'ready',
-                event:'modal-ready'
-            }
+                event:'modal-ready',
+                signal:lifecycleController.signal
+            },
+            {signal:lifecycleController.signal}
         );
+        if(destroyed||generation!==fileOpenGeneration){
+            return false;
+        }
         const content=document.createElement('section');
         const styles=componentStyles.cloneNode(true);
         const heading=document.createElement('h1');
@@ -1254,8 +1430,13 @@
         deleteButton.addEventListener(
             'click',
             ()=>confirmDelete(directory,fileName,true).catch(
-                error=>console.error('Unable to delete file:',error)
-            )
+                error=>{
+                    if(!destroyed){
+                        console.error('Unable to delete file:',error);
+                    }
+                }
+            ),
+            {signal:lifecycleController.signal}
         );
         status.innerText='Opening file...';
         actions.append(deleteButton);
@@ -1267,13 +1448,22 @@
             status
         );
 
-        modal.populate(content,false);
+        await modal.populate(content,false);
+        if(destroyed||generation!==fileOpenGeneration){
+            return false;
+        }
         modal.open();
 
         try{
             const {default:FileEntity}=await fileEntityPromise;
+            if(destroyed||generation!==fileOpenGeneration){
+                return false;
+            }
             const file=new FileEntity(fileName,directory);
             const fileRef=await file.open();
+            if(destroyed||generation!==fileOpenGeneration){
+                return false;
+            }
 
             status.remove();
 
@@ -1282,7 +1472,13 @@
 
                 if(!layout){
                     await dbopfs.delete(directory,fileName);
+                    if(destroyed||generation!==fileOpenGeneration){
+                        return false;
+                    }
                     await loadAll();
+                    if(destroyed||generation!==fileOpenGeneration){
+                        return false;
+                    }
                     empty.innerText='File was empty and has been deleted';
                 }else{
                     empty.innerText='File is empty';
@@ -1290,11 +1486,19 @@
 
                 content.append(empty);
             }else{
-                content.append(await renderFile(fileRef,{directory,fileName}));
+                const rendered=await renderFile(fileRef,{directory,fileName});
+                if(destroyed||generation!==fileOpenGeneration){
+                    return false;
+                }
+                content.append(rendered);
             }
+            return true;
         }catch(error){
-            status.innerText='Unable to open this file.';
-            console.error('Unable to open file:',error);
+            if(!destroyed&&generation===fileOpenGeneration){
+                status.innerText='Unable to open this file.';
+                console.error('Unable to open file:',error);
+            }
+            return false;
         }
     }
 
@@ -1479,8 +1683,9 @@
             async()=>{
                 await select(entry.path,{entry:entry});
                 const detail={path:entry.path,entry:entry,trigger:'click'};
-                const openAllowed=emit('file-manager-open',detail,true);
-                const actionAllowed=emitAction('open',entry,{trigger:'click'},true);
+                const operationId=nextOperationId('open');
+                const openAllowed=emit('file-manager-open',detail,true,operationId);
+                const actionAllowed=emitAction('open',entry,{trigger:'click'},true,operationId);
 
                 if(!openAllowed||!actionAllowed||openMode==='event'){
                     return;
@@ -1489,19 +1694,21 @@
                 openFile(directory,fileName).catch(
                     error=>console.error('Unable to open file:',error)
                 );
-            }
+            },
+            {signal:lifecycleController.signal}
         );
         deleteButton.addEventListener(
             'click',
             ()=>{
-                if(!emitAction('delete',entry,{},true)){
+                if(!emitAction('delete',entry,{},true,nextOperationId('delete'))){
                     return;
                 }
 
                 confirmDelete(directory,fileName).catch(
                     error=>console.error('Unable to delete file:',error)
                 );
-            }
+            },
+            {signal:lifecycleController.signal}
         );
 
         openButton.append(fileIcon,fileDetails);
@@ -1512,18 +1719,23 @@
     }
 
     async function confirmDelete(directory='',fileName='',closeFile=false){
-        if(!directory||!fileName){
+        if(destroyed||!directory||!fileName){
             return false;
         }
+        const generation=++deleteGeneration;
 
         const modal=await waitForComponent(
             deleteModal,
             {
                 methods:['populate','open','close'],
                 property:'ready',
-                event:'modal-ready'
+                event:'modal-ready',
+                signal:lifecycleController.signal
             }
         );
+        if(destroyed||generation!==deleteGeneration){
+            return false;
+        }
         const content=document.createElement('section');
         const heading=document.createElement('h1');
         const message=document.createElement('p');
@@ -1539,7 +1751,8 @@
 
         cancelButton.addEventListener(
             'click',
-            ()=>modal.close(undefined,true)
+            ()=>modal.close(undefined,true),
+            {signal:lifecycleController.signal}
         );
         deleteButton.addEventListener(
             'click',
@@ -1549,24 +1762,39 @@
 
                 try{
                     await dbopfs.delete(directory,fileName);
+                    if(destroyed||generation!==deleteGeneration){
+                        return;
+                    }
                     await modal.close(undefined,true);
+                    if(destroyed||generation!==deleteGeneration){
+                        return;
+                    }
 
                     if(closeFile&&typeof fileModal.close==='function'){
                         await fileModal.close(undefined,true);
+                        if(destroyed||generation!==deleteGeneration){
+                            return;
+                        }
                     }
 
                     await loadAll();
+                    if(destroyed||generation!==deleteGeneration){
+                        return;
+                    }
 
                     if(layout==='grid'){
                         await openDirectory(directory);
                     }
                 }catch(error){
-                    message.innerText=`Unable to delete ${fileName}.`;
-                    cancelButton.disabled=false;
-                    deleteButton.disabled=false;
-                    console.error('Unable to delete file:',error);
+                    if(!destroyed&&generation===deleteGeneration){
+                        message.innerText=`Unable to delete ${fileName}.`;
+                        cancelButton.disabled=false;
+                        deleteButton.disabled=false;
+                        console.error('Unable to delete file:',error);
+                    }
                 }
-            }
+            },
+            {signal:lifecycleController.signal}
         );
 
         content.append(
@@ -1577,6 +1805,9 @@
         );
 
         await modal.populate(content,false);
+        if(destroyed||generation!==deleteGeneration){
+            return false;
+        }
         modal.open();
 
         return true;
@@ -1592,6 +1823,9 @@
     }
 
     async function uploadFiles(){
+        if(destroyed){
+            return false;
+        }
         const files=Array.from(fileUpload.files||[]);
         const directory=uploadDirectory;
         fileUpload.value='';
@@ -1601,6 +1835,9 @@
         }
 
         const {default:FileEntity}=await fileEntityPromise;
+        if(destroyed){
+            return false;
+        }
 
         const results=await Promise.allSettled(
             files.map(
@@ -1612,8 +1849,14 @@
                 }
             )
         );
+        if(destroyed){
+            return false;
+        }
 
         await loadAll();
+        if(destroyed){
+            return false;
+        }
 
         if(layout==='grid'){
             await openDirectory(directory);
@@ -1626,10 +1869,11 @@
         if(failed){
             throw failed.reason;
         }
+        return true;
     }
 
     async function init(){
-        if(initialized){
+        if(initialized||destroyed){
             return;
         }
 
@@ -1640,25 +1884,68 @@
                 await fileEntityPromise;
             }
             await loadAll();
+            if(destroyed){
+                return;
+            }
             host.ready=true;
-            host.dispatchEvent(
-                new CustomEvent('file-manager-ready')
-            );
+            const publication=events.dispatch('file-manager-ready',{}, {publicDetail:{ready:true}});
+            projectArcaneDOMEvent(host,publication.occurrence);
         }catch(error){
-            initialized=false;
-            console.error('Unable to initialize file manager:',error);
+            if(!destroyed){
+                initialized=false;
+                console.error('Unable to initialize file manager:',error);
+            }
         }
     }
 
+    function destroy(){
+        if(destroyed){
+            return false;
+        }
+        destroyed=true;
+        initialized=false;
+        host.ready=false;
+        lifecycleController.abort('file-manager-destroyed');
+        treeLoadSequence+=1;
+        gridLoadSequence+=1;
+        providerGeneration+=1;
+        filterGeneration+=1;
+        treeOpenGeneration+=1;
+        directoryOpenGeneration+=1;
+        fileOpenGeneration+=1;
+        deleteGeneration+=1;
+        selectionGeneration+=1;
+        if(activeFileURL){
+            URL.revokeObjectURL(activeFileURL);
+            activeFileURL='';
+        }
+        treeItems.clear();
+        provider=null;
+        filter=null;
+        directoryModal.destroy?.();
+        fileModal.destroy?.();
+        deleteModal.destroy?.();
+        events.dispose();
+        return true;
+    }
+
     async function loadAll(){
+        if(destroyed){
+            return [];
+        }
+        selectionGeneration+=1;
         if(layout==='tree'){
             return loadTree();
         }
+        const sequence=++gridLoadSequence;
 
         let tableNames=dirs;
 
         if(!tableNames?.length){
             tableNames=await dbopfs.getTableNames(Boolean(layout));
+        }
+        if(destroyed||sequence!==gridLoadSequence){
+            return [];
         }
 
         tableNames.sort();
@@ -1666,12 +1953,19 @@
 
         for(let i=0;i<tableNames.length;i++){
             const tableName=tableNames[i];
-            const files=(await dbopfs.getAllKeys(tableName))
+            const keys=await dbopfs.getAllKeys(tableName);
+            if(destroyed||sequence!==gridLoadSequence){
+                return [];
+            }
+            const files=keys
                 .filter(isVisibleFileName)
                 .sort();
             const metadata=layout==='files'
                 ?await getFilesMetadata(tableName,files)
                 :[];
+            if(destroyed||sequence!==gridLoadSequence){
+                return [];
+            }
             const directory=document.createElement('ul');
             const folder=document.createElement('li');
             const folderIcon=document.createElement('img');
@@ -1711,5 +2005,6 @@
 
             fileManager.append(directory);
         }
+        return tableNames;
     }
 </script>

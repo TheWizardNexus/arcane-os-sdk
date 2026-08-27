@@ -70,17 +70,24 @@
     const notesLabel=shadow.querySelector('[data-notes-label]');
     const saveState=shadow.querySelector('.save-state');
     const {default:MD}=await import('../modules/MD.js');
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.document-inspector',eventTypes:['document-review-change','document-inspector-ready']});
+    const lifecycleController=new AbortController();
     let rawMarkdown='';
     let renderedMarkdown='';
     let markdownMessage=null;
     let activeRecordId='';
     let loadSequence=0;
+    let loadController=null;
+    let operationSequence=0;
+    let destroyed=false;
 
     host.loadDocument=loadDocument;
     host.selectView=selectView;
+    host.destroy=destroy;
     host.ready=true;
 
-    tabs.forEach(tab=>tab.addEventListener('click',()=>selectView(tab.dataset.view)));
+    tabs.forEach(tab=>tab.addEventListener('click',()=>selectView(tab.dataset.view),{signal:lifecycleController.signal}));
     tabs.forEach(tab=>tab.addEventListener('keydown',event=>{
         if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
         event.preventDefault();
@@ -88,16 +95,18 @@
         const index=available.indexOf(tab);
         const next=event.key==='Home'?0:event.key==='End'?available.length-1:(index+(event.key==='ArrowRight'?1:-1)+available.length)%available.length;
         selectView(available[next].dataset.view); available[next].focus();
-    }));
-    searchInput.addEventListener('input',()=>highlightSearch(searchInput.value));
+    },{signal:lifecycleController.signal}));
+    searchInput.addEventListener('input',()=>highlightSearch(searchInput.value),{signal:lifecycleController.signal});
     reviewForm.addEventListener('submit',event=>{
         event.preventDefault();
         const attributes={};
         reviewFields.querySelectorAll('[data-review-field]').forEach(field=>{attributes[field.dataset.reviewField]=field.value;});
         const detail={recordId:activeRecordId,status:reviewStatus.value,classification:reviewClassification.value||'unassigned',attributes,notes:reviewNotes.value};
         saveState.textContent='Saving…';
-        host.dispatchEvent(new CustomEvent('document-review-change',{detail,bubbles:true,composed:true}));
-    });
+        const operationId=`${events.descriptor.instanceId}:review-change:${++operationSequence}`;
+        const publication=events.dispatch('document-review-change',detail,{operationId,publicDetail:{hasRecord:Boolean(activeRecordId),attributeCount:Object.keys(attributes).length,hasNotes:Boolean(reviewNotes.value)}});
+        projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});
+    },{signal:lifecycleController.signal});
 
     function sameOriginUrl(value){
         if(!String(value||'').trim()) throw new TypeError('A document source is required.');
@@ -117,6 +126,9 @@
     }
 
     function selectView(view='pdf'){
+        if(destroyed){
+            return false;
+        }
         const available=tabs.filter(tab=>!tab.hidden);
         const selected=available.some(tab=>tab.dataset.view===view)?view:available[0]?.dataset.view;
         tabs.forEach(tab=>{const active=tab.dataset.view===selected;tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;});
@@ -172,6 +184,12 @@
     }
 
     async function loadDocument(config={}){
+        if(destroyed){
+            return false;
+        }
+        loadController?.abort('document-replaced');
+        const controller=new AbortController();
+        loadController=controller;
         const sequence=++loadSequence;
         activeRecordId=String(config.recordId||'');
         saveState.textContent=''; searchInput.value=''; matchStatus.textContent='';
@@ -231,22 +249,41 @@
         if(hasText){
             showSurfaceMessage(markdownSurface,'Loading document text…');
             try{
-                const response=await fetch(sameOriginUrl(config.markdownUrl),{cache:'no-store',credentials:'same-origin'});
+                const response=await fetch(sameOriginUrl(config.markdownUrl),{cache:'no-store',credentials:'same-origin',signal:controller.signal});
                 if(!response.ok) throw new Error(`Document text unavailable (${response.status}).`);
                 const markdown=await response.text();
-                if(sequence!==loadSequence) return false;
+                if(destroyed||sequence!==loadSequence) return false;
                 rawMarkdown=markdown; renderedMarkdown=safeMarkdown(rawMarkdown); showMarkdown();
             }catch(error){
-                if(sequence!==loadSequence) return false;
+                if(destroyed||sequence!==loadSequence||controller.signal.aborted) return false;
                 markdownMessage={message:error.message,className:'error'}; showMarkdown();
             }
         }else{
             markdownMessage={message:'No document text is available.',className:'loading'};
             showMarkdown();
         }
+        if(loadController===controller){
+            loadController=null;
+        }
+        return !destroyed&&sequence===loadSequence;
+    }
+
+    function destroy(){
+        if(destroyed){
+            return false;
+        }
+        destroyed=true;
+        loadSequence+=1;
+        loadController?.abort('document-inspector-destroyed');
+        loadController=null;
+        lifecycleController.abort('document-inspector-destroyed');
+        pdfPanel.replaceChildren();
+        events.dispose();
+        host.ready=false;
         return true;
     }
 
-    host.markSaved=message=>{saveState.textContent=String(message||'Saved');};
-    host.dispatchEvent(new CustomEvent('document-inspector-ready',{bubbles:true,composed:true}));
+    host.markSaved=message=>{if(destroyed)return false;saveState.textContent=String(message||'Saved');return true;};
+    const readyPublication=events.dispatch('document-inspector-ready',{}, {publicDetail:{ready:true}});
+    projectArcaneDOMEvent(host,readyPublication.occurrence,{bubbles:true,composed:true});
 </script>
