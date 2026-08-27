@@ -2,6 +2,20 @@
  * First-class browser module for Arcane's capability-gated Ollama service.
  * Apps should import this module instead of connecting to localhost:11434.
  */
+import {
+    createArcaneEventSource,
+    projectArcaneDOMEvent
+} from 'arcane-os/event-manager';
+
+const PUBLISH_OLLAMA_READY=Symbol('publish-ollama-ready');
+
+export const OLLAMA_EVENT_TYPES=Object.freeze({
+    ready:'arcane-ollama-ready'
+});
+export const OLLAMA_REASONS=Object.freeze({
+    ready:'ollama-module-ready'
+});
+
 function api(){
     const client=globalThis.Arcane?.ollama
     if(!client){
@@ -13,6 +27,11 @@ function api(){
 }
 
 export class Ollama{
+    #events=createArcaneEventSource(this,{
+        source:'ollama',
+        eventTypes:Object.freeze(Object.values(OLLAMA_EVENT_TYPES))
+    })
+
     version(){ return api().version() }
     models(){ return api().models() }
     list(){ return api().models() }
@@ -63,6 +82,22 @@ export class Ollama{
     unload(model){
         return this.generate({ model,prompt:'',keep_alive:0 })
     }
+
+    [PUBLISH_OLLAMA_READY](){
+        const reason=OLLAMA_REASONS.ready;
+        const {occurrence}=this.#events.dispatch(
+            OLLAMA_EVENT_TYPES.ready,
+            Object.freeze({ollama:this,reason}),
+            {
+                operationId:`${this.#events.instanceId}:ready:1`,
+                publicDetail:Object.freeze({ready:true,reason})
+            }
+        )
+        if(typeof globalThis.CustomEvent==='function'
+            &&typeof globalThis.dispatchEvent==='function'){
+            projectArcaneDOMEvent(globalThis,occurrence)
+        }
+    }
 }
 
 export const ollama=Object.freeze(new Ollama())
@@ -71,4 +106,4 @@ export default ollama
 if(!Object.prototype.hasOwnProperty.call(globalThis,'arcaneOllama')){
     Object.defineProperty(globalThis,'arcaneOllama',{ value:ollama,enumerable:true,configurable:false,writable:false })
 }
-globalThis.dispatchEvent?.(new CustomEvent('arcane-ollama-ready',{ detail:{ ollama } }))
+ollama[PUBLISH_OLLAMA_READY]()
