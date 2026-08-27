@@ -986,7 +986,8 @@ jobs:
 
           cat > "$inputs/build.sh" <<'EOF'
           #!/usr/bin/env bash
-          set -euo pipefail
+          set -Eeuo pipefail
+          trap 'status=$?; printf "ARCANE_ESPEAK_BUILD_FAILURE line=%s status=%s command=%q\n" "$LINENO" "$status" "$BASH_COMMAND" >&2; exit "$status"' ERR
           umask 022
           export HOME=/tmp/arcane-home
           export EM_CACHE=/work/emscripten-cache
@@ -1443,8 +1444,9 @@ jobs:
               --mount "type=bind,src=$output,dst=/out" \
               --mount "type=bind,src=$evidence,dst=/evidence" \
               "$DERIVED_IMAGE_ID" \
-              bash -s <<'ARCANE_BUILD'
-          set -euo pipefail
+          bash -s <<'ARCANE_BUILD'
+          set -Eeuo pipefail
+          trap 'status=$?; printf "ARCANE_ESPEAK_CONTAINER_FAILURE line=%s status=%s command=%q\n" "$LINENO" "$status" "$BASH_COMMAND" >&2; exit "$status"' ERR
           /inputs/build.sh 2>&1 | tee /evidence/build.log
           (
             cd /out
