@@ -15,7 +15,7 @@
   },
   "artifactCount": 85,
   "javascriptArtifactCount": 83,
-  "esmExportCount": 319,
+  "esmExportCount": 320,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -287,14 +287,15 @@
       "name": "CalculatorEngine.js",
       "kind": "esm",
       "exports": [
+        "CALCULATOR_ENGINE_ERROR_CODES",
         "default",
         "evaluateExpression"
       ],
       "summary": "Evaluates bounded arithmetic, powers, constants, and common functions without `eval`.",
       "availability": "Cross-host",
-      "protocol": "In-process only",
-      "normalization": "Normalized `Calculation` result and parser errors.",
-      "surface": "default `CalculatorEngine`, `evaluateExpression()`; `calculate()` emits result/error events."
+      "protocol": "arcane-event-source/1 on the per-realm globalThis.arcaneEvents authority",
+      "normalization": "Frozen canonical result/error details, source-instance operation IDs, exact parser/evaluation error codes, and state-free EventTarget compatibility.",
+      "surface": "CALCULATOR_ENGINE_ERROR_CODES; default CalculatorEngine with calculate(), EventTarget/on compatibility, dispose()/destroy(); evaluateExpression()."
     },
     {
       "file": "runtime/arcane/modules/CaseEvidenceIndexer.js",

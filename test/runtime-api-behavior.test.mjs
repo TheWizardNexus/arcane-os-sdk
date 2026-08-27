@@ -3394,3 +3394,92 @@ test(
         assert.equal(listeners.has('click'), false);
     }
 );
+
+test(
+    'calculator lifecycle events use the singleton authority without changing legacy results',
+    async function testCalculatorEventAuthority() {
+        const [{default: CalculatorEngine, CALCULATOR_ENGINE_ERROR_CODES}, {arcaneEvents}]
+            = await Promise.all([
+                import('../runtime/arcane/modules/CalculatorEngine.js'),
+                import('../src/event-manager.mjs')
+            ]);
+        const engine = new CalculatorEngine();
+        const canonicalEvents = [];
+        const localEvents = [];
+        const removeCanonicalResult = arcaneEvents.subscribe(
+            'calculator-result',
+            function observeCanonicalCalculatorResult(event) {
+                canonicalEvents.push(event);
+            }
+        );
+        const removeCanonicalError = arcaneEvents.subscribe(
+            'calculator-error',
+            function observeCanonicalCalculatorError(event) {
+                canonicalEvents.push(event);
+            }
+        );
+        const removeLocalResult = engine.on(
+            'calculator-result',
+            function observeLocalCalculatorResult(event) {
+                localEvents.push(event);
+            }
+        );
+        const removeLocalError = engine.on(
+            'calculator-error',
+            function observeLocalCalculatorError(event) {
+                localEvents.push(event);
+            }
+        );
+
+        const calculation = engine.calculate('2 + 3');
+        assert.equal(calculation.result, 5);
+        assert.equal(localEvents[0].detail, calculation);
+        const instanceId = localEvents[0].instanceId;
+        const resultOccurrence = canonicalEvents.find(
+            event => event.instanceId === instanceId && event.type === 'calculator-result'
+        );
+        assert.deepEqual(resultOccurrence.detail, {result: 5});
+        assert.ok(Object.isFrozen(resultOccurrence.detail));
+        assert.equal(resultOccurrence.operationId, localEvents[0].operationId);
+
+        let domainError;
+        assert.throws(
+            function rejectCalculatorDomainFailure() {
+                engine.calculate('1 / 0');
+            },
+            function rememberCalculatorDomainFailure(error) {
+                domainError = error;
+                return error?.code === CALCULATOR_ENGINE_ERROR_CODES.domain;
+            }
+        );
+        const localError = localEvents.find(event => event.type === 'calculator-error');
+        const errorOccurrence = canonicalEvents.find(
+            event => event.instanceId === instanceId && event.type === 'calculator-error'
+        );
+        assert.equal(localError.detail.error, domainError);
+        assert.deepEqual(errorOccurrence.detail, {
+            code: CALCULATOR_ENGINE_ERROR_CODES.domain
+        });
+        assert.ok(Object.isFrozen(errorOccurrence.detail));
+        assert.throws(
+            function rejectCalculatorInputFailure() {
+                engine.calculate('');
+            },
+            error => error?.code === CALCULATOR_ENGINE_ERROR_CODES.input
+        );
+
+        assert.equal(removeLocalResult(), true);
+        assert.equal(removeLocalResult(), false);
+        assert.equal(removeLocalError.dispose(), true);
+        assert.equal(removeCanonicalResult(), true);
+        assert.equal(removeCanonicalError.dispose(), true);
+        assert.equal(engine.dispose(), true);
+        assert.equal(engine.destroy(), false);
+        assert.throws(
+            function rejectDisposedCalculator() {
+                engine.calculate('1 + 1');
+            },
+            error => error?.code === CALCULATOR_ENGINE_ERROR_CODES.disposed
+        );
+    }
+);

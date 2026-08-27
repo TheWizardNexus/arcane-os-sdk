@@ -615,13 +615,40 @@ Evaluates bounded arithmetic, powers, constants, and common functions without `e
 
 ### Public surface
 
-default `CalculatorEngine`, `evaluateExpression()`; `calculate()` emits result/error events.
+`new CalculatorEngine()` exposes synchronous
+`calculate(expression): Calculation`,
+`addEventListener(type,listener,options): void`,
+`removeEventListener(type,listener,options): void`,
+`on(type,listener,options): unsubscribe`,
+`dispatchEvent(event): boolean`, and idempotent
+`dispose(): boolean` / `destroy(): boolean`. `evaluateExpression(input): number`
+remains the parser-only helper. `CALCULATOR_ENGINE_ERROR_CODES` is one frozen
+record containing the stable `disposed`, `input`, `syntax`, `domain`, and
+`evaluation` codes.
 
-Exact exports: `default`, `evaluateExpression`.
+Exact exports: `CALCULATOR_ENGINE_ERROR_CODES`, `default`,
+`evaluateExpression`.
 
 ### Availability and normalization
 
-**Cross-host.** Normalized `Calculation` result and parser errors. Transport: In-process only. [Deep protocol details](protocols.md).
+**Cross-host.** Each engine owns one `calculator-engine` source on the realm's
+branded `globalThis.arcaneEvents`. `calculator-result` publishes frozen public
+detail `{result}`; the legacy instance listener receives the same `Calculation`
+object returned by `calculate()`. `calculator-error` publishes frozen public
+detail `{code}`; the legacy listener receives frozen
+`{expression,error}` while `calculate()` rethrows that same `Error`. Both
+occurrences carry one source-instance `operationId`. Listener callbacks are
+synchronous observations; their failures are reported by the central event
+authority and do not rewrite calculation settlement. Listener registration
+supports `{once,signal}` and its returned unsubscribe also exposes `.dispose()`.
+Disposal removes instance listeners and rejects later calculations with
+`ARCANE_CALCULATOR_ENGINE_DISPOSED`. Invalid expression input, syntax, numeric
+domain, and unexpected evaluation boundaries use
+`ARCANE_CALCULATOR_EXPRESSION_INPUT_INVALID`,
+`ARCANE_CALCULATOR_EXPRESSION_SYNTAX_INVALID`,
+`ARCANE_CALCULATOR_EXPRESSION_DOMAIN_INVALID`, and
+`ARCANE_CALCULATOR_EXPRESSION_EVALUATION_FAILED`. Transport: in-process only.
+[Deep protocol details](protocols.md).
 
 ### Example
 
