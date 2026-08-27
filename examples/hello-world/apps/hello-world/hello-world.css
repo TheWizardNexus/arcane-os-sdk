@@ -7,7 +7,7 @@ body {
 
 .app-shell {
     box-sizing: border-box;
-    width: min(68rem, 100%);
+    width: min(82rem, 100%);
     margin: 0 auto;
     padding: 2rem 1rem;
 }
@@ -49,15 +49,64 @@ body {
     grid-column: 1 / -1;
 }
 
-.app-feature--ai h3 {
+.app-feature--ai h3,
+.app-feature--ai h4 {
     margin-bottom: 0.5rem;
-    font-size: 1rem;
 }
 
 .ai-model-note {
     padding: 0.85rem 1rem;
     border-left: 0.25rem solid var(--accent-color, rgb(116, 167, 255));
     background: var(--surface-raised, rgb(23, 34, 56));
+}
+
+.speech-authority-note {
+    margin: 1rem 0;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--border-color, rgb(57, 72, 103));
+    border-radius: 0.65rem;
+    background: var(--surface-raised, rgb(23, 34, 56));
+}
+
+.speech-authority-note code {
+    color: var(--text-color, rgb(235, 241, 255));
+}
+
+.ai-role-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+    gap: 1rem;
+    margin-top: 1.25rem;
+}
+
+.ai-role {
+    min-width: 0;
+    padding: 1rem;
+    border: 1px solid var(--border-color, rgb(57, 72, 103));
+    border-radius: 0.75rem;
+    background: var(--surface-raised, rgb(23, 34, 56));
+}
+
+.ai-role__header {
+    margin-bottom: 0.75rem;
+}
+
+.ai-role__header h3 {
+    margin-top: 0;
+    font-size: 1.1rem;
+}
+
+.ai-role__eyebrow {
+    margin: 0 0 0.25rem;
+    color: var(--accent-color, rgb(116, 167, 255));
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.role-status {
+    min-height: 3rem;
 }
 
 .ai-controls {
@@ -68,7 +117,7 @@ body {
 }
 
 .ai-controls .arcane-button:disabled,
-#ai-send:disabled {
+.ai-role > .arcane-button:disabled {
     cursor: not-allowed;
     opacity: 0.55;
 }
@@ -77,18 +126,19 @@ body {
     min-height: 3rem;
 }
 
-#ai-progress {
+.ai-progress-block progress {
     width: 100%;
     accent-color: var(--accent-color, rgb(116, 167, 255));
 }
 
-.ai-prompt-label {
+.ai-field-label {
     display: block;
     margin: 0.75rem 0 0.4rem;
     font-weight: 700;
 }
 
-#ai-prompt {
+.ai-role textarea,
+.ai-file-input {
     box-sizing: border-box;
     width: 100%;
     margin-bottom: 0.75rem;
@@ -101,9 +151,38 @@ body {
     font: inherit;
 }
 
-#ai-prompt:focus-visible {
+.ai-file-input {
+    min-height: 2.75rem;
+}
+
+.ai-file-input::file-selector-button {
+    margin-right: 0.75rem;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--border-color, rgb(57, 72, 103));
+    border-radius: 0.4rem;
+    background: var(--surface-raised, rgb(23, 34, 56));
+    color: var(--text-color, rgb(235, 241, 255));
+    font: inherit;
+    cursor: pointer;
+}
+
+.ai-file-input:disabled,
+.ai-file-input:disabled::file-selector-button {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.arcane-button:focus-visible,
+.ai-role textarea:focus-visible,
+.ai-file-input:focus-visible,
+.tts-audio:focus-visible {
     outline: 0.2rem solid var(--accent-color, rgb(116, 167, 255));
     outline-offset: 0.15rem;
+}
+
+.tts-audio {
+    width: 100%;
+    color-scheme: light dark;
 }
 
 .ai-output {
@@ -126,7 +205,16 @@ body {
     }
 
     .ai-controls .arcane-button,
-    #ai-send {
+    .ai-role > .arcane-button {
         width: 100%;
+    }
+
+    .app-shell {
+        padding: 1rem 0.5rem;
+    }
+
+    .app-feature,
+    .ai-role {
+        padding: 0.85rem;
     }
 }

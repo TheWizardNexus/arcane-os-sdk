@@ -1414,9 +1414,9 @@ test('documentation describes the consumer source-to-portable-browser-package co
     assert.match(quickStart,/Node[.]js 22[.]23[.]2/u);
     assert.match(external,/arcane-os@0[.]1[.]1/u);
     assert.match(external,/packaged HTML, CSS, and JavaScript/u);
-    assert.match(hello,/npx arcane-os@0[.]1[.]1 new hello-world/u);
+    assert.match(hello,/npx arcane-os@0[.]2[.]1 new hello-world/u);
     assert.match(hello,/npm install/u);
-    assert.match(hello,/npm install --global arcane-os@0[.]1[.]1/u);
+    assert.match(hello,/npm install --global arcane-os@0[.]2[.]1/u);
     assert.match(hello,/--target browser/u);
     assert.match(hello,/What Arcane adds/u);
     assert.match(hello,/arcane\/[\s\S]*dependencies\/[\s\S]*sdk\//u);
@@ -1433,14 +1433,21 @@ test('documentation describes the consumer source-to-portable-browser-package co
     assert.match(hello,/portable browser package/u);
     assert.match(hello,/do not create or launch a standalone (?:native )?executable/u);
     assert.match(hello,/Standalone native execution is provider-supplied/u);
-    assert.match(decodedHello,/No model weights ship[\s\S]*no model download starts/iu);
+    assert.match(decodedHello,/No external AI model or adapter artifact downloads at import time/iu);
+    assert.match(decodedHello,/Full SDK AI lifecycle/u);
+    assert.match(decodedHello,/HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED/u);
+    assert.match(decodedHello,/WebGPU-capable browser/u);
+    assert.match(decodedHello,/2,000 characters/u);
+    assert.match(decodedHello,/500 characters/u);
+    assert.match(decodedHello,/8 MiB/u);
+    assert.match(decodedHello,/back\/forward cache/u);
     assert.match(decodedHello,/1,998,371,424 bytes \(1[.]86 GiB\)/u);
     assert.match(decodedHello,/loadPolicy:'manual'/u);
     assert.match(decodedHello,/localOnly:true/u);
     assert.match(decodedHello,/Proposed tool calls/u);
     assert.match(decodedHello,/model-source request/u);
     assert.match(decodedHello,/same-origin Wllama\/WASM assets may still load/u);
-    assert.match(decodedHello,/Any verified cache remains; an interrupted model download is discarded/u);
+    assert.match(decodedHello,/Any admitted DBOPFS cache remains; interrupted downloads are discarded/u);
     assert.match(decodedHello,/ARCANE_AI_[\s\S]*APP_DATA_/u);
     assert.doesNotMatch(
         decodedHello,
@@ -1581,6 +1588,7 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         'apps/hello-world/index.html',
         'apps/hello-world/hello-world.css',
         'apps/hello-world/modules/App.js',
+        'apps/hello-world/modules/SpeechAuthorities.js',
         'apps/hello-world/modules/arcane.importmap.json',
         'apps/hello-world/test/app.test.mjs',
         'apps/hello-world/img/icon.png'
@@ -1602,11 +1610,11 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
     ]);
     await t.test('pins the current npm and runtime identities',()=>{
         assert.equal(rootPackage.version,'0.2.1');
-        assert.equal(examplePackage.devDependencies['arcane-os'],'0.1.2');
+        assert.equal(examplePackage.devDependencies['arcane-os'],'0.2.1');
         assert.equal(examplePackage.engines.node,'>=22.23.2');
         assert.equal(packageLock.lockfileVersion,3);
         assert.equal(packageLock.requires,true);
-        assert.equal(packageLock.packages[''].devDependencies['arcane-os'],'0.1.2');
+        assert.equal(packageLock.packages[''].devDependencies['arcane-os'],'0.2.1');
         assert.equal(packageLock.packages[''].engines.node,'>=22.23.2');
         const installedSdk=packageLock.packages['node_modules/arcane-os'];
         assert.deepEqual(
@@ -1619,15 +1627,15 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
                 node:installedSdk.engines.node
             },
             {
-                version:'0.1.2',
-                resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.1.2.tgz',
-                integrity:'sha512-fzVbd01xwFVCHTN6k8x/xPK8xtPy5yCtSkzFLmr1jNVTUBHzmnubLK8a5pWSGH7IhsWce+/AFHOu/TnWSKwDsQ==',
+                version:'0.2.1',
+                resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.2.1.tgz',
+                integrity:'sha512-FJ7zCFvQVZEMLQ8kn9IqddnFkfw397S87tENfLULwt0bN5hYn22wmN2zU50BqYC4zDKI/fdf4Rcl5G6A6KwlCg==',
                 dev:true,
                 license:'AGPL-3.0-only',
                 node:'>=22.23.2'
             }
         );
-        assert.equal(lock.sdk.version,'0.1.2');
+        assert.equal(lock.sdk.version,'0.2.1');
         assert.equal(lock.runtime.contentSha256,runtimeRelease.contentSha256);
         assert.equal(lock.runtime.upstreamCommit,runtimeRelease.source.legacyProjection.commit);
         assert.equal(lock.protocols.arcane,runtimeRelease.source.protocol);
@@ -1748,10 +1756,11 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         assert.equal(createHash('sha256').update(exampleIcon).digest('hex'),createHash('sha256').update(templateIcon).digest('hex'));
     });
     await t.test('source uses the generated map before named app behavior',async()=>{
-        const [html,style,script,readme,workflow,tutorial,compatibilityAlias]=await Promise.all([
+        const [html,style,script,speechAuthoritySource,readme,workflow,tutorial,compatibilityAlias]=await Promise.all([
             readFile(path.join(appRoot,'index.html'),'utf8'),
             readFile(path.join(appRoot,'hello-world.css'),'utf8'),
             readFile(path.join(appRoot,'modules','App.js'),'utf8'),
+            readFile(path.join(appRoot,'modules','SpeechAuthorities.js'),'utf8'),
             readFile(path.join(exampleRoot,'README.md'),'utf8'),
             readFile(path.join(exampleRoot,'.github','workflows','check.yml'),'utf8'),
             readSiteFile('examples/index.html'),
@@ -1778,6 +1787,7 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
             'arcane/css/theme.css'
         ]);
         assert.deepEqual(scriptRuntimeImports,[
+            'arcane-os/ai/browser-speech',
             'arcane-os/ai/browser-wasm',
             'arcane/AppDataScope',
             'arcane/DBOPFS',
@@ -1793,20 +1803,52 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
             'bytes:1_998_371_424',
             "sha256:'ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a'"
         ])assert.equal(script.includes(modelAuthority),true,modelAuthority);
-        assert.match(html,/No model weights ship[\s\S]*no model download starts/iu);
-        assert.match(html,/1,998,371,424 bytes \(1[.]86 GiB\)/u);
+        assert.match(html,/Full SDK AI lifecycle/u);
+        assert.match(html,/No external AI model or adapter artifact downloads at import time/u);
+        assert.match(html,/Speech authority required/u);
+        for(const role of ['ai','tts','stt']){
+            assert.match(html,new RegExp(`id="${role}-(?:load|load-offline|cancel|unload)"`,'u'));
+        }
+        assert.match(html,/id="tts-audio"[\s\S]*controls[\s\S]*preload="none"/u);
+        assert.match(html,/id="stt-file"[\s\S]*type="file"[\s\S]*accept="audio\/[*]"/u);
+        assert.doesNotMatch(html,/autoplay/iu);
         assert.match(html,/Proposed tool calls/u);
         assert.match(script,/new DBOPFS\(\{applicationId:appId\}\)/u);
         assert.match(script,/await dbopfs[.]readyPromise/u);
         assert.match(script,/dbopfs[.]applicationId!==appId/u);
         assert.match(script,/createArcaneAI\(\{[\s\S]*provider,[\s\S]*loadPolicy:'manual',[\s\S]*security:\{secure:true\}[\s\S]*\}\)/u);
-        assert.match(script,/renderProgress\(event[.]detail[?][.]progress\)/u);
+        assert.match(script,/renderLlmProgress\(event[.]detail[?][.]progress\)/u);
         assert.match(script,/local[.]load\(\{signal:controller[.]signal,offline\}\)/u);
         assert.match(script,/local[.]streamRequest\(\{[\s\S]*localOnly:true,[\s\S]*signal:controller[.]signal,[\s\S]*tools:\[SHOW_GREETING_TOOL\]/u);
-        assert.match(script,/activeController[?][.]abort\('Cancelled by the application user[.]'\)/u);
+        assert.match(script,/roleOperations=\{[\s\S]*llm:\{controller:null[\s\S]*stt:\{controller:null[\s\S]*tts:\{controller:null/u);
+        assert.match(script,/roleOperations\[role\][.]controller[?][.]abort\('Cancelled by the application user[.]'\)/u);
         assert.match(script,/await local[.]unload\(\)/u);
-        assert.match(script,/activeController[?][.]abort\('The page is closing[.]'\)[\s\S]*[.]then\(value=>value[.]dispose\(\)\)/u);
-        assert.match(script,/Any verified cache remains; an interrupted model download is discarded/u);
+        assert.match(script,/createDbopfsSpeechArtifactStore\(\{dbopfs:await applicationDbopfs\(\)\}\)/u);
+        assert.match(script,/createBrowserSpeechAuthority\(\{[\s\S]*security:\{[\s\S]*secure:true,[\s\S]*byteLength:true,sha256:true/u);
+        assert.match(script,/createBrowserWhisperProvider\(options\)/u);
+        assert.match(script,/createBrowserKokoroProvider\(options\)/u);
+        assert.match(script,/appSecurity:\{secure:true\}/u);
+        assert.doesNotMatch(script,/security:authority[.]security/u);
+        assert.match(script,/offline/u);
+        assert.match(script,/await provider[.]unload\(\)/u);
+        assert.match(script,/payload:\{[\s\S]*audio:file,[\s\S]*mimeType,[\s\S]*model:selection[.]modelId/u);
+        assert.match(script,/responseFormat:'wav'/u);
+        assert.match(script,/new Blob\(\[result[.]audio\],\{type:'audio\/wav'\}\)/u);
+        assert.match(script,/pageController[.]abort\('The page is closing[.]'\)/u);
+        assert.match(script,/provider[.]dispose\(\)/u);
+        assert.match(script,/globalThis[.]URL[?][.]revokeObjectURL/u);
+        assert.match(script,/HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED/u);
+        assert.match(script,/MAX_LLM_PROMPT_LENGTH=2000/u);
+        assert.match(script,/MAX_TTS_TEXT_LENGTH=500/u);
+        assert.match(script,/MAX_STT_FILE_BYTES=8[*]1024[*]1024/u);
+        assert.match(script,/reloadAfterBackForwardCache/u);
+        assert.match(script,/event[?][.]persisted===true/u);
+        assert.match(speechAuthoritySource,/stt:null,[\s\S]*tts:null/u);
+        assert.match(speechAuthoritySource,/transformers-whisper/u);
+        assert.match(speechAuthoritySource,/kokoro-js/u);
+        assert.doesNotMatch(speechAuthoritySource,/https?:\/\//u);
+        assert.doesNotMatch(`${html}\n${script}`,/getUserMedia|mediaDevices|autoplay/iu);
+        assert.match(script,/Any admitted DBOPFS cache remains; interrupted downloads are discarded/u);
         assert.match(script,/without a model-source request/u);
         assert.match(script,/same-origin Wllama\/WASM assets may still load/u);
         assert.doesNotMatch(
@@ -1815,22 +1857,30 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         );
         const renderedTutorial=decodeReferenceHtml(tutorial);
         const renderedAlias=decodeReferenceHtml(compatibilityAlias);
-        for(const source of [html,style,script]){
+        for(const source of [html,style,speechAuthoritySource,script]){
             assert.equal(renderedTutorial.includes(source.trim()),true);
             assert.equal(renderedAlias.includes(source.trim()),false);
         }
-        assert.match(readme,/npx arcane-os@0[.]1[.]2 new[\s\S]*npm install/u);
+        assert.match(readme,/npx arcane-os@0[.]2[.]1 new[\s\S]*npm install/u);
         assert.match(readme,/generated project pins `arcane-os` exactly[\s\S]*project-local CLI/u);
-        assert.match(readme,/npm install --global arcane-os@0[.]1[.]2/u);
+        assert.match(readme,/npm install --global arcane-os@0[.]2[.]1/u);
         assert.match(readme,/## Source shape[\s\S]*same physical runtime paths[\s\S]*arcane[.]importmap[.]json/u);
         assert.match(
             readme,
             /[.]\/node_modules\/strong-type\/index[.]js[\s\S]*[.]\/arcane\/dependencies\/strong-type\/index[.]js/u
         );
-        assert.match(readme,/authenticated `arcane\/` projection contains 173 files/u);
-        assert.match(readme,/generated map\s+contains 86 entries/u);
+        assert.match(readme,/representative paths rather than freezing an inventory\s+count/u);
+        assert.doesNotMatch(readme,/authenticated `arcane\/` projection contains \d+ files|generated map\s+contains \d+ entries/u);
         assert.match(readme,/`load\(\{offline:true\}\)`\s+makes no model-source request/u);
         assert.match(readme,/ARCANE_AI_[*][\s\S]*APP_DATA_[*]/u);
+        assert.match(readme,/SpeechAuthorities[.]js[\s\S]*HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED/u);
+        assert.match(readme,/File[\s\S]*does not open a microphone/iu);
+        assert.match(readme,/WAV[\s\S]*does not autoplay/iu);
+        assert.match(readme,/2,000 characters[\s\S]*tokenization remains bounded/u);
+        assert.match(readme,/500 characters[\s\S]*synthesis[\s\S]*bounded/u);
+        assert.match(readme,/8 MiB[\s\S]*before the SDK reads or\s+decodes/u);
+        assert.match(readme,/licenses\/speech\/[\s\S]*arcane-app[.]json[\s\S]*arcane-package[.]json/u);
+        assert.match(readme,/directly fetchable[\s\S]*non-redirecting/u);
         assert.match(
             readme,
             /initial Hugging Face origin[\s\S]*provider-controlled HTTPS redirect[\s\S]*without pinning an unstable[\s\S]*regional CDN hostname/u

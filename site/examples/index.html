@@ -2,20 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
-  <meta name="description" content="Create your first Arcane OS application, see every generated file, and take Hello World from scaffold to a verified portable browser package.">
+  <meta name="description" content="Create your first Arcane OS application, take it from scaffold to a verified browser package, and follow the SDK lifecycle for local language, speech-to-text, and text-to-speech roles.">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
   <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/examples/"><link rel="icon" type="image/png" href="../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../styles.css">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Hello World tutorial · Arcane OS SDK"><meta property="og:description" content="Follow one Arcane application from scaffold to a verified portable browser package."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/examples/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Hello World tutorial · Arcane OS SDK"><meta name="twitter:description" content="HTML, CSS, and JavaScript from first command to a verified portable browser package."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Hello World tutorial · Arcane OS SDK"><meta property="og:description" content="Follow one Arcane application from scaffold to a verified browser package and the independent LLM, TTS, and STT lifecycle."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/examples/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Hello World tutorial · Arcane OS SDK"><meta name="twitter:description" content="Plain HTML, CSS, and JavaScript from first command to a verified browser package and full local-AI role lifecycle."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
   <title>Hello World | Arcane OS SDK</title><script src="../app.js" defer></script>
 </head>
 <body data-page="examples">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../" aria-label="Arcane OS SDK documentation home"><img src="../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../">Overview</a><a href="./" aria-current="page">Hello World</a><a href="../guides/">Guides</a><a href="../reference/sdk-api/">API</a><a href="../reference/">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../">Docs</a><span aria-hidden="true">/</span><span aria-current="page">Hello World</span></nav><p class="eyebrow">Start here</p><h1>Build Hello World, step by step.</h1><p class="doc-lead">Start with an empty folder and finish with one checked, packaged, verified, bundled, and runnable Arcane browser application. Every command and maintained app source file is shown below, with the generated runtime represented by the paths this walkthrough uses.</p><div class="doc-meta"><span>Plain HTML + CSS + JavaScript</span><span>arcane-os@0.2.1</span><span>Node.js 22.23.2+</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../">Docs</a><span aria-hidden="true">/</span><span aria-current="page">Hello World</span></nav><p class="eyebrow">Start here</p><h1>Build Hello World, step by step.</h1><p class="doc-lead">Start with an empty folder and finish with one checked, packaged, verified, bundled, and runnable Arcane browser application. Every command and maintained app source file is shown below, followed by the complete SDK lifecycle for independent local language, text-to-speech, and speech-to-text roles.</p><div class="doc-meta"><span>Plain HTML + CSS + JavaScript</span><span>arcane-os@0.2.1</span><span>Node.js 22.23.2+</span></div></header>
     <div class="docs-layout section-shell">
-        <aside class="docs-sidebar" aria-label="Hello World navigation"><p>Hello World</p><nav><a href="#install">Create and install</a><a href="#shape">Project shape</a><a href="#arcane-adds">Arcane and imports</a><a href="#source">Application source</a><a href="#permissions">App contract</a><a href="#browser">Run in browser</a><a href="#local-ai">Local AI</a><a href="#package">Package and verify</a><a href="#packaged-run">Run the package</a><a href="#related">Related reference</a></nav></aside>
+        <aside class="docs-sidebar" aria-label="Hello World navigation"><p>Hello World</p><nav><a href="#install">Create and install</a><a href="#shape">Project shape</a><a href="#arcane-adds">Arcane and imports</a><a href="#source">Application source</a><a href="#permissions">App contract</a><a href="#browser">Run in browser</a><a href="#local-ai">Full AI lifecycle</a><a href="#package">Package and verify</a><a href="#packaged-run">Run the package</a><a href="#related">Related reference</a></nav></aside>
       <article class="prose">
         <section id="install"><p class="step-label">Step 01</p><h2>Create and install the project</h2><p>Install Node.js 22.23.2 or newer, then let the published SDK create the complete browser project. The version in the command and generated lockfile keeps this walkthrough reproducible.</p><div class="code-block"><div class="code-bar"><span>PowerShell</span><button type="button" data-copy-button>Copy</button></div><pre><code>npx arcane-os@0.2.1 new hello-world --path ./hello-world --display-name "Arcane Hello World" --target browser --git
 Set-Location ./hello-world
@@ -27,6 +27,7 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
 │   ├── img/icon.png
 │   ├── modules/
 │   │   ├── App.js
+│   │   ├── SpeechAuthorities.js
 │   │   └── arcane.importmap.json
 │   ├── test/app.test.mjs
 │   ├── arcane-app.json
@@ -43,9 +44,12 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
 │   ├── sdk/
 │   │   ├── ai/
 │   │   │   ├── ARCANE_AI_BROWSER_WASM_COMPONENTS.json
+│   │   │   ├── browser-kokoro-worker.mjs
 │   │   │   ├── browser-speech.mjs
+│   │   │   ├── browser-speech-{artifacts,providers}.mjs
 │   │   │   ├── browser-wasm.mjs
 │   │   │   ├── browser-wasm-llm-provider.mjs
+│   │   │   ├── browser-whisper-worker.mjs
 │   │   │   ├── model-controller.mjs
 │   │   │   ├── speech-worker-{client,runtime}.mjs
 │   │   │   └── wllama/{index.mjs,wllama.wasm,LICENCE,llama.cpp-LICENSE}
@@ -60,7 +64,7 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
 ├── ARCANE_RUNTIME_AUTHORITIES.json
 ├── index.html
 ├── apps/hello-world/
-│   ├── modules/{App.js,arcane.importmap.json}
+│   ├── modules/{App.js,SpeechAuthorities.js,arcane.importmap.json}
 │   ├── hello-world.css
 │   ├── index.html
 │   └── manifest.json
@@ -73,175 +77,242 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
 
         <section id="arcane-adds"><p class="step-label">Step 03</p><h2>What Arcane adds</h2><ul><li><strong>CLI:</strong> <code>arcane</code> creates, checks, tests, serves, packages, verifies, bundles, and runs the application.</li><li><strong>Browser runtime:</strong> <a href="../reference/runtime-modules/theme-bootstrap/">ThemeBootstrap</a> and shared CSS style the app; <a href="../reference/runtime-modules/app-data-scope/">AppDataScope</a> isolates its browser data; <a href="../reference/runtime-modules/dbopfs/">DBOPFS</a> provides app-scoped persistent model storage.</li><li><strong>Stable imports:</strong> the generated browser import map binds names such as <code>arcane/AppDataScope</code>, <code>arcane/DBOPFS</code>, <code>arcane/ThemeBootstrap</code>, <code>arcane-os/ai/browser-wasm</code>, <code>arcane-os/ai/browser-speech</code>, and <code>strong-type</code> to authenticated files under <code>arcane/</code>.</li><li><strong>Distribution parity:</strong> development and <code>dist/hello-world/</code> use byte-identical application, runtime, dependency, and import-map bytes.</li></ul><p>Regenerate the map whenever the authenticated runtime projection changes:</p><div class="code-block"><div class="code-bar"><span>Application repository</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run import-map</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p>Application code continues to import by name; the generated map owns the physical paths. The complete generated map is visible in the HTML source below. See the <a href="../reference/cli/#arcane-import-map">import-map command</a> for generation and validation details.</p></section>
 
-        <section id="source"><p class="step-label">Step 04</p><h2>Write the visible application</h2><p>These are the complete maintained HTML, CSS, and JavaScript files—not fragments. The greeting works immediately. The optional AI panel uses the shipped browser-WASM entrypoint and starts no model download until the user presses its load button.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/index.html</span><button type="button" data-copy-button>Copy</button></div><pre><code>&lt;!doctype html&gt;
-&lt;html lang="en"&gt;
+        <section id="source"><p class="step-label">Step 04</p><h2>Write the visible application</h2><p>These are the complete maintained HTML, CSS, and JavaScript files—not fragments. The greeting works immediately. The AI roles use the shipped browser-WASM and browser-speech entrypoints, but no network acquisition starts until a user chooses a network-permitted load. Speech remains explicitly unavailable until the application owner fills <code>SpeechAuthorities.js</code> with reviewed, immutable artifact authorities.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/index.html</span><button type="button" data-copy-button>Copy</button></div><pre><code>&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot;&gt;
 &lt;head&gt;
-    &lt;meta charset="utf-8"&gt;
-    &lt;meta name="arcane-app-id" content="hello-world"&gt;
-    &lt;base href="../../"&gt;
-    &lt;script type="importmap" data-arcane-import-map&gt;
+    &lt;meta charset=&quot;utf-8&quot;&gt;
+    &lt;meta name=&quot;arcane-app-id&quot; content=&quot;hello-world&quot;&gt;
+    &lt;base href=&quot;../../&quot;&gt;
+    &lt;script type=&quot;importmap&quot; data-arcane-import-map&gt;
 {
-  "imports": {
-    "#arcane/persistent-ai-chat-session": "./arcane/modules/PersistentAIChatSession.js",
-    "./node_modules/strong-type/index.js": "./arcane/dependencies/strong-type/index.js",
-    "arcane-os/ai/browser-speech": "./arcane/sdk/ai/browser-speech.mjs",
-    "arcane-os/ai/browser-wasm": "./arcane/sdk/ai/browser-wasm.mjs",
-    "arcane-os/event-manager": "./arcane/sdk/event-manager.mjs",
-    "arcane/AI": "./arcane/modules/AI.js",
-    "arcane/AIPreferenceRuntime": "./arcane/modules/AIPreferenceRuntime.js",
-    "arcane/AIPreferenceTuple": "./arcane/modules/AIPreferenceTuple.js",
-    "arcane/AIProviderRuntime": "./arcane/modules/AIProviderRuntime.js",
-    "arcane/AIResponseLength": "./arcane/modules/AIResponseLength.js",
-    "arcane/AIResponseURLPolicy": "./arcane/modules/AIResponseURLPolicy.js",
-    "arcane/AIRuntimeState": "./arcane/modules/AIRuntimeState.js",
-    "arcane/AnsiText": "./arcane/modules/AnsiText.js",
-    "arcane/ApiModelDatabase": "./arcane/modules/ApiModelDatabase.js",
-    "arcane/AppDataScope": "./arcane/modules/AppDataScope.js",
-    "arcane/AppearancePreferences": "./arcane/modules/AppearancePreferences.js",
-    "arcane/ArcaneCommunicationBridge": "./arcane/modules/ArcaneCommunicationBridge.js",
-    "arcane/ArcaneNavigationPolicy": "./arcane/modules/ArcaneNavigationPolicy.js",
-    "arcane/ArcaneNetworkPolicy": "./arcane/modules/ArcaneNetworkPolicy.js",
-    "arcane/AsyncBoundary": "./arcane/modules/AsyncBoundary.js",
-    "arcane/BrowserTestSuite": "./arcane/modules/BrowserTestSuite.js",
-    "arcane/CalculatorEngine": "./arcane/modules/CalculatorEngine.js",
-    "arcane/ChartLibrary": "./arcane/modules/ChartLibrary.js",
-    "arcane/ChatRecords": "./arcane/modules/ChatRecords.js",
-    "arcane/CommunicationAppController": "./arcane/modules/CommunicationAppController.js",
-    "arcane/CommunicationHub": "./arcane/modules/CommunicationHub.js",
-    "arcane/CommunicationPreferences": "./arcane/modules/CommunicationPreferences.js",
-    "arcane/CommunicationProviderRegistry": "./arcane/modules/CommunicationProviderRegistry.js",
-    "arcane/ComponentContracts": "./arcane/modules/ComponentContracts.js",
-    "arcane/ConfiguredAIChatSession": "./arcane/modules/ConfiguredAIChatSession.js",
-    "arcane/ConversationActionItems": "./arcane/modules/ConversationActionItems.js",
-    "arcane/ConversationClosingReport": "./arcane/modules/ConversationClosingReport.js",
-    "arcane/ConversationTimebox": "./arcane/modules/ConversationTimebox.js",
-    "arcane/CoreLocalModelCatalog": "./arcane/modules/CoreLocalModelCatalog.js",
-    "arcane/DBLS": "./arcane/modules/DBLS.js",
-    "arcane/DBOPFS": "./arcane/modules/DBOPFS.js",
-    "arcane/DBOPFSDocumentLibrary": "./arcane/modules/DBOPFSDocumentLibrary.js",
-    "arcane/DataMaintenance": "./arcane/modules/DataMaintenance.js",
-    "arcane/DevelopmentWorkspace": "./arcane/modules/DevelopmentWorkspace.js",
-    "arcane/DirectoryPicker": "./arcane/modules/DirectoryPicker.js",
-    "arcane/DocumentLexicalSearch": "./arcane/modules/DocumentLexicalSearch.js",
-    "arcane/DocumentNavigation": "./arcane/modules/DocumentNavigation.js",
-    "arcane/Errors": "./arcane/modules/Errors.js",
-    "arcane/GifEncoder": "./arcane/modules/GifEncoder.js",
-    "arcane/HTMLImport": "./arcane/modules/HTMLImport.js",
-    "arcane/InMemoryCommunicationProvider": "./arcane/modules/InMemoryCommunicationProvider.js",
-    "arcane/IsolatedModelQuestionRunner": "./arcane/modules/IsolatedModelQuestionRunner.js",
-    "arcane/LocalAIReadiness": "./arcane/modules/LocalAIReadiness.js",
-    "arcane/LocalAIReadinessController": "./arcane/modules/LocalAIReadinessController.js",
-    "arcane/MD": "./arcane/modules/MD.js",
-    "arcane/Mail": "./arcane/modules/Mail.js",
-    "arcane/MailTransport": "./arcane/modules/MailTransport.mjs",
-    "arcane/Marked.min": "./arcane/modules/Marked.min.js",
-    "arcane/MemoryRecords": "./arcane/modules/MemoryRecords.js",
-    "arcane/MessageAdvisory": "./arcane/modules/MessageAdvisory.js",
-    "arcane/ModelDefinition": "./arcane/modules/ModelDefinition.js",
-    "arcane/Ollama": "./arcane/modules/Ollama.js",
-    "arcane/OllamaModelIdentifier": "./arcane/modules/OllamaModelIdentifier.js",
-    "arcane/OllamaSettings": "./arcane/modules/OllamaSettings.js",
-    "arcane/OpenMeteoWeatherProvider": "./arcane/modules/OpenMeteoWeatherProvider.js",
-    "arcane/PersistentAIChatSession": "./arcane/modules/PersistentAIChatSession.js",
-    "arcane/PreferenceStore": "./arcane/modules/PreferenceStore.js",
-    "arcane/Questionnaire": "./arcane/modules/Questionnaire.js",
-    "arcane/RecordLinkIndex": "./arcane/modules/RecordLinkIndex.js",
-    "arcane/RecordPassageIndex": "./arcane/modules/RecordPassageIndex.js",
-    "arcane/RecordReviewStore": "./arcane/modules/RecordReviewStore.js",
-    "arcane/RevocableProjectionLedger": "./arcane/modules/RevocableProjectionLedger.js",
-    "arcane/RiskSignalAnalyzer": "./arcane/modules/RiskSignalAnalyzer.js",
-    "arcane/ScamRiskPolicy": "./arcane/modules/ScamRiskPolicy.js",
-    "arcane/ScopedOPFSCache": "./arcane/modules/ScopedOPFSCache.js",
-    "arcane/ScreenCapture": "./arcane/modules/ScreenCapture.js",
-    "arcane/SpeechPlayback": "./arcane/modules/SpeechPlayback.js",
-    "arcane/StaticDocumentCatalog": "./arcane/modules/StaticDocumentCatalog.js",
-    "arcane/SystemAppearance": "./arcane/modules/SystemAppearance.js",
-    "arcane/SystemToolRegistry": "./arcane/modules/SystemToolRegistry.js",
-    "arcane/TerminalClient": "./arcane/modules/TerminalClient.js",
-    "arcane/TerminalCommandRegistry": "./arcane/modules/TerminalCommandRegistry.js",
-    "arcane/ThemeBootstrap": "./arcane/modules/ThemeBootstrap.js",
-    "arcane/ThemeManager": "./arcane/modules/ThemeManager.js",
-    "arcane/TimeGuard": "./arcane/modules/TimeGuard.js",
-    "arcane/ToolCallRouter": "./arcane/modules/ToolCallRouter.js",
-    "arcane/WaitForComponent": "./arcane/modules/WaitForComponent.js",
-    "arcane/YouTubeMedia": "./arcane/modules/YouTubeMedia.js",
-    "arcane/entities/ApiModelRecord": "./arcane/entities/ApiModelRecord.js",
-    "arcane/entities/Calculation": "./arcane/entities/Calculation.js",
-    "arcane/entities/Chat": "./arcane/entities/Chat.js",
-    "arcane/entities/CommunicationMessage": "./arcane/entities/CommunicationMessage.js",
-    "arcane/entities/CommunicationThread": "./arcane/entities/CommunicationThread.js",
-    "arcane/entities/Preference": "./arcane/entities/Preference.js",
-    "arcane/entities/TerminalSession": "./arcane/entities/TerminalSession.js",
-    "arcane/entities/Theme": "./arcane/entities/Theme.js",
-    "arcane/entities/User": "./arcane/entities/User.js",
-    "arcane/entities/Weather": "./arcane/entities/Weather.js",
-    "event-pubsub": "./arcane/sdk/dependencies/event-pubsub/index.js"
+  &quot;imports&quot;: {
+    &quot;#arcane/persistent-ai-chat-session&quot;: &quot;./arcane/modules/PersistentAIChatSession.js&quot;,
+    &quot;./node_modules/strong-type/index.js&quot;: &quot;./arcane/dependencies/strong-type/index.js&quot;,
+    &quot;arcane-os/ai/browser-speech&quot;: &quot;./arcane/sdk/ai/browser-speech.mjs&quot;,
+    &quot;arcane-os/ai/browser-wasm&quot;: &quot;./arcane/sdk/ai/browser-wasm.mjs&quot;,
+    &quot;arcane-os/event-manager&quot;: &quot;./arcane/sdk/event-manager.mjs&quot;,
+    &quot;arcane/AI&quot;: &quot;./arcane/modules/AI.js&quot;,
+    &quot;arcane/AIPreferenceRuntime&quot;: &quot;./arcane/modules/AIPreferenceRuntime.js&quot;,
+    &quot;arcane/AIPreferenceTuple&quot;: &quot;./arcane/modules/AIPreferenceTuple.js&quot;,
+    &quot;arcane/AIProviderRuntime&quot;: &quot;./arcane/modules/AIProviderRuntime.js&quot;,
+    &quot;arcane/AIResponseLength&quot;: &quot;./arcane/modules/AIResponseLength.js&quot;,
+    &quot;arcane/AIResponseURLPolicy&quot;: &quot;./arcane/modules/AIResponseURLPolicy.js&quot;,
+    &quot;arcane/AIRuntimeState&quot;: &quot;./arcane/modules/AIRuntimeState.js&quot;,
+    &quot;arcane/AnsiText&quot;: &quot;./arcane/modules/AnsiText.js&quot;,
+    &quot;arcane/ApiModelDatabase&quot;: &quot;./arcane/modules/ApiModelDatabase.js&quot;,
+    &quot;arcane/AppDataScope&quot;: &quot;./arcane/modules/AppDataScope.js&quot;,
+    &quot;arcane/AppearancePreferences&quot;: &quot;./arcane/modules/AppearancePreferences.js&quot;,
+    &quot;arcane/ArcaneCommunicationBridge&quot;: &quot;./arcane/modules/ArcaneCommunicationBridge.js&quot;,
+    &quot;arcane/ArcaneNavigationPolicy&quot;: &quot;./arcane/modules/ArcaneNavigationPolicy.js&quot;,
+    &quot;arcane/ArcaneNetworkPolicy&quot;: &quot;./arcane/modules/ArcaneNetworkPolicy.js&quot;,
+    &quot;arcane/AsyncBoundary&quot;: &quot;./arcane/modules/AsyncBoundary.js&quot;,
+    &quot;arcane/BrowserTestSuite&quot;: &quot;./arcane/modules/BrowserTestSuite.js&quot;,
+    &quot;arcane/CalculatorEngine&quot;: &quot;./arcane/modules/CalculatorEngine.js&quot;,
+    &quot;arcane/ChartLibrary&quot;: &quot;./arcane/modules/ChartLibrary.js&quot;,
+    &quot;arcane/ChatRecords&quot;: &quot;./arcane/modules/ChatRecords.js&quot;,
+    &quot;arcane/CommunicationAppController&quot;: &quot;./arcane/modules/CommunicationAppController.js&quot;,
+    &quot;arcane/CommunicationHub&quot;: &quot;./arcane/modules/CommunicationHub.js&quot;,
+    &quot;arcane/CommunicationPreferences&quot;: &quot;./arcane/modules/CommunicationPreferences.js&quot;,
+    &quot;arcane/CommunicationProviderRegistry&quot;: &quot;./arcane/modules/CommunicationProviderRegistry.js&quot;,
+    &quot;arcane/ComponentContracts&quot;: &quot;./arcane/modules/ComponentContracts.js&quot;,
+    &quot;arcane/ConfiguredAIChatSession&quot;: &quot;./arcane/modules/ConfiguredAIChatSession.js&quot;,
+    &quot;arcane/ConversationActionItems&quot;: &quot;./arcane/modules/ConversationActionItems.js&quot;,
+    &quot;arcane/ConversationClosingReport&quot;: &quot;./arcane/modules/ConversationClosingReport.js&quot;,
+    &quot;arcane/ConversationTimebox&quot;: &quot;./arcane/modules/ConversationTimebox.js&quot;,
+    &quot;arcane/CoreLocalModelCatalog&quot;: &quot;./arcane/modules/CoreLocalModelCatalog.js&quot;,
+    &quot;arcane/DBLS&quot;: &quot;./arcane/modules/DBLS.js&quot;,
+    &quot;arcane/DBOPFS&quot;: &quot;./arcane/modules/DBOPFS.js&quot;,
+    &quot;arcane/DBOPFSDocumentLibrary&quot;: &quot;./arcane/modules/DBOPFSDocumentLibrary.js&quot;,
+    &quot;arcane/DataMaintenance&quot;: &quot;./arcane/modules/DataMaintenance.js&quot;,
+    &quot;arcane/DevelopmentWorkspace&quot;: &quot;./arcane/modules/DevelopmentWorkspace.js&quot;,
+    &quot;arcane/DirectoryPicker&quot;: &quot;./arcane/modules/DirectoryPicker.js&quot;,
+    &quot;arcane/DocumentLexicalSearch&quot;: &quot;./arcane/modules/DocumentLexicalSearch.js&quot;,
+    &quot;arcane/DocumentNavigation&quot;: &quot;./arcane/modules/DocumentNavigation.js&quot;,
+    &quot;arcane/Errors&quot;: &quot;./arcane/modules/Errors.js&quot;,
+    &quot;arcane/GifEncoder&quot;: &quot;./arcane/modules/GifEncoder.js&quot;,
+    &quot;arcane/HTMLImport&quot;: &quot;./arcane/modules/HTMLImport.js&quot;,
+    &quot;arcane/InMemoryCommunicationProvider&quot;: &quot;./arcane/modules/InMemoryCommunicationProvider.js&quot;,
+    &quot;arcane/IsolatedModelQuestionRunner&quot;: &quot;./arcane/modules/IsolatedModelQuestionRunner.js&quot;,
+    &quot;arcane/LocalAIReadiness&quot;: &quot;./arcane/modules/LocalAIReadiness.js&quot;,
+    &quot;arcane/LocalAIReadinessController&quot;: &quot;./arcane/modules/LocalAIReadinessController.js&quot;,
+    &quot;arcane/MD&quot;: &quot;./arcane/modules/MD.js&quot;,
+    &quot;arcane/Mail&quot;: &quot;./arcane/modules/Mail.js&quot;,
+    &quot;arcane/MailTransport&quot;: &quot;./arcane/modules/MailTransport.mjs&quot;,
+    &quot;arcane/Marked.min&quot;: &quot;./arcane/modules/Marked.min.js&quot;,
+    &quot;arcane/MemoryRecords&quot;: &quot;./arcane/modules/MemoryRecords.js&quot;,
+    &quot;arcane/MessageAdvisory&quot;: &quot;./arcane/modules/MessageAdvisory.js&quot;,
+    &quot;arcane/ModelDefinition&quot;: &quot;./arcane/modules/ModelDefinition.js&quot;,
+    &quot;arcane/Ollama&quot;: &quot;./arcane/modules/Ollama.js&quot;,
+    &quot;arcane/OllamaModelIdentifier&quot;: &quot;./arcane/modules/OllamaModelIdentifier.js&quot;,
+    &quot;arcane/OllamaSettings&quot;: &quot;./arcane/modules/OllamaSettings.js&quot;,
+    &quot;arcane/OpenMeteoWeatherProvider&quot;: &quot;./arcane/modules/OpenMeteoWeatherProvider.js&quot;,
+    &quot;arcane/PersistentAIChatSession&quot;: &quot;./arcane/modules/PersistentAIChatSession.js&quot;,
+    &quot;arcane/PreferenceStore&quot;: &quot;./arcane/modules/PreferenceStore.js&quot;,
+    &quot;arcane/Questionnaire&quot;: &quot;./arcane/modules/Questionnaire.js&quot;,
+    &quot;arcane/RecordLinkIndex&quot;: &quot;./arcane/modules/RecordLinkIndex.js&quot;,
+    &quot;arcane/RecordPassageIndex&quot;: &quot;./arcane/modules/RecordPassageIndex.js&quot;,
+    &quot;arcane/RecordReviewStore&quot;: &quot;./arcane/modules/RecordReviewStore.js&quot;,
+    &quot;arcane/RevocableProjectionLedger&quot;: &quot;./arcane/modules/RevocableProjectionLedger.js&quot;,
+    &quot;arcane/RiskSignalAnalyzer&quot;: &quot;./arcane/modules/RiskSignalAnalyzer.js&quot;,
+    &quot;arcane/ScamRiskPolicy&quot;: &quot;./arcane/modules/ScamRiskPolicy.js&quot;,
+    &quot;arcane/ScopedOPFSCache&quot;: &quot;./arcane/modules/ScopedOPFSCache.js&quot;,
+    &quot;arcane/ScreenCapture&quot;: &quot;./arcane/modules/ScreenCapture.js&quot;,
+    &quot;arcane/SpeechPlayback&quot;: &quot;./arcane/modules/SpeechPlayback.js&quot;,
+    &quot;arcane/StaticDocumentCatalog&quot;: &quot;./arcane/modules/StaticDocumentCatalog.js&quot;,
+    &quot;arcane/SystemAppearance&quot;: &quot;./arcane/modules/SystemAppearance.js&quot;,
+    &quot;arcane/SystemToolRegistry&quot;: &quot;./arcane/modules/SystemToolRegistry.js&quot;,
+    &quot;arcane/TerminalClient&quot;: &quot;./arcane/modules/TerminalClient.js&quot;,
+    &quot;arcane/TerminalCommandRegistry&quot;: &quot;./arcane/modules/TerminalCommandRegistry.js&quot;,
+    &quot;arcane/ThemeBootstrap&quot;: &quot;./arcane/modules/ThemeBootstrap.js&quot;,
+    &quot;arcane/ThemeManager&quot;: &quot;./arcane/modules/ThemeManager.js&quot;,
+    &quot;arcane/TimeGuard&quot;: &quot;./arcane/modules/TimeGuard.js&quot;,
+    &quot;arcane/ToolCallRouter&quot;: &quot;./arcane/modules/ToolCallRouter.js&quot;,
+    &quot;arcane/WaitForComponent&quot;: &quot;./arcane/modules/WaitForComponent.js&quot;,
+    &quot;arcane/YouTubeMedia&quot;: &quot;./arcane/modules/YouTubeMedia.js&quot;,
+    &quot;arcane/entities/ApiModelRecord&quot;: &quot;./arcane/entities/ApiModelRecord.js&quot;,
+    &quot;arcane/entities/Calculation&quot;: &quot;./arcane/entities/Calculation.js&quot;,
+    &quot;arcane/entities/Chat&quot;: &quot;./arcane/entities/Chat.js&quot;,
+    &quot;arcane/entities/CommunicationMessage&quot;: &quot;./arcane/entities/CommunicationMessage.js&quot;,
+    &quot;arcane/entities/CommunicationThread&quot;: &quot;./arcane/entities/CommunicationThread.js&quot;,
+    &quot;arcane/entities/Preference&quot;: &quot;./arcane/entities/Preference.js&quot;,
+    &quot;arcane/entities/TerminalSession&quot;: &quot;./arcane/entities/TerminalSession.js&quot;,
+    &quot;arcane/entities/Theme&quot;: &quot;./arcane/entities/Theme.js&quot;,
+    &quot;arcane/entities/User&quot;: &quot;./arcane/entities/User.js&quot;,
+    &quot;arcane/entities/Weather&quot;: &quot;./arcane/entities/Weather.js&quot;,
+    &quot;event-pubsub&quot;: &quot;./arcane/sdk/dependencies/event-pubsub/index.js&quot;
   }
 }
 &lt;/script&gt;
-    &lt;meta name="viewport" content="width=device-width, initial-scale=1"&gt;
-    &lt;meta name="theme-color" content="rgb(23, 34, 56)"&gt;
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+    &lt;meta name=&quot;theme-color&quot; content=&quot;rgb(23, 34, 56)&quot;&gt;
     &lt;title&gt;Arcane Hello World&lt;/title&gt;
-    &lt;link rel="manifest" href="./apps/hello-world/manifest.json"&gt;
-    &lt;link rel="stylesheet" href="./arcane/css/theme.css?v=1"&gt;
-    &lt;link rel="stylesheet" href="./arcane/css/primitives.css?v=1"&gt;
-    &lt;link rel="stylesheet" href="./apps/hello-world/hello-world.css?v=1"&gt;
+    &lt;link rel=&quot;manifest&quot; href=&quot;./apps/hello-world/manifest.json&quot;&gt;
+    &lt;link rel=&quot;stylesheet&quot; href=&quot;./arcane/css/theme.css?v=1&quot;&gt;
+    &lt;link rel=&quot;stylesheet&quot; href=&quot;./arcane/css/primitives.css?v=1&quot;&gt;
+    &lt;link rel=&quot;stylesheet&quot; href=&quot;./apps/hello-world/hello-world.css?v=1&quot;&gt;
 &lt;/head&gt;
 &lt;body&gt;
-    &lt;main class="app-shell"&gt;
-        &lt;section class="arcane-card" aria-labelledby="app-title"&gt;
-            &lt;header class="arcane-card__header"&gt;
+    &lt;main class=&quot;app-shell&quot;&gt;
+        &lt;section class=&quot;arcane-card&quot; aria-labelledby=&quot;app-title&quot;&gt;
+            &lt;header class=&quot;arcane-card__header&quot;&gt;
                 &lt;div&gt;
-                    &lt;p class="eyebrow"&gt;Arcane application&lt;/p&gt;
-                    &lt;h1 id="app-title"&gt;Hello, Arcane World!&lt;/h1&gt;
+                    &lt;p class=&quot;eyebrow&quot;&gt;Arcane application&lt;/p&gt;
+                    &lt;h1 id=&quot;app-title&quot;&gt;Hello, Arcane World!&lt;/h1&gt;
                 &lt;/div&gt;
             &lt;/header&gt;
-            &lt;div class="arcane-card__body"&gt;
-                &lt;div class="app-features"&gt;
-                    &lt;section class="app-feature" aria-labelledby="imports-feature-title"&gt;
-                        &lt;h2 id="imports-feature-title"&gt;Named browser imports&lt;/h2&gt;
+            &lt;div class=&quot;arcane-card__body&quot;&gt;
+                &lt;div class=&quot;app-features&quot;&gt;
+                    &lt;section class=&quot;app-feature&quot; aria-labelledby=&quot;imports-feature-title&quot;&gt;
+                        &lt;h2 id=&quot;imports-feature-title&quot;&gt;Named browser imports&lt;/h2&gt;
                         &lt;p&gt;Arcane supplies the theme, button styles, and app-scoped storage through stable JavaScript names.&lt;/p&gt;
-                        &lt;p id="app-status" role="status" aria-live="polite"&gt;Ready to say hello.&lt;/p&gt;
-                        &lt;button id="app-action" class="arcane-button" type="button"&gt;Say hello&lt;/button&gt;
+                        &lt;p id=&quot;app-status&quot; role=&quot;status&quot; aria-live=&quot;polite&quot;&gt;Ready to say hello.&lt;/p&gt;
+                        &lt;button id=&quot;app-action&quot; class=&quot;arcane-button&quot; type=&quot;button&quot;&gt;Say hello&lt;/button&gt;
                     &lt;/section&gt;
-                    &lt;section class="app-feature" aria-labelledby="parity-feature-title"&gt;
-                        &lt;h2 id="parity-feature-title"&gt;Same files in dev and dist&lt;/h2&gt;
+                    &lt;section class=&quot;app-feature&quot; aria-labelledby=&quot;parity-feature-title&quot;&gt;
+                        &lt;h2 id=&quot;parity-feature-title&quot;&gt;Same files in dev and dist&lt;/h2&gt;
                         &lt;p&gt;The import map resolves the committed &lt;code&gt;arcane/&lt;/code&gt; tree during development and the byte-identical packaged tree in &lt;code&gt;dist/hello-world/&lt;/code&gt;.&lt;/p&gt;
-                        &lt;p class="app-environment"&gt;Regenerate it at any time with &lt;code&gt;npm run import-map&lt;/code&gt;.&lt;/p&gt;
+                        &lt;p class=&quot;app-environment&quot;&gt;Regenerate it at any time with &lt;code&gt;npm run import-map&lt;/code&gt;.&lt;/p&gt;
                     &lt;/section&gt;
-                    &lt;section class="app-feature app-feature--ai" aria-labelledby="ai-feature-title"&gt;
-                        &lt;h2 id="ai-feature-title"&gt;Optional browser-local AI&lt;/h2&gt;
-                        &lt;p&gt;This example can load the SDK's browser-WASM provider. No model weights ship with Arcane, and no model download starts until you choose the network-permitted load button.&lt;/p&gt;
-                        &lt;p class="ai-model-note"&gt;&lt;strong&gt;First-use download:&lt;/strong&gt; Granite 4.1 3B Q4_K_S is 1,998,371,424 bytes (1.86 GiB). Arcane verifies its SHA-256 digest before admitting it to this app's DBOPFS cache.&lt;/p&gt;
-                        &lt;p id="ai-lifecycle" class="app-environment"&gt;Lifecycle: unloaded.&lt;/p&gt;
-                        &lt;p id="ai-status" role="status" aria-live="polite"&gt;Model not loaded. No model download has started.&lt;/p&gt;
-                        &lt;div class="ai-controls" aria-label="Local AI model controls"&gt;
-                            &lt;button id="ai-load" class="arcane-button" type="button"&gt;Load local AI (downloads 1.86 GiB if needed)&lt;/button&gt;
-                            &lt;button id="ai-load-offline" class="arcane-button" type="button"&gt;Load verified cache offline&lt;/button&gt;
-                            &lt;button id="ai-cancel" class="arcane-button" type="button" hidden disabled&gt;Cancel current operation&lt;/button&gt;
-                            &lt;button id="ai-unload" class="arcane-button" type="button" disabled&gt;Unload model&lt;/button&gt;
+                    &lt;section class=&quot;app-feature app-feature--ai&quot; aria-labelledby=&quot;ai-feature-title&quot;&gt;
+                        &lt;h2 id=&quot;ai-feature-title&quot;&gt;Full SDK AI lifecycle&lt;/h2&gt;
+                        &lt;p&gt;Arcane gives language, speech synthesis, and speech transcription separate provider lifecycles. Each role loads, runs, cancels, and unloads without changing the other two.&lt;/p&gt;
+                        &lt;p class=&quot;ai-model-note&quot;&gt;&lt;strong&gt;No external AI model or adapter artifact downloads at import time.&lt;/strong&gt; A role&#39;s network load is the only control that may fetch those external artifacts. Offline load is strict: it uses previously verified app-scoped DBOPFS bytes or reports a cache miss.&lt;/p&gt;
+                        &lt;p id=&quot;speech-authority-status&quot; class=&quot;speech-authority-note&quot; role=&quot;status&quot; aria-live=&quot;polite&quot;&gt;&lt;strong&gt;Speech authority required:&lt;/strong&gt; Arcane ships no speech runtime bytes, model weights, or voices. Before using speech, the application must pin immutable, licensed STT and TTS authorities in &lt;code&gt;modules/SpeechAuthorities.js&lt;/code&gt;.&lt;/p&gt;
+
+                        &lt;div class=&quot;ai-role-grid&quot;&gt;
+                            &lt;section class=&quot;ai-role&quot; aria-labelledby=&quot;llm-role-title&quot;&gt;
+                                &lt;header class=&quot;ai-role__header&quot;&gt;
+                                    &lt;p class=&quot;ai-role__eyebrow&quot;&gt;LLM&lt;/p&gt;
+                                    &lt;h3 id=&quot;llm-role-title&quot;&gt;Generate text and inspect tool calls&lt;/h3&gt;
+                                &lt;/header&gt;
+                                &lt;p&gt;The SDK verifies Granite 4.1 3B Q4_K_S before admitting its 1.86 GiB first-use download to this app&#39;s cache. This 0.2.1 LLM path requires a WebGPU-capable browser.&lt;/p&gt;
+                                &lt;p id=&quot;ai-lifecycle&quot; class=&quot;app-environment&quot;&gt;Lifecycle: unloaded.&lt;/p&gt;
+                                &lt;p id=&quot;ai-status&quot; class=&quot;role-status&quot; role=&quot;status&quot; aria-live=&quot;polite&quot;&gt;Model not loaded. No model download has started.&lt;/p&gt;
+                                &lt;div class=&quot;ai-controls&quot; aria-label=&quot;Language model lifecycle controls&quot;&gt;
+                                    &lt;button id=&quot;ai-load&quot; class=&quot;arcane-button&quot; type=&quot;button&quot;&gt;Network load LLM (1.86 GiB if not cached)&lt;/button&gt;
+                                    &lt;button id=&quot;ai-load-offline&quot; class=&quot;arcane-button&quot; type=&quot;button&quot;&gt;Load LLM from verified cache&lt;/button&gt;
+                                    &lt;button id=&quot;ai-cancel&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; hidden disabled&gt;Cancel LLM operation&lt;/button&gt;
+                                    &lt;button id=&quot;ai-unload&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Unload LLM&lt;/button&gt;
+                                &lt;/div&gt;
+                                &lt;div class=&quot;ai-progress-block&quot;&gt;
+                                    &lt;progress id=&quot;ai-progress&quot; max=&quot;1998371424&quot; value=&quot;0&quot; aria-labelledby=&quot;ai-progress-label&quot; hidden&gt;&lt;/progress&gt;
+                                    &lt;p id=&quot;ai-progress-label&quot; class=&quot;app-environment&quot;&gt;No LLM operation in progress.&lt;/p&gt;
+                                &lt;/div&gt;
+                                &lt;label class=&quot;ai-field-label&quot; for=&quot;ai-prompt&quot;&gt;Prompt&lt;/label&gt;
+                                &lt;textarea id=&quot;ai-prompt&quot; rows=&quot;3&quot; maxlength=&quot;2000&quot; aria-describedby=&quot;ai-prompt-limit&quot;&gt;Say hello in one short sentence. If useful, propose the show_greeting tool.&lt;/textarea&gt;
+                                &lt;p id=&quot;ai-prompt-limit&quot; class=&quot;app-environment&quot;&gt;Up to 2,000 characters keeps tutorial tokenization bounded.&lt;/p&gt;
+                                &lt;button id=&quot;ai-send&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Ask local AI&lt;/button&gt;
+                                &lt;h4&gt;Response&lt;/h4&gt;
+                                &lt;pre id=&quot;ai-response&quot; class=&quot;ai-output&quot;&gt;Load the model to begin.&lt;/pre&gt;
+                                &lt;h4&gt;Proposed tool calls&lt;/h4&gt;
+                                &lt;pre id=&quot;ai-tool-calls&quot; class=&quot;ai-output&quot;&gt;No tool calls proposed. Structural output is displayed only; the application invokes no tool.&lt;/pre&gt;
+                            &lt;/section&gt;
+
+                            &lt;section class=&quot;ai-role&quot; aria-labelledby=&quot;tts-role-title&quot;&gt;
+                                &lt;header class=&quot;ai-role__header&quot;&gt;
+                                    &lt;p class=&quot;ai-role__eyebrow&quot;&gt;TTS&lt;/p&gt;
+                                    &lt;h3 id=&quot;tts-role-title&quot;&gt;Synthesize a WAV response&lt;/h3&gt;
+                                &lt;/header&gt;
+                                &lt;p&gt;Configure a licensed voice and immutable Kokoro runtime and model authority before loading. Arcane never autoplays the result.&lt;/p&gt;
+                                &lt;p id=&quot;tts-lifecycle&quot; class=&quot;app-environment&quot;&gt;Lifecycle: unavailable until speech authority is configured.&lt;/p&gt;
+                                &lt;p id=&quot;tts-status&quot; class=&quot;role-status&quot; role=&quot;status&quot; aria-live=&quot;polite&quot;&gt;Speech authority required. No speech download has started.&lt;/p&gt;
+                                &lt;div class=&quot;ai-controls&quot; aria-label=&quot;Text-to-speech lifecycle controls&quot;&gt;
+                                    &lt;button id=&quot;tts-load&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Network load TTS&lt;/button&gt;
+                                    &lt;button id=&quot;tts-load-offline&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Load TTS from verified cache&lt;/button&gt;
+                                    &lt;button id=&quot;tts-cancel&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; hidden disabled&gt;Cancel TTS operation&lt;/button&gt;
+                                    &lt;button id=&quot;tts-unload&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Unload TTS&lt;/button&gt;
+                                &lt;/div&gt;
+                                &lt;div class=&quot;ai-progress-block&quot;&gt;
+                                    &lt;progress id=&quot;tts-progress&quot; max=&quot;1&quot; value=&quot;0&quot; aria-labelledby=&quot;tts-progress-label&quot; hidden&gt;&lt;/progress&gt;
+                                    &lt;p id=&quot;tts-progress-label&quot; class=&quot;app-environment&quot;&gt;No TTS operation in progress.&lt;/p&gt;
+                                &lt;/div&gt;
+                                &lt;label class=&quot;ai-field-label&quot; for=&quot;tts-input&quot;&gt;Text to speak&lt;/label&gt;
+                                &lt;textarea id=&quot;tts-input&quot; rows=&quot;3&quot; maxlength=&quot;500&quot; aria-describedby=&quot;tts-input-limit&quot;&gt;Hello from Arcane&#39;s independent text-to-speech lifecycle.&lt;/textarea&gt;
+                                &lt;p id=&quot;tts-input-limit&quot; class=&quot;app-environment&quot;&gt;Up to 500 characters per synthesis keeps this tutorial&#39;s browser work bounded.&lt;/p&gt;
+                                &lt;button id=&quot;tts-synthesize&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Synthesize WAV&lt;/button&gt;
+                                &lt;h4 id=&quot;tts-audio-title&quot;&gt;Generated audio&lt;/h4&gt;
+                                &lt;p class=&quot;app-environment&quot;&gt;Playback begins only when you use the audio controls.&lt;/p&gt;
+                                &lt;audio id=&quot;tts-audio&quot; class=&quot;tts-audio&quot; controls preload=&quot;none&quot; aria-labelledby=&quot;tts-audio-title&quot; hidden&gt;
+                                    Your browser does not support WAV playback.
+                                &lt;/audio&gt;
+                            &lt;/section&gt;
+
+                            &lt;section class=&quot;ai-role&quot; aria-labelledby=&quot;stt-role-title&quot;&gt;
+                                &lt;header class=&quot;ai-role__header&quot;&gt;
+                                    &lt;p class=&quot;ai-role__eyebrow&quot;&gt;STT&lt;/p&gt;
+                                    &lt;h3 id=&quot;stt-role-title&quot;&gt;Transcribe a selected audio file&lt;/h3&gt;
+                                &lt;/header&gt;
+                                &lt;p&gt;Configure immutable, licensed Whisper runtime and model authority before loading. This example reads only the file you select; it never requests microphone access.&lt;/p&gt;
+                                &lt;p id=&quot;stt-lifecycle&quot; class=&quot;app-environment&quot;&gt;Lifecycle: unavailable until speech authority is configured.&lt;/p&gt;
+                                &lt;p id=&quot;stt-status&quot; class=&quot;role-status&quot; role=&quot;status&quot; aria-live=&quot;polite&quot;&gt;Speech authority required. No speech download has started.&lt;/p&gt;
+                                &lt;div class=&quot;ai-controls&quot; aria-label=&quot;Speech-to-text lifecycle controls&quot;&gt;
+                                    &lt;button id=&quot;stt-load&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Network load STT&lt;/button&gt;
+                                    &lt;button id=&quot;stt-load-offline&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Load STT from verified cache&lt;/button&gt;
+                                    &lt;button id=&quot;stt-cancel&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; hidden disabled&gt;Cancel STT operation&lt;/button&gt;
+                                    &lt;button id=&quot;stt-unload&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Unload STT&lt;/button&gt;
+                                &lt;/div&gt;
+                                &lt;div class=&quot;ai-progress-block&quot;&gt;
+                                    &lt;progress id=&quot;stt-progress&quot; max=&quot;1&quot; value=&quot;0&quot; aria-labelledby=&quot;stt-progress-label&quot; hidden&gt;&lt;/progress&gt;
+                                    &lt;p id=&quot;stt-progress-label&quot; class=&quot;app-environment&quot;&gt;No STT operation in progress.&lt;/p&gt;
+                                &lt;/div&gt;
+                                &lt;label class=&quot;ai-field-label&quot; for=&quot;stt-file&quot;&gt;Audio file to transcribe&lt;/label&gt;
+                                &lt;input id=&quot;stt-file&quot; class=&quot;ai-file-input&quot; type=&quot;file&quot; accept=&quot;audio/*&quot; aria-describedby=&quot;stt-file-limit&quot; disabled&gt;
+                                &lt;p id=&quot;stt-file-limit&quot; class=&quot;app-environment&quot;&gt;Choose one audio file up to 8 MiB. Selecting it is an explicit local action; the example does not record or capture audio.&lt;/p&gt;
+                                &lt;button id=&quot;stt-transcribe&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Transcribe selected file&lt;/button&gt;
+                                &lt;h4&gt;Transcript&lt;/h4&gt;
+                                &lt;pre id=&quot;stt-transcript&quot; class=&quot;ai-output&quot;&gt;Load STT and select an audio file to begin.&lt;/pre&gt;
+                            &lt;/section&gt;
                         &lt;/div&gt;
-                        &lt;div class="ai-progress-block"&gt;
-                            &lt;progress id="ai-progress" max="1998371424" value="0" hidden&gt;&lt;/progress&gt;
-                            &lt;p id="ai-progress-label" class="app-environment"&gt;&lt;/p&gt;
-                        &lt;/div&gt;
-                        &lt;label class="ai-prompt-label" for="ai-prompt"&gt;Prompt&lt;/label&gt;
-                        &lt;textarea id="ai-prompt" rows="3"&gt;Say hello in one short sentence. If useful, propose the show_greeting tool.&lt;/textarea&gt;
-                        &lt;button id="ai-send" class="arcane-button" type="button" disabled&gt;Ask local AI&lt;/button&gt;
-                        &lt;h3&gt;Response&lt;/h3&gt;
-                        &lt;pre id="ai-response" class="ai-output"&gt;Load the model to begin.&lt;/pre&gt;
-                        &lt;h3&gt;Proposed tool calls&lt;/h3&gt;
-                        &lt;pre id="ai-tool-calls" class="ai-output"&gt;No tool calls proposed. Structural output is displayed only; the application invokes no tool.&lt;/pre&gt;
                     &lt;/section&gt;
                 &lt;/div&gt;
             &lt;/div&gt;
         &lt;/section&gt;
     &lt;/main&gt;
-    &lt;script type="module" src="./apps/hello-world/modules/App.js?v=1"&gt;&lt;/script&gt;
+    &lt;script type=&quot;module&quot; src=&quot;./apps/hello-world/modules/App.js?v=1&quot;&gt;&lt;/script&gt;
 &lt;/body&gt;
 &lt;/html&gt;</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div>
 
-        <p>The app stylesheet lays out the named-import and dev/dist-parity features as two simple cards.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/hello-world.css</span><button type="button" data-copy-button>Copy</button></div><pre><code>body {
+        <p>The app stylesheet keeps the basic features readable and arranges the independent LLM, TTS, and STT role cards responsively.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/hello-world.css</span><button type="button" data-copy-button>Copy</button></div><pre><code>body {
     margin: 0;
     min-height: 100vh;
     background: var(--background, rgb(13, 18, 32));
@@ -250,7 +321,7 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
 
 .app-shell {
     box-sizing: border-box;
-    width: min(68rem, 100%);
+    width: min(82rem, 100%);
     margin: 0 auto;
     padding: 2rem 1rem;
 }
@@ -284,7 +355,7 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
 }
 
 .app-feature code {
-    font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
+    font-family: ui-monospace, &quot;Cascadia Code&quot;, &quot;Segoe UI Mono&quot;, monospace;
     overflow-wrap: anywhere;
 }
 
@@ -292,15 +363,64 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
     grid-column: 1 / -1;
 }
 
-.app-feature--ai h3 {
+.app-feature--ai h3,
+.app-feature--ai h4 {
     margin-bottom: 0.5rem;
-    font-size: 1rem;
 }
 
 .ai-model-note {
     padding: 0.85rem 1rem;
     border-left: 0.25rem solid var(--accent-color, rgb(116, 167, 255));
     background: var(--surface-raised, rgb(23, 34, 56));
+}
+
+.speech-authority-note {
+    margin: 1rem 0;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--border-color, rgb(57, 72, 103));
+    border-radius: 0.65rem;
+    background: var(--surface-raised, rgb(23, 34, 56));
+}
+
+.speech-authority-note code {
+    color: var(--text-color, rgb(235, 241, 255));
+}
+
+.ai-role-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+    gap: 1rem;
+    margin-top: 1.25rem;
+}
+
+.ai-role {
+    min-width: 0;
+    padding: 1rem;
+    border: 1px solid var(--border-color, rgb(57, 72, 103));
+    border-radius: 0.75rem;
+    background: var(--surface-raised, rgb(23, 34, 56));
+}
+
+.ai-role__header {
+    margin-bottom: 0.75rem;
+}
+
+.ai-role__header h3 {
+    margin-top: 0;
+    font-size: 1.1rem;
+}
+
+.ai-role__eyebrow {
+    margin: 0 0 0.25rem;
+    color: var(--accent-color, rgb(116, 167, 255));
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.role-status {
+    min-height: 3rem;
 }
 
 .ai-controls {
@@ -311,7 +431,7 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
 }
 
 .ai-controls .arcane-button:disabled,
-#ai-send:disabled {
+.ai-role &gt; .arcane-button:disabled {
     cursor: not-allowed;
     opacity: 0.55;
 }
@@ -320,18 +440,19 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
     min-height: 3rem;
 }
 
-#ai-progress {
+.ai-progress-block progress {
     width: 100%;
     accent-color: var(--accent-color, rgb(116, 167, 255));
 }
 
-.ai-prompt-label {
+.ai-field-label {
     display: block;
     margin: 0.75rem 0 0.4rem;
     font-weight: 700;
 }
 
-#ai-prompt {
+.ai-role textarea,
+.ai-file-input {
     box-sizing: border-box;
     width: 100%;
     margin-bottom: 0.75rem;
@@ -344,9 +465,38 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
     font: inherit;
 }
 
-#ai-prompt:focus-visible {
+.ai-file-input {
+    min-height: 2.75rem;
+}
+
+.ai-file-input::file-selector-button {
+    margin-right: 0.75rem;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--border-color, rgb(57, 72, 103));
+    border-radius: 0.4rem;
+    background: var(--surface-raised, rgb(23, 34, 56));
+    color: var(--text-color, rgb(235, 241, 255));
+    font: inherit;
+    cursor: pointer;
+}
+
+.ai-file-input:disabled,
+.ai-file-input:disabled::file-selector-button {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.arcane-button:focus-visible,
+.ai-role textarea:focus-visible,
+.ai-file-input:focus-visible,
+.tts-audio:focus-visible {
     outline: 0.2rem solid var(--accent-color, rgb(116, 167, 255));
     outline-offset: 0.15rem;
+}
+
+.tts-audio {
+    width: 100%;
+    color-scheme: light dark;
 }
 
 .ai-output {
@@ -360,7 +510,7 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
     border-radius: 0.55rem;
     background: var(--background, rgb(13, 18, 32));
     color: var(--text-color, rgb(235, 241, 255));
-    font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
+    font-family: ui-monospace, &quot;Cascadia Code&quot;, &quot;Segoe UI Mono&quot;, monospace;
 }
 
 @media (max-width: 36rem) {
@@ -369,89 +519,244 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
     }
 
     .ai-controls .arcane-button,
-    #ai-send {
+    .ai-role &gt; .arcane-button {
         width: 100%;
+    }
+
+    .app-shell {
+        padding: 1rem 0.5rem;
+    }
+
+    .app-feature,
+    .ai-role {
+        padding: 0.85rem;
     }
 }</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div>
 
-        <p><code>App.js</code> imports Arcane by stable names, waits for the shared theme, resolves the application identity, and stores its greeting count in an app-scoped browser key.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/modules/App.js</span><button type="button" data-copy-button>Copy</button></div><pre><code>import arcaneThemeReady from 'arcane/ThemeBootstrap';
+        <p><code>SpeechAuthorities.js</code> is the application-owned policy boundary. It remains fail-closed until you replace an individual <code>null</code> with a complete, licensed, immutable authority.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/modules/SpeechAuthorities.js</span><button type="button" data-copy-button>Copy</button></div><pre><code>/*
+ * The Arcane OS SDK supplies the speech lifecycle, storage, verification,
+ * isolation, and provider contracts. The application must supply and license every model,
+ * runtime, voice, URL, revision, byte length, and SHA-256 authority below.
+ *
+ * Replace an individual null only after choosing an immutable authority:
+ *
+ * stt: {
+ *     model: {id,repository,revision,files:[{path,url,bytes,sha256,mediaType}]},
+ *     runtime: {
+ *         adapter:&#39;transformers-whisper&#39;,version,revision,entry,
+ *         files:[{path,url,bytes,sha256,mediaType}]
+ *     }
+ * }
+ *
+ * tts: {
+ *     model: {
+ *         id,repository,revision,defaultVoice,
+ *         files:[{path,url,bytes,sha256,mediaType}]
+ *     },
+ *     runtime: {
+ *         adapter:&#39;kokoro-js&#39;,version,revision,entry,
+ *         files:[{path,url,bytes,sha256,mediaType}]
+ *     }
+ * }
+ *
+ * mediaType is optional. Security policy is not configurable here: App.js
+ * enforces secure byte-length and SHA-256 admission for both roles.
+ *
+ * Every URL must be immutable HTTPS or same-origin authority. Do not use
+ * mutable main, master, or latest paths. With appSecurity.secure enabled in
+ * App.js, every declared artifact must include bytes and sha256 evidence.
+ */
+const speechAuthorities=Object.freeze({
+    stt:null,
+    tts:null
+});
+
+export default speechAuthorities;</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div>
+
+        <p><code>App.js</code> imports Arcane by stable names, waits for the shared theme, resolves the application identity, stores its greeting count in an app-scoped browser key, and owns one lifecycle controller for each AI role.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/modules/App.js</span><button type="button" data-copy-button>Copy</button></div><pre><code>import arcaneThemeReady from &#39;arcane/ThemeBootstrap&#39;;
 import {
     resolveApplicationId,
     resolveApplicationLocalStorageKey
-} from 'arcane/AppDataScope';
-import DBOPFS from 'arcane/DBOPFS';
+} from &#39;arcane/AppDataScope&#39;;
+import DBOPFS from &#39;arcane/DBOPFS&#39;;
 import {
     createArcaneAI,
     createBrowserModelSource,
     createBrowserWasmLlmProvider,
     createDbopfsModelStore
-} from 'arcane-os/ai/browser-wasm';
+} from &#39;arcane-os/ai/browser-wasm&#39;;
+import {
+    createBrowserKokoroProvider,
+    createBrowserSpeechAuthority,
+    createBrowserWhisperProvider,
+    createDbopfsSpeechArtifactStore
+} from &#39;arcane-os/ai/browser-speech&#39;;
+import speechAuthorities from &#39;./SpeechAuthorities.js&#39;;
 
 const MODEL=Object.freeze({
-    id:'ibm-granite-4.1-3b-q4-k-s',
-    url:'https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/ab4701481089b58a082ef63cc1cee738887293ff/granite-4.1-3b-Q4_K_S.gguf',
+    id:&#39;ibm-granite-4.1-3b-q4-k-s&#39;,
+    url:&#39;https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/ab4701481089b58a082ef63cc1cee738887293ff/granite-4.1-3b-Q4_K_S.gguf&#39;,
     bytes:1_998_371_424,
-    sha256:'ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a'
+    sha256:&#39;ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a&#39;
 });
 
+const SPEECH_PROVIDER_IDS=Object.freeze({
+    stt:&#39;hello-world-browser-whisper&#39;,
+    tts:&#39;hello-world-browser-kokoro&#39;
+});
+const MAX_LLM_PROMPT_LENGTH=2000;
+const MAX_STT_FILE_BYTES=8*1024*1024;
+const MAX_TTS_TEXT_LENGTH=500;
+
 const SHOW_GREETING_TOOL=Object.freeze({
-    type:'function',
+    type:&#39;function&#39;,
     function:Object.freeze({
-        name:'show_greeting',
-        description:'Propose greeting text for the application to review.',
+        name:&#39;show_greeting&#39;,
+        description:&#39;Propose greeting text for the application to review.&#39;,
         parameters:Object.freeze({
-            type:'object',
+            type:&#39;object&#39;,
             properties:Object.freeze({
-                message:Object.freeze({type:'string'})
+                message:Object.freeze({type:&#39;string&#39;})
             }),
-            required:Object.freeze(['message']),
+            required:Object.freeze([&#39;message&#39;]),
             additionalProperties:false
         })
     })
 });
 
 const ERROR_COPY=Object.freeze({
-    ARCANE_AI_REQUEST_ABORTED:'The operation was cancelled. Any verified cache remains; an interrupted model download is discarded.',
-    ARCANE_AI_MODEL_OFFLINE_MISS:'No verified offline model cache is available. Load once while online first.',
-    ARCANE_AI_MODEL_DOWNLOAD_FAILED:'The model download failed. Check the network and try again.',
-    ARCANE_AI_MODEL_REDIRECT_BLOCKED:'The model response left HTTPS and was rejected.',
-    ARCANE_AI_MODEL_SIZE_MISMATCH:'The downloaded model size did not match its declared authority.',
-    ARCANE_AI_MODEL_DIGEST_MISMATCH:'The downloaded bytes failed SHA-256 verification and were removed.',
-    ARCANE_AI_MODEL_CACHE_REJECTED:'The completed model cache failed revalidation and was not admitted.',
-    ARCANE_AI_STORAGE_UNAVAILABLE:'App-scoped browser storage is unavailable.',
-    ARCANE_AI_NOT_READY:'Load the verified model before asking the local AI.',
-    ARCANE_AI_LOCAL_ONLY_UNAVAILABLE:'The selected provider cannot guarantee browser-local inference.',
-    ARCANE_AI_DISPOSED:'This local AI session is closed. Reload the page to create another.',
-    APP_DATA_SCOPE_MISMATCH:'The browser storage singleton belongs to another application.',
-    APP_DATA_STORAGE_UNAVAILABLE:'App-scoped browser storage is unavailable.'
+    HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED:&#39;This speech role has no complete app-owned model, runtime, license, revision, URL, and hash authority. TTS also requires a voice. Configure SpeechAuthorities.js before loading it.&#39;,
+    HELLO_WORLD_STT_FILE_REQUIRED:&#39;Choose a nonempty audio file before transcribing.&#39;,
+    HELLO_WORLD_STT_FILE_TOO_LARGE:&#39;Choose an audio file no larger than 8 MiB so browser decoding remains bounded.&#39;,
+    HELLO_WORLD_STT_MIME_TYPE_REQUIRED:&#39;The chosen audio file must declare its audio media type.&#39;,
+    HELLO_WORLD_TTS_TEXT_REQUIRED:&#39;Enter text before synthesizing speech.&#39;,
+    HELLO_WORLD_TTS_TEXT_TOO_LONG:&#39;Keep text-to-speech input at 500 characters or fewer so synthesis remains bounded.&#39;,
+    HELLO_WORLD_AUDIO_PLAYBACK_UNAVAILABLE:&#39;This browser cannot expose the synthesized WAV for user-controlled playback.&#39;,
+    HELLO_WORLD_LLM_PROMPT_TOO_LONG:&#39;Keep the language-model prompt at 2,000 characters or fewer so tokenization remains bounded.&#39;,
+    ARCANE_AI_REQUEST_ABORTED:&#39;The operation was cancelled. Any admitted DBOPFS cache remains; interrupted downloads are discarded.&#39;,
+    ARCANE_AI_OPERATION_SUPERSEDED:&#39;A newer lifecycle operation replaced this one safely.&#39;,
+    ARCANE_AI_MODEL_AUTHORITY_REQUIRED:&#39;The selected model does not match the admitted application authority.&#39;,
+    ARCANE_AI_MODEL_OFFLINE_MISS:&#39;No verified offline LLM cache is available. Load once while online first.&#39;,
+    ARCANE_AI_ARTIFACT_OFFLINE_MISS:&#39;No admitted offline speech cache is available. Load this role once while online first.&#39;,
+    ARCANE_AI_MODEL_DOWNLOAD_FAILED:&#39;The model download failed. Check the network and try again.&#39;,
+    ARCANE_AI_ARTIFACT_DOWNLOAD_FAILED:&#39;A declared speech artifact could not be downloaded.&#39;,
+    ARCANE_AI_MODEL_REDIRECT_BLOCKED:&#39;The model response left HTTPS and was rejected.&#39;,
+    ARCANE_AI_ARTIFACT_SOURCE_CHANGED:&#39;A speech artifact response left its admitted immutable URL and was rejected.&#39;,
+    ARCANE_AI_ARTIFACT_SOURCE_INVALID:&#39;A declared speech artifact did not provide readable bytes.&#39;,
+    ARCANE_AI_ARTIFACT_SOURCE_UNAVAILABLE:&#39;Speech artifact fetching is unavailable in this browser.&#39;,
+    ARCANE_AI_MODEL_SIZE_MISMATCH:&#39;The downloaded model size did not match its declared authority.&#39;,
+    ARCANE_AI_ARTIFACT_SIZE_MISMATCH:&#39;A speech artifact size did not match its declared authority.&#39;,
+    ARCANE_AI_MODEL_DIGEST_MISMATCH:&#39;The downloaded bytes failed SHA-256 verification and were removed.&#39;,
+    ARCANE_AI_ARTIFACT_DIGEST_MISMATCH:&#39;A speech artifact failed SHA-256 verification and was removed.&#39;,
+    ARCANE_AI_MODEL_CACHE_REJECTED:&#39;The completed model cache failed revalidation and was not admitted.&#39;,
+    ARCANE_AI_ARTIFACT_CACHE_REJECTED:&#39;The completed speech cache failed revalidation and was not admitted.&#39;,
+    ARCANE_AI_WEBGPU_REQUIRED:&#39;This LLM requires a WebGPU-capable browser and device.&#39;,
+    ARCANE_AI_WEBGPU_API_UNAVAILABLE:&#39;This browser does not expose the WebGPU API required by this LLM.&#39;,
+    ARCANE_AI_WEBGPU_EVIDENCE_INVALID:&#39;The provider could not prove the required WebGPU execution boundary.&#39;,
+    ARCANE_AI_MODEL_WEBGPU_REQUIREMENT_FAILED:&#39;The selected model could not satisfy its required WebGPU execution policy.&#39;,
+    ARCANE_AI_MODEL_FULL_OFFLOAD_UNPROVEN:&#39;The provider could not prove full model offload to WebGPU.&#39;,
+    ARCANE_AI_MODEL_GPU_MEMORY_INSUFFICIENT:&#39;The selected device does not have enough reported GPU memory for this model.&#39;,
+    ARCANE_AI_MODEL_SHARD_TOO_LARGE:&#39;A model shard is too large for the selected WebGPU device.&#39;,
+    ARCANE_AI_WEBASSEMBLY_UNAVAILABLE:&#39;This browser does not provide the WebAssembly support required by the local runtime.&#39;,
+    ARCANE_AI_SECURE_CONTEXT_REQUIRED:&#39;Open this app from HTTPS or a loopback development URL so secure browser APIs are available.&#39;,
+    ARCANE_AI_OPFS_UNAVAILABLE:&#39;This browser does not provide the origin-private storage required for verified model cache data.&#39;,
+    ARCANE_AI_STORAGE_BUSY:&#39;Another browser context is updating this exact authority.&#39;,
+    ARCANE_AI_STORAGE_UNAVAILABLE:&#39;App-scoped browser storage is unavailable.&#39;,
+    ARCANE_AI_STORAGE_READ_FAILED:&#39;The admitted speech cache could not be read.&#39;,
+    ARCANE_AI_STORAGE_DELETE_FAILED:&#39;An invalid speech cache could not be removed safely.&#39;,
+    ARCANE_AI_RUNTIME_MODULE_GRAPH_UNDECLARED:&#39;The speech runtime attempted to leave its declared module closure.&#39;,
+    ARCANE_AI_AUDIO_DECODE_UNAVAILABLE:&#39;This browser cannot decode the selected file to the required speech input.&#39;,
+    ARCANE_AI_AUDIO_DECODE_FAILED:&#39;The selected audio file could not be decoded to 16 kHz mono speech input.&#39;,
+    ARCANE_AI_UNSUPPORTED_RESPONSE_FORMAT:&#39;The speech provider did not admit the requested WAV format.&#39;,
+    ARCANE_AI_UNDECLARED_ARTIFACT:&#39;The speech runtime requested an artifact outside its admitted closure.&#39;,
+    ARCANE_AI_WORKER_CRASHED:&#39;The isolated speech Worker stopped unexpectedly.&#39;,
+    ARCANE_AI_WORKER_MESSAGE_ERROR:&#39;The isolated speech Worker returned an invalid message.&#39;,
+    ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH:&#39;The admitted speech runtime does not implement the SDK protocol.&#39;,
+    ARCANE_AI_PROVIDER_LOAD_FAILED:&#39;The selected local provider could not be loaded.&#39;,
+    ARCANE_AI_PROVIDER_REQUEST_FAILED:&#39;The selected local provider could not complete the request.&#39;,
+    ARCANE_AI_PROVIDER_UNAVAILABLE:&#39;The selected local provider is unavailable.&#39;,
+    ARCANE_AI_PROVIDER_BUSY:&#39;This role is already processing one request.&#39;,
+    ARCANE_AI_PROVIDER_DISPOSED:&#39;This speech provider generation is closed. Load the role to create another.&#39;,
+    ARCANE_AI_INVALID_REQUEST:&#39;The request did not match the selected role contract.&#39;,
+    ARCANE_AI_INVALID_PROVIDER_RESULT:&#39;The provider returned data outside the SDK contract.&#39;,
+    ARCANE_AI_NOT_READY:&#39;Load this role before requesting local inference.&#39;,
+    ARCANE_AI_LOCAL_ONLY_UNAVAILABLE:&#39;The selected provider cannot guarantee browser-local inference.&#39;,
+    ARCANE_AI_DISPOSED:&#39;This local AI session is closed. Reload the page to create another.&#39;,
+    ARCANE_AI_REQUEST_FAILED:&#39;The browser-local AI operation failed safely.&#39;,
+    APP_DATA_SCOPE_MISMATCH:&#39;The browser storage singleton belongs to another application.&#39;,
+    APP_DATA_STORAGE_UNAVAILABLE:&#39;App-scoped browser storage is unavailable.&#39;
 });
 
-const action=document.querySelector('#app-action');
-const status=document.querySelector('#app-status');
-const aiLoad=document.querySelector('#ai-load');
-const aiLoadOffline=document.querySelector('#ai-load-offline');
-const aiUnload=document.querySelector('#ai-unload');
-const aiCancel=document.querySelector('#ai-cancel');
-const aiPrompt=document.querySelector('#ai-prompt');
-const aiSend=document.querySelector('#ai-send');
-const aiStatus=document.querySelector('#ai-status');
-const aiLifecycle=document.querySelector('#ai-lifecycle');
-const aiProgress=document.querySelector('#ai-progress');
-const aiProgressLabel=document.querySelector('#ai-progress-label');
-const aiResponse=document.querySelector('#ai-response');
-const aiToolCalls=document.querySelector('#ai-tool-calls');
+const action=document.querySelector(&#39;#app-action&#39;);
+const status=document.querySelector(&#39;#app-status&#39;);
+const aiLoad=document.querySelector(&#39;#ai-load&#39;);
+const aiLoadOffline=document.querySelector(&#39;#ai-load-offline&#39;);
+const aiUnload=document.querySelector(&#39;#ai-unload&#39;);
+const aiCancel=document.querySelector(&#39;#ai-cancel&#39;);
+const aiPrompt=document.querySelector(&#39;#ai-prompt&#39;);
+const aiSend=document.querySelector(&#39;#ai-send&#39;);
+const aiStatus=document.querySelector(&#39;#ai-status&#39;);
+const aiLifecycle=document.querySelector(&#39;#ai-lifecycle&#39;);
+const aiProgress=document.querySelector(&#39;#ai-progress&#39;);
+const aiProgressLabel=document.querySelector(&#39;#ai-progress-label&#39;);
+const aiResponse=document.querySelector(&#39;#ai-response&#39;);
+const aiToolCalls=document.querySelector(&#39;#ai-tool-calls&#39;);
+const speechAuthorityStatus=document.querySelector(&#39;#speech-authority-status&#39;);
 
-globalThis.dbopfs?.readyPromise?.catch(()=&gt;undefined);
+const speechControls=Object.freeze({
+    tts:Object.freeze({
+        lifecycle:document.querySelector(&#39;#tts-lifecycle&#39;),
+        status:document.querySelector(&#39;#tts-status&#39;),
+        load:document.querySelector(&#39;#tts-load&#39;),
+        loadOffline:document.querySelector(&#39;#tts-load-offline&#39;),
+        cancel:document.querySelector(&#39;#tts-cancel&#39;),
+        unload:document.querySelector(&#39;#tts-unload&#39;),
+        progress:document.querySelector(&#39;#tts-progress&#39;),
+        progressLabel:document.querySelector(&#39;#tts-progress-label&#39;),
+        input:document.querySelector(&#39;#tts-input&#39;),
+        request:document.querySelector(&#39;#tts-synthesize&#39;),
+        audio:document.querySelector(&#39;#tts-audio&#39;)
+    }),
+    stt:Object.freeze({
+        lifecycle:document.querySelector(&#39;#stt-lifecycle&#39;),
+        status:document.querySelector(&#39;#stt-status&#39;),
+        load:document.querySelector(&#39;#stt-load&#39;),
+        loadOffline:document.querySelector(&#39;#stt-load-offline&#39;),
+        cancel:document.querySelector(&#39;#stt-cancel&#39;),
+        unload:document.querySelector(&#39;#stt-unload&#39;),
+        progress:document.querySelector(&#39;#stt-progress&#39;),
+        progressLabel:document.querySelector(&#39;#stt-progress-label&#39;),
+        file:document.querySelector(&#39;#stt-file&#39;),
+        request:document.querySelector(&#39;#stt-transcribe&#39;),
+        transcript:document.querySelector(&#39;#stt-transcript&#39;)
+    })
+});
+
+function ignoreReadyFailure(){
+    // The first explicit AI action reports storage readiness with a stable code.
+}
+
+globalThis.dbopfs?.readyPromise?.catch(ignoreReadyFailure);
 await arcaneThemeReady;
 
 const appId=await resolveApplicationId();
-const countKey=resolveApplicationLocalStorageKey('hello-count',{applicationId:appId});
+const countKey=resolveApplicationLocalStorageKey(&#39;hello-count&#39;,{applicationId:appId});
+const pageController=new AbortController();
+const roleOperations={
+    llm:{controller:null,name:null,pageAbortHandler:null},
+    stt:{controller:null,name:null,pageAbortHandler:null},
+    tts:{controller:null,name:null,pageAbortHandler:null}
+};
+const speechProviders={stt:null,tts:null};
+const speechProviderOffline={stt:null,tts:null};
+const speechAuthorityCache={stt:undefined,tts:undefined};
+let dbopfsPromise=null;
+let speechStorePromise=null;
 let ai=null;
 let aiPromise=null;
-let activeController=null;
-let activeOperation=null;
-let disposePromise=null;
+let pageDisposePromise=null;
 let requestNumber=0;
+let ttsAudioUrl=null;
 
 function loadHelloCount(){
     try{
@@ -476,122 +781,233 @@ function sayHello(){
     status.textContent=`Hello from Arcane OS! Greeting ${count}.`;
 }
 
+function createPublicError(code){
+    const error=new Error(code);
+    error.code=code;
+    return error;
+}
+
+function publicErrorCode(error){
+    const suppliedCode=typeof error?.code===&#39;string&#39;?error.code:&#39;&#39;;
+    if(suppliedCode.startsWith(&#39;ARCANE_AI_&#39;)
+        ||suppliedCode.startsWith(&#39;APP_DATA_&#39;)
+        ||suppliedCode.startsWith(&#39;HELLO_WORLD_&#39;)){
+        return suppliedCode;
+    }
+    return &#39;ARCANE_AI_REQUEST_FAILED&#39;;
+}
+
+function renderPublicError(target,error){
+    const code=publicErrorCode(error);
+    const message=ERROR_COPY[code]??ERROR_COPY.ARCANE_AI_REQUEST_FAILED;
+    target.textContent=`${code}: ${message}`;
+}
+
+function throwIfAborted(signal){
+    if(signal?.aborted)throw createPublicError(&#39;ARCANE_AI_REQUEST_ABORTED&#39;);
+}
+
+function beginRoleOperation(role,name){
+    const operation=roleOperations[role];
+    if(pageController.signal.aborted||operation.controller)return null;
+    const controller=new AbortController();
+    function abortOperationForPage(){
+        controller.abort(&#39;The page is closing.&#39;);
+    }
+    pageController.signal.addEventListener(&#39;abort&#39;,abortOperationForPage,{once:true});
+    operation.controller=controller;
+    operation.name=name;
+    operation.pageAbortHandler=abortOperationForPage;
+    updateRoleControls(role);
+    return controller;
+}
+
+function finishRoleOperation(role,controller){
+    const operation=roleOperations[role];
+    if(operation.controller!==controller)return;
+    if(operation.pageAbortHandler){
+        pageController.signal.removeEventListener(&#39;abort&#39;,operation.pageAbortHandler);
+    }
+    operation.controller=null;
+    operation.name=null;
+    operation.pageAbortHandler=null;
+    updateRoleControls(role);
+}
+
+function cancelRoleOperation(role){
+    roleOperations[role].controller?.abort(&#39;Cancelled by the application user.&#39;);
+}
+
 function lifecycleState(){
-    return ai?.status?.().llm?.state??'unloaded';
+    return ai?.status?.().llm?.state??&#39;unloaded&#39;;
 }
 
-function updateControls(){
+function updateLlmControls(){
     const state=lifecycleState();
-    const busy=activeController!==null;
+    const operation=roleOperations.llm;
+    const busy=operation.controller!==null;
     aiLifecycle.textContent=`Lifecycle: ${state}.`;
-    aiLoad.disabled=busy||state==='ready';
-    aiLoadOffline.disabled=busy||state==='ready';
-    aiSend.disabled=busy||state!=='ready';
-    aiUnload.disabled=busy||ai===null||state==='unloaded';
-    aiCancel.disabled=!busy||activeOperation==='unload';
-    aiCancel.hidden=!busy||activeOperation==='unload';
+    aiLoad.disabled=busy||state===&#39;ready&#39;;
+    aiLoadOffline.disabled=busy||state===&#39;ready&#39;;
+    aiSend.disabled=busy||state!==&#39;ready&#39;;
+    aiUnload.disabled=busy||ai===null||state===&#39;unloaded&#39;;
+    aiCancel.disabled=!busy||operation.name===&#39;unload&#39;;
+    aiCancel.hidden=!busy||operation.name===&#39;unload&#39;;
 }
 
-function renderProgress(value){
-    if(!value||typeof value!=='object')return;
+function speechLifecycleState(role){
+    if(!configuredSpeechAuthority(role))return &#39;authority-required&#39;;
+    return speechProviders[role]?.status?.().state??&#39;unloaded&#39;;
+}
+
+function updateSpeechControls(role){
+    const controls=speechControls[role];
+    if(!controls.lifecycle)return;
+    const state=speechLifecycleState(role);
+    const operation=roleOperations[role];
+    const busy=operation.controller!==null;
+    controls.lifecycle.textContent=`Lifecycle: ${state}.`;
+    controls.load.disabled=busy||state===&#39;ready&#39;;
+    controls.loadOffline.disabled=busy||state===&#39;ready&#39;;
+    controls.request.disabled=busy||state!==&#39;ready&#39;;
+    if(role===&#39;stt&#39;)controls.file.disabled=busy||state!==&#39;ready&#39;;
+    controls.unload.disabled=busy||speechProviders[role]===null||state===&#39;unloaded&#39;;
+    controls.cancel.disabled=!busy||operation.name===&#39;unload&#39;;
+    controls.cancel.hidden=!busy||operation.name===&#39;unload&#39;;
+}
+
+function updateRoleControls(role){
+    if(role===&#39;llm&#39;){
+        updateLlmControls();
+        return;
+    }
+    updateSpeechControls(role);
+}
+
+function renderSpeechAuthorityStatus(){
+    if(!speechAuthorityStatus)return;
+    const missing=[];
+    if(!configuredSpeechAuthority(&#39;tts&#39;))missing.push(&#39;TTS&#39;);
+    if(!configuredSpeechAuthority(&#39;stt&#39;))missing.push(&#39;STT&#39;);
+    if(missing.length===0){
+        speechAuthorityStatus.textContent=&#39;Speech authorities configured. Loading still starts only from the matching role button.&#39;;
+        return;
+    }
+    speechAuthorityStatus.textContent=`HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED: ${missing.join(&#39; and &#39;)} remain fail-closed until the application supplies immutable, licensed authority in SpeechAuthorities.js.`;
+}
+
+async function initializeApplicationDbopfs(){
+    const dbopfs=globalThis.dbopfs||new DBOPFS({applicationId:appId});
+    try{
+        await dbopfs.readyPromise;
+    }catch(cause){
+        if(typeof cause?.code===&#39;string&#39;&amp;&amp;cause.code.startsWith(&#39;APP_DATA_&#39;)){
+            throw cause;
+        }
+        const error=new Error(&#39;App-scoped browser storage is unavailable.&#39;,{cause});
+        error.code=&#39;APP_DATA_STORAGE_UNAVAILABLE&#39;;
+        throw error;
+    }
+    if(dbopfs.applicationId!==appId){
+        throw createPublicError(&#39;APP_DATA_SCOPE_MISMATCH&#39;);
+    }
+    return dbopfs;
+}
+
+function resetDbopfsPromise(error){
+    dbopfsPromise=null;
+    throw error;
+}
+
+function applicationDbopfs(){
+    if(dbopfsPromise)return dbopfsPromise;
+    dbopfsPromise=initializeApplicationDbopfs().catch(resetDbopfsPromise);
+    return dbopfsPromise;
+}
+
+async function initializeSpeechStore(){
+    return createDbopfsSpeechArtifactStore({dbopfs:await applicationDbopfs()});
+}
+
+function resetSpeechStorePromise(error){
+    speechStorePromise=null;
+    throw error;
+}
+
+function speechArtifactStore(){
+    if(speechStorePromise)return speechStorePromise;
+    speechStorePromise=initializeSpeechStore().catch(resetSpeechStorePromise);
+    return speechStorePromise;
+}
+
+function renderLlmProgress(value){
+    if(!value||typeof value!==&#39;object&#39;)return;
     const total=Number(value.total)||MODEL.bytes;
     const loaded=Math.min(total,Math.max(0,Number(value.loaded)||0));
     const phase={
-        download:'Downloading model bytes',
-        'verify-download':'Verifying the downloaded model SHA-256',
-        'verify-cache':'Rehashing the DBOPFS cache',
-        initialize:'Starting the browser-local runtime'
-    }[value.phase]??'Preparing local AI';
+        download:&#39;Downloading model bytes&#39;,
+        &#39;verify-download&#39;:&#39;Verifying the downloaded model SHA-256&#39;,
+        &#39;verify-cache&#39;:&#39;Rehashing the DBOPFS cache&#39;,
+        initialize:&#39;Starting the browser-local runtime&#39;
+    }[value.phase]??&#39;Preparing local AI&#39;;
     aiProgress.max=total;
     aiProgress.value=loaded;
     aiProgress.hidden=false;
-    const percent=Number.isFinite(value.percent)?`${value.percent.toFixed(1)}%`:'in progress';
+    const percent=Number.isFinite(value.percent)?`${value.percent.toFixed(1)}%`:&#39;in progress&#39;;
     aiProgressLabel.textContent=`${phase}: ${percent}.`;
 }
 
-function renderError(error){
-    const suppliedCode=typeof error?.code==='string'?error.code:'';
-    const code=suppliedCode.startsWith('ARCANE_AI_')||suppliedCode.startsWith('APP_DATA_')
-        ?suppliedCode
-        :'ARCANE_AI_REQUEST_FAILED';
-    const message=ERROR_COPY[code]??'The browser-local AI operation failed safely.';
-    aiStatus.textContent=`${code}: ${message}`;
+function handleLlmProgressEvent(event){
+    renderLlmProgress(event.detail?.progress);
 }
 
-function beginOperation(name){
-    if(activeController)return null;
-    activeController=new AbortController();
-    activeOperation=name;
-    updateControls();
-    return activeController;
-}
-
-function finishOperation(controller){
-    if(activeController!==controller)return;
-    activeController=null;
-    activeOperation=null;
-    updateControls();
-}
-
-async function localAI(){
-    if(ai)return ai;
-    if(aiPromise)return aiPromise;
-    aiPromise=(async()=&gt;{
-        const dbopfs=globalThis.dbopfs||new DBOPFS({applicationId:appId});
-        try{
-            await dbopfs.readyPromise;
-        }catch(cause){
-            if(typeof cause?.code==='string'&amp;&amp;cause.code.startsWith('APP_DATA_')){
-                throw cause;
-            }
-            const error=new Error('App-scoped browser storage is unavailable.',{cause});
-            error.code='APP_DATA_STORAGE_UNAVAILABLE';
-            throw error;
+async function createLocalAIInstance(){
+    const dbopfs=await applicationDbopfs();
+    const store=createDbopfsModelStore({dbopfs});
+    const source=createBrowserModelSource(MODEL);
+    const provider=createBrowserWasmLlmProvider({
+        source,
+        store,
+        loadDefaults:{
+            contextTokens:1024,
+            threads:1,
+            batchTokens:256,
+            microBatchTokens:64
         }
-        if(dbopfs.applicationId!==appId){
-            const error=new Error('The DBOPFS application scope does not match this app.');
-            error.code='APP_DATA_SCOPE_MISMATCH';
-            throw error;
-        }
-        const store=createDbopfsModelStore({dbopfs});
-        const source=createBrowserModelSource(MODEL);
-        const provider=createBrowserWasmLlmProvider({
-            source,
-            store,
-            loadDefaults:{
-                contextTokens:1024,
-                threads:1,
-                batchTokens:256,
-                microBatchTokens:64
-            }
-        });
-        const created=createArcaneAI({
-            provider,
-            loadPolicy:'manual',
-            security:{secure:true}
-        });
-        created.llm.addEventListener('progress',event=&gt;{
-            renderProgress(event.detail?.progress);
-        });
-        created.llm.addEventListener('statechange',updateControls);
-        ai=created;
-        updateControls();
-        return created;
-    })().catch(error=&gt;{
-        aiPromise=null;
-        throw error;
     });
+    const created=createArcaneAI({
+        provider,
+        loadPolicy:&#39;manual&#39;,
+        security:{secure:true}
+    });
+    created.llm.addEventListener(&#39;progress&#39;,handleLlmProgressEvent);
+    created.llm.addEventListener(&#39;statechange&#39;,updateLlmControls);
+    ai=created;
+    updateLlmControls();
+    return created;
+}
+
+function resetAiPromise(error){
+    aiPromise=null;
+    throw error;
+}
+
+function localAI(){
+    if(ai)return Promise.resolve(ai);
+    if(aiPromise)return aiPromise;
+    aiPromise=createLocalAIInstance().catch(resetAiPromise);
     return aiPromise;
 }
 
-async function loadModel({offline=false}={}){
-    const controller=beginOperation(offline?'offline-load':'load');
+async function loadModel(options={}){
+    const offline=options.offline===true;
+    const controller=beginRoleOperation(&#39;llm&#39;,offline?&#39;offline-load&#39;:&#39;load&#39;);
     if(!controller)return;
     aiStatus.textContent=offline
-        ?'Checking the verified DBOPFS cache without a model-source request. Packaged same-origin Wllama/WASM assets may still load.'
-        :'Checking the strict cache. A 1.86 GiB model download starts only if it is missing.';
+        ?&#39;Checking the verified DBOPFS cache without a model-source request. Packaged same-origin Wllama/WASM assets may still load.&#39;
+        :&#39;Checking the strict cache. A 1.86 GiB model download starts only if it is missing.&#39;;
     aiProgress.hidden=true;
-    aiProgressLabel.textContent='';
+    aiProgressLabel.textContent=&#39;&#39;;
     try{
         const local=await localAI();
         const result=await local.load({signal:controller.signal,offline});
@@ -599,60 +1015,62 @@ async function loadModel({offline=false}={}){
         aiProgress.max=MODEL.bytes;
         aiProgress.value=MODEL.bytes;
         aiProgress.hidden=false;
-        if(cacheState==='installed'){
-            aiStatus.textContent='Model downloaded, SHA-256 verified, admitted to app-scoped DBOPFS, and loaded locally.';
+        if(cacheState===&#39;installed&#39;){
+            aiStatus.textContent=&#39;Model downloaded, SHA-256 verified, admitted to app-scoped DBOPFS, and loaded locally.&#39;;
         }else{
             aiStatus.textContent=offline
-                ?'Verified DBOPFS cache loaded without a model-source request.'
-                :'Verified DBOPFS cache reused and loaded locally.';
+                ?&#39;Verified DBOPFS cache loaded without a model-source request.&#39;
+                :&#39;Verified DBOPFS cache reused and loaded locally.&#39;;
         }
-        aiProgressLabel.textContent='Browser-local model ready.';
+        aiProgressLabel.textContent=&#39;Browser-local model ready.&#39;;
     }catch(error){
-        renderError(error);
+        renderPublicError(aiStatus,error);
     }finally{
-        finishOperation(controller);
+        finishRoleOperation(&#39;llm&#39;,controller);
     }
 }
 
 function renderToolCalls(result){
-    if(!result||typeof result!=='object'||Array.isArray(result)){
-        aiToolCalls.textContent='No tool calls were proposed. Structural output is displayed only; the application invokes no tool.';
+    if(!result||typeof result!==&#39;object&#39;||Array.isArray(result)){
+        aiToolCalls.textContent=&#39;No tool calls were proposed. Structural output is displayed only; the application invokes no tool.&#39;;
         return;
     }
     const records=Object.entries(result);
     if(records.length===0){
-        aiToolCalls.textContent='No tool calls were proposed. Structural output is displayed only; the application invokes no tool.';
+        aiToolCalls.textContent=&#39;No tool calls were proposed. Structural output is displayed only; the application invokes no tool.&#39;;
         return;
     }
-    aiToolCalls.textContent=[
-        'Proposed tool calls (structural output only):',
-        ...records.flatMap(([name,argumentsJson])=&gt;[
-            `name: ${name}`,
-            `arguments: ${String(argumentsJson)}`
-        ])
-    ].join('\n');
+    const lines=[&#39;Proposed tool calls (structural output only):&#39;];
+    for(const [name,argumentsJson] of records){
+        lines.push(`name: ${name}`,`arguments: ${String(argumentsJson)}`);
+    }
+    aiToolCalls.textContent=lines.join(&#39;\n&#39;);
 }
 
 async function askLocalAI(){
-    const controller=beginOperation('request');
+    const controller=beginRoleOperation(&#39;llm&#39;,&#39;request&#39;);
     if(!controller)return;
-    aiResponse.textContent='';
-    aiToolCalls.textContent='Waiting for a response. Proposed tool calls remain structural output only.';
-    aiStatus.textContent='Running this request locally in the browser.';
+    aiResponse.textContent=&#39;&#39;;
+    aiToolCalls.textContent=&#39;Waiting for a response. Proposed tool calls remain structural output only.&#39;;
+    aiStatus.textContent=&#39;Running this request locally in the browser.&#39;;
     try{
+        const prompt=aiPrompt.value.trim()||&#39;Say hello in one short sentence.&#39;;
+        if(prompt.length&gt;MAX_LLM_PROMPT_LENGTH){
+            throw createPublicError(&#39;HELLO_WORLD_LLM_PROMPT_TOO_LONG&#39;);
+        }
         const local=await localAI();
         const result=await local.streamRequest({
             id:`hello-world-${++requestNumber}`,
             localOnly:true,
             signal:controller.signal,
             messages:[{
-                role:'user',
-                content:aiPrompt.value.trim()||'Say hello in one short sentence.'
+                role:&#39;user&#39;,
+                content:prompt
             }],
             temperature:0,
             maxTokens:128,
             tools:[SHOW_GREETING_TOOL],
-            toolChoice:'auto',
+            toolChoice:&#39;auto&#39;,
             onChunk(text,_requestId,isThinking){
                 if(!isThinking)aiResponse.textContent+=text;
             },
@@ -660,57 +1078,401 @@ async function askLocalAI(){
                 aiToolCalls.textContent=`Model proposed ${name}; the application has not invoked it.`;
             }
         });
-        if(typeof result==='string'&amp;&amp;!aiResponse.textContent){
+        if(typeof result===&#39;string&#39;&amp;&amp;!aiResponse.textContent){
             aiResponse.textContent=result;
         }
         renderToolCalls(result);
-        aiStatus.textContent='Local-only request complete.';
+        aiStatus.textContent=&#39;Local-only request complete.&#39;;
     }catch(error){
-        renderError(error);
+        renderPublicError(aiStatus,error);
     }finally{
-        finishOperation(controller);
+        finishRoleOperation(&#39;llm&#39;,controller);
     }
 }
 
 async function unloadModel(){
-    const controller=beginOperation('unload');
+    const controller=beginRoleOperation(&#39;llm&#39;,&#39;unload&#39;);
     if(!controller)return;
-    aiStatus.textContent='Ending the browser model session; the verified cache will remain.';
+    aiStatus.textContent=&#39;Ending the browser model session without deleting any verified cache.&#39;;
     try{
         const local=await localAI();
         await local.unload();
-        aiStatus.textContent='Model unloaded. The browser model Worker is no longer active; the verified DBOPFS cache remains.';
+        aiStatus.textContent=&#39;Model unloaded. The browser model Worker is no longer active; any verified DBOPFS cache remains.&#39;;
     }catch(error){
-        renderError(error);
+        renderPublicError(aiStatus,error);
     }finally{
-        finishOperation(controller);
+        finishRoleOperation(&#39;llm&#39;,controller);
     }
 }
 
-function cancelOperation(){
-    activeController?.abort('Cancelled by the application user.');
+function configuredSpeechAuthority(role){
+    if(speechAuthorityCache[role]!==undefined)return speechAuthorityCache[role];
+    const authority=speechAuthorities[role];
+    if(!authority||typeof authority!==&#39;object&#39;||Array.isArray(authority)){
+        speechAuthorityCache[role]=null;
+        return null;
+    }
+    try{
+        createBrowserSpeechAuthority({
+            providerId:SPEECH_PROVIDER_IDS[role],
+            role,
+            model:authority.model,
+            runtime:authority.runtime,
+            security:{
+                secure:true,
+                checks:{byteLength:true,sha256:true}
+            }
+        });
+        speechAuthorityCache[role]=authority;
+    }catch{
+        speechAuthorityCache[role]=null;
+    }
+    return speechAuthorityCache[role];
 }
 
-function disposeLocalAI(){
-    activeController?.abort('The page is closing.');
-    if(disposePromise)return;
-    const current=ai??aiPromise;
-    if(!current)return;
-    disposePromise=Promise.resolve(current)
-        .then(value=&gt;value.dispose())
-        .catch(()=&gt;undefined);
+function requiredSpeechAuthority(role){
+    const authority=configuredSpeechAuthority(role);
+    if(!authority)throw createPublicError(&#39;HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED&#39;);
+    return authority;
 }
 
-action?.addEventListener('click',sayHello);
-aiLoad?.addEventListener('click',()=&gt;loadModel());
-aiLoadOffline?.addEventListener('click',()=&gt;loadModel({offline:true}));
-aiSend?.addEventListener('click',askLocalAI);
-aiCancel?.addEventListener('click',cancelOperation);
-aiUnload?.addEventListener('click',unloadModel);
-globalThis.addEventListener('pagehide',disposeLocalAI,{once:true});
-updateControls();</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div></section>
+async function createSpeechProvider(role,offline,signal){
+    const authority=requiredSpeechAuthority(role);
+    const store=await speechArtifactStore();
+    throwIfAborted(signal);
+    const options={
+        id:SPEECH_PROVIDER_IDS[role],
+        localOnly:true,
+        model:authority.model,
+        runtime:authority.runtime,
+        appSecurity:{secure:true},
+        store,
+        offline
+    };
+    return role===&#39;stt&#39;
+        ?createBrowserWhisperProvider(options)
+        :createBrowserKokoroProvider(options);
+}
 
-        <section id="permissions"><p class="step-label">Step 05</p><h2>Declare the browser contract</h2><p>The greeting needs no privileged Arcane <a href="../reference/core/capabilities/">capability</a> or host method. The optional model download declares only its pinned URL’s initial Hugging Face origin, and the first-release target remains the browser:</p><div class="code-block"><div class="code-bar"><span>arcane-app.json · relevant contract</span><button type="button" data-copy-button>Copy</button></div><pre><code>{
+async function speechProvider(role,offline,signal){
+    const current=speechProviders[role];
+    if(current&amp;&amp;speechProviderOffline[role]===offline)return current;
+    if(current){
+        await current.dispose();
+        if(speechProviders[role]===current){
+            speechProviders[role]=null;
+            speechProviderOffline[role]=null;
+        }
+    }
+    throwIfAborted(signal);
+    const created=await createSpeechProvider(role,offline,signal);
+    if(signal?.aborted){
+        await created.dispose();
+        throw createPublicError(&#39;ARCANE_AI_REQUEST_ABORTED&#39;);
+    }
+    speechProviders[role]=created;
+    speechProviderOffline[role]=offline;
+    updateSpeechControls(role);
+    return created;
+}
+
+function speechSelection(provider){
+    const catalog=provider.catalog();
+    return Object.freeze({
+        providerId:provider.id,
+        modelId:catalog[0].id,
+        localOnly:true
+    });
+}
+
+function speechPhaseLabel(phase){
+    return {
+        download:&#39;Downloading declared artifacts&#39;,
+        &#39;verify-download&#39;:&#39;Verifying downloaded artifact authority&#39;,
+        &#39;verify-cache&#39;:&#39;Revalidating the admitted DBOPFS cache&#39;,
+        &#39;runtime-import&#39;:&#39;Importing the isolated runtime&#39;,
+        &#39;model-load&#39;:&#39;Loading the speech model in its Worker&#39;,
+        ready:&#39;Speech Worker ready&#39;
+    }[phase]??&#39;Preparing browser-local speech&#39;;
+}
+
+function renderSpeechProgress(role,value){
+    const controls=speechControls[role];
+    if(!controls.progress||!value||typeof value!==&#39;object&#39;)return;
+    const total=Math.max(0,Number(value.total)||0);
+    const completed=Math.min(total,Math.max(0,Number(value.completed)||0));
+    controls.progress.hidden=false;
+    if(value.heartbeat||total===0){
+        controls.progress.removeAttribute(&#39;value&#39;);
+    }else{
+        controls.progress.max=total;
+        controls.progress.value=completed;
+    }
+    const unit=typeof value.unit===&#39;string&#39;?` ${value.unit}`:&#39;&#39;;
+    const amount=total&gt;0?` ${completed} of ${total}${unit}`:&#39;&#39;;
+    controls.progressLabel.textContent=`${speechPhaseLabel(value.phase)}.${amount}`;
+}
+
+async function loadSpeechRole(role,offline){
+    const controller=beginRoleOperation(role,offline?&#39;offline-load&#39;:&#39;load&#39;);
+    if(!controller)return;
+    const controls=speechControls[role];
+    controls.status.textContent=offline
+        ?&#39;Checking this exact role authority in DBOPFS with network access disabled.&#39;
+        :&#39;Checking the admitted cache. Missing declared artifacts download only after this explicit action.&#39;;
+    controls.progress.hidden=true;
+    controls.progressLabel.textContent=&#39;&#39;;
+    try{
+        const provider=await speechProvider(role,offline,controller.signal);
+        const selection=speechSelection(provider);
+        function handleSpeechLoadProgress(progress){
+            renderSpeechProgress(role,progress);
+        }
+        const result=await provider.load({
+            role,
+            selection,
+            signal:controller.signal,
+            progress:handleSpeechLoadProgress
+        });
+        const cacheState=typeof result.cache===&#39;string&#39;
+            ?result.cache
+            :result.cache?.state??provider.status().cache;
+        controls.progress.hidden=true;
+        controls.status.textContent=offline
+            ?&#39;Admitted DBOPFS artifacts loaded with network access disabled.&#39;
+            :cacheState===&#39;installed&#39;
+                ?&#39;Declared artifacts downloaded, verified, admitted to DBOPFS, and loaded in this role Worker.&#39;
+                :&#39;Admitted DBOPFS artifacts reused and loaded in this role Worker.&#39;;
+        controls.progressLabel.textContent=&#39;Browser-local speech role ready.&#39;;
+    }catch(error){
+        controls.progress.hidden=true;
+        controls.progressLabel.textContent=&#39;&#39;;
+        renderPublicError(controls.status,error);
+    }finally{
+        finishRoleOperation(role,controller);
+    }
+}
+
+async function unloadSpeechRole(role){
+    const controller=beginRoleOperation(role,&#39;unload&#39;);
+    if(!controller)return;
+    const controls=speechControls[role];
+    const provider=speechProviders[role];
+    controls.status.textContent=&#39;Ending only this speech role session without deleting any admitted DBOPFS cache.&#39;;
+    try{
+        if(provider)await provider.unload();
+        if(role===&#39;tts&#39;)revokeTtsAudioUrl();
+        controls.status.textContent=&#39;Role unloaded. Its Worker is no longer active and any admitted DBOPFS cache remains.&#39;;
+    }catch(error){
+        renderPublicError(controls.status,error);
+    }finally{
+        finishRoleOperation(role,controller);
+    }
+}
+
+function revokeTtsAudioUrl(){
+    if(!ttsAudioUrl)return;
+    try{
+        globalThis.URL?.revokeObjectURL?.(ttsAudioUrl);
+    }catch{
+        // The page still clears its reference if the host already revoked it.
+    }
+    ttsAudioUrl=null;
+    const audio=speechControls.tts.audio;
+    audio?.pause?.();
+    audio?.removeAttribute?.(&#39;src&#39;);
+    audio?.load?.();
+    if(audio)audio.hidden=true;
+}
+
+function installTtsAudio(result){
+    if(!(result?.audio instanceof Uint8Array)||result.contentType!==&#39;audio/wav&#39;){
+        throw createPublicError(&#39;ARCANE_AI_INVALID_PROVIDER_RESULT&#39;);
+    }
+    if(typeof Blob!==&#39;function&#39;||typeof globalThis.URL?.createObjectURL!==&#39;function&#39;){
+        throw createPublicError(&#39;HELLO_WORLD_AUDIO_PLAYBACK_UNAVAILABLE&#39;);
+    }
+    revokeTtsAudioUrl();
+    const blob=new Blob([result.audio],{type:&#39;audio/wav&#39;});
+    ttsAudioUrl=globalThis.URL.createObjectURL(blob);
+    speechControls.tts.audio.src=ttsAudioUrl;
+    speechControls.tts.audio.hidden=false;
+}
+
+async function synthesizeSpeech(){
+    const controller=beginRoleOperation(&#39;tts&#39;,&#39;request&#39;);
+    if(!controller)return;
+    const controls=speechControls.tts;
+    controls.status.textContent=&#39;Synthesizing WAV audio in the TTS Worker. Playback remains under your control.&#39;;
+    try{
+        const text=controls.input.value.trim();
+        if(!text)throw createPublicError(&#39;HELLO_WORLD_TTS_TEXT_REQUIRED&#39;);
+        if(text.length&gt;MAX_TTS_TEXT_LENGTH){
+            throw createPublicError(&#39;HELLO_WORLD_TTS_TEXT_TOO_LONG&#39;);
+        }
+        const provider=speechProviders.tts;
+        if(!provider)throw createPublicError(&#39;ARCANE_AI_NOT_READY&#39;);
+        const selection=speechSelection(provider);
+        const result=await provider.request({
+            role:&#39;tts&#39;,
+            operation:&#39;synthesize&#39;,
+            selection,
+            signal:controller.signal,
+            payload:{
+                model:selection.modelId,
+                input:text,
+                responseFormat:&#39;wav&#39;,
+                speed:1
+            }
+        });
+        installTtsAudio(result);
+        controls.status.textContent=&#39;WAV synthesis complete. Press play when you choose; the application never autoplays it.&#39;;
+    }catch(error){
+        renderPublicError(controls.status,error);
+    }finally{
+        finishRoleOperation(&#39;tts&#39;,controller);
+    }
+}
+
+async function transcribeSpeech(){
+    const controller=beginRoleOperation(&#39;stt&#39;,&#39;request&#39;);
+    if(!controller)return;
+    const controls=speechControls.stt;
+    controls.status.textContent=&#39;Decoding the selected file, then transcribing it in the STT Worker.&#39;;
+    controls.transcript.textContent=&#39;&#39;;
+    try{
+        const file=controls.file.files?.[0];
+        if(!file||file.size&lt;1)throw createPublicError(&#39;HELLO_WORLD_STT_FILE_REQUIRED&#39;);
+        if(file.size&gt;MAX_STT_FILE_BYTES){
+            throw createPublicError(&#39;HELLO_WORLD_STT_FILE_TOO_LARGE&#39;);
+        }
+        const mimeType=typeof file.type===&#39;string&#39;?file.type.trim():&#39;&#39;;
+        const mimeEssence=mimeType.split(&#39;;&#39;,1)[0].trim().toLowerCase();
+        if(!/^audio\/[a-z0-9!#$%&amp;&#39;*+.^_`|~-]+$/u.test(mimeEssence)){
+            throw createPublicError(&#39;HELLO_WORLD_STT_MIME_TYPE_REQUIRED&#39;);
+        }
+        const provider=speechProviders.stt;
+        if(!provider)throw createPublicError(&#39;ARCANE_AI_NOT_READY&#39;);
+        const selection=speechSelection(provider);
+        const result=await provider.request({
+            role:&#39;stt&#39;,
+            operation:&#39;transcribe&#39;,
+            selection,
+            signal:controller.signal,
+            payload:{
+                audio:file,
+                mimeType,
+                model:selection.modelId
+            }
+        });
+        if(typeof result?.text!==&#39;string&#39;){
+            throw createPublicError(&#39;ARCANE_AI_INVALID_PROVIDER_RESULT&#39;);
+        }
+        controls.transcript.textContent=result.text;
+        controls.status.textContent=&#39;File transcription complete. No microphone was opened or requested.&#39;;
+    }catch(error){
+        renderPublicError(controls.status,error);
+    }finally{
+        finishRoleOperation(&#39;stt&#39;,controller);
+    }
+}
+
+function loadOnlineModel(){
+    return loadModel();
+}
+
+function loadOfflineModel(){
+    return loadModel({offline:true});
+}
+
+function cancelLlmOperation(){
+    cancelRoleOperation(&#39;llm&#39;);
+}
+
+function loadTtsOnline(){
+    return loadSpeechRole(&#39;tts&#39;,false);
+}
+
+function loadTtsOffline(){
+    return loadSpeechRole(&#39;tts&#39;,true);
+}
+
+function cancelTtsOperation(){
+    cancelRoleOperation(&#39;tts&#39;);
+}
+
+function unloadTts(){
+    return unloadSpeechRole(&#39;tts&#39;);
+}
+
+function loadSttOnline(){
+    return loadSpeechRole(&#39;stt&#39;,false);
+}
+
+function loadSttOffline(){
+    return loadSpeechRole(&#39;stt&#39;,true);
+}
+
+function cancelSttOperation(){
+    cancelRoleOperation(&#39;stt&#39;);
+}
+
+function unloadStt(){
+    return unloadSpeechRole(&#39;stt&#39;);
+}
+
+function disposeResolvedAi(value){
+    return value.dispose();
+}
+
+function ignoreDisposeFailure(){
+    // Page teardown is best effort after every active operation is aborted.
+}
+
+function disposeApplication(){
+    if(pageDisposePromise)return;
+    pageController.abort(&#39;The page is closing.&#39;);
+    revokeTtsAudioUrl();
+    const disposals=[];
+    const currentAi=ai??aiPromise;
+    if(currentAi){
+        disposals.push(Promise.resolve(currentAi).then(disposeResolvedAi,ignoreDisposeFailure));
+    }
+    for(const role of [&#39;stt&#39;,&#39;tts&#39;]){
+        const provider=speechProviders[role];
+        if(provider)disposals.push(provider.dispose().catch(ignoreDisposeFailure));
+    }
+    pageDisposePromise=Promise.allSettled(disposals);
+}
+
+function reloadAfterBackForwardCache(event){
+    if(event?.persisted===true)globalThis.location?.reload?.();
+}
+
+action?.addEventListener(&#39;click&#39;,sayHello);
+aiLoad?.addEventListener(&#39;click&#39;,loadOnlineModel);
+aiLoadOffline?.addEventListener(&#39;click&#39;,loadOfflineModel);
+aiSend?.addEventListener(&#39;click&#39;,askLocalAI);
+aiCancel?.addEventListener(&#39;click&#39;,cancelLlmOperation);
+aiUnload?.addEventListener(&#39;click&#39;,unloadModel);
+speechControls.tts.load?.addEventListener(&#39;click&#39;,loadTtsOnline);
+speechControls.tts.loadOffline?.addEventListener(&#39;click&#39;,loadTtsOffline);
+speechControls.tts.cancel?.addEventListener(&#39;click&#39;,cancelTtsOperation);
+speechControls.tts.unload?.addEventListener(&#39;click&#39;,unloadTts);
+speechControls.tts.request?.addEventListener(&#39;click&#39;,synthesizeSpeech);
+speechControls.stt.load?.addEventListener(&#39;click&#39;,loadSttOnline);
+speechControls.stt.loadOffline?.addEventListener(&#39;click&#39;,loadSttOffline);
+speechControls.stt.cancel?.addEventListener(&#39;click&#39;,cancelSttOperation);
+speechControls.stt.unload?.addEventListener(&#39;click&#39;,unloadStt);
+speechControls.stt.request?.addEventListener(&#39;click&#39;,transcribeSpeech);
+globalThis.addEventListener(&#39;pagehide&#39;,disposeApplication,{once:true});
+globalThis.addEventListener(&#39;pageshow&#39;,reloadAfterBackForwardCache);
+renderSpeechAuthorityStatus();
+updateLlmControls();
+updateSpeechControls(&#39;tts&#39;);
+updateSpeechControls(&#39;stt&#39;);</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div></section>
+
+        <section id="permissions"><p class="step-label">Step 05</p><h2>Declare the browser contract</h2><p>The greeting, file-selected transcription, and browser-controlled audio playback need no privileged Arcane <a href="../reference/core/capabilities/">capability</a> or host method. The maintained <code>arcane-app.json</code> and <code>arcane-package.json</code> descriptors carry the same pinned LLM origin. When you choose real speech authorities, add each exact directly fetchable artifact origin to <code>security.connectOrigins</code> in both files; browser-speech rejects redirects and changed final URLs, so do not add broad, guessed, or redirect-only origins:</p><div class="code-block"><div class="code-bar"><span>arcane-app.json + arcane-package.json · shared contract</span><button type="button" data-copy-button>Copy</button></div><pre><code>{
   "permissions": {
     "capabilities": [],
     "methods": []
@@ -723,27 +1485,51 @@ updateControls();</code></pre><span class="copy-status" role="status" aria-live=
   "targets": [
     "browser"
   ]
-}</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p>In an ordinary browser, the page’s <code>arcane-app-id</code> metadata supplies the application identity and the greeting count stays in an app-scoped local-storage key. In a compatible Arcane host, <a href="../reference/runtime-modules/app-data-scope/">AppDataScope</a> can reconcile the authoritative <a href="../reference/core/reference/arcane-api/applications-terminal-capabilities/#arcaneappcurrent"><code>Arcane.app.current()</code></a> identity, while <a href="../reference/runtime-modules/theme-bootstrap/">ThemeBootstrap</a> can consume host appearance events. The application source has no executable-only branch.</p></section>
+}</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p>Keep that shared contract identical in both descriptors. When enabling speech, place each reviewed license and required notice under <code>apps/hello-world/licenses/speech/</code>, then add <code>"licenses"</code> to <code>arcane-app.json</code>’s <code>package.include</code> and <code>arcane-package.json</code>’s top-level <code>include</code> so the packaged app carries them. In an ordinary browser, the page’s <code>arcane-app-id</code> metadata supplies the application identity and the greeting count stays in an app-scoped local-storage key. In a compatible Arcane host, <a href="../reference/runtime-modules/app-data-scope/">AppDataScope</a> can reconcile the authoritative <a href="../reference/core/reference/arcane-api/applications-terminal-capabilities/#arcaneappcurrent"><code>Arcane.app.current()</code></a> identity, while <a href="../reference/runtime-modules/theme-bootstrap/">ThemeBootstrap</a> can consume host appearance events. The application source has no executable-only branch.</p></section>
 
         <section id="browser"><p class="step-label">Step 06</p><h2>Check it and run it in a browser</h2><p>Doctor checks the toolchain, check validates the complete app and authenticated runtime, the focused test exercises the visible behavior, and dev serves the source tree on a loopback URL.</p><div class="code-block"><div class="code-bar"><span>Application repository</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run doctor
 npm run check
 npm test
-npm run dev</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>You will see:</strong> an Arcane-styled page with a working <strong>Say hello</strong> button. Each click updates the app-scoped greeting count while named imports resolve from the committed runtime. Open the printed loopback URL; press <kbd>Ctrl</kbd>+<kbd>C</kbd> when finished.</p></section>
+npm run dev</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>You will see:</strong> an Arcane-styled page with a working <strong>Say hello</strong> button and separate LLM, TTS, and STT lifecycle cards. The LLM can use its maintained authority. TTS and STT fail closed with <code>HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED</code> until you provide reviewed speech authorities. Open the printed loopback URL; press <kbd>Ctrl</kbd>+<kbd>C</kbd> when finished.</p></section>
 
-        <section id="local-ai"><p class="step-label">Step 07 · optional</p><h2>Try the shipped browser-local AI</h2><p>The <code>arcane-os@0.2.1</code> <code>arcane-os/ai/browser-wasm</code> entrypoint ships authenticated Wllama JavaScript and WebAssembly, but it ships no model weights and starts no model download automatically. This example supplies an immutable Granite 4.1 3B Q4_K_S model authority: 1,998,371,424 bytes (1.86 GiB), Apache-2.0, revision <code>ab4701481089b58a082ef63cc1cee738887293ff</code>, and SHA-256 <code>ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a</code>.</p><ol><li>Press <strong>Load local AI</strong> to allow the first network fetch. The UI reports byte progress. A first network load can follow provider-controlled HTTPS redirects from the declared Hugging Face origin; deployments must account for that chain without pinning a transient regional CDN hostname.</li><li>Arcane verifies the complete SHA-256 before DBOPFS admission, writes the completion record, reopens the cached model, and rehashes it before use. <strong>Model downloaded, SHA-256 verified, admitted to app-scoped DBOPFS, and loaded locally</strong> is the successful first-use boundary.</li><li>Press <strong>Load verified cache offline</strong> on a later visit. <code>load({offline:true})</code> makes no model-source request and succeeds only with a verified cache. Packaged same-origin Wllama/WASM assets may still load, and every warm-cache load rehashes the full model.</li><li>Ask the model. Every request sets <code>localOnly:true</code>, which keeps inference in this browser provider after load; it does not make first-use model acquisition offline.</li></ol><p><strong>WebGPU:</strong> this 0.2.1 browser path requires WebGPU. The published provider owns its full-offload setting; the application does not provide a <code>gpuLayers</code> override.</p><p><strong>Lifecycle:</strong> cancel aborts the active load or request, retains any verified cache, and discards an interrupted model download. Unload ends the Wllama session and ensures the browser model Worker is no longer active while retaining the verified cache; it does not claim physical VRAM reclamation. Leaving the page aborts active work and disposes the session.</p><p><strong>Tool calls:</strong> proposed calls appear as structural name-and-argument records. The SDK does not execute them, and this example has no dispatcher. The UI shows stable <code>ARCANE_AI_*</code> and <code>APP_DATA_*</code> failure codes instead of provider error text.</p><p>This maintained interaction uses the browser-WASM LLM path and does not claim Node inference. Arcane 0.2.1 also ships the separate <a href="../reference/ai/browser-speech/"><code>arcane-os/ai/browser-speech</code></a> entrypoint, but this smallest app does not fetch speech runtime or model bytes. Compare the <a href="../reference/ai/browser-wasm/">browser-WASM guide</a>, the normalized <a href="../reference/ai/">AI surface</a>, and the runtime <a href="../reference/runtime-modules/ai/">AI.js module</a> before choosing a different host integration.</p></section>
+        <section id="local-ai">
+          <p class="step-label">Step 07 · optional</p>
+          <h2>Walk through the full browser AI lifecycle</h2>
+          <p>The application gives the LLM, TTS, and STT roles separate providers, operation signals, status, progress, cancellation, and unload controls. A failure or unload in one role does not silently switch providers or stop either other role.</p>
+          <h3>1. Know what the SDK and application each own</h3>
+          <p><code>arcane-os@0.2.1</code> ships the authenticated browser-WASM LLM runtime plus the browser-speech authority, artifact-store, Worker, lifecycle, and normalization machinery. It does not choose or ship caller-selected Whisper or Kokoro adapter closures, speech models, voices, URLs, or their licenses. This app keeps <code>SpeechAuthorities.js</code> at <code>null</code> for both speech roles until its owner supplies a reviewed, immutable closure. A speech load attempt before then returns <code>HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED</code> before storage or provider creation and performs no fetch.</p>
+          <p>The LLM example supplies an immutable Granite 4.1 3B Q4_K_S authority: 1,998,371,424 bytes (1.86 GiB), Apache-2.0, revision <code>ab4701481089b58a082ef63cc1cee738887293ff</code>, and SHA-256 <code>ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a</code>. This 0.2.1 LLM provider requires a WebGPU-capable browser.</p>
+          <h3>2. Admit each role’s artifacts once</h3>
+          <ol>
+            <li>Choose a role’s <strong>network load</strong> button. The SDK checks that role’s app-scoped DBOPFS cache first and downloads only a missing, declared artifact closure. Its progress remains local to that role.</li>
+            <li>With the app’s fixed secure policy, Arcane checks every declared byte length and SHA-256 digest before committing the completed cache. Speech URLs must be immutable, directly fetchable, and non-redirecting.</li>
+            <li>Unload the role, then choose its <strong>verified cache offline</strong> button. The app reconstructs the same authority with strict offline acquisition; a miss returns <code>ARCANE_AI_ARTIFACT_OFFLINE_MISS</code> without network fallback.</li>
+          </ol>
+          <p>LLM packaged same-origin Wllama/WASM assets may still load during its offline model-cache path. Speech strict-offline mode applies to the complete caller-declared adapter and model closure. Unload and dispose release live provider Workers and object URLs while retaining admitted DBOPFS artifacts.</p>
+          <h3>3. Use each loaded role</h3>
+          <ul>
+            <li><strong>LLM:</strong> ask a local-only question. Proposed tool calls remain visible structural name-and-argument records; the SDK and this app execute none of them.</li>
+            <li><strong>TTS:</strong> enter up to 500 characters and synthesize WAV bytes. The app exposes a temporary Blob URL through user-controlled <code>&lt;audio controls&gt;</code>, never autoplays, and revokes that URL when audio is replaced, TTS unloads, or the page leaves.</li>
+            <li><strong>STT:</strong> explicitly choose one audio file up to 8 MiB and transcribe it. Oversized input is rejected before SDK decoding. The app never requests microphone access or captures background audio.</li>
+          </ul>
+          <h3>4. Cancel, unload, and leave safely</h3>
+          <p>Each role owns one active <code>AbortController</code>. Cancel affects only that role. Depending on timing, speech cancellation leaves its provider ready or returns it to unloaded; the UI reads the provider state. Unload is disabled while a role is busy, so cancel or let the operation settle first. Unload then ends only that role and keeps verified cache data.</p>
+          <p>Leaving the page aborts all active operations, initiates best-effort disposal of every created provider, and revokes the TTS playback URL; browser termination releases any remaining live resources. If the browser restores the document from back/forward cache, the app reloads once to create fresh lifecycle owners. The UI maps documented <code>ARCANE_AI_*</code>, <code>APP_DATA_*</code>, and bounded-input <code>HELLO_WORLD_*</code> codes to stable copy instead of exposing provider-private messages.</p>
+          <p>This interaction is browser-only and makes no Node-inference claim. Follow the <a href="../reference/ai/browser-wasm/">browser-WASM guide</a>, <a href="../reference/ai/browser-speech/">browser-speech guide</a>, <a href="../reference/sdk-api/">SDK API</a>, normalized <a href="../reference/ai/">AI guidance</a>, and runtime <a href="../reference/runtime-modules/ai/">AI.js module</a> for the full contracts.</p>
+        </section>
 
         <section id="package"><p class="step-label">Step 08</p><h2>Package, verify, and bundle the browser application</h2><div class="code-block"><div class="code-bar"><span>Create and authenticate dist/hello-world</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run package
 npm run verify
 npm run bundle</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>Output:</strong> <code>dist/hello-world/</code> plus <code>dist/hello-world-0.1.0.arcane-app.tar.gz</code>. The <code>0.1.0</code> in that filename is this app’s version; the SDK dependency remains <code>arcane-os@0.2.1</code>. Verification compares the packaged inventory, byte sizes, and hashes with its release receipt.</p><p>See the CLI reference for <a href="../reference/cli/#arcane-package">package</a>, <a href="../reference/cli/#arcane-verify">verify</a>, and <a href="../reference/cli/#arcane-bundle">bundle</a>.</p></section>
 
         <section id="packaged-run"><p class="step-label">Step 09</p><h2>Build and run the packaged browser release</h2><p>The maintained scripts name the browser target explicitly. <code>build</code> regenerates the map and packages <code>dist/hello-world/</code>; <code>run</code> verifies the existing packaged release and serves it on a loopback URL.</p><div class="code-block"><div class="code-bar"><span>Browser build and packaged run</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run build
-npm run run</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>You will see:</strong> the same greeting and optional local-AI interface running from the verified packaged browser release. These commands do not create or launch a standalone native executable. Standalone native execution is provider-supplied and belongs to the separate <a href="../guides/native-builds/">native-build workflow</a>.</p></section>
+npm run run</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>You will see:</strong> the same greeting and independent LLM, TTS, and STT lifecycle interface running from the verified packaged browser release. Speech remains authority-gated unless you configured its immutable closures before packaging. These commands do not create or launch a standalone native executable. Standalone native execution is provider-supplied and belongs to the separate <a href="../guides/native-builds/">native-build workflow</a>.</p></section>
 
         <section id="related"><p class="step-label">Keep going</p><h2>Open the related reference where you need it</h2><ul><li><strong>Commands:</strong> <a href="../reference/cli/">CLI reference</a> and the direct <a href="../reference/sdk-api/">SDK API inventory</a>.</li><li><strong>App and host:</strong> <a href="../reference/core/capabilities/">capabilities</a>, <a href="../reference/core/reference/arcane-api/core-and-events/#arcaneruntimecurrent"><code>Arcane.runtime.current()</code></a>, <a href="../reference/core/reference/arcane-api/applications-terminal-capabilities/#arcaneappcurrent"><code>Arcane.app.current()</code></a>, and <a href="../reference/core/reference/arcane-api/applications-terminal-capabilities/#arcanecapabilitieslist"><code>Arcane.capabilities.list()</code></a>.</li><li><strong>Runtime modules:</strong> <a href="../reference/runtime-modules/theme-bootstrap/">ThemeBootstrap</a>, <a href="../reference/runtime-modules/app-data-scope/">AppDataScope</a>, <a href="../reference/runtime-modules/dbopfs/">DBOPFS</a>, and <a href="../reference/runtime-modules/directory-picker/">DirectoryPicker</a>. DirectoryPicker is related host functionality; this browser-only example does not request its <a href="../reference/core/capabilities/#capability-filesystemdirectoryselect"><code>filesystem.directory.select</code> capability</a>.</li><li><strong>AI:</strong> <a href="../reference/ai/browser-wasm/">browser-WASM local AI</a>, <a href="../reference/ai/browser-speech/">browser speech</a>, <a href="../reference/ai/">normalized AI guidance</a>, <a href="../reference/runtime-modules/ai/">AI.js</a>, and <a href="../reference/core/reference/arcane-api/ai-and-ollama/#arcaneaichat"><code>Arcane.ai.chat</code></a>.</li></ul></section>
 
         <nav class="page-pagination" aria-label="Page navigation"><a href="../"><span>Previous</span><strong>SDK overview</strong></a><a href="../guides/"><span>Next</span><strong>Choose a guide</strong></a></nav>
       </article>
-      <aside class="on-this-page" aria-label="On this page"><p>On this page</p><nav><a href="#install">Create and install</a><a href="#shape">Project shape</a><a href="#arcane-adds">Arcane and imports</a><a href="#source">Application source</a><a href="#permissions">App contract</a><a href="#browser">Run in browser</a><a href="#local-ai">Local AI</a><a href="#package">Package and verify</a><a href="#packaged-run">Run the package</a><a href="#related">Related reference</a></nav></aside>
+      <aside class="on-this-page" aria-label="On this page"><p>On this page</p><nav><a href="#install">Create and install</a><a href="#shape">Project shape</a><a href="#arcane-adds">Arcane and imports</a><a href="#source">Application source</a><a href="#permissions">App contract</a><a href="#browser">Run in browser</a><a href="#local-ai">Full AI lifecycle</a><a href="#package">Package and verify</a><a href="#packaged-run">Run the package</a><a href="#related">Related reference</a></nav></aside>
     </div>
   </main>
   <footer class="site-footer section-shell"><a class="brand footer-brand" href="../" aria-label="Arcane OS SDK documentation home"><img src="../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Build Arcane applications with HTML, CSS, and JavaScript.</p><nav aria-label="Footer navigation"><a href="../architecture/">Architecture</a><a href="../compatibility/">Compatibility</a><a href="https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a></nav></footer>
