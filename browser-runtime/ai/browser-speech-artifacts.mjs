@@ -3408,33 +3408,74 @@ export function createDbopfsSpeechArtifactStore({
           }
           throw speechError("ARCANE_AI_ARTIFACT_DOWNLOAD_FAILED", "A speech artifact source fetch was rejected.", error);
         }
+        let responseBody;
+        let responseHeaders;
+        let responseOk;
+        let responseRedirected;
+        let responseStatus;
+        let responseUrl;
+        try {
+          if (!response || typeof response !== "object") {
+            throw new TypeError("The artifact fetch result is not an object.");
+          }
+          responseBody = response.body;
+          responseHeaders = response.headers;
+          responseOk = response.ok;
+          responseRedirected = response.redirected;
+          responseStatus = response.status;
+          responseUrl = response.url;
+          if (
+            typeof responseOk !== "boolean"
+            || typeof responseRedirected !== "boolean"
+            || !Number.isInteger(responseStatus)
+            || typeof responseUrl !== "string"
+            || !responseHeaders
+            || typeof responseHeaders.get !== "function"
+            || (responseBody !== null && typeof responseBody?.getReader !== "function")
+          ) {
+            throw new TypeError("The artifact fetch result is not a readable Fetch Response.");
+          }
+        } catch (error) {
+          if (graph) {
+            throw artifactGraphError(
+              "artifact-graph-source-http-response-rejected",
+              `Artifact graph source fetch for ${descriptor.path} did not return a readable Fetch Response.`,
+              error,
+            );
+          }
+          throw speechError(
+            "ARCANE_AI_ARTIFACT_DOWNLOAD_FAILED",
+            "A speech artifact source fetch did not return a readable Fetch Response.",
+            error,
+          );
+        }
         let finalUrl = null;
         let finalUrlRecord = null;
         try {
-          finalUrlRecord = typeof response.url === "string" && response.url
-            ? new URL(response.url)
+          finalUrlRecord = responseUrl
+            ? new URL(responseUrl)
             : null;
           finalUrl = finalUrlRecord?.href ?? null;
         } catch {
           finalUrlRecord = null;
           finalUrl = null;
         }
-        if (graph && response.redirected === true && !finalUrlRecord) {
-          await response?.body?.cancel?.().catch(() => undefined);
+        if (graph && responseRedirected && !finalUrlRecord) {
+          await responseBody?.cancel?.().catch(() => undefined);
           throw artifactGraphError(
             "artifact-graph-source-response-url-unreadable",
             `Artifact graph redirected source response for ${descriptor.path} did not expose a readable final URL.`,
           );
         }
-        if (graph && response.redirected === true && redirectFinalOrigins.length < 1) {
-          await response?.body?.cancel?.().catch(() => undefined);
+        if (graph && responseRedirected && redirectFinalOrigins.length < 1) {
+          await responseBody?.cancel?.().catch(() => undefined);
           throw artifactGraphError(
             "artifact-graph-source-redirected",
             `Artifact graph source response for ${descriptor.path} did not match its immutable URL.`,
           );
         }
-        if (graph && response.redirected === true && finalUrlRecord.protocol !== "https:") {
-          await response?.body?.cancel?.().catch(() => undefined);
+        if (graph && responseRedirected && finalUrlRecord.protocol !== "https:") {
+          await responseBody?.cancel?.().catch(() => undefined);
           throw artifactGraphError(
             "artifact-graph-source-response-url-protocol-not-https",
             `Artifact graph redirected source response for ${descriptor.path} did not end at HTTPS.`,
@@ -3442,17 +3483,17 @@ export function createDbopfsSpeechArtifactStore({
         }
         if (
           graph
-          && response.redirected === true
+          && responseRedirected
           && (finalUrlRecord.username || finalUrlRecord.password)
         ) {
-          await response?.body?.cancel?.().catch(() => undefined);
+          await responseBody?.cancel?.().catch(() => undefined);
           throw artifactGraphError(
             "artifact-graph-source-response-url-credentials-rejected",
             `Artifact graph redirected source response for ${descriptor.path} exposed credentials in its final URL.`,
           );
         }
-        if (graph && response.redirected === true && finalUrlRecord.hash) {
-          await response?.body?.cancel?.().catch(() => undefined);
+        if (graph && responseRedirected && finalUrlRecord.hash) {
+          await responseBody?.cancel?.().catch(() => undefined);
           throw artifactGraphError(
             "artifact-graph-source-response-url-fragment-rejected",
             `Artifact graph redirected source response for ${descriptor.path} exposed a fragment in its final URL.`,
@@ -3460,52 +3501,52 @@ export function createDbopfsSpeechArtifactStore({
         }
         if (
           graph
-          && response.redirected === true
+          && responseRedirected
           && !redirectFinalOrigins.includes(finalUrlRecord.origin)
         ) {
-          await response?.body?.cancel?.().catch(() => undefined);
+          await responseBody?.cancel?.().catch(() => undefined);
           throw artifactGraphError(
             "artifact-graph-source-redirect-final-origin-mismatch",
             `Artifact graph redirected source response for ${descriptor.path} ended at an undeclared final origin.`,
           );
         }
-        if (graph && response.redirected !== true && finalUrl !== sourceUrl) {
-          await response?.body?.cancel?.().catch(() => undefined);
+        if (graph && !responseRedirected && finalUrl !== sourceUrl) {
+          await responseBody?.cancel?.().catch(() => undefined);
           throw artifactGraphError(
             "artifact-graph-source-response-url-mismatch",
             `Artifact graph non-redirected source response for ${descriptor.path} did not retain its immutable URL.`,
           );
         }
-        if (!graph && (response.redirected === true || finalUrl !== sourceUrl)) {
-          await response?.body?.cancel?.().catch(() => undefined);
+        if (!graph && (responseRedirected || finalUrl !== sourceUrl)) {
+          await responseBody?.cancel?.().catch(() => undefined);
           throw speechError(
             "ARCANE_AI_ARTIFACT_SOURCE_CHANGED",
             "A speech artifact response did not match its admitted URL.",
           );
         }
-        if (!response?.ok || !response.body) {
-          await response?.body?.cancel?.().catch(() => undefined);
+        if (!responseOk || !responseBody) {
+          await responseBody?.cancel?.().catch(() => undefined);
           if (graph) {
             throw artifactGraphError(
               "artifact-graph-source-http-response-rejected",
-              `Artifact graph source for ${descriptor.path} returned HTTP ${response?.status ?? "unknown"}.`,
+              `Artifact graph source for ${descriptor.path} returned HTTP ${String(responseStatus)}.`,
             );
           }
           throw speechError(
             "ARCANE_AI_ARTIFACT_DOWNLOAD_FAILED",
-            `A speech artifact server returned HTTP ${response?.status ?? "unknown"}.`,
+            `A speech artifact server returned HTTP ${String(responseStatus)}.`,
           );
         }
-        const header = response.headers?.get?.("content-length");
+        const header = responseHeaders.get("content-length");
         const reportedBytes = header ? Number(header) : null;
-        const contentEncoding = response.headers?.get?.("content-encoding")?.trim() ?? "";
+        const contentEncoding = responseHeaders.get("content-encoding")?.trim() ?? "";
         if (graph) {
-          const reportedMediaType = response.headers?.get?.("content-type")
+          const reportedMediaType = responseHeaders.get("content-type")
             ?.split(";", 1)[0]
             ?.trim()
             ?.toLowerCase() ?? null;
           if (reportedMediaType !== descriptor.sourceMediaType) {
-            await response.body.cancel?.().catch(() => undefined);
+            await responseBody.cancel?.().catch(() => undefined);
             throw graphVerificationError(
               descriptor,
               descriptor.sourceMediaType === descriptor.mediaType
@@ -3521,7 +3562,7 @@ export function createDbopfsSpeechArtifactStore({
           && (!graph || !contentEncoding)
           && reportedBytes !== descriptor.bytes
         ) {
-          await response.body.cancel?.().catch(() => undefined);
+          await responseBody.cancel?.().catch(() => undefined);
           if (graph) {
             throw graphVerificationError(
               descriptor,
@@ -3534,7 +3575,7 @@ export function createDbopfsSpeechArtifactStore({
         const digest = security.checks.sha256
           ? createStreamingSha256()
           : null;
-        const written = await writeFile(names.files[index], response.body, {
+        const written = await writeFile(names.files[index], responseBody, {
           signal,
           onChunk(chunk, completed) {
             digest?.update(chunk);

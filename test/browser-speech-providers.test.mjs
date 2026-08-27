@@ -579,6 +579,23 @@ test("artifact graph source redirects bind exact canonical final origins", () =>
     (error) => error?.reason === "artifact-graph-identity-sha256-mismatch",
   );
 
+  const sourceMediaGraph = createBrowserSpeechArtifactGraph({
+    ...fixture.descriptor,
+    files: [{ ...entrypoint, sourceMediaType: "application/javascript" }, ...remaining],
+  });
+  const sourceMediaFile = sourceMediaGraph.files.find((file) => file.path === entrypoint.path);
+  assert.equal(sourceMediaFile.sourceMediaType, "application/javascript");
+  assert.equal(sourceMediaFile.redirectFinalOrigins, undefined);
+  assert.notEqual(sourceMediaGraph.identitySha256, fixture.graph.identitySha256);
+  assert.throws(
+    () => createBrowserSpeechArtifactGraph({
+      ...fixture.descriptor,
+      identitySha256: fixture.graph.identitySha256,
+      files: [{ ...entrypoint, sourceMediaType: "application/javascript" }, ...remaining],
+    }),
+    (error) => error?.reason === "artifact-graph-identity-sha256-mismatch",
+  );
+
   const invalidInventories = [
     [null, "artifact-graph-source-redirect-final-origins-not-array"],
     [[], "artifact-graph-source-redirect-final-origin-inventory-empty"],
@@ -608,6 +625,13 @@ test("artifact graph source redirects bind exact canonical final origins", () =>
       files: [{ ...entrypoint, sourceMediaType: "text/plain; charset=utf-8" }, ...remaining],
     }),
     (error) => error?.reason === "artifact-graph-file-source-media-type-format-mismatch",
+  );
+  assert.throws(
+    () => createBrowserSpeechArtifactGraph({
+      ...fixture.descriptor,
+      files: [{ ...entrypoint, sourceMediaType: "" }, ...remaining],
+    }),
+    (error) => error?.reason === "artifact-graph-file-source-media-type-missing",
   );
   assert.throws(
     () => createBrowserSpeechArtifactGraph({
@@ -1200,6 +1224,15 @@ test("artifact graph cold redirects require declared final origin and source med
     redirectFailureStore("https://undeclared.example/xet/model").prepare(graph),
     (error) => error?.reason === "artifact-graph-source-redirect-final-origin-mismatch",
   );
+  for (const invalidResponse of [null, Object.freeze({})]) {
+    await assert.rejects(
+      createDbopfsSpeechArtifactStore({
+        dbopfs: createMemoryDbopfs(),
+        fetchImpl: async () => invalidResponse,
+      }).prepare(graph),
+      (error) => error?.reason === "artifact-graph-source-http-response-rejected",
+    );
+  }
   await assert.rejects(
     redirectFailureStore("https://undeclared.example/xet/model", {
       status: 404,
