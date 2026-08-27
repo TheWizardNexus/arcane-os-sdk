@@ -5,6 +5,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 import test from '../src/testing.mjs';
+import {loadSdkBrowserRuntimeRelease} from '../src/sdk-browser-runtime.mjs';
 import {createModelController} from '../browser-runtime/ai/model-controller.mjs';
 import {
     createBrowserModelSource,
@@ -16,9 +17,13 @@ import {runCommand,runNode,temporaryDirectory} from './helpers.mjs';
 
 const FORBIDDEN_PACKED_ASSET_EXTENSION=
     /\.(?:gguf|ggml|safetensors|onnx|ort|tflite|mlmodel|pb|pt|pth|bin|data|exe|dll|so|dylib|node|a|lib|wav|flac|mp3|ogg|opus)$/iu;
-const PACKED_WASM_ALLOWLIST=Object.freeze([
-    'browser-runtime/ai/wllama/wllama.wasm'
-]);
+const SDK_BROWSER_RUNTIME_RELEASE=await loadSdkBrowserRuntimeRelease();
+const PACKED_WASM_ALLOWLIST=Object.freeze(
+    SDK_BROWSER_RUNTIME_RELEASE.files
+        .filter(file=>file.path.toLowerCase().endsWith('.wasm'))
+        .map(file=>`browser-runtime/${file.path}`)
+        .sort()
+);
 const sourceTest=process.env.ARCANE_SDK_EXACT_ARTIFACT_REQUIRED==='true'
     ?()=>undefined
     :test;

@@ -6,6 +6,7 @@ import {pathToFileURL} from 'node:url';
 import test from '../src/testing.mjs';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';
 import {SDK_VERSION} from '../src/constants.mjs';
+import {loadSdkBrowserRuntimeRelease} from '../src/sdk-browser-runtime.mjs';
 import {verifyNpmReleaseArtifact} from '../tools/npm-release-contract.mjs';
 import {
     repositoryRoot,
@@ -15,33 +16,10 @@ import {
     temporaryDirectory
 } from './helpers.mjs';
 
-const SDK_BROWSER_RUNTIME_FILES=Object.freeze([
-    'ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json',
-    'ai/browser-kokoro-worker.mjs',
-    'ai/browser-speech-artifacts.mjs',
-    'ai/browser-speech-providers.mjs',
-    'ai/browser-speech.mjs',
-    'ai/browser-wasm-llm-provider.mjs',
-    'ai/browser-wasm.mjs',
-    'ai/browser-whisper-worker.mjs',
-    'ai/browser-wllama-runtime.mjs',
-    'ai/internal/sha256.mjs',
-    'ai/model-controller.mjs',
-    'ai/speech-worker-client.mjs',
-    'ai/speech-worker-runtime.mjs',
-    'ai/wllama/LICENCE',
-    'ai/wllama/index.mjs',
-    'ai/wllama/llama.cpp-LICENSE',
-    'ai/wllama/wllama.wasm',
-    'dependencies/event-pubsub/index.js',
-    'dependencies/event-pubsub/licence',
-    'dependencies/event-pubsub/package.json',
-    'dependencies/strong-type/index.js',
-    'dependencies/strong-type/licence',
-    'dependencies/strong-type/package.json',
-    'dom-event-instrumentation.mjs',
-    'event-manager.mjs'
-]);
+const SDK_BROWSER_RUNTIME_RELEASE=await loadSdkBrowserRuntimeRelease();
+const SDK_BROWSER_RUNTIME_FILES=Object.freeze(
+    SDK_BROWSER_RUNTIME_RELEASE.files.map(file=>file.path)
+);
 const SDK_BROWSER_RUNTIME_PACKAGE_FILES=Object.freeze([
     'ARCANE_SDK_BROWSER_RELEASE.json',
     ...SDK_BROWSER_RUNTIME_FILES
@@ -58,9 +36,12 @@ const DEBUG_MODEL_PATH_PRESENT=Object.hasOwn(
 );
 const FORBIDDEN_PACKED_ASSET_EXTENSION=
     /\.(?:gguf|ggml|safetensors|onnx|ort|tflite|mlmodel|pb|pt|pth|bin|data|exe|dll|so|dylib|node|a|lib|wav|flac|mp3|ogg|opus)$/iu;
-const PACKED_WASM_ALLOWLIST=Object.freeze([
-    'browser-runtime/ai/wllama/wllama.wasm'
-]);
+const PACKED_WASM_ALLOWLIST=Object.freeze(
+    SDK_BROWSER_RUNTIME_FILES
+        .filter(file=>file.toLowerCase().endsWith('.wasm'))
+        .map(file=>`browser-runtime/${file}`)
+        .sort()
+);
 
 async function realFileInventory(root,relativeRoot=''){
     const files=[];
@@ -300,11 +281,6 @@ test('packed npm artifact installs and drives an external repository end to end'
         const aiComponentFiles=new Map(aiComponents.components.flatMap(component=>
             component.files.map(file=>[file.path,file])
         ));
-        const packagedOnlySources=new Set([
-            'ai/wllama/LICENCE',
-            'ai/wllama/index.mjs',
-            'ai/wllama/wllama.wasm'
-        ]);
         for(const file of manifest.files){
             const snapshot=await readFile(path.join(browserRuntimeRoot,...file.path.split('/')));
             assert.equal(snapshot.length,file.bytes,`${file.path} byte length drifted.`);
@@ -313,7 +289,8 @@ test('packed npm artifact installs and drives an external repository end to end'
                 file.sha256,
                 `${file.path} digest drifted.`
             );
-            if(packagedOnlySources.has(file.path)){
+            if(file.sourcePath.startsWith('node_modules/@wllama/wllama/')
+                ||file.provenance==='deterministic-derived-vendor'){
                 const componentFile=aiComponentFiles.get(file.path);
                 assert.ok(componentFile,`${file.path} lacks component authority.`);
                 assert.equal(componentFile.bytes,file.bytes);

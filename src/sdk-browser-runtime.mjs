@@ -35,40 +35,36 @@ const expectedAiComponents=Object.freeze(
     JSON.parse(canonicalAiComponentsBytes.toString('utf8'))
 );
 
-const expectedFiles=Object.freeze([
-    ['ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json','browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json','sdk-source-identity'],
-    ['ai/browser-kokoro-worker.mjs','browser-runtime/ai/browser-kokoro-worker.mjs','sdk-source-identity'],
-    ['ai/browser-speech-artifacts.mjs','browser-runtime/ai/browser-speech-artifacts.mjs','sdk-source-identity'],
-    ['ai/browser-speech-providers.mjs','browser-runtime/ai/browser-speech-providers.mjs','sdk-source-identity'],
-    ['ai/browser-speech.mjs','browser-runtime/ai/browser-speech.mjs','sdk-source-identity'],
-    ['ai/browser-wasm-llm-provider.mjs','browser-runtime/ai/browser-wasm-llm-provider.mjs','sdk-source-identity'],
-    ['ai/browser-wasm.mjs','browser-runtime/ai/browser-wasm.mjs','sdk-source-identity'],
-    ['ai/browser-whisper-worker.mjs','browser-runtime/ai/browser-whisper-worker.mjs','sdk-source-identity'],
-    ['ai/browser-wllama-runtime.mjs','browser-runtime/ai/browser-wllama-runtime.mjs','sdk-source-identity'],
-    ['ai/internal/sha256.mjs','browser-runtime/ai/internal/sha256.mjs','sdk-source-identity'],
-    ['ai/model-controller.mjs','browser-runtime/ai/model-controller.mjs','sdk-source-identity'],
-    ['ai/speech-worker-client.mjs','browser-runtime/ai/speech-worker-client.mjs','sdk-source-identity'],
-    ['ai/speech-worker-runtime.mjs','browser-runtime/ai/speech-worker-runtime.mjs','sdk-source-identity'],
-    ['ai/wllama/LICENCE','node_modules/@wllama/wllama/LICENCE','vendor-package-identity'],
-    ['ai/wllama/index.mjs','browser-runtime/ai/wllama/index.mjs','deterministic-derived-vendor'],
-    ['ai/wllama/llama.cpp-LICENSE','browser-runtime/ai/wllama/llama.cpp-LICENSE','vendor-source-identity'],
-    ['ai/wllama/wllama.wasm','node_modules/@wllama/wllama/esm/wasm/wllama.wasm','vendor-package-identity'],
-    ['dependencies/event-pubsub/index.js','node_modules/event-pubsub/index.js','vendor-package-identity'],
-    ['dependencies/event-pubsub/licence','node_modules/event-pubsub/licence','vendor-package-identity'],
-    ['dependencies/event-pubsub/package.json','node_modules/event-pubsub/package.json','vendor-package-identity'],
-    ['dependencies/strong-type/index.js','node_modules/strong-type/index.js','vendor-package-identity'],
-    ['dependencies/strong-type/licence','node_modules/strong-type/licence','vendor-package-identity'],
-    ['dependencies/strong-type/package.json','node_modules/strong-type/package.json','vendor-package-identity'],
-    ['dom-event-instrumentation.mjs','src/dom-event-instrumentation.mjs','sdk-source-identity'],
-    ['event-manager.mjs','src/event-manager.mjs','sdk-source-identity']
-].map(([filePath,sourcePath,provenance])=>Object.freeze({
-    path:filePath,sourcePath,provenance
-})));
-
-const expectedDirectories=Object.freeze([...new Set(expectedFiles.flatMap(file=>{
-    const segments=file.path.split('/');
-    return segments.slice(0,-1).map((_,index)=>segments.slice(0,index+1).join('/'));
-}))].sort(compareText));
+const admittedDependencyFiles=Object.freeze({
+    'event-pubsub':Object.freeze(['index.js','licence','package.json']),
+    'strong-type':Object.freeze(['index.js','licence','package.json'])
+});
+const exactRuntimeFileAuthorities=Object.freeze({
+    'ai/wllama/LICENCE':Object.freeze({
+        sourcePath:'node_modules/@wllama/wllama/LICENCE',
+        provenance:'vendor-package-identity'
+    }),
+    'ai/wllama/index.mjs':Object.freeze({
+        sourcePath:'browser-runtime/ai/wllama/index.mjs',
+        provenance:'deterministic-derived-vendor'
+    }),
+    'ai/wllama/llama.cpp-LICENSE':Object.freeze({
+        sourcePath:'browser-runtime/ai/wllama/llama.cpp-LICENSE',
+        provenance:'vendor-source-identity'
+    }),
+    'ai/wllama/wllama.wasm':Object.freeze({
+        sourcePath:'node_modules/@wllama/wllama/esm/wasm/wllama.wasm',
+        provenance:'vendor-package-identity'
+    }),
+    'dom-event-instrumentation.mjs':Object.freeze({
+        sourcePath:'src/dom-event-instrumentation.mjs',
+        provenance:'sdk-source-identity'
+    }),
+    'event-manager.mjs':Object.freeze({
+        sourcePath:'src/event-manager.mjs',
+        provenance:'sdk-source-identity'
+    })
+});
 
 function fail(message,code='ARCANE_SDK_BROWSER_INTEGRITY_FAILED'){
     const error=new Error(message);
@@ -101,7 +97,8 @@ function safeInventoryPath(value,label='manifest'){
     if(typeof value!=='string'||!value||value.includes('\\')||value.includes('\0')
         ||value.normalize('NFC')!==value||path.posix.isAbsolute(value)
         ||path.posix.normalize(value)!==value||value==='.'||value.startsWith('../')
-        ||value.includes('/../')){
+        ||value.includes('/../')
+        ||value.split('/').some(segment=>!segment||segment.startsWith('.'))){
         fail(`SDK browser runtime ${label} contains an unsafe path: ${String(value)}.`);
     }
     return value;
@@ -109,6 +106,46 @@ function safeInventoryPath(value,label='manifest'){
 
 function collisionKey(value){
     return value.normalize('NFC').toLocaleLowerCase('en-US');
+}
+
+function runtimeFileAuthority(value){
+    const relative=safeInventoryPath(value);
+    const exact=Object.hasOwn(exactRuntimeFileAuthorities,relative)
+        ?exactRuntimeFileAuthorities[relative]
+        :null;
+    if(exact)return Object.freeze({path:relative,...exact});
+
+    if(relative.startsWith('ai/wllama/')){
+        fail(`SDK browser runtime Wllama asset is not admitted: ${relative}.`);
+    }
+    if(relative.startsWith('ai/')&&['.mjs','.json'].includes(path.posix.extname(relative))){
+        return Object.freeze({
+            path:relative,
+            sourcePath:`browser-runtime/${relative}`,
+            provenance:'sdk-source-identity'
+        });
+    }
+    if(relative.startsWith('dependencies/')){
+        const [directory,packageName,fileName,...extra]=relative.split('/');
+        const admitted=Object.hasOwn(admittedDependencyFiles,packageName)
+            ?admittedDependencyFiles[packageName]
+            :null;
+        if(directory==='dependencies'&&extra.length===0&&admitted?.includes(fileName)){
+            return Object.freeze({
+                path:relative,
+                sourcePath:`node_modules/${packageName}/${fileName}`,
+                provenance:'vendor-package-identity'
+            });
+        }
+    }
+    fail(`SDK browser runtime path has no admitted source authority: ${relative}.`);
+}
+
+function inventoryDirectories(files){
+    return Object.freeze([...new Set(files.flatMap(file=>{
+        const segments=file.path.split('/');
+        return segments.slice(0,-1).map((_,index)=>segments.slice(0,index+1).join('/'));
+    }))].sort(compareText));
 }
 
 function immutableInventory(files){
@@ -181,7 +218,7 @@ function validateSource(source){
     });
 }
 
-function validateRelease(value){
+function validateRelease(value,{expectedContentSha256=SDK_BROWSER_RUNTIME_CONTENT_SHA256}={}){
     if(!value||typeof value!=='object'||Array.isArray(value)){
         fail('SDK browser runtime manifest must be a JSON object.');
     }
@@ -197,8 +234,8 @@ function validateRelease(value){
         fail('SDK browser runtime manifest sdkVersion is incompatible with this SDK.');
     }
     const source=validateSource(value.source);
-    if(!Array.isArray(value.files)||!Number.isSafeInteger(value.fileCount)
-        ||value.fileCount!==value.files.length||value.fileCount!==expectedFiles.length
+    if(!Array.isArray(value.files)||value.files.length===0||!Number.isSafeInteger(value.fileCount)
+        ||value.fileCount!==value.files.length
         ||!Number.isSafeInteger(value.totalBytes)||value.totalBytes<0
         ||!SHA256_PATTERN.test(value.contentSha256)){
         fail('SDK browser runtime manifest inventory summary is invalid.');
@@ -206,6 +243,7 @@ function validateRelease(value){
     let previous='';
     let totalBytes=0;
     const collisionKeys=new Set();
+    const sourceCollisionKeys=new Set();
     const files=value.files.map((entry,index)=>{
         if(!entry||typeof entry!=='object'||Array.isArray(entry)
             ||!exactKeys(entry,['bytes','path','provenance','sha256','sourcePath'])){
@@ -213,11 +251,13 @@ function validateRelease(value){
         }
         const relative=safeInventoryPath(entry.path);
         const sourcePath=safeInventoryPath(entry.sourcePath,'source inventory');
-        const expected=expectedFiles[index];
+        const expected=runtimeFileAuthority(relative);
         const key=collisionKey(relative);
+        const sourceKey=collisionKey(sourcePath);
         if(relative===MANIFEST_NAME||collisionKeys.has(key)
+            ||sourceCollisionKeys.has(sourceKey)
             ||(previous&&compareText(previous,relative)>=0)
-            ||relative!==expected.path||sourcePath!==expected.sourcePath
+            ||sourcePath!==expected.sourcePath
             ||entry.provenance!==expected.provenance){
             fail(`SDK browser runtime manifest inventory is invalid at ${relative}.`);
         }
@@ -225,6 +265,7 @@ function validateRelease(value){
             fail(`SDK browser runtime manifest metadata is invalid for ${relative}.`);
         }
         collisionKeys.add(key);
+        sourceCollisionKeys.add(sourceKey);
         previous=relative;
         totalBytes+=entry.bytes;
         if(!Number.isSafeInteger(totalBytes)){
@@ -245,11 +286,14 @@ function validateRelease(value){
     if(aggregate!==value.contentSha256){
         fail('SDK browser runtime manifest contentSha256 does not match its inventory.');
     }
-    if(value.contentSha256!==SDK_BROWSER_RUNTIME_CONTENT_SHA256){
+    if(expectedContentSha256!==null&&value.contentSha256!==expectedContentSha256){
         fail('SDK browser runtime manifest does not match the trusted SDK browser closure.');
     }
     return Object.freeze({...value,source,files:immutableInventory(files)});
 }
+
+const validatedCanonicalRelease=validateRelease(canonicalRelease,{expectedContentSha256:null});
+const expectedDirectories=inventoryDirectories(validatedCanonicalRelease.files);
 
 function sameIdentity(before,after){
     return before.dev===after.dev&&before.ino===after.ino&&before.size===after.size

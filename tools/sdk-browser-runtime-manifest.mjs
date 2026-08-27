@@ -125,45 +125,96 @@ const expectedAiComponents=Object.freeze({
     ]
 });
 
-const expectedFiles=Object.freeze([
-    ['ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json','browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json','sdk-source-identity'],
-    ['ai/browser-kokoro-worker.mjs','browser-runtime/ai/browser-kokoro-worker.mjs','sdk-source-identity'],
-    ['ai/browser-speech-artifacts.mjs','browser-runtime/ai/browser-speech-artifacts.mjs','sdk-source-identity'],
-    ['ai/browser-speech-providers.mjs','browser-runtime/ai/browser-speech-providers.mjs','sdk-source-identity'],
-    ['ai/browser-speech.mjs','browser-runtime/ai/browser-speech.mjs','sdk-source-identity'],
-    ['ai/browser-wasm-llm-provider.mjs','browser-runtime/ai/browser-wasm-llm-provider.mjs','sdk-source-identity'],
-    ['ai/browser-wasm.mjs','browser-runtime/ai/browser-wasm.mjs','sdk-source-identity'],
-    ['ai/browser-whisper-worker.mjs','browser-runtime/ai/browser-whisper-worker.mjs','sdk-source-identity'],
-    ['ai/browser-wllama-runtime.mjs','browser-runtime/ai/browser-wllama-runtime.mjs','sdk-source-identity'],
-    ['ai/internal/sha256.mjs','browser-runtime/ai/internal/sha256.mjs','sdk-source-identity'],
-    ['ai/model-controller.mjs','browser-runtime/ai/model-controller.mjs','sdk-source-identity'],
-    ['ai/speech-worker-client.mjs','browser-runtime/ai/speech-worker-client.mjs','sdk-source-identity'],
-    ['ai/speech-worker-runtime.mjs','browser-runtime/ai/speech-worker-runtime.mjs','sdk-source-identity'],
-    ['ai/wllama/LICENCE','node_modules/@wllama/wllama/LICENCE','vendor-package-identity'],
-    ['ai/wllama/index.mjs','browser-runtime/ai/wllama/index.mjs','deterministic-derived-vendor'],
-    ['ai/wllama/llama.cpp-LICENSE','browser-runtime/ai/wllama/llama.cpp-LICENSE','vendor-source-identity'],
-    ['ai/wllama/wllama.wasm','node_modules/@wllama/wllama/esm/wasm/wllama.wasm','vendor-package-identity'],
-    ['dependencies/event-pubsub/index.js','node_modules/event-pubsub/index.js','vendor-package-identity'],
-    ['dependencies/event-pubsub/licence','node_modules/event-pubsub/licence','vendor-package-identity'],
-    ['dependencies/event-pubsub/package.json','node_modules/event-pubsub/package.json','vendor-package-identity'],
-    ['dependencies/strong-type/index.js','node_modules/strong-type/index.js','vendor-package-identity'],
-    ['dependencies/strong-type/licence','node_modules/strong-type/licence','vendor-package-identity'],
-    ['dependencies/strong-type/package.json','node_modules/strong-type/package.json','vendor-package-identity'],
-    ['dom-event-instrumentation.mjs','src/dom-event-instrumentation.mjs','sdk-source-identity'],
-    ['event-manager.mjs','src/event-manager.mjs','sdk-source-identity']
-].map(([filePath,sourcePath,provenance])=>Object.freeze({
-    path:filePath,sourcePath,provenance
-})));
-
-const expectedDirectories=Object.freeze([...new Set(expectedFiles.flatMap(file=>{
-    const segments=file.path.split('/');
-    return segments.slice(0,-1).map((_,index)=>segments.slice(0,index+1).join('/'));
-}))].sort(compareText));
+const admittedDependencyFiles=Object.freeze({
+    'event-pubsub':Object.freeze(['index.js','licence','package.json']),
+    'strong-type':Object.freeze(['index.js','licence','package.json'])
+});
+const exactRuntimeFileAuthorities=Object.freeze({
+    'ai/wllama/LICENCE':Object.freeze({
+        sourcePath:'node_modules/@wllama/wllama/LICENCE',
+        provenance:'vendor-package-identity'
+    }),
+    'ai/wllama/index.mjs':Object.freeze({
+        sourcePath:'browser-runtime/ai/wllama/index.mjs',
+        provenance:'deterministic-derived-vendor'
+    }),
+    'ai/wllama/llama.cpp-LICENSE':Object.freeze({
+        sourcePath:'browser-runtime/ai/wllama/llama.cpp-LICENSE',
+        provenance:'vendor-source-identity'
+    }),
+    'ai/wllama/wllama.wasm':Object.freeze({
+        sourcePath:'node_modules/@wllama/wllama/esm/wasm/wllama.wasm',
+        provenance:'vendor-package-identity'
+    }),
+    'dom-event-instrumentation.mjs':Object.freeze({
+        sourcePath:'src/dom-event-instrumentation.mjs',
+        provenance:'sdk-source-identity'
+    }),
+    'event-manager.mjs':Object.freeze({
+        sourcePath:'src/event-manager.mjs',
+        provenance:'sdk-source-identity'
+    })
+});
 
 function compareText(left,right){
     const a=String(left);
     const b=String(right);
     return a<b?-1:a>b?1:0;
+}
+
+function safeInventoryPath(value,label='inventory'){
+    if(typeof value!=='string'||!value||value.includes('\\')||value.includes('\0')
+        ||value.normalize('NFC')!==value||path.posix.isAbsolute(value)
+        ||path.posix.normalize(value)!==value||value==='.'||value.startsWith('../')
+        ||value.includes('/../')
+        ||value.split('/').some(segment=>!segment||segment.startsWith('.'))){
+        throw new Error(`SDK browser runtime ${label} contains an unsafe path: ${String(value)}.`);
+    }
+    return value;
+}
+
+function collisionKey(value){
+    return value.normalize('NFC').toLocaleLowerCase('en-US');
+}
+
+function runtimeFileAuthority(value){
+    const relative=safeInventoryPath(value);
+    const exact=Object.hasOwn(exactRuntimeFileAuthorities,relative)
+        ?exactRuntimeFileAuthorities[relative]
+        :null;
+    if(exact)return Object.freeze({path:relative,...exact});
+
+    if(relative.startsWith('ai/wllama/')){
+        throw new Error(`SDK browser runtime Wllama asset is not admitted: ${relative}.`);
+    }
+    if(relative.startsWith('ai/')&&['.mjs','.json'].includes(path.posix.extname(relative))){
+        return Object.freeze({
+            path:relative,
+            sourcePath:`browser-runtime/${relative}`,
+            provenance:'sdk-source-identity'
+        });
+    }
+    if(relative.startsWith('dependencies/')){
+        const [directory,packageName,fileName,...extra]=relative.split('/');
+        const admitted=Object.hasOwn(admittedDependencyFiles,packageName)
+            ?admittedDependencyFiles[packageName]
+            :null;
+        if(directory==='dependencies'&&extra.length===0&&admitted?.includes(fileName)){
+            return Object.freeze({
+                path:relative,
+                sourcePath:`node_modules/${packageName}/${fileName}`,
+                provenance:'vendor-package-identity'
+            });
+        }
+    }
+    throw new Error(`SDK browser runtime path has no admitted source authority: ${relative}.`);
+}
+
+function expectedDirectories(files){
+    return [...new Set(files.flatMap(file=>{
+        const segments=file.path.split('/');
+        return segments.slice(0,-1).map((_,index)=>segments.slice(0,index+1).join('/'));
+    }))].sort(compareText);
 }
 
 function sameIdentity(before,after){
@@ -217,7 +268,10 @@ async function snapshotInventory(){
         const entries=await readdir(directory,{withFileTypes:true});
         entries.sort((left,right)=>compareText(left.name,right.name));
         for(const entry of entries){
-            const relative=relativeRoot?`${relativeRoot}/${entry.name}`:entry.name;
+            const relative=safeInventoryPath(
+                relativeRoot?`${relativeRoot}/${entry.name}`:entry.name,
+                'tree'
+            );
             if(relative===MANIFEST_NAME)continue;
             const absolute=path.join(directory,entry.name);
             const info=await lstat(absolute);
@@ -237,18 +291,34 @@ async function snapshotInventory(){
     await visit(browserRuntimeRoot);
     files.sort(compareText);
     directories.sort(compareText);
-    const expectedFilePaths=expectedFiles.map(file=>file.path);
-    if(JSON.stringify(files)!==JSON.stringify(expectedFilePaths)
-        ||JSON.stringify(directories)!==JSON.stringify(expectedDirectories)){
-        const missing=[...expectedFilePaths,...expectedDirectories]
-            .filter(entry=>!files.includes(entry)&&!directories.includes(entry));
-        const extra=[...files,...directories]
-            .filter(entry=>!expectedFilePaths.includes(entry)&&!expectedDirectories.includes(entry));
+    const collisionKeys=new Set();
+    const sourceCollisionKeys=new Set();
+    const authorities=files.map(file=>{
+        const key=collisionKey(file);
+        if(collisionKeys.has(key)){
+            throw new Error(`SDK browser runtime contains an ambiguous path: ${file}.`);
+        }
+        collisionKeys.add(key);
+        const authority=runtimeFileAuthority(file);
+        const sourceKey=collisionKey(authority.sourcePath);
+        if(sourceCollisionKeys.has(sourceKey)){
+            throw new Error(
+                `SDK browser runtime contains an ambiguous source path: ${authority.sourcePath}.`
+            );
+        }
+        sourceCollisionKeys.add(sourceKey);
+        return authority;
+    });
+    const admittedDirectories=expectedDirectories(authorities);
+    if(JSON.stringify(directories)!==JSON.stringify(admittedDirectories)){
+        const missing=admittedDirectories.filter(entry=>!directories.includes(entry));
+        const extra=directories.filter(entry=>!admittedDirectories.includes(entry));
         throw new Error(
-            `SDK browser runtime inventory drifted; missing=${JSON.stringify(missing)}, `
+            `SDK browser runtime directory inventory drifted; missing=${JSON.stringify(missing)}, `
             +`extra=${JSON.stringify(extra)}.`
         );
     }
+    return Object.freeze(authorities);
 }
 
 function parseJson(bytes,label){
@@ -256,7 +326,7 @@ function parseJson(bytes,label){
     catch(error){throw new Error(`${label} is not valid JSON: ${error.message}`);}
 }
 
-function validateAiComponents(sourceBytes){
+function validateAiComponents(sourceBytes,expectedFiles){
     const receipt=parseJson(
         sourceBytes.get('browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json'),
         'Arcane AI browser WASM component receipt'
@@ -276,13 +346,24 @@ function validateAiComponents(sourceBytes){
     }
 }
 
-async function sourceBytesByPath(){
+async function sourceBytesByPath(expectedFiles){
     const packageDocument=parseJson(
         await readRealFile(path.join(packageRoot,'package.json'),'SDK package manifest'),
         'SDK package manifest'
     );
     if(packageDocument.name!=='arcane-os'||packageDocument.version!==SDK_VERSION){
         throw new Error('SDK browser runtime package identity does not match this SDK.');
+    }
+    const runtimePaths=new Set(expectedFiles.map(file=>file.path));
+    for(const [exportName,target] of Object.entries(packageDocument.exports??{})){
+        if(typeof target!=='string'||!target.startsWith('./browser-runtime/'))continue;
+        const relative=safeInventoryPath(target.slice('./browser-runtime/'.length),'package export');
+        if(!runtimePaths.has(relative)){
+            throw new Error(
+                `SDK browser package export ${exportName} is missing from the runtime inventory: `
+                +`${relative}.`
+            );
+        }
     }
     const lockDocument=parseJson(
         await readRealFile(path.join(packageRoot,'package-lock.json'),'SDK package lock'),
@@ -358,7 +439,7 @@ async function sourceBytesByPath(){
     if(!projectedSnapshot||!projectedSnapshot.equals(projectedWllama)){
         throw new Error('Packaged Wllama ESM is not the deterministic authenticated projection.');
     }
-    validateAiComponents(sourceBytes);
+    validateAiComponents(sourceBytes,expectedFiles);
     const eventManagerText=sourceBytes.get('src/event-manager.mjs').toString('utf8');
     const eventPubSubText=sourceBytes.get('node_modules/event-pubsub/index.js').toString('utf8');
     if(!eventManagerText.includes("from 'event-pubsub'")
@@ -370,8 +451,8 @@ async function sourceBytesByPath(){
 }
 
 async function buildManifest(){
-    await snapshotInventory();
-    const sourceBytes=await sourceBytesByPath();
+    const expectedFiles=await snapshotInventory();
+    const sourceBytes=await sourceBytesByPath(expectedFiles);
     const files=[];
     for(const file of expectedFiles){
         const snapshot=await readRealFile(

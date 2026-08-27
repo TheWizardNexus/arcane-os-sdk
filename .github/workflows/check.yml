@@ -155,8 +155,22 @@ jobs:
           node tools/verify-npm-release.mjs --metadata "$RELEASE_METADATA" --expected-source "$GITHUB_SHA" --expected-version "$RELEASE_VERSION" --require-clean
           node --input-type=module <<'NODE'
           import {readFile} from 'node:fs/promises';
+          import {loadSdkBrowserRuntimeRelease} from './src/sdk-browser-runtime.mjs';
           const manifest=JSON.parse(await readFile(process.env.RELEASE_METADATA,'utf8'));
           const files=new Set(manifest.package.files.map(file=>file.path));
+          const browserRuntimeRelease=await loadSdkBrowserRuntimeRelease();
+          const exactBrowserRuntimeProjection=new Set([
+            'browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json',
+            ...browserRuntimeRelease.files.map(file=>`browser-runtime/${file.path}`)
+          ]);
+          const exactBrowserAiProjection=new Set(
+            [...exactBrowserRuntimeProjection].filter(file=>file.startsWith('browser-runtime/ai/'))
+          );
+          const admittedBrowserWasm=new Set(
+            browserRuntimeRelease.files
+              .filter(file=>file.path.toLowerCase().endsWith('.wasm'))
+              .map(file=>`browser-runtime/${file.path}`)
+          );
           const required=[
             'LICENSE',
             'COMMERCIAL-LICENSE.md',
@@ -173,27 +187,8 @@ jobs:
           for(const requiredPath of required){
             if(!files.has(requiredPath))throw new Error(`Missing release license: ${requiredPath}.`);
           }
-          const exactBrowserAiProjection=new Set([
-            'browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json',
-            'browser-runtime/ai/browser-kokoro-worker.mjs',
-            'browser-runtime/ai/browser-speech-artifacts.mjs',
-            'browser-runtime/ai/browser-speech-providers.mjs',
-            'browser-runtime/ai/browser-speech.mjs',
-            'browser-runtime/ai/browser-wasm-llm-provider.mjs',
-            'browser-runtime/ai/browser-wasm.mjs',
-            'browser-runtime/ai/browser-whisper-worker.mjs',
-            'browser-runtime/ai/browser-wllama-runtime.mjs',
-            'browser-runtime/ai/internal/sha256.mjs',
-            'browser-runtime/ai/model-controller.mjs',
-            'browser-runtime/ai/speech-worker-client.mjs',
-            'browser-runtime/ai/speech-worker-runtime.mjs',
-            'browser-runtime/ai/wllama/LICENCE',
-            'browser-runtime/ai/wllama/index.mjs',
-            'browser-runtime/ai/wllama/llama.cpp-LICENSE',
-            'browser-runtime/ai/wllama/wllama.wasm'
-          ]);
-          for(const exactPath of exactBrowserAiProjection){
-            if(!files.has(exactPath))throw new Error(`Missing authenticated browser-AI component: ${exactPath}.`);
+          for(const exactPath of exactBrowserRuntimeProjection){
+            if(!files.has(exactPath))throw new Error(`Missing authenticated browser runtime file: ${exactPath}.`);
           }
           const forbiddenPrefixes=[
             'native/',
@@ -209,13 +204,12 @@ jobs:
           ];
           const forbiddenExtension=/\.(?:gguf|ggml|safetensors|onnx|ort|tflite|mlmodel|pb|pt|pth|bin|wasm|data|a|lib|exe|dll|so|dylib|node|wav|flac|mp3|ogg|opus|py|c|cc|cpp|h|sh|ps1|bat|cmd)$/iu;
           for(const file of files){
-            const browserAi=file.startsWith('browser-runtime/ai/');
-            const allowedWasm=file==='browser-runtime/ai/wllama/wllama.wasm';
-            if((browserAi&&!exactBrowserAiProjection.has(file))
+            const browserRuntime=file.startsWith('browser-runtime/');
+            if((browserRuntime&&!exactBrowserRuntimeProjection.has(file))
               ||forbiddenPrefixes.some(prefix=>file.startsWith(prefix))
-              ||(forbiddenExtension.test(file)&&!allowedWasm)){
+              ||(forbiddenExtension.test(file)&&!admittedBrowserWasm.has(file))){
               throw new Error(`Nonstandard release content requires separate authorization: ${file}.`);
             }
           }
-          console.log(`Verified ${files.size} release files, ${exactBrowserAiProjection.size} authenticated browser-AI components, and ${required.length} license boundaries.`);
+          console.log(`Verified ${files.size} release files, ${exactBrowserRuntimeProjection.size} authenticated browser-runtime files (${exactBrowserAiProjection.size} browser-AI files), and ${required.length} license boundaries.`);
           NODE
