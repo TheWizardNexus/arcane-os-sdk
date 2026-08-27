@@ -220,13 +220,13 @@ jobs:
           if original_sha256 != "1f70c90c9ba2ef7fef4d2d2e1734f047b1af697c0b0b0ed1d808491a92dc4ed1":
               raise SystemExit(f"Unexpected wctype.h input: {original_sha256}")
           open_guard = b"#include <ucd/ucd.h>\n"
-          close_guard = b"#define iswxdigit ucd_isxdigit\n"
+          close_guard = b"#define toupper udc_toupper\n"
           if original.count(open_guard) != 1 or original.count(close_guard) != 1:
               raise SystemExit("The authenticated Emscripten compatibility patch did not match exactly once.")
           patched = original.replace(open_guard, b"#ifndef __EMSCRIPTEN__\n" + open_guard)
           patched = patched.replace(close_guard, close_guard + b"#endif\n")
           patched_sha256 = hashlib.sha256(patched).hexdigest()
-          if patched_sha256 != "398855e24fd0435ee626cf3274985409fd3d9d52b2b439ecb4132fcff90d3c12":
+          if patched_sha256 != "0d602dbf151dba62481d92997c8644dbf77e6a4381b655c2055f17d853969835":
               raise SystemExit(f"Unexpected wctype.h output: {patched_sha256}")
           target.write_bytes(patched)
           print(f"wctype.h {original_sha256} -> {patched_sha256}")
@@ -558,11 +558,15 @@ jobs:
                   "sourceDateEpoch": int(os.environ["SOURCE_DATE_EPOCH"]),
                   "compatibilityPatch": {
                       "path": "src/include/compat/wctype.h",
-                      "purpose": "apply the exact upstream Emscripten compatibility guard without later unrelated source changes",
+                      "purpose": "backport the exact upstream Emscripten compatibility guard around the complete base-revision UCD mapping block",
+                      "upstreamIssue": "https://github.com/espeak-ng/espeak-ng/issues/1887",
+                      "upstreamPullRequest": "https://github.com/espeak-ng/espeak-ng/pull/2401",
                       "upstreamCommit": "690ee601ff8fb91c2eb6b37cce746d4d0913fcd3",
                       "upstreamParent": "724808c5a83f9ef95fdd0db886ba7ba537ff224a",
                       "inputSha256": "1f70c90c9ba2ef7fef4d2d2e1734f047b1af697c0b0b0ed1d808491a92dc4ed1",
-                      "outputSha256": "398855e24fd0435ee626cf3274985409fd3d9d52b2b439ecb4132fcff90d3c12",
+                      "outputBytes": 1546,
+                      "outputSha256": "0d602dbf151dba62481d92997c8644dbf77e6a4381b655c2055f17d853969835",
+                      "outputGitBlob": "c1ed30c40bf084498a1d8aa873b337505ac1a9dd",
                   },
               },
               "toolchain": {
