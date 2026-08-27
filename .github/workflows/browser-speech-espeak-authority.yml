@@ -120,7 +120,7 @@ jobs:
             const int sample_rate = espeak_Initialize(
               AUDIO_OUTPUT_SYNCHRONOUS,
               100,
-              "/usr/share/espeak-ng-data",
+              "/usr/share",
               espeakINITIALIZE_DONT_EXIT
             );
             if (sample_rate < 1) return last_error = -1;
@@ -342,6 +342,9 @@ jobs:
           install -D -m 0644 espeak-ng-data/lang/gmw/en-US /work/selected-data/lang/gmw/en-US
 
           cd /work/wasm/src/ucd-tools
+          # This pinned archive spells the file CHANGELOG.md while the pinned
+          # upstream autogen.sh links NEWS through ChangeLog.md.
+          ln -s CHANGELOG.md ChangeLog.md
           ./autogen.sh
           emconfigure ./configure
           emmake make -j1
