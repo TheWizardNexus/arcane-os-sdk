@@ -31,7 +31,12 @@ test('mail browser acceptance fixture proves an empty offline start and event-ow
     assert.match(app,/startup[.]online!==false\|\|startup[.]considered!==0\|\|startup[.]attempted!==0/u);
     assert.match(app,/cleanupButton[.]disabled=busy\|\|\(mail===null&&!hasOwnedRecords\)/u);
     assert.match(app,/events[.]on\('mail-outbox-drain',observeOnlineDrain\)/u);
+    assert.match(app,/events[.]on\('mail-outbox-state',observeOnlineDrainFailure\)/u);
     assert.match(app,/detail[?][.]reason!=='online'/u);
+    assert.match(app,/lifecycle!=='background-drain-failed'/u);
+    assert.match(app,/unsubscribeDrain[?][.]\(\)/u);
+    assert.match(app,/unsubscribeState[?][.]\(\)/u);
+    assert.doesNotMatch(app,/setTimeout\(/u);
     assert.match(app,/const onlineDrainPromise=waitForOnlineDrain\(\)/u);
     assert.match(app,/globalThis[.]dispatchEvent\(new Event\('online'\)\)/u);
     assert.ok(
@@ -42,13 +47,22 @@ test('mail browser acceptance fixture proves an empty offline start and event-ow
     assert.doesNotMatch(app,/mail[.]drain\s*\(/u);
     assert.match(app,/eventOwned:true/u);
     assert.match(app,/drainReason:drainSummary[.]reason/u);
-    assert.match(app,/drainSummary[.]online!==true\|\|drainSummary[.]attempted!==1/u);
+    assert.match(app,/drainSummary[.]reason!=='online'\|\|drainSummary[.]online!==true/u);
+    assert.match(app,/drainSummary[.]attempted!==1\|\|drainSummary[.]considered!==2/u);
+    assert.match(app,/states[.]length===3&&states\[0\]==='queued'/u);
+    assert.match(app,/states\[1\]==='sending'&&states\[2\]==='accepted'/u);
     assert.match(app,/getAllKeys\('mail_outbox'\)/u);
     assert.match(app,/getOutboxRecord\(offlineReportKey\)/u);
     assert.match(app,/stored[?][.]state!=='accepted'\|\|stored[.]attempts!==1/u);
     assert.match(app,/[.][.][.]stateEvents[.]map\(function stateEventReportKey/u);
     assert.match(app,/filter\(function nonEmptyReportKey/u);
+    assert.match(app,/activeMail[?][.]stop\(\)/u);
     assert.match(app,/activeMail[?][.]dispose\(\)/u);
+    assert.ok(
+        app.indexOf('activeMail?.stop()')
+            <app.indexOf("globalThis.dbopfs.delete('mail_outbox',name)"),
+        'Mail must stop accepting online work before durable cleanup begins'
+    );
     assert.match(app,/globalThis[.]dbopfs[.]delete\('mail_outbox',name\)/u);
     assert.match(app,/if\(remaining[.]length!==0\)/u);
     assert.doesNotMatch(app,/re_[A-Za-z0-9_-]{12,}/u);

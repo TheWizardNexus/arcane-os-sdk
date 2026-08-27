@@ -80,13 +80,13 @@ function waitForOnlineDrain(){
     if(!events) return Promise.reject(new Error('Mail events are unavailable.'));
     return new Promise(function waitForEventOwnedOnlineDrain(resolve,reject){
         let settled=false;
-        let timeoutId=null;
-        let unsubscribe=null;
+        let unsubscribeDrain=null;
+        let unsubscribeState=null;
         function finish(error,detail){
             if(settled) return;
             settled=true;
-            if(timeoutId!==null) clearTimeout(timeoutId);
-            unsubscribe?.();
+            unsubscribeDrain?.();
+            unsubscribeState?.();
             if(error) reject(error);
             else resolve(detail);
         }
@@ -95,11 +95,12 @@ function waitForOnlineDrain(){
             if(detail?.reason!=='online') return;
             finish(null,detail);
         }
-        function rejectTimedOutOnlineDrain(){
-            finish(new Error('Timed out waiting for the event-owned online drain.'));
+        function observeOnlineDrainFailure(event){
+            if(event?.detail?.lifecycle!=='background-drain-failed') return;
+            finish(new Error('The event-owned online drain failed before completion.'));
         }
-        unsubscribe=events.on('mail-outbox-drain',observeOnlineDrain);
-        timeoutId=setTimeout(rejectTimedOutOnlineDrain,30_000);
+        unsubscribeDrain=events.on('mail-outbox-drain',observeOnlineDrain);
+        unsubscribeState=events.on('mail-outbox-state',observeOnlineDrainFailure);
     });
 }
 
@@ -111,7 +112,7 @@ async function configureMail(){
         appName:'mail-browser-proof',
         appKey,
         endpoint:'http://127.0.0.1:8025/v1/mail',
-        requestTimeout:590_000
+        requestTimeout:45_000
     };
     globalThis.arcane??={};
     globalThis.arcane.config??={};
@@ -153,6 +154,7 @@ async function configureMail(){
         if(mail===candidate) mail=null;
         delete globalThis.arcane.config.mail;
         recipient='';
+        stateEvents=[];
         throw error;
     }
 }
@@ -214,10 +216,13 @@ async function reconnectAndAwaitEventDrain(){
     const states=stateEvents.filter(function offlineState(event){
         return event.reportKey===offlineReportKey;
     }).map(function stateName(event){return event.state;});
-    if(!observedOnline||drainSummary.online!==true||drainSummary.attempted!==1
-        ||drainSummary.considered<1||stored?.state!=='accepted'||stored.attempts!==1
+    const exactStates=states.length===3&&states[0]==='queued'
+        &&states[1]==='sending'&&states[2]==='accepted';
+    if(!observedOnline||drainSummary.reason!=='online'||drainSummary.online!==true
+        ||drainSummary.attempted!==1||drainSummary.considered!==2
+        ||stored?.state!=='accepted'||stored.attempts!==1
         ||!stored.result?.requestId||!stored.result?.providerId
-        ||!states.includes('queued')||!states.includes('sending')||!states.includes('accepted')){
+        ||!exactStates){
         throw new Error('The online event did not drain the same durable report to acceptance once.');
     }
     appendEvidence('reconnected-accepted',{
@@ -247,6 +252,7 @@ async function cleanupProof(){
         return `${reportKey}.mail-outbox.json`;
     });
     try{
+        activeMail?.stop();
         for(const name of names){
             await globalThis.dbopfs.delete('mail_outbox',name);
         }
