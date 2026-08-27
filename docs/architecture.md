@@ -200,7 +200,7 @@ length with an EOF growth probe, and rechecked by handle and pathname identity.
 Every cumulative path prefix has one case-folded spelling and one file/directory
 kind; prefix topology conflicts and the complete portable Windows device-name
 set fail before creation or admission.
-The current SDK admits only the explicitly compatible `0.2.1` bundle
+The current SDK admits only the explicitly compatible `0.2.2` bundle
 generation and rejects zero-byte payload releases.
 
 Promotion retains any prior output as an identity-bound backup until the new
@@ -320,7 +320,7 @@ through SDK-bound verified readers rather than accepting a mutable source path
 as authority. Build completion requires provider verification, and later
 verify/run calls receive the exact artifact receipt.
 
-The SDK `0.2.1` runtime requires Arcane `0.8.12` or newer. Compatibility
+The SDK `0.2.2` runtime requires Arcane `0.8.12` or newer. Compatibility
 is contractual rather than exact-version pinning: the prepared Core must meet
 the highest minimum declared by the runtime, selected app, and bundled app
 dependencies; keep each app's Arcane protocol generation; and provide every

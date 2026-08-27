@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.2
+
+- Corrected latest-request-wins ownership so each newly admitted AI request
+  aborts and settles the prior provider operation, revalidates role readiness,
+  and prevents stale results from restoring superseded state.
+- Made speech startup and controls explicitly lifecycle-owned: STT startup is
+  opt-in, selected-unloaded STT exposes user activation and cancellation,
+  caller abort reaches shared transcription, and TTS mute/unmute owns its load,
+  cancellation, playback, and unload sequence.
+- Kept positive speech readiness bound to admitted sticky provider state while
+  exposing truthful capability-only legacy OpenAI, Ollama, and Core speech
+  routes without downloads, hidden provider selection, model authority, or
+  fallback.
+- Preserved the existing shared Blob/File STT and WAV TTS request shapes at the
+  browser-provider boundary, with explicit decode/format errors and
+  provider/model-owned TTS voice defaults.
+
 ## 0.2.1
 
 - Added explicit selected-unloaded chat activation, truthful legacy Cloud/Core

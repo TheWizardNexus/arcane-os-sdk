@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "builder": "arcane-sdk-runtime-v1",
-  "sdkVersion": "0.2.1",
+  "sdkVersion": "0.2.2",
   "source": {
     "authority": "sdk-canonical",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
@@ -14,8 +14,8 @@
     }
   },
   "fileCount": 160,
-  "totalBytes": 3605154,
-  "contentSha256": "5b921d50b6a0cf36a13f7a7dedf96cd3a68104a322e5139136fd4197aa1ca7cb",
+  "totalBytes": 3643083,
+  "contentSha256": "0b09b1fd548152416f583d5e117197c7886b5a9e63071e43493577b4090e4a8c",
   "files": [
     {
       "path": "arcane/components/app-bar.html",
@@ -39,8 +39,8 @@
     },
     {
       "path": "arcane/components/chat.html",
-      "bytes": 61650,
-      "sha256": "d644848fbc3ccc85d491db7ada75231f393a371dd3a0ccd92f223c172571e47b"
+      "bytes": 60478,
+      "sha256": "2f3a7f454c1e3da64c9eaeedb0869d49f04636b20ff59e5116a671e0d0a17973"
     },
     {
       "path": "arcane/components/conversation-view.html",
@@ -159,8 +159,8 @@
     },
     {
       "path": "arcane/components/speech.html",
-      "bytes": 38217,
-      "sha256": "61786685b7f4f257da77db2cbbe8230b379c56292ad635081f5b0763d5f48e1e"
+      "bytes": 49596,
+      "sha256": "2a8b2929d28699ab9011f358b09b5fd2d53a0703542b2fee5cda8334261c6c86"
     },
     {
       "path": "arcane/components/summary-strip.html",
@@ -374,8 +374,8 @@
     },
     {
       "path": "arcane/modules/AI.js",
-      "bytes": 103733,
-      "sha256": "3a051d67b1e895b7c6f14af36a34daf1d92fe70e02c95c1c4ffd80cc7c622561"
+      "bytes": 120607,
+      "sha256": "703a5342ed0c0758cccdfd8469fbae6d86e91de8c43ec01c893619daf97c2d34"
     },
     {
       "path": "arcane/modules/AIPreferenceRuntime.js",
@@ -389,8 +389,8 @@
     },
     {
       "path": "arcane/modules/AIProviderRuntime.js",
-      "bytes": 83261,
-      "sha256": "32aa65b464ea9a9317d47f382063fc052e1f47e63e6c65c28e58898e0ab4911a"
+      "bytes": 93507,
+      "sha256": "d1b33f678431128cefe6f43daabe177794e758c770394098871cf4ac726926b8"
     },
     {
       "path": "arcane/modules/AIResponseLength.js",
@@ -404,8 +404,8 @@
     },
     {
       "path": "arcane/modules/AIRuntimeState.js",
-      "bytes": 24783,
-      "sha256": "8b9bfaf208eb44455b581d8e700cec785044f81595dcf839dcdfa3e06ed0f5fa"
+      "bytes": 25379,
+      "sha256": "492162cec5e6a8b9e9b437833172905b2cb4e352ca1ef30104c65ec29cf3fa29"
     },
     {
       "path": "arcane/modules/AnsiText.js",
@@ -599,8 +599,8 @@
     },
     {
       "path": "arcane/modules/LocalAIReadinessController.js",
-      "bytes": 4334,
-      "sha256": "32d4ce2639557b89a283754a67435226777b56df696ce7a76231ec6c0274b25c"
+      "bytes": 4340,
+      "sha256": "f80d51d0ad499664f265b4f2d52a46ede521a78d56714fecb0e13b939b261007"
     },
     {
       "path": "arcane/modules/MD.js",
