@@ -482,7 +482,7 @@
     "description": "The checked core npm metadata exposes no dist attestations. This authority makes no Sigstore or npm provenance claim. Registry integrity and signatures are not substitutes for selected-file verification."
   },
   "plannedVerification": {
-    "status": "browser-speech-package-and-runtime-capability-verification-recorded-runtime-graph-implementation-pending",
+    "status": "browser-speech-runtime-graph-implemented-selected-release-materialization-pending",
     "sequence": [
       "fetch-exact-registry-tarballs-without-installing-or-executing-package-code",
       "verify-each-registry-tarball-against-recorded-sha512-before-extraction",
@@ -496,6 +496,30 @@
       "record-an-authenticated-verification-receipt-and-delete-the-read-only-temporary-export",
       "permit-browser-runtime-execution-only-after-every-prior-verification-boundary-succeeds"
     ]
+  },
+  "runtimeImplementation": {
+    "status": "browser-speech-runtime-graph-implemented-and-focused-contracts-passed",
+    "sourceCommits": [
+      "fba95ed0fa2e9ab11727e19b257a8d7e1e95a495",
+      "f466458a09a2f6210c46aeaafcdc56a9da5c3a82"
+    ],
+    "documentationCommit": "c1967fe3dc46986844666f5bb881485a462989b6",
+    "focusedVerification": {
+      "command": "node ./bin/arcane-test.mjs test/browser-speech-providers.test.mjs",
+      "result": "23-passed-0-failed",
+      "verifiedBoundaries": [
+        "deterministic-closed-artifact-graph",
+        "cold-warm-and-zero-network-offline-dbopfs-admission",
+        "manifest-last-persistence",
+        "declared-edge-and-dynamic-code-isolation",
+        "caller-owned-model-sample-rate-and-voice-authority",
+        "private-worker-message-channel",
+        "exact-role-operation-error-envelope-admission",
+        "abort-and-unload-supersession",
+        "provider-worker-cleanup"
+      ]
+    },
+    "deferredReleaseBoundary": "The combined numeric 0.3.0 package, runtime/browser receipts, npm integrity/provenance, tag, and GitHub release remain assigned to the shared release owner after Browser Speech, singleton events, and Mail source increments are reconciled."
   },
   "omittedUntilVerified": [
     "Final composite SPDX license expressions for the bundled JavaScript entrypoints.",
