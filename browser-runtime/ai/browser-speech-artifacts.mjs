@@ -25,6 +25,7 @@ const AUTHORITIES = new WeakSet();
 const AUTHORITY_METADATA = new WeakMap();
 const ARTIFACT_GRAPHS = new WeakSet();
 const ARTIFACT_GRAPH_METADATA = new WeakMap();
+const ARTIFACT_ERRORS = new WeakSet();
 const STORES = new WeakSet();
 const PLATFORM_CREATE_OBJECT_URL = typeof globalThis.URL?.createObjectURL === "function"
   ? globalThis.URL.createObjectURL.bind(globalThis.URL)
@@ -39,12 +40,12 @@ const LEGACY_ARTIFACT_ERROR_REASONS = Object.freeze({
   ARCANE_AI_REQUEST_ABORTED: "browser-speech-artifact-preparation-cancelled",
   ARCANE_AI_STORAGE_BUSY: "browser-speech-artifact-dbopfs-write-lock-unavailable",
   ARCANE_AI_STORAGE_UNAVAILABLE: "browser-speech-artifact-dbopfs-table-unavailable",
-  ARCANE_AI_STORAGE_DELETE_FAILED: "browser-speech-artifact-dbopfs-delete-failed",
-  ARCANE_AI_STORAGE_READ_FAILED: "browser-speech-artifact-dbopfs-read-failed",
-  ARCANE_AI_ARTIFACT_SOURCE_INVALID: "browser-speech-artifact-source-body-invalid",
+  ARCANE_AI_STORAGE_DELETE_FAILED: "browser-speech-artifact-dbopfs-delete-rejected",
+  ARCANE_AI_STORAGE_READ_FAILED: "browser-speech-artifact-dbopfs-read-rejected",
+  ARCANE_AI_ARTIFACT_SOURCE_INVALID: "browser-speech-artifact-source-body-unreadable",
   ARCANE_AI_RUNTIME_MODULE_GRAPH_UNDECLARED: "browser-speech-runtime-module-graph-undeclared",
   ARCANE_AI_ARTIFACT_SOURCE_UNAVAILABLE: "browser-speech-artifact-fetch-unavailable",
-  ARCANE_AI_ARTIFACT_DOWNLOAD_FAILED: "browser-speech-artifact-download-failed",
+  ARCANE_AI_ARTIFACT_DOWNLOAD_FAILED: "browser-speech-artifact-fetch-rejected",
   ARCANE_AI_ARTIFACT_SOURCE_CHANGED: "browser-speech-artifact-source-redirected",
   ARCANE_AI_ARTIFACT_SIZE_MISMATCH: "browser-speech-artifact-byte-length-mismatch",
   ARCANE_AI_ARTIFACT_DIGEST_MISMATCH: "browser-speech-artifact-sha256-mismatch",
@@ -90,6 +91,7 @@ function speechError(code, message, cause, reason = LEGACY_ARTIFACT_ERROR_REASON
   error.name = "ArcaneBrowserSpeechError";
   error.code = code;
   if (typeof reason === "string" && reason) error.reason = reason;
+  ARTIFACT_ERRORS.add(error);
   return error;
 }
 
@@ -102,6 +104,7 @@ function artifactGraphError(reason, message, cause, Type = Error) {
     : "ArcaneBrowserSpeechArtifactGraphError";
   error.code = `ARCANE_AI_${reason.toUpperCase().replaceAll("-", "_")}`;
   error.reason = reason;
+  ARTIFACT_ERRORS.add(error);
   return error;
 }
 
@@ -135,17 +138,22 @@ function identifier(value, label) {
   return result;
 }
 
-function artifactGraphText(value, label, reason = "artifact-graph-field-invalid") {
+function artifactGraphText(value, label, reason = "artifact-graph-field-text-required") {
   if (typeof value !== "string" || !value.trim()) {
     throw artifactGraphTypeError(reason, `${label} must be a nonempty string.`);
   }
   return value.trim();
 }
 
-function artifactGraphIdentifier(value, label, reason = "artifact-graph-identifier-invalid") {
-  const result = artifactGraphText(value, label, reason);
+function artifactGraphIdentifier(
+  value,
+  label,
+  missingReason = "artifact-graph-identifier-missing",
+  lengthReason = "artifact-graph-identifier-length-exceeded",
+) {
+  const result = artifactGraphText(value, label, missingReason);
   if (result.length > 128) {
-    throw artifactGraphTypeError(reason, `${label} must not exceed 128 characters.`);
+    throw artifactGraphTypeError(lengthReason, `${label} must not exceed 128 characters.`);
   }
   return result;
 }
@@ -176,12 +184,13 @@ function immutableUrl(value, label) {
 function canonicalArtifactPath(
   value,
   label,
-  reason = "artifact-graph-file-path-ambiguous",
+  missingReason = "artifact-graph-file-path-missing",
+  formatReason = "artifact-graph-file-path-noncanonical",
 ) {
   const path = artifactGraphText(
     value,
     label,
-    reason,
+    missingReason,
   );
   if (
     path !== value
@@ -193,7 +202,7 @@ function canonicalArtifactPath(
     || path.split("/").some((part) => !part || part === "." || part === "..")
   ) {
     throw artifactGraphTypeError(
-      reason,
+      formatReason,
       `${label} must be one NFC-normalized relative path without escapes, empty segments, or URL delimiters.`,
     );
   }
@@ -203,16 +212,17 @@ function canonicalArtifactPath(
 function graphSha256(
   value,
   label,
-  reason = "artifact-graph-file-sha256-invalid",
+  missingReason = "artifact-graph-file-sha256-missing",
+  formatReason = "artifact-graph-file-sha256-format-mismatch",
 ) {
   const sha256 = artifactGraphText(
     value,
     label,
-    reason,
+    missingReason,
   );
   if (sha256 !== value || !SHA256_PATTERN.test(sha256)) {
     throw artifactGraphTypeError(
-      reason,
+      formatReason,
       `${label} must contain exactly 64 lowercase hexadecimal characters.`,
     );
   }
@@ -222,7 +232,7 @@ function graphSha256(
 function graphPositiveInteger(
   value,
   label,
-  reason = "artifact-graph-positive-integer-invalid",
+  reason = "artifact-graph-positive-safe-integer-required",
 ) {
   if (!Number.isSafeInteger(value) || value < 1) {
     throw artifactGraphTypeError(
@@ -244,7 +254,7 @@ function graphOptionalSampleRate(value, label, required = false) {
   return graphPositiveInteger(
     value,
     label,
-    "artifact-graph-sample-rate-invalid",
+    "artifact-graph-sample-rate-positive-safe-integer-required",
   );
 }
 
@@ -252,14 +262,14 @@ function exactMediaType(value, label) {
   const mediaType = artifactGraphText(
     value,
     label,
-    "artifact-graph-file-media-type-invalid",
+    "artifact-graph-file-media-type-missing",
   ).toLowerCase();
   if (
     mediaType !== value
     || !/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/u.test(mediaType)
   ) {
     throw artifactGraphTypeError(
-      "artifact-graph-file-media-type-invalid",
+      "artifact-graph-file-media-type-format-mismatch",
       `${label} must be one lowercase media type without parameters.`,
     );
   }
@@ -267,29 +277,37 @@ function exactMediaType(value, label) {
 }
 
 function graphRuntimeRequestUrl(value, label) {
+  const url = artifactGraphText(
+    value,
+    label,
+    "artifact-graph-runtime-request-url-text-required",
+  );
   let result;
   try {
-    result = new URL(artifactGraphText(
-      value,
-      label,
-      "artifact-graph-runtime-request-url-invalid",
-    ));
+    result = new URL(url);
   } catch (error) {
     throw artifactGraphTypeError(
-      "artifact-graph-runtime-request-url-invalid",
+      "artifact-graph-runtime-request-url-not-absolute",
       `${label} must be an absolute HTTPS URL.`,
       error,
     );
   }
-  if (
-    result.protocol !== "https:"
-    || result.username
-    || result.password
-    || result.hash
-  ) {
+  if (result.protocol !== "https:") {
     throw artifactGraphTypeError(
-      "artifact-graph-runtime-request-url-invalid",
-      `${label} must be an absolute HTTPS URL without credentials or a fragment.`,
+      "artifact-graph-runtime-request-url-protocol-not-https",
+      `${label} must use HTTPS.`,
+    );
+  }
+  if (result.username || result.password) {
+    throw artifactGraphTypeError(
+      "artifact-graph-runtime-request-url-credentials-rejected",
+      `${label} must not contain credentials.`,
+    );
+  }
+  if (result.hash) {
+    throw artifactGraphTypeError(
+      "artifact-graph-runtime-request-url-fragment-rejected",
+      `${label} must not contain a fragment.`,
     );
   }
   return result.href;
@@ -307,7 +325,7 @@ function graphImmutableUrl(value, label, revision, sha256) {
       label,
     );
   } catch (error) {
-    if (error?.reason) throw error;
+    if (ARTIFACT_ERRORS.has(error)) throw error;
     throw artifactGraphTypeError(
       "artifact-graph-source-url-mutable",
       `${label} must identify an immutable HTTPS or same-origin source authority.`,
@@ -436,18 +454,18 @@ function publicFile(file) {
 function normalizeArtifactGraphFile(value, index) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw artifactGraphTypeError(
-      "artifact-graph-file-descriptor-invalid",
+      "artifact-graph-file-descriptor-not-object",
       `Artifact graph file ${String(index)} must be an object.`,
     );
   }
   const kind = artifactGraphText(
     value.kind,
     `Artifact graph file ${String(index)} kind`,
-    "artifact-graph-file-kind-unsupported",
+    "artifact-graph-file-kind-missing",
   );
   if (!ARTIFACT_GRAPH_FILE_KINDS.has(kind)) {
     throw artifactGraphTypeError(
-      "artifact-graph-file-kind-unsupported",
+      "artifact-graph-file-kind-not-admitted",
       `Artifact graph file ${String(index)} kind is not supported.`,
     );
   }
@@ -458,12 +476,13 @@ function normalizeArtifactGraphFile(value, index) {
   const revision = artifactGraphIdentifier(
     value.revision,
     `Artifact graph file ${path} revision`,
-    "artifact-graph-file-revision-invalid",
+    "artifact-graph-file-revision-missing",
+    "artifact-graph-file-revision-length-exceeded",
   );
   const bytes = graphPositiveInteger(
     value.bytes,
     `Artifact graph file ${path} bytes`,
-    "artifact-graph-file-byte-length-invalid",
+    "artifact-graph-file-byte-length-positive-safe-integer-required",
   );
   const sha256 = graphSha256(
     value.sha256,
@@ -480,15 +499,28 @@ function normalizeArtifactGraphFile(value, index) {
     `Artifact graph file ${path} license`,
     "artifact-graph-file-license-missing",
   );
-  if (
-    license !== value.license
-    || license !== license.normalize("NFC")
-    || /[\u0000-\u001f\u007f]/u.test(license)
-    || license.length > 256
-  ) {
+  if (license !== value.license) {
     throw artifactGraphTypeError(
-      "artifact-graph-file-license-invalid",
-      `Artifact graph file ${path} license must be one exact NFC-normalized 1-256 character value without controls.`,
+      "artifact-graph-file-license-whitespace-rejected",
+      `Artifact graph file ${path} license must not contain surrounding whitespace.`,
+    );
+  }
+  if (license !== license.normalize("NFC")) {
+    throw artifactGraphTypeError(
+      "artifact-graph-file-license-not-nfc",
+      `Artifact graph file ${path} license must be NFC-normalized.`,
+    );
+  }
+  if (/[\u0000-\u001f\u007f]/u.test(license)) {
+    throw artifactGraphTypeError(
+      "artifact-graph-file-license-control-character-rejected",
+      `Artifact graph file ${path} license must not contain control characters.`,
+    );
+  }
+  if (license.length > 256) {
+    throw artifactGraphTypeError(
+      "artifact-graph-file-license-length-exceeded",
+      `Artifact graph file ${path} license must not exceed 256 characters.`,
     );
   }
   const mediaType = exactMediaType(
@@ -520,7 +552,7 @@ function normalizeArtifactGraphFile(value, index) {
   const requestUrls = value.runtimeRequestUrls ?? [];
   if (!Array.isArray(requestUrls)) {
     throw artifactGraphTypeError(
-      "artifact-graph-runtime-request-routes-invalid",
+      "artifact-graph-runtime-request-routes-not-array",
       `Artifact graph file ${path} runtimeRequestUrls must be an array.`,
     );
   }
@@ -567,7 +599,7 @@ function normalizeGraphOccurrence(value, label) {
   return graphPositiveInteger(
     value,
     `${label} occurrence`,
-    "artifact-graph-edge-occurrence-invalid",
+    "artifact-graph-edge-occurrence-positive-safe-integer-required",
   );
 }
 
@@ -575,11 +607,12 @@ function normalizeGraphModulePath(value, label, filesByPath) {
   const path = canonicalArtifactPath(
     value,
     `${label} modulePath`,
-    "artifact-graph-edge-module-path-invalid",
+    "artifact-graph-edge-module-path-missing",
+    "artifact-graph-edge-module-path-noncanonical",
   );
   if (!ARTIFACT_GRAPH_JAVASCRIPT_KINDS.has(filesByPath.get(path)?.kind)) {
     throw artifactGraphTypeError(
-      "artifact-graph-edge-module-path-invalid",
+      "artifact-graph-edge-module-path-not-runtime-javascript",
       `${label} modulePath must name one declared runtime JavaScript file.`,
     );
   }
@@ -590,7 +623,8 @@ function normalizeGraphTargetPath(value, label, filesByPath, javascript = false)
   const path = canonicalArtifactPath(
     value,
     `${label} targetPath`,
-    "artifact-graph-edge-target-path-invalid",
+    "artifact-graph-edge-target-path-missing",
+    "artifact-graph-edge-target-path-noncanonical",
   );
   const target = filesByPath.get(path);
   if (!target || (javascript && !ARTIFACT_GRAPH_JAVASCRIPT_KINDS.has(target.kind))) {
@@ -606,7 +640,7 @@ function normalizeGraphPolicy(value, label) {
   const policy = value ?? "artifact-targets-admitted";
   if (!ARTIFACT_GRAPH_EDGE_POLICIES.has(policy)) {
     throw artifactGraphTypeError(
-      "artifact-graph-edge-policy-unsupported",
+      "artifact-graph-edge-policy-not-admitted",
       `${label} edgePolicy must identify an admitted artifact target or an inactive rejected runtime branch.`,
     );
   }
@@ -619,7 +653,7 @@ function normalizeGraphTargets(value, label, filesByPath, {
 } = {}) {
   if (!Array.isArray(value)) {
     throw artifactGraphTypeError(
-      "artifact-graph-edge-targets-invalid",
+      "artifact-graph-edge-targets-not-array",
       `${label} targets must be an array.`,
     );
   }
@@ -629,19 +663,19 @@ function normalizeGraphTargets(value, label, filesByPath, {
   const targets = value.map((target, index) => {
     if (!target || typeof target !== "object" || Array.isArray(target)) {
       throw artifactGraphTypeError(
-        "artifact-graph-edge-target-invalid",
+        "artifact-graph-edge-target-not-object",
         `${label} target ${String(index)} must be an object.`,
       );
     }
     const match = artifactGraphText(
       target.match,
       `${label} target ${String(index)} match`,
-      "artifact-graph-edge-target-match-unsupported",
+      "artifact-graph-edge-target-match-missing",
     );
     if (!allowedMatches.has(match)) {
       throw artifactGraphTypeError(
-        "artifact-graph-edge-target-match-unsupported",
-        `${label} target ${String(index)} match is unsupported.`,
+        "artifact-graph-edge-target-match-not-admitted",
+        `${label} target ${String(index)} match is not admitted.`,
       );
     }
     const targetPath = normalizeGraphTargetPath(
@@ -674,7 +708,7 @@ function normalizeArtifactGraphEdges(value, filesByPath, negativeRuntimeRequestU
   const edges = value ?? {};
   if (!edges || typeof edges !== "object" || Array.isArray(edges)) {
     throw artifactGraphTypeError(
-      "artifact-graph-edges-invalid",
+      "artifact-graph-edges-not-object",
       "Artifact graph edges must be an object.",
     );
   }
@@ -688,8 +722,8 @@ function normalizeArtifactGraphEdges(value, filesByPath, negativeRuntimeRequestU
   if (Reflect.ownKeys(edges).some((name) =>
     typeof name !== "string" || !allowedEdgeNames.has(name))) {
     throw artifactGraphTypeError(
-      "artifact-graph-edge-kind-unsupported",
-      "Artifact graph edges contain an unsupported edge kind.",
+      "artifact-graph-edge-kind-not-admitted",
+      "Artifact graph edges contain an edge kind that is not admitted.",
     );
   }
 
@@ -697,14 +731,14 @@ function normalizeArtifactGraphEdges(value, filesByPath, negativeRuntimeRequestU
     const values = edges[name] ?? [];
     if (!Array.isArray(values)) {
       throw artifactGraphTypeError(
-        "artifact-graph-edge-list-invalid",
+        "artifact-graph-edge-list-not-array",
         `Artifact graph ${name} must be an array.`,
       );
     }
     const normalized = values.map((edge, index) => {
       if (!edge || typeof edge !== "object" || Array.isArray(edge)) {
         throw artifactGraphTypeError(
-          "artifact-graph-edge-invalid",
+          "artifact-graph-edge-not-object",
           `Artifact graph ${name}[${String(index)}] must be an object.`,
         );
       }
@@ -801,14 +835,14 @@ function normalizeArtifactGraphEdges(value, filesByPath, negativeRuntimeRequestU
         || methods[0] !== "GET"
       ) {
         throw artifactGraphTypeError(
-          "artifact-graph-fetch-method-unsupported",
+          "artifact-graph-fetch-method-not-get",
           `${label} methods must be exactly ["GET"].`,
         );
       }
       const targetPaths = edge.targetPaths ?? [];
       if (!Array.isArray(targetPaths)) {
         throw artifactGraphTypeError(
-          "artifact-graph-fetch-targets-invalid",
+          "artifact-graph-fetch-targets-not-array",
           `${label} targetPaths must be an array.`,
         );
       }
@@ -830,7 +864,7 @@ function normalizeArtifactGraphEdges(value, filesByPath, negativeRuntimeRequestU
       const negativeUrls = edge.negativeRuntimeRequestUrls ?? [];
       if (!Array.isArray(negativeUrls)) {
         throw artifactGraphTypeError(
-          "artifact-graph-fetch-negative-routes-invalid",
+          "artifact-graph-fetch-negative-routes-not-array",
           `${label} negativeRuntimeRequestUrls must be an array.`,
         );
       }
@@ -882,12 +916,12 @@ function normalizeArtifactGraphEdges(value, filesByPath, negativeRuntimeRequestU
       const cacheName = artifactGraphText(
         edge.cacheName,
         `${label} cacheName`,
-        "artifact-graph-cache-name-invalid",
+        "artifact-graph-cache-name-missing",
       );
       const targetPaths = edge.targetPaths ?? [];
       if (!Array.isArray(targetPaths)) {
         throw artifactGraphTypeError(
-          "artifact-graph-cache-targets-invalid",
+          "artifact-graph-cache-targets-not-array",
           `${label} targetPaths must be an array.`,
         );
       }
@@ -936,14 +970,14 @@ function normalizeArtifactGraphTransforms(value, filesByPath) {
   const transforms = value ?? [];
   if (!Array.isArray(transforms)) {
     throw artifactGraphTypeError(
-      "artifact-graph-transforms-invalid",
+      "artifact-graph-transforms-not-array",
       "Artifact graph transforms must be an array.",
     );
   }
   const normalized = transforms.map((transform, index) => {
     if (!transform || typeof transform !== "object" || Array.isArray(transform)) {
       throw artifactGraphTypeError(
-        "artifact-graph-transform-invalid",
+        "artifact-graph-transform-not-object",
         `Artifact graph transform ${String(index)} must be an object.`,
       );
     }
@@ -952,8 +986,8 @@ function normalizeArtifactGraphTransforms(value, filesByPath) {
       transform.kind,
     )) {
       throw artifactGraphTypeError(
-        "artifact-graph-transform-kind-unsupported",
-        `${label} kind is unsupported.`,
+        "artifact-graph-transform-kind-not-admitted",
+        `${label} kind is not admitted.`,
       );
     }
     return Object.freeze({
@@ -983,14 +1017,15 @@ function normalizeArtifactGraphVoices(value, defaultVoice, filesByPath) {
   const voices = value.map((voice, index) => {
     if (!voice || typeof voice !== "object" || Array.isArray(voice)) {
       throw artifactGraphTypeError(
-        "artifact-graph-voice-descriptor-invalid",
+        "artifact-graph-voice-descriptor-not-object",
         `Artifact graph voice ${String(index)} must be an object.`,
       );
     }
     const id = artifactGraphIdentifier(
       voice.id,
       `Artifact graph voice ${String(index)} id`,
-      "artifact-graph-voice-id-invalid",
+      "artifact-graph-voice-id-missing",
+      "artifact-graph-voice-id-length-exceeded",
     );
     const path = normalizeGraphTargetPath(
       voice.path,
@@ -1063,13 +1098,13 @@ export function createBrowserSpeechArtifactGraph({
 } = {}) {
   if (kind !== ARTIFACT_GRAPH_KIND) {
     throw artifactGraphTypeError(
-      "artifact-graph-kind-unsupported",
+      "artifact-graph-kind-mismatch",
       `Browser speech artifact graph kind must equal ${ARTIFACT_GRAPH_KIND}.`,
     );
   }
   if (role !== "stt" && role !== "tts") {
     throw artifactGraphTypeError(
-      "artifact-graph-role-unsupported",
+      "artifact-graph-role-not-stt-or-tts",
       'Browser speech artifact graph role must be "stt" or "tts".',
     );
   }
@@ -1078,7 +1113,8 @@ export function createBrowserSpeechArtifactGraph({
     : artifactGraphIdentifier(
       providerId,
       "Browser speech artifact graph providerId",
-      "artifact-graph-provider-id-invalid",
+      "artifact-graph-provider-id-missing",
+      "artifact-graph-provider-id-length-exceeded",
     );
   if (!model || typeof model !== "object" || Array.isArray(model)) {
     throw artifactGraphTypeError(
@@ -1141,7 +1177,8 @@ export function createBrowserSpeechArtifactGraph({
   const entrypoint = canonicalArtifactPath(
     runtime.entrypoint ?? runtime.entry,
     "Browser speech artifact graph runtime entrypoint",
-    "artifact-graph-entrypoint-path-invalid",
+    "artifact-graph-entrypoint-path-missing",
+    "artifact-graph-entrypoint-path-noncanonical",
   );
   const entrypointFile = filesByPath.get(entrypoint);
   if (entrypointFile?.kind !== "runtime-entrypoint-javascript") {
@@ -1160,7 +1197,7 @@ export function createBrowserSpeechArtifactGraph({
   const runtimeAdapter = artifactGraphText(
     runtime.adapter,
     "Browser speech artifact graph runtime adapter",
-    "artifact-graph-runtime-adapter-role-mismatch",
+    "artifact-graph-runtime-adapter-missing",
   );
   const expectedAdapter = role === "stt" ? "transformers-whisper" : "kokoro-js";
   if (runtimeAdapter !== expectedAdapter) {
@@ -1172,12 +1209,14 @@ export function createBrowserSpeechArtifactGraph({
   const runtimeVersion = artifactGraphIdentifier(
     runtime.version,
     "Browser speech artifact graph runtime version",
-    "artifact-graph-runtime-version-invalid",
+    "artifact-graph-runtime-version-missing",
+    "artifact-graph-runtime-version-length-exceeded",
   );
   const runtimeRevision = artifactGraphIdentifier(
     runtime.revision,
     "Browser speech artifact graph runtime revision",
-    "artifact-graph-runtime-revision-invalid",
+    "artifact-graph-runtime-revision-missing",
+    "artifact-graph-runtime-revision-length-exceeded",
   );
   if (entrypointFile.revision !== runtimeRevision) {
     throw artifactGraphTypeError(
@@ -1195,7 +1234,7 @@ export function createBrowserSpeechArtifactGraph({
   const namespace = artifactGraphText(
     onnxWasm.namespace,
     "Browser speech artifact graph ONNX namespace",
-    "artifact-graph-onnx-wasm-namespace-role-mismatch",
+    "artifact-graph-onnx-wasm-namespace-missing",
   );
   const expectedNamespace = role === "stt"
     ? "transformers-env-backends-onnx-wasm"
@@ -1231,11 +1270,11 @@ export function createBrowserSpeechArtifactGraph({
     : graphPositiveInteger(
       onnxWasm.numThreads,
       "Browser speech artifact graph ONNX numThreads",
-      "artifact-graph-onnx-wasm-num-threads-invalid",
+      "artifact-graph-onnx-wasm-num-threads-positive-safe-integer-required",
     );
   if (role === "tts" && numThreads !== null) {
     throw artifactGraphTypeError(
-      "kokoro-env-num-threads-unsupported",
+      "kokoro-env-num-threads-field-not-exposed",
       "Kokoro does not expose a verified numThreads configuration field.",
     );
   }
@@ -1243,7 +1282,7 @@ export function createBrowserSpeechArtifactGraph({
   const negativeRoutes = runtime.negativeRuntimeRequestUrls ?? [];
   if (!Array.isArray(negativeRoutes)) {
     throw artifactGraphTypeError(
-      "artifact-graph-negative-runtime-routes-invalid",
+      "artifact-graph-negative-runtime-routes-not-array",
       "Browser speech artifact graph runtime negativeRuntimeRequestUrls must be an array.",
     );
   }
@@ -1273,22 +1312,26 @@ export function createBrowserSpeechArtifactGraph({
   const modelId = artifactGraphIdentifier(
     model.id,
     "Browser speech artifact graph model id",
-    "artifact-graph-model-id-invalid",
+    "artifact-graph-model-id-missing",
+    "artifact-graph-model-id-length-exceeded",
   );
   const repository = artifactGraphIdentifier(
     model.repository,
     "Browser speech artifact graph model repository",
-    "artifact-graph-model-repository-invalid",
+    "artifact-graph-model-repository-missing",
+    "artifact-graph-model-repository-length-exceeded",
   );
   const modelRevision = artifactGraphIdentifier(
     model.revision,
     "Browser speech artifact graph model revision",
-    "artifact-graph-model-revision-invalid",
+    "artifact-graph-model-revision-missing",
+    "artifact-graph-model-revision-length-exceeded",
   );
   const dtype = artifactGraphIdentifier(
     model.dtype,
     "Browser speech artifact graph model dtype",
-    "artifact-graph-model-dtype-invalid",
+    "artifact-graph-model-dtype-missing",
+    "artifact-graph-model-dtype-length-exceeded",
   );
   const inputSampleRate = graphOptionalSampleRate(
     model.inputSampleRate,
@@ -1304,7 +1347,8 @@ export function createBrowserSpeechArtifactGraph({
     ? artifactGraphIdentifier(
       model.defaultVoice,
       "Browser speech artifact graph defaultVoice",
-      "artifact-graph-default-voice-invalid",
+      "artifact-graph-default-voice-missing",
+      "artifact-graph-default-voice-length-exceeded",
     )
     : null;
   if (
@@ -1312,7 +1356,7 @@ export function createBrowserSpeechArtifactGraph({
     && (model.defaultVoice !== undefined || model.voices !== undefined)
   ) {
     throw artifactGraphTypeError(
-      "artifact-graph-stt-voice-authority-invalid",
+      "artifact-graph-stt-voice-authority-declared",
       "An STT artifact graph must not declare TTS voice authority.",
     );
   }
@@ -1385,7 +1429,7 @@ export function createBrowserSpeechArtifactGraph({
   }
   if (role === "stt" && modelFiles.some((file) => file.kind === "voice-style-binary")) {
     throw artifactGraphTypeError(
-      "artifact-graph-stt-voice-file-invalid",
+      "artifact-graph-stt-voice-file-declared",
       "An STT artifact graph must not contain voice-style-binary files.",
     );
   }
@@ -1447,7 +1491,8 @@ export function createBrowserSpeechArtifactGraph({
     && graphSha256(
       identitySha256,
       "Browser speech artifact graph identitySha256",
-      "artifact-graph-identity-sha256-invalid",
+      "artifact-graph-identity-sha256-text-required",
+      "artifact-graph-identity-sha256-format-mismatch",
     )
       !== computedIdentitySha256
   ) {
@@ -2041,14 +2086,14 @@ function tokenizeArtifactGraphModule(source, modulePath) {
 
   function readEscape() {
     if (index >= source.length) {
-      fail("artifact-graph-javascript-string-invalid", "unterminated escape sequence.");
+      fail("artifact-graph-javascript-escape-unterminated", "unterminated escape sequence.");
     }
     const character = source[index];
     index += 1;
     if (character === "x") {
       const hex = source.slice(index, index + 2);
       if (!/^[a-f0-9]{2}$/iu.test(hex)) {
-        fail("artifact-graph-javascript-string-invalid", "invalid hexadecimal escape sequence.");
+        fail("artifact-graph-javascript-hexadecimal-escape-malformed", "malformed hexadecimal escape sequence.");
       }
       index += 2;
       return String.fromCodePoint(Number.parseInt(hex, 16));
@@ -2058,18 +2103,18 @@ function tokenizeArtifactGraphModule(source, modulePath) {
         const end = source.indexOf("}", index + 1);
         const hex = end < 0 ? "" : source.slice(index + 1, end);
         if (!/^[a-f0-9]{1,6}$/iu.test(hex)) {
-          fail("artifact-graph-javascript-string-invalid", "invalid Unicode escape sequence.");
+          fail("artifact-graph-javascript-unicode-code-point-escape-malformed", "malformed Unicode escape sequence.");
         }
         const codePoint = Number.parseInt(hex, 16);
         if (codePoint > 0x10ffff) {
-          fail("artifact-graph-javascript-string-invalid", "Unicode escape exceeds the valid range.");
+          fail("artifact-graph-javascript-unicode-code-point-out-of-range", "Unicode escape exceeds the valid range.");
         }
         index = end + 1;
         return String.fromCodePoint(codePoint);
       }
       const hex = source.slice(index, index + 4);
       if (!/^[a-f0-9]{4}$/iu.test(hex)) {
-        fail("artifact-graph-javascript-string-invalid", "invalid Unicode escape sequence.");
+        fail("artifact-graph-javascript-unicode-escape-malformed", "malformed Unicode escape sequence.");
       }
       index += 4;
       return String.fromCodePoint(Number.parseInt(hex, 16));
@@ -2103,12 +2148,12 @@ function tokenizeArtifactGraphModule(source, modulePath) {
         tokens.push(Object.freeze({ type: "string", value, start, end: index }));
         return;
       } else if (character === "\n" || character === "\r") {
-        fail("artifact-graph-javascript-string-invalid", "quoted string contains a line break.");
+        fail("artifact-graph-javascript-quoted-string-line-break-rejected", "quoted string contains a line break.");
       } else {
         value += character;
       }
     }
-    fail("artifact-graph-javascript-string-invalid", "unterminated quoted string.");
+    fail("artifact-graph-javascript-quoted-string-unterminated", "unterminated quoted string.");
   }
 
   function skipRegex() {
@@ -2127,10 +2172,10 @@ function tokenizeArtifactGraphModule(source, modulePath) {
         while (/[A-Za-z]/u.test(source[index] ?? "")) index += 1;
         return;
       } else if (character === "\n" || character === "\r") {
-        fail("artifact-graph-javascript-regexp-invalid", "regular expression contains a line break.");
+        fail("artifact-graph-javascript-regexp-line-break-rejected", "regular expression contains a line break.");
       }
     }
-    fail("artifact-graph-javascript-regexp-invalid", "unterminated regular expression.");
+    fail("artifact-graph-javascript-regexp-unterminated", "unterminated regular expression.");
   }
 
   function canStartRegex(lastToken) {
@@ -2155,7 +2200,7 @@ function tokenizeArtifactGraphModule(source, modulePath) {
         scanCode(true);
       }
     }
-    fail("artifact-graph-javascript-template-invalid", "unterminated template literal.");
+    fail("artifact-graph-javascript-template-literal-unterminated", "unterminated template literal.");
   }
 
   function scanCode(stopAtTemplateBrace = false) {
@@ -2176,7 +2221,7 @@ function tokenizeArtifactGraphModule(source, modulePath) {
       if (character === "/" && next === "*") {
         const end = source.indexOf("*/", index + 2);
         if (end < 0) {
-          fail("artifact-graph-javascript-comment-invalid", "unterminated block comment.");
+          fail("artifact-graph-javascript-block-comment-unterminated", "unterminated block comment.");
         }
         index = end + 2;
         continue;
@@ -2211,7 +2256,7 @@ function tokenizeArtifactGraphModule(source, modulePath) {
         continue;
       }
       if (character === "\\") {
-        fail("artifact-graph-javascript-token-invalid", "escaped identifier is not admitted.");
+        fail("artifact-graph-javascript-escaped-identifier-rejected", "escaped identifier is not admitted.");
       }
       if (stopAtTemplateBrace && character === "}") {
         if (nestedBraces === 0) {
@@ -2239,7 +2284,7 @@ function tokenizeArtifactGraphModule(source, modulePath) {
       lastToken = token;
     }
     if (stopAtTemplateBrace) {
-      fail("artifact-graph-javascript-template-invalid", "unterminated template expression.");
+      fail("artifact-graph-javascript-template-expression-unterminated", "unterminated template expression.");
     }
   }
 
@@ -2313,7 +2358,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata) {
     const opening = next(index);
     if (opening?.value !== "(") {
       throw artifactGraphError(
-        "artifact-graph-runtime-capability-reference-unsupported",
+        `artifact-graph-runtime-${kind.toLowerCase()}-direct-call-required`,
         `${modulePath} references ${kind} outside an admitted direct call boundary.`,
       );
     }
@@ -2321,7 +2366,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata) {
     if (previous(index)?.value === ".") {
       if (!["globalThis", "self"].includes(previous(index, 2)?.value)) {
         throw artifactGraphError(
-          "artifact-graph-runtime-capability-receiver-unsupported",
+          `artifact-graph-runtime-${kind.toLowerCase()}-receiver-not-global`,
           `${modulePath} calls ${kind} through a non-global receiver.`,
         );
       }
@@ -2398,7 +2443,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata) {
     if (forbiddenDynamicCode.has(token.value)) {
       throw artifactGraphError(
         "artifact-graph-runtime-dynamic-code-undeclared",
-        `${modulePath} contains unsupported dynamic code capability ${token.value}.`,
+        `${modulePath} contains dynamic code capability ${token.value}, which is not admitted.`,
       );
     }
     if (token.value === "Function") {
@@ -2441,7 +2486,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata) {
       if (previous(index)?.value === ".") {
         if (!["globalThis", "self"].includes(previous(index, 2)?.value)) {
           throw artifactGraphError(
-            "artifact-graph-runtime-capability-receiver-unsupported",
+            "artifact-graph-runtime-cache-open-receiver-not-global",
             `${modulePath} calls CacheStorage.open through a non-global receiver.`,
           );
         }
@@ -2453,7 +2498,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata) {
     if (token.value === "caches") {
       if (previous(index)?.value === "typeof") continue;
       throw artifactGraphError(
-        "artifact-graph-runtime-cache-capability-reference-unsupported",
+        "artifact-graph-runtime-cache-open-direct-call-required",
         `${modulePath} references CacheStorage outside an admitted direct open call.`,
       );
     }
@@ -2532,7 +2577,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata) {
       const opening = next(index);
       if (opening?.value !== "(") {
         throw artifactGraphError(
-          "artifact-graph-runtime-capability-reference-unsupported",
+          "artifact-graph-runtime-worker-constructor-call-required",
           `${modulePath} references Worker outside an admitted constructor boundary.`,
         );
       }
@@ -2542,7 +2587,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata) {
       } else if (previous(index)?.value === ".") {
         if (!["globalThis", "self"].includes(previous(index, 2)?.value)) {
           throw artifactGraphError(
-            "artifact-graph-runtime-capability-receiver-unsupported",
+            "artifact-graph-runtime-worker-receiver-not-global",
             `${modulePath} constructs Worker through a non-global receiver.`,
           );
         }
@@ -2676,7 +2721,7 @@ async function inspectArtifactGraphRuntime(admitted, metadata, signal) {
       source = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
     } catch (error) {
       throw artifactGraphError(
-        "artifact-graph-runtime-javascript-utf8-invalid",
+        "artifact-graph-runtime-javascript-utf8-decode-rejected",
         `Artifact graph runtime JavaScript file ${descriptor.path} is not valid UTF-8.`,
         error,
       );
@@ -2822,7 +2867,7 @@ async function createArtifactGraphObjectUrls(admitted, metadata, inspection) {
     const moduleUrl = PLATFORM_CREATE_OBJECT_URL(blob);
     if (typeof moduleUrl !== "string" || !moduleUrl.startsWith("blob:")) {
       throw artifactGraphError(
-        "artifact-graph-object-url-scheme-invalid",
+        "artifact-graph-object-url-scheme-not-blob",
         `Materialized artifact graph file ${descriptor.path} did not produce a Blob URL.`,
       );
     }
@@ -3228,12 +3273,12 @@ export function createDbopfsSpeechArtifactStore({
           if (signal?.aborted || error?.name === "AbortError") throwIfAborted(signal);
           if (graph) {
             throw artifactGraphError(
-              "artifact-graph-source-download-failed",
-              `Artifact graph source download failed for ${descriptor.path}.`,
+              "artifact-graph-source-fetch-rejected",
+              `Artifact graph source fetch was rejected for ${descriptor.path}.`,
               error,
             );
           }
-          throw speechError("ARCANE_AI_ARTIFACT_DOWNLOAD_FAILED", "A speech artifact download failed.", error);
+          throw speechError("ARCANE_AI_ARTIFACT_DOWNLOAD_FAILED", "A speech artifact source fetch was rejected.", error);
         }
         if (!response?.ok || !response.body) {
           await response?.body?.cancel?.().catch(() => undefined);
@@ -3369,10 +3414,10 @@ export function createDbopfsSpeechArtifactStore({
             throw graphVerificationError(
               descriptor,
               "dbopfs-persisted-sha256-mismatch",
-              `DBOPFS persisted bytes for artifact graph file ${descriptor.path} failed re-verification.`,
+              `DBOPFS persisted bytes for artifact graph file ${descriptor.path} were rejected during re-verification.`,
             );
           }
-          throw speechError("ARCANE_AI_ARTIFACT_CACHE_REJECTED", "DBOPFS persisted bytes failed verification.");
+          throw speechError("ARCANE_AI_ARTIFACT_CACHE_REJECTED", "DBOPFS persisted bytes were rejected during verification.");
         }
         installed.push({ descriptor, file });
       }
@@ -3424,8 +3469,8 @@ export function createDbopfsSpeechArtifactStore({
         );
       } catch (error) {
         throw artifactGraphTypeError(
-          "artifact-graph-load-security-invalid",
-          "Browser speech artifact graph load security is invalid.",
+          "artifact-graph-load-security-contract-rejected",
+          "Browser speech artifact graph load security does not satisfy the required contract.",
           error,
         );
       }
@@ -3577,6 +3622,10 @@ export function isBrowserSpeechAuthority(value) {
 
 export function isBrowserSpeechArtifactGraph(value) {
   return ARTIFACT_GRAPHS.has(value);
+}
+
+export function isBrowserSpeechArtifactError(value) {
+  return ARTIFACT_ERRORS.has(value);
 }
 
 export function isDbopfsSpeechArtifactStore(value) {

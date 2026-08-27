@@ -1,5 +1,7 @@
 export const SPEECH_WORKER_PROTOCOL = "arcane-ai-speech-worker/1";
 
+const SPEECH_WORKER_ERROR_PROTOCOL = "arcane-ai-speech-worker-error/1";
+
 const ARTIFACT_GRAPH_MODULE_GRAPH =
   "browser-speech-authenticated-artifact-graph";
 const GRAPH_GUARD_NAME = "__arcaneBrowserSpeechArtifactGraphGuardsV1";
@@ -22,6 +24,426 @@ const ARTIFACT_GRAPH_TRANSFORM_KINDS = new Set([
   "function-return-this-to-global-this",
   "typed-array-constructor",
 ]);
+const PUBLIC_WORKER_OPERATIONS = Object.freeze([
+  "load",
+  "use",
+  "status",
+  "unload",
+  "dispose",
+]);
+const TRANSPORT_WORKER_OPERATION_SET = new Set([
+  ...PUBLIC_WORKER_OPERATIONS,
+  "cancel",
+]);
+const BOTH_WORKER_ROLES = Object.freeze(["stt", "tts"]);
+const LOAD_OPERATION = Object.freeze(["load"]);
+const USE_OPERATION = Object.freeze(["use"]);
+const STATUS_OPERATION = Object.freeze(["status"]);
+const UNLOAD_OPERATION = Object.freeze(["unload"]);
+const DISPOSE_OPERATION = Object.freeze(["dispose"]);
+const UNLOAD_OR_DISPOSE_OPERATIONS = Object.freeze(["unload", "dispose"]);
+const LOAD_OR_USE_OPERATIONS = Object.freeze(["load", "use"]);
+const SDK_WORKER_ERRORS = new WeakSet();
+const WORKER_ERROR_MESSAGES = Object.freeze({
+  ARCANE_AI_REQUEST_ABORTED: "The speech worker operation was cancelled.",
+  ARCANE_AI_NOT_READY: "The speech worker is not loaded.",
+  ARCANE_AI_INVALID_REQUEST: "The speech worker request was rejected.",
+  ARCANE_AI_INVALID_PROVIDER_RESULT: "The speech engine result was rejected.",
+  ARCANE_AI_UNDECLARED_ARTIFACT: "The speech engine requested an undeclared artifact.",
+  ARCANE_AI_PROVIDER_UNAVAILABLE: "The selected speech engine is unavailable.",
+  ARCANE_AI_PROVIDER_DISPOSED: "The speech worker is disposed.",
+  ARCANE_AI_PROVIDER_REQUEST_FAILED: "The speech engine operation was rejected.",
+  ARCANE_AI_WORKER_CRASHED: "The speech Worker stopped unexpectedly.",
+  ARCANE_AI_WORKER_MESSAGE_ERROR: "The speech Worker message was rejected.",
+  ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID:
+    "The authenticated artifact graph Worker configuration was rejected.",
+  ARCANE_AI_ARTIFACT_GRAPH_FETCH_EDGE_UNDECLARED:
+    "The runtime used an undeclared artifact graph fetch edge.",
+  ARCANE_AI_ARTIFACT_GRAPH_IMPORT_EDGE_UNDECLARED:
+    "The runtime used an undeclared artifact graph import edge.",
+  ARCANE_AI_ARTIFACT_GRAPH_CACHE_EDGE_UNDECLARED:
+    "The runtime used an undeclared artifact graph cache edge.",
+  ARCANE_AI_ARTIFACT_GRAPH_WORKER_EDGE_UNDECLARED:
+    "The runtime used an undeclared artifact graph module Worker edge.",
+  ARCANE_AI_ARTIFACT_GRAPH_ISOLATION_UNAVAILABLE:
+    "The Worker cannot install the authenticated artifact graph isolation boundary.",
+});
+const WORKER_ERROR_REASON_ADMISSIONS = new Map();
+
+function registerWorkerErrorReasons(code, roles, operations, reasons) {
+  const admission = Object.freeze({
+    code,
+    roles: Object.freeze([...roles]),
+    operations: Object.freeze([...operations]),
+  });
+  for (const reason of reasons) WORKER_ERROR_REASON_ADMISSIONS.set(reason, admission);
+}
+
+registerWorkerErrorReasons("ARCANE_AI_REQUEST_ABORTED", ["stt"], LOAD_OPERATION, [
+  "stt-load-cancelled",
+]);
+registerWorkerErrorReasons("ARCANE_AI_REQUEST_ABORTED", ["stt"], STATUS_OPERATION, [
+  "stt-status-cancelled",
+]);
+registerWorkerErrorReasons("ARCANE_AI_REQUEST_ABORTED", ["stt"], UNLOAD_OPERATION, [
+  "stt-unload-cancelled",
+]);
+registerWorkerErrorReasons("ARCANE_AI_REQUEST_ABORTED", ["stt"], DISPOSE_OPERATION, [
+  "stt-dispose-cancelled",
+]);
+registerWorkerErrorReasons("ARCANE_AI_REQUEST_ABORTED", ["stt"], USE_OPERATION, [
+  "stt-transcription-cancelled",
+]);
+registerWorkerErrorReasons("ARCANE_AI_REQUEST_ABORTED", ["tts"], LOAD_OPERATION, [
+  "tts-load-cancelled",
+]);
+registerWorkerErrorReasons("ARCANE_AI_REQUEST_ABORTED", ["tts"], STATUS_OPERATION, [
+  "tts-status-cancelled",
+]);
+registerWorkerErrorReasons("ARCANE_AI_REQUEST_ABORTED", ["tts"], UNLOAD_OPERATION, [
+  "tts-unload-cancelled",
+]);
+registerWorkerErrorReasons("ARCANE_AI_REQUEST_ABORTED", ["tts"], DISPOSE_OPERATION, [
+  "tts-dispose-cancelled",
+]);
+registerWorkerErrorReasons("ARCANE_AI_REQUEST_ABORTED", ["tts"], USE_OPERATION, [
+  "tts-synthesis-cancelled",
+]);
+registerWorkerErrorReasons("ARCANE_AI_PROVIDER_REQUEST_FAILED", ["stt"], LOAD_OPERATION, [
+  "stt-worker-runtime-configuration-rejected",
+  "stt-worker-runtime-import-rejected",
+  "stt-worker-model-load-rejected",
+]);
+registerWorkerErrorReasons("ARCANE_AI_PROVIDER_REQUEST_FAILED", ["tts"], LOAD_OPERATION, [
+  "tts-worker-runtime-configuration-rejected",
+  "tts-worker-runtime-import-rejected",
+  "tts-worker-model-load-rejected",
+]);
+registerWorkerErrorReasons("ARCANE_AI_PROVIDER_REQUEST_FAILED", ["stt"], USE_OPERATION, [
+  "stt-transcription-engine-operation-rejected",
+]);
+registerWorkerErrorReasons("ARCANE_AI_PROVIDER_REQUEST_FAILED", ["tts"], USE_OPERATION, [
+  "tts-synthesis-engine-operation-rejected",
+]);
+registerWorkerErrorReasons(
+  "ARCANE_AI_PROVIDER_REQUEST_FAILED",
+  ["stt"],
+  UNLOAD_OR_DISPOSE_OPERATIONS,
+  ["stt-worker-engine-dispose-rejected"],
+);
+registerWorkerErrorReasons(
+  "ARCANE_AI_PROVIDER_REQUEST_FAILED",
+  ["tts"],
+  UNLOAD_OR_DISPOSE_OPERATIONS,
+  ["tts-worker-engine-dispose-rejected"],
+);
+registerWorkerErrorReasons("ARCANE_AI_PROVIDER_REQUEST_FAILED", ["stt"], DISPOSE_OPERATION, [
+  "stt-worker-dispose-rejected",
+]);
+registerWorkerErrorReasons("ARCANE_AI_PROVIDER_REQUEST_FAILED", ["tts"], DISPOSE_OPERATION, [
+  "tts-worker-dispose-rejected",
+]);
+registerWorkerErrorReasons("ARCANE_AI_PROVIDER_REQUEST_FAILED", ["stt"], STATUS_OPERATION, [
+  "stt-worker-status-rejected",
+]);
+registerWorkerErrorReasons("ARCANE_AI_PROVIDER_REQUEST_FAILED", ["tts"], STATUS_OPERATION, [
+  "tts-worker-status-rejected",
+]);
+registerWorkerErrorReasons("ARCANE_AI_INVALID_REQUEST", BOTH_WORKER_ROLES, LOAD_OPERATION, [
+  "artifact-graph-entrypoint-not-materialized",
+  "artifact-graph-materialized-file-not-object",
+  "artifact-graph-materialized-media-type-empty",
+  "artifact-graph-materialized-module-url-empty",
+  "artifact-graph-materialized-path-ambiguous",
+  "artifact-graph-materialized-path-empty",
+  "artifact-graph-materialized-source-url-empty",
+  "artifact-graph-runtime-request-routes-not-array",
+  "speech-model-sample-rate-not-positive-safe-integer",
+  "speech-runtime-entrypoint-not-materialized",
+  "speech-worker-configuration-missing",
+  "speech-worker-materialized-files-missing",
+  "speech-worker-model-dtype-empty",
+  "speech-worker-model-id-empty",
+  "speech-worker-model-repository-empty",
+  "speech-worker-model-revision-empty",
+  "speech-worker-runtime-entry-empty",
+  "speech-worker-runtime-selection-mismatch",
+]);
+registerWorkerErrorReasons("ARCANE_AI_INVALID_REQUEST", ["stt"], USE_OPERATION, [
+  "stt-transcription-audio-not-float32array",
+  "stt-transcription-sample-rate-mismatch",
+]);
+registerWorkerErrorReasons("ARCANE_AI_INVALID_REQUEST", ["tts"], LOAD_OPERATION, [
+  "tts-default-voice-empty",
+]);
+registerWorkerErrorReasons("ARCANE_AI_INVALID_REQUEST", ["tts"], USE_OPERATION, [
+  "tts-synthesis-speed-out-of-range",
+  "tts-synthesis-text-empty",
+  "tts-synthesis-voice-empty",
+  "tts-synthesis-voice-not-declared",
+]);
+registerWorkerErrorReasons("ARCANE_AI_INVALID_PROVIDER_RESULT", ["stt"], USE_OPERATION, [
+  "stt-transcription-result-text-not-string",
+]);
+registerWorkerErrorReasons("ARCANE_AI_INVALID_PROVIDER_RESULT", ["tts"], USE_OPERATION, [
+  "tts-synthesis-pcm-result-not-float32array",
+  "tts-synthesis-pcm-sample-non-finite",
+  "tts-synthesis-result-sample-rate-mismatch",
+]);
+registerWorkerErrorReasons(
+  "ARCANE_AI_UNDECLARED_ARTIFACT",
+  BOTH_WORKER_ROLES,
+  LOAD_OR_USE_OPERATIONS,
+  [
+  "artifact-graph-cache-write-rejected",
+  "artifact-graph-runtime-request-url-malformed",
+  "speech-worker-artifact-request-method-rejected",
+  "speech-worker-artifact-request-undeclared",
+  "speech-worker-cache-match-rejected",
+  "speech-worker-cache-open-rejected",
+  ],
+);
+registerWorkerErrorReasons("ARCANE_AI_PROVIDER_DISPOSED", ["stt"], LOAD_OPERATION, [
+  "stt-load-rejected-after-dispose",
+]);
+registerWorkerErrorReasons("ARCANE_AI_PROVIDER_DISPOSED", ["tts"], LOAD_OPERATION, [
+  "tts-load-rejected-after-dispose",
+]);
+registerWorkerErrorReasons("ARCANE_AI_NOT_READY", ["stt"], USE_OPERATION, [
+  "stt-transcription-rejected-before-load",
+]);
+registerWorkerErrorReasons("ARCANE_AI_NOT_READY", ["tts"], USE_OPERATION, [
+  "tts-synthesis-rejected-before-load",
+]);
+registerWorkerErrorReasons("ARCANE_AI_PROVIDER_UNAVAILABLE", BOTH_WORKER_ROLES, LOAD_OPERATION, [
+  "artifact-graph-fetch-constructor-unavailable",
+  "artifact-graph-onnx-wasm-pair-not-materialized",
+  "speech-worker-fetch-unavailable",
+]);
+registerWorkerErrorReasons(
+  "ARCANE_AI_PROVIDER_UNAVAILABLE",
+  BOTH_WORKER_ROLES,
+  LOAD_OR_USE_OPERATIONS,
+  [
+  "artifact-graph-module-worker-constructor-unavailable",
+  "artifact-graph-negative-response-constructor-unavailable",
+  ],
+);
+registerWorkerErrorReasons("ARCANE_AI_PROVIDER_UNAVAILABLE", ["tts"], LOAD_OPERATION, [
+  "kokoro-env-wasm-paths-assignment-rejected",
+  "kokoro-env-wasm-paths-unavailable",
+  "kokoro-tts-constructor-export-missing",
+]);
+registerWorkerErrorReasons("ARCANE_AI_PROVIDER_UNAVAILABLE", ["stt"], LOAD_OPERATION, [
+  "transformers-env-allow-local-models-assignment-rejected",
+  "transformers-env-allow-local-models-unavailable",
+  "transformers-env-allow-remote-models-assignment-rejected",
+  "transformers-env-allow-remote-models-unavailable",
+  "transformers-env-backends-onnx-wasm-unavailable",
+  "transformers-env-browser-cache-assignment-rejected",
+  "transformers-env-browser-cache-unavailable",
+  "transformers-env-custom-cache-assignment-rejected",
+  "transformers-env-custom-cache-toggle-unavailable",
+  "transformers-env-custom-cache-toggle-assignment-rejected",
+  "transformers-env-custom-cache-unavailable",
+  "transformers-env-fs-cache-assignment-rejected",
+  "transformers-env-fs-cache-unavailable",
+  "transformers-env-num-threads-assignment-rejected",
+  "transformers-env-num-threads-unavailable",
+  "transformers-env-wasm-paths-assignment-rejected",
+  "transformers-env-wasm-paths-unavailable",
+  "transformers-whisper-pipeline-export-missing",
+]);
+registerWorkerErrorReasons("ARCANE_AI_PROVIDER_UNAVAILABLE", ["stt"], USE_OPERATION, [
+  "stt-transcription-method-unavailable",
+]);
+registerWorkerErrorReasons("ARCANE_AI_PROVIDER_UNAVAILABLE", ["tts"], USE_OPERATION, [
+  "tts-synthesis-method-unavailable",
+]);
+registerWorkerErrorReasons(
+  "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
+  BOTH_WORKER_ROLES,
+  LOAD_OPERATION,
+  [
+  "artifact-graph-kokoro-voice-inventory-missing",
+  "artifact-graph-module-worker-target-not-materialized",
+  "artifact-graph-negative-request-routes-not-array",
+  "artifact-graph-onnx-wasm-configuration-mismatch",
+  "artifact-graph-runtime-request-route-ambiguous",
+  "artifact-graph-transform-identity-ambiguous",
+  "artifact-graph-transform-kind-not-admitted",
+  "artifact-graph-transform-module-path-empty",
+  "artifact-graph-transform-occurrence-not-positive-safe-integer",
+  "artifact-graph-transformers-cache-edge-ambiguous",
+  "artifact-graph-worker-configuration-incomplete",
+  ],
+);
+registerWorkerErrorReasons(
+  "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
+  BOTH_WORKER_ROLES,
+  LOAD_OR_USE_OPERATIONS,
+  ["artifact-graph-typed-array-constructor-transform-undeclared"],
+);
+registerWorkerErrorReasons(
+  "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
+  ["tts"],
+  LOAD_OPERATION,
+  [
+  "kokoro-env-num-threads-field-not-exposed",
+  ],
+);
+registerWorkerErrorReasons(
+  "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
+  ["stt"],
+  LOAD_OPERATION,
+  [
+  "transformers-env-num-threads-not-positive-safe-integer",
+  ],
+);
+for (const label of ["cache-open", "dynamic-import", "fetch", "module-worker"]) {
+  registerWorkerErrorReasons(
+    "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
+    BOTH_WORKER_ROLES,
+    LOAD_OPERATION,
+    [
+    `artifact-graph-${label}-edges-not-array`,
+    `artifact-graph-${label}-edge-not-object`,
+    `artifact-graph-${label}-edge-module-path-empty`,
+    `artifact-graph-${label}-edge-occurrence-not-positive-safe-integer`,
+    `artifact-graph-${label}-edge-policy-not-admitted`,
+    `artifact-graph-${label}-edge-identity-ambiguous`,
+    ],
+  );
+}
+registerWorkerErrorReasons(
+  "ARCANE_AI_ARTIFACT_GRAPH_IMPORT_EDGE_UNDECLARED",
+  BOTH_WORKER_ROLES,
+  LOAD_OR_USE_OPERATIONS,
+  [
+  "artifact-graph-dynamic-import-edge-undeclared",
+  "artifact-graph-dynamic-import-edge-undeclared-inactive-runtime-branch-entered",
+  "artifact-graph-dynamic-import-target-undeclared",
+  ],
+);
+registerWorkerErrorReasons(
+  "ARCANE_AI_ARTIFACT_GRAPH_FETCH_EDGE_UNDECLARED",
+  BOTH_WORKER_ROLES,
+  LOAD_OR_USE_OPERATIONS,
+  [
+  "artifact-graph-fetch-edge-undeclared",
+  "artifact-graph-fetch-edge-undeclared-inactive-runtime-branch-entered",
+  "artifact-graph-fetch-guard-bypassed",
+  "artifact-graph-fetch-method-undeclared",
+  "artifact-graph-fetch-target-undeclared",
+  ],
+);
+registerWorkerErrorReasons(
+  "ARCANE_AI_ARTIFACT_GRAPH_CACHE_EDGE_UNDECLARED",
+  BOTH_WORKER_ROLES,
+  LOAD_OR_USE_OPERATIONS,
+  [
+  "artifact-graph-cache-match-guard-bypassed",
+  "artifact-graph-cache-name-mismatch",
+  "artifact-graph-cache-open-edge-undeclared",
+  "artifact-graph-cache-open-edge-undeclared-inactive-runtime-branch-entered",
+  "artifact-graph-cache-open-guard-bypassed",
+  "artifact-graph-cache-read-target-undeclared",
+  ],
+);
+registerWorkerErrorReasons(
+  "ARCANE_AI_ARTIFACT_GRAPH_WORKER_EDGE_UNDECLARED",
+  BOTH_WORKER_ROLES,
+  LOAD_OR_USE_OPERATIONS,
+  [
+  "artifact-graph-module-worker-edge-undeclared",
+  "artifact-graph-module-worker-edge-undeclared-inactive-runtime-branch-entered",
+  "artifact-graph-module-worker-target-undeclared",
+  "artifact-graph-module-worker-type-mismatch",
+  ],
+);
+registerWorkerErrorReasons(
+  "ARCANE_AI_ARTIFACT_GRAPH_ISOLATION_UNAVAILABLE",
+  BOTH_WORKER_ROLES,
+  LOAD_OPERATION,
+  [
+  "artifact-graph-cache-isolation-unavailable",
+  "artifact-graph-dynamic-code-constructor-isolation-unavailable",
+  "artifact-graph-fetch-isolation-unavailable",
+  "artifact-graph-guard-global-collision",
+  "artifact-graph-guard-global-definition-rejected",
+  "artifact-graph-indexeddb-isolation-unavailable",
+  "artifact-graph-opfs-isolation-unavailable",
+  "artifact-graph-private-message-port-missing",
+  "artifact-graph-setinterval-isolation-unavailable",
+  "artifact-graph-settimeout-isolation-unavailable",
+  "artifact-graph-typed-array-validation-unavailable",
+  "speech-worker-cache-isolation-unavailable",
+  "speech-worker-fetch-isolation-unavailable",
+  ],
+);
+registerWorkerErrorReasons(
+  "ARCANE_AI_ARTIFACT_GRAPH_ISOLATION_UNAVAILABLE",
+  BOTH_WORKER_ROLES,
+  LOAD_OR_USE_OPERATIONS,
+  [
+  "artifact-graph-dynamic-code-constructor-rejected",
+  "artifact-graph-guard-capability-mismatch",
+  "artifact-graph-setinterval-string-callback-rejected",
+  "artifact-graph-settimeout-string-callback-rejected",
+  "artifact-graph-typed-array-constructor-intrinsic-mismatch",
+  "artifact-graph-typed-array-constructor-receiver-not-typed-array",
+  ],
+);
+for (const name of [
+  "broadcastchannel",
+  "eventsource",
+  "function",
+  "rtcpeerconnection",
+  "shadowrealm",
+  "sharedworker",
+  "websocket",
+  "websocketstream",
+  "webtransport",
+  "worker",
+  "xmlhttprequest",
+  "eval",
+  "importscripts",
+]) {
+  registerWorkerErrorReasons(
+    "ARCANE_AI_ARTIFACT_GRAPH_ISOLATION_UNAVAILABLE",
+    BOTH_WORKER_ROLES,
+    LOAD_OR_USE_OPERATIONS,
+    [`artifact-graph-${name}-capability-undeclared`],
+  );
+  registerWorkerErrorReasons(
+    "ARCANE_AI_ARTIFACT_GRAPH_ISOLATION_UNAVAILABLE",
+    BOTH_WORKER_ROLES,
+    LOAD_OPERATION,
+    [`artifact-graph-${name}-isolation-unavailable`],
+  );
+}
+registerWorkerErrorReasons(
+  "ARCANE_AI_WORKER_MESSAGE_ERROR",
+  BOTH_WORKER_ROLES,
+  LOAD_OR_USE_OPERATIONS,
+  [
+  "artifact-graph-module-worker-error-envelope-rejected",
+  "artifact-graph-module-worker-initialization-message-rejected",
+  ],
+);
+
+function operationFailureReason(role, op) {
+  if (op === "load") return `${role}-worker-model-load-rejected`;
+  if (op === "use") {
+    return role === "stt"
+      ? "stt-transcription-engine-operation-rejected"
+      : "tts-synthesis-engine-operation-rejected";
+  }
+  if (op === "unload") return `${role}-worker-engine-dispose-rejected`;
+  if (op === "dispose") return `${role}-worker-dispose-rejected`;
+  if (op === "status") return `${role}-worker-status-rejected`;
+  return `${role}-worker-operation-unknown`;
+}
 
 function workerError(code, message, cause, reason) {
   const error = cause === undefined
@@ -32,7 +454,18 @@ function workerError(code, message, cause, reason) {
     : "ArcaneSpeechWorkerError";
   error.code = code;
   if (typeof reason === "string" && reason) error.reason = reason;
+  SDK_WORKER_ERRORS.add(error);
   return error;
+}
+
+function isSdkWorkerError(value) {
+  return value instanceof Error && SDK_WORKER_ERRORS.has(value);
+}
+
+function admitWorkerFailure(error, code, message, reason) {
+  return isSdkWorkerError(error)
+    ? error
+    : workerError(code, message, error, reason);
 }
 
 function operationReason(role, op, suffix) {
@@ -79,42 +512,65 @@ export function collectSpeechTransferables(value) {
 }
 
 function serializedError(error, role, op) {
-  const code = typeof error?.code === "string" && /^ARCANE_AI_[A-Z0-9_]+$/u.test(error.code)
-    ? error.code
-    : "ARCANE_AI_PROVIDER_REQUEST_FAILED";
-  const messages = Object.freeze({
-    ARCANE_AI_REQUEST_ABORTED: "The speech worker operation was cancelled.",
-    ARCANE_AI_NOT_READY: "The speech worker is not loaded.",
-    ARCANE_AI_INVALID_REQUEST: "The speech worker request is invalid.",
-    ARCANE_AI_INVALID_PROVIDER_RESULT: "The speech engine returned an invalid result.",
-    ARCANE_AI_UNDECLARED_ARTIFACT: "The speech engine requested an undeclared artifact.",
-    ARCANE_AI_PROVIDER_UNAVAILABLE: "The selected speech engine is unavailable.",
-    ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID:
-      "The authenticated artifact graph Worker configuration is invalid.",
-    ARCANE_AI_ARTIFACT_GRAPH_FETCH_EDGE_UNDECLARED:
-      "The runtime used an undeclared artifact graph fetch edge.",
-    ARCANE_AI_ARTIFACT_GRAPH_IMPORT_EDGE_UNDECLARED:
-      "The runtime used an undeclared artifact graph import edge.",
-    ARCANE_AI_ARTIFACT_GRAPH_CACHE_EDGE_UNDECLARED:
-      "The runtime used an undeclared artifact graph cache edge.",
-    ARCANE_AI_ARTIFACT_GRAPH_WORKER_EDGE_UNDECLARED:
-      "The runtime used an undeclared artifact graph module Worker edge.",
-    ARCANE_AI_ARTIFACT_GRAPH_ISOLATION_UNAVAILABLE:
-      "The Worker cannot install the authenticated artifact graph isolation boundary.",
+  const admission = isSdkWorkerError(error)
+    ? workerErrorReasonAdmission(error.reason, role, op)
+    : null;
+  const admittedCode = isSdkWorkerError(error)
+    && Object.hasOwn(WORKER_ERROR_MESSAGES, error.code)
+    && admission?.code === error.code;
+  const code = admittedCode ? error.code : "ARCANE_AI_PROVIDER_REQUEST_FAILED";
+  const reason = admittedCode ? error.reason : operationFailureReason(role, op);
+  return Object.freeze({
+    protocol: SPEECH_WORKER_ERROR_PROTOCOL,
+    code,
+    message: WORKER_ERROR_MESSAGES[code],
+    reason,
   });
+}
+
+function workerErrorReasonAdmission(reason, role, op) {
+  const admission = WORKER_ERROR_REASON_ADMISSIONS.get(reason);
+  return admission
+    && admission.roles.includes(role)
+    && admission.operations.includes(op)
+    ? admission
+    : null;
+}
+
+export function normalizeSpeechWorkerErrorEnvelope(value, role, op) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  let descriptors;
+  try {
+    const keys = Reflect.ownKeys(value);
+    if (keys.some((key) => typeof key !== "string")
+      || keys.sort().join(",") !== "code,message,protocol,reason") return null;
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    return null;
+  }
+  for (const key of ["code", "message", "protocol", "reason"]) {
+    if (!Object.hasOwn(descriptors[key], "value")) return null;
+  }
+  const protocol = descriptors.protocol.value;
+  const code = descriptors.code.value;
+  const message = descriptors.message.value;
+  const reason = descriptors.reason.value;
+  if (protocol !== SPEECH_WORKER_ERROR_PROTOCOL) return null;
+  if (!Object.hasOwn(WORKER_ERROR_MESSAGES, code)) return null;
+  if (message !== WORKER_ERROR_MESSAGES[code]) return null;
+  const admission = workerErrorReasonAdmission(reason, role, op);
+  if (admission?.code !== code) return null;
   return Object.freeze({
     code,
-    message: messages[code] ?? "The speech worker operation failed.",
-    reason: typeof error?.reason === "string" && error.reason
-      ? error.reason
-      : operationReason(role, op, "failed"),
+    message,
+    reason,
   });
 }
 
 function requiredText(
   value,
   label,
-  reason = "speech-worker-configuration-field-invalid",
+  reason,
 ) {
   if (typeof value !== "string" || !value.trim()) {
     throw workerError(
@@ -134,7 +590,7 @@ function requiredSampleRate(value, label, fallback) {
       "ARCANE_AI_INVALID_REQUEST",
       `${label} must be a positive safe integer.`,
       undefined,
-      "speech-model-sample-rate-invalid",
+      "speech-model-sample-rate-not-positive-safe-integer",
     );
   }
   return candidate;
@@ -150,19 +606,19 @@ function validateMaterializedFile(file, label) {
       "ARCANE_AI_INVALID_REQUEST",
       `${label} must be an object.`,
       undefined,
-      "artifact-graph-materialized-file-invalid",
+      "artifact-graph-materialized-file-not-object",
     );
   }
-  requiredText(file.path, `${label} path`, "artifact-graph-materialized-path-invalid");
-  requiredText(file.sourceUrl, `${label} sourceUrl`, "artifact-graph-materialized-source-url-invalid");
-  requiredText(file.moduleUrl, `${label} moduleUrl`, "artifact-graph-materialized-module-url-invalid");
-  requiredText(file.mediaType, `${label} mediaType`, "artifact-graph-materialized-media-type-invalid");
+  requiredText(file.path, `${label} path`, "artifact-graph-materialized-path-empty");
+  requiredText(file.sourceUrl, `${label} sourceUrl`, "artifact-graph-materialized-source-url-empty");
+  requiredText(file.moduleUrl, `${label} moduleUrl`, "artifact-graph-materialized-module-url-empty");
+  requiredText(file.mediaType, `${label} mediaType`, "artifact-graph-materialized-media-type-empty");
   if (file.runtimeRequestUrls !== undefined && !Array.isArray(file.runtimeRequestUrls)) {
     throw workerError(
       "ARCANE_AI_INVALID_REQUEST",
       `${label} runtimeRequestUrls must be an array.`,
       undefined,
-      "artifact-graph-runtime-request-routes-invalid",
+      "artifact-graph-runtime-request-routes-not-array",
     );
   }
   return file;
@@ -190,10 +646,10 @@ function validateConfiguration(configuration, role) {
       "speech-worker-runtime-selection-mismatch",
     );
   }
-  requiredText(configuration.model?.id, "Speech model id", "speech-worker-model-id-invalid");
-  requiredText(configuration.model?.repository, "Speech model repository", "speech-worker-model-repository-invalid");
-  requiredText(configuration.model?.revision, "Speech model revision", "speech-worker-model-revision-invalid");
-  requiredText(configuration.runtime?.entry, "Speech runtime entry", "speech-worker-runtime-entry-invalid");
+  requiredText(configuration.model?.id, "Speech model id", "speech-worker-model-id-empty");
+  requiredText(configuration.model?.repository, "Speech model repository", "speech-worker-model-repository-empty");
+  requiredText(configuration.model?.revision, "Speech model revision", "speech-worker-model-revision-empty");
+  requiredText(configuration.runtime?.entry, "Speech runtime entry", "speech-worker-runtime-entry-empty");
   if (!Array.isArray(configuration.runtime?.files) || !Array.isArray(configuration.model?.files)) {
     throw workerError(
       "ARCANE_AI_INVALID_REQUEST",
@@ -269,7 +725,7 @@ function validateConfiguration(configuration, role) {
         "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
         "Kokoro does not expose a verified numThreads configuration field.",
         undefined,
-        "kokoro-env-num-threads-unsupported",
+        "kokoro-env-num-threads-field-not-exposed",
       );
     }
     if (
@@ -280,15 +736,15 @@ function validateConfiguration(configuration, role) {
         "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
         "Transformers numThreads must be a positive safe integer.",
         undefined,
-        "transformers-env-num-threads-invalid",
+        "transformers-env-num-threads-not-positive-safe-integer",
       );
     }
-    requiredText(configuration.model?.dtype, "Speech model dtype", "speech-worker-model-dtype-invalid");
+    requiredText(configuration.model?.dtype, "Speech model dtype", "speech-worker-model-dtype-empty");
     if (role === "stt") {
       requiredSampleRate(configuration.model.inputSampleRate, "Whisper inputSampleRate");
     } else {
       requiredSampleRate(configuration.model.outputSampleRate, "Kokoro outputSampleRate");
-      requiredText(configuration.model.defaultVoice, "Kokoro defaultVoice", "tts-default-voice-invalid");
+      requiredText(configuration.model.defaultVoice, "Kokoro defaultVoice", "tts-default-voice-empty");
       if (!Array.isArray(configuration.model.voices) || configuration.model.voices.length < 1) {
         throw workerError(
           "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
@@ -306,7 +762,7 @@ function validateConfiguration(configuration, role) {
         "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
         "Artifact graph negative runtime request routes must be an array.",
         undefined,
-        "artifact-graph-negative-request-routes-invalid",
+        "artifact-graph-negative-request-routes-not-array",
       );
     }
   }
@@ -322,9 +778,9 @@ function absoluteRequestUrl(value, scope) {
   } catch {
     throw workerError(
       "ARCANE_AI_UNDECLARED_ARTIFACT",
-      "The speech engine requested an invalid artifact URL.",
+      "The speech engine requested a malformed artifact URL.",
       undefined,
-      "artifact-graph-runtime-request-url-invalid",
+      "artifact-graph-runtime-request-url-malformed",
     );
   }
 }
@@ -635,24 +1091,42 @@ function edgeMap(edges, label) {
       "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
       `Artifact graph ${label} edges must be an array.`,
       undefined,
-      `artifact-graph-${label}-edges-invalid`,
+      `artifact-graph-${label}-edges-not-array`,
     );
   }
   const map = new Map();
   for (const edge of edges) {
-    if (
-      !edge
-      || typeof edge.modulePath !== "string"
-      || !Number.isSafeInteger(edge.occurrence)
-      || edge.occurrence < 1
-      || (edge.edgePolicy !== "artifact-targets-admitted"
-        && edge.edgePolicy !== "inactive-runtime-branch-rejected")
-    ) {
+    if (!edge || typeof edge !== "object" || Array.isArray(edge)) {
       throw workerError(
         "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
-        `Artifact graph ${label} edge identity is invalid.`,
+        `Artifact graph ${label} edge must be an object.`,
         undefined,
-        `artifact-graph-${label}-edge-identity-invalid`,
+        `artifact-graph-${label}-edge-not-object`,
+      );
+    }
+    if (typeof edge.modulePath !== "string" || !edge.modulePath) {
+      throw workerError(
+        "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
+        `Artifact graph ${label} edge modulePath must be nonempty.`,
+        undefined,
+        `artifact-graph-${label}-edge-module-path-empty`,
+      );
+    }
+    if (!Number.isSafeInteger(edge.occurrence) || edge.occurrence < 1) {
+      throw workerError(
+        "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
+        `Artifact graph ${label} edge occurrence must be a positive safe integer.`,
+        undefined,
+        `artifact-graph-${label}-edge-occurrence-not-positive-safe-integer`,
+      );
+    }
+    if (edge.edgePolicy !== "artifact-targets-admitted"
+      && edge.edgePolicy !== "inactive-runtime-branch-rejected") {
+      throw workerError(
+        "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
+        `Artifact graph ${label} edge policy is not admitted.`,
+        undefined,
+        `artifact-graph-${label}-edge-policy-not-admitted`,
       );
     }
     const key = edgeKey(edge.modulePath, edge.occurrence);
@@ -675,22 +1149,26 @@ function transformSet(transforms, kind) {
     if (!ARTIFACT_GRAPH_TRANSFORM_KINDS.has(transform?.kind)) {
       throw workerError(
         "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
-        "Artifact graph Worker configuration contains an unsupported transform kind.",
+        "Artifact graph Worker configuration contains a transform kind that is not admitted.",
         undefined,
-        "artifact-graph-transform-kind-unsupported",
+        "artifact-graph-transform-kind-not-admitted",
       );
     }
     if (transform?.kind !== kind) continue;
-    if (
-      typeof transform.modulePath !== "string"
-      || !Number.isSafeInteger(transform.occurrence)
-      || transform.occurrence < 1
-    ) {
+    if (typeof transform.modulePath !== "string" || !transform.modulePath) {
       throw workerError(
         "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
-        `Artifact graph ${kind} transform identity is invalid.`,
+        `Artifact graph ${kind} transform modulePath must be nonempty.`,
         undefined,
-        "artifact-graph-transform-identity-invalid",
+        "artifact-graph-transform-module-path-empty",
+      );
+    }
+    if (!Number.isSafeInteger(transform.occurrence) || transform.occurrence < 1) {
+      throw workerError(
+        "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
+        `Artifact graph ${kind} transform occurrence must be a positive safe integer.`,
+        undefined,
+        "artifact-graph-transform-occurrence-not-positive-safe-integer",
       );
     }
     const key = edgeKey(transform.modulePath, transform.occurrence);
@@ -986,14 +1464,17 @@ function createArtifactGraphGuard(scope, configuration, role, reader, originalWo
       nestedWorkers.add(worker);
       const onBootstrapMessage = (event) => {
         if (event.data?.protocol !== NESTED_WORKER_PROTOCOL
-          || event.data?.event !== "artifact-module-worker-bootstrap-failed") return;
+          || event.data?.event !== "artifact-module-worker-bootstrap-rejected") return;
         event.stopImmediatePropagation?.();
-        const failure = workerError(
-          event.data.error?.code ?? "ARCANE_AI_WORKER_CRASHED",
-          event.data.error?.message ?? "The authenticated artifact module Worker failed to start.",
-          undefined,
-          event.data.error?.reason ?? "artifact-graph-module-worker-bootstrap-failed",
-        );
+        const admitted = normalizeSpeechWorkerErrorEnvelope(event.data.error, role, "load");
+        const failure = admitted
+          ? workerError(admitted.code, admitted.message, undefined, admitted.reason)
+          : workerError(
+            "ARCANE_AI_WORKER_MESSAGE_ERROR",
+            "The authenticated artifact module Worker error envelope was rejected.",
+            undefined,
+            "artifact-graph-module-worker-error-envelope-rejected",
+          );
         worker.dispatchEvent?.(nestedWorkerFailureEvent(scope, failure));
       };
       worker.addEventListener?.("message", onBootstrapMessage);
@@ -1037,7 +1518,7 @@ function createArtifactGraphGuard(scope, configuration, role, reader, originalWo
           "ARCANE_AI_ARTIFACT_GRAPH_ISOLATION_UNAVAILABLE",
           "The typed-array constructor transform received an unauthenticated receiver.",
           undefined,
-          "artifact-graph-typed-array-constructor-receiver-invalid",
+          "artifact-graph-typed-array-constructor-receiver-not-typed-array",
         );
       }
       const Constructor = typedArrays.constructors.get(
@@ -1200,7 +1681,7 @@ function installArtifactGraphEnvironment(scope, configuration, role) {
       scope,
       GRAPH_GUARD_NAME,
       graphGuard.guard,
-      "artifact-graph-guard-installation-failed",
+      "artifact-graph-guard-global-definition-rejected",
     ));
     restores.push(installScopeValue(
       scope,
@@ -1294,34 +1775,53 @@ function installArtifactGraphEnvironment(scope, configuration, role) {
   });
 }
 
-function assignSetting(object, name, value, cleanup, reason, { allowCreate = false } = {}) {
-  if (!object || (!allowCreate && !(name in object))) {
+function assignSetting(object, name, value, cleanup, {
+  allowCreate = false,
+  assignmentRejectedReason,
+  unavailableReason,
+} = {}) {
+  if (!object) {
     throw workerError(
       "ARCANE_AI_PROVIDER_UNAVAILABLE",
       `The selected runtime does not expose the verified ${name} setting.`,
       undefined,
-      reason,
+      unavailableReason,
     );
   }
-  const hadOwn = Object.hasOwn(object, name);
-  const previous = object[name];
+  let hadOwn;
+  let previous;
+  let canRestore = false;
   try {
+    if (!allowCreate && !(name in object)) {
+      throw workerError(
+        "ARCANE_AI_PROVIDER_UNAVAILABLE",
+        `The selected runtime does not expose the verified ${name} setting.`,
+        undefined,
+        unavailableReason,
+      );
+    }
+    hadOwn = Object.hasOwn(object, name);
+    previous = object[name];
+    canRestore = true;
     object[name] = value;
     if (object[name] !== value) {
       throw new TypeError(`The ${name} assignment was not retained.`);
     }
   } catch (error) {
-    try {
-      if (hadOwn) object[name] = previous;
-      else delete object[name];
-    } catch {
-      // Preserve the exact configuration failure as the public boundary.
+    if (isSdkWorkerError(error)) throw error;
+    if (canRestore) {
+      try {
+        if (hadOwn) object[name] = previous;
+        else delete object[name];
+      } catch {
+        // Preserve the exact configuration failure as the public boundary.
+      }
     }
     throw workerError(
       "ARCANE_AI_PROVIDER_UNAVAILABLE",
       `The selected runtime rejected the verified ${name} setting.`,
       error,
-      reason,
+      assignmentRejectedReason,
     );
   }
   cleanup.push(() => {
@@ -1381,7 +1881,10 @@ function configureRuntimeNamespace(namespace, configuration, role, cache) {
           "wasmPaths",
           paths,
           cleanup,
-          "kokoro-env-wasm-paths-assignment-rejected",
+          {
+            assignmentRejectedReason: "kokoro-env-wasm-paths-assignment-rejected",
+            unavailableReason: "kokoro-env-wasm-paths-unavailable",
+          },
         );
       }
     } catch (error) {
@@ -1402,20 +1905,41 @@ function configureRuntimeNamespace(namespace, configuration, role, cache) {
     );
   }
   try {
-    assignSetting(env, "allowLocalModels", false, cleanup, "transformers-env-allow-local-models-unavailable");
-    assignSetting(env, "allowRemoteModels", true, cleanup, "transformers-env-allow-remote-models-unavailable");
-    assignSetting(env, "useBrowserCache", false, cleanup, "transformers-env-browser-cache-unavailable");
-    assignSetting(env, "useFSCache", false, cleanup, "transformers-env-fs-cache-unavailable");
-    assignSetting(env, "useCustomCache", cache !== null, cleanup, "transformers-env-custom-cache-toggle-unavailable");
-    assignSetting(env, "customCache", cache, cleanup, "transformers-env-custom-cache-unavailable");
+    assignSetting(env, "allowLocalModels", false, cleanup, {
+      assignmentRejectedReason: "transformers-env-allow-local-models-assignment-rejected",
+      unavailableReason: "transformers-env-allow-local-models-unavailable",
+    });
+    assignSetting(env, "allowRemoteModels", true, cleanup, {
+      assignmentRejectedReason: "transformers-env-allow-remote-models-assignment-rejected",
+      unavailableReason: "transformers-env-allow-remote-models-unavailable",
+    });
+    assignSetting(env, "useBrowserCache", false, cleanup, {
+      assignmentRejectedReason: "transformers-env-browser-cache-assignment-rejected",
+      unavailableReason: "transformers-env-browser-cache-unavailable",
+    });
+    assignSetting(env, "useFSCache", false, cleanup, {
+      assignmentRejectedReason: "transformers-env-fs-cache-assignment-rejected",
+      unavailableReason: "transformers-env-fs-cache-unavailable",
+    });
+    assignSetting(env, "useCustomCache", cache !== null, cleanup, {
+      assignmentRejectedReason: "transformers-env-custom-cache-toggle-assignment-rejected",
+      unavailableReason: "transformers-env-custom-cache-toggle-unavailable",
+    });
+    assignSetting(env, "customCache", cache, cleanup, {
+      assignmentRejectedReason: "transformers-env-custom-cache-assignment-rejected",
+      unavailableReason: "transformers-env-custom-cache-unavailable",
+    });
     if (paths) {
       assignSetting(
         wasm,
         "wasmPaths",
         paths,
         cleanup,
-        "transformers-env-wasm-paths-unavailable",
-        { allowCreate: true },
+        {
+          allowCreate: true,
+          assignmentRejectedReason: "transformers-env-wasm-paths-assignment-rejected",
+          unavailableReason: "transformers-env-wasm-paths-unavailable",
+        },
       );
     }
     if (configuration.runtime.onnxWasm?.numThreads !== undefined) {
@@ -1424,8 +1948,11 @@ function configureRuntimeNamespace(namespace, configuration, role, cache) {
         "numThreads",
         configuration.runtime.onnxWasm.numThreads,
         cleanup,
-        "transformers-env-num-threads-unavailable",
-        { allowCreate: true },
+        {
+          allowCreate: true,
+          assignmentRejectedReason: "transformers-env-num-threads-assignment-rejected",
+          unavailableReason: "transformers-env-num-threads-unavailable",
+        },
       );
     }
   } catch (error) {
@@ -1586,21 +2113,29 @@ function validateInput(role, payload, configuration) {
       "Whisper inputSampleRate",
       16_000,
     );
-    if (!(payload?.audio instanceof Float32Array) || payload.sampleRate !== inputSampleRate) {
+    if (!(payload?.audio instanceof Float32Array)) {
       throw workerError(
         "ARCANE_AI_INVALID_REQUEST",
-        `Whisper requires Float32Array audio sampled at exactly ${String(inputSampleRate)} Hz.`,
+        "Whisper requires Float32Array audio.",
         undefined,
-        "stt-transcription-pcm-input-invalid",
+        "stt-transcription-audio-not-float32array",
+      );
+    }
+    if (payload.sampleRate !== inputSampleRate) {
+      throw workerError(
+        "ARCANE_AI_INVALID_REQUEST",
+        `Whisper requires audio sampled at exactly ${String(inputSampleRate)} Hz.`,
+        undefined,
+        "stt-transcription-sample-rate-mismatch",
       );
     }
     return Object.freeze({ audio: payload.audio, sampleRate: inputSampleRate });
   }
-  const text = requiredText(payload?.text, "Kokoro text", "tts-synthesis-text-invalid");
+  const text = requiredText(payload?.text, "Kokoro text", "tts-synthesis-text-empty");
   const voice = requiredText(
     payload?.voice ?? configuration.model.defaultVoice,
     "Kokoro voice",
-    "tts-synthesis-voice-invalid",
+    "tts-synthesis-voice-empty",
   );
   const voices = callerVoiceIds(configuration);
   if (voices.size > 0 && !voices.has(voice)) {
@@ -1617,7 +2152,7 @@ function validateInput(role, payload, configuration) {
       "ARCANE_AI_INVALID_REQUEST",
       "Kokoro speed must be greater than 0 and at most 4.",
       undefined,
-      "tts-synthesis-speed-invalid",
+      "tts-synthesis-speed-out-of-range",
     );
   }
   return Object.freeze({ text, voice, speed });
@@ -1630,7 +2165,7 @@ function validateResult(role, result, configuration) {
         "ARCANE_AI_INVALID_PROVIDER_RESULT",
         "Whisper did not return text.",
         undefined,
-        "stt-transcription-result-text-invalid",
+        "stt-transcription-result-text-not-string",
       );
     }
     return Object.freeze({ text: result.text.trim() });
@@ -1640,12 +2175,20 @@ function validateResult(role, result, configuration) {
     "Kokoro outputSampleRate",
     24_000,
   );
-  if (!(result?.audio instanceof Float32Array) || result.sampleRate !== outputSampleRate) {
+  if (!(result?.audio instanceof Float32Array)) {
     throw workerError(
       "ARCANE_AI_INVALID_PROVIDER_RESULT",
-      `Kokoro must return ${String(outputSampleRate)} Hz Float32 PCM.`,
+      "Kokoro must return Float32 PCM.",
       undefined,
-      "tts-synthesis-pcm-result-invalid",
+      "tts-synthesis-pcm-result-not-float32array",
+    );
+  }
+  if (result.sampleRate !== outputSampleRate) {
+    throw workerError(
+      "ARCANE_AI_INVALID_PROVIDER_RESULT",
+      `Kokoro must return ${String(outputSampleRate)} Hz PCM.`,
+      undefined,
+      "tts-synthesis-result-sample-rate-mismatch",
     );
   }
   for (const sample of result.audio) {
@@ -1707,6 +2250,7 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
     }
     if (engine) return status();
     lifecycleReason = `${role}-load-started`;
+    let loadFailureReason = `${role}-worker-runtime-configuration-rejected`;
     try {
       configuration = validateConfiguration(request.payload?.configuration, role);
       const entry = configuration.runtime.files.find((file) =>
@@ -1733,6 +2277,7 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
         }
       }
       workerProgress(send, role, request.id, `${role}-runtime-import-started`);
+      loadFailureReason = `${role}-worker-runtime-import-rejected`;
       const namespace = await import(entry.moduleUrl);
       throwIfAborted(signal, `${role}-load-cancelled`);
       restoreNamespace = configureRuntimeNamespace(
@@ -1742,6 +2287,7 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
         environment.cache,
       );
       workerProgress(send, role, request.id, `${role}-model-load-started`);
+      loadFailureReason = `${role}-worker-model-load-rejected`;
       const report = upstreamProgress(send, role, request.id);
       engine = role === "stt"
         ? await createWhisperEngine(namespace, configuration, signal, report)
@@ -1750,10 +2296,16 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
       workerProgress(send, role, request.id, `${role}-provider-ready`, 1, 1);
       return status();
     } catch (error) {
-      const failedEngine = engine;
+      const failure = admitWorkerFailure(
+        error,
+        "ARCANE_AI_PROVIDER_REQUEST_FAILED",
+        "The speech Worker load operation was rejected.",
+        loadFailureReason,
+      );
+      const rejectedEngine = engine;
       engine = null;
       try {
-        await disposeEngine(failedEngine);
+        await disposeEngine(rejectedEngine);
       } catch {
         // Preserve the load boundary error that caused teardown.
       }
@@ -1762,12 +2314,12 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
       try {
         environment?.cleanup();
       } catch {
-        // A failed load is followed by provider-owned Worker termination.
+        // A rejected load is followed by provider-owned Worker termination.
       }
       environment = null;
       configuration = null;
-      lifecycleReason = error?.reason ?? `${role}-load-failed`;
-      throw error;
+      lifecycleReason = failure.reason;
+      throw failure;
     }
   }
 
@@ -1808,9 +2360,16 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
         : "tts-synthesis-completed";
       return result;
     } catch (error) {
-      lifecycleReason = error?.reason
-        ?? (role === "stt" ? "stt-transcription-failed" : "tts-synthesis-failed");
-      throw error;
+      const failure = admitWorkerFailure(
+        error,
+        "ARCANE_AI_PROVIDER_REQUEST_FAILED",
+        "The speech engine operation was rejected.",
+        role === "stt"
+          ? "stt-transcription-engine-operation-rejected"
+          : "tts-synthesis-engine-operation-rejected",
+      );
+      lifecycleReason = failure.reason;
+      throw failure;
     }
   }
 
@@ -1825,9 +2384,15 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
     try {
       await disposeEngine(current);
     } catch (error) {
-      disposeFailure = error;
-      lifecycleReason = error?.reason ?? `${role}-unload-engine-dispose-failed`;
-      throw error;
+      const failure = admitWorkerFailure(
+        error,
+        "ARCANE_AI_PROVIDER_REQUEST_FAILED",
+        "The speech engine dispose operation was rejected.",
+        `${role}-worker-engine-dispose-rejected`,
+      );
+      disposeFailure = failure;
+      lifecycleReason = failure.reason;
+      throw failure;
     } finally {
       restoreNamespace?.();
       restoreNamespace = null;
@@ -1843,12 +2408,12 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
     return status();
   }
 
-  async function dispatch(request, signal) {
-    if (request.op === "load") return load(request, signal);
-    if (request.op === "use") return use(request, signal);
-    if (request.op === "status") return status();
-    if (request.op === "unload") return unload(`${role}-unload-completed`);
-    if (request.op === "dispose") {
+  async function dispatch(request, signal, op) {
+    if (op === "load") return load(request, signal);
+    if (op === "use") return use(request, signal);
+    if (op === "status") return status();
+    if (op === "unload") return unload(`${role}-unload-completed`);
+    if (op === "dispose") {
       await unload(`${role}-dispose-unloaded-worker`);
       disposed = true;
       lifecycleReason = `${role}-dispose-completed`;
@@ -1862,7 +2427,7 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
     );
   }
 
-  function respond(request, operation) {
+  function respond(request, operation, op) {
     operation.then((result) => send({
       protocol: SPEECH_WORKER_PROTOCOL,
       id: request.id,
@@ -1872,7 +2437,7 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
       protocol: SPEECH_WORKER_PROTOCOL,
       id: request.id,
       ok: false,
-      error: serializedError(error, role, request.op),
+      error: serializedError(error, role, op),
     }, []));
   }
 
@@ -1882,12 +2447,21 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
       || request.id < 1) {
       return Promise.reject(workerError(
         "ARCANE_AI_INVALID_REQUEST",
-        "The speech worker envelope is invalid.",
+        "The speech worker envelope shape was rejected.",
         undefined,
-        `${role}-worker-message-envelope-invalid`,
+        `${role}-worker-message-envelope-shape-rejected`,
       ));
     }
-    if (request.op === "cancel") {
+    const op = request.op;
+    if (!TRANSPORT_WORKER_OPERATION_SET.has(op)) {
+      return Promise.reject(workerError(
+        "ARCANE_AI_INVALID_REQUEST",
+        "The speech worker operation is not part of its protocol.",
+        undefined,
+        `${role}-worker-operation-unknown`,
+      ));
+    }
+    if (op === "cancel") {
       const target = operations.get(request.payload?.targetId);
       target?.controller.abort(operationReason(role, target.op, "cancelled"));
       const result = Promise.resolve(Object.freeze({
@@ -1896,22 +2470,22 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
           ? operationReason(role, target.op, "cancelled")
           : `${role}-cancel-target-not-active`,
       }));
-      respond(request, result);
+      respond(request, result, op);
       return result;
     }
     const controller = new AbortController();
-    const publicOperation = request.op === "use"
+    const publicOperation = op === "use"
       ? role === "stt" ? "stt-transcription" : "tts-synthesis"
-      : `${role}-${request.op}`;
-    const record = { controller, op: request.op, publicOperation };
+      : `${role}-${op}`;
+    const record = { controller, op, publicOperation };
     const execute = tail.catch(() => undefined).then(() => {
-      throwIfAborted(controller.signal, operationReason(role, request.op, "cancelled"));
-      return dispatch(request, controller.signal);
+      throwIfAborted(controller.signal, operationReason(role, op, "cancelled"));
+      return dispatch(request, controller.signal, op);
     });
     operations.set(request.id, record);
     const operation = execute.finally(() => operations.delete(request.id));
     tail = operation.catch(() => undefined);
-    respond(request, operation);
+    respond(request, operation, op);
     return operation;
   }
 
@@ -2026,7 +2600,7 @@ export function installBrowserSpeechArtifactModuleWorker(role, scope = globalThi
         }
         scope.postMessage({
           protocol: NESTED_WORKER_PROTOCOL,
-          event: "artifact-module-worker-bootstrap-failed",
+          event: "artifact-module-worker-bootstrap-rejected",
           error: serializedError(error, role, "load"),
         });
         scope.close?.();

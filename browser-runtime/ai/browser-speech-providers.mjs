@@ -1,6 +1,7 @@
 import {
   createBrowserSpeechAuthority,
   isBrowserSpeechArtifactGraph,
+  isBrowserSpeechArtifactError,
   isBrowserSpeechAuthority,
   isDbopfsSpeechArtifactStore,
 } from "./browser-speech-artifacts.mjs";
@@ -12,6 +13,7 @@ import {
 import {
   createSpeechWorkerClient,
   isSpeechWorkerClient,
+  isSpeechWorkerClientError,
 } from "./speech-worker-client.mjs";
 
 const AI_PROVIDER_PROTOCOL = "arcane-ai-provider/2";
@@ -28,32 +30,16 @@ const ROLE_REQUEST_REASON = Object.freeze({
   stt: "stt-transcription-cancelled",
   tts: "tts-synthesis-cancelled",
 });
-const ERROR_REASONS = Object.freeze({
-  ARCANE_AI_MODEL_AUTHORITY_REQUIRED: "browser-speech-model-authority-mismatch",
-  ARCANE_AI_INVALID_REQUEST: "browser-speech-request-contract-rejected",
-  ARCANE_AI_NOT_READY: "browser-speech-provider-not-ready",
-  ARCANE_AI_PROVIDER_BUSY: "browser-speech-provider-operation-active",
-  ARCANE_AI_PROVIDER_DISPOSED: "browser-speech-provider-disposed",
-  ARCANE_AI_REQUEST_ABORTED: "browser-speech-operation-cancelled",
-  ARCANE_AI_OPERATION_SUPERSEDED: "browser-speech-operation-superseded",
-  ARCANE_AI_AUDIO_DECODE_UNAVAILABLE: "stt-browser-audio-decoder-unavailable",
-  ARCANE_AI_AUDIO_DECODE_FAILED: "stt-browser-audio-decode-operation-rejected",
-  ARCANE_AI_UNSUPPORTED_RESPONSE_FORMAT: "tts-wav-response-format-required",
-  ARCANE_AI_INVALID_PROVIDER_RESULT: "browser-speech-provider-result-contract-rejected",
-  ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH: "speech-worker-protocol-mismatch",
-  ARCANE_AI_WORKER_CRASHED: "speech-worker-crashed",
-  ARCANE_AI_WORKER_MESSAGE_ERROR: "speech-worker-message-rejected",
-  ARCANE_AI_WORKER_MESSAGE_REJECTED: "speech-worker-message-rejected",
-  ARCANE_AI_PROVIDER_LOAD_FAILED: "browser-speech-provider-load-rejected",
-});
+const UNMAPPED_PROVIDER_REASON = "browser-speech-provider-error-reason-unmapped";
 const WORKER_FAILURE_CODES = new Set([
   "ARCANE_AI_WORKER_CRASHED",
   "ARCANE_AI_WORKER_MESSAGE_ERROR",
   "ARCANE_AI_WORKER_MESSAGE_REJECTED",
   "ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH",
 ]);
+const PROVIDER_ERRORS = new WeakSet();
 
-function providerError(code, message, cause, reason = ERROR_REASONS[code]) {
+function providerError(code, message, cause, reason) {
   const error = cause === undefined
     ? new Error(message)
     : new Error(message, { cause });
@@ -61,16 +47,73 @@ function providerError(code, message, cause, reason = ERROR_REASONS[code]) {
     ? "AbortError"
     : "ArcaneBrowserSpeechProviderError";
   error.code = code;
-  error.reason = reason ?? "browser-speech-provider-boundary-rejected";
+  error.reason = typeof reason === "string" && reason
+    ? reason
+    : UNMAPPED_PROVIDER_REASON;
+  PROVIDER_ERRORS.add(error);
   return error;
 }
 
-function resolveReason(reason, fallback = ERROR_REASONS.ARCANE_AI_REQUEST_ABORTED) {
+function isBrowserSpeechProviderError(value) {
+  return typeof value === "object"
+    && value !== null
+    && PROVIDER_ERRORS.has(value);
+}
+
+function isTrustedSpeechError(value) {
+  return isBrowserSpeechProviderError(value)
+    || isBrowserSpeechArtifactError(value)
+    || isSpeechWorkerClientError(value);
+}
+
+function trustedLoadFailure(error, role) {
+  if (isTrustedSpeechError(error)) return error;
+  return providerError(
+    "ARCANE_AI_PROVIDER_LOAD_FAILED",
+    `The browser ${role} provider load was rejected.`,
+    error,
+    `${role}-provider-load-rejected`,
+  );
+}
+
+function trustedRequestFailure(error, role) {
+  if (isTrustedSpeechError(error)) return error;
+  return providerError(
+    "ARCANE_AI_PROVIDER_REQUEST_FAILED",
+    `The browser ${role} engine operation was rejected.`,
+    error,
+    role === "stt"
+      ? "stt-transcription-engine-operation-rejected"
+      : "tts-synthesis-engine-operation-rejected",
+  );
+}
+
+function trustedWorkerFailure(error, role) {
+  if (isTrustedSpeechError(error)) return error;
+  return providerError(
+    "ARCANE_AI_WORKER_MESSAGE_REJECTED",
+    `The browser ${role} Worker returned an untrusted error envelope.`,
+    error,
+    `${role}-worker-error-envelope-rejected`,
+  );
+}
+
+function trustedLifecycleFailure(error, role, operation) {
+  if (isTrustedSpeechError(error)) return error;
+  return providerError(
+    "ARCANE_AI_INVALID_REQUEST",
+    `The browser ${role} ${operation} context could not be read.`,
+    error,
+    `${role}-provider-${operation}-context-read-rejected`,
+  );
+}
+
+function resolveReason(reason, fallback = UNMAPPED_PROVIDER_REASON) {
   const resolved = typeof reason === "function" ? reason() : reason;
   return typeof resolved === "string" && resolved ? resolved : fallback;
 }
 
-function abortError(signal, reason = ERROR_REASONS.ARCANE_AI_REQUEST_ABORTED) {
+function abortError(signal, reason = UNMAPPED_PROVIDER_REASON) {
   return providerError(
     "ARCANE_AI_REQUEST_ABORTED",
     "The browser speech operation was cancelled.",
@@ -148,7 +191,7 @@ function createProviderAuthority({
     security,
   });
   if (!isBrowserSpeechAuthority(authority)) {
-    throw new TypeError("Browser speech authority construction failed.");
+    throw new TypeError("Browser speech authority construction did not return an SDK authority.");
   }
   return authority;
 }
@@ -164,21 +207,56 @@ function outputSampleRate(authority) {
 function linkSignal(signal) {
   const controller = new AbortController();
   let internalReason = null;
+  let internalCode = null;
   const forwardExternalAbort = () => controller.abort(signal?.reason);
   if (signal?.aborted) forwardExternalAbort();
   else signal?.addEventListener?.("abort", forwardExternalAbort, { once: true });
   return Object.freeze({
     controller,
-    abort(reason) {
+    abort(reason, code = "ARCANE_AI_REQUEST_ABORTED") {
       if (controller.signal.aborted) return;
       internalReason = resolveReason(reason);
+      internalCode = code;
       controller.abort(internalReason);
+    },
+    code() {
+      return internalCode;
     },
     reason(fallback) {
       return internalReason ?? resolveReason(fallback);
     },
     release: () => signal?.removeEventListener?.("abort", forwardExternalAbort),
   });
+}
+
+function linkedAbortFailure(linked, fallbackReason) {
+  const reason = linked.reason(fallbackReason);
+  const code = linked.code();
+  if (code === "ARCANE_AI_OPERATION_SUPERSEDED") {
+    return providerError(
+      "ARCANE_AI_OPERATION_SUPERSEDED",
+      "The browser speech operation was superseded.",
+      linked.controller.signal.reason,
+      reason,
+    );
+  }
+  if (code === "ARCANE_AI_LOAD_PROGRESS_CALLBACK_THREW") {
+    return providerError(
+      code,
+      "The browser speech load progress callback was rejected.",
+      linked.controller.signal.reason,
+      reason,
+    );
+  }
+  if (code === "ARCANE_AI_PROVIDER_LOAD_FAILED") {
+    return providerError(
+      code,
+      "The browser speech provider load was rejected.",
+      linked.controller.signal.reason,
+      reason,
+    );
+  }
+  return abortError(linked.controller.signal, reason);
 }
 
 function isAbortSignal(value) {
@@ -197,7 +275,7 @@ function providerContext(context, role, operation) {
       "ARCANE_AI_INVALID_REQUEST",
       `Browser ${role} ${operation} context must be an object.`,
       undefined,
-      `${role}-provider-${operation}-context-invalid`,
+      `${role}-provider-${operation}-context-not-object`,
     );
   }
   if (Object.hasOwn(context, "role") && context.role !== role) {
@@ -214,7 +292,7 @@ function providerContext(context, role, operation) {
       "ARCANE_AI_INVALID_REQUEST",
       `Browser ${role} ${operation} signal must be an AbortSignal.`,
       undefined,
-      `${role}-provider-${operation}-abort-signal-invalid`,
+      `${role}-provider-${operation}-signal-not-abort-signal`,
     );
   }
   return Object.freeze({ context, signal });
@@ -361,13 +439,13 @@ function genericPayloadDescriptors(
   return descriptors;
 }
 
-function audioMimeEssence(value, label, reason) {
+function audioMimeEssence(value, label, reasonPrefix) {
   if (typeof value !== "string") {
     throw providerError(
       "ARCANE_AI_INVALID_REQUEST",
       `${label} must be an audio MIME type.`,
       undefined,
-      reason,
+      `${reasonPrefix}-not-string`,
     );
   }
   const essence = value.split(";", 1)[0].trim().toLowerCase();
@@ -376,7 +454,7 @@ function audioMimeEssence(value, label, reason) {
       "ARCANE_AI_INVALID_REQUEST",
       `${label} must be an audio MIME type.`,
       undefined,
-      reason,
+      `${reasonPrefix}-malformed`,
     );
   }
   return essence;
@@ -415,16 +493,30 @@ function observeLoadOperation(record, { signal, progress }, role) {
   }
   return new Promise((resolve, reject) => {
     let settled = false;
-    const release = () => signal?.removeEventListener?.("abort", cancel);
+    const release = () => {
+      try {
+        signal?.removeEventListener?.("abort", cancel);
+        return null;
+      } catch (error) {
+        return error;
+      }
+    };
     const settle = (callback, value) => {
       if (settled) return;
       settled = true;
       record.observers.delete(observer);
-      release();
+      const releaseError = release();
+      if (releaseError) {
+        reject(trustedLoadFailure(releaseError, role));
+        return;
+      }
       callback(value);
     };
-    const abandonIfUnobserved = (reason) => {
-      if (!record.settled && record.observers.size === 0) record.abort(reason);
+    const abandonIfUnobserved = (
+      reason,
+      code = "ARCANE_AI_REQUEST_ABORTED",
+    ) => {
+      if (!record.settled && record.observers.size === 0) record.abort(reason, code);
     };
     const cancel = () => {
       settle(reject, abortError(signal, `${role}-load-cancelled`));
@@ -437,21 +529,35 @@ function observeLoadOperation(record, { signal, progress }, role) {
           progress(value);
         } catch (error) {
           settle(reject, providerError(
-            "ARCANE_AI_LOAD_PROGRESS_CALLBACK_FAILED",
+            "ARCANE_AI_LOAD_PROGRESS_CALLBACK_THREW",
             `Browser ${role} load progress callback threw.`,
             error,
             `${role}-load-progress-callback-threw`,
           ));
-          abandonIfUnobserved(`${role}-load-progress-callback-threw`);
+          abandonIfUnobserved(
+            `${role}-load-progress-callback-threw`,
+            "ARCANE_AI_LOAD_PROGRESS_CALLBACK_THREW",
+          );
         }
       },
     });
     record.observers.add(observer);
-    signal?.addEventListener?.("abort", cancel, { once: true });
     record.promise.then(
       (value) => settle(resolve, value),
       (error) => settle(reject, error),
     );
+    try {
+      signal?.addEventListener?.("abort", cancel, { once: true });
+    } catch (error) {
+      settled = true;
+      record.observers.delete(observer);
+      reject(trustedLoadFailure(error, role));
+      abandonIfUnobserved(
+        `${role}-provider-load-rejected`,
+        "ARCANE_AI_PROVIDER_LOAD_FAILED",
+      );
+      return;
+    }
     if (record.hasProgress) observer.progress(record.latestProgress);
   });
 }
@@ -475,23 +581,39 @@ async function decodeSharedTranscriptionPayload(
     operationSubject: "stt-transcription",
   });
   const audio = descriptors.audio.value;
-  if (typeof Blob !== "function" || !(audio instanceof Blob) || audio.size < 1) {
+  if (typeof Blob !== "function") {
     throw providerError(
       "ARCANE_AI_INVALID_REQUEST",
-      "Shared speech transcription requires a nonempty audio Blob or File.",
+      "Shared speech transcription requires the browser Blob constructor.",
       undefined,
-      "stt-transcription-audio-blob-invalid",
+      "stt-transcription-blob-constructor-unavailable",
+    );
+  }
+  if (!(audio instanceof Blob)) {
+    throw providerError(
+      "ARCANE_AI_INVALID_REQUEST",
+      "Shared speech transcription audio must be a Blob or File.",
+      undefined,
+      "stt-transcription-audio-not-blob-or-file",
+    );
+  }
+  if (audio.size < 1) {
+    throw providerError(
+      "ARCANE_AI_INVALID_REQUEST",
+      "Shared speech transcription audio Blob or File must be nonempty.",
+      undefined,
+      "stt-transcription-audio-blob-empty",
     );
   }
   const mimeType = audioMimeEssence(
     descriptors.mimeType.value,
     "Speech transcription mimeType",
-    "stt-transcription-mime-type-invalid",
+    "stt-transcription-mime-type",
   );
   if (audio.type && audioMimeEssence(
     audio.type,
     "Speech transcription Blob.type",
-    "stt-transcription-audio-blob-mime-type-invalid",
+    "stt-transcription-audio-blob-mime-type",
   ) !== mimeType) {
     throw providerError(
       "ARCANE_AI_INVALID_REQUEST",
@@ -552,28 +674,89 @@ async function decodeSharedTranscriptionPayload(
       "stt-browser-audio-decode-operation-rejected",
     );
   }
-  if (decoded?.sampleRate !== sampleRate
-    || !Number.isSafeInteger(decoded.length)
-    || decoded.length < 1
-    || !Number.isSafeInteger(decoded.numberOfChannels)
-    || decoded.numberOfChannels < 1
-    || typeof decoded.getChannelData !== "function") {
+  if (!decoded || typeof decoded !== "object") {
     throw providerError(
       "ARCANE_AI_AUDIO_DECODE_FAILED",
-      `Decoded speech audio must provide nonempty ${sampleRate} Hz channel data.`,
+      "Decoded speech audio must be an AudioBuffer-like object.",
       undefined,
-      "stt-browser-decoded-audio-metadata-invalid",
+      "stt-browser-decoded-audio-not-object",
+    );
+  }
+  if (decoded.sampleRate !== sampleRate) {
+    throw providerError(
+      "ARCANE_AI_AUDIO_DECODE_FAILED",
+      `Decoded speech audio must be sampled at ${sampleRate} Hz.`,
+      undefined,
+      "stt-browser-decoded-audio-sample-rate-mismatch",
+    );
+  }
+  if (!Number.isSafeInteger(decoded.length)) {
+    throw providerError(
+      "ARCANE_AI_AUDIO_DECODE_FAILED",
+      "Decoded speech audio frame length must be a safe integer.",
+      undefined,
+      "stt-browser-decoded-audio-frame-length-not-safe-integer",
+    );
+  }
+  if (decoded.length < 1) {
+    throw providerError(
+      "ARCANE_AI_AUDIO_DECODE_FAILED",
+      "Decoded speech audio must contain at least one frame.",
+      undefined,
+      "stt-browser-decoded-audio-empty",
+    );
+  }
+  if (!Number.isSafeInteger(decoded.numberOfChannels)) {
+    throw providerError(
+      "ARCANE_AI_AUDIO_DECODE_FAILED",
+      "Decoded speech audio channel count must be a safe integer.",
+      undefined,
+      "stt-browser-decoded-audio-channel-count-not-safe-integer",
+    );
+  }
+  if (decoded.numberOfChannels < 1) {
+    throw providerError(
+      "ARCANE_AI_AUDIO_DECODE_FAILED",
+      "Decoded speech audio must contain at least one channel.",
+      undefined,
+      "stt-browser-decoded-audio-channel-count-zero",
+    );
+  }
+  if (typeof decoded.getChannelData !== "function") {
+    throw providerError(
+      "ARCANE_AI_AUDIO_DECODE_FAILED",
+      "Decoded speech audio must expose getChannelData().",
+      undefined,
+      "stt-browser-decoded-audio-get-channel-data-not-function",
     );
   }
   const channels = [];
   for (let index = 0; index < decoded.numberOfChannels; index += 1) {
-    const channel = decoded.getChannelData(index);
-    if (!(channel instanceof Float32Array) || channel.length !== decoded.length) {
+    let channel;
+    try {
+      channel = decoded.getChannelData(index);
+    } catch (error) {
       throw providerError(
         "ARCANE_AI_AUDIO_DECODE_FAILED",
-        "Decoded speech audio returned invalid channel data.",
+        "Decoded speech audio channel access was rejected.",
+        error,
+        "stt-browser-decoded-audio-channel-read-rejected",
+      );
+    }
+    if (!(channel instanceof Float32Array)) {
+      throw providerError(
+        "ARCANE_AI_AUDIO_DECODE_FAILED",
+        "Decoded speech audio channels must be Float32Array values.",
         undefined,
-        "stt-browser-decoded-audio-channel-invalid",
+        "stt-browser-decoded-audio-channel-not-float32-array",
+      );
+    }
+    if (channel.length !== decoded.length) {
+      throw providerError(
+        "ARCANE_AI_AUDIO_DECODE_FAILED",
+        "Decoded speech audio channel length must match the decoded frame length.",
+        undefined,
+        "stt-browser-decoded-audio-channel-length-mismatch",
       );
     }
     channels.push(channel);
@@ -588,7 +771,7 @@ async function decodeSharedTranscriptionPayload(
         "ARCANE_AI_AUDIO_DECODE_FAILED",
         "Decoded speech audio contains a non-finite sample.",
         undefined,
-        "stt-browser-decoded-audio-sample-nonfinite",
+        "stt-browser-decoded-audio-sample-non-finite",
       );
     }
     mono[index] = sample;
@@ -610,13 +793,20 @@ function cloneNativeTranscriptionPayload(payload, authority) {
   );
   assertPayloadModel(payload, authority, { operationSubject: "stt-transcription" });
   const sampleRate = inputSampleRate(authority);
-  if (!(descriptors.audio.value instanceof Float32Array)
-    || descriptors.audio.value.length < 1) {
+  if (!(descriptors.audio.value instanceof Float32Array)) {
     throw providerError(
       "ARCANE_AI_INVALID_REQUEST",
       "Whisper requires Float32Array audio.",
       undefined,
-      "stt-transcription-pcm-input-invalid",
+      "stt-transcription-audio-not-float32-array",
+    );
+  }
+  if (descriptors.audio.value.length < 1) {
+    throw providerError(
+      "ARCANE_AI_INVALID_REQUEST",
+      "Whisper requires nonempty Float32 PCM audio.",
+      undefined,
+      "stt-transcription-pcm-input-empty",
     );
   }
   if (descriptors.sampleRate.value !== sampleRate) {
@@ -633,7 +823,7 @@ function cloneNativeTranscriptionPayload(payload, authority) {
         "ARCANE_AI_INVALID_REQUEST",
         "Whisper audio must contain only finite Float32 PCM samples.",
         undefined,
-        "stt-transcription-pcm-sample-nonfinite",
+        "stt-transcription-pcm-sample-non-finite",
       );
     }
   }
@@ -695,7 +885,7 @@ function normalizeSynthesisPayload(payload, authority) {
       "ARCANE_AI_INVALID_REQUEST",
       "Kokoro requires nonempty text.",
       undefined,
-      "tts-synthesis-text-invalid",
+      "tts-synthesis-text-empty",
     );
   }
   if (!voice) {
@@ -703,7 +893,7 @@ function normalizeSynthesisPayload(payload, authority) {
       "ARCANE_AI_INVALID_REQUEST",
       "Kokoro requires a nonempty voice id.",
       undefined,
-      "tts-synthesis-voice-invalid",
+      "tts-synthesis-voice-empty",
     );
   }
   if (!Number.isFinite(speed) || speed <= 0 || speed > 4) {
@@ -711,7 +901,7 @@ function normalizeSynthesisPayload(payload, authority) {
       "ARCANE_AI_INVALID_REQUEST",
       "Kokoro speed must be greater than 0 and at most 4.",
       undefined,
-      "tts-synthesis-speed-invalid",
+      "tts-synthesis-speed-out-of-range",
     );
   }
   if (authority.graph
@@ -742,15 +932,16 @@ async function normalizeRequestPayload(
       "Speech request payload must be an object.",
       undefined,
       role === "stt"
-        ? "stt-transcription-payload-invalid"
-        : "tts-synthesis-payload-invalid",
+        ? "stt-transcription-payload-not-object"
+        : "tts-synthesis-payload-not-object",
     );
   }
   if (role === "stt") {
     const audio = Object.getOwnPropertyDescriptor(payload, "audio");
-    if (Object.hasOwn(audio ?? {}, "value")
-      && typeof Blob === "function"
-      && audio.value instanceof Blob) {
+    if (Object.hasOwn(payload, "mimeType")
+      || (Object.hasOwn(audio ?? {}, "value")
+        && typeof Blob === "function"
+        && audio.value instanceof Blob)) {
       return decodeSharedTranscriptionPayload(
         payload,
         authority,
@@ -765,15 +956,44 @@ async function normalizeRequestPayload(
 
 function encodeSharedSynthesisResult(result, authority) {
   const sampleRate = outputSampleRate(authority);
-  if (!(result?.audio instanceof Float32Array)
-    || result.sampleRate !== sampleRate
-    || result.audio.length < 1
-    || result.audio.length > (0xffffffff - 44) / 2) {
+  if (!result || typeof result !== "object") {
     throw providerError(
       "ARCANE_AI_INVALID_PROVIDER_RESULT",
-      `Browser Kokoro must return nonempty ${sampleRate} Hz Float32 PCM.`,
+      "Browser Kokoro must return a synthesis result object.",
       undefined,
-      "tts-synthesis-pcm-result-invalid",
+      "tts-synthesis-result-not-object",
+    );
+  }
+  if (!(result.audio instanceof Float32Array)) {
+    throw providerError(
+      "ARCANE_AI_INVALID_PROVIDER_RESULT",
+      "Browser Kokoro must return Float32 PCM audio.",
+      undefined,
+      "tts-synthesis-result-audio-not-float32-array",
+    );
+  }
+  if (result.sampleRate !== sampleRate) {
+    throw providerError(
+      "ARCANE_AI_INVALID_PROVIDER_RESULT",
+      `Browser Kokoro must return audio sampled at ${sampleRate} Hz.`,
+      undefined,
+      "tts-synthesis-result-sample-rate-mismatch",
+    );
+  }
+  if (result.audio.length < 1) {
+    throw providerError(
+      "ARCANE_AI_INVALID_PROVIDER_RESULT",
+      "Browser Kokoro must return nonempty PCM audio.",
+      undefined,
+      "tts-synthesis-result-audio-empty",
+    );
+  }
+  if (result.audio.length > (0xffffffff - 44) / 2) {
+    throw providerError(
+      "ARCANE_AI_INVALID_PROVIDER_RESULT",
+      "Browser Kokoro PCM audio exceeds the WAV byte-length boundary.",
+      undefined,
+      "tts-synthesis-result-wav-byte-length-overflow",
     );
   }
   const buffer = new ArrayBuffer(44 + result.audio.length * 2);
@@ -804,7 +1024,7 @@ function encodeSharedSynthesisResult(result, authority) {
         "ARCANE_AI_INVALID_PROVIDER_RESULT",
         "Browser Kokoro returned a non-finite PCM sample.",
         undefined,
-        "tts-synthesis-pcm-sample-nonfinite",
+        "tts-synthesis-pcm-sample-non-finite",
       );
     }
     const clamped = Math.max(-1, Math.min(1, sample));
@@ -911,8 +1131,8 @@ function createBrowserSpeechProvider({
 
   function releaseSlot(slot) {
     if (!slot || slot.released) return;
-    slot.released = true;
     slot.prepared.release();
+    slot.released = true;
   }
 
   async function terminateSlot(slot, reason, { intentional = true } = {}) {
@@ -925,8 +1145,18 @@ function createBrowserSpeechProvider({
         `${role}-worker-client-authority-mismatch`,
       );
     }
-    await slot.client.terminate(reason, { intentional });
-    releaseSlot(slot);
+    const trustedReason = trustedWorkerFailure(reason, role);
+    try {
+      await slot.client.terminate(trustedReason, { intentional });
+    } catch (error) {
+      throw trustedWorkerFailure(error, role);
+    } finally {
+      try {
+        releaseSlot(slot);
+      } catch (error) {
+        throw trustedWorkerFailure(error, role);
+      }
+    }
   }
 
   const provider = {
@@ -965,10 +1195,16 @@ function createBrowserSpeechProvider({
       try {
         loadContext = providerContext(context, role, "load");
       } catch (error) {
-        return Promise.reject(error);
+        return Promise.reject(trustedLoadFailure(error, role));
       }
       const loadSignal = loadContext.signal;
-      if (context.role !== role) {
+      let contextRole;
+      try {
+        contextRole = context.role;
+      } catch (error) {
+        return Promise.reject(trustedLoadFailure(error, role));
+      }
+      if (contextRole !== role) {
         return Promise.reject(providerError(
           "ARCANE_AI_INVALID_REQUEST",
           `Browser ${role} load role does not match the provider.`,
@@ -992,19 +1228,34 @@ function createBrowserSpeechProvider({
           `${role}-load-rejected-during-unload`,
         ));
       }
-      if (typeof context.progress !== "function") {
+      let loadProgress;
+      let selectionProviderId;
+      let selectionModelId;
+      let selectionLocalOnly;
+      let selectionRoleMismatch;
+      try {
+        loadProgress = context.progress;
+        const selection = context.selection;
+        selectionProviderId = selection?.providerId;
+        selectionModelId = selection?.modelId;
+        selectionLocalOnly = selection?.localOnly;
+        selectionRoleMismatch = Object.hasOwn(selection ?? {}, "role")
+          && selection.role !== role;
+      } catch (error) {
+        return Promise.reject(trustedLoadFailure(error, role));
+      }
+      if (typeof loadProgress !== "function") {
         return Promise.reject(providerError(
           "ARCANE_AI_INVALID_REQUEST",
           "Browser speech load progress must be a function.",
           undefined,
-          `${role}-load-progress-callback-invalid`,
+          `${role}-load-progress-callback-not-function`,
         ));
       }
-      if (context.selection?.providerId !== providerId
-        || context.selection?.modelId !== authority.modelId
-        || (Object.hasOwn(context.selection ?? {}, "role")
-          && context.selection.role !== role)
-        || context.selection?.localOnly === false) {
+      if (selectionProviderId !== providerId
+        || selectionModelId !== authority.modelId
+        || selectionRoleMismatch
+        || selectionLocalOnly === false) {
         return Promise.reject(providerError(
           "ARCANE_AI_MODEL_AUTHORITY_REQUIRED",
           "Browser speech load selection changed.",
@@ -1028,7 +1279,7 @@ function createBrowserSpeechProvider({
         }
         throwIfAborted(loadSignal, `${role}-load-cancelled`);
       } catch (error) {
-        return Promise.reject(error);
+        return Promise.reject(trustedLoadFailure(error, role));
       }
       if (state === "ready" && active) {
         if (sameModelSecurity(active.security, effectiveSecurity)) {
@@ -1041,11 +1292,14 @@ function createBrowserSpeechProvider({
         if (sameModelSecurity(loadOperation.security, effectiveSecurity)) {
           return observeLoadOperation(loadOperation, {
             signal: loadSignal,
-            progress: context.progress,
+            progress: loadProgress,
           }, role);
         }
         lifecycleReason = `${role}-load-superseded-by-security-change`;
-        loadOperation.abort(`${role}-load-superseded-by-security-change`);
+        loadOperation.abort(
+          `${role}-load-superseded-by-security-change`,
+          "ARCANE_AI_OPERATION_SUPERSEDED",
+        );
         return loadOperation.promise.catch(() => undefined).then(() => provider.load(context));
       }
       generation += 1;
@@ -1062,7 +1316,10 @@ function createBrowserSpeechProvider({
         settled: false,
         hasProgress: false,
         latestProgress: null,
-        abort: (reason = `${role}-load-cancelled`) => linked.abort(reason),
+        abort: (
+          reason = `${role}-load-cancelled`,
+          code = "ARCANE_AI_REQUEST_ABORTED",
+        ) => linked.abort(reason, code),
         publishProgress(progress) {
           record.latestProgress = progress;
           record.hasProgress = true;
@@ -1102,14 +1359,15 @@ function createBrowserSpeechProvider({
           slot.client = createSpeechWorkerClient({
             role,
             onTermination({ reason, intentional }) {
+              const trustedReason = trustedWorkerFailure(reason, role);
               if (active === slot) {
                 active = null;
                 if (state !== "disposed" && state !== "unloading") {
                   state = intentional ? "unloaded" : "error";
-                  errorCode = intentional ? null : workerFailureCode(reason);
+                  errorCode = intentional ? null : workerFailureCode(trustedReason);
                   lifecycleReason = intentional
                     ? `${role}-worker-terminated`
-                    : reason?.reason ?? (errorCode === "ARCANE_AI_WORKER_MESSAGE_ERROR"
+                    : trustedReason.reason ?? (errorCode === "ARCANE_AI_WORKER_MESSAGE_ERROR"
                       || errorCode === "ARCANE_AI_WORKER_MESSAGE_REJECTED"
                       ? `${role}-worker-message-rejected`
                       : errorCode === "ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH"
@@ -1118,7 +1376,19 @@ function createBrowserSpeechProvider({
                   activeOperation = null;
                   artifactGraphAdmission = null;
                 }
-                releaseSlot(slot);
+                try {
+                  releaseSlot(slot);
+                } catch (error) {
+                  const releaseFailure = trustedWorkerFailure(error, role);
+                  if (state !== "disposed" && state !== "unloading") {
+                    state = "error";
+                    errorCode = releaseFailure.code;
+                    lifecycleReason = releaseFailure.reason;
+                    activeOperation = null;
+                    artifactGraphAdmission = null;
+                  }
+                  throw releaseFailure;
+                }
               }
             },
           });
@@ -1165,14 +1435,17 @@ function createBrowserSpeechProvider({
           activeOperation = null;
           return status();
         } catch (error) {
-          const failure = linked.controller.signal.aborted
-            ? abortError(
-              linked.controller.signal,
-              () => linked.reason(`${role}-load-cancelled`),
-            )
-            : error;
-          if (slot) await terminateSlot(slot, failure).catch(() => undefined);
-          else prepared?.release();
+          let failure = linked.controller.signal.aborted
+            ? linkedAbortFailure(linked, `${role}-load-cancelled`)
+            : trustedLoadFailure(error, role);
+          try {
+            if (slot) await terminateSlot(slot, failure);
+            else prepared?.release();
+          } catch (cleanupError) {
+            failure = slot
+              ? trustedWorkerFailure(cleanupError, role)
+              : trustedLoadFailure(cleanupError, role);
+          }
           if (operationGeneration === generation && state !== "unloading" && state !== "disposed") {
             state = failure?.code === "ARCANE_AI_REQUEST_ABORTED"
               || failure?.code === "ARCANE_AI_OPERATION_SUPERSEDED"
@@ -1194,36 +1467,41 @@ function createBrowserSpeechProvider({
       loadOperation = record;
       return observeLoadOperation(record, {
         signal: loadSignal,
-        progress: context.progress,
+        progress: loadProgress,
       }, role);
     },
 
     async request(context = {}) {
-      const requestContext = providerContext(context, role, "request");
-      if (context.role !== role) {
-        throw providerError(
-          "ARCANE_AI_INVALID_REQUEST",
-          `Browser ${role} request role does not match the provider.`,
-          undefined,
-          `${role}-provider-request-role-mismatch`,
+      let requestContext;
+      try {
+        requestContext = providerContext(context, role, "request");
+        if (context.role !== role) {
+          throw providerError(
+            "ARCANE_AI_INVALID_REQUEST",
+            `Browser ${role} request role does not match the provider.`,
+            undefined,
+            `${role}-provider-request-role-mismatch`,
+          );
+        }
+        if (context.operation !== operation) {
+          throw providerError(
+            "ARCANE_AI_INVALID_REQUEST",
+            `Browser ${role} supports only ${operation}.`,
+            undefined,
+            `${role}-provider-operation-mismatch`,
+          );
+        }
+        assertRequestAuthority(
+          context,
+          authority,
+          providerId,
+          `${role}-provider-request-selection-authority-mismatch`,
         );
+        throwIfAborted(requestContext.signal, ROLE_REQUEST_REASON[role]);
+      } catch (error) {
+        throw trustedRequestFailure(error, role);
       }
-      if (context.operation !== operation) {
-        throw providerError(
-          "ARCANE_AI_INVALID_REQUEST",
-          `Browser ${role} supports only ${operation}.`,
-          undefined,
-          `${role}-provider-operation-mismatch`,
-        );
-      }
-      assertRequestAuthority(
-        context,
-        authority,
-        providerId,
-        `${role}-provider-request-selection-authority-mismatch`,
-      );
       const externalSignal = requestContext.signal;
-      throwIfAborted(externalSignal, ROLE_REQUEST_REASON[role]);
       if (state !== "ready" || !active) {
         throw providerError(
           "ARCANE_AI_NOT_READY",
@@ -1240,10 +1518,15 @@ function createBrowserSpeechProvider({
           `${role}-provider-request-already-active`,
         );
       }
-      const linked = linkSignal(externalSignal);
+      let linked;
+      try {
+        linked = linkSignal(externalSignal);
+      } catch (error) {
+        throw trustedRequestFailure(error, role);
+      }
       if (linked.controller.signal.aborted) {
         linked.release();
-        throw abortError(externalSignal, ROLE_REQUEST_REASON[role]);
+        throw linkedAbortFailure(linked, ROLE_REQUEST_REASON[role]);
       }
       const slot = active;
       const requestGeneration = generation;
@@ -1276,8 +1559,8 @@ function createBrowserSpeechProvider({
             "The browser speech result was superseded.",
             undefined,
             role === "stt"
-              ? "transcription-superseded-by-unload"
-              : "synthesis-superseded-by-unload",
+              ? "stt-transcription-superseded-by-unload"
+              : "tts-synthesis-superseded-by-unload",
           );
         }
         return role === "tts" && normalized.shared
@@ -1286,7 +1569,10 @@ function createBrowserSpeechProvider({
       })();
       requestOperation = Object.freeze({
         promise,
-        abort: (reason = ROLE_REQUEST_REASON[role]) => linked.abort(reason),
+        abort: (
+          reason = ROLE_REQUEST_REASON[role],
+          code = "ARCANE_AI_REQUEST_ABORTED",
+        ) => linked.abort(reason, code),
       });
       try {
         const result = await promise;
@@ -1295,18 +1581,20 @@ function createBrowserSpeechProvider({
           : "tts-synthesis-completed";
         return result;
       } catch (error) {
-        const failure = linked.controller.signal.aborted
-          && error?.code === "ARCANE_AI_REQUEST_ABORTED"
-          ? abortError(
-            linked.controller.signal,
-            () => linked.reason(ROLE_REQUEST_REASON[role]),
-          )
-          : error;
+        let failure = linked.controller.signal.aborted
+          && (error?.code === "ARCANE_AI_REQUEST_ABORTED"
+            || linked.code() === "ARCANE_AI_OPERATION_SUPERSEDED")
+          ? linkedAbortFailure(linked, ROLE_REQUEST_REASON[role])
+          : trustedRequestFailure(error, role);
         if (failure?.code === "ARCANE_AI_REQUEST_ABORTED"
           && workerRequestStarted
           && active === slot) {
           active = null;
-          releaseSlot(slot);
+          try {
+            releaseSlot(slot);
+          } catch (cleanupError) {
+            failure = trustedWorkerFailure(cleanupError, role);
+          }
           state = "unloaded";
           artifactGraphAdmission = null;
         }
@@ -1314,8 +1602,8 @@ function createBrowserSpeechProvider({
           ?? (failure?.code === "ARCANE_AI_REQUEST_ABORTED"
             ? ROLE_REQUEST_REASON[role]
             : role === "stt"
-              ? "stt-transcription-rejected"
-              : "tts-synthesis-rejected");
+              ? "stt-transcription-engine-operation-rejected"
+              : "tts-synthesis-engine-operation-rejected");
         throw failure;
       } finally {
         linked.release();
@@ -1336,7 +1624,7 @@ function createBrowserSpeechProvider({
         );
         throwIfAborted(unloadContext.signal, `${role}-unload-cancelled`);
       } catch (error) {
-        return Promise.reject(error);
+        return Promise.reject(trustedLifecycleFailure(error, role, "unload"));
       }
       const unloadSignal = unloadContext.signal;
       if (state === "disposed") return Promise.resolve(status());
@@ -1355,12 +1643,15 @@ function createBrowserSpeechProvider({
       const capturedRequest = requestOperation?.promise ?? null;
       if (loadOperation) {
         lifecycleReason = `${role}-load-superseded-by-unload`;
-        loadOperation.abort(`${role}-load-superseded-by-unload`);
+        loadOperation.abort(
+          `${role}-load-superseded-by-unload`,
+          "ARCANE_AI_OPERATION_SUPERSEDED",
+        );
       } else if (requestOperation) {
         lifecycleReason = role === "stt"
-          ? "transcription-superseded-by-unload"
-          : "synthesis-superseded-by-unload";
-        requestOperation.abort(lifecycleReason);
+          ? "stt-transcription-superseded-by-unload"
+          : "tts-synthesis-superseded-by-unload";
+        requestOperation.abort(lifecycleReason, "ARCANE_AI_OPERATION_SUPERSEDED");
       } else {
         lifecycleReason = `${role}-unload-started`;
       }
@@ -1411,7 +1702,7 @@ function createBrowserSpeechProvider({
         );
         throwIfAborted(disposalContext.signal, `${role}-dispose-cancelled`);
       } catch (error) {
-        return Promise.reject(error);
+        return Promise.reject(trustedLifecycleFailure(error, role, "dispose"));
       }
       const disposeSignal = disposalContext.signal;
       if (state === "disposed") return Promise.resolve(status());

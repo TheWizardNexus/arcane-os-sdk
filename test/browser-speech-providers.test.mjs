@@ -12,8 +12,10 @@ import {
 } from "../browser-runtime/ai/browser-speech.mjs";
 import {
   createSpeechWorkerRuntime,
+  normalizeSpeechWorkerErrorEnvelope,
   SPEECH_WORKER_PROTOCOL,
 } from "../browser-runtime/ai/speech-worker-runtime.mjs";
+import { createSpeechWorkerClient } from "../browser-runtime/ai/speech-worker-client.mjs";
 import { createSpeechWorkerContract } from "./browser-speech-workers.contract.mjs";
 
 function digest(bytes) {
@@ -503,7 +505,7 @@ test("browser speech artifact graphs bind one deterministic closed authority", (
         onnxWasm: { ...tts.descriptor.runtime.onnxWasm, numThreads: 2 },
       },
     }),
-    (error) => error?.reason === "kokoro-env-num-threads-unsupported",
+    (error) => error?.reason === "kokoro-env-num-threads-field-not-exposed",
   );
   const [entrypoint, ...remaining] = stt.descriptor.files;
   assert.throws(
@@ -519,7 +521,7 @@ test("browser speech artifact graphs bind one deterministic closed authority", (
       ...stt.descriptor,
       files: [{ ...entrypoint, license: " Apache-2.0 " }, ...remaining],
     }),
-    (error) => error?.reason === "artifact-graph-file-license-invalid",
+    (error) => error?.reason === "artifact-graph-file-license-whitespace-rejected",
   );
   assert.throws(
     () => createBrowserSpeechArtifactGraph({
@@ -726,6 +728,219 @@ test("artifact graph DBOPFS admission proves cold, warm, and zero-network offlin
   );
 });
 
+test("speech Worker publishes only SDK-owned error envelopes", async () => {
+  const runtimeEnvironment = `
+    export const env = {
+      allowLocalModels: true,
+      allowRemoteModels: false,
+      useBrowserCache: true,
+      useFSCache: true,
+      useCustomCache: false,
+      customCache: null,
+      backends: { onnx: { wasm: {} } },
+    };
+  `;
+  const useMessages = [];
+  const useRuntime = createSpeechWorkerRuntime({
+    role: "stt",
+    send: (message) => useMessages.push(message),
+  });
+  await useRuntime.handleMessage({
+    protocol: SPEECH_WORKER_PROTOCOL,
+    id: 1,
+    op: "load",
+    payload: {
+      configuration: directGraphWorkerConfiguration(`${runtimeEnvironment}
+        export async function pipeline() {
+          const transcriber = async () => {
+            const failure = new Error("foreign engine failure");
+            failure.code = "ARCANE_AI_FAKE";
+            failure.reason = "failed";
+            throw failure;
+          };
+          transcriber.dispose = async () => undefined;
+          return transcriber;
+        }
+      `, { cache: false, transforms: false }),
+    },
+  });
+  await assert.rejects(
+    useRuntime.handleMessage({
+      protocol: SPEECH_WORKER_PROTOCOL,
+      id: 2,
+      op: "use",
+      payload: { audio: new Float32Array([0]), sampleRate: 16_000 },
+    }),
+    (error) => error?.code === "ARCANE_AI_PROVIDER_REQUEST_FAILED"
+      && error?.reason === "stt-transcription-engine-operation-rejected"
+      && error?.cause?.code === "ARCANE_AI_FAKE"
+      && error?.cause?.reason === "failed",
+  );
+  const useEnvelope = useMessages.find((message) => message.id === 2 && message.ok === false);
+  assert.deepEqual(useEnvelope?.error, {
+    protocol: "arcane-ai-speech-worker-error/1",
+    code: "ARCANE_AI_PROVIDER_REQUEST_FAILED",
+    message: "The speech engine operation was rejected.",
+    reason: "stt-transcription-engine-operation-rejected",
+  });
+  assert.equal(
+    normalizeSpeechWorkerErrorEnvelope(useEnvelope.error, "stt", "use")?.reason,
+    "stt-transcription-engine-operation-rejected",
+  );
+  assert.equal(normalizeSpeechWorkerErrorEnvelope({
+    ...useEnvelope.error,
+    code: "ARCANE_AI_FAKE",
+    message: "foreign",
+    reason: "failed",
+  }, "stt", "use"), null);
+  assert.equal(normalizeSpeechWorkerErrorEnvelope({
+    ...useEnvelope.error,
+    extra: true,
+  }, "stt", "use"), null);
+  assert.equal(useRuntime.status().lifecycleReason, "stt-transcription-engine-operation-rejected");
+  await useRuntime.handleMessage({
+    protocol: SPEECH_WORKER_PROTOCOL,
+    id: 3,
+    op: "unload",
+    payload: null,
+  });
+
+  const loadMessages = [];
+  const loadRuntime = createSpeechWorkerRuntime({
+    role: "stt",
+    send: (message) => loadMessages.push(message),
+  });
+  await assert.rejects(
+    loadRuntime.handleMessage({
+      protocol: SPEECH_WORKER_PROTOCOL,
+      id: 1,
+      op: "load",
+      payload: {
+        configuration: directGraphWorkerConfiguration(`${runtimeEnvironment}
+          export async function pipeline() {
+            const failure = new Error("foreign model failure");
+            failure.code = "ARCANE_AI_FAKE";
+            failure.reason = "failed";
+            throw failure;
+          }
+        `, { cache: false, transforms: false }),
+      },
+    }),
+    (error) => error?.code === "ARCANE_AI_PROVIDER_REQUEST_FAILED"
+      && error?.reason === "stt-worker-model-load-rejected"
+      && error?.cause?.code === "ARCANE_AI_FAKE"
+      && error?.cause?.reason === "failed",
+  );
+  const loadEnvelope = loadMessages.find((message) => message.id === 1 && message.ok === false);
+  assert.equal(loadEnvelope?.error?.code, "ARCANE_AI_PROVIDER_REQUEST_FAILED");
+  assert.equal(loadEnvelope?.error?.reason, "stt-worker-model-load-rejected");
+  assert.equal(
+    normalizeSpeechWorkerErrorEnvelope(loadEnvelope.error, "stt", "use"),
+    null,
+  );
+  assert.equal(loadRuntime.status().lifecycleReason, "stt-worker-model-load-rejected");
+});
+
+test("speech Worker operations are admitted before public value construction", async () => {
+  const client = createSpeechWorkerClient({ role: "stt" });
+  await assert.rejects(
+    client.request("attacker-selected-operation", null),
+    (error) => error?.code === "ARCANE_AI_INVALID_REQUEST"
+      && error?.reason === "stt-worker-operation-unknown"
+      && !error.message.includes("attacker-selected-operation"),
+  );
+
+  const runtime = createSpeechWorkerRuntime({ role: "tts", send: () => undefined });
+  await assert.rejects(
+    runtime.handleMessage({
+      protocol: SPEECH_WORKER_PROTOCOL,
+      id: 1,
+      op: "attacker-selected-operation",
+      payload: null,
+    }),
+    (error) => error?.code === "ARCANE_AI_INVALID_REQUEST"
+      && error?.reason === "tts-worker-operation-unknown"
+      && !error.message.includes("attacker-selected-operation"),
+  );
+  assert.equal(runtime.status().activeOperation, null);
+  assert.equal(runtime.status().lifecycleReason, "tts-worker-created");
+});
+
+test("speech Worker distinguishes missing and rejected Transformers settings", async () => {
+  const load = (runtime, source, id) => runtime.handleMessage({
+    protocol: SPEECH_WORKER_PROTOCOL,
+    id,
+    op: "load",
+    payload: {
+      configuration: directGraphWorkerConfiguration(source, {
+        cache: false,
+        transforms: false,
+      }),
+    },
+  });
+
+  const missingRuntime = createSpeechWorkerRuntime({ role: "stt", send: () => undefined });
+  await assert.rejects(
+    load(missingRuntime, `
+      export const env = { backends: { onnx: { wasm: {} } } };
+      export async function pipeline() { return async () => ({ text: "unused" }); }
+    `, 1),
+    (error) => error?.code === "ARCANE_AI_PROVIDER_UNAVAILABLE"
+      && error?.reason === "transformers-env-allow-local-models-unavailable",
+  );
+  assert.equal(globalThis.__arcaneBrowserSpeechArtifactGraphGuardsV1, undefined);
+
+  const wasmPathsRuntime = createSpeechWorkerRuntime({ role: "stt", send: () => undefined });
+  await assert.rejects(
+    load(wasmPathsRuntime, `
+      const wasm = {};
+      Object.defineProperty(wasm, "wasmPaths", {
+        configurable: true,
+        get() { return null; },
+        set() { throw new Error("synthetic wasmPaths assignment rejection"); },
+      });
+      export const env = {
+        allowLocalModels: true,
+        allowRemoteModels: false,
+        useBrowserCache: true,
+        useFSCache: true,
+        useCustomCache: false,
+        customCache: null,
+        backends: { onnx: { wasm } },
+      };
+      export async function pipeline() { return async () => ({ text: "unused" }); }
+    `, 2),
+    (error) => error?.code === "ARCANE_AI_PROVIDER_UNAVAILABLE"
+      && error?.reason === "transformers-env-wasm-paths-assignment-rejected",
+  );
+  assert.equal(globalThis.__arcaneBrowserSpeechArtifactGraphGuardsV1, undefined);
+
+  const numThreadsRuntime = createSpeechWorkerRuntime({ role: "stt", send: () => undefined });
+  await assert.rejects(
+    load(numThreadsRuntime, `
+      const wasm = {};
+      Object.defineProperty(wasm, "numThreads", {
+        configurable: true,
+        get() { return 0; },
+        set() { throw new Error("synthetic numThreads assignment rejection"); },
+      });
+      export const env = {
+        allowLocalModels: true,
+        allowRemoteModels: false,
+        useBrowserCache: true,
+        useFSCache: true,
+        useCustomCache: false,
+        customCache: null,
+        backends: { onnx: { wasm } },
+      };
+      export async function pipeline() { return async () => ({ text: "unused" }); }
+    `, 3),
+    (error) => error?.code === "ARCANE_AI_PROVIDER_UNAVAILABLE"
+      && error?.reason === "transformers-env-num-threads-assignment-rejected",
+  );
+  assert.equal(globalThis.__arcaneBrowserSpeechArtifactGraphGuardsV1, undefined);
+});
+
 test("artifact graph materialization rewrites exact cache and typed-array sites", async () => {
   const fixture = artifactGraphFixture("tts");
   const prepared = await graphStore(createMemoryDbopfs(), fixture.sources)
@@ -749,7 +964,7 @@ test("artifact graph materialization rewrites exact cache and typed-array sites"
   }
 });
 
-test("artifact graph source verification propagates exact failed boundaries", async () => {
+test("artifact graph source verification propagates exact rejection boundaries", async () => {
   const fixture = artifactGraphFixture("stt");
   const entrypoint = fixture.graph.files.find((file) =>
     file.kind === "runtime-entrypoint-javascript");
@@ -936,6 +1151,59 @@ test("graph Whisper uses caller sample-rate authority over a private Worker chan
   );
   await whisper.unload();
   assert.equal(contract.terminated, true);
+});
+
+test("browser speech rejects foreign and incomplete Worker error envelopes", async (t) => {
+  const fixture = artifactGraphFixture("stt");
+  const rejectedEnvelopes = [
+    {
+      protocol: "arcane-ai-speech-worker-error/1",
+      code: "ARCANE_AI_FAKE",
+      message: "foreign Worker error",
+      reason: "failed",
+    },
+    {},
+    {
+      protocol: "arcane-ai-speech-worker-error/1",
+      code: "ARCANE_AI_PROVIDER_REQUEST_FAILED",
+      message: "The speech engine operation was rejected.",
+      reason: "stt-transcription-engine-operation-rejected",
+    },
+    {
+      protocol: "arcane-ai-speech-worker-error/1",
+      code: "ARCANE_AI_PROVIDER_REQUEST_FAILED",
+      message: "The speech engine operation was rejected.",
+      reason: "stt-worker-model-load-rejected",
+      extra: true,
+    },
+  ];
+  const contracts = [];
+  installContractWorker(t, () => {
+    const responseError = rejectedEnvelopes[contracts.length];
+    const contract = createSpeechWorkerContract({ role: "stt", responseError });
+    contracts.push(contract);
+    return contract;
+  });
+  for (let index = 0; index < rejectedEnvelopes.length; index += 1) {
+    const whisper = createBrowserWhisperProvider({
+      id: fixture.graph.providerId,
+      graph: fixture.graph,
+      store: graphStore(createMemoryDbopfs(), fixture.sources),
+    });
+    await assert.rejects(
+      whisper.load({
+        role: "stt",
+        selection: selection(whisper),
+        progress: () => undefined,
+      }),
+      (error) => error?.code === "ARCANE_AI_WORKER_MESSAGE_ERROR"
+        && error?.reason === "stt-worker-error-envelope-rejected",
+    );
+    assert.equal(whisper.status().lifecycleStatus, "stt-provider-error");
+    assert.equal(whisper.status().errorCode, "ARCANE_AI_WORKER_MESSAGE_ERROR");
+    assert.equal(whisper.status().lifecycleReason, "stt-worker-error-envelope-rejected");
+    assert.equal(contracts[index].terminated, true);
+  }
 });
 
 test("browser Whisper and Kokoro expose independent provider-v2 workers", async (t) => {
@@ -1472,7 +1740,7 @@ test("unload preserves exact supersession during artifact preparation", async ()
   const unloading = whisper.unload({ role: "stt", selection: selection(whisper) });
   await assert.rejects(
     loading,
-    (error) => error?.code === "ARCANE_AI_REQUEST_ABORTED"
+    (error) => error?.code === "ARCANE_AI_OPERATION_SUPERSEDED"
       && error?.reason === "stt-load-superseded-by-unload",
   );
   assert.equal((await unloading).lifecycleReason, "stt-unload-completed");
@@ -1591,8 +1859,8 @@ test("unload preserves exact supersession during pre-Worker audio decoding", asy
   const unloading = whisper.unload({ role: "stt", selection: selection(whisper) });
   await assert.rejects(
     request,
-    (error) => error?.code === "ARCANE_AI_REQUEST_ABORTED"
-      && error?.reason === "transcription-superseded-by-unload",
+    (error) => error?.code === "ARCANE_AI_OPERATION_SUPERSEDED"
+      && error?.reason === "stt-transcription-superseded-by-unload",
   );
   const status = await unloading;
   assert.equal(status.lifecycleStatus, "stt-provider-unloaded");

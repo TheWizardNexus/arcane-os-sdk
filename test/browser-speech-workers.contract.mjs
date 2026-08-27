@@ -1,6 +1,10 @@
 import { SPEECH_WORKER_PROTOCOL } from "../browser-runtime/ai/speech-worker-runtime.mjs";
 
-export function createSpeechWorkerContract({ role, holdUse = false } = {}) {
+export function createSpeechWorkerContract({
+  role,
+  holdUse = false,
+  responseError = null,
+} = {}) {
   const listeners = new Map();
   let terminated = false;
   let privatePort = null;
@@ -21,6 +25,18 @@ export function createSpeechWorkerContract({ role, holdUse = false } = {}) {
     if (holdUse && message.op === "use") return;
     queueMicrotask(() => {
       if (terminated) return;
+      const rejected = typeof responseError === "function"
+        ? responseError(message)
+        : responseError;
+      if (rejected) {
+        reply({
+          protocol: SPEECH_WORKER_PROTOCOL,
+          id: message.id,
+          ok: false,
+          error: rejected,
+        });
+        return;
+      }
       let result;
       if (message.op === "load") {
         configuration = message.payload?.configuration ?? null;

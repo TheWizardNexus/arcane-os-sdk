@@ -1,10 +1,19 @@
 import {
   collectSpeechTransferables,
+  normalizeSpeechWorkerErrorEnvelope,
   SPEECH_WORKER_PROTOCOL,
 } from "./speech-worker-runtime.mjs";
 
 const ARTIFACT_GRAPH_MODULE_GRAPH =
   "browser-speech-authenticated-artifact-graph";
+const PUBLIC_WORKER_OPERATIONS = new Set([
+  "load",
+  "use",
+  "status",
+  "unload",
+  "dispose",
+]);
+const WORKER_CLIENT_ERRORS = new WeakSet();
 
 function clientError(code, message, cause, reason) {
   const error = cause === undefined
@@ -15,6 +24,7 @@ function clientError(code, message, cause, reason) {
     : "ArcaneSpeechWorkerError";
   error.code = code;
   if (typeof reason === "string" && reason) error.reason = reason;
+  WORKER_CLIENT_ERRORS.add(error);
   return error;
 }
 
@@ -30,6 +40,24 @@ function abortError(signal, role, op) {
     signal?.reason,
     `${operationSubject(role, op)}-cancelled`,
   );
+}
+
+function validProgress(role, progress) {
+  if (!progress || typeof progress !== "object" || Array.isArray(progress)) return false;
+  const keys = Object.keys(progress).sort().join(",");
+  if (keys !== "completed,heartbeat,phase,total,unit") return false;
+  const phases = new Set([
+    `${role}-runtime-import-started`,
+    `${role}-model-load-started`,
+    `${role}-model-load-progress`,
+    `${role}-provider-ready`,
+  ]);
+  return phases.has(progress.phase)
+    && Number.isFinite(progress.completed)
+    && progress.completed >= 0
+    && (progress.total === null || (Number.isFinite(progress.total) && progress.total >= 0))
+    && (progress.unit === "bytes" || progress.unit === "items")
+    && progress.heartbeat === true;
 }
 
 function validateWorker(worker) {
@@ -185,11 +213,20 @@ class SpeechWorkerClient {
     if (message.event === "progress") {
       const pending = this.#pending.get(message.requestId);
       if (!pending) return;
+      if (!validProgress(this.#role, message.progress)) {
+        void this.terminate(clientError(
+          "ARCANE_AI_WORKER_MESSAGE_ERROR",
+          "The speech Worker progress envelope was rejected.",
+          undefined,
+          `${this.#role}-worker-progress-envelope-rejected`,
+        ), { intentional: false }).catch(() => undefined);
+        return;
+      }
       try {
         pending.progress(message.progress);
       } catch (error) {
         void this.terminate(clientError(
-          "ARCANE_AI_PROGRESS_CALLBACK_FAILED",
+          "ARCANE_AI_PROGRESS_CALLBACK_THREW",
           "The speech load progress callback threw an exception.",
           error,
           `${this.#role}-load-progress-callback-threw`,
@@ -200,9 +237,9 @@ class SpeechWorkerClient {
     if (!Number.isSafeInteger(message.id) || typeof message.ok !== "boolean") {
       void this.terminate(clientError(
         "ARCANE_AI_WORKER_MESSAGE_ERROR",
-        "The speech Worker response envelope was invalid.",
+        "The speech Worker response envelope shape was rejected.",
         undefined,
-        `${this.#role}-worker-response-envelope-invalid`,
+        `${this.#role}-worker-response-envelope-shape-rejected`,
       ), { intentional: false }).catch(() => undefined);
       return;
     }
@@ -214,15 +251,39 @@ class SpeechWorkerClient {
       pending.resolve(message.result);
       return;
     }
+    const admitted = normalizeSpeechWorkerErrorEnvelope(
+      message.error,
+      this.#role,
+      pending.op,
+    );
+    if (!admitted) {
+      const failure = clientError(
+        "ARCANE_AI_WORKER_MESSAGE_ERROR",
+        "The speech Worker error envelope was rejected.",
+        undefined,
+        `${this.#role}-worker-error-envelope-rejected`,
+      );
+      pending.reject(failure);
+      void this.terminate(failure, { intentional: false }).catch(() => undefined);
+      return;
+    }
     pending.reject(clientError(
-      message.error?.code ?? "ARCANE_AI_PROVIDER_REQUEST_FAILED",
-      message.error?.message ?? "The speech Worker operation failed.",
+      admitted.code,
+      admitted.message,
       undefined,
-      message.error?.reason ?? `${operationSubject(this.#role, pending.op)}-failed`,
+      admitted.reason,
     ));
   }
 
   request(op, payload, { signal = null, progress = () => undefined } = {}) {
+    if (!PUBLIC_WORKER_OPERATIONS.has(op)) {
+      return Promise.reject(clientError(
+        "ARCANE_AI_INVALID_REQUEST",
+        "The speech worker operation is not part of its protocol.",
+        undefined,
+        `${this.#role}-worker-operation-unknown`,
+      ));
+    }
     if (signal?.aborted) return Promise.reject(abortError(signal, this.#role, op));
     if (typeof progress !== "function") {
       return Promise.reject(new TypeError("Speech Worker progress must be a function."));
@@ -300,16 +361,19 @@ class SpeechWorkerClient {
     });
   }
 
-  async terminate(reason = clientError(
-    "ARCANE_AI_OPERATION_SUPERSEDED",
-    "The speech Worker was terminated.",
-    undefined,
-    `${this.#role}-worker-terminated`,
-  ), { intentional = true } = {}) {
+  async terminate(reason = null, { intentional = true } = {}) {
     if (typeof intentional !== "boolean") {
       throw new TypeError("Speech Worker termination intent must be a boolean.");
     }
     if (this.#terminated) return;
+    const terminationReason = reason instanceof Error && WORKER_CLIENT_ERRORS.has(reason)
+      ? reason
+      : clientError(
+        "ARCANE_AI_OPERATION_SUPERSEDED",
+        "The speech Worker was terminated.",
+        reason instanceof Error ? reason : undefined,
+        `${this.#role}-worker-terminated`,
+      );
     this.#terminated = true;
     const worker = this.#worker;
     this.#worker = null;
@@ -339,8 +403,8 @@ class SpeechWorkerClient {
       const termination = worker?.terminate();
       if (termination && typeof termination.then === "function") await termination;
     } finally {
-      for (const pending of pendingOperations) pending.reject(reason);
-      this.#onTermination(Object.freeze({ reason, intentional }));
+      for (const pending of pendingOperations) pending.reject(terminationReason);
+      this.#onTermination(Object.freeze({ reason: terminationReason, intentional }));
     }
   }
 }
@@ -351,4 +415,8 @@ export function createSpeechWorkerClient(options) {
 
 export function isSpeechWorkerClient(value) {
   return WORKER_CLIENTS.has(value);
+}
+
+export function isSpeechWorkerClientError(value) {
+  return value instanceof Error && WORKER_CLIENT_ERRORS.has(value);
 }

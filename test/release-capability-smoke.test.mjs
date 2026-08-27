@@ -315,7 +315,7 @@ sourceTest('browser-WASM provider admits only module-branded model sources and s
 
     assert.throws(
         ()=>createBrowserWasmLlmProvider({source:sourceLookalike,store}),
-        /requires createBrowserModelSource\(\)/u
+        /must come from createBrowserModelSource\(\)/u
     );
     assert.throws(
         ()=>createBrowserWasmLlmProvider({source,store:storeLookalike}),
