@@ -1,0 +1,571 @@
+name: Build authenticated Browser Speech eSpeak authority
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: browser-speech-espeak-authority
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build one reproducible phonemizer authority twice
+    if: github.repository == 'TheWizardNexus/arcane-os-sdk'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      ESPEAK_REVISION: 328128ea63358979d5f74a20f5000078863795bd
+      ESPEAK_SOURCE_URL: https://codeload.github.com/espeak-ng/espeak-ng/tar.gz/328128ea63358979d5f74a20f5000078863795bd
+      ESPEAK_SOURCE_BYTES: '17629421'
+      ESPEAK_SOURCE_SHA256: 2476231f2da9cce6565573492d112994c02cd79937025231c43189f0e32f19e7
+      SOURCE_DATE_EPOCH: '1724522532'
+      TOOLCHAIN_IMAGE: docker.io/emscripten/emsdk:4.0.4@sha256:47d573d5a86379a06f850de200d69407e6baa2d2f9c19d9e156a67db57f80f2f
+      TOOLCHAIN_SHA256: 47d573d5a86379a06f850de200d69407e6baa2d2f9c19d9e156a67db57f80f2f
+      UBUNTU_SNAPSHOT: https://snapshot.ubuntu.com/ubuntu/20250225T232300Z
+    steps:
+      - name: Check out the exact SDK build contract
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Fetch and authenticate every external build input
+        id: inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/arcane-espeak-authority"
+          inputs="$root/inputs"
+          debs="$inputs/debs"
+          mkdir -p "$debs"
+
+          download_exact() {
+            local relative_path="$1"
+            local expected_bytes="$2"
+            local expected_sha256="$3"
+            local url="$4"
+            local target="$inputs/$relative_path"
+            mkdir -p "$(dirname "$target")"
+            curl --fail --show-error --silent --location \
+              --proto '=https' --tlsv1.2 \
+              --output "$target" "$url"
+            test "$(stat -c '%s' "$target")" = "$expected_bytes"
+            printf '%s  %s\n' "$expected_sha256" "$target" | sha256sum --check --strict
+          }
+
+          download_exact \
+            espeak-ng.tar.gz \
+            "$ESPEAK_SOURCE_BYTES" \
+            "$ESPEAK_SOURCE_SHA256" \
+            "$ESPEAK_SOURCE_URL"
+
+          cat > "$inputs/dependencies.tsv" <<'EOF'
+          autoconf_2.71-2_all.deb	337608	96b528889794c4134015a63c75050f93d8aecdf5e3f2a20993c1433f4c61b80e	pool/main/a/autoconf/autoconf_2.71-2_all.deb
+          automake_1.16.5-1.3_all.deb	557936	59e3890fc8407bcf8ccc9f709d6513156346d5c942e8c624dc90435e58f6f978	pool/main/a/automake-1.16/automake_1.16.5-1.3_all.deb
+          autotools-dev_20220109.1_all.deb	44886	d909f0327b09d9a9136239caca975df89782fa28efd721c4eb4caea422d3fc5a	pool/main/a/autotools-dev/autotools-dev_20220109.1_all.deb
+          libtool_2.4.6-15build2_all.deb	163940	fb994bc0152f4e77a791b51bc54fd5e38963aa6473e60c45369ef373b6119124	pool/main/libt/libtool/libtool_2.4.6-15build2_all.deb
+          m4_1.4.18-5ubuntu2_amd64.deb	198836	572a544d2c18bf49d25c465720c570cd8e6e38731386ac9c0a7f29bed2486f3e	pool/main/m/m4/m4_1.4.18-5ubuntu2_amd64.deb
+          libsigsegv2_2.13-1ubuntu3_amd64.deb	14612	894fcb0804df54dca59edbd0860d6f3eeac25d1555aebd3fa99d80665969f891	pool/main/libs/libsigsegv/libsigsegv2_2.13-1ubuntu3_amd64.deb
+          pkg-config_0.29.2-1ubuntu3_amd64.deb	48218	69da4190d948d0bf7444ead040791b7924bd1a08a10ec13cd7f0bb9baab09c53	pool/main/p/pkg-config/pkg-config_0.29.2-1ubuntu3_amd64.deb
+          file_5.41-3ubuntu0.1_amd64.deb	21524	b63b48e8b32c6f0fce5ad37d5ec3269cbbdc8feed13170aae1f416a43ebe898b	pool/main/f/file/file_5.41-3ubuntu0.1_amd64.deb
+          libmagic1_5.41-3ubuntu0.1_amd64.deb	87242	344d0cc65fea4175ca1ab222c20b5b95fb1357acafea6b016add9988760829d0	pool/main/f/file/libmagic1_5.41-3ubuntu0.1_amd64.deb
+          libmagic-mgc_5.41-3ubuntu0.1_amd64.deb	257310	23fcefb8b9ee73eb74e127fc230330918a8f81e127fa54015f191cfd34726b3c	pool/main/f/file/libmagic-mgc_5.41-3ubuntu0.1_amd64.deb
+          libglib2.0-0_2.72.4-0ubuntu2.4_amd64.deb	1465352	b4017c697176219dbd0f66183f4e173f725794744ddf8504a26f2580d2a51492	pool/main/g/glib2.0/libglib2.0-0_2.72.4-0ubuntu2.4_amd64.deb
+          libpcre3_8.39-13ubuntu0.22.04.1_amd64.deb	245530	0d1eb051047eb0c637c893f618f45e1d419863bfa3bc821897ee05ad418ba22e	pool/main/p/pcre3/libpcre3_8.39-13ubuntu0.22.04.1_amd64.deb
+          EOF
+
+          total_bytes=0
+          while IFS=$'\t' read -r filename bytes sha256 pool_path; do
+            download_exact "debs/$filename" "$bytes" "$sha256" \
+              "$UBUNTU_SNAPSHOT/$pool_path"
+            total_bytes=$((total_bytes + bytes))
+          done < "$inputs/dependencies.tsv"
+          test "$total_bytes" = 3442994
+
+          cat > "$inputs/Dockerfile" <<'EOF'
+          ARG BASE_IMAGE
+          FROM ${BASE_IMAGE}
+          COPY debs /arcane-authority/debs
+          RUN set -eux; \
+              test "$(dpkg --print-architecture)" = amd64; \
+              test "$(. /etc/os-release && printf '%s' "$VERSION_ID")" = 22.04; \
+              dpkg --unpack --force-downgrade /arcane-authority/debs/*.deb; \
+              dpkg --configure -a; \
+              dpkg --audit; \
+              test "$(dpkg-query -W -f='${Version}' autoconf)" = 2.71-2; \
+              test "$(dpkg-query -W -f='${Version}' automake)" = 1:1.16.5-1.3; \
+              test "$(dpkg-query -W -f='${Version}' autotools-dev)" = 20220109.1; \
+              test "$(dpkg-query -W -f='${Version}' libtool)" = 2.4.6-15build2; \
+              test "$(dpkg-query -W -f='${Version}' m4)" = 1.4.18-5ubuntu2; \
+              test "$(dpkg-query -W -f='${Version}' libsigsegv2)" = 2.13-1ubuntu3; \
+              test "$(dpkg-query -W -f='${Version}' pkg-config)" = 0.29.2-1ubuntu3; \
+              test "$(dpkg-query -W -f='${Version}' file)" = 1:5.41-3ubuntu0.1; \
+              test "$(dpkg-query -W -f='${Version}' libmagic1)" = 1:5.41-3ubuntu0.1; \
+              test "$(dpkg-query -W -f='${Version}' libmagic-mgc)" = 1:5.41-3ubuntu0.1; \
+              test "$(dpkg-query -W -f='${Version}' libglib2.0-0)" = 2.72.4-0ubuntu2.4; \
+              test "$(dpkg-query -W -f='${Version}' libpcre3)" = 2:8.39-13ubuntu0.22.04.1
+          EOF
+
+          cat > "$inputs/arcane_espeak_phonemes.c" <<'EOF'
+          #include <stddef.h>
+          #include <stdint.h>
+          #include <stdlib.h>
+          #include <string.h>
+          #include <emscripten/emscripten.h>
+          #include <espeak-ng/speak_lib.h>
+
+          static int initialized = 0;
+          static int last_error = 0;
+
+          EMSCRIPTEN_KEEPALIVE
+          int arcane_espeak_initialize(void) {
+            if (initialized) return 0;
+            const int sample_rate = espeak_Initialize(
+              AUDIO_OUTPUT_SYNCHRONOUS,
+              100,
+              "/usr/share/espeak-ng-data",
+              espeakINITIALIZE_DONT_EXIT
+            );
+            if (sample_rate < 1) return last_error = -1;
+            if (espeak_SetVoiceByName("en-us") != EE_OK) return last_error = -2;
+            initialized = 1;
+            last_error = 0;
+            return 0;
+          }
+
+          EMSCRIPTEN_KEEPALIVE
+          int arcane_espeak_set_voice(const char *voice) {
+            if (!initialized || voice == NULL) return last_error = -1;
+            if (strcmp(voice, "en") != 0 && strcmp(voice, "en-us") != 0) {
+              return last_error = -2;
+            }
+            if (espeak_SetVoiceByName(voice) != EE_OK) return last_error = -3;
+            last_error = 0;
+            return 0;
+          }
+
+          static int append_text(char **output, size_t *length, const char *chunk) {
+            const size_t chunk_length = chunk == NULL ? 0 : strlen(chunk);
+            if (chunk_length == 0) return 0;
+            const size_t separator = *length == 0 ? 0 : 1;
+            if (chunk_length > SIZE_MAX - *length - separator - 1) return -1;
+            const size_t next_length = *length + separator + chunk_length;
+            char *next = realloc(*output, next_length + 1);
+            if (next == NULL) return -1;
+            if (separator) next[*length] = '\n';
+            memcpy(next + *length + separator, chunk, chunk_length);
+            next[next_length] = '\0';
+            *output = next;
+            *length = next_length;
+            return 0;
+          }
+
+          EMSCRIPTEN_KEEPALIVE
+          char *arcane_espeak_phonemize(const char *text) {
+            if (!initialized || text == NULL) {
+              last_error = -4;
+              return NULL;
+            }
+            char *output = calloc(1, 1);
+            if (output == NULL) {
+              last_error = -5;
+              return NULL;
+            }
+            size_t output_length = 0;
+            const void *cursor = text;
+            while (cursor != NULL) {
+              const void *before = cursor;
+              const char *chunk = espeak_TextToPhonemes(
+                &cursor,
+                espeakCHARS_UTF8,
+                espeakPHONEMES_IPA | (' ' << 8)
+              );
+              if (append_text(&output, &output_length, chunk) != 0) {
+                free(output);
+                last_error = -5;
+                return NULL;
+              }
+              if (cursor == before) break;
+            }
+            last_error = 0;
+            return output;
+          }
+
+          EMSCRIPTEN_KEEPALIVE
+          void arcane_espeak_free(void *value) {
+            free(value);
+          }
+
+          EMSCRIPTEN_KEEPALIVE
+          int arcane_espeak_last_error(void) {
+            return last_error;
+          }
+
+          EMSCRIPTEN_KEEPALIVE
+          int arcane_espeak_dispose(void) {
+            if (!initialized) return 0;
+            const int result = espeak_Terminate();
+            initialized = 0;
+            last_error = result == EE_OK ? 0 : -6;
+            return last_error;
+          }
+          EOF
+
+          cat > "$inputs/arcane-espeak-phonemizer.mjs" <<'EOF'
+          import createArcaneEspeakModule from "./arcane-espeak-ng.mjs";
+
+          const ASSET_BASE =
+            "https://github.com/TheWizardNexus/arcane-os-sdk/releases/download/0.3.0";
+          const ASSET_URLS = Object.freeze({
+            "arcane-espeak-ng.data": `${ASSET_BASE}/arcane-espeak-ng.data`,
+            "arcane-espeak-ng.wasm": `${ASSET_BASE}/arcane-espeak-ng.wasm`,
+          });
+          const LANGUAGES = new Set(["en", "en-us"]);
+          let modulePromise = null;
+          let operationTail = Promise.resolve();
+
+          function loadModule() {
+            modulePromise ??= createArcaneEspeakModule({
+              locateFile(path) {
+                const url = ASSET_URLS[path];
+                if (!url) throw new Error(`Undeclared eSpeak runtime file: ${path}.`);
+                return url;
+              },
+            }).then((module) => {
+              if (module._arcane_espeak_initialize() !== 0) {
+                throw new Error("The authenticated eSpeak runtime did not initialize.");
+              }
+              return module;
+            });
+            return modulePromise;
+          }
+
+          function withUtf8(module, value, operation) {
+            const bytes = module.lengthBytesUTF8(value) + 1;
+            const pointer = module._malloc(bytes);
+            if (!pointer) throw new Error("The eSpeak runtime could not allocate UTF-8 input.");
+            try {
+              module.stringToUTF8(value, pointer, bytes);
+              return operation(pointer);
+            } finally {
+              module._free(pointer);
+            }
+          }
+
+          async function runPhonemize(text, language) {
+            if (typeof text !== "string") throw new TypeError("Phonemizer text must be a string.");
+            if (!LANGUAGES.has(language)) {
+              throw new TypeError('Phonemizer language must be exactly "en" or "en-us".');
+            }
+            if (!text) return [];
+            const module = await loadModule();
+            const voiceResult = withUtf8(
+              module,
+              language,
+              (pointer) => module._arcane_espeak_set_voice(pointer),
+            );
+            if (voiceResult !== 0) throw new Error("The authenticated eSpeak voice was rejected.");
+            const resultPointer = withUtf8(
+              module,
+              text,
+              (pointer) => module._arcane_espeak_phonemize(pointer),
+            );
+            if (!resultPointer) throw new Error("The authenticated eSpeak phonemizer failed.");
+            try {
+              return module.UTF8ToString(resultPointer)
+                .split("\n")
+                .filter((value) => value.length > 0);
+            } finally {
+              module._arcane_espeak_free(resultPointer);
+            }
+          }
+
+          export function phonemize(text, language = "en-us") {
+            const operation = operationTail.then(
+              () => runPhonemize(text, language),
+              () => runPhonemize(text, language),
+            );
+            operationTail = operation.then(() => undefined, () => undefined);
+            return operation;
+          }
+
+          export function dispose() {
+            const operation = operationTail.then(async () => {
+              if (!modulePromise) return false;
+              const module = await modulePromise;
+              if (module._arcane_espeak_dispose() !== 0) {
+                throw new Error("The authenticated eSpeak runtime did not dispose cleanly.");
+              }
+              modulePromise = null;
+              return true;
+            });
+            operationTail = operation.then(() => undefined, () => undefined);
+            return operation;
+          }
+          EOF
+
+          cat > "$inputs/build.sh" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          export HOME=/tmp/arcane-home
+          export SOURCE_DATE_EPOCH=1724522532
+          export TZ=UTC
+          export LC_ALL=C.UTF-8
+          mkdir -p "$HOME" /work/native /work/wasm /work/selected-data /out
+          tar --extract --gzip --file /inputs/espeak-ng.tar.gz --directory /work/native \
+            --strip-components 1 --no-same-owner --no-same-permissions
+          tar --extract --gzip --file /inputs/espeak-ng.tar.gz --directory /work/wasm \
+            --strip-components 1 --no-same-owner --no-same-permissions
+
+          common_configure=(
+            --prefix=/usr
+            --without-pcaudiolib
+            --without-klatt
+            --without-speechplayer
+            --without-async
+            --without-mbrola
+            --without-sonic
+            --without-extdict-ru
+            --without-extdict-cmn
+            --without-extdict-yue
+          )
+          deterministic_flags="-O2 -g0 -ffile-prefix-map=/work/native=/usr/src/espeak-ng -ffile-prefix-map=/work/wasm=/usr/src/espeak-ng"
+
+          cd /work/native
+          ./autogen.sh
+          CFLAGS="$deterministic_flags" CXXFLAGS="$deterministic_flags" \
+            ./configure "${common_configure[@]}"
+          make -j1 en
+          install -D -m 0644 espeak-ng-data/phontab /work/selected-data/phontab
+          install -D -m 0644 espeak-ng-data/phondata /work/selected-data/phondata
+          install -D -m 0644 espeak-ng-data/phonindex /work/selected-data/phonindex
+          install -D -m 0644 espeak-ng-data/intonations /work/selected-data/intonations
+          install -D -m 0644 espeak-ng-data/en_dict /work/selected-data/en_dict
+          install -D -m 0644 espeak-ng-data/lang/gmw/en /work/selected-data/lang/gmw/en
+          install -D -m 0644 espeak-ng-data/lang/gmw/en-US /work/selected-data/lang/gmw/en-US
+
+          cd /work/wasm/src/ucd-tools
+          ./autogen.sh
+          emconfigure ./configure
+          emmake make -j1
+
+          cd /work/wasm
+          ./autogen.sh
+          CFLAGS="$deterministic_flags" CXXFLAGS="$deterministic_flags" \
+            emconfigure ./configure "${common_configure[@]}" \
+              --disable-shared --enable-static
+          emmake make -j1 src/libespeak-ng.la
+          test -f src/.libs/libespeak-ng.a
+
+          emcc /inputs/arcane_espeak_phonemes.c src/.libs/libespeak-ng.a \
+            -I src/include \
+            -O3 \
+            -lm \
+            -s ASSERTIONS=0 \
+            -s ALLOW_MEMORY_GROWTH=1 \
+            -s DYNAMIC_EXECUTION=0 \
+            -s ENVIRONMENT=worker \
+            -s EXIT_RUNTIME=0 \
+            -s EXPORT_ES6=1 \
+            -s EXPORT_NAME=createArcaneEspeakModule \
+            -s FILESYSTEM=1 \
+            -s FORCE_FILESYSTEM=1 \
+            -s MODULARIZE=1 \
+            -s MALLOC=emmalloc \
+            -s 'EXPORTED_FUNCTIONS=["_arcane_espeak_initialize","_arcane_espeak_set_voice","_arcane_espeak_phonemize","_arcane_espeak_free","_arcane_espeak_last_error","_arcane_espeak_dispose","_malloc","_free"]' \
+            -s 'EXPORTED_RUNTIME_METHODS=["UTF8ToString","stringToUTF8","lengthBytesUTF8"]' \
+            --preload-file /work/selected-data@/usr/share/espeak-ng-data \
+            -o /out/arcane-espeak-ng.mjs
+          install -m 0644 /inputs/arcane-espeak-phonemizer.mjs \
+            /out/arcane-espeak-phonemizer.mjs
+          test -s /out/arcane-espeak-ng.mjs
+          test -s /out/arcane-espeak-ng.wasm
+          test -s /out/arcane-espeak-ng.data
+          test -s /out/arcane-espeak-phonemizer.mjs
+          test "$(find /out -maxdepth 1 -type f | wc -l)" = 4
+          touch --date="@$SOURCE_DATE_EPOCH" /out/*
+          EOF
+          chmod 0755 "$inputs/build.sh"
+
+          docker pull "$TOOLCHAIN_IMAGE"
+          test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$TOOLCHAIN_IMAGE")" = linux/amd64
+          docker image inspect "$TOOLCHAIN_IMAGE" > "$inputs/toolchain-image-inspect.json"
+          docker build \
+            --network=none \
+            --pull=false \
+            --build-arg "BASE_IMAGE=$TOOLCHAIN_IMAGE" \
+            --tag arcane-espeak-authority:4.0.4 \
+            --file "$inputs/Dockerfile" \
+            "$inputs"
+          docker image inspect arcane-espeak-authority:4.0.4 \
+            > "$inputs/derived-image-inspect.json"
+          echo "root=$root" >> "$GITHUB_OUTPUT"
+          echo "inputs=$inputs" >> "$GITHUB_OUTPUT"
+
+      - name: Build in two fresh network-disabled containers
+        shell: bash
+        env:
+          ROOT: ${{ steps.inputs.outputs.root }}
+          INPUTS: ${{ steps.inputs.outputs.inputs }}
+        run: |
+          set -euo pipefail
+          for run in 1 2; do
+            output="$ROOT/output-$run"
+            mkdir -p "$output"
+            docker run --rm \
+              --pull=never \
+              --network=none \
+              --read-only \
+              --tmpfs /tmp:rw,nosuid,nodev,size=1g \
+              --tmpfs /work:rw,exec,nosuid,nodev,size=5g \
+              --mount "type=bind,src=$INPUTS,dst=/inputs,readonly" \
+              --mount "type=bind,src=$output,dst=/out" \
+              arcane-espeak-authority:4.0.4 \
+              /inputs/build.sh 2>&1 | tee "$ROOT/build-$run.log"
+            (
+              cd "$output"
+              find . -maxdepth 1 -type f -printf '%P\0' \
+                | sort --zero-terminated \
+                | xargs --null sha256sum
+            ) > "$ROOT/output-$run.sha256"
+          done
+          diff --no-dereference --recursive "$ROOT/output-1" "$ROOT/output-2"
+          diff --unified "$ROOT/output-1.sha256" "$ROOT/output-2.sha256"
+
+      - name: Assemble exact runtime, legal, and corresponding-source authority
+        id: authority
+        shell: bash
+        env:
+          ROOT: ${{ steps.inputs.outputs.root }}
+          INPUTS: ${{ steps.inputs.outputs.inputs }}
+        run: |
+          set -euo pipefail
+          artifact="$ROOT/artifact"
+          source_tree="$ROOT/source-tree"
+          corresponding="$ROOT/corresponding-source"
+          mkdir -p "$artifact" "$source_tree" "$corresponding"
+          cp --preserve=mode,timestamps "$ROOT/output-1/"* "$artifact/"
+          cp "$ROOT/output-1.sha256" "$artifact/arcane-espeak-ng.outputs.sha256"
+          cp "$ROOT/build-1.log" "$artifact/arcane-espeak-ng.build.log"
+
+          tar --extract --gzip --file "$INPUTS/espeak-ng.tar.gz" \
+            --directory "$source_tree" --strip-components 1 \
+            --no-same-owner --no-same-permissions
+          for legal in COPYING COPYING.APACHE COPYING.BSD2 COPYING.UCD; do
+            cp "$source_tree/$legal" "$artifact/$legal"
+          done
+          printf '%s  %s\n' \
+            8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903 \
+            "$artifact/COPYING" \
+            cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30 \
+            "$artifact/COPYING.APACHE" \
+            a8b0c1c7d7af6c0415c068be8cf373799d1a42b0707b79dc4ccfcaf593cd902d \
+            "$artifact/COPYING.BSD2" \
+            be029c50df83105a810e391778b6edcb522d6cb4b4e142332aca54437a499bf7 \
+            "$artifact/COPYING.UCD" | sha256sum --check --strict
+
+          cp "$INPUTS/espeak-ng.tar.gz" "$corresponding/"
+          cp "$INPUTS/arcane_espeak_phonemes.c" "$corresponding/"
+          cp "$INPUTS/arcane-espeak-phonemizer.mjs" "$corresponding/"
+          cp "$INPUTS/build.sh" "$corresponding/"
+          cp "$INPUTS/Dockerfile" "$corresponding/"
+          cp "$INPUTS/dependencies.tsv" "$corresponding/"
+          cp "$INPUTS/toolchain-image-inspect.json" "$corresponding/"
+          cp "$INPUTS/derived-image-inspect.json" "$corresponding/"
+          cp -R "$INPUTS/debs" "$corresponding/debs"
+          cp .github/workflows/browser-speech-espeak-authority.yml "$corresponding/"
+          find "$corresponding" -exec touch --date="@$SOURCE_DATE_EPOCH" {} +
+          tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" \
+            --owner=0 --group=0 --numeric-owner \
+            --format=posix --pax-option=delete=atime,delete=ctime \
+            --directory "$corresponding" --create --file - . \
+            | gzip --no-name --best \
+            > "$artifact/arcane-espeak-ng-corresponding-source-${ESPEAK_REVISION}.tar.gz"
+
+          ARTIFACT="$artifact" INPUTS="$INPUTS" python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          artifact = Path(os.environ["ARTIFACT"])
+          inputs = Path(os.environ["INPUTS"])
+
+          def identity(path):
+              data = path.read_bytes()
+              return {
+                  "path": path.name,
+                  "bytes": len(data),
+                  "sha256": hashlib.sha256(data).hexdigest(),
+              }
+
+          dependencies = []
+          for line in (inputs / "dependencies.tsv").read_text(encoding="utf-8").splitlines():
+              filename, size, sha256, pool_path = line.split("\t")
+              dependencies.append({
+                  "filename": filename,
+                  "bytes": int(size),
+                  "sha256": sha256,
+                  "url": f"{os.environ['UBUNTU_SNAPSHOT']}/{pool_path}",
+              })
+
+          files = sorted(
+              (identity(path) for path in artifact.iterdir() if path.is_file()),
+              key=lambda item: item["path"],
+          )
+          receipt = {
+              "schema": "arcane.browser-speech.espeak-build-receipt/1",
+              "source": {
+                  "repository": "https://github.com/espeak-ng/espeak-ng",
+                  "revision": os.environ["ESPEAK_REVISION"],
+                  "archiveUrl": os.environ["ESPEAK_SOURCE_URL"],
+                  "archiveBytes": int(os.environ["ESPEAK_SOURCE_BYTES"]),
+                  "archiveSha256": os.environ["ESPEAK_SOURCE_SHA256"],
+                  "sourceDateEpoch": int(os.environ["SOURCE_DATE_EPOCH"]),
+              },
+              "toolchain": {
+                  "container": os.environ["TOOLCHAIN_IMAGE"],
+                  "platform": "linux/amd64",
+                  "networkDuringImageExtension": False,
+                  "networkDuringCompilation": False,
+                  "cleanBuilds": 2,
+                  "byteIdentical": True,
+                  "dependencies": dependencies,
+              },
+              "workflow": {
+                  "repository": os.environ["GITHUB_REPOSITORY"],
+                  "sourceSha": os.environ["GITHUB_SHA"],
+                  "runId": int(os.environ["GITHUB_RUN_ID"]),
+                  "runAttempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+              },
+              "outputs": files,
+              "claims": {
+                  "languages": ["en", "en-us"],
+                  "api": "async phonemize(text, language) -> string[]; async dispose() -> boolean",
+                  "runtimePayloadPackedInNpm": False,
+                  "reproducibility": "two-clean-container-byte-identity",
+              },
+          }
+          target = artifact / "ARCANE_ESPEAK_NG_BUILD_RECEIPT.json"
+          target.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+          PY
+
+          checksum="$ROOT/ARCANE_ESPEAK_NG_ARTIFACT.sha256"
+          find "$artifact" -maxdepth 1 -type f -printf '%f\0' \
+            | sort --zero-terminated \
+            | xargs --null -I{} sh -c 'sha256sum "$1/{}"' sh "$artifact" \
+            > "$checksum"
+          mv "$checksum" "$artifact/ARCANE_ESPEAK_NG_ARTIFACT.sha256"
+          echo "artifact=$artifact" >> "$GITHUB_OUTPUT"
+          echo "name=arcane-browser-speech-espeak-${ESPEAK_REVISION}-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the exact reproducible authority
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.authority.outputs.name }}
+          path: ${{ steps.authority.outputs.artifact }}
+          if-no-files-found: error
+          retention-days: 90
