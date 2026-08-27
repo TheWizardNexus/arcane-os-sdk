@@ -38,9 +38,19 @@
     const status=root.querySelector('#status');
     const reset=root.querySelector('#reset');
     const save=root.querySelector('#save');
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.preferences-form',eventTypes:['preferences-submit','preferences-change','preferences-reset','preferences-form-ready']});
+    let destroyed=false;
     let schema=[];
 
+    function emit(type,detail={},publicDetail={}){
+        if(destroyed)return false;
+        const publication=events.dispatch(type,detail,{publicDetail});
+        return projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});
+    }
+
     host.configure=configure;
+    host.destroy=destroy;
     host.getValues=getValues;
     host.setValues=setValues;
     host.setBusy=setBusy;
@@ -48,14 +58,14 @@
 
     form.addEventListener('submit',event=>{
         event.preventDefault();
-        host.dispatchEvent(new CustomEvent('preferences-submit',{bubbles:true,composed:true,detail:{values:getValues()}}));
+        emit('preferences-submit',{values:getValues()},{fieldCount:schema.length});
     });
     form.addEventListener('input',event=>{
         const field=schema.find(item=>item.key===event.target.name);
         if(!field) return;
-        host.dispatchEvent(new CustomEvent('preferences-change',{bubbles:true,composed:true,detail:{key:field.key,value:readControl(event.target,field),values:getValues()}}));
+        emit('preferences-change',{key:field.key,value:readControl(event.target,field),values:getValues()},{key:String(field.key),fieldType:String(field.type||'text')});
     });
-    reset.addEventListener('click',()=>host.dispatchEvent(new CustomEvent('preferences-reset',{bubbles:true,composed:true})));
+    reset.addEventListener('click',()=>emit('preferences-reset'));
 
     function configure(options={}){
         schema=Array.from(options.schema||[]).map(item=>typeof item.toJSON==='function'?item.toJSON():{...item});
@@ -130,6 +140,14 @@
     }
     function setStatus(message=''){status.innerText=String(message||'');return status.innerText;}
 
+    function destroy(){
+        if(destroyed)return false;
+        destroyed=true;
+        host.ready=false;
+        events.dispose();
+        return true;
+    }
+
     host.ready=true;
-    host.dispatchEvent(new CustomEvent('preferences-form-ready',{bubbles:true,composed:true}));
+    emit('preferences-form-ready',{}, {ready:true});
 </script>

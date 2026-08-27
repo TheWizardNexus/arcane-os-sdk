@@ -158,6 +158,8 @@
 <script type="module">
     const host=this;
     const shadowRoot=host.shadowRoot;
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.modal',eventTypes:['modal-action','modal-opened','modal-closed','modal-ready']});
     const dialog=shadowRoot.querySelector('#modal');
     const modalContent=shadowRoot.querySelector('#modal-content');
     const modalSearch=shadowRoot.querySelector('#modal-search');
@@ -175,7 +177,13 @@
     host.populate=populate;
     host.open=open;
     host.close=close;
+    host.destroy=dispose;
     host.runTasks=runTasks;
+
+    function emit(type,detail={},publicDetail={}){
+        const publication=events.dispatch(type,detail,{publicDetail});
+        return projectArcaneDOMEvent(host,publication.occurrence);
+    }
 
     Object.defineProperties(host,{
         running:{get:function getRunningState(){return running;}},
@@ -220,7 +228,7 @@
         const detail={...action.dataset};
         detail.action=detail.modalAction;
         delete detail.modalAction;
-        host.dispatchEvent(new CustomEvent('modal-action',{detail}));
+        emit('modal-action',detail,{action:String(detail.action||'')});
     });
 
     async function open(){
@@ -244,7 +252,7 @@
                 const focusTarget=modalContent.querySelector('[autofocus],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),a[href]')||closeButton;
                 focusTarget?.focus({preventScroll:true});
             });
-            host.dispatchEvent(new CustomEvent('modal-opened'));
+            emit('modal-opened',{}, {opened:true});
         }
         return true;
     }
@@ -269,7 +277,7 @@
         }
 
         if(wasOpen){
-            host.dispatchEvent(new CustomEvent('modal-closed'));
+            emit('modal-closed',{}, {opened:false});
             const target=returnFocus;
             returnFocus=null;
             queueMicrotask(function restoreModalReturnFocus(){
@@ -287,7 +295,7 @@
 
     function dispose(){
         if(disposed){
-            return;
+            return false;
         }
         disposed=true;
         host.ready=false;
@@ -298,7 +306,9 @@
         if(dialog.open){
             dialog.close();
         }
+        events.dispose();
         host.remove();
+        return true;
     }
 
     async function populate(content='<p>Content goes here</p>',search=false){
@@ -398,5 +408,5 @@
     }
 
     host.ready=true;
-    host.dispatchEvent(new CustomEvent('modal-ready'));
+    emit('modal-ready',{}, {ready:true});
 </script>

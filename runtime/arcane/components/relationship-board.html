@@ -34,23 +34,33 @@
   const selectedTitle=host.shadowRoot.querySelector('[data-selected-title]');
   const selectedSummary=host.shadowRoot.querySelector('[data-selected-summary]');
   const edgeList=host.shadowRoot.querySelector('[data-edges]');
+  const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+  const events=createArcaneEventSource(host,{source:'arcane.component.relationship-board',eventTypes:['relationship-node-open','relationship-edge-open','relationship-board-ready']});
+  let destroyed=false;
   let nodes=[]; let edges=[]; let lanes=[]; let selectedId='';
 
   host.setGraph=setGraph;
   host.populate=(graph={},options={})=>setGraph(graph,options);
+  host.destroy=destroy;
 
   board.addEventListener('click',event=>{
+    if(destroyed) return;
     const trigger=event.target.closest('[data-node-id]');
     if(!trigger) return;
     selectedId=trigger.dataset.nodeId; renderSelection();
     const node=nodes.find(item=>item.id===selectedId);
-    host.dispatchEvent(new CustomEvent('relationship-node-open',{bubbles:true,composed:true,detail:{id:selectedId,node:{...node}}}));
+    const publication=events.dispatch('relationship-node-open',{id:selectedId,node:{...node}},{publicDetail:{lane:String(node?.lane||'')}});
+    projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});
   });
   edgeList.addEventListener('click',event=>{
+    if(destroyed) return;
     const trigger=event.target.closest('[data-edge-id]');
     if(!trigger) return;
     const edge=edges.find(item=>item.id===trigger.dataset.edgeId);
-    if(edge) host.dispatchEvent(new CustomEvent('relationship-edge-open',{bubbles:true,composed:true,detail:{id:edge.id,edge:{...edge}}}));
+    if(edge){
+      const publication=events.dispatch('relationship-edge-open',{id:edge.id,edge:{...edge}},{publicDetail:{hasEdge:true}});
+      projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});
+    }
   });
 
   function normalizeNode(value,index){
@@ -112,5 +122,15 @@
     if(!related.length){const row=document.createElement('li'); row.className='empty'; row.textContent='No displayed connections.'; edgeList.append(row);}
   }
 
-  host.dispatchEvent(new CustomEvent('relationship-board-ready',{bubbles:true,composed:true}));
+  function destroy(){
+    if(destroyed) return false;
+    destroyed=true;
+    host.ready=false;
+    events.dispose();
+    return true;
+  }
+
+  host.ready=true;
+  const readyPublication=events.dispatch('relationship-board-ready',{}, {publicDetail:{ready:true}});
+  projectArcaneDOMEvent(host,readyPublication.occurrence,{bubbles:true,composed:true});
 </script>

@@ -21,8 +21,11 @@
     const colors=root.querySelector('#colors');
     const status=root.querySelector('#status');
     const {default:Theme,themeColorToHex,themeTokens}=await import('../entities/Theme.js');
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.theme-editor',eventTypes:['theme-preview','theme-save','theme-reset','theme-editor-ready']});
+    let destroyed=false;
 
-    host.configure=configure;host.getTheme=getTheme;host.setTheme=setTheme;host.setBusy=setBusy;host.setStatus=setStatus;
+    host.configure=configure;host.destroy=destroy;host.getTheme=getTheme;host.setTheme=setTheme;host.setBusy=setBusy;host.setStatus=setStatus;
     colors.replaceChildren(...themeTokens.map(token=>{
         const field=document.createElement('div'),input=document.createElement('input'),label=document.createElement('label');
         field.className='color-field';input.type='color';input.id=`theme-${token.key}`;input.name=token.key;input.value=themeColorToHex(token.defaultValue);label.htmlFor=input.id;label.textContent=token.label;field.append(input,label);return field;
@@ -31,11 +34,12 @@
     form.addEventListener('submit',event=>{event.preventDefault();emit('theme-save',{theme:getTheme()});});
     root.querySelector('#reset').addEventListener('click',()=>emit('theme-reset'));
 
-    function emit(name,detail={}){host.dispatchEvent(new CustomEvent(name,{bubbles:true,composed:true,detail}));}
+    function emit(name,detail={}){if(destroyed)return false;const theme=detail.theme;const publication=events.dispatch(name,detail,{publicDetail:theme?{scheme:String(theme.scheme||''),tokenCount:Object.keys(theme.tokens||{}).length}:{}});return projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});}
     function getTheme(){return new Theme({name:form.elements.name.value,scheme:form.elements.scheme.value,tokens:Object.fromEntries(themeTokens.map(token=>[token.key,form.elements[token.key].value]))});}
     function setTheme(input={}){const theme=Theme.fromJSON(input);form.elements.name.value=theme.name;form.elements.scheme.value=theme.scheme;for(const token of themeTokens) form.elements[token.key].value=themeColorToHex(theme.tokens[token.key]);return theme;}
     function configure(options={}){return setTheme(options.theme||{name:'My Arcane skin'});}
     function setBusy(value=true){for(const control of form.elements) control.disabled=Boolean(value);form.setAttribute('aria-busy',String(Boolean(value)));}
     function setStatus(value=''){status.textContent=String(value||'');return status.textContent;}
-    configure();host.ready=true;emit('theme-editor-ready');
+    function destroy(){if(destroyed)return false;destroyed=true;host.ready=false;events.dispose();return true;}
+    configure();host.ready=true;const readyPublication=events.dispatch('theme-editor-ready',{}, {publicDetail:{ready:true}});projectArcaneDOMEvent(host,readyPublication.occurrence,{bubbles:true,composed:true});
 </script>

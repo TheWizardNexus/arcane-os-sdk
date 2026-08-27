@@ -43,6 +43,8 @@
 <script type="module">
     const host=this;
     const root=host.shadowRoot;
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.output-panel',eventTypes:['output-panel-action','output-panel-state','output-panel-error','output-panel-change','output-panel-cleared','output-panel-ready']});
     const region=root.querySelector('#region');
     const title=root.querySelector('#outputTitle');
     const status=root.querySelector('#status');
@@ -55,11 +57,13 @@
     const footerActions=root.querySelector('#footerActions');
 
     let actions=[];
+    let destroyed=false;
     let output=null;
     let options={};
 
     host.clear=clear;
     host.configure=configure;
+    host.destroy=destroy;
     host.setActions=setActions;
     host.setBody=setBody;
     host.setCoverage=setCoverage;
@@ -76,6 +80,13 @@
     headerActions.addEventListener('click',handleAction);
     footerActions.addEventListener('click',handleAction);
     bodySlot.addEventListener('slotchange',syncBodySlot);
+
+    function emit(type,detail={},publicDetail={},cancelable=false){
+        if(destroyed)return false;
+        const publication=events.dispatch(type,detail,{publicDetail,cancelable});
+        if(cancelable&&!publication.accepted) return false;
+        return projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true,cancelable});
+    }
 
     function datasetOptions(){
         return {
@@ -183,12 +194,7 @@
         if(!button||!action||action.disabled){
             return;
         }
-        host.dispatchEvent(new CustomEvent('output-panel-action',{
-            bubbles:true,
-            cancelable:true,
-            composed:true,
-            detail:{action:{...action},id:action.id,output:output?{...output}:null}
-        }));
+        emit('output-panel-action',{action:{...action},id:action.id,output:output?{...output}:null},{actionId:action.id,hasOutput:Boolean(output)},true);
     }
 
     function setPending(value=true,message='Working…'){
@@ -197,11 +203,7 @@
         if(pending){
             renderState(message,'loading');
         }
-        host.dispatchEvent(new CustomEvent('output-panel-state',{
-            bubbles:true,
-            composed:true,
-            detail:{pending,state:pending?'loading':'ready'}
-        }));
+        emit('output-panel-state',{pending,state:pending?'loading':'ready'},{pending,state:pending?'loading':'ready'});
         return pending;
     }
 
@@ -210,11 +212,7 @@
         body.setAttribute('aria-busy','false');
         if(text){
             renderState(text,'error');
-            host.dispatchEvent(new CustomEvent('output-panel-error',{
-                bubbles:true,
-                composed:true,
-                detail:{message:text,output:output?{...output}:null}
-            }));
+            emit('output-panel-error',{message:text,output:output?{...output}:null},{hasOutput:Boolean(output),hasError:true});
         }
         return text;
     }
@@ -231,11 +229,7 @@
     }
 
     function emitChange(){
-        host.dispatchEvent(new CustomEvent('output-panel-change',{
-            bubbles:true,
-            composed:true,
-            detail:{output:output?{...output}:null}
-        }));
+        emit('output-panel-change',{output:output?{...output}:null},{hasOutput:Boolean(output)});
     }
 
     function clear(){
@@ -247,7 +241,18 @@
         setActions([]);
         renderState(options.emptyLabel||'No output yet.','empty');
         body.setAttribute('aria-busy','false');
-        host.dispatchEvent(new CustomEvent('output-panel-cleared',{bubbles:true,composed:true}));
+        emit('output-panel-cleared');
+        return true;
+    }
+
+    function destroy(){
+        if(destroyed)return false;
+        destroyed=true;
+        host.ready=false;
+        headerActions.removeEventListener('click',handleAction);
+        footerActions.removeEventListener('click',handleAction);
+        bodySlot.removeEventListener('slotchange',syncBodySlot);
+        events.dispose();
         return true;
     }
 
@@ -255,5 +260,5 @@
     clear();
     syncBodySlot();
     host.ready=true;
-    host.dispatchEvent(new CustomEvent('output-panel-ready',{bubbles:true,composed:true}));
+    emit('output-panel-ready',{}, {ready:true});
 </script>

@@ -40,13 +40,17 @@
 <script type="module">
     const host=this;
     const root=host.shadowRoot;
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.summary-strip',eventTypes:['summary-strip-change','summary-strip-select','summary-strip-ready']});
     const region=root.querySelector('#region');
     const list=root.querySelector('#items');
+    let destroyed=false;
     let items=[];
     let options={};
 
     host.clear=clear;
     host.configure=configure;
+    host.destroy=destroy;
     host.setItems=setItems;
     host.updateItem=updateItem;
 
@@ -56,6 +60,12 @@
     });
 
     list.addEventListener('click',selectItem);
+
+    function emit(type,detail={},publicDetail={}){
+        if(destroyed)return false;
+        const publication=events.dispatch(type,detail,{publicDetail});
+        return projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});
+    }
 
     function datasetOptions(){
         return {
@@ -74,11 +84,7 @@
     function setItems(values=[]){
         items=Array.from(values||[]).map((value,index)=>normalizeItem(value,index));
         render();
-        host.dispatchEvent(new CustomEvent('summary-strip-change',{
-            bubbles:true,
-            composed:true,
-            detail:{items:getItems()}
-        }));
+        emit('summary-strip-change',{items:getItems()},{itemCount:items.length});
         return getItems();
     }
 
@@ -156,11 +162,7 @@
         if(!target||!item||item.disabled){
             return;
         }
-        host.dispatchEvent(new CustomEvent('summary-strip-select',{
-            bubbles:true,
-            composed:true,
-            detail:{id:item.id,item:{...item}}
-        }));
+        emit('summary-strip-select',{id:item.id,item:{...item}},{id:item.id,status:item.status});
     }
 
     function getItems(){
@@ -171,7 +173,16 @@
         return setItems([]);
     }
 
+    function destroy(){
+        if(destroyed)return false;
+        destroyed=true;
+        host.ready=false;
+        list.removeEventListener('click',selectItem);
+        events.dispose();
+        return true;
+    }
+
     configure(datasetOptions());
     host.ready=true;
-    host.dispatchEvent(new CustomEvent('summary-strip-ready',{bubbles:true,composed:true}));
+    emit('summary-strip-ready',{}, {ready:true});
 </script>

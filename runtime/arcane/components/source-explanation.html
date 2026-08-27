@@ -47,17 +47,24 @@
   const elements=root.querySelector('[data-elements]'); const application=root.querySelector('[data-application]'); const limitations=root.querySelector('[data-limitations]'); const nextSteps=root.querySelector('[data-next-steps]');
   const evidenceList=root.querySelector('[data-evidence]'); const original=root.querySelector('[data-original]'); const originalLabel=root.querySelector('[data-original-label]'); const originalPicker=root.querySelector('[data-original-picker]');
   const reviewForm=root.querySelector('[data-review]'); const actor=root.querySelector('[data-actor]'); const disposition=root.querySelector('[data-disposition]'); const confidence=root.querySelector('[data-confidence]'); const notes=root.querySelector('[data-notes]'); const saveState=root.querySelector('[data-save-state]');
+  const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+  const events=createArcaneEventSource(host,{source:'arcane.component.source-explanation',eventTypes:['source-explanation-save','source-explanation-source-selected','source-explanation-ready']});
+  let destroyed=false;
   let finding=null; let sources=[];
 
   host.showFinding=showFinding;
   host.populate=(value={},options={})=>showFinding(value,options);
   host.selectSource=selectSource;
   host.markSaved=message=>{saveState.textContent=String(message||'Saved.');};
+  host.destroy=destroy;
 
   reviewForm.addEventListener('submit',event=>{
+    if(destroyed) return;
     event.preventDefault(); if(!finding) return;
     saveState.textContent='Saving…';
-    host.dispatchEvent(new CustomEvent('source-explanation-save',{bubbles:true,composed:true,detail:{recordId:finding.id,classification:actor.value,status:disposition.value,attributes:{confidence:confidence.value},notes:notes.value}}));
+    const detail={recordId:finding.id,classification:actor.value,status:disposition.value,attributes:{confidence:confidence.value},notes:notes.value};
+    const publication=events.dispatch('source-explanation-save',detail,{publicDetail:{hasFinding:true,hasNotes:Boolean(notes.value)}});
+    projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});
   });
   originalPicker.addEventListener('change',()=>showSource(Number(originalPicker.value)));
 
@@ -110,15 +117,28 @@
   }
 
   function showSource(index=0){
+    if(destroyed) return null;
     const source=sources[index]; if(!source?.pdfUrl) return null;
     try{
       const url=sameOrigin(source.pdfUrl); if(source.page){url.searchParams.set('arcane-pdf-page',String(Number(source.page)));url.hash=`page=${Number(source.page)}`;}
       originalPicker.value=String(index); original.src=url.href; original.title=`Original cited source: ${source.filename||source.recordId||'document'}${source.page?`, page ${source.page}`:''}`; original.hidden=false;
       originalLabel.textContent=`Original source${source.page?` at PDF page ${source.page}`:''}. Compare the full page before relying on the extracted text.`;
-      host.dispatchEvent(new CustomEvent('source-explanation-source-selected',{bubbles:true,composed:true,detail:{index,source:{...source}}}));
+      const publication=events.dispatch('source-explanation-source-selected',{index,source:{...source}},{publicDetail:{index,hasSource:true}});
+      projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});
       return {...source};
     }catch(error){original.hidden=true; originalLabel.textContent=error.message; return null;}
   }
 
-  host.dispatchEvent(new CustomEvent('source-explanation-ready',{bubbles:true,composed:true}));
+  function destroy(){
+    if(destroyed) return false;
+    destroyed=true;
+    host.ready=false;
+    original.removeAttribute('src');
+    events.dispose();
+    return true;
+  }
+
+  host.ready=true;
+  const readyPublication=events.dispatch('source-explanation-ready',{}, {publicDetail:{ready:true}});
+  projectArcaneDOMEvent(host,readyPublication.occurrence,{bubbles:true,composed:true});
 </script>
