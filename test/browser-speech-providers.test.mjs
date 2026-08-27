@@ -176,8 +176,10 @@ function artifactGraphFixture(role) {
     revision,
     license,
     mediaType,
+    sourceMediaType,
     body,
     runtimeRequestUrls = [],
+    redirectFinalOrigins,
   }) {
     const sha256 = digest(body);
     const sourceUrl = `https://speech.example/${revision}/${sha256}/${path}`;
@@ -188,11 +190,16 @@ function artifactGraphFixture(role) {
       revision,
       license,
       mediaType,
+      ...(sourceMediaType === undefined ? {} : { sourceMediaType }),
       bytes: body.byteLength,
       sha256,
       runtimeRequestUrls,
+      ...(redirectFinalOrigins === undefined ? {} : { redirectFinalOrigins }),
     });
-    sources.set(sourceUrl, Object.freeze({ body, mediaType }));
+    sources.set(sourceUrl, Object.freeze({
+      body,
+      mediaType: sourceMediaType ?? mediaType,
+    }));
     return descriptor;
   }
 
@@ -536,6 +543,78 @@ test("browser speech artifact graphs bind one deterministic closed authority", (
       files: [{
         ...entrypoint,
         sourceUrl: `https://speech.example/resolve/main/${entrypoint.revision}/${entrypoint.sha256}`,
+      }, ...remaining],
+    }),
+    (error) => error?.reason === "artifact-graph-source-url-mutable",
+  );
+});
+
+test("artifact graph source redirects bind exact canonical final origins", () => {
+  const fixture = artifactGraphFixture("stt");
+  const [entrypoint, ...remaining] = fixture.descriptor.files;
+  const redirectFile = {
+    ...entrypoint,
+    redirectFinalOrigins: [
+      "https://us.aws.cdn.hf.co/",
+      "https://huggingface.co",
+    ],
+  };
+  const redirected = createBrowserSpeechArtifactGraph({
+    ...fixture.descriptor,
+    files: [redirectFile, ...remaining],
+  });
+  const publicFile = redirected.files.find((file) => file.path === entrypoint.path);
+  assert.deepEqual(publicFile.redirectFinalOrigins, [
+    "https://huggingface.co",
+    "https://us.aws.cdn.hf.co",
+  ]);
+  assert.equal(Object.isFrozen(publicFile.redirectFinalOrigins), true);
+  assert.notEqual(redirected.identitySha256, fixture.graph.identitySha256);
+  assert.throws(
+    () => createBrowserSpeechArtifactGraph({
+      ...fixture.descriptor,
+      identitySha256: fixture.graph.identitySha256,
+      files: [redirectFile, ...remaining],
+    }),
+    (error) => error?.reason === "artifact-graph-identity-sha256-mismatch",
+  );
+
+  const invalidInventories = [
+    [null, "artifact-graph-source-redirect-final-origins-not-array"],
+    [[], "artifact-graph-source-redirect-final-origin-inventory-empty"],
+    [[""], "artifact-graph-source-redirect-final-origin-text-required"],
+    [[" https://huggingface.co"], "artifact-graph-source-redirect-final-origin-whitespace-rejected"],
+    [["huggingface.co"], "artifact-graph-source-redirect-final-origin-not-absolute"],
+    [["http://huggingface.co"], "artifact-graph-source-redirect-final-origin-protocol-not-https"],
+    [["https://user:secret@huggingface.co"], "artifact-graph-source-redirect-final-origin-credentials-rejected"],
+    [["https://huggingface.co/path"], "artifact-graph-source-redirect-final-origin-path-rejected"],
+    [["https://huggingface.co?source=mutable"], "artifact-graph-source-redirect-final-origin-query-rejected"],
+    [["https://huggingface.co#source"], "artifact-graph-source-redirect-final-origin-fragment-rejected"],
+    [["https://HUGGINGFACE.co", "https://huggingface.co/"], "artifact-graph-source-redirect-final-origin-duplicate"],
+  ];
+  for (const [redirectFinalOrigins, reason] of invalidInventories) {
+    assert.throws(
+      () => createBrowserSpeechArtifactGraph({
+        ...fixture.descriptor,
+        files: [{ ...entrypoint, redirectFinalOrigins }, ...remaining],
+      }),
+      (error) => error?.reason === reason,
+    );
+  }
+  assert.throws(
+    () => createBrowserSpeechArtifactGraph({
+      ...fixture.descriptor,
+      files: [{ ...entrypoint, sourceMediaType: "text/plain; charset=utf-8" }, ...remaining],
+    }),
+    (error) => error?.reason === "artifact-graph-file-source-media-type-format-mismatch",
+  );
+  assert.throws(
+    () => createBrowserSpeechArtifactGraph({
+      ...fixture.descriptor,
+      files: [{
+        ...entrypoint,
+        sourceUrl: `https://speech.example/resolve/main/${entrypoint.sha256}`,
+        redirectFinalOrigins: ["https://huggingface.co"],
       }, ...remaining],
     }),
     (error) => error?.reason === "artifact-graph-source-url-mutable",
@@ -1020,6 +1099,138 @@ test("artifact graph source verification propagates exact rejection boundaries",
   await assert.rejects(
     redirectedStore.prepare(fixture.graph),
     (error) => error?.reason === "artifact-graph-source-redirected",
+  );
+});
+
+test("artifact graph cold redirects require declared final origin and source media type", async () => {
+  const fixture = artifactGraphFixture("stt");
+  const targetPath = "model/config.json";
+  const graph = createBrowserSpeechArtifactGraph({
+    ...fixture.descriptor,
+    files: fixture.descriptor.files.map((file) => file.path === targetPath
+      ? {
+        ...file,
+        sourceMediaType: "text/plain",
+        redirectFinalOrigins: ["https://huggingface.co"],
+      }
+      : file),
+  });
+  const target = graph.files.find((file) => file.path === targetPath);
+  const sources = new Map(fixture.sources);
+  sources.set(target.sourceUrl, Object.freeze({
+    ...sources.get(target.sourceUrl),
+    mediaType: "text/plain",
+  }));
+  const dbopfs = createMemoryDbopfs();
+  const fetches = [];
+  const store = createDbopfsSpeechArtifactStore({
+    dbopfs,
+    fetchImpl: async (url, init) => {
+      const sourceUrl = String(url);
+      const source = sources.get(sourceUrl);
+      fetches.push(Object.freeze({ sourceUrl, redirect: init.redirect }));
+      if (!source) return responseAt(sourceUrl, null, { status: 404 });
+      const responseUrl = sourceUrl === target.sourceUrl
+        ? "https://huggingface.co/api/resolve-cache/models/example/revision/config.json?etag=immutable"
+        : sourceUrl;
+      return responseAt(responseUrl, source.body, {
+        status: 200,
+        redirected: sourceUrl === target.sourceUrl,
+        headers: {
+          "content-length": String(source.body.byteLength),
+          "content-type": source.mediaType,
+        },
+      });
+    },
+  });
+  const cold = await store.prepare(graph);
+  assert.equal(cold.cache, "artifact-graph-network-dbopfs-verified");
+  assert.equal(
+    fetches.find((entry) => entry.sourceUrl === target.sourceUrl).redirect,
+    "follow",
+  );
+  assert.ok(fetches.filter((entry) => entry.sourceUrl !== target.sourceUrl)
+    .every((entry) => entry.redirect === "error"));
+  cold.release();
+
+  const fetchCount = fetches.length;
+  const warm = await store.prepare(graph);
+  assert.equal(warm.cache, "artifact-graph-dbopfs-cache-verified");
+  assert.equal(fetches.length, fetchCount);
+  warm.release();
+  const offline = await store.prepare(graph, { offline: true });
+  assert.equal(offline.cache, "artifact-graph-offline-dbopfs-cache-verified");
+  assert.equal(fetches.length, fetchCount);
+  offline.release();
+
+  function redirectFailureStore(finalUrl, {
+    redirected = true,
+    mediaType = "text/plain",
+    body = sources.get(target.sourceUrl).body,
+  } = {}) {
+    return createDbopfsSpeechArtifactStore({
+      dbopfs: createMemoryDbopfs(),
+      fetchImpl: async (url) => {
+        const sourceUrl = String(url);
+        const source = sources.get(sourceUrl);
+        if (sourceUrl !== target.sourceUrl) {
+          return responseAt(sourceUrl, source.body, {
+            status: 200,
+            headers: {
+              "content-length": String(source.body.byteLength),
+              "content-type": source.mediaType,
+            },
+          });
+        }
+        return responseAt(finalUrl, body, {
+          status: 200,
+          redirected,
+          headers: {
+            "content-length": String(body.byteLength),
+            "content-type": mediaType,
+          },
+        });
+      },
+    });
+  }
+
+  await assert.rejects(
+    redirectFailureStore("https://undeclared.example/xet/model").prepare(graph),
+    (error) => error?.reason === "artifact-graph-source-redirect-final-origin-mismatch",
+  );
+  await assert.rejects(
+    redirectFailureStore("not a final URL").prepare(graph),
+    (error) => error?.reason === "artifact-graph-source-response-url-unreadable",
+  );
+  await assert.rejects(
+    redirectFailureStore("http://huggingface.co/xet/model").prepare(graph),
+    (error) => error?.reason === "artifact-graph-source-response-url-protocol-not-https",
+  );
+  await assert.rejects(
+    redirectFailureStore("https://user:secret@huggingface.co/xet/model").prepare(graph),
+    (error) => error?.reason === "artifact-graph-source-response-url-credentials-rejected",
+  );
+  await assert.rejects(
+    redirectFailureStore("https://huggingface.co/xet/model#fragment").prepare(graph),
+    (error) => error?.reason === "artifact-graph-source-response-url-fragment-rejected",
+  );
+  await assert.rejects(
+    redirectFailureStore("https://huggingface.co/not-a-redirect", {
+      redirected: false,
+    }).prepare(graph),
+    (error) => error?.reason === "artifact-graph-source-response-url-mismatch",
+  );
+  await assert.rejects(
+    redirectFailureStore("https://huggingface.co/xet/model", {
+      mediaType: "application/json",
+    }).prepare(graph),
+    (error) => error?.reason === "artifact-graph-model-configuration-json-source-media-type-mismatch",
+  );
+  await assert.rejects(
+    redirectFailureStore("https://huggingface.co/xet/model", {
+      body: sources.get(target.sourceUrl).body.slice(0, 1),
+    }).prepare(graph),
+    (error) => error?.reason === "artifact-graph-model-configuration-json-byte-length-mismatch",
   );
 });
 

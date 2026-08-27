@@ -276,6 +276,24 @@ function exactMediaType(value, label) {
   return mediaType;
 }
 
+function exactSourceMediaType(value, label) {
+  const mediaType = artifactGraphText(
+    value,
+    label,
+    "artifact-graph-file-source-media-type-missing",
+  ).toLowerCase();
+  if (
+    mediaType !== value
+    || !/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/u.test(mediaType)
+  ) {
+    throw artifactGraphTypeError(
+      "artifact-graph-file-source-media-type-format-mismatch",
+      `${label} must be one lowercase media type without parameters.`,
+    );
+  }
+  return mediaType;
+}
+
 function graphRuntimeRequestUrl(value, label) {
   const url = artifactGraphText(
     value,
@@ -311,6 +329,89 @@ function graphRuntimeRequestUrl(value, label) {
     );
   }
   return result.href;
+}
+
+function graphRedirectFinalOrigin(value, label) {
+  const text = artifactGraphText(
+    value,
+    label,
+    "artifact-graph-source-redirect-final-origin-text-required",
+  );
+  if (text !== value) {
+    throw artifactGraphTypeError(
+      "artifact-graph-source-redirect-final-origin-whitespace-rejected",
+      `${label} must not contain surrounding whitespace.`,
+    );
+  }
+  let result;
+  try {
+    result = new URL(text);
+  } catch (error) {
+    throw artifactGraphTypeError(
+      "artifact-graph-source-redirect-final-origin-not-absolute",
+      `${label} must be an absolute HTTPS origin.`,
+      error,
+    );
+  }
+  if (result.protocol !== "https:") {
+    throw artifactGraphTypeError(
+      "artifact-graph-source-redirect-final-origin-protocol-not-https",
+      `${label} must use HTTPS.`,
+    );
+  }
+  if (result.username || result.password) {
+    throw artifactGraphTypeError(
+      "artifact-graph-source-redirect-final-origin-credentials-rejected",
+      `${label} must not contain credentials.`,
+    );
+  }
+  if (result.pathname !== "/") {
+    throw artifactGraphTypeError(
+      "artifact-graph-source-redirect-final-origin-path-rejected",
+      `${label} must not contain a path.`,
+    );
+  }
+  if (result.search) {
+    throw artifactGraphTypeError(
+      "artifact-graph-source-redirect-final-origin-query-rejected",
+      `${label} must not contain a query.`,
+    );
+  }
+  if (result.hash) {
+    throw artifactGraphTypeError(
+      "artifact-graph-source-redirect-final-origin-fragment-rejected",
+      `${label} must not contain a fragment.`,
+    );
+  }
+  return result.origin;
+}
+
+function normalizeGraphRedirectFinalOrigins(value, path) {
+  if (value === undefined) return Object.freeze([]);
+  if (!Array.isArray(value)) {
+    throw artifactGraphTypeError(
+      "artifact-graph-source-redirect-final-origins-not-array",
+      `Artifact graph file ${path} redirectFinalOrigins must be an array.`,
+    );
+  }
+  if (value.length < 1) {
+    throw artifactGraphTypeError(
+      "artifact-graph-source-redirect-final-origin-inventory-empty",
+      `Artifact graph file ${path} redirectFinalOrigins must contain at least one final origin when supplied.`,
+    );
+  }
+  const origins = value.map((origin, index) => graphRedirectFinalOrigin(
+    origin,
+    `Artifact graph file ${path} redirectFinalOrigins[${String(index)}]`,
+  ));
+  const unique = new Set(origins);
+  if (unique.size !== origins.length) {
+    throw artifactGraphTypeError(
+      "artifact-graph-source-redirect-final-origin-duplicate",
+      `Artifact graph file ${path} redirectFinalOrigins must be unique after canonicalization.`,
+    );
+  }
+  return Object.freeze([...origins].sort(lexicalCompare));
 }
 
 function graphImmutableUrl(value, label, revision, sha256) {
@@ -494,6 +595,10 @@ function normalizeArtifactGraphFile(value, index) {
     revision,
     sha256,
   );
+  const redirectFinalOrigins = normalizeGraphRedirectFinalOrigins(
+    value.redirectFinalOrigins,
+    path,
+  );
   const license = artifactGraphText(
     value.license,
     `Artifact graph file ${path} license`,
@@ -527,6 +632,12 @@ function normalizeArtifactGraphFile(value, index) {
     value.mediaType,
     `Artifact graph file ${path} mediaType`,
   );
+  const sourceMediaType = value.sourceMediaType === undefined
+    ? mediaType
+    : exactSourceMediaType(
+      value.sourceMediaType,
+      `Artifact graph file ${path} sourceMediaType`,
+    );
   if (
     ARTIFACT_GRAPH_JAVASCRIPT_KINDS.has(kind)
     && mediaType !== "application/javascript"
@@ -575,9 +686,11 @@ function normalizeArtifactGraphFile(value, index) {
     revision,
     license,
     mediaType,
+    sourceMediaType,
     bytes,
     sha256,
     runtimeRequestUrls: Object.freeze(normalizedRequestUrls),
+    redirectFinalOrigins,
   });
 }
 
@@ -589,9 +702,15 @@ function publicArtifactGraphFile(file) {
     revision: file.revision,
     license: file.license,
     mediaType: file.mediaType,
+    ...(file.sourceMediaType === file.mediaType
+      ? {}
+      : { sourceMediaType: file.sourceMediaType }),
     bytes: file.bytes,
     sha256: file.sha256,
     runtimeRequestUrls: file.runtimeRequestUrls,
+    ...(file.redirectFinalOrigins.length < 1
+      ? {}
+      : { redirectFinalOrigins: file.redirectFinalOrigins }),
   });
 }
 
@@ -2934,9 +3053,15 @@ async function createArtifactGraphObjectUrls(admitted, metadata, inspection) {
       license: descriptor.license,
       moduleUrl,
       mediaType: descriptor.mediaType,
+      ...(descriptor.sourceMediaType === descriptor.mediaType
+        ? {}
+        : { sourceMediaType: descriptor.sourceMediaType }),
       bytes: descriptor.bytes,
       sha256: descriptor.sha256,
       runtimeRequestUrls: descriptor.runtimeRequestUrls,
+      ...(descriptor.redirectFinalOrigins.length < 1
+        ? {}
+        : { redirectFinalOrigins: descriptor.redirectFinalOrigins }),
     }));
   }
   try {
@@ -3259,13 +3384,16 @@ export function createDbopfsSpeechArtifactStore({
         throwIfAborted(signal);
         const descriptor = metadata.files[index];
         const sourceUrl = graph ? descriptor.sourceUrl : descriptor.url;
+        const redirectFinalOrigins = graph
+          ? descriptor.redirectFinalOrigins
+          : Object.freeze([]);
         let response;
         try {
           response = await fetchFunction(sourceUrl, {
             cache: "no-store",
             credentials: "omit",
             mode: "cors",
-            redirect: "error",
+            redirect: redirectFinalOrigins.length < 1 ? "error" : "follow",
             referrerPolicy: "no-referrer",
             signal,
           });
@@ -3294,21 +3422,75 @@ export function createDbopfsSpeechArtifactStore({
           );
         }
         let finalUrl = null;
+        let finalUrlRecord = null;
         try {
-          finalUrl = typeof response.url === "string" && response.url
-            ? new URL(response.url).href
+          finalUrlRecord = typeof response.url === "string" && response.url
+            ? new URL(response.url)
             : null;
+          finalUrl = finalUrlRecord?.href ?? null;
         } catch {
+          finalUrlRecord = null;
           finalUrl = null;
         }
-        if (response.redirected === true || finalUrl !== sourceUrl) {
+        if (graph && response.redirected === true && !finalUrlRecord) {
           await response.body.cancel?.().catch(() => undefined);
-          if (graph) {
-            throw artifactGraphError(
-              "artifact-graph-source-redirected",
-              `Artifact graph source response for ${descriptor.path} did not match its immutable URL.`,
-            );
-          }
+          throw artifactGraphError(
+            "artifact-graph-source-response-url-unreadable",
+            `Artifact graph redirected source response for ${descriptor.path} did not expose a readable final URL.`,
+          );
+        }
+        if (graph && response.redirected === true && redirectFinalOrigins.length < 1) {
+          await response.body.cancel?.().catch(() => undefined);
+          throw artifactGraphError(
+            "artifact-graph-source-redirected",
+            `Artifact graph source response for ${descriptor.path} did not match its immutable URL.`,
+          );
+        }
+        if (graph && response.redirected === true && finalUrlRecord.protocol !== "https:") {
+          await response.body.cancel?.().catch(() => undefined);
+          throw artifactGraphError(
+            "artifact-graph-source-response-url-protocol-not-https",
+            `Artifact graph redirected source response for ${descriptor.path} did not end at HTTPS.`,
+          );
+        }
+        if (
+          graph
+          && response.redirected === true
+          && (finalUrlRecord.username || finalUrlRecord.password)
+        ) {
+          await response.body.cancel?.().catch(() => undefined);
+          throw artifactGraphError(
+            "artifact-graph-source-response-url-credentials-rejected",
+            `Artifact graph redirected source response for ${descriptor.path} exposed credentials in its final URL.`,
+          );
+        }
+        if (graph && response.redirected === true && finalUrlRecord.hash) {
+          await response.body.cancel?.().catch(() => undefined);
+          throw artifactGraphError(
+            "artifact-graph-source-response-url-fragment-rejected",
+            `Artifact graph redirected source response for ${descriptor.path} exposed a fragment in its final URL.`,
+          );
+        }
+        if (
+          graph
+          && response.redirected === true
+          && !redirectFinalOrigins.includes(finalUrlRecord.origin)
+        ) {
+          await response.body.cancel?.().catch(() => undefined);
+          throw artifactGraphError(
+            "artifact-graph-source-redirect-final-origin-mismatch",
+            `Artifact graph redirected source response for ${descriptor.path} ended at an undeclared final origin.`,
+          );
+        }
+        if (graph && response.redirected !== true && finalUrl !== sourceUrl) {
+          await response.body.cancel?.().catch(() => undefined);
+          throw artifactGraphError(
+            "artifact-graph-source-response-url-mismatch",
+            `Artifact graph non-redirected source response for ${descriptor.path} did not retain its immutable URL.`,
+          );
+        }
+        if (!graph && (response.redirected === true || finalUrl !== sourceUrl)) {
+          await response.body.cancel?.().catch(() => undefined);
           throw speechError(
             "ARCANE_AI_ARTIFACT_SOURCE_CHANGED",
             "A speech artifact response did not match its admitted URL.",
@@ -3322,12 +3504,14 @@ export function createDbopfsSpeechArtifactStore({
             ?.split(";", 1)[0]
             ?.trim()
             ?.toLowerCase() ?? null;
-          if (reportedMediaType !== descriptor.mediaType) {
+          if (reportedMediaType !== descriptor.sourceMediaType) {
             await response.body.cancel?.().catch(() => undefined);
             throw graphVerificationError(
               descriptor,
-              "media-type-mismatch",
-              `Artifact graph source media type for ${descriptor.path} did not match ${descriptor.mediaType}.`,
+              descriptor.sourceMediaType === descriptor.mediaType
+                ? "media-type-mismatch"
+                : "source-media-type-mismatch",
+              `Artifact graph source media type for ${descriptor.path} did not match ${descriptor.sourceMediaType}.`,
             );
           }
         }
