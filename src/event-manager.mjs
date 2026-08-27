@@ -1506,6 +1506,22 @@ function eventListener(value){
     );
 }
 
+function eventTargetListener(value){
+    if(typeof value==='function'){
+        return Object.freeze({
+            identity:value,
+            invoke(event,thisArg,...rest){return value.call(thisArg,event,...rest);}
+        });
+    }
+    if(value&&typeof value==='object'&&typeof value.handleEvent==='function'){
+        return Object.freeze({
+            identity:value,
+            invoke(event){return value.handleEvent(event);}
+        });
+    }
+    return null;
+}
+
 function compatibilityDetail(value){
     if(value===null||(typeof value!=='object'&&typeof value!=='function'))return value;
     if(Object.isFrozen(value))return value;
@@ -1906,7 +1922,8 @@ function createArcaneEventAuthority(){
 
     function addEventTargetListener(registrations,type,handler,options,subscribeWith,thisArg){
         const admittedType=eventName(type);
-        const admitted=eventListener(handler);
+        const admitted=eventTargetListener(handler);
+        if(!admitted)return;
         const normalized=eventTargetOptions(options);
         if(normalized.signal?.aborted)return;
         if(registrations.some(record=>record.type===admittedType
@@ -1942,7 +1959,8 @@ function createArcaneEventAuthority(){
 
     function removeEventTargetListener(registrations,type,handler,options){
         const admittedType=eventName(type);
-        const admitted=eventListener(handler);
+        const admitted=eventTargetListener(handler);
+        if(!admitted)return;
         const normalized=eventTargetOptions(options);
         const index=registrations.findIndex(record=>record.type===admittedType
             &&record.identity===admitted.identity

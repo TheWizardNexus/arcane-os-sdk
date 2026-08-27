@@ -89,25 +89,12 @@ const MAX_IDENTIFIER_LENGTH = 128;
 const MAX_PROGRESS_UNIT_LENGTH = 32;
 const MAX_ERROR_MESSAGE_LENGTH = 512;
 
-const AI_RUNTIME_EVENT_OWNER = Object.freeze({});
-const aiRuntimeEventSource = createArcaneEventSource(
-    AI_RUNTIME_EVENT_OWNER,
-    {
-        source: 'ai-runtime-state',
-        eventTypes: Object.freeze([
-            AI_RUNTIME_STATE_EVENT,
-            AI_RUNTIME_INTENT_EVENT,
-            AI_RUNTIME_STARTUP_EVENT
-        ])
-    }
-);
-
 /**
  * @deprecated Subscribe through the focused runtime helpers or arcaneEvents.
  * This state-free EventTarget compatibility view delegates to the module's
  * canonical source; it does not own a second listener registry or event bus.
  */
-export const aiRuntimeEvents = Object.freeze({
+const aiRuntimeEventCompatibilityView = {
     addEventListener(type, listener, options) {
         return aiRuntimeEventSource.addEventListener(type, listener, options);
     },
@@ -117,7 +104,19 @@ export const aiRuntimeEvents = Object.freeze({
     dispatchEvent(event) {
         return aiRuntimeEventSource.dispatchEvent(event);
     }
-});
+};
+const aiRuntimeEventSource = createArcaneEventSource(
+    aiRuntimeEventCompatibilityView,
+    {
+        source: 'ai-runtime-state',
+        eventTypes: Object.freeze([
+            AI_RUNTIME_STATE_EVENT,
+            AI_RUNTIME_INTENT_EVENT,
+            AI_RUNTIME_STARTUP_EVENT
+        ])
+    }
+);
+export const aiRuntimeEvents = Object.freeze(aiRuntimeEventCompatibilityView);
 
 function fail(message) {
     throw new TypeError(`ARCANE_AI_RUNTIME_STATE_INVALID: ${message}`);
@@ -358,6 +357,9 @@ function publicAIRuntimeState(snapshot, role = null) {
                     ...(roleState.operationId === null
                         ? {}
                         : {operationId: roleState.operationId}),
+                    ...(roleState.progress === null
+                        ? {}
+                        : {progress: roleState.progress}),
                     ...(roleState.error === null
                         ? {}
                         : {code: roleState.error.code})

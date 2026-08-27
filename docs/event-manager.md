@@ -65,6 +65,9 @@ the source owner as `this`, and the frozen compatibility view exposes that owner
 as both `target` and `currentTarget`. Already-frozen compatibility detail retains
 its identity. Other plain records and arrays are shallow-copied and frozen;
 rich host objects remain local and are not recursively frozen.
+EventTarget-shaped `addEventListener()` and `removeEventListener()` preserve
+native no-op admission for null or non-listener callbacks; strict `subscribe()`
+and `on()` still reject an invalid handler.
 
 Canonical delivery is observational. Every active listener runs in registration
 order. A listener failure publishes one privacy-safe

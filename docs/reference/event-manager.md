@@ -473,7 +473,9 @@ reported directly without another listener-error occurrence.
 `on(type,handler,{once=false,signal}={})` and `subscribe()` on the source are
 aliases returning an idempotent disposable unsubscribe. `once()` is the
 one-delivery form. `addEventListener()`/`removeEventListener()` use EventTarget
-deduplication and `undefined` returns. `dispatchEvent(event)` is a compatibility
+deduplication, ignore null or non-listener callbacks, and return `undefined`.
+The stricter `on()`/`subscribe()` APIs reject invalid handlers.
+`dispatchEvent(event)` is a compatibility
 adapter that accepts only a declared type, preserves cancellation, and publishes
 a new canonical occurrence rather than the raw input.
 

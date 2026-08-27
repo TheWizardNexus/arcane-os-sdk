@@ -1013,6 +1013,12 @@ test('EventTarget adapters deduplicate listeners and preserve declared cancellat
         preventDefault(){this.defaultPrevented=true;}
     };
     try{
+        assert.doesNotThrow(function ignoreInvalidCentralListeners(){
+            arcaneEvents.addEventListener(centralType,null);
+            arcaneEvents.addEventListener(centralType,{});
+            arcaneEvents.removeEventListener(centralType,null);
+            arcaneEvents.removeEventListener(centralType,{});
+        });
         assert.equal(arcaneEvents.dispatchEvent(centralInput),false);
         assert.deepEqual(centralSeen,[true,true]);
         arcaneEvents.removeEventListener(centralType,centralListener);
@@ -1052,6 +1058,12 @@ test('EventTarget adapters deduplicate listeners and preserve declared cancellat
             eventTypes:[sourceType]
         });
         try{
+            assert.doesNotThrow(function ignoreInvalidSourceListeners(){
+                source.addEventListener(sourceType,null);
+                source.addEventListener(sourceType,7);
+                source.removeEventListener(sourceType,null);
+                source.removeEventListener(sourceType,7);
+            });
             let sourceEvent=null;
             source.addEventListener(sourceType,function cancelSourceEvent(event){
                 sourceEvent=event;
