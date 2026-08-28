@@ -1124,6 +1124,30 @@ export class AIProviderRuntime {
         }
     }
 
+    #pendingSpeechProviderHydrationMatches(role, slot, provider, routes) {
+        if (!provider || !slot.selection || !routes.default) {
+            return false;
+        }
+        const pending = slot.selection;
+        if (this.#providers.has(providerKey(role, pending.providerId))
+            || provider.id !== pending.providerId
+            || routes.default.providerId !== pending.providerId
+            || routes.default.modelId !== pending.modelId) {
+            return false;
+        }
+        const currentSelections = [
+            slot.selection,
+            slot.routes.default,
+            slot.routes.localOnly
+        ].filter(Boolean);
+        return currentSelections.length > 0
+            && currentSelections.every(selection =>
+                selection.providerId === pending.providerId
+                && selection.modelId === pending.modelId
+                && selection.localOnly === null
+            );
+    }
+
     #commitSpeechProviderRoleReplacement(role, value) {
         const replacement = immutableSpeechProviderRoleReplacement(role, value);
         const currentState = getAIRuntimeState();
@@ -1168,9 +1192,15 @@ export class AIProviderRuntime {
                     `AI role ${role} selected routes no longer belong to the expected provider identity.`
                 );
             }
-        } else if (slot.routes.default
+        } else if ((slot.routes.default
             || slot.routes.localOnly
-            || slot.selection) {
+            || slot.selection)
+            && !this.#pendingSpeechProviderHydrationMatches(
+                role,
+                slot,
+                replacement.provider,
+                replacement.routes
+            )) {
             throw speechProviderReplacementError(
                 'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_EXPECTED_PROVIDER_REQUIRED',
                 'speech-provider-replacement-expected-provider-required',
@@ -1315,9 +1345,15 @@ export class AIProviderRuntime {
                         `AI role ${role} selected routes no longer belong to the expected provider identity.`
                     );
                 }
-            } else if (slot.routes.default
+            } else if ((slot.routes.default
                 || slot.routes.localOnly
-                || slot.selection) {
+                || slot.selection)
+                && !this.#pendingSpeechProviderHydrationMatches(
+                    role,
+                    slot,
+                    replacement.providers[role],
+                    replacement.routes[role]
+                )) {
                 throw speechProviderReplacementError(
                     'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_EXPECTED_PROVIDER_REQUIRED',
                     'speech-provider-replacement-expected-provider-required',

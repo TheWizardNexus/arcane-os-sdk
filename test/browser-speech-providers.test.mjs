@@ -562,6 +562,163 @@ test("warn-first authorities use upstream package and provider downloads", async
   });
 });
 
+test("warn-first provider/store loads unchecked upstream bytes with one visible warning", async (t) => {
+  const dbopfs = createMemoryDbopfs();
+  const base = providerOptions("stt", null);
+  const sources = new Map([
+    [
+      base.runtime.files[0].url,
+      new TextEncoder().encode("export const upstreamRuntime = 'changed-after-selection';"),
+    ],
+    [base.model.files[0].url, new Uint8Array([9, 8, 7, 6, 5])],
+  ]);
+  let objectUrl = 0;
+  const store = createDbopfsSpeechArtifactStore({
+    dbopfs,
+    fetchImpl: async (url) => {
+      const bytes = sources.get(String(url));
+      return bytes
+        ? responseAt(url, bytes, {
+          status: 200,
+          headers: { "content-length": String(bytes.byteLength) },
+        })
+        : responseAt(url, null, { status: 404 });
+    },
+    objectUrlFactory: {
+      create: () => `blob:arcane-warn-first-${String(++objectUrl)}`,
+      revoke: () => undefined,
+    },
+  });
+  installContractWorker(t, () => createSpeechWorkerContract({ role: "stt" }));
+  const observedWarnings = [];
+  const originalWarn = globalThis.console.warn;
+  globalThis.console.warn = (...values) => observedWarnings.push(values.join(" "));
+  t.after(() => {
+    globalThis.console.warn = originalWarn;
+  });
+
+  const whisper = createBrowserWhisperProvider({
+    ...base,
+    store,
+    appSecurity: { secure: false },
+    security: {
+      secure: false,
+      checks: { byteLength: false, sha256: false },
+    },
+  });
+  assert.equal(whisper.status().integrity.state, "unchecked");
+  assert.deepEqual(whisper.status().warnings, [
+    "browser-speech-warn-first-secure-mode-disabled",
+  ]);
+
+  const ready = await whisper.load({
+    role: "stt",
+    selection: selection(whisper),
+    progress: () => undefined,
+  });
+  assert.equal(ready.state, "ready");
+  assert.equal(ready.security.secure, false);
+  assert.deepEqual(ready.security.checks, { byteLength: false, sha256: false });
+  assert.deepEqual(ready.integrity, {
+    state: "unchecked",
+    byteLength: { enabled: false, state: "unchecked" },
+    sha256: { enabled: false, state: "unchecked" },
+  });
+  assert.deepEqual(ready.warnings, [
+    "browser-speech-warn-first-secure-mode-disabled",
+  ]);
+  assert.equal(observedWarnings.length, 1);
+  assert.match(observedWarnings[0], /loading in warn-first mode/u);
+  assert.match(observedWarnings[0], /strict admission is disabled/u);
+  assert.equal(
+    dbopfs.mutations.some((entry) => entry.name.endsWith(".complete.json")),
+    true,
+  );
+  await whisper.unload();
+  await whisper.load({
+    role: "stt",
+    selection: selection(whisper),
+    progress: () => undefined,
+  });
+  assert.equal(observedWarnings.length, 1);
+  await whisper.dispose();
+});
+
+test("warn-first integrity follows the actual enabled-check outcome", async (t) => {
+  const exactOptions = providerOptions("stt", null);
+  const exactRuntimeBytes = new TextEncoder().encode("export const pipeline=()=>{};");
+  const exactModelBytes = new Uint8Array([1, 2, 3]);
+  const exactSources = new Map([
+    [exactOptions.runtime.files[0].url, exactRuntimeBytes],
+    [exactOptions.model.files[0].url, exactModelBytes],
+  ]);
+  const exactStore = createDbopfsSpeechArtifactStore({
+    dbopfs: createMemoryDbopfs(),
+    fetchImpl: async (url) => responseAt(
+      url,
+      exactSources.get(String(url)),
+      { status: 200 },
+    ),
+    objectUrlFactory: {
+      create: () => "blob:arcane-verified-integrity",
+      revoke: () => undefined,
+    },
+  });
+  installContractWorker(t, () => createSpeechWorkerContract({ role: "stt" }));
+  const verified = createBrowserWhisperProvider({
+    ...exactOptions,
+    store: exactStore,
+    appSecurity: { secure: false },
+    security: {
+      secure: false,
+      checks: { byteLength: true, sha256: true },
+    },
+  });
+  assert.equal(verified.status().integrity.state, "pending");
+  assert.equal((await verified.load({
+    role: "stt",
+    selection: selection(verified),
+    progress: () => undefined,
+  })).integrity.state, "verified");
+  assert.deepEqual(verified.status().integrity, {
+    state: "verified",
+    byteLength: { enabled: true, state: "verified" },
+    sha256: { enabled: true, state: "verified" },
+  });
+  await verified.dispose();
+
+  const rejectedStore = createDbopfsSpeechArtifactStore({
+    dbopfs: createMemoryDbopfs(),
+    fetchImpl: async (url) => responseAt(url, new Uint8Array([9, 9, 9]), { status: 200 }),
+    objectUrlFactory: {
+      create: () => "blob:arcane-failed-integrity",
+      revoke: () => undefined,
+    },
+  });
+  const rejected = createBrowserWhisperProvider({
+    ...exactOptions,
+    id: "failed-integrity-whisper",
+    store: rejectedStore,
+    appSecurity: { secure: false },
+    security: {
+      secure: false,
+      checks: { byteLength: true, sha256: true },
+    },
+  });
+  await assert.rejects(
+    rejected.load({
+      role: "stt",
+      selection: selection(rejected),
+      progress: () => undefined,
+    }),
+    (error) => error?.code === "ARCANE_AI_ARTIFACT_DIGEST_MISMATCH"
+      || error?.code === "ARCANE_AI_ARTIFACT_SIZE_MISMATCH",
+  );
+  assert.equal(rejected.status().integrity.state, "failed");
+  assert.equal(rejected.status().security.checks.sha256, true);
+  await rejected.dispose();
+});
+
 test("browser speech artifact graphs bind one deterministic closed authority", () => {
   const stt = artifactGraphFixture("stt");
   assert.equal(stt.graph.protocol, BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL);

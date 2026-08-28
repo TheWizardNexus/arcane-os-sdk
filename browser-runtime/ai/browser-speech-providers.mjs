@@ -27,6 +27,9 @@ const ROLE_REQUEST_REASON = Object.freeze({
   tts: "tts-synthesis-cancelled",
 });
 const UNMAPPED_PROVIDER_REASON = "browser-speech-provider-error-reason-unmapped";
+const WARN_FIRST_WARNING = "browser-speech-warn-first-secure-mode-disabled";
+const NO_PROVIDER_WARNINGS = Object.freeze([]);
+const WARN_FIRST_PROVIDER_WARNINGS = Object.freeze([WARN_FIRST_WARNING]);
 const WORKER_FAILURE_CODES = new Set([
   "ARCANE_AI_WORKER_CRASHED",
   "ARCANE_AI_WORKER_MESSAGE_ERROR",
@@ -298,6 +301,43 @@ function graphSecurity(scope, label) {
   return normalizeModelSecurity(scope, label);
 }
 
+function providerIntegrity(security, outcome = "pending") {
+  const enabledCount = Number(security.checks.byteLength)
+    + Number(security.checks.sha256);
+  const state = enabledCount === 0 ? "unchecked" : outcome;
+  if (!["unchecked", "pending", "verified", "failed"].includes(state)) {
+    throw new TypeError("Browser speech integrity outcome is invalid.");
+  }
+  return Object.freeze({
+    state,
+    byteLength: Object.freeze({
+      enabled: security.checks.byteLength,
+      state: security.checks.byteLength ? state : "unchecked",
+    }),
+    sha256: Object.freeze({
+      enabled: security.checks.sha256,
+      state: security.checks.sha256 ? state : "unchecked",
+    }),
+  });
+}
+
+function providerWarnings(security) {
+  return security.secure === true
+    ? NO_PROVIDER_WARNINGS
+    : WARN_FIRST_PROVIDER_WARNINGS;
+}
+
+function warnFirstLoad(role, providerId, security) {
+  if (security.secure === true) return;
+  try {
+    globalThis.console?.warn?.(
+      `[Arcane browser speech] ${role} provider ${providerId} is loading in warn-first mode (${WARN_FIRST_WARNING}); strict admission is disabled and integrity remains unchecked unless an explicit check is enabled.`,
+    );
+  } catch {
+    // A diagnostic console cannot own or block the provider lifecycle.
+  }
+}
+
 function publicStatus({
   role,
   id,
@@ -311,6 +351,8 @@ function publicStatus({
   activeOperation,
   artifactGraphAdmission,
   security,
+  integrity,
+  warnings,
 }) {
   return Object.freeze({
     role,
@@ -326,6 +368,8 @@ function publicStatus({
     errorCode,
     cache,
     security,
+    integrity,
+    warnings,
     artifactGraphId: authority.artifactGraphId ?? null,
     artifactGraphAdmission,
   });
@@ -1101,8 +1145,19 @@ function createBrowserSpeechProvider({
   let unloadOperation = null;
   let disposeOperation = null;
   let requestOperation = null;
+  let warnedFirstLoad = false;
+  let lastIntegrity = Object.freeze({
+    security: defaultSecurity,
+    integrity: providerIntegrity(defaultSecurity),
+  });
 
   function status() {
+    const effectiveSecurity = active?.security
+      ?? loadOperation?.security
+      ?? lastIntegrity.security;
+    const integrity = active?.integrity
+      ?? loadOperation?.integrity
+      ?? lastIntegrity.integrity;
     return publicStatus({
       role,
       id: providerId,
@@ -1115,7 +1170,9 @@ function createBrowserSpeechProvider({
       lifecycleReason,
       activeOperation,
       artifactGraphAdmission,
-      security: active?.security ?? loadOperation?.security ?? defaultSecurity,
+      security: effectiveSecurity,
+      integrity,
+      warnings: providerWarnings(effectiveSecurity),
     });
   }
 
@@ -1289,6 +1346,10 @@ function createBrowserSpeechProvider({
       } catch (error) {
         return Promise.reject(trustedLoadFailure(error, role));
       }
+      if (effectiveSecurity.secure !== true && warnedFirstLoad === false) {
+        warnedFirstLoad = true;
+        warnFirstLoad(role, providerId, effectiveSecurity);
+      }
       if (state === "ready" && active) {
         if (sameModelSecurity(active.security, effectiveSecurity)) {
           return Promise.resolve(status());
@@ -1320,6 +1381,7 @@ function createBrowserSpeechProvider({
       const record = {
         promise: null,
         security: effectiveSecurity,
+        integrity: providerIntegrity(effectiveSecurity),
         observers: new Set(),
         settled: false,
         hasProgress: false,
@@ -1334,6 +1396,10 @@ function createBrowserSpeechProvider({
           for (const observer of [...record.observers]) observer.progress(progress);
         },
       };
+      lastIntegrity = Object.freeze({
+        security: effectiveSecurity,
+        integrity: record.integrity,
+      });
       const promise = Promise.resolve().then(async () => {
         let prepared = null;
         let slot = null;
@@ -1343,6 +1409,11 @@ function createBrowserSpeechProvider({
             onProgress: record.publishProgress,
             offline,
             security: effectiveSecurity,
+          });
+          record.integrity = providerIntegrity(effectiveSecurity, "verified");
+          lastIntegrity = Object.freeze({
+            security: effectiveSecurity,
+            integrity: record.integrity,
           });
           throwIfAborted(
             linked.controller.signal,
@@ -1363,6 +1434,7 @@ function createBrowserSpeechProvider({
             released: false,
             client: null,
             security: effectiveSecurity,
+            integrity: record.integrity,
           };
           slot.client = createSpeechWorkerClient({
             role,
@@ -1447,6 +1519,13 @@ function createBrowserSpeechProvider({
           let failure = linked.controller.signal.aborted
             ? linkedAbortFailure(linked, `${role}-load-cancelled`)
             : trustedLoadFailure(error, role);
+          if (!linked.controller.signal.aborted && prepared === null) {
+            record.integrity = providerIntegrity(effectiveSecurity, "failed");
+            lastIntegrity = Object.freeze({
+              security: effectiveSecurity,
+              integrity: record.integrity,
+            });
+          }
           try {
             if (slot) await terminateSlot(slot, failure);
             else prepared?.release();

@@ -1284,8 +1284,6 @@ test(
         const localTTS = createProvider('tts', 'local-tts', true, new Uint8Array([1]));
         runtime.register(localLLM);
         runtime.register(cloudLLM);
-        runtime.register(localSTT);
-        runtime.register(localTTS);
 
         const pendingTupleRoutes = runtime.configureFromTuple(
             [
@@ -1300,6 +1298,65 @@ test(
         assert.deepEqual(
             pendingTupleRoutes.llm.default,
             selection('missing-llm', 'missing-llm-model', null)
+        );
+        assert.deepEqual(
+            pendingTupleRoutes.stt.default,
+            selection('local-stt', 'local-stt-model', null)
+        );
+        assert.deepEqual(
+            pendingTupleRoutes.tts.default,
+            selection('local-tts', 'local-tts-model', null)
+        );
+        assert.equal(runtime.providerIdentity('stt', 'local-stt'), null);
+        assert.equal(runtime.providerIdentity('tts', 'local-tts'), null);
+        const pendingSpeechSnapshot = runtime.status();
+        assert.throws(
+            function rejectMismatchedPendingSpeechHydration() {
+                runtime.replaceSpeechProviders({
+                    providers: {stt: localSTT, tts: localTTS},
+                    routes: {
+                        stt: {
+                            default: selection('local-stt', 'wrong-model', true),
+                            localOnly: selection('local-stt', 'wrong-model', true)
+                        },
+                        tts: {
+                            default: selection('local-tts', 'local-tts-model', true),
+                            localOnly: selection('local-tts', 'local-tts-model', true)
+                        }
+                    },
+                    expectedProviders: {stt: null, tts: null}
+                });
+            },
+            function isPendingHydrationMismatch(error) {
+                return error?.code
+                    === 'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_EXPECTED_PROVIDER_REQUIRED';
+            }
+        );
+        assert.equal(runtime.status(), pendingSpeechSnapshot);
+        const hydratedSpeech = runtime.replaceSpeechProviders({
+            providers: {stt: localSTT, tts: localTTS},
+            routes: {
+                stt: {
+                    default: selection('local-stt', 'local-stt-model', true),
+                    localOnly: selection('local-stt', 'local-stt-model', true)
+                },
+                tts: {
+                    default: selection('local-tts', 'local-tts-model', true),
+                    localOnly: selection('local-tts', 'local-tts-model', true)
+                }
+            },
+            expectedProviders: {stt: null, tts: null}
+        });
+        assert.ok(Object.isFrozen(hydratedSpeech));
+        assert.equal(runtime.providerIdentity('stt', 'local-stt').id, 'local-stt');
+        assert.equal(runtime.providerIdentity('tts', 'local-tts').id, 'local-tts');
+        assert.deepEqual(
+            runtime.selection('stt'),
+            selection('local-stt', 'local-stt-model', true)
+        );
+        assert.deepEqual(
+            runtime.selection('tts'),
+            selection('local-tts', 'local-tts-model', true)
         );
         const pendingLLM = createProvider('llm', 'missing-llm', true, 'pending result');
         const unregisterPendingLLM = runtime.register(pendingLLM);
@@ -2263,17 +2320,51 @@ test(
                     offline:false
                 });
             };
+            const initialExternalTTSSelection=runtime.selection('tts');
+            const pendingSTTSelection=Object.freeze({
+                providerId:'boss-stt-direct',
+                modelId:'whisper-tiny-en-direct',
+                localOnly:null
+            });
+            runtime.configureSpeech({
+                stt:Object.freeze({
+                    default:pendingSTTSelection,
+                    localOnly:null
+                }),
+                tts:Object.freeze({
+                    default:initialExternalTTSSelection,
+                    localOnly:null
+                })
+            });
             const externalTTSIdentity=runtime.providerIdentity('tts','OPENAI');
             const externalTTSSelection=runtime.selection('tts');
             const externalTTSStatus=runtime.status('tts');
+            const hydrationProviderIds=[];
+            const unsubscribeHydration=subscribeAIRuntimeState(
+                function observePendingSpeechHydration(snapshot){
+                    hydrationProviderIds.push(snapshot.roles.stt.providerId);
+                }
+            );
             const initialSTTOnly=Object.freeze({
                 protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
                 id:'browser-speech-initial-stt-only',
                 dbopfs,
                 stt:directSTTRole('boss-stt-direct')
             });
-            const initialSTTDescriptor=await ai.configureBrowserSpeech(
-                initialSTTOnly
+            let initialSTTDescriptor;
+            try{
+                initialSTTDescriptor=await ai.configureBrowserSpeech(
+                    initialSTTOnly
+                );
+            }finally{
+                unsubscribeHydration();
+            }
+            assert.equal(hydrationProviderIds.includes('OPENAI'),false);
+            assert.equal(
+                hydrationProviderIds.every(providerId=>
+                    providerId==='boss-stt-direct'
+                ),
+                true
             );
             assert.equal(ai.browserSpeechConfiguration,initialSTTOnly);
             assert.equal(initialSTTDescriptor.stt.providerId,'boss-stt-direct');

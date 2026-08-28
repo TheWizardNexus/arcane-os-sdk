@@ -811,6 +811,61 @@ test('installed public SDK capabilities are coherent',async()=>{
         browserSpeech.BROWSER_SPEECH_ARTIFACT_PROTOCOL,
         'arcane-ai-browser-speech-artifacts/1'
     );
+    const speechStore=browserSpeech.createDbopfsSpeechArtifactStore({
+        dbopfs:{
+            readyPromise:Promise.resolve(),
+            lockManager:{async request(){
+                throw new Error('installed speech store must remain idle');
+            }},
+            async getTableHandle(){
+                throw new Error('installed speech store must remain idle');
+            }
+        }
+    });
+    const speechProvider=browserSpeech.createBrowserWhisperProvider({
+        id:'installed-smoke-whisper',
+        store:speechStore,
+        appSecurity:{secure:false},
+        security:{secure:false},
+        runtime:{
+            adapter:'transformers-whisper',
+            version:'3.5.1',
+            revision:'3.5.1',
+            entry:'transformers.mjs',
+            wasmPaths:'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/',
+            files:[{
+                path:'transformers.mjs',
+                url:'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/transformers.min.js'
+            }]
+        },
+        model:{
+            id:'installed-smoke-whisper',
+            repository:'Xenova/whisper-small',
+            revision:'provider-selected-revision'
+        }
+    });
+    const speechStatus=speechProvider.status();
+    assert.equal(speechStatus.state,'unloaded');
+    assert.deepEqual(
+        speechStatus.security,
+        {secure:false,checks:{byteLength:false,sha256:false}}
+    );
+    assert.equal(speechStatus.integrity.state,'unchecked');
+    assert.deepEqual(
+        speechStatus.warnings,
+        ['browser-speech-warn-first-secure-mode-disabled']
+    );
+    assert.equal(speechStatus.artifactGraphAdmission,null);
+    assert.deepEqual(
+        speechProvider.catalog().map(({id})=>id),
+        ['installed-smoke-whisper']
+    );
+    assert.equal(speechProvider.inspect({
+        role:'stt',
+        providerId:'installed-smoke-whisper',
+        modelId:'installed-smoke-whisper',
+        localOnly:true
+    }).authority.admitted,true);
 
     assert.deepEqual(Object.keys(browserWasm).sort(),[
         'BROWSER_WASM_RUNTIME_AUTHORITY',

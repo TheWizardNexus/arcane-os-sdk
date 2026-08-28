@@ -574,6 +574,9 @@ Provider `status()` returns:
   generation,
   errorCode,
   cache,
+  security,
+  integrity,
+  warnings,
   artifactGraphId,
   artifactGraphAdmission
 }
@@ -595,6 +598,16 @@ The provider states are exactly `unloaded`, `loading`, `ready`, `unloading`,
 synthesis request; load, unload, and dispose remain visible through `state` and
 `activeOperation`. `cache` is `null`, a graph admission value, or the legacy
 `installed`/`cached` value. Graph identity and admission are otherwise `null`.
+`security` reports the effective `secure`, `byteLength`, and `sha256` choices.
+`integrity.state` is `unchecked` when no integrity check is enabled, `pending`
+while enabled checks have not completed, `verified` only after every enabled
+check passes, and `failed` when an enabled verification attempt rejects. This
+verification outcome is independent of later Worker initialization and remains
+visible after a failed or unloaded provider. Default `secure:false` status includes the frozen warning code
+`browser-speech-warn-first-secure-mode-disabled`, and the first explicit load
+emits one concise console warning without blocking upstream package, provider,
+model, voice, fetch, cache, or Worker behavior. Strict graph admission and
+capability isolation remain exclusive to explicit `secure:true`.
 
 Provider-owned lifecycle reasons are:
 

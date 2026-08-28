@@ -2089,6 +2089,14 @@ class AI {
             );
             if(!record
                 ||!this.#providerRuntime.ownsProvider(role,record.provider)){
+                const pendingIdentity=this.#providerRuntime.providerIdentity(
+                    role,
+                    selection.providerId
+                );
+                if(pendingIdentity===null&&selection.localOnly===null){
+                    expectedProviders[role]=null;
+                    continue;
+                }
                 throw this.#browserSpeechProviderRouteOwnershipError(
                     `The selected ${role} route is not owned by the replaceable AI legacy speech boundary.`
                 );
