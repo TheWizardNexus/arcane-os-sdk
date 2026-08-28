@@ -1,3 +1,5 @@
+import {createArcaneEventSource} from 'arcane-os/event-manager';
+
 export const AI_RUNTIME_PROTOCOL = 'arcane-ai-runtime-state/1';
 export const AI_RUNTIME_STATE_EVENT = 'arcane-ai-runtime-state';
 export const AI_RUNTIME_INTENT_EVENT = 'arcane-ai-runtime-intent';
@@ -57,6 +59,7 @@ const INTENT_SUBSCRIPTION_OPTION_KEYS = Object.freeze([
 ]);
 const STARTUP_OPTION_KEYS = Object.freeze([
     'startMuted',
+    'startTranscription',
     'signal'
 ]);
 const ROLE_SET = new Set(AI_RUNTIME_ROLES);
@@ -86,7 +89,34 @@ const MAX_IDENTIFIER_LENGTH = 128;
 const MAX_PROGRESS_UNIT_LENGTH = 32;
 const MAX_ERROR_MESSAGE_LENGTH = 512;
 
-export const aiRuntimeEvents = new EventTarget();
+/**
+ * @deprecated Subscribe through the focused runtime helpers or arcaneEvents.
+ * This state-free EventTarget compatibility view delegates to the module's
+ * canonical source; it does not own a second listener registry or event bus.
+ */
+const aiRuntimeEventCompatibilityView = {
+    addEventListener(type, listener, options) {
+        return aiRuntimeEventSource.addEventListener(type, listener, options);
+    },
+    removeEventListener(type, listener, options) {
+        return aiRuntimeEventSource.removeEventListener(type, listener, options);
+    },
+    dispatchEvent(event) {
+        return aiRuntimeEventSource.dispatchEvent(event);
+    }
+};
+const aiRuntimeEventSource = createArcaneEventSource(
+    aiRuntimeEventCompatibilityView,
+    {
+        source: 'ai-runtime-state',
+        eventTypes: Object.freeze([
+            AI_RUNTIME_STATE_EVENT,
+            AI_RUNTIME_INTENT_EVENT,
+            AI_RUNTIME_STARTUP_EVENT
+        ])
+    }
+);
+export const aiRuntimeEvents = Object.freeze(aiRuntimeEventCompatibilityView);
 
 function fail(message) {
     throw new TypeError(`ARCANE_AI_RUNTIME_STATE_INVALID: ${message}`);
@@ -315,6 +345,50 @@ function unavailableRole(role) {
     );
 }
 
+function publicAIRuntimeState(snapshot, role = null) {
+    const roleState = role === null ? null : snapshot.roles[role];
+    return Object.freeze(
+        {
+            revision: snapshot.revision,
+            ...(roleState
+                ? {
+                    role,
+                    state: roleState.state,
+                    ...(roleState.operationId === null
+                        ? {}
+                        : {operationId: roleState.operationId}),
+                    ...(roleState.progress === null
+                        ? {}
+                        : {progress: roleState.progress}),
+                    ...(roleState.error === null
+                        ? {}
+                        : {code: roleState.error.code})
+                }
+                : {count: AI_RUNTIME_ROLES.length})
+        }
+    );
+}
+
+function publicAIRuntimeIntent(intent) {
+    return Object.freeze(
+        {
+            role: intent.role,
+            action: intent.action,
+            reason: intent.reason
+        }
+    );
+}
+
+function publicAIRuntimeStartup(report) {
+    return Object.freeze(
+        {
+            revision: report.currentRevision,
+            role: 'llm',
+            state: report.roles.llm.state.state
+        }
+    );
+}
+
 function initialSnapshot() {
     return Object.freeze(
         {
@@ -395,6 +469,7 @@ function startupOptions(options) {
     if (options === undefined) {
         return {
             startMuted: true,
+            startTranscription: false,
             signal: null
         };
     }
@@ -403,14 +478,21 @@ function startupOptions(options) {
     const startMuted = Object.hasOwn(options, 'startMuted')
         ? options.startMuted
         : true;
+    const startTranscription = Object.hasOwn(options, 'startTranscription')
+        ? options.startTranscription
+        : false;
     const signal = Object.hasOwn(options, 'signal') ? options.signal : null;
     if (typeof startMuted !== 'boolean') {
         fail('startup options.startMuted must be a boolean.');
+    }
+    if (typeof startTranscription !== 'boolean') {
+        fail('startup options.startTranscription must be a boolean.');
     }
     assertAbortSignal(signal);
 
     return {
         startMuted,
+        startTranscription,
         signal
     };
 }
@@ -419,11 +501,11 @@ function hasAIRuntimeSelection(roleState) {
     return roleState.providerId !== null && roleState.modelId !== null;
 }
 
-function startupRequestedRoles(snapshot, startMuted) {
+function startupRequestedRoles(snapshot, startMuted, startTranscription) {
     return Object.freeze(
         {
             llm: hasAIRuntimeSelection(snapshot.roles.llm),
-            stt: hasAIRuntimeSelection(snapshot.roles.stt),
+            stt: startTranscription && hasAIRuntimeSelection(snapshot.roles.stt),
             tts: !startMuted && hasAIRuntimeSelection(snapshot.roles.tts)
         }
     );
@@ -444,13 +526,20 @@ function startupRoleReport(requested, roleState) {
     );
 }
 
-function startupReport(snapshot, startRevision, startMuted, requestedRoles) {
+function startupReport(
+    snapshot,
+    startRevision,
+    startMuted,
+    startTranscription,
+    requestedRoles
+) {
     return Object.freeze(
         {
             protocol: AI_RUNTIME_PROTOCOL,
             startRevision,
             currentRevision: snapshot.revision,
             startMuted,
+            startTranscription,
             chatReady: snapshot.roles.llm.state === 'ready',
             roles: Object.freeze(
                 {
@@ -487,37 +576,25 @@ function assertListener(listener) {
 
 function subscribe(eventName, listener, normalized, currentValue) {
     assertListener(listener);
-    let active = !normalized.signal?.aborted;
-
-    function unsubscribeAIRuntimeEvent() {
-        if (!active) {
-            return;
-        }
-
-        active = false;
-        aiRuntimeEvents.removeEventListener(eventName, forwardAIRuntimeEvent);
-        normalized.signal?.removeEventListener('abort', unsubscribeAIRuntimeEvent);
-    }
 
     function forwardAIRuntimeEvent(event) {
         listener(event.detail);
     }
 
-    if (!active) {
-        return unsubscribeAIRuntimeEvent;
-    }
-
-    aiRuntimeEvents.addEventListener(eventName, forwardAIRuntimeEvent);
-    normalized.signal?.addEventListener(
-        'abort',
-        unsubscribeAIRuntimeEvent,
-        {
-            once: true
-        }
+    const unsubscribeAIRuntimeEvent = aiRuntimeEventSource.on(
+        eventName,
+        forwardAIRuntimeEvent,
+        normalized.signal
+            ? {
+                signal: normalized.signal
+            }
+            : undefined
     );
 
     try {
-        if (normalized.emitCurrent && currentValue !== undefined) {
+        if (!normalized.signal?.aborted
+            && normalized.emitCurrent
+            && currentValue !== undefined) {
             listener(currentValue);
         }
     } catch (error) {
@@ -571,13 +648,12 @@ export function publishAIRuntimeRoleState(role, completeRecord) {
             roles: Object.freeze(nextRoles)
         }
     );
-    aiRuntimeEvents.dispatchEvent(
-        new CustomEvent(
-            AI_RUNTIME_STATE_EVENT,
-            {
-                detail: currentSnapshot
-            }
-        )
+    aiRuntimeEventSource.dispatch(
+        AI_RUNTIME_STATE_EVENT,
+        currentSnapshot,
+        {
+            publicDetail: publicAIRuntimeState(currentSnapshot, role)
+        }
     );
     return currentSnapshot;
 }
@@ -608,13 +684,12 @@ export function publishAIRuntimeRolesState(completeRecords) {
             roles: nextRoles
         }
     );
-    aiRuntimeEvents.dispatchEvent(
-        new CustomEvent(
-            AI_RUNTIME_STATE_EVENT,
-            {
-                detail: currentSnapshot
-            }
-        )
+    aiRuntimeEventSource.dispatch(
+        AI_RUNTIME_STATE_EVENT,
+        currentSnapshot,
+        {
+            publicDetail: publicAIRuntimeState(currentSnapshot)
+        }
     );
     return currentSnapshot;
 }
@@ -640,13 +715,12 @@ export function requestAIRuntimeIntent(intent) {
             reason: intent.reason
         }
     );
-    aiRuntimeEvents.dispatchEvent(
-        new CustomEvent(
-            AI_RUNTIME_INTENT_EVENT,
-            {
-                detail: publishedIntent
-            }
-        )
+    aiRuntimeEventSource.dispatch(
+        AI_RUNTIME_INTENT_EVENT,
+        publishedIntent,
+        {
+            publicDetail: publicAIRuntimeIntent(publishedIntent)
+        }
     );
     return publishedIntent;
 }
@@ -726,17 +800,17 @@ export function startAIRuntime(options) {
             snapshot,
             startRevision,
             normalized.startMuted,
+            normalized.startTranscription,
             requestedRoles
         );
         barrierResolved = true;
         resolveBarrier(report);
-        aiRuntimeEvents.dispatchEvent(
-            new CustomEvent(
-                AI_RUNTIME_STARTUP_EVENT,
-                {
-                    detail: report
-                }
-            )
+        aiRuntimeEventSource.dispatch(
+            AI_RUNTIME_STARTUP_EVENT,
+            report,
+            {
+                publicDetail: publicAIRuntimeStartup(report)
+            }
         );
     }
 
@@ -747,6 +821,7 @@ export function startAIRuntime(options) {
                 snapshot,
                 startRevision,
                 normalized.startMuted,
+                normalized.startTranscription,
                 requestedRoles
             )
         );
@@ -847,7 +922,8 @@ export function startAIRuntime(options) {
     startRevision = latestSnapshot.revision;
     requestedRoles = startupRequestedRoles(
         latestSnapshot,
-        normalized.startMuted
+        normalized.startMuted,
+        normalized.startTranscription
     );
     normalized.signal?.addEventListener(
         'abort',

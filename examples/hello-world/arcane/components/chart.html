@@ -172,6 +172,9 @@
         normalizeChartOptions,
         normalizeChartRows
     }=await import(moduleURL('ComponentContracts.js'));
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.chart',eventTypes:['chart-remove','chart-ready']});
+    const lifecycleController=new AbortController();
     const title=host.shadowRoot.querySelector('#chartTitle');
     const info=host.shadowRoot.querySelector('#chartInfo');
     const plot=host.shadowRoot.querySelector('#plot');
@@ -190,6 +193,8 @@
     let selectedIndex=-1;
     let resizeFrame=0;
     let renderGeneration=0;
+    let operationSequence=0;
+    let destroyed=false;
     let options=normalizeChartOptions(optionsFromDataset());
 
     host.addData=addData;
@@ -203,18 +208,22 @@
         host,
         {
             chartStyle:{
+                configurable:true,
                 get:()=>options.style,
                 set:value=>void configure({style:value})
             },
             chartTitle:{
+                configurable:true,
                 get:()=>options.title,
                 set:value=>void configure({title:value})
             },
             dataSet:{
+                configurable:true,
                 get:()=>rows.map(row=>row.slice()),
                 set:value=>void update(value)
             },
             options:{
+                configurable:true,
                 get:getOptions,
                 set:value=>void configure(value)
             }
@@ -223,21 +232,22 @@
 
     removeButton.addEventListener(
         'click',
-        ()=>host.dispatchEvent(
-            new CustomEvent(
-                'chart-remove',
-                {
-                    bubbles:true,
-                    composed:true,
-                    detail:{key:options.key}
-                }
-            )
-        )
+        ()=>{
+            const operationId=`${events.descriptor.instanceId}:remove:${++operationSequence}`;
+            const publication=events.dispatch('chart-remove',{key:options.key},{operationId,publicDetail:{key:options.key}});
+            projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});
+        },
+        {signal:lifecycleController.signal}
     );
-    plot.addEventListener('keydown',navigatePoints);
+    plot.addEventListener(
+        'keydown',
+        navigatePoints,
+        {signal:lifecycleController.signal}
+    );
     plot.addEventListener(
         'pointerleave',
-        ()=>updateSelectedValue(selectedIndex,'selected')
+        ()=>updateSelectedValue(selectedIndex,'selected'),
+        {signal:lifecycleController.signal}
     );
 
     const resizeObserver=typeof ResizeObserver==='function'
@@ -286,6 +296,9 @@
     }
 
     async function configure(input={}){
+        if(destroyed){
+            return false;
+        }
         const suppliedData=Object.prototype.hasOwnProperty.call(input||{},'data')
             ||Object.prototype.hasOwnProperty.call(input||{},'dataset')
             ||Object.prototype.hasOwnProperty.call(input||{},'datasets');
@@ -302,18 +315,27 @@
     }
 
     async function populate(data=[],input={}){
+        if(destroyed){
+            return [];
+        }
         options=normalizeChartOptions(input,options);
         renderOptions();
         return update(data);
     }
 
     async function update(data=[]){
+        if(destroyed){
+            return [];
+        }
         rows=normalizeChartRows(data,options);
         options={...options,data};
         return renderRows();
     }
 
     async function renderRows(){
+        if(destroyed){
+            return [];
+        }
         const generation=++renderGeneration;
         selectedIndex=rows.length-1;
 
@@ -329,11 +351,20 @@
         plot.classList.remove('hidden');
         chartValue.classList.remove('hidden');
         empty.classList.add('hidden');
-        uPlot=uPlot||await loadChartLibrary();
+        let library;
+        try{
+            library=uPlot||await loadChartLibrary();
+        }catch(error){
+            if(destroyed||generation!==renderGeneration){
+                return host.dataSet;
+            }
+            throw error;
+        }
 
-        if(generation!==renderGeneration){
+        if(destroyed||generation!==renderGeneration){
             return host.dataSet;
         }
+        uPlot=library;
         if(chart){
             chart.setData(toChartData(rows));
             updateSelectedValue(selectedIndex,'latest');
@@ -344,6 +375,9 @@
     }
 
     async function addData(data=[]){
+        if(destroyed){
+            return [];
+        }
         const additions=normalizeChartRows(data,options);
         const merged=new Map(rows.concat(additions).map(row=>[row[0],row]));
         rows=[...merged.values()].sort((left,right)=>left[0]-right[0]);
@@ -633,6 +667,11 @@
     }
 
     function destroy(){
+        if(destroyed){
+            return false;
+        }
+        destroyed=true;
+        lifecycleController.abort();
         renderGeneration++;
         resizeObserver?.disconnect();
         if(!resizeObserver){
@@ -644,12 +683,14 @@
         }
         destroyChart();
         rows=[];
+        events.dispose();
+        host.ready=false;
+        return true;
     }
 
     renderOptions();
     updateSelectedValue(-1);
     host.ready=true;
-    host.dispatchEvent(
-        new CustomEvent('chart-ready',{bubbles:true,composed:true})
-    );
+    const readyPublication=events.dispatch('chart-ready',{}, {publicDetail:{ready:true}});
+    projectArcaneDOMEvent(host,readyPublication.occurrence,{bubbles:true,composed:true});
 </script>

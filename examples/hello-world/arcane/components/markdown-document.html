@@ -220,6 +220,9 @@
     );
     const moduleURL=name=>new URL(`../modules/${name}`,componentURL).href;
     const {default:MD}=await import(moduleURL('MD.js?v=2'));
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.markdown-document',eventTypes:['markdown-document-state','markdown-document-empty','markdown-document-error','markdown-document-loading','markdown-document-rendered','markdown-document-navigate','markdown-document-ready']});
+    const lifecycleController=new AbortController();
 
     const documentElement=host.shadowRoot.querySelector('#document');
     const statusElement=host.shadowRoot.querySelector('#status');
@@ -436,9 +439,13 @@
     let options=normalizeOptions(optionsFromDataset(),defaultOptions);
     let state='empty';
     let tableOfContents=[];
+    let operationSequence=0;
+    let loadController=null;
+    let destroyed=false;
 
     host.clear=clear;
     host.configure=configure;
+    host.destroy=destroy;
     host.fail=fail;
     host.focus=focusDocument;
     host.focusFragment=focusFragment;
@@ -448,15 +455,15 @@
     Object.defineProperties(
         host,
         {
-            options:{get:getOptions,set:configure},
-            sourceURL:{get:()=>currentSourceURL,set:setSourceURL},
-            state:{get:()=>state},
-            tableOfContents:{get:()=>tableOfContents.map(entry=>({...entry}))},
-            value:{get:()=>currentMarkdown,set:value=>render(value)}
+            options:{configurable:true,get:getOptions,set:configure},
+            sourceURL:{configurable:true,get:()=>currentSourceURL,set:setSourceURL},
+            state:{configurable:true,get:()=>state},
+            tableOfContents:{configurable:true,get:()=>tableOfContents.map(entry=>({...entry}))},
+            value:{configurable:true,get:()=>currentMarkdown,set:value=>render(value)}
         }
     );
 
-    documentElement.addEventListener('click',handleNavigation);
+    documentElement.addEventListener('click',handleNavigation,{signal:lifecycleController.signal});
 
     function optionsFromDataset(){
         const configured={};
@@ -533,14 +540,30 @@
     }
 
     function configure(input={}){
+        if(destroyed){
+            return false;
+        }
         const priorSourceURL=options.sourceURL;
-        options=normalizeOptions(input,options);
+        const normalized=normalizeOptions(input,options);
+        const wasLoading=state==='loading';
+        supersedeLoad('markdown-configuration-replaced');
+        options=normalized;
         renderLabels();
 
         if(!currentMarkdown){
             currentSourceURL=options.sourceURL;
-            updateStateDOM();
+            if(wasLoading){
+                transition(
+                    'empty',
+                    {reason:'markdown-configuration-replaced'},
+                    `${events.descriptor.instanceId}:configure:${++operationSequence}`
+                );
+            }else{
+                updateStateDOM();
+            }
         }else if(priorSourceURL!==options.sourceURL){
+            render(currentMarkdown,{sourceURL:options.sourceURL});
+        }else if(wasLoading){
             render(currentMarkdown,{sourceURL:options.sourceURL});
         }else{
             buildTableOfContents(tableOfContents);
@@ -573,37 +596,61 @@
     }
 
     function setSourceURL(value=''){
-        options=normalizeOptions({sourceURL:value},options);
+        if(destroyed){
+            return false;
+        }
+        const normalized=normalizeOptions({sourceURL:value},options);
+        const wasLoading=state==='loading';
+        supersedeLoad('markdown-source-replaced');
+        options=normalized;
         if(currentMarkdown){
             render(currentMarkdown,{sourceURL:options.sourceURL});
         }else{
             currentSourceURL=options.sourceURL;
-            updateStateDOM();
+            if(wasLoading){
+                transition(
+                    'empty',
+                    {reason:'markdown-source-replaced'},
+                    `${events.descriptor.instanceId}:source:${++operationSequence}`
+                );
+            }else{
+                updateStateDOM();
+            }
         }
         return currentSourceURL;
     }
 
     async function load(source='',loadOptions={}){
-        const sequence=++loadSequence;
+        if(destroyed){
+            return false;
+        }
+        supersedeLoad('markdown-load-replaced');
+        const controller=new AbortController();
+        loadController=controller;
+        const sequence=loadSequence;
+        const operationId=`${events.descriptor.instanceId}:load:${++operationSequence}`;
         let sourceURL;
         try{
             sourceURL=sourceURLFrom(loadOptions,currentSourceURL||options.sourceURL);
         }catch(error){
             if(sequence===loadSequence){
-                showError(error);
+                showError(error,operationId);
+            }
+            if(loadController===controller){
+                loadController=null;
             }
             return false;
         }
 
         currentSourceURL=sourceURL;
-        transition('loading');
+        transition('loading',{},operationId);
 
         try{
             const pending=typeof source==='function'
-                ?source({sourceURL})
+                ?source({sourceURL,signal:controller.signal,operationId})
                 :source;
             const result=await pending;
-            if(sequence!==loadSequence){
+            if(destroyed||sequence!==loadSequence){
                 return false;
             }
 
@@ -616,32 +663,40 @@
                     result,
                     sourceURL
                 );
-                return renderMarkdown(result.markdown??result.value??'',sourceURL);
+                return renderMarkdown(result.markdown??result.value??'',sourceURL,operationId);
             }
-            return renderMarkdown(result??'',sourceURL);
+            return renderMarkdown(result??'',sourceURL,operationId);
         }catch(error){
-            if(sequence===loadSequence){
-                showError(error);
+            if(!destroyed&&sequence===loadSequence&&!controller.signal.aborted){
+                showError(error,operationId);
             }
             return false;
+        }finally{
+            if(loadController===controller){
+                loadController=null;
+            }
         }
     }
 
     function render(markdown='',renderOptions={}){
-        ++loadSequence;
+        if(destroyed){
+            return false;
+        }
+        supersedeLoad('markdown-content-replaced');
+        const operationId=`${events.descriptor.instanceId}:render:${++operationSequence}`;
         try{
             const sourceURL=sourceURLFrom(
                 renderOptions,
                 currentSourceURL||options.sourceURL
             );
-            return renderMarkdown(markdown,sourceURL);
+            return renderMarkdown(markdown,sourceURL,operationId);
         }catch(error){
-            showError(error);
+            showError(error,operationId);
             return false;
         }
     }
 
-    function renderMarkdown(markdown='',sourceURL=options.sourceURL){
+    function renderMarkdown(markdown='',sourceURL=options.sourceURL,operationId=null){
         if(typeof markdown!=='string'){
             throw new TypeError('Markdown document content must be a string.');
         }
@@ -653,7 +708,7 @@
         tableOfContentsList.replaceChildren();
 
         if(!markdown.trim()){
-            transition('empty');
+            transition('empty',{},operationId);
             return true;
         }
 
@@ -667,7 +722,7 @@
             ||fragment.querySelector('img,hr,table')
         );
         if(!meaningful){
-            transition('empty');
+            transition('empty',{},operationId);
             return true;
         }
 
@@ -680,7 +735,8 @@
             {
                 characters:markdown.length,
                 headings:tableOfContents.map(entry=>({...entry}))
-            }
+            },
+            operationId
         );
         return true;
     }
@@ -875,22 +931,29 @@
     }
 
     function clear(){
-        ++loadSequence;
+        if(destroyed){
+            return false;
+        }
+        supersedeLoad('markdown-content-cleared');
+        const operationId=`${events.descriptor.instanceId}:clear:${++operationSequence}`;
         currentMarkdown='';
         currentSourceURL=options.sourceURL;
         contentElement.replaceChildren();
         tableOfContents=[];
         tableOfContentsList.replaceChildren();
-        transition('empty');
+        transition('empty',{},operationId);
         return true;
     }
 
     function fail(error){
-        ++loadSequence;
-        return showError(error);
+        if(destroyed){
+            return false;
+        }
+        supersedeLoad('markdown-failure-presented');
+        return showError(error,`${events.descriptor.instanceId}:fail:${++operationSequence}`);
     }
 
-    function showError(error){
+    function showError(error,operationId=null){
         currentMarkdown='';
         contentElement.replaceChildren();
         tableOfContents=[];
@@ -898,11 +961,16 @@
         const message=error instanceof Error
             ?error.message
             :String(error||options.labels.error);
-        transition('error',{message:message.slice(0,2048)});
+        const code=String(error?.code||'ARCANE_MARKDOWN_DOCUMENT_RENDER_FAILED');
+        const reason=String(error?.reason||'markdown-document-render-failed');
+        transition('error',{message:message.slice(0,2048),code,reason},operationId);
         return false;
     }
 
-    function transition(nextState,detail={}){
+    function transition(nextState,detail={},operationId=null){
+        if(destroyed){
+            return null;
+        }
         state=nextState;
         updateStateDOM();
 
@@ -913,12 +981,19 @@
                 state
             }
         );
-        host.dispatchEvent(
-            new CustomEvent(
-                'markdown-document-state',
-                {bubbles:true,composed:true,detail:eventDetail}
-            )
-        );
+        const publicDetail={
+            characters:Number(detail.characters||currentMarkdown.length||0),
+            headingCount:Array.isArray(detail.headings)?detail.headings.length:tableOfContents.length,
+            state
+        };
+        if(detail.code){
+            publicDetail.code=String(detail.code);
+        }
+        if(detail.reason){
+            publicDetail.reason=String(detail.reason);
+        }
+        const statePublication=events.dispatch('markdown-document-state',eventDetail,{publicDetail,operationId});
+        projectArcaneDOMEvent(host,statePublication.occurrence,{bubbles:true,composed:true});
 
         const stateEvent={
             empty:'markdown-document-empty',
@@ -927,12 +1002,8 @@
             ready:'markdown-document-rendered'
         }[state];
         if(stateEvent){
-            host.dispatchEvent(
-                new CustomEvent(
-                    stateEvent,
-                    {bubbles:true,composed:true,detail:eventDetail}
-                )
-            );
+            const exactPublication=events.dispatch(stateEvent,eventDetail,{publicDetail,operationId});
+            projectArcaneDOMEvent(host,exactPublication.occurrence,{bubbles:true,composed:true});
         }
         return eventDetail;
     }
@@ -961,6 +1032,9 @@
     }
 
     function focusDocument(){
+        if(destroyed){
+            return false;
+        }
         if(state==='ready'){
             const heading=contentElement.querySelector('h1,h2,h3,h4,h5,h6');
             (heading||contentElement).focus({preventScroll:true});
@@ -971,7 +1045,7 @@
     }
 
     function handleNavigation(event){
-        if(event.defaultPrevented||event.button!==0){
+        if(destroyed||event.defaultPrevented||event.button!==0){
             return;
         }
         const link=event.composedPath().find(
@@ -990,16 +1064,14 @@
                 targetURL:link.dataset.markdownTargetUrl||link.href
             }
         );
-        const navigationEvent=new CustomEvent(
-            'markdown-document-navigate',
-            {
-                bubbles:true,
-                cancelable:true,
-                composed:true,
-                detail
-            }
-        );
-        const continueNavigation=host.dispatchEvent(navigationEvent);
+        operationSequence+=1;
+        const operationId=`${events.descriptor.instanceId}:navigate:${operationSequence}`;
+        const publication=events.dispatch('markdown-document-navigate',detail,{
+            operationId,
+            publicDetail:{kind:detail.kind,hasFragment:Boolean(detail.fragment)},
+            cancelable:true
+        });
+        const continueNavigation=publication.accepted&&projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true,cancelable:true});
 
         if(detail.kind==='fragment'||detail.kind==='markdown'){
             event.preventDefault();
@@ -1012,13 +1084,20 @@
         if(detail.kind==='fragment'){
             focusFragment(detail.fragment);
         }else if(detail.kind==='markdown'&&options.onNavigate){
-            Promise.resolve(options.onNavigate(detail)).catch(
-                error=>console.error('Markdown document navigation callback failed.',error)
+            Promise.resolve(options.onNavigate(detail,{signal:lifecycleController.signal,operationId})).catch(
+                error=>{
+                    if(!destroyed){
+                        console.error('Markdown document navigation callback failed.',error);
+                    }
+                }
             );
         }
     }
 
     function focusFragment(fragment=''){
+        if(destroyed){
+            return false;
+        }
         const decoded=markdownDocumentDecodeFragment(fragment);
         const generatedIdentifier=markdownDocumentHeadingBase(decoded);
         const target=Array.from(contentElement.querySelectorAll('[id]')).find(
@@ -1032,17 +1111,31 @@
         return true;
     }
 
+    function supersedeLoad(reason){
+        loadSequence+=1;
+        loadController?.abort(reason);
+        loadController=null;
+    }
+
+    function destroy(){
+        if(destroyed){
+            return false;
+        }
+        destroyed=true;
+        supersedeLoad('markdown-document-destroyed');
+        lifecycleController.abort('markdown-document-destroyed');
+        currentMarkdown='';
+        tableOfContents=[];
+        contentElement.replaceChildren();
+        tableOfContentsList.replaceChildren();
+        events.dispose();
+        host.ready=false;
+        return true;
+    }
+
     renderLabels();
     host.ready=true;
     transition('empty');
-    host.dispatchEvent(
-        new CustomEvent(
-            'markdown-document-ready',
-            {
-                bubbles:true,
-                composed:true,
-                detail:{component:host,state}
-            }
-        )
-    );
+    const readyPublication=events.dispatch('markdown-document-ready',{component:host,state},{publicDetail:{ready:true,state}});
+    projectArcaneDOMEvent(host,readyPublication.occurrence,{bubbles:true,composed:true});
 </script>

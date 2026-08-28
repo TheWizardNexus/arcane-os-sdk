@@ -293,6 +293,8 @@ function aiHarness(options={}){
     };
     const calls={
         createAI:[],
+        configureBrowserSpeech:[],
+        configureSpeech:[],
         dbopfs:[],
         dispose:0,
         load:[],
@@ -301,11 +303,13 @@ function aiHarness(options={}){
         requests:[],
         resolveSpeechRequest:{stt:null,tts:null},
         speechDisposes:[],
+        speechConfigurationDisposes:0,
         speechFetch:0,
         speechAuthorityValidations:[],
         speechLoads:[],
         speechProviders:{stt:[],tts:[]},
         speechRequests:[],
+        speechRuntimeCancels:[],
         speechStore:[],
         speechUnloads:[],
         store:[],
@@ -321,6 +325,11 @@ function aiHarness(options={}){
         return Object.freeze({
             state,
             cache:Object.freeze({state:cacheState}),
+            security:Object.freeze({
+                secure:false,
+                checks:Object.freeze({byteLength:false,sha256:false})
+            }),
+            integrity:Object.freeze({state:'unchecked'}),
             progress
         });
     }
@@ -424,11 +433,10 @@ function aiHarness(options={}){
         async remove(){ calls.storeRemove+=1; return true; }
     });
 
-    const speechStore=Object.freeze({kind:'fake-dbopfs-speech-artifact-store'});
-
     function createSpeechProvider(role,providerOptions){
         let speechState='unloaded';
         let speechCacheState='unknown';
+        let speechErrorCode=null;
         const provider={
             protocol:'arcane-ai-provider/2',
             role,
@@ -437,7 +445,16 @@ function aiHarness(options={}){
             catalog(){
                 return Object.freeze([Object.freeze({id:providerOptions.model.id})]);
             },
-            inspect(){ return provider.status(); },
+            inspect(){
+                return Object.freeze({
+                    available:true,
+                    authority:Object.freeze({
+                        providerId:providerOptions.id,
+                        modelId:providerOptions.model.id,
+                        localOnly:true
+                    })
+                });
+            },
             status(){
                 return Object.freeze({
                     role,
@@ -445,15 +462,25 @@ function aiHarness(options={}){
                     modelId:providerOptions.model.id,
                     state:speechState,
                     loaded:speechState==='ready',
-                    busy:speechState==='loading',
+                    busy:false,
                     generation:1,
-                    errorCode:null,
-                    cache:speechCacheState
+                    errorCode:speechErrorCode,
+                    cache:speechCacheState,
+                    security:Object.freeze({
+                        secure:providerOptions.security.secure,
+                        byteLength:false,
+                        sha256:false
+                    }),
+                    integrity:Object.freeze({state:'unchecked'}),
+                    warnings:Object.freeze([
+                        'browser-speech-warn-first-secure-mode-disabled'
+                    ])
                 });
             },
             async load(loadOptions={}){
                 calls.speechLoads.push({role,options:loadOptions,provider});
                 speechState='loading';
+                speechErrorCode=null;
                 loadOptions.progress?.(Object.freeze({
                     phase:providerOptions.offline?'verify-cache':'download',
                     completed:4,
@@ -463,13 +490,15 @@ function aiHarness(options={}){
                 }));
                 if(behavior.speechOfflineMissRole===role&&providerOptions.offline){
                     speechState='error';
+                    speechErrorCode='ARCANE_AI_ARTIFACT_OFFLINE_MISS';
                     throw arcaneFailure(
                         'ARCANE_AI_ARTIFACT_OFFLINE_MISS',
                         'PRIVATE SPEECH OFFLINE DETAIL'
                     );
                 }
                 if(loadOptions.signal?.aborted){
-                    speechState='unloaded';
+                    speechState='error';
+                    speechErrorCode='ARCANE_AI_REQUEST_ABORTED';
                     throw arcaneFailure('ARCANE_AI_REQUEST_ABORTED');
                 }
                 speechCacheState=providerOptions.offline?'cached':'installed';
@@ -494,6 +523,8 @@ function aiHarness(options={}){
                 if(behavior.speechDeferRequest[role]){
                     await new Promise(function awaitSpeechAbort(resolve,reject){
                         function abortSpeechRequest(){
+                            speechState='error';
+                            speechErrorCode='ARCANE_AI_REQUEST_ABORTED';
                             reject(arcaneFailure(
                                 'ARCANE_AI_REQUEST_ABORTED',
                                 `PRIVATE ${role.toUpperCase()} ABORT DETAIL`
@@ -518,16 +549,299 @@ function aiHarness(options={}){
             async unload(){
                 calls.speechUnloads.push({role,provider});
                 speechState='unloaded';
+                speechErrorCode=null;
                 return provider.status();
             },
             async dispose(){
                 calls.speechDisposes.push({role,provider});
                 speechState='unloaded';
+                speechErrorCode=null;
                 return provider.status();
             }
         };
         calls.speechProviders[role].push({options:providerOptions,provider});
         return Object.freeze(provider);
+    }
+
+    function createNormalizedAI({publishAIRuntimeRoleState}={}){
+        const externalSelection=Object.freeze({
+            providerId:'OPENAI',
+            modelId:'OPENAI',
+            localOnly:false
+        });
+        const routes={
+            stt:{default:externalSelection,localOnly:null},
+            tts:{default:externalSelection,localOnly:null}
+        };
+        const providers={stt:null,tts:null};
+        const managed={stt:false,tts:false};
+        const roleProgress={stt:null,tts:null};
+        let activeConfiguration=null;
+        let activeDescriptor=null;
+
+        function selected(role,options={}){
+            return options.localOnly===true
+                ?routes[role].localOnly
+                :routes[role].default;
+        }
+
+        function normalizedRoleStatus(role){
+            const provider=providers[role];
+            const selection=selected(role);
+            const providerStatus=provider?.status();
+            const roleState=providerStatus?.state??(selection?'unavailable':'unloaded');
+            const errorCode=providerStatus?.errorCode??null;
+            return Object.freeze({
+                role,
+                state:roleState,
+                providerId:selection?.providerId??null,
+                modelId:selection?.modelId??null,
+                localOnly:selection?.localOnly??null,
+                loaded:providerStatus?.loaded??false,
+                busy:providerStatus?.busy??false,
+                operationId:null,
+                progress:roleProgress[role],
+                error:roleState==='error'
+                    ?Object.freeze({
+                        code:errorCode??'ARCANE_AI_PROVIDER_REQUEST_FAILED',
+                        message:'The selected test provider operation failed.'
+                    })
+                    :null
+            });
+        }
+
+        function publishRole(role){
+            publishAIRuntimeRoleState?.(role,normalizedRoleStatus(role));
+        }
+
+        const providerRuntime={
+            selection: selected,
+            configureSpeech(configuration){
+                calls.configureSpeech.push(configuration);
+                routes.stt=configuration.stt;
+                routes.tts=configuration.tts;
+                return configuration;
+            },
+            providerIdentity(role,providerId){
+                const provider=providers[role];
+                if(!provider||provider.id!==providerId)return null;
+                return Object.freeze({
+                    protocol:provider.protocol,
+                    role,
+                    id:provider.id,
+                    localOnly:true
+                });
+            },
+            status(role){ return normalizedRoleStatus(role); },
+            catalog(role){
+                const provider=providers[role];
+                return provider
+                    ?Object.freeze([Object.freeze({
+                        providerId:provider.id,
+                        localOnly:true,
+                        models:provider.catalog()
+                    })])
+                    :Object.freeze([]);
+            },
+            async inspect(role){
+                return providers[role]?.inspect()??Object.freeze({
+                    available:false,
+                    code:'ARCANE_AI_PROVIDER_UNAVAILABLE'
+                });
+            },
+            async load(role,loadOptions={}){
+                const provider=providers[role];
+                if(!provider)throw arcaneFailure('ARCANE_AI_PROVIDER_UNAVAILABLE');
+                const selection=selected(role,{localOnly:loadOptions.localOnly===true});
+                try{
+                    const result=await provider.load({
+                        role,
+                        selection,
+                        signal:loadOptions.signal,
+                        progress(value){
+                            roleProgress[role]=value;
+                            publishRole(role);
+                        }
+                    });
+                    roleProgress[role]=null;
+                    publishRole(role);
+                    return result;
+                }catch(error){
+                    roleProgress[role]=null;
+                    publishRole(role);
+                    throw error;
+                }
+            },
+            async unload(role,unloadOptions={}){
+                const provider=providers[role];
+                if(!provider)return normalizedRoleStatus(role);
+                const result=await provider.unload({
+                    role,
+                    selection:selected(role),
+                    signal:unloadOptions.signal
+                });
+                roleProgress[role]=null;
+                publishRole(role);
+                return result;
+            },
+            cancel(role){
+                calls.speechRuntimeCancels.push(role);
+                return true;
+            },
+            async request(role,requestOptions){
+                const provider=providers[role];
+                if(!provider)throw arcaneFailure('ARCANE_AI_PROVIDER_UNAVAILABLE');
+                try{
+                    const result=await provider.request({
+                        role,
+                        operation:requestOptions.operation,
+                        selection:selected(role),
+                        signal:requestOptions.signal,
+                        payload:requestOptions.payload
+                    });
+                    publishRole(role);
+                    return result;
+                }catch(error){
+                    publishRole(role);
+                    throw error;
+                }
+            }
+        };
+
+        const normalized={
+            providerRuntime,
+            muted:true,
+            get browserSpeechConfiguration(){ return activeConfiguration; },
+            get browserSpeechDescriptor(){ return activeDescriptor; },
+            async configureBrowserSpeech(configuration,configureOptions={}){
+                const configuredRoles=['stt','tts'].filter(function hasConfiguredRole(role){
+                    return Object.hasOwn(configuration,role);
+                });
+                const normalizedSpeechStore=Object.freeze({
+                    kind:'fake-dbopfs-speech-artifact-store',
+                    dbopfs:configuration.dbopfs
+                });
+                calls.speechStore.push({
+                    dbopfs:configuration.dbopfs,
+                    value:normalizedSpeechStore
+                });
+                const before=Object.freeze({
+                    stt:selected('stt'),
+                    tts:selected('tts')
+                });
+                for(const role of configuredRoles){
+                    const roleConfiguration=configuration[role];
+                    const oldProvider=providers[role];
+                    const provider=createSpeechProvider(role,{
+                        id:roleConfiguration.providerId,
+                        model:roleConfiguration.model,
+                        runtime:roleConfiguration.runtime,
+                        security:roleConfiguration.security,
+                        store:normalizedSpeechStore,
+                        offline:roleConfiguration.offline
+                    });
+                    const selection=Object.freeze({
+                        providerId:provider.id,
+                        modelId:provider.catalog()[0].id,
+                        localOnly:true
+                    });
+                    providers[role]=provider;
+                    routes[role]=Object.freeze({default:selection,localOnly:selection});
+                    managed[role]=true;
+                    if(oldProvider)await oldProvider.dispose();
+                    publishRole(role);
+                }
+                const merged={
+                    protocol:configuration.protocol,
+                    id:configuration.id,
+                    dbopfs:configuration.dbopfs
+                };
+                const descriptor={
+                    protocol:configuration.protocol,
+                    configurationId:configuration.id,
+                    stt:null,
+                    tts:null
+                };
+                for(const role of ['stt','tts']){
+                    if(!managed[role])continue;
+                    const roleConfiguration=Object.hasOwn(configuration,role)
+                        ?configuration[role]
+                        :activeConfiguration?.[role];
+                    merged[role]=roleConfiguration;
+                    descriptor[role]=Object.freeze({
+                        role,
+                        providerId:providers[role].id,
+                        modelId:providers[role].catalog()[0].id,
+                        offline:roleConfiguration.offline,
+                        ...(role==='tts'
+                            ?{defaultVoice:roleConfiguration.model.defaultVoice}
+                            :{})
+                    });
+                }
+                activeConfiguration=Object.freeze(merged);
+                activeDescriptor=Object.freeze(descriptor);
+                calls.configureBrowserSpeech.push({
+                    before,
+                    configuration,
+                    options:configureOptions,
+                    descriptor:activeDescriptor
+                });
+                return activeDescriptor;
+            },
+            async setSpeechMuted(muted){
+                normalized.muted=muted;
+                if(muted){
+                    await providerRuntime.unload('tts');
+                }else{
+                    await providerRuntime.load('tts');
+                }
+                return true;
+            },
+            async fetchTTS(payload,signal){
+                const result=await providerRuntime.request('tts',{
+                    operation:'synthesize',
+                    payload:{
+                        model:payload.model,
+                        voice:activeConfiguration.tts.model.defaultVoice,
+                        input:payload.input,
+                        responseFormat:payload.responseFormat,
+                        speed:payload.speed
+                    },
+                    localOnly:false,
+                    signal
+                });
+                return new globalThis.Blob([result.audio],{type:result.contentType});
+            },
+            async fetchSTT(file,responseHandler,signal){
+                const result=await providerRuntime.request('stt',{
+                    operation:'transcribe',
+                    payload:{
+                        audio:file,
+                        mimeType:file.type,
+                        model:selected('stt').modelId
+                    },
+                    localOnly:false,
+                    signal
+                });
+                const text=result.text;
+                await responseHandler(text);
+                return text;
+            },
+            async disposeBrowserSpeech(){
+                calls.speechConfigurationDisposes+=1;
+                for(const role of ['stt','tts']){
+                    if(!managed[role])continue;
+                    await providers[role].dispose();
+                    providers[role]=null;
+                    routes[role]=Object.freeze({default:null,localOnly:null});
+                    managed[role]=false;
+                }
+                activeConfiguration=null;
+                activeDescriptor=null;
+                return true;
+            }
+        };
+        return normalized;
     }
 
     return {
@@ -559,9 +873,10 @@ function aiHarness(options={}){
             calls.createAI.push(createOptions);
             return facade;
         },
+        createNormalizedAI,
         createDbopfsSpeechArtifactStore(storeOptions){
             calls.speechStore.push(storeOptions);
-            return speechStore;
+            return Object.freeze({kind:'fake-dbopfs-speech-artifact-store'});
         },
         createBrowserWhisperProvider(providerOptions){
             return createSpeechProvider('stt',providerOptions);
@@ -653,6 +968,11 @@ async function runApplication(callback,{
         })
     ]);
     await mkdir(fakeRoot,{recursive:true});
+    await writeFile(
+        path.join(temporaryRoot,'package.json'),
+        '{"type":"module"}\n',
+        'utf8'
+    );
     await writeFile(path.join(fakeRoot,'dbopfs.mjs'),`
 const harness=globalThis.__arcaneHelloWorldAIHarness;
 class DBOPFS {
@@ -667,6 +987,14 @@ export const createDbopfsModelStore=options=>harness.createDbopfsModelStore(opti
 export const createBrowserModelSource=descriptor=>harness.createBrowserModelSource(descriptor);
 export const createBrowserWasmLlmProvider=options=>harness.createBrowserWasmLlmProvider(options);
 export const createArcaneAI=options=>harness.createArcaneAI(options);
+`,'utf8');
+    await writeFile(path.join(fakeRoot,'arcane-ai.mjs'),`
+import {publishAIRuntimeRoleState} from 'arcane/AIRuntimeState';
+const harness=globalThis.__arcaneHelloWorldAIHarness;
+export const AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL='arcane-ai-browser-speech-configuration/1';
+export default class AI {
+    constructor(){ return harness.createNormalizedAI({publishAIRuntimeRoleState}); }
+}
 `,'utf8');
     await writeFile(path.join(fakeRoot,'browser-speech.mjs'),`
 const harness=globalThis.__arcaneHelloWorldAIHarness;
@@ -690,6 +1018,12 @@ export default globalThis.__arcaneHelloWorldSpeechAuthorities;
             pathToFileURL(path.join(temporaryRoot,'arcane','modules','AppDataScope.js')).href
         ],
         ['arcane/DBOPFS',pathToFileURL(path.join(fakeRoot,'dbopfs.mjs')).href],
+        ['arcane/AI',pathToFileURL(path.join(fakeRoot,'arcane-ai.mjs')).href],
+        [
+            'arcane/AIRuntimeState',
+            pathToFileURL(path.join(temporaryRoot,'arcane','modules','AIRuntimeState.js')).href
+        ],
+        ['arcane-os/event-manager',import.meta.resolve('arcane-os/event-manager')],
         ['arcane-os/ai/browser-wasm',pathToFileURL(path.join(fakeRoot,'browser-ai.mjs')).href],
         [
             'arcane-os/ai/browser-speech',
@@ -715,6 +1049,7 @@ export default globalThis.__arcaneHelloWorldSpeechAuthorities;
         await new Promise(resolve=>setTimeout(resolve,0));
         return await callback({...browser,aiRuntime});
     }finally{
+        await browser.triggerPage('pagehide');
         restoreGlobals();
         moduleHooks.deregister();
         await rm(temporaryRoot,{recursive:true,force:true});
@@ -790,32 +1125,32 @@ test('workspace pins the published SDK and browser release workflow',async funct
         readFile(new URL('arcane-packager.json',workspaceRoot),'utf8').then(JSON.parse),
         readFile(new URL('README.md',workspaceRoot),'utf8')
     ]);
-    assert.equal(packageJson.devDependencies['arcane-os'],'0.2.1');
+    assert.equal(packageJson.devDependencies['arcane-os'],'0.3.1');
     assert.equal(packageJson.engines.node,'>=22.23.2');
-    assert.equal(packageLock.packages[''].devDependencies['arcane-os'],'0.2.1');
-    assert.equal(packageLock.packages['node_modules/arcane-os'].version,'0.2.1');
+    assert.equal(packageLock.packages[''].devDependencies['arcane-os'],'0.3.1');
+    assert.equal(packageLock.packages['node_modules/arcane-os'].version,'0.3.1');
     assert.equal(
         packageLock.packages['node_modules/arcane-os'].integrity,
-        'sha512-FJ7zCFvQVZEMLQ8kn9IqddnFkfw397S87tENfLULwt0bN5hYn22wmN2zU50BqYC4zDKI/fdf4Rcl5G6A6KwlCg=='
+        'sha512-g9C0cXK6Xim4Mu8D7zLKn3XErIo8UZEjIaGUA1fwnU6nVbB8XXgLD6/AjaVln+na6ihIHLzsHGgyTeic4yNggg=='
     );
     assert.equal(
         packageLock.packages['node_modules/arcane-os'].resolved,
-        'https://registry.npmjs.org/arcane-os/-/arcane-os-0.2.1.tgz'
+        'https://registry.npmjs.org/arcane-os/-/arcane-os-0.3.1.tgz'
     );
-    assert.equal(lock.sdk.version,'0.2.1');
+    assert.equal(lock.sdk.version,'0.3.1');
     assert.equal(
         lock.runtime.contentSha256,
-        '5b921d50b6a0cf36a13f7a7dedf96cd3a68104a322e5139136fd4197aa1ca7cb'
+        '9ed39694d9f286e0994404a82fb6002c3ba48be0d085a6b68d51c7facc17c56f'
     );
     assert.equal(lock.runtime.upstreamCommit,'c540014afe69f14cf5ae60493b7295f36dbcec64');
-    assert.equal(lock.sdkBrowserRuntime.sdkVersion,'0.2.1');
+    assert.equal(lock.sdkBrowserRuntime.sdkVersion,'0.3.1');
     assert.equal(
         lock.sdkBrowserRuntime.contentSha256,
-        'a9715c4b3aef70ec4042e4738089568d6588877b29582e0f758ed83897b6814f'
+        '1493497265c330507abed847e52e65dc2ce22c15efaf5646ed7ae544b107ad6f'
     );
     assert.equal(
         lock.sdkBrowserRuntime.manifestSha256,
-        '44efd97352d970ebeac5363e86c0e71e908a71098f17514b6ea67c4792b4b3d4'
+        'fbb9cde052660d98f3bc1c15a5e85fe9ec3c9716b3f0f2d9d0b055ec20037410'
     );
     assert.deepEqual(
         Object.fromEntries([
@@ -851,11 +1186,11 @@ test('workspace pins the published SDK and browser release workflow',async funct
     assert.match(readme,/listed by the release receipt/u);
     assert.doesNotMatch(readme,/173 files|86 entries/u);
     assert.match(readme,/does not create a\s+standalone native executable/u);
-    assert.match(readme,/no artifact request starts until its own\s+load button is chosen/u);
-    assert.match(readme,/`load\(\{offline:true\}\)` makes no model-source request/u);
+    assert.match(readme,/no artifact request starts\s+until its own load button is chosen/u);
+    assert.match(readme,/`load\(\{offline:true\}\)` makes no\s+model-source request/u);
     assert.match(readme,/Packaged same-origin Wllama\/WASM\s+runtime assets may still load/u);
     assert.match(readme,/maps expected failures to stable codes/u);
-    assert.match(readme,/initial Hugging Face origin/u);
+    assert.match(readme,/initial\s+Hugging Face origin/u);
     assert.match(readme,/provider-controlled HTTPS redirect\s+chain/u);
     assert.doesNotMatch(readme,/`load\(\{offline:true\}\)` never fetches|regional CDN hostname[^.]*in `security[.]connectOrigins`/iu);
     assert.doesNotMatch(readme,/--arcane-root|source sync|SDK update poll/iu);
@@ -884,13 +1219,19 @@ test('application demonstrates direct named Arcane and browser-AI imports',async
     assert.match(script,/from 'arcane\/ThemeBootstrap'/u);
     assert.match(script,/from 'arcane\/AppDataScope'/u);
     assert.match(script,/from 'arcane\/DBOPFS'/u);
+    assert.match(script,/from 'arcane\/AI'/u);
+    assert.match(script,/from 'arcane\/AIRuntimeState'/u);
     assert.match(script,/from 'arcane-os\/ai\/browser-wasm'/u);
-    assert.match(script,/from 'arcane-os\/ai\/browser-speech'/u);
-    assert.match(script,/createBrowserSpeechAuthority/u);
     assert.match(script,/from '[.]\/SpeechAuthorities[.]js'/u);
     assert.match(script,/loadPolicy:'manual'/u);
     assert.match(script,/localOnly:true/u);
-    assert.match(script,/appSecurity:\{secure:true\}/u);
+    assert.match(script,/AI_SECURITY=Object[.]freeze\(\{secure:false\}\)/u);
+    assert.match(script,/AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL/u);
+    assert.match(script,/configureBrowserSpeech/u);
+    assert.match(script,/localOnly:null/u);
+    assert.match(script,/providerRuntime[.]load/u);
+    assert.match(script,/providerRuntime[.]unload/u);
+    assert.match(script,/disposeBrowserSpeech/u);
     assert.match(script,/toolChoice:'auto'/u);
     assert.match(script,/ARCANE_AI_MODEL_OFFLINE_MISS/u);
     assert.match(script,/HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED/u);
@@ -903,7 +1244,8 @@ test('application demonstrates direct named Arcane and browser-AI imports',async
     assert.match(script,/Any admitted DBOPFS cache remains; interrupted downloads are discarded/u);
     assert.match(script,/Proposed tool calls \(structural output only\)/u);
     assert.match(script,/responseFormat:'wav'/u);
-    assert.match(script,/audio:file/u);
+    assert.match(script,/fetchSTT/u);
+    assert.doesNotMatch(script,/createBrowserWhisperProvider|createBrowserKokoroProvider|createDbopfsSpeechArtifactStore/u);
     assert.doesNotMatch(script,/gpuLayers/u);
     assert.doesNotMatch(script,/getUserMedia|mediaDevices|navigator[.]mediaDevices/iu);
     assert.doesNotMatch(script,/[.]play\s*\(/u);
@@ -949,7 +1291,7 @@ test('malformed speech records map to the stable authority error before storage'
         await elements.get('#tts-load').trigger('click');
         await elements.get('#stt-load').trigger('click');
 
-        assert.equal(aiRuntime.calls.speechAuthorityValidations.length,2);
+        assert.equal(aiRuntime.calls.speechAuthorityValidations.length,0);
         assert.equal(aiRuntime.calls.speechStore.length,0);
         assert.equal(aiRuntime.calls.speechProviders.tts.length,0);
         assert.equal(aiRuntime.calls.speechProviders.stt.length,0);
@@ -1033,39 +1375,55 @@ test('configured speech roles use exact authority, selections, and file or WAV p
         await elements.get('#tts-load').trigger('click');
         await elements.get('#stt-load').trigger('click');
 
-        assert.equal(aiRuntime.calls.speechStore.length,1);
-        assert.equal(aiRuntime.calls.speechAuthorityValidations.length,2);
+        assert.equal(aiRuntime.calls.speechStore.length,2);
+        assert.equal(aiRuntime.calls.speechAuthorityValidations.length,0);
         assert.equal(aiRuntime.calls.speechStore[0].dbopfs.applicationId,'hello-world');
+        assert.equal(aiRuntime.calls.speechStore[1].dbopfs.applicationId,'hello-world');
         assert.equal(aiRuntime.calls.speechProviders.tts.length,1);
         assert.equal(aiRuntime.calls.speechProviders.stt.length,1);
+        assert.equal(aiRuntime.calls.configureSpeech.length,1);
+        assert.equal(aiRuntime.calls.configureBrowserSpeech.length,2);
+        const pendingRoutes=aiRuntime.calls.configureSpeech[0];
+        assert.deepEqual(pendingRoutes.tts.default,{
+            providerId:'hello-world-browser-kokoro',
+            modelId:TEST_SPEECH_AUTHORITIES.tts.model.id,
+            localOnly:null
+        });
+        assert.equal(pendingRoutes.tts.localOnly,null);
+        assert.deepEqual(pendingRoutes.stt.default,{
+            providerId:'OPENAI',
+            modelId:'OPENAI',
+            localOnly:false
+        });
+        const firstConfiguration=aiRuntime.calls.configureBrowserSpeech[0];
+        assert.equal(firstConfiguration.before.tts.localOnly,null);
+        assert.equal(firstConfiguration.before.stt.providerId,'OPENAI');
+        const secondConfiguration=aiRuntime.calls.configureBrowserSpeech[1];
+        assert.equal(secondConfiguration.before.tts.localOnly,true);
+        assert.equal(secondConfiguration.before.stt.providerId,'OPENAI');
+        assert.equal(secondConfiguration.descriptor.tts.providerId,'hello-world-browser-kokoro');
+        assert.equal(secondConfiguration.descriptor.stt.providerId,'hello-world-browser-whisper');
 
         const ttsProvider=aiRuntime.calls.speechProviders.tts[0];
         const sttProvider=aiRuntime.calls.speechProviders.stt[0];
         assert.equal(ttsProvider.options.id,'hello-world-browser-kokoro');
         assert.equal(sttProvider.options.id,'hello-world-browser-whisper');
         for(const [role,record] of [['tts',ttsProvider],['stt',sttProvider]]){
-            assert.equal(record.options.localOnly,true);
-            assert.deepEqual(record.options.appSecurity,{secure:true});
+            assert.equal('localOnly' in record.options,false);
+            assert.deepEqual(record.options.security,{secure:false});
             assert.equal(record.options.model,TEST_SPEECH_AUTHORITIES[role].model);
             assert.equal(record.options.runtime,TEST_SPEECH_AUTHORITIES[role].runtime);
-            assert.equal('security' in record.options,false);
-            assert.equal(record.options.store,ttsProvider.options.store);
             assert.equal(record.options.offline,false);
-            const validation=aiRuntime.calls.speechAuthorityValidations.find(
-                function findAuthorityValidation(entry){
-                    return entry.role===role;
-                }
+            assert.match(
+                elements.get(`#${role}-status`).textContent,
+                /Warn-first mode/u
             );
-            assert.equal(validation.providerId,record.options.id);
-            assert.equal(validation.model,TEST_SPEECH_AUTHORITIES[role].model);
-            assert.equal(validation.runtime,TEST_SPEECH_AUTHORITIES[role].runtime);
-            assert.deepEqual(validation.security,{
-                secure:true,
-                checks:{byteLength:true,sha256:true}
-            });
         }
-        assert.equal(elements.get('#tts-progress').hidden,true);
-        assert.equal(elements.get('#stt-progress').hidden,true);
+        assert.notEqual(ttsProvider.options.store,sttProvider.options.store);
+        assert.equal(elements.get('#tts-progress').hidden,false);
+        assert.equal(elements.get('#stt-progress').hidden,false);
+        assert.match(elements.get('#tts-progress-label').textContent,/ready/u);
+        assert.match(elements.get('#stt-progress-label').textContent,/ready/u);
 
         const ttsLoad=aiRuntime.calls.speechLoads.find(function findTtsLoad(entry){
             return entry.role==='tts';
@@ -1083,7 +1441,7 @@ test('configured speech roles use exact authority, selections, and file or WAV p
             modelId:TEST_SPEECH_AUTHORITIES.stt.model.id,
             localOnly:true
         });
-        assert.ok(ttsLoad.options.signal instanceof AbortSignal);
+        assert.equal(ttsLoad.options.signal,undefined);
         assert.ok(sttLoad.options.signal instanceof AbortSignal);
         assert.notEqual(ttsLoad.options.signal,sttLoad.options.signal);
 
@@ -1104,11 +1462,11 @@ test('configured speech roles use exact authority, selections, and file or WAV p
         assert.deepEqual(ttsRequest.selection,ttsLoad.options.selection);
         assert.deepEqual(ttsRequest.payload,{
             model:TEST_SPEECH_AUTHORITIES.tts.model.id,
+            voice:TEST_SPEECH_AUTHORITIES.tts.model.defaultVoice,
             input:"Hello from Arcane's independent text-to-speech lifecycle.",
             responseFormat:'wav',
             speed:1
         });
-        assert.equal('voice' in ttsRequest.payload,false);
         assert.ok(ttsRequest.signal instanceof AbortSignal);
 
         const audio=elements.get('#tts-audio');
@@ -1146,7 +1504,7 @@ test('configured speech roles use exact authority, selections, and file or WAV p
     },{speechAuthorities:TEST_SPEECH_AUTHORITIES});
 });
 
-test('strict offline speech loads reconstruct both providers over the admitted store',async function verifySpeechOfflineReconstruction(){
+test('warn-first offline speech loads replace only the selected role over the app store',async function verifySpeechOfflineReconstruction(){
     await runApplication(async function inspectSpeechOfflineReconstruction({elements,aiRuntime}){
         for(const role of ['tts','stt']){
             await elements.get(`#${role}-load`).trigger('click');
@@ -1160,16 +1518,17 @@ test('strict offline speech loads reconstruct both providers over the admitted s
             assert.equal(records[0].options.id,records[1].options.id);
             assert.equal(records[0].options.model,records[1].options.model);
             assert.equal(records[0].options.runtime,records[1].options.runtime);
-            assert.equal(records[0].options.store,records[1].options.store);
-            assert.equal(records[0].options.appSecurity.secure,true);
-            assert.equal(records[1].options.appSecurity.secure,true);
+            assert.notEqual(records[0].options.store,records[1].options.store);
+            assert.equal(records[0].options.security.secure,false);
+            assert.equal(records[1].options.security.secure,false);
             assert.match(
                 elements.get(`#${role}-status`).textContent,
-                /network access disabled/u
+                /upstream requests disabled/u
             );
         }
 
-        assert.equal(aiRuntime.calls.speechStore.length,1);
+        assert.equal(aiRuntime.calls.speechStore.length,4);
+        assert.equal(aiRuntime.calls.configureBrowserSpeech.length,4);
         assert.equal(aiRuntime.calls.speechUnloads.length,2);
         assert.equal(aiRuntime.calls.speechDisposes.length,2);
         assert.deepEqual(
@@ -1189,7 +1548,7 @@ test('speech offline miss is stable and never exposes provider detail',async fun
 
         const rendered=elements.get('#stt-status').textContent;
         assert.match(rendered,/ARCANE_AI_ARTIFACT_OFFLINE_MISS/u);
-        assert.match(rendered,/No admitted offline speech cache is available/u);
+        assert.match(rendered,/No compatible offline speech cache is available/u);
         assert.doesNotMatch(rendered,/PRIVATE SPEECH OFFLINE DETAIL/u);
         assert.equal(aiRuntime.calls.speechProviders.stt[0].options.offline,true);
         assert.equal(aiRuntime.calls.speechFetch,0);
@@ -1242,29 +1601,11 @@ test('speech cancellation and unload remain independent by role',async function 
         await sttOperation;
         assert.equal(sttRequest.signal.aborted,true);
         assert.doesNotMatch(elements.get('#stt-status').textContent,/PRIVATE STT ABORT DETAIL/u);
+        assert.deepEqual(aiRuntime.calls.speechRuntimeCancels,['tts','stt']);
 
-        await elements.get('#tts-unload').trigger('click');
-        assert.equal(
-            aiRuntime.calls.speechUnloads.filter(function countTts(entry){
-                return entry.role==='tts';
-            }).length,
-            1
-        );
-        assert.equal(
-            aiRuntime.calls.speechUnloads.filter(function countStt(entry){
-                return entry.role==='stt';
-            }).length,
-            0
-        );
-        assert.match(elements.get('#stt-lifecycle').textContent,/ready/u);
-
-        await elements.get('#stt-unload').trigger('click');
-        assert.deepEqual(
-            aiRuntime.calls.speechUnloads.map(function unloadedRole(entry){
-                return entry.role;
-            }).sort(),
-            ['stt','tts']
-        );
+        assert.match(elements.get('#tts-lifecycle').textContent,/error/u);
+        assert.match(elements.get('#stt-lifecycle').textContent,/error/u);
+        assert.equal(aiRuntime.calls.speechUnloads.length,0);
         assert.equal(aiRuntime.calls.speechDisposes.length,0);
         assert.equal(aiRuntime.calls.dispose,0);
         assert.equal(aiRuntime.calls.unload,0);
@@ -1295,7 +1636,7 @@ test('online load authenticates the exact model and request stays local',async f
         assert.equal(aiRuntime.calls.store[0].dbopfs.applicationId,'hello-world');
         assert.equal(aiRuntime.calls.createAI.length,1);
         assert.equal(aiRuntime.calls.createAI[0].loadPolicy,'manual');
-        assert.deepEqual(aiRuntime.calls.createAI[0].security,{secure:true});
+        assert.deepEqual(aiRuntime.calls.createAI[0].security,{secure:false});
         assert.deepEqual(aiRuntime.calls.provider[0].loadDefaults,{
             contextTokens:1024,
             threads:1,
@@ -1307,7 +1648,8 @@ test('online load authenticates the exact model and request stays local',async f
         assert.equal(aiRuntime.calls.load[0].offline,false);
         assert.ok(aiRuntime.calls.load[0].signal instanceof AbortSignal);
         assert.equal(elements.get('#ai-progress').value,MODEL.bytes);
-        assert.match(elements.get('#ai-status').textContent,/SHA-256 verified/u);
+        assert.match(elements.get('#ai-status').textContent,/Warn-first mode/u);
+        assert.match(elements.get('#ai-status').textContent,/checks were not requested/u);
 
         await elements.get('#ai-send').trigger('click');
         assert.equal(aiRuntime.calls.requests.length,1);
@@ -1341,7 +1683,7 @@ test('LLM prompts are bounded before tokenization and provider dispatch',async f
     });
 });
 
-test('offline load reuses a verified cache without a model-source request',async function verifyOfflineLoad(){
+test('offline load reuses a compatible cache without a model-source request',async function verifyOfflineLoad(){
     await runApplication(async({elements,aiRuntime})=>{
         await elements.get('#ai-load-offline').trigger('click');
         assert.equal(aiRuntime.calls.load.length,1);
@@ -1356,7 +1698,7 @@ test('offline miss renders stable copy without leaking provider detail',async fu
         await elements.get('#ai-load-offline').trigger('click');
         const rendered=elements.get('#ai-status').textContent;
         assert.match(rendered,/ARCANE_AI_MODEL_OFFLINE_MISS/u);
-        assert.match(rendered,/No verified offline model cache is available/u);
+        assert.match(rendered,/No compatible offline LLM cache is available/u);
         assert.doesNotMatch(rendered,/PRIVATE OFFLINE PROVIDER DETAIL/u);
         assert.equal(aiRuntime.calls.storeRemove,0);
     },{aiOptions:{offlineMiss:true}});
@@ -1388,7 +1730,7 @@ test('unload and page exit release runtime state but never delete cache',async f
         await elements.get('#ai-unload').trigger('click');
         assert.equal(aiRuntime.calls.unload,1);
         assert.match(elements.get('#ai-status').textContent,/browser model Worker is no longer active/u);
-        assert.match(elements.get('#ai-status').textContent,/verified DBOPFS cache remains/u);
+        assert.match(elements.get('#ai-status').textContent,/stored DBOPFS cache remains/u);
         assert.equal(aiRuntime.calls.storeRemove,0);
 
         await elements.get('#ai-load').trigger('click');
@@ -1457,7 +1799,8 @@ test('page exit aborts and disposes all three roles and revokes generated audio'
         await waitFor(
             function everyRoleDisposed(){
                 return aiRuntime.calls.dispose===1
-                    &&aiRuntime.calls.speechDisposes.length===2;
+                    &&aiRuntime.calls.speechDisposes.length===2
+                    &&aiRuntime.calls.speechConfigurationDisposes===1;
             },
             'all AI role disposals'
         );
@@ -1466,6 +1809,7 @@ test('page exit aborts and disposes all three roles and revokes generated audio'
         assert.equal(pendingTts.signal.aborted,true);
         assert.equal(pendingStt.signal.aborted,true);
         assert.equal(aiRuntime.calls.dispose,1);
+        assert.equal(aiRuntime.calls.speechConfigurationDisposes,1);
         assert.deepEqual(
             aiRuntime.calls.speechDisposes.map(function disposedRole(entry){
                 return entry.role;

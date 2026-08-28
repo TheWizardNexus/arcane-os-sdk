@@ -13,13 +13,13 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../" aria-label="Arcane OS SDK documentation home"><img src="../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../">Overview</a><a href="./" aria-current="page">Hello World</a><a href="../guides/">Guides</a><a href="../reference/sdk-api/">API</a><a href="../reference/">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../">Docs</a><span aria-hidden="true">/</span><span aria-current="page">Hello World</span></nav><p class="eyebrow">Start here</p><h1>Build Hello World, step by step.</h1><p class="doc-lead">Start with an empty folder and finish with one checked, packaged, verified, bundled, and runnable Arcane browser application. Every command and maintained app source file is shown below, followed by the complete SDK lifecycle for independent local language, text-to-speech, and speech-to-text roles.</p><div class="doc-meta"><span>Plain HTML + CSS + JavaScript</span><span>arcane-os@0.2.1</span><span>Node.js 22.23.2+</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../">Docs</a><span aria-hidden="true">/</span><span aria-current="page">Hello World</span></nav><p class="eyebrow">Start here</p><h1>Build Hello World, step by step.</h1><p class="doc-lead">Start with an empty folder and finish with one checked, packaged, verified, bundled, and runnable Arcane browser application. Every command and maintained app source file is shown below, followed by the complete SDK lifecycle for independent local language, text-to-speech, and speech-to-text roles.</p><div class="doc-meta"><span>Plain HTML + CSS + JavaScript</span><span>arcane-os@0.3.1</span><span>Node.js 22.23.2+</span></div></header>
     <div class="docs-layout section-shell">
         <aside class="docs-sidebar" aria-label="Hello World navigation"><p>Hello World</p><nav><a href="#install">Create and install</a><a href="#shape">Project shape</a><a href="#arcane-adds">Arcane and imports</a><a href="#source">Application source</a><a href="#permissions">App contract</a><a href="#browser">Run in browser</a><a href="#local-ai">Full AI lifecycle</a><a href="#package">Package and verify</a><a href="#packaged-run">Run the package</a><a href="#related">Related reference</a></nav></aside>
       <article class="prose">
-        <section id="install"><p class="step-label">Step 01</p><h2>Create and install the project</h2><p>Install Node.js 22.23.2 or newer, then let the published SDK create the complete browser project. The version in the command and generated lockfile keeps this walkthrough reproducible.</p><div class="code-block"><div class="code-bar"><span>PowerShell</span><button type="button" data-copy-button>Copy</button></div><pre><code>npx arcane-os@0.2.1 new hello-world --path ./hello-world --display-name "Arcane Hello World" --target browser --git
+        <section id="install"><p class="step-label">Step 01</p><h2>Create and install the project</h2><p>Install Node.js 22.23.2 or newer, then let the published SDK create the complete browser project. The version in the command and generated lockfile keeps this walkthrough reproducible.</p><div class="code-block"><div class="code-bar"><span>PowerShell</span><button type="button" data-copy-button>Copy</button></div><pre><code>npx arcane-os@0.3.1 new hello-world --path ./hello-world --display-name "Arcane Hello World" --target browser --git
 Set-Location ./hello-world
-npm install</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p>The npm scripts use the project-local CLI. <code>npm install --global arcane-os@0.2.1</code> is an optional shell convenience; it does not install services, model weights, native providers, or prebuilt executables.</p><p>Want the flags and generated-file contract before continuing? See <a href="../reference/cli/#arcane-new"><code>arcane new</code></a>.</p></section>
+npm install</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p>The npm scripts use the project-local CLI. <code>npm install --global arcane-os@0.3.1</code> is an optional shell convenience; it does not install services, model weights, native providers, or prebuilt executables.</p><p>Want the flags and generated-file contract before continuing? See <a href="../reference/cli/#arcane-new"><code>arcane new</code></a>.</p></section>
 
         <section id="shape"><p class="step-label">Step 02</p><h2>See the files your app uses</h2><p>You write the files under <code>apps/hello-world/</code>. The scaffold materializes the authenticated SDK browser runtime in a physical <code>arcane/</code> tree beside the app; the browser never imports runtime files from <code>node_modules</code>. The tree calls out representative paths rather than freezing an inventory count; <code>arcane.lock.json</code>, the runtime receipts, and the generated import map are the current authority.</p><div class="file-tree"><pre><code>hello-world/
 ├── .github/workflows/check.yml
@@ -43,6 +43,7 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
 │   ├── modules/{DocumentLexicalSearch.js,PersistentAIChatSession.js,ThemeBootstrap.js,…}
 │   ├── sdk/
 │   │   ├── ai/
+│   │   │   ├── ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json
 │   │   │   ├── ARCANE_AI_BROWSER_WASM_COMPONENTS.json
 │   │   │   ├── browser-kokoro-worker.mjs
 │   │   │   ├── browser-speech.mjs
@@ -75,9 +76,9 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
 │   └── sdk/{ai,dependencies,event-manager.mjs,…}
 └── licenses/arcane-os/</code></pre></div><p>Authoring descriptors, tests, and the unused icon stay outside <code>dist/</code>. <code>arcane.lock.json</code> authenticates the development projection; the release receipts authenticate the packaged projection.</p></section>
 
-        <section id="arcane-adds"><p class="step-label">Step 03</p><h2>What Arcane adds</h2><ul><li><strong>CLI:</strong> <code>arcane</code> creates, checks, tests, serves, packages, verifies, bundles, and runs the application.</li><li><strong>Browser runtime:</strong> <a href="../reference/runtime-modules/theme-bootstrap/">ThemeBootstrap</a> and shared CSS style the app; <a href="../reference/runtime-modules/app-data-scope/">AppDataScope</a> isolates its browser data; <a href="../reference/runtime-modules/dbopfs/">DBOPFS</a> provides app-scoped persistent model storage.</li><li><strong>Stable imports:</strong> the generated browser import map binds names such as <code>arcane/AppDataScope</code>, <code>arcane/DBOPFS</code>, <code>arcane/ThemeBootstrap</code>, <code>arcane-os/ai/browser-wasm</code>, <code>arcane-os/ai/browser-speech</code>, and <code>strong-type</code> to authenticated files under <code>arcane/</code>.</li><li><strong>Distribution parity:</strong> development and <code>dist/hello-world/</code> use byte-identical application, runtime, dependency, and import-map bytes.</li></ul><p>Regenerate the map whenever the authenticated runtime projection changes:</p><div class="code-block"><div class="code-bar"><span>Application repository</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run import-map</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p>Application code continues to import by name; the generated map owns the physical paths. The complete generated map is visible in the HTML source below. See the <a href="../reference/cli/#arcane-import-map">import-map command</a> for generation and validation details.</p></section>
+        <section id="arcane-adds"><p class="step-label">Step 03</p><h2>What Arcane adds</h2><ul><li><strong>CLI:</strong> <code>arcane</code> creates, checks, tests, serves, packages, verifies, bundles, and runs the application.</li><li><strong>Browser runtime:</strong> <a href="../reference/runtime-modules/theme-bootstrap/">ThemeBootstrap</a> and shared CSS style the app; <a href="../reference/runtime-modules/app-data-scope/">AppDataScope</a> isolates its browser data; <a href="../reference/runtime-modules/dbopfs/">DBOPFS</a> provides app-scoped persistent model storage.</li><li><strong>Stable imports:</strong> the generated browser import map binds names such as <code>arcane/AI</code>, <code>arcane/AppDataScope</code>, <code>arcane/DBOPFS</code>, <code>arcane/ThemeBootstrap</code>, <code>arcane-os/ai/browser-wasm</code>, and <code>strong-type</code> to authenticated files under <code>arcane/</code>.</li><li><strong>Distribution parity:</strong> development and <code>dist/hello-world/</code> use byte-identical application, runtime, dependency, and import-map bytes.</li></ul><p>Regenerate the map whenever the authenticated runtime projection changes:</p><div class="code-block"><div class="code-bar"><span>Application repository</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run import-map</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p>Application code continues to import by name; the generated map owns the physical paths. The complete generated map is visible in the HTML source below. See the <a href="../reference/cli/#arcane-import-map">import-map command</a> for generation and validation details.</p></section>
 
-        <section id="source"><p class="step-label">Step 04</p><h2>Write the visible application</h2><p>These are the complete maintained HTML, CSS, and JavaScript files—not fragments. The greeting works immediately. The AI roles use the shipped browser-WASM and browser-speech entrypoints, but no network acquisition starts until a user chooses a network-permitted load. Speech remains explicitly unavailable until the application owner fills <code>SpeechAuthorities.js</code> with reviewed, immutable artifact authorities.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/index.html</span><button type="button" data-copy-button>Copy</button></div><pre><code>&lt;!doctype html&gt;
+        <section id="source"><p class="step-label">Step 04</p><h2>Write the visible application</h2><p>These are the complete maintained HTML, CSS, and JavaScript files—not fragments. The greeting works immediately. The LLM uses the shipped browser-WASM entrypoint, while normalized <code>arcane/AI</code> owns browser speech configuration and mixed routes. No upstream acquisition starts until a user chooses a network-permitted load. Speech remains explicitly unavailable until the application owner fills <code>SpeechAuthorities.js</code> with version-pinned upstream authorities.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/index.html</span><button type="button" data-copy-button>Copy</button></div><pre><code>&lt;!doctype html&gt;
 &lt;html lang=&quot;en&quot;&gt;
 &lt;head&gt;
     &lt;meta charset=&quot;utf-8&quot;&gt;
@@ -137,6 +138,7 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
     &quot;arcane/LocalAIReadinessController&quot;: &quot;./arcane/modules/LocalAIReadinessController.js&quot;,
     &quot;arcane/MD&quot;: &quot;./arcane/modules/MD.js&quot;,
     &quot;arcane/Mail&quot;: &quot;./arcane/modules/Mail.js&quot;,
+    &quot;arcane/MailOutbox&quot;: &quot;./arcane/modules/MailOutbox.mjs&quot;,
     &quot;arcane/MailTransport&quot;: &quot;./arcane/modules/MailTransport.mjs&quot;,
     &quot;arcane/Marked.min&quot;: &quot;./arcane/modules/Marked.min.js&quot;,
     &quot;arcane/MemoryRecords&quot;: &quot;./arcane/modules/MemoryRecords.js&quot;,
@@ -216,8 +218,9 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
                     &lt;section class=&quot;app-feature app-feature--ai&quot; aria-labelledby=&quot;ai-feature-title&quot;&gt;
                         &lt;h2 id=&quot;ai-feature-title&quot;&gt;Full SDK AI lifecycle&lt;/h2&gt;
                         &lt;p&gt;Arcane gives language, speech synthesis, and speech transcription separate provider lifecycles. Each role loads, runs, cancels, and unloads without changing the other two.&lt;/p&gt;
-                        &lt;p class=&quot;ai-model-note&quot;&gt;&lt;strong&gt;No external AI model or adapter artifact downloads at import time.&lt;/strong&gt; A role&#39;s network load is the only control that may fetch those external artifacts. Offline load is strict: it uses previously verified app-scoped DBOPFS bytes or reports a cache miss.&lt;/p&gt;
-                        &lt;p id=&quot;speech-authority-status&quot; class=&quot;speech-authority-note&quot; role=&quot;status&quot; aria-live=&quot;polite&quot;&gt;&lt;strong&gt;Speech authority required:&lt;/strong&gt; Arcane ships no speech runtime bytes, model weights, or voices. Before using speech, the application must pin immutable, licensed STT and TTS authorities in &lt;code&gt;modules/SpeechAuthorities.js&lt;/code&gt;.&lt;/p&gt;
+                        &lt;p&gt;The normalized &lt;code&gt;arcane/AI&lt;/code&gt; module hydrates only the selected browser speech route. An omitted Cloud or Core role stays unchanged, so STT and TTS can use different providers.&lt;/p&gt;
+                        &lt;p class=&quot;ai-model-note&quot;&gt;&lt;strong&gt;No external AI model or adapter artifact downloads at import time.&lt;/strong&gt; A role&#39;s network load is the only control that may fetch its upstream artifacts. Offline load uses compatible app-scoped DBOPFS data or reports a cache miss. The ordinary &lt;code&gt;secure:false&lt;/code&gt; path warns when optional byte checks are not requested.&lt;/p&gt;
+                        &lt;p id=&quot;speech-authority-status&quot; class=&quot;speech-authority-note&quot; role=&quot;status&quot; aria-live=&quot;polite&quot;&gt;&lt;strong&gt;Speech authority required:&lt;/strong&gt; Arcane ships no speech runtime bytes, model weights, or voices, nor any third-party legal corpora. Before using speech, the application must select version-pinned upstream STT and TTS authorities in &lt;code&gt;modules/SpeechAuthorities.js&lt;/code&gt;.&lt;/p&gt;
 
                         &lt;div class=&quot;ai-role-grid&quot;&gt;
                             &lt;section class=&quot;ai-role&quot; aria-labelledby=&quot;llm-role-title&quot;&gt;
@@ -225,12 +228,12 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
                                     &lt;p class=&quot;ai-role__eyebrow&quot;&gt;LLM&lt;/p&gt;
                                     &lt;h3 id=&quot;llm-role-title&quot;&gt;Generate text and inspect tool calls&lt;/h3&gt;
                                 &lt;/header&gt;
-                                &lt;p&gt;The SDK verifies Granite 4.1 3B Q4_K_S before admitting its 1.86 GiB first-use download to this app&#39;s cache. This 0.2.1 LLM path requires a WebGPU-capable browser.&lt;/p&gt;
+                                &lt;p&gt;The SDK loads Granite 4.1 3B Q4_K_S from this app&#39;s 1,998,371,424 bytes (1.86 GiB) first-use download or DBOPFS cache. Status distinguishes warn-first unchecked bytes from completed optional integrity checks. This 0.3.1 LLM path requires a WebGPU-capable browser.&lt;/p&gt;
                                 &lt;p id=&quot;ai-lifecycle&quot; class=&quot;app-environment&quot;&gt;Lifecycle: unloaded.&lt;/p&gt;
                                 &lt;p id=&quot;ai-status&quot; class=&quot;role-status&quot; role=&quot;status&quot; aria-live=&quot;polite&quot;&gt;Model not loaded. No model download has started.&lt;/p&gt;
                                 &lt;div class=&quot;ai-controls&quot; aria-label=&quot;Language model lifecycle controls&quot;&gt;
                                     &lt;button id=&quot;ai-load&quot; class=&quot;arcane-button&quot; type=&quot;button&quot;&gt;Network load LLM (1.86 GiB if not cached)&lt;/button&gt;
-                                    &lt;button id=&quot;ai-load-offline&quot; class=&quot;arcane-button&quot; type=&quot;button&quot;&gt;Load LLM from verified cache&lt;/button&gt;
+                                    &lt;button id=&quot;ai-load-offline&quot; class=&quot;arcane-button&quot; type=&quot;button&quot;&gt;Load LLM from app cache&lt;/button&gt;
                                     &lt;button id=&quot;ai-cancel&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; hidden disabled&gt;Cancel LLM operation&lt;/button&gt;
                                     &lt;button id=&quot;ai-unload&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Unload LLM&lt;/button&gt;
                                 &lt;/div&gt;
@@ -253,12 +256,12 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
                                     &lt;p class=&quot;ai-role__eyebrow&quot;&gt;TTS&lt;/p&gt;
                                     &lt;h3 id=&quot;tts-role-title&quot;&gt;Synthesize a WAV response&lt;/h3&gt;
                                 &lt;/header&gt;
-                                &lt;p&gt;Configure a licensed voice and immutable Kokoro runtime and model authority before loading. Arcane never autoplays the result.&lt;/p&gt;
+                                &lt;p&gt;Configure a licensed voice and version-pinned upstream Kokoro runtime and model authority before loading. Arcane never autoplays the result.&lt;/p&gt;
                                 &lt;p id=&quot;tts-lifecycle&quot; class=&quot;app-environment&quot;&gt;Lifecycle: unavailable until speech authority is configured.&lt;/p&gt;
                                 &lt;p id=&quot;tts-status&quot; class=&quot;role-status&quot; role=&quot;status&quot; aria-live=&quot;polite&quot;&gt;Speech authority required. No speech download has started.&lt;/p&gt;
                                 &lt;div class=&quot;ai-controls&quot; aria-label=&quot;Text-to-speech lifecycle controls&quot;&gt;
                                     &lt;button id=&quot;tts-load&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Network load TTS&lt;/button&gt;
-                                    &lt;button id=&quot;tts-load-offline&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Load TTS from verified cache&lt;/button&gt;
+                                    &lt;button id=&quot;tts-load-offline&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Load TTS from app cache&lt;/button&gt;
                                     &lt;button id=&quot;tts-cancel&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; hidden disabled&gt;Cancel TTS operation&lt;/button&gt;
                                     &lt;button id=&quot;tts-unload&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Unload TTS&lt;/button&gt;
                                 &lt;/div&gt;
@@ -282,12 +285,12 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
                                     &lt;p class=&quot;ai-role__eyebrow&quot;&gt;STT&lt;/p&gt;
                                     &lt;h3 id=&quot;stt-role-title&quot;&gt;Transcribe a selected audio file&lt;/h3&gt;
                                 &lt;/header&gt;
-                                &lt;p&gt;Configure immutable, licensed Whisper runtime and model authority before loading. This example reads only the file you select; it never requests microphone access.&lt;/p&gt;
+                                &lt;p&gt;Configure a licensed, version-pinned upstream Whisper runtime and model authority before loading. This example reads only the file you select; it never requests microphone access.&lt;/p&gt;
                                 &lt;p id=&quot;stt-lifecycle&quot; class=&quot;app-environment&quot;&gt;Lifecycle: unavailable until speech authority is configured.&lt;/p&gt;
                                 &lt;p id=&quot;stt-status&quot; class=&quot;role-status&quot; role=&quot;status&quot; aria-live=&quot;polite&quot;&gt;Speech authority required. No speech download has started.&lt;/p&gt;
                                 &lt;div class=&quot;ai-controls&quot; aria-label=&quot;Speech-to-text lifecycle controls&quot;&gt;
                                     &lt;button id=&quot;stt-load&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Network load STT&lt;/button&gt;
-                                    &lt;button id=&quot;stt-load-offline&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Load STT from verified cache&lt;/button&gt;
+                                    &lt;button id=&quot;stt-load-offline&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Load STT from app cache&lt;/button&gt;
                                     &lt;button id=&quot;stt-cancel&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; hidden disabled&gt;Cancel STT operation&lt;/button&gt;
                                     &lt;button id=&quot;stt-unload&quot; class=&quot;arcane-button&quot; type=&quot;button&quot; disabled&gt;Unload STT&lt;/button&gt;
                                 &lt;/div&gt;
@@ -533,38 +536,45 @@ npm install</code></pre><span class="copy-status" role="status" aria-live="polit
     }
 }</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div>
 
-        <p><code>SpeechAuthorities.js</code> is the application-owned policy boundary. It remains fail-closed until you replace an individual <code>null</code> with a complete, licensed, immutable authority.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/modules/SpeechAuthorities.js</span><button type="button" data-copy-button>Copy</button></div><pre><code>/*
- * The Arcane OS SDK supplies the speech lifecycle, storage, verification,
- * isolation, and provider contracts. The application must supply and license every model,
- * runtime, voice, URL, revision, byte length, and SHA-256 authority below.
+        <p><code>SpeechAuthorities.js</code> is the application-owned selection boundary. It remains fail-closed until you replace an individual <code>null</code> with a licensed, version-pinned upstream authority. The SDK and example do not vendor the selected speech runtime, model, voice, or legal corpus.</p><div class="code-block"><div class="code-bar"><span>apps/hello-world/modules/SpeechAuthorities.js</span><button type="button" data-copy-button>Copy</button></div><pre><code>/*
+ * The Arcane OS SDK supplies normalized speech configuration, provider
+ * lifecycle, DBOPFS storage, and Worker contracts. It does not redistribute a
+ * third-party speech runtime, model, voice, license corpus, or corresponding
+ * source. The application selects and licenses every upstream authority below.
  *
  * Replace an individual null only after choosing an immutable authority:
  *
  * stt: {
- *     model: {id,repository,revision,files:[{path,url,bytes,sha256,mediaType}]},
+ *     model: {id,repository,revision,files:[]},
  *     runtime: {
- *         adapter:&#39;transformers-whisper&#39;,version,revision,entry,
- *         files:[{path,url,bytes,sha256,mediaType}]
+ *         adapter:&#39;transformers-whisper&#39;,version,revision,entry,wasmPaths,
+ *         files:[{path,url,mediaType}]
  *     }
  * }
  *
  * tts: {
  *     model: {
- *         id,repository,revision,defaultVoice,
- *         files:[{path,url,bytes,sha256,mediaType}]
+ *         id,repository,revision,defaultVoice,files:[]
  *     },
  *     runtime: {
- *         adapter:&#39;kokoro-js&#39;,version,revision,entry,
- *         files:[{path,url,bytes,sha256,mediaType}]
+ *         adapter:&#39;kokoro-js&#39;,version,revision,entry,wasmPaths,
+ *         files:[{path,url,mediaType}]
  *     }
  * }
  *
- * mediaType is optional. Security policy is not configurable here: App.js
- * enforces secure byte-length and SHA-256 admission for both roles.
+ * Default warn-first operation uses secure:false in App.js. It permits an empty
+ * or omitted model file inventory so the selected version-pinned upstream
+ * provider can fetch its own model and voice assets, and it reports those bytes
+ * as unchecked when no optional integrity check ran. Runtime entry files and
+ * any wasmPaths must still identify a version-pinned upstream npm/package
+ * distribution. Do not use mutable main, master, or latest URLs.
  *
- * Every URL must be immutable HTTPS or same-origin authority. Do not use
- * mutable main, master, or latest paths. With appSecurity.secure enabled in
- * App.js, every declared artifact must include bytes and sha256 evidence.
+ * An application may deliberately change AI_SECURITY to secure:true only after
+ * supplying the complete compatible content-addressed model/runtime graph, file
+ * authority, byte lengths, SHA-256 evidence, and licenses. Strict mode rejects
+ * remote wasmPaths; immutable HTTPS graph sources remain supported.
+ * Changing policy requires an unload and reload; this fixture does not enable
+ * or pretend to satisfy that optional hardening mode.
  */
 const speechAuthorities=Object.freeze({
     stt:null,
@@ -579,18 +589,16 @@ import {
     resolveApplicationLocalStorageKey
 } from &#39;arcane/AppDataScope&#39;;
 import DBOPFS from &#39;arcane/DBOPFS&#39;;
+import AI, {
+    AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL
+} from &#39;arcane/AI&#39;;
+import {subscribeAIRuntimeState} from &#39;arcane/AIRuntimeState&#39;;
 import {
     createArcaneAI,
     createBrowserModelSource,
     createBrowserWasmLlmProvider,
     createDbopfsModelStore
 } from &#39;arcane-os/ai/browser-wasm&#39;;
-import {
-    createBrowserKokoroProvider,
-    createBrowserSpeechAuthority,
-    createBrowserWhisperProvider,
-    createDbopfsSpeechArtifactStore
-} from &#39;arcane-os/ai/browser-speech&#39;;
 import speechAuthorities from &#39;./SpeechAuthorities.js&#39;;
 
 const MODEL=Object.freeze({
@@ -604,6 +612,7 @@ const SPEECH_PROVIDER_IDS=Object.freeze({
     stt:&#39;hello-world-browser-whisper&#39;,
     tts:&#39;hello-world-browser-kokoro&#39;
 });
+const AI_SECURITY=Object.freeze({secure:false});
 const MAX_LLM_PROMPT_LENGTH=2000;
 const MAX_STT_FILE_BYTES=8*1024*1024;
 const MAX_TTS_TEXT_LENGTH=500;
@@ -625,19 +634,21 @@ const SHOW_GREETING_TOOL=Object.freeze({
 });
 
 const ERROR_COPY=Object.freeze({
-    HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED:&#39;This speech role has no complete app-owned model, runtime, license, revision, URL, and hash authority. TTS also requires a voice. Configure SpeechAuthorities.js before loading it.&#39;,
+    HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED:&#39;This speech role has no complete app-owned model and version-pinned runtime selection. TTS also requires a voice. Configure SpeechAuthorities.js before loading it.&#39;,
     HELLO_WORLD_STT_FILE_REQUIRED:&#39;Choose a nonempty audio file before transcribing.&#39;,
     HELLO_WORLD_STT_FILE_TOO_LARGE:&#39;Choose an audio file no larger than 8 MiB so browser decoding remains bounded.&#39;,
     HELLO_WORLD_STT_MIME_TYPE_REQUIRED:&#39;The chosen audio file must declare its audio media type.&#39;,
     HELLO_WORLD_TTS_TEXT_REQUIRED:&#39;Enter text before synthesizing speech.&#39;,
     HELLO_WORLD_TTS_TEXT_TOO_LONG:&#39;Keep text-to-speech input at 500 characters or fewer so synthesis remains bounded.&#39;,
     HELLO_WORLD_AUDIO_PLAYBACK_UNAVAILABLE:&#39;This browser cannot expose the synthesized WAV for user-controlled playback.&#39;,
+    HELLO_WORLD_SPEECH_ROUTE_RESTORE_FAILED:&#39;The application could not restore its prior speech routes after configuration failed. Reload the page before trying again.&#39;,
     HELLO_WORLD_LLM_PROMPT_TOO_LONG:&#39;Keep the language-model prompt at 2,000 characters or fewer so tokenization remains bounded.&#39;,
     ARCANE_AI_REQUEST_ABORTED:&#39;The operation was cancelled. Any admitted DBOPFS cache remains; interrupted downloads are discarded.&#39;,
     ARCANE_AI_OPERATION_SUPERSEDED:&#39;A newer lifecycle operation replaced this one safely.&#39;,
     ARCANE_AI_MODEL_AUTHORITY_REQUIRED:&#39;The selected model does not match the admitted application authority.&#39;,
-    ARCANE_AI_MODEL_OFFLINE_MISS:&#39;No verified offline LLM cache is available. Load once while online first.&#39;,
-    ARCANE_AI_ARTIFACT_OFFLINE_MISS:&#39;No admitted offline speech cache is available. Load this role once while online first.&#39;,
+    ARCANE_AI_MODEL_OFFLINE_MISS:&#39;No compatible offline LLM cache is available. Load once while online first.&#39;,
+    ARCANE_AI_ARTIFACT_OFFLINE_MISS:&#39;No compatible offline speech cache is available. Load this role once while online first.&#39;,
+    ARCANE_AI_ARTIFACT_GRAPH_OFFLINE_CACHE_MISS:&#39;No compatible offline speech cache is available. Load this role once while online first.&#39;,
     ARCANE_AI_MODEL_DOWNLOAD_FAILED:&#39;The model download failed. Check the network and try again.&#39;,
     ARCANE_AI_ARTIFACT_DOWNLOAD_FAILED:&#39;A declared speech artifact could not be downloaded.&#39;,
     ARCANE_AI_MODEL_REDIRECT_BLOCKED:&#39;The model response left HTTPS and was rejected.&#39;,
@@ -659,7 +670,7 @@ const ERROR_COPY=Object.freeze({
     ARCANE_AI_MODEL_SHARD_TOO_LARGE:&#39;A model shard is too large for the selected WebGPU device.&#39;,
     ARCANE_AI_WEBASSEMBLY_UNAVAILABLE:&#39;This browser does not provide the WebAssembly support required by the local runtime.&#39;,
     ARCANE_AI_SECURE_CONTEXT_REQUIRED:&#39;Open this app from HTTPS or a loopback development URL so secure browser APIs are available.&#39;,
-    ARCANE_AI_OPFS_UNAVAILABLE:&#39;This browser does not provide the origin-private storage required for verified model cache data.&#39;,
+    ARCANE_AI_OPFS_UNAVAILABLE:&#39;This browser does not provide the origin-private storage required for model cache data.&#39;,
     ARCANE_AI_STORAGE_BUSY:&#39;Another browser context is updating this exact authority.&#39;,
     ARCANE_AI_STORAGE_UNAVAILABLE:&#39;App-scoped browser storage is unavailable.&#39;,
     ARCANE_AI_STORAGE_READ_FAILED:&#39;The admitted speech cache could not be read.&#39;,
@@ -747,13 +758,14 @@ const roleOperations={
     stt:{controller:null,name:null,pageAbortHandler:null},
     tts:{controller:null,name:null,pageAbortHandler:null}
 };
-const speechProviders={stt:null,tts:null};
-const speechProviderOffline={stt:null,tts:null};
 const speechAuthorityCache={stt:undefined,tts:undefined};
+const speechRoleOffline={stt:null,tts:null};
+const speechRoleManaged={stt:false,tts:false};
 let dbopfsPromise=null;
-let speechStorePromise=null;
 let ai=null;
 let aiPromise=null;
+let speechAI=null;
+let speechHydrationPending=true;
 let pageDisposePromise=null;
 let requestNumber=0;
 let ttsAudioUrl=null;
@@ -835,7 +847,19 @@ function finishRoleOperation(role,controller){
 }
 
 function cancelRoleOperation(role){
-    roleOperations[role].controller?.abort(&#39;Cancelled by the application user.&#39;);
+    const operation=roleOperations[role];
+    operation.controller?.abort(&#39;Cancelled by the application user.&#39;);
+    if((role===&#39;stt&#39;||role===&#39;tts&#39;)&amp;&amp;speechAI){
+        speechAI.providerRuntime.cancel(role);
+    }
+    if(role===&#39;tts&#39;&amp;&amp;operation.name?.includes(&#39;load&#39;)&amp;&amp;speechAI){
+        return speechAI.setSpeechMuted(true).catch(ignoreSpeechCancellationFailure);
+    }
+    return Promise.resolve();
+}
+
+function ignoreSpeechCancellationFailure(){
+    // The active operation reports the authoritative cancellation result.
 }
 
 function lifecycleState(){
@@ -857,7 +881,8 @@ function updateLlmControls(){
 
 function speechLifecycleState(role){
     if(!configuredSpeechAuthority(role))return &#39;authority-required&#39;;
-    return speechProviders[role]?.status?.().state??&#39;unloaded&#39;;
+    if(!speechAI||!speechRoleManaged[role])return &#39;unloaded&#39;;
+    return speechAI.providerRuntime.status(role).state;
 }
 
 function updateSpeechControls(role){
@@ -871,7 +896,7 @@ function updateSpeechControls(role){
     controls.loadOffline.disabled=busy||state===&#39;ready&#39;;
     controls.request.disabled=busy||state!==&#39;ready&#39;;
     if(role===&#39;stt&#39;)controls.file.disabled=busy||state!==&#39;ready&#39;;
-    controls.unload.disabled=busy||speechProviders[role]===null||state===&#39;unloaded&#39;;
+    controls.unload.disabled=busy||!speechRoleManaged[role]||state===&#39;unloaded&#39;;
     controls.cancel.disabled=!busy||operation.name===&#39;unload&#39;;
     controls.cancel.hidden=!busy||operation.name===&#39;unload&#39;;
 }
@@ -925,29 +950,14 @@ function applicationDbopfs(){
     return dbopfsPromise;
 }
 
-async function initializeSpeechStore(){
-    return createDbopfsSpeechArtifactStore({dbopfs:await applicationDbopfs()});
-}
-
-function resetSpeechStorePromise(error){
-    speechStorePromise=null;
-    throw error;
-}
-
-function speechArtifactStore(){
-    if(speechStorePromise)return speechStorePromise;
-    speechStorePromise=initializeSpeechStore().catch(resetSpeechStorePromise);
-    return speechStorePromise;
-}
-
 function renderLlmProgress(value){
     if(!value||typeof value!==&#39;object&#39;)return;
     const total=Number(value.total)||MODEL.bytes;
     const loaded=Math.min(total,Math.max(0,Number(value.loaded)||0));
     const phase={
         download:&#39;Downloading model bytes&#39;,
-        &#39;verify-download&#39;:&#39;Verifying the downloaded model SHA-256&#39;,
-        &#39;verify-cache&#39;:&#39;Rehashing the DBOPFS cache&#39;,
+        &#39;verify-download&#39;:&#39;Running enabled download integrity checks&#39;,
+        &#39;verify-cache&#39;:&#39;Running enabled cache integrity checks&#39;,
         initialize:&#39;Starting the browser-local runtime&#39;
     }[value.phase]??&#39;Preparing local AI&#39;;
     aiProgress.max=total;
@@ -978,7 +988,7 @@ async function createLocalAIInstance(){
     const created=createArcaneAI({
         provider,
         loadPolicy:&#39;manual&#39;,
-        security:{secure:true}
+        security:AI_SECURITY
     });
     created.llm.addEventListener(&#39;progress&#39;,handleLlmProgressEvent);
     created.llm.addEventListener(&#39;statechange&#39;,updateLlmControls);
@@ -1004,23 +1014,28 @@ async function loadModel(options={}){
     const controller=beginRoleOperation(&#39;llm&#39;,offline?&#39;offline-load&#39;:&#39;load&#39;);
     if(!controller)return;
     aiStatus.textContent=offline
-        ?&#39;Checking the verified DBOPFS cache without a model-source request. Packaged same-origin Wllama/WASM assets may still load.&#39;
-        :&#39;Checking the strict cache. A 1.86 GiB model download starts only if it is missing.&#39;;
+        ?&#39;Checking the DBOPFS cache without a model-source request. Packaged same-origin Wllama/WASM assets may still load.&#39;
+        :&#39;Checking the cache. A 1.86 GiB model download starts only if it is missing.&#39;;
     aiProgress.hidden=true;
     aiProgressLabel.textContent=&#39;&#39;;
     try{
         const local=await localAI();
         const result=await local.load({signal:controller.signal,offline});
-        const cacheState=result.cache?.state??local.status().llm.cache?.state;
+        const snapshot=local.status().llm;
+        const cacheState=result.cache?.state??snapshot.cache?.state;
+        const integrityState=snapshot.integrity?.state??&#39;unchecked&#39;;
+        const integrityCopy=integrityState===&#39;verified&#39;
+            ?&#39;Enabled integrity checks completed successfully.&#39;
+            :&#39;Warn-first mode: byte-length and SHA-256 checks were not requested.&#39;;
         aiProgress.max=MODEL.bytes;
         aiProgress.value=MODEL.bytes;
         aiProgress.hidden=false;
         if(cacheState===&#39;installed&#39;){
-            aiStatus.textContent=&#39;Model downloaded, SHA-256 verified, admitted to app-scoped DBOPFS, and loaded locally.&#39;;
+            aiStatus.textContent=`Model downloaded, stored in app-scoped DBOPFS, and loaded locally. ${integrityCopy}`;
         }else{
             aiStatus.textContent=offline
-                ?&#39;Verified DBOPFS cache loaded without a model-source request.&#39;
-                :&#39;Verified DBOPFS cache reused and loaded locally.&#39;;
+                ?`DBOPFS cache loaded without a model-source request. ${integrityCopy}`
+                :`DBOPFS cache reused and loaded locally. ${integrityCopy}`;
         }
         aiProgressLabel.textContent=&#39;Browser-local model ready.&#39;;
     }catch(error){
@@ -1093,11 +1108,11 @@ async function askLocalAI(){
 async function unloadModel(){
     const controller=beginRoleOperation(&#39;llm&#39;,&#39;unload&#39;);
     if(!controller)return;
-    aiStatus.textContent=&#39;Ending the browser model session without deleting any verified cache.&#39;;
+    aiStatus.textContent=&#39;Ending the browser model session without deleting the stored DBOPFS cache.&#39;;
     try{
         const local=await localAI();
         await local.unload();
-        aiStatus.textContent=&#39;Model unloaded. The browser model Worker is no longer active; any verified DBOPFS cache remains.&#39;;
+        aiStatus.textContent=&#39;Model unloaded. The browser model Worker is no longer active; the stored DBOPFS cache remains.&#39;;
     }catch(error){
         renderPublicError(aiStatus,error);
     }finally{
@@ -1112,21 +1127,25 @@ function configuredSpeechAuthority(role){
         speechAuthorityCache[role]=null;
         return null;
     }
-    try{
-        createBrowserSpeechAuthority({
-            providerId:SPEECH_PROVIDER_IDS[role],
-            role,
-            model:authority.model,
-            runtime:authority.runtime,
-            security:{
-                secure:true,
-                checks:{byteLength:true,sha256:true}
-            }
-        });
-        speechAuthorityCache[role]=authority;
-    }catch{
+    const model=authority.model;
+    const runtime=authority.runtime;
+    const expectedAdapter=role===&#39;stt&#39;?&#39;transformers-whisper&#39;:&#39;kokoro-js&#39;;
+    const complete=typeof model?.id===&#39;string&#39;
+        &amp;&amp;typeof model?.repository===&#39;string&#39;
+        &amp;&amp;typeof model?.revision===&#39;string&#39;
+        &amp;&amp;(model.files===undefined||Array.isArray(model.files))
+        &amp;&amp;(role!==&#39;tts&#39;||typeof model?.defaultVoice===&#39;string&#39;)
+        &amp;&amp;runtime?.adapter===expectedAdapter
+        &amp;&amp;typeof runtime?.version===&#39;string&#39;
+        &amp;&amp;typeof runtime?.revision===&#39;string&#39;
+        &amp;&amp;typeof runtime?.entry===&#39;string&#39;
+        &amp;&amp;Array.isArray(runtime?.files)
+        &amp;&amp;runtime.files.length&gt;0;
+    if(!complete){
         speechAuthorityCache[role]=null;
+        return null;
     }
+    speechAuthorityCache[role]=authority;
     return speechAuthorityCache[role];
 }
 
@@ -1136,81 +1155,135 @@ function requiredSpeechAuthority(role){
     return authority;
 }
 
-async function createSpeechProvider(role,offline,signal){
-    const authority=requiredSpeechAuthority(role);
-    const store=await speechArtifactStore();
-    throwIfAborted(signal);
-    const options={
-        id:SPEECH_PROVIDER_IDS[role],
-        localOnly:true,
-        model:authority.model,
-        runtime:authority.runtime,
-        appSecurity:{secure:true},
-        store,
-        offline
-    };
-    return role===&#39;stt&#39;
-        ?createBrowserWhisperProvider(options)
-        :createBrowserKokoroProvider(options);
+function normalizedSpeechAI(){
+    if(!speechAI)speechAI=new AI();
+    return speechAI;
 }
 
-async function speechProvider(role,offline,signal){
-    const current=speechProviders[role];
-    if(current&amp;&amp;speechProviderOffline[role]===offline)return current;
-    if(current){
-        await current.dispose();
-        if(speechProviders[role]===current){
-            speechProviders[role]=null;
-            speechProviderOffline[role]=null;
-        }
-    }
-    throwIfAborted(signal);
-    const created=await createSpeechProvider(role,offline,signal);
-    if(signal?.aborted){
-        await created.dispose();
-        throw createPublicError(&#39;ARCANE_AI_REQUEST_ABORTED&#39;);
-    }
-    speechProviders[role]=created;
-    speechProviderOffline[role]=offline;
-    updateSpeechControls(role);
-    return created;
-}
-
-function speechSelection(provider){
-    const catalog=provider.catalog();
+function speechRuntimeRoutes(runtime,role){
     return Object.freeze({
-        providerId:provider.id,
-        modelId:catalog[0].id,
-        localOnly:true
+        default:runtime.selection(role),
+        localOnly:runtime.selection(role,{localOnly:true})
     });
 }
 
-function speechPhaseLabel(phase){
-    return {
-        download:&#39;Downloading declared artifacts&#39;,
-        &#39;verify-download&#39;:&#39;Verifying downloaded artifact authority&#39;,
-        &#39;verify-cache&#39;:&#39;Revalidating the admitted DBOPFS cache&#39;,
-        &#39;runtime-import&#39;:&#39;Importing the isolated runtime&#39;,
-        &#39;model-load&#39;:&#39;Loading the speech model in its Worker&#39;,
-        ready:&#39;Speech Worker ready&#39;
-    }[phase]??&#39;Preparing browser-local speech&#39;;
+function pendingSpeechRoutes(authority){
+    const selection=Object.freeze({
+        providerId:authority.providerId,
+        modelId:authority.model.id,
+        localOnly:null
+    });
+    return Object.freeze({default:selection,localOnly:null});
+}
+
+function prepareSelectedSpeechHydration(owner,role,authority){
+    if(!speechHydrationPending)return null;
+    const runtime=owner.providerRuntime;
+    const previous=Object.freeze({
+        stt:speechRuntimeRoutes(runtime,&#39;stt&#39;),
+        tts:speechRuntimeRoutes(runtime,&#39;tts&#39;)
+    });
+    const pending=Object.freeze({
+        providerId:SPEECH_PROVIDER_IDS[role],
+        model:authority.model
+    });
+    const next={stt:previous.stt,tts:previous.tts};
+    next[role]=pendingSpeechRoutes(pending);
+    runtime.configureSpeech(Object.freeze(next));
+    return previous;
+}
+
+function restoreSpeechRoutes(runtime,previous){
+    if(!previous)return;
+    try{
+        runtime.configureSpeech(previous);
+    }catch{
+        throw createPublicError(&#39;HELLO_WORLD_SPEECH_ROUTE_RESTORE_FAILED&#39;);
+    }
+}
+
+async function recoverInitialSpeechRoutes(owner,previous,error){
+    if(!previous)return;
+    if(error?.committed===true){
+        try{
+            await owner.disposeBrowserSpeech();
+        }catch{
+            throw createPublicError(&#39;HELLO_WORLD_SPEECH_ROUTE_RESTORE_FAILED&#39;);
+        }
+    }
+    restoreSpeechRoutes(owner.providerRuntime,previous);
+    speechHydrationPending=true;
+}
+
+async function ensureSpeechRoleConfigured(role,offline,signal){
+    if(speechRoleManaged[role]&amp;&amp;speechRoleOffline[role]===offline){
+        return normalizedSpeechAI().browserSpeechDescriptor;
+    }
+    const owner=normalizedSpeechAI();
+    const authority=requiredSpeechAuthority(role);
+    const dbopfs=await applicationDbopfs();
+    const previous=prepareSelectedSpeechHydration(owner,role,authority);
+    const roleConfiguration=Object.freeze({
+        providerId:SPEECH_PROVIDER_IDS[role],
+        model:authority.model,
+        runtime:authority.runtime,
+        security:AI_SECURITY,
+        offline
+    });
+    const configuration={
+        protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+        id:`hello-world-${role}-${offline?&#39;offline&#39;:&#39;network&#39;}`,
+        dbopfs
+    };
+    configuration[role]=roleConfiguration;
+    try{
+        const descriptor=await owner.configureBrowserSpeech(
+            Object.freeze(configuration),
+            {signal}
+        );
+        speechRoleManaged[role]=true;
+        speechRoleOffline[role]=offline;
+        speechHydrationPending=false;
+        return descriptor;
+    }catch(error){
+        await recoverInitialSpeechRoutes(owner,previous,error);
+        throw error;
+    }
+}
+
+function speechProgressPhase(value){
+    const phase=typeof value?.phase===&#39;string&#39;&amp;&amp;value.phase
+        ?value.phase.replace(/[-_]+/gu,&#39; &#39;)
+        :&#39;loading&#39;;
+    return phase[0].toUpperCase()+phase.slice(1);
 }
 
 function renderSpeechProgress(role,value){
+    if(!value||typeof value!==&#39;object&#39;)return;
     const controls=speechControls[role];
-    if(!controls.progress||!value||typeof value!==&#39;object&#39;)return;
-    const total=Math.max(0,Number(value.total)||0);
-    const completed=Math.min(total,Math.max(0,Number(value.completed)||0));
+    const total=Number(value.total);
+    const completed=Number(value.completed);
+    const determinate=Number.isFinite(total)&amp;&amp;total&gt;0&amp;&amp;Number.isFinite(completed);
+    controls.progress.max=determinate?total:1;
+    controls.progress.value=determinate
+        ?Math.min(total,Math.max(0,completed))
+        :0;
     controls.progress.hidden=false;
-    if(value.heartbeat||total===0){
-        controls.progress.removeAttribute(&#39;value&#39;);
-    }else{
-        controls.progress.max=total;
-        controls.progress.value=completed;
+    const unit=typeof value.unit===&#39;string&#39;&amp;&amp;value.unit?` ${value.unit}`:&#39;&#39;;
+    const amount=determinate
+        ?`${controls.progress.value} of ${total}${unit}`
+        :value.heartbeat===true?&#39;active&#39;:&#39;in progress&#39;;
+    controls.progressLabel.textContent=`${role.toUpperCase()} ${speechProgressPhase(value)}: ${amount}.`;
+}
+
+function handleAIRuntimeState(snapshot){
+    for(const role of [&#39;tts&#39;,&#39;stt&#39;]){
+        if(!speechAI||!speechRoleManaged[role])continue;
+        updateSpeechControls(role);
+        if(!roleOperations[role].name?.includes(&#39;load&#39;))continue;
+        const roleState=snapshot?.roles?.[role];
+        if(roleState?.state===&#39;loading&#39;)renderSpeechProgress(role,roleState.progress);
     }
-    const unit=typeof value.unit===&#39;string&#39;?` ${value.unit}`:&#39;&#39;;
-    const amount=total&gt;0?` ${completed} of ${total}${unit}`:&#39;&#39;;
-    controls.progressLabel.textContent=`${speechPhaseLabel(value.phase)}.${amount}`;
 }
 
 async function loadSpeechRole(role,offline){
@@ -1218,31 +1291,30 @@ async function loadSpeechRole(role,offline){
     if(!controller)return;
     const controls=speechControls[role];
     controls.status.textContent=offline
-        ?&#39;Checking this exact role authority in DBOPFS with network access disabled.&#39;
-        :&#39;Checking the admitted cache. Missing declared artifacts download only after this explicit action.&#39;;
+        ?&#39;Checking this exact role in DBOPFS with upstream requests disabled.&#39;
+        :&#39;Hydrating this selected browser role without changing the other speech route. Missing upstream artifacts download only after this explicit action.&#39;;
     controls.progress.hidden=true;
     controls.progressLabel.textContent=&#39;&#39;;
     try{
-        const provider=await speechProvider(role,offline,controller.signal);
-        const selection=speechSelection(provider);
-        function handleSpeechLoadProgress(progress){
-            renderSpeechProgress(role,progress);
+        const owner=normalizedSpeechAI();
+        await ensureSpeechRoleConfigured(role,offline,controller.signal);
+        throwIfAborted(controller.signal);
+        if(role===&#39;tts&#39;){
+            await owner.setSpeechMuted(false);
+        }else{
+            await owner.providerRuntime.load(role,{
+                signal:controller.signal,
+                localOnly:true
+            });
         }
-        const result=await provider.load({
-            role,
-            selection,
-            signal:controller.signal,
-            progress:handleSpeechLoadProgress
-        });
-        const cacheState=typeof result.cache===&#39;string&#39;
-            ?result.cache
-            :result.cache?.state??provider.status().cache;
-        controls.progress.hidden=true;
+        throwIfAborted(controller.signal);
+        controls.progress.max=1;
+        controls.progress.value=1;
+        controls.progress.hidden=false;
+        const securityCopy=&#39;Warn-first mode remains active; strict byte-length and SHA-256 admission was not requested.&#39;;
         controls.status.textContent=offline
-            ?&#39;Admitted DBOPFS artifacts loaded with network access disabled.&#39;
-            :cacheState===&#39;installed&#39;
-                ?&#39;Declared artifacts downloaded, verified, admitted to DBOPFS, and loaded in this role Worker.&#39;
-                :&#39;Admitted DBOPFS artifacts reused and loaded in this role Worker.&#39;;
+            ?`Compatible app-scoped DBOPFS artifacts loaded with upstream requests disabled. ${securityCopy}`
+            :`Role loaded in its browser Worker after the SDK resolved app-scoped DBOPFS and any missing app-selected upstream artifacts. ${securityCopy}`;
         controls.progressLabel.textContent=&#39;Browser-local speech role ready.&#39;;
     }catch(error){
         controls.progress.hidden=true;
@@ -1257,12 +1329,15 @@ async function unloadSpeechRole(role){
     const controller=beginRoleOperation(role,&#39;unload&#39;);
     if(!controller)return;
     const controls=speechControls[role];
-    const provider=speechProviders[role];
-    controls.status.textContent=&#39;Ending only this speech role session without deleting any admitted DBOPFS cache.&#39;;
+    const owner=speechAI;
+    controls.status.textContent=&#39;Ending only this speech role session without deleting its DBOPFS cache.&#39;;
     try{
-        if(provider)await provider.unload();
+        if(owner){
+            if(role===&#39;tts&#39;)await owner.setSpeechMuted(true);
+            else await owner.providerRuntime.unload(role,{signal:controller.signal});
+        }
         if(role===&#39;tts&#39;)revokeTtsAudioUrl();
-        controls.status.textContent=&#39;Role unloaded. Its Worker is no longer active and any admitted DBOPFS cache remains.&#39;;
+        controls.status.textContent=&#39;Role unloaded. Its Worker is no longer active and its DBOPFS cache remains.&#39;;
     }catch(error){
         renderPublicError(controls.status,error);
     }finally{
@@ -1286,15 +1361,17 @@ function revokeTtsAudioUrl(){
 }
 
 function installTtsAudio(result){
-    if(!(result?.audio instanceof Uint8Array)||result.contentType!==&#39;audio/wav&#39;){
+    const mediaType=typeof result?.type===&#39;string&#39;
+        ?result.type.split(&#39;;&#39;,1)[0].trim().toLowerCase()
+        :&#39;&#39;;
+    if(!(result instanceof Blob)||mediaType!==&#39;audio/wav&#39;){
         throw createPublicError(&#39;ARCANE_AI_INVALID_PROVIDER_RESULT&#39;);
     }
     if(typeof Blob!==&#39;function&#39;||typeof globalThis.URL?.createObjectURL!==&#39;function&#39;){
         throw createPublicError(&#39;HELLO_WORLD_AUDIO_PLAYBACK_UNAVAILABLE&#39;);
     }
     revokeTtsAudioUrl();
-    const blob=new Blob([result.audio],{type:&#39;audio/wav&#39;});
-    ttsAudioUrl=globalThis.URL.createObjectURL(blob);
+    ttsAudioUrl=globalThis.URL.createObjectURL(result);
     speechControls.tts.audio.src=ttsAudioUrl;
     speechControls.tts.audio.hidden=false;
 }
@@ -1310,21 +1387,17 @@ async function synthesizeSpeech(){
         if(text.length&gt;MAX_TTS_TEXT_LENGTH){
             throw createPublicError(&#39;HELLO_WORLD_TTS_TEXT_TOO_LONG&#39;);
         }
-        const provider=speechProviders.tts;
-        if(!provider)throw createPublicError(&#39;ARCANE_AI_NOT_READY&#39;);
-        const selection=speechSelection(provider);
-        const result=await provider.request({
-            role:&#39;tts&#39;,
-            operation:&#39;synthesize&#39;,
-            selection,
-            signal:controller.signal,
-            payload:{
-                model:selection.modelId,
-                input:text,
-                responseFormat:&#39;wav&#39;,
-                speed:1
-            }
-        });
+        const owner=speechAI;
+        if(!owner||owner.providerRuntime.status(&#39;tts&#39;).state!==&#39;ready&#39;){
+            throw createPublicError(&#39;ARCANE_AI_NOT_READY&#39;);
+        }
+        const selection=owner.providerRuntime.selection(&#39;tts&#39;);
+        const result=await owner.fetchTTS({
+            model:selection.modelId,
+            input:text,
+            responseFormat:&#39;wav&#39;,
+            speed:1
+        },controller.signal);
         installTtsAudio(result);
         controls.status.textContent=&#39;WAV synthesis complete. Press play when you choose; the application never autoplays it.&#39;;
     }catch(error){
@@ -1351,24 +1424,22 @@ async function transcribeSpeech(){
         if(!/^audio\/[a-z0-9!#$%&amp;&#39;*+.^_`|~-]+$/u.test(mimeEssence)){
             throw createPublicError(&#39;HELLO_WORLD_STT_MIME_TYPE_REQUIRED&#39;);
         }
-        const provider=speechProviders.stt;
-        if(!provider)throw createPublicError(&#39;ARCANE_AI_NOT_READY&#39;);
-        const selection=speechSelection(provider);
-        const result=await provider.request({
-            role:&#39;stt&#39;,
-            operation:&#39;transcribe&#39;,
-            selection,
-            signal:controller.signal,
-            payload:{
-                audio:file,
-                mimeType,
-                model:selection.modelId
-            }
-        });
-        if(typeof result?.text!==&#39;string&#39;){
+        const owner=speechAI;
+        if(!owner||owner.providerRuntime.status(&#39;stt&#39;).state!==&#39;ready&#39;){
+            throw createPublicError(&#39;ARCANE_AI_NOT_READY&#39;);
+        }
+        function receiveTranscript(value){
+            controls.transcript.textContent=value;
+        }
+        const result=await owner.fetchSTT(
+            file,
+            receiveTranscript,
+            controller.signal
+        );
+        if(typeof result!==&#39;string&#39;){
             throw createPublicError(&#39;ARCANE_AI_INVALID_PROVIDER_RESULT&#39;);
         }
-        controls.transcript.textContent=result.text;
+        controls.transcript.textContent=result;
         controls.status.textContent=&#39;File transcription complete. No microphone was opened or requested.&#39;;
     }catch(error){
         renderPublicError(controls.status,error);
@@ -1425,6 +1496,11 @@ function disposeResolvedAi(value){
     return value.dispose();
 }
 
+function disposeNormalizedSpeech(){
+    if(!speechAI)return Promise.resolve(false);
+    return speechAI.disposeBrowserSpeech();
+}
+
 function ignoreDisposeFailure(){
     // Page teardown is best effort after every active operation is aborted.
 }
@@ -1438,10 +1514,7 @@ function disposeApplication(){
     if(currentAi){
         disposals.push(Promise.resolve(currentAi).then(disposeResolvedAi,ignoreDisposeFailure));
     }
-    for(const role of [&#39;stt&#39;,&#39;tts&#39;]){
-        const provider=speechProviders[role];
-        if(provider)disposals.push(provider.dispose().catch(ignoreDisposeFailure));
-    }
+    if(speechAI)disposals.push(disposeNormalizedSpeech().catch(ignoreDisposeFailure));
     pageDisposePromise=Promise.allSettled(disposals);
 }
 
@@ -1467,6 +1540,7 @@ speechControls.stt.unload?.addEventListener(&#39;click&#39;,unloadStt);
 speechControls.stt.request?.addEventListener(&#39;click&#39;,transcribeSpeech);
 globalThis.addEventListener(&#39;pagehide&#39;,disposeApplication,{once:true});
 globalThis.addEventListener(&#39;pageshow&#39;,reloadAfterBackForwardCache);
+subscribeAIRuntimeState(handleAIRuntimeState,{signal:pageController.signal});
 renderSpeechAuthorityStatus();
 updateLlmControls();
 updateSpeechControls(&#39;tts&#39;);
@@ -1485,7 +1559,7 @@ updateSpeechControls(&#39;stt&#39;);</code></pre><span class="copy-status" role=
   "targets": [
     "browser"
   ]
-}</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p>Keep that shared contract identical in both descriptors. When enabling speech, place each reviewed license and required notice under <code>apps/hello-world/licenses/speech/</code>, then add <code>"licenses"</code> to <code>arcane-app.json</code>’s <code>package.include</code> and <code>arcane-package.json</code>’s top-level <code>include</code> so the packaged app carries them. In an ordinary browser, the page’s <code>arcane-app-id</code> metadata supplies the application identity and the greeting count stays in an app-scoped local-storage key. In a compatible Arcane host, <a href="../reference/runtime-modules/app-data-scope/">AppDataScope</a> can reconcile the authoritative <a href="../reference/core/reference/arcane-api/applications-terminal-capabilities/#arcaneappcurrent"><code>Arcane.app.current()</code></a> identity, while <a href="../reference/runtime-modules/theme-bootstrap/">ThemeBootstrap</a> can consume host appearance events. The application source has no executable-only branch.</p></section>
+}</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p>Keep that shared contract identical in both descriptors. Add only origins required by the app-selected version-pinned upstream authority; the SDK and this example do not vendor or redistribute its speech runtime, model, voice, or legal corpus. In an ordinary browser, the page’s <code>arcane-app-id</code> metadata supplies the application identity and the greeting count stays in an app-scoped local-storage key. In a compatible Arcane host, <a href="../reference/runtime-modules/app-data-scope/">AppDataScope</a> can reconcile the authoritative <a href="../reference/core/reference/arcane-api/applications-terminal-capabilities/#arcaneappcurrent"><code>Arcane.app.current()</code></a> identity, while <a href="../reference/runtime-modules/theme-bootstrap/">ThemeBootstrap</a> can consume host appearance events. The application source has no executable-only branch.</p></section>
 
         <section id="browser"><p class="step-label">Step 06</p><h2>Check it and run it in a browser</h2><p>Doctor checks the toolchain, check validates the complete app and authenticated runtime, the focused test exercises the visible behavior, and dev serves the source tree on a loopback URL.</p><div class="code-block"><div class="code-bar"><span>Application repository</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run doctor
 npm run check
@@ -1495,35 +1569,35 @@ npm run dev</code></pre><span class="copy-status" role="status" aria-live="polit
         <section id="local-ai">
           <p class="step-label">Step 07 · optional</p>
           <h2>Walk through the full browser AI lifecycle</h2>
-          <p>The application gives the LLM, TTS, and STT roles separate providers, operation signals, status, progress, cancellation, and unload controls. A failure or unload in one role does not silently switch providers or stop either other role.</p>
+          <p>The application gives the LLM, TTS, and STT roles separate providers, operation signals, status, cancellation, and unload controls. A failure or unload in one role does not silently switch providers or stop either other role.</p>
           <h3>1. Know what the SDK and application each own</h3>
-          <p><code>arcane-os@0.2.1</code> ships the authenticated browser-WASM LLM runtime plus the browser-speech authority, artifact-store, Worker, lifecycle, and normalization machinery. It does not choose or ship caller-selected Whisper or Kokoro adapter closures, speech models, voices, URLs, or their licenses. This app keeps <code>SpeechAuthorities.js</code> at <code>null</code> for both speech roles until its owner supplies a reviewed, immutable closure. A speech load attempt before then returns <code>HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED</code> before storage or provider creation and performs no fetch.</p>
-          <p>The LLM example supplies an immutable Granite 4.1 3B Q4_K_S authority: 1,998,371,424 bytes (1.86 GiB), Apache-2.0, revision <code>ab4701481089b58a082ef63cc1cee738887293ff</code>, and SHA-256 <code>ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a</code>. This 0.2.1 LLM provider requires a WebGPU-capable browser.</p>
-          <h3>2. Admit each role’s artifacts once</h3>
+          <p><code>arcane-os@0.3.1</code> ships normalized <code>arcane/AI</code>, the browser-WASM LLM runtime, and browser-speech provider, store, Worker, and lifecycle machinery. It does not choose or redistribute caller-selected Whisper or Kokoro runtimes, models, voices, legal corpora, or corresponding source. This app keeps <code>SpeechAuthorities.js</code> at <code>null</code> until its owner supplies a licensed, version-pinned upstream authority. A speech load attempt before then returns <code>HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED</code> before provider creation and performs no fetch.</p>
+          <p>The LLM example supplies an immutable Granite 4.1 3B Q4_K_S source: 1,998,371,424 bytes (1.86 GiB), Apache-2.0, revision <code>ab4701481089b58a082ef63cc1cee738887293ff</code>, and SHA-256 <code>ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a</code>. The ordinary <code>secure:false</code> path retains that evidence but reports optional byte checks as <code>unchecked</code> when they did not run. This 0.3.1 LLM provider requires a WebGPU-capable browser.</p>
+          <h3>2. Hydrate and load one selected role</h3>
           <ol>
-            <li>Choose a role’s <strong>network load</strong> button. The SDK checks that role’s app-scoped DBOPFS cache first and downloads only a missing, declared artifact closure. Its progress remains local to that role.</li>
-            <li>With the app’s fixed secure policy, Arcane checks every declared byte length and SHA-256 digest before committing the completed cache. Speech URLs must be immutable, directly fetchable, and non-redirecting.</li>
-            <li>Unload the role, then choose its <strong>verified cache offline</strong> button. The app reconstructs the same authority with strict offline acquisition; a miss returns <code>ARCANE_AI_ARTIFACT_OFFLINE_MISS</code> without network fallback.</li>
+            <li>The app first stages the exact selected provider and model in the in-memory provider runtime with <code>localOnly:null</code>. <code>AI.configureBrowserSpeech()</code> hydrates that selected-but-unregistered route without changing the omitted external Cloud or Core role.</li>
+            <li>Choose that role’s <strong>network load</strong> button. The SDK checks its app-scoped DBOPFS cache and obtains missing artifacts from the app-selected version-pinned upstream distribution only after this action.</li>
+            <li>Unload the role, then choose its <strong>app cache</strong> button. The normalized AI owner replaces only that role with <code>offline:true</code>; a miss returns the documented offline-miss code without upstream fallback.</li>
           </ol>
-          <p>LLM packaged same-origin Wllama/WASM assets may still load during its offline model-cache path. Speech strict-offline mode applies to the complete caller-declared adapter and model closure. Unload and dispose release live provider Workers and object URLs while retaining admitted DBOPFS artifacts.</p>
+          <p>LLM packaged same-origin Wllama/WASM assets may still load during its offline model-cache path. Warn-first status surfaces <code>browser-speech-warn-first-secure-mode-disabled</code> and says <code>unchecked</code> when optional integrity checks did not run. Optional <code>secure:true</code> requires a complete compatible content-addressed graph and file authority plus unload/reload; it rejects remote <code>wasmPaths</code> while still supporting immutable HTTPS graph sources. This example does not silently enable it. Unload and dispose release live Workers and object URLs while retaining DBOPFS data.</p>
           <h3>3. Use each loaded role</h3>
           <ul>
             <li><strong>LLM:</strong> ask a local-only question. Proposed tool calls remain visible structural name-and-argument records; the SDK and this app execute none of them.</li>
-            <li><strong>TTS:</strong> enter up to 500 characters and synthesize WAV bytes. The app exposes a temporary Blob URL through user-controlled <code>&lt;audio controls&gt;</code>, never autoplays, and revokes that URL when audio is replaced, TTS unloads, or the page leaves.</li>
+            <li><strong>TTS:</strong> enter up to 500 characters and synthesize a WAV <code>Blob</code>. The app exposes a temporary object URL through user-controlled <code>&lt;audio controls&gt;</code>, never autoplays, and revokes that URL when audio is replaced, TTS unloads, or the page leaves.</li>
             <li><strong>STT:</strong> explicitly choose one audio file up to 8 MiB and transcribe it. Oversized input is rejected before SDK decoding. The app never requests microphone access or captures background audio.</li>
           </ul>
           <h3>4. Cancel, unload, and leave safely</h3>
-          <p>Each role owns one active <code>AbortController</code>. Cancel affects only that role. Depending on timing, speech cancellation leaves its provider ready or returns it to unloaded; the UI reads the provider state. Unload is disabled while a role is busy, so cancel or let the operation settle first. Unload then ends only that role and keeps verified cache data.</p>
-          <p>Leaving the page aborts all active operations, initiates best-effort disposal of every created provider, and revokes the TTS playback URL; browser termination releases any remaining live resources. If the browser restores the document from back/forward cache, the app reloads once to create fresh lifecycle owners. The UI maps documented <code>ARCANE_AI_*</code>, <code>APP_DATA_*</code>, and bounded-input <code>HELLO_WORLD_*</code> codes to stable copy instead of exposing provider-private messages.</p>
+          <p>Each role owns one active <code>AbortController</code>. Cancel affects only that role. Depending on timing, speech cancellation leaves its provider ready or returns it to unloaded; the UI reads normalized provider state. Unload is disabled while a role is busy, so cancel or let the operation settle first. Unload then ends only that role and keeps its cache data.</p>
+          <p>Leaving the page aborts all active operations, calls the LLM facade’s <code>dispose()</code> and normalized AI’s <code>disposeBrowserSpeech()</code>, and revokes the TTS playback URL; browser termination releases any remaining live resources. If the browser restores the document from back/forward cache, the app reloads once to create fresh lifecycle owners. The UI maps documented <code>ARCANE_AI_*</code>, <code>APP_DATA_*</code>, and bounded-input <code>HELLO_WORLD_*</code> codes to stable copy instead of exposing provider-private messages.</p>
           <p>This interaction is browser-only and makes no Node-inference claim. Follow the <a href="../reference/ai/browser-wasm/">browser-WASM guide</a>, <a href="../reference/ai/browser-speech/">browser-speech guide</a>, <a href="../reference/sdk-api/">SDK API</a>, normalized <a href="../reference/ai/">AI guidance</a>, and runtime <a href="../reference/runtime-modules/ai/">AI.js module</a> for the full contracts.</p>
         </section>
 
         <section id="package"><p class="step-label">Step 08</p><h2>Package, verify, and bundle the browser application</h2><div class="code-block"><div class="code-bar"><span>Create and authenticate dist/hello-world</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run package
 npm run verify
-npm run bundle</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>Output:</strong> <code>dist/hello-world/</code> plus <code>dist/hello-world-0.1.0.arcane-app.tar.gz</code>. The <code>0.1.0</code> in that filename is this app’s version; the SDK dependency remains <code>arcane-os@0.2.1</code>. Verification compares the packaged inventory, byte sizes, and hashes with its release receipt.</p><p>See the CLI reference for <a href="../reference/cli/#arcane-package">package</a>, <a href="../reference/cli/#arcane-verify">verify</a>, and <a href="../reference/cli/#arcane-bundle">bundle</a>.</p></section>
+npm run bundle</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>Output:</strong> <code>dist/hello-world/</code> plus <code>dist/hello-world-0.1.0.arcane-app.tar.gz</code>. The <code>0.1.0</code> in that filename is this app’s version; the SDK dependency remains <code>arcane-os@0.3.1</code>. Verification compares the packaged inventory, byte sizes, and hashes with its release receipt.</p><p>See the CLI reference for <a href="../reference/cli/#arcane-package">package</a>, <a href="../reference/cli/#arcane-verify">verify</a>, and <a href="../reference/cli/#arcane-bundle">bundle</a>.</p></section>
 
         <section id="packaged-run"><p class="step-label">Step 09</p><h2>Build and run the packaged browser release</h2><p>The maintained scripts name the browser target explicitly. <code>build</code> regenerates the map and packages <code>dist/hello-world/</code>; <code>run</code> verifies the existing packaged release and serves it on a loopback URL.</p><div class="code-block"><div class="code-bar"><span>Browser build and packaged run</span><button type="button" data-copy-button>Copy</button></div><pre><code>npm run build
-npm run run</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>You will see:</strong> the same greeting and independent LLM, TTS, and STT lifecycle interface running from the verified packaged browser release. Speech remains authority-gated unless you configured its immutable closures before packaging. These commands do not create or launch a standalone native executable. Standalone native execution is provider-supplied and belongs to the separate <a href="../guides/native-builds/">native-build workflow</a>.</p></section>
+npm run run</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div><p class="expected"><strong>You will see:</strong> the same greeting and independent LLM, TTS, and STT lifecycle interface running from the verified packaged browser release. Speech remains authority-gated unless you configured its version-pinned upstream authorities before packaging. These commands do not create or launch a standalone native executable. Standalone native execution is provider-supplied and belongs to the separate <a href="../guides/native-builds/">native-build workflow</a>.</p></section>
 
         <section id="related"><p class="step-label">Keep going</p><h2>Open the related reference where you need it</h2><ul><li><strong>Commands:</strong> <a href="../reference/cli/">CLI reference</a> and the direct <a href="../reference/sdk-api/">SDK API inventory</a>.</li><li><strong>App and host:</strong> <a href="../reference/core/capabilities/">capabilities</a>, <a href="../reference/core/reference/arcane-api/core-and-events/#arcaneruntimecurrent"><code>Arcane.runtime.current()</code></a>, <a href="../reference/core/reference/arcane-api/applications-terminal-capabilities/#arcaneappcurrent"><code>Arcane.app.current()</code></a>, and <a href="../reference/core/reference/arcane-api/applications-terminal-capabilities/#arcanecapabilitieslist"><code>Arcane.capabilities.list()</code></a>.</li><li><strong>Runtime modules:</strong> <a href="../reference/runtime-modules/theme-bootstrap/">ThemeBootstrap</a>, <a href="../reference/runtime-modules/app-data-scope/">AppDataScope</a>, <a href="../reference/runtime-modules/dbopfs/">DBOPFS</a>, and <a href="../reference/runtime-modules/directory-picker/">DirectoryPicker</a>. DirectoryPicker is related host functionality; this browser-only example does not request its <a href="../reference/core/capabilities/#capability-filesystemdirectoryselect"><code>filesystem.directory.select</code> capability</a>.</li><li><strong>AI:</strong> <a href="../reference/ai/browser-wasm/">browser-WASM local AI</a>, <a href="../reference/ai/browser-speech/">browser speech</a>, <a href="../reference/ai/">normalized AI guidance</a>, <a href="../reference/runtime-modules/ai/">AI.js</a>, and <a href="../reference/core/reference/arcane-api/ai-and-ollama/#arcaneaichat"><code>Arcane.ai.chat</code></a>.</li></ul></section>
 

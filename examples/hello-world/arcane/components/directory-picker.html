@@ -33,6 +33,9 @@
     const host=this;
     const root=host.shadowRoot;
     const {default:DirectoryPicker}=await import('../modules/DirectoryPicker.js');
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.directory-picker',eventTypes:['directory-picker-cancel','directory-picker-change','directory-picker-error','directory-picker-ready']});
+    const lifecycleController=new AbortController();
     const field=root.querySelector('#field');
     const label=root.querySelector('#label');
     const pathDisplay=root.querySelector('#path');
@@ -45,18 +48,37 @@
     let disabled=false;
     let pending=false;
     let picker=new DirectoryPicker();
+    let operationGeneration=0;
+    let selectionRevision=0;
+    let operationSequence=0;
+    let destroyed=false;
 
     host.configure=configure;
+    host.destroy=destroy;
     host.focus=focus;
     host.select=select;
 
     Object.defineProperties(host,{
-        disabled:{get:()=>disabled,set:setDisabled},
-        options:{get:getOptions,set:configure},
-        value:{get:()=>currentValue,set:setValue}
+        disabled:{configurable:true,get:()=>disabled,set:setDisabled},
+        options:{configurable:true,get:getOptions,set:configure},
+        value:{configurable:true,get:()=>currentValue,set:setValue}
     });
 
-    choose.addEventListener('click',()=>select().catch(()=>{}));
+    choose.addEventListener(
+        'click',
+        ()=>select().catch(
+            error=>console.error('Unable to select a directory:',error)
+        ),
+        {signal:lifecycleController.signal}
+    );
+
+    function emit(type,detail={},publicDetail={},operationId=null){
+        if(destroyed){
+            return false;
+        }
+        const publication=events.dispatch(type,detail,{publicDetail,operationId});
+        return projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});
+    }
 
     function datasetOptions(){
         return {
@@ -71,32 +93,47 @@
     }
 
     function configure(input={}){
+        if(destroyed){
+            return false;
+        }
         if(!input||typeof input!=='object'||Array.isArray(input)){
             throw new TypeError('Directory picker configuration must be an object.');
         }
+        const replacesSelection=Object.prototype.hasOwnProperty.call(input,'picker')
+            ||Object.prototype.hasOwnProperty.call(input,'value');
         const next={...datasetOptions(),...options,...input};
         const nextDisabled=Object.prototype.hasOwnProperty.call(input,'disabled')||!host.ready
             ?Boolean(next.disabled)
             :disabled;
+        const nextPicker=input.picker===undefined?picker:input.picker;
         if(input.picker!==undefined){
-            if(!input.picker||typeof input.picker.select!=='function'){
+            if(!nextPicker||typeof nextPicker.select!=='function'){
                 throw new TypeError('picker must expose a select(options) function.');
             }
-            picker=input.picker;
         }
-        options={
+        const nextOptions={
             buttonLabel:text(next.buttonLabel,'Choose folder'),
             help:text(next.help,'Choose one folder from this device.'),
             label:text(next.label,'Folder'),
             placeholder:text(next.placeholder,'No folder selected'),
             title:text(next.title,next.label||'Choose folder')
         };
+        const replacesValue=Object.prototype.hasOwnProperty.call(input,'value')
+            ||!host.ready;
+        const nextValue=replacesValue
+            ?normalizeValue(next.value??'')
+            :currentValue;
+        if(replacesSelection){
+            reviseSelection();
+        }
+        picker=nextPicker;
+        options=nextOptions;
         label.innerText=options.label;
         help.innerText=options.help;
         choose.innerText=options.buttonLabel;
         pathDisplay.placeholder=options.placeholder;
-        if(Object.prototype.hasOwnProperty.call(input,'value')||!host.ready){
-            setValue(next.value??'');
+        if(replacesValue){
+            applyValue(nextValue);
         }
         setDisabled(nextDisabled);
         return getOptions();
@@ -112,17 +149,33 @@
     }
 
     function setValue(value=''){
-        const next=`${value??''}`.trim();
-        if(next.length>4096||/[\u0000-\u001f\u007f]/.test(next)){
-            throw new TypeError('The directory path must be bounded plain text.');
+        if(destroyed){
+            return currentValue;
         }
-        currentValue=next;
+        const next=normalizeValue(value);
+        reviseSelection();
+        return applyValue(next);
+    }
+
+    function applyValue(value=''){
+        currentValue=normalizeValue(value);
         pathDisplay.value=currentValue;
         host.dataset.hasValue=`${Boolean(currentValue)}`;
         return currentValue;
     }
 
+    function normalizeValue(value=''){
+        const next=`${value??''}`.trim();
+        if(next.length>4096||/[\u0000-\u001f\u007f]/.test(next)){
+            throw new TypeError('The directory path must be bounded plain text.');
+        }
+        return next;
+    }
+
     function setDisabled(value=false){
+        if(destroyed){
+            return disabled;
+        }
         disabled=Boolean(value);
         pathDisplay.disabled=disabled;
         choose.disabled=disabled||pending;
@@ -132,12 +185,18 @@
     }
 
     function focus(options){
+        if(destroyed){
+            return false;
+        }
         choose.focus(options);
         return document.activeElement===host||root.activeElement===choose;
     }
 
     async function select(){
-        if(disabled||pending) return null;
+        if(destroyed||disabled||pending) return null;
+        const generation=++operationGeneration;
+        const revision=selectionRevision;
+        const operationId=`${events.descriptor.instanceId}:select:${++operationSequence}`;
         const previousPath=currentValue;
         setPending(true);
         setStatus('Opening the folder selector.');
@@ -146,34 +205,39 @@
                 ...(currentValue?{initialPath:currentValue}:{}),
                 title:options.title||options.label||'Choose folder'
             });
+            if(destroyed
+                ||generation!==operationGeneration
+                ||revision!==selectionRevision){
+                return null;
+            }
             if(result.cancelled){
                 setStatus('Folder selection canceled.');
-                host.dispatchEvent(new CustomEvent('directory-picker-cancel',{
-                    bubbles:true,
-                    composed:true,
-                    detail:{path:currentValue}
-                }));
+                emit('directory-picker-cancel',{path:currentValue,reason:'directory-selection-cancelled'},{hasPath:Boolean(currentValue),reason:'directory-selection-cancelled'},operationId);
                 return result;
             }
-            setValue(result.path);
+            applyValue(result.path);
             setStatus('Folder selected.');
-            host.dispatchEvent(new CustomEvent('directory-picker-change',{
-                bubbles:true,
-                composed:true,
-                detail:{path:currentValue,previousPath,source:'picker'}
-            }));
+            emit('directory-picker-change',{path:currentValue,previousPath,source:'picker'},{hasPath:Boolean(currentValue),changed:currentValue!==previousPath},operationId);
             return result;
         }catch(error){
+            if(destroyed
+                ||generation!==operationGeneration
+                ||revision!==selectionRevision){
+                return null;
+            }
             const message=error?.message||'The folder selector could not open.';
             setStatus(message,'error');
-            host.dispatchEvent(new CustomEvent('directory-picker-error',{
-                bubbles:true,
-                composed:true,
-                detail:{error,message}
-            }));
+            const code=String(error?.code||'ARCANE_DIRECTORY_PICKER_SELECTION_FAILED');
+            const reason='directory-selection-failed';
+            emit('directory-picker-error',{error,message,code,reason},{code,reason},operationId);
             throw error;
         }finally{
-            setPending(false);
+            if(!destroyed&&generation===operationGeneration){
+                setPending(false);
+                if(revision!==selectionRevision){
+                    setStatus('Folder selection superseded.');
+                }
+            }
         }
     }
 
@@ -185,13 +249,35 @@
         return pending;
     }
 
+    function reviseSelection(){
+        selectionRevision+=1;
+        if(pending){
+            setStatus('Folder selection superseded; waiting for the selector to close.');
+        }
+    }
+
     function setStatus(message='',tone=''){
         status.innerText=`${message||''}`;
         status.dataset.tone=tone;
         return status.innerText;
     }
 
+    function destroy(){
+        if(destroyed){
+            return false;
+        }
+        destroyed=true;
+        operationGeneration+=1;
+        selectionRevision+=1;
+        lifecycleController.abort('directory-picker-destroyed');
+        pending=false;
+        picker?.destroy?.();
+        events.dispose();
+        host.ready=false;
+        return true;
+    }
+
     configure(datasetOptions());
     host.ready=true;
-    host.dispatchEvent(new CustomEvent('directory-picker-ready',{bubbles:true,composed:true}));
+    emit('directory-picker-ready',{}, {ready:true});
 </script>

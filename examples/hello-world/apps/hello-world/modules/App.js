@@ -4,18 +4,16 @@ import {
     resolveApplicationLocalStorageKey
 } from 'arcane/AppDataScope';
 import DBOPFS from 'arcane/DBOPFS';
+import AI, {
+    AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL
+} from 'arcane/AI';
+import {subscribeAIRuntimeState} from 'arcane/AIRuntimeState';
 import {
     createArcaneAI,
     createBrowserModelSource,
     createBrowserWasmLlmProvider,
     createDbopfsModelStore
 } from 'arcane-os/ai/browser-wasm';
-import {
-    createBrowserKokoroProvider,
-    createBrowserSpeechAuthority,
-    createBrowserWhisperProvider,
-    createDbopfsSpeechArtifactStore
-} from 'arcane-os/ai/browser-speech';
 import speechAuthorities from './SpeechAuthorities.js';
 
 const MODEL=Object.freeze({
@@ -29,6 +27,7 @@ const SPEECH_PROVIDER_IDS=Object.freeze({
     stt:'hello-world-browser-whisper',
     tts:'hello-world-browser-kokoro'
 });
+const AI_SECURITY=Object.freeze({secure:false});
 const MAX_LLM_PROMPT_LENGTH=2000;
 const MAX_STT_FILE_BYTES=8*1024*1024;
 const MAX_TTS_TEXT_LENGTH=500;
@@ -50,19 +49,21 @@ const SHOW_GREETING_TOOL=Object.freeze({
 });
 
 const ERROR_COPY=Object.freeze({
-    HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED:'This speech role has no complete app-owned model, runtime, license, revision, URL, and hash authority. TTS also requires a voice. Configure SpeechAuthorities.js before loading it.',
+    HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED:'This speech role has no complete app-owned model and version-pinned runtime selection. TTS also requires a voice. Configure SpeechAuthorities.js before loading it.',
     HELLO_WORLD_STT_FILE_REQUIRED:'Choose a nonempty audio file before transcribing.',
     HELLO_WORLD_STT_FILE_TOO_LARGE:'Choose an audio file no larger than 8 MiB so browser decoding remains bounded.',
     HELLO_WORLD_STT_MIME_TYPE_REQUIRED:'The chosen audio file must declare its audio media type.',
     HELLO_WORLD_TTS_TEXT_REQUIRED:'Enter text before synthesizing speech.',
     HELLO_WORLD_TTS_TEXT_TOO_LONG:'Keep text-to-speech input at 500 characters or fewer so synthesis remains bounded.',
     HELLO_WORLD_AUDIO_PLAYBACK_UNAVAILABLE:'This browser cannot expose the synthesized WAV for user-controlled playback.',
+    HELLO_WORLD_SPEECH_ROUTE_RESTORE_FAILED:'The application could not restore its prior speech routes after configuration failed. Reload the page before trying again.',
     HELLO_WORLD_LLM_PROMPT_TOO_LONG:'Keep the language-model prompt at 2,000 characters or fewer so tokenization remains bounded.',
     ARCANE_AI_REQUEST_ABORTED:'The operation was cancelled. Any admitted DBOPFS cache remains; interrupted downloads are discarded.',
     ARCANE_AI_OPERATION_SUPERSEDED:'A newer lifecycle operation replaced this one safely.',
     ARCANE_AI_MODEL_AUTHORITY_REQUIRED:'The selected model does not match the admitted application authority.',
-    ARCANE_AI_MODEL_OFFLINE_MISS:'No verified offline LLM cache is available. Load once while online first.',
-    ARCANE_AI_ARTIFACT_OFFLINE_MISS:'No admitted offline speech cache is available. Load this role once while online first.',
+    ARCANE_AI_MODEL_OFFLINE_MISS:'No compatible offline LLM cache is available. Load once while online first.',
+    ARCANE_AI_ARTIFACT_OFFLINE_MISS:'No compatible offline speech cache is available. Load this role once while online first.',
+    ARCANE_AI_ARTIFACT_GRAPH_OFFLINE_CACHE_MISS:'No compatible offline speech cache is available. Load this role once while online first.',
     ARCANE_AI_MODEL_DOWNLOAD_FAILED:'The model download failed. Check the network and try again.',
     ARCANE_AI_ARTIFACT_DOWNLOAD_FAILED:'A declared speech artifact could not be downloaded.',
     ARCANE_AI_MODEL_REDIRECT_BLOCKED:'The model response left HTTPS and was rejected.',
@@ -84,7 +85,7 @@ const ERROR_COPY=Object.freeze({
     ARCANE_AI_MODEL_SHARD_TOO_LARGE:'A model shard is too large for the selected WebGPU device.',
     ARCANE_AI_WEBASSEMBLY_UNAVAILABLE:'This browser does not provide the WebAssembly support required by the local runtime.',
     ARCANE_AI_SECURE_CONTEXT_REQUIRED:'Open this app from HTTPS or a loopback development URL so secure browser APIs are available.',
-    ARCANE_AI_OPFS_UNAVAILABLE:'This browser does not provide the origin-private storage required for verified model cache data.',
+    ARCANE_AI_OPFS_UNAVAILABLE:'This browser does not provide the origin-private storage required for model cache data.',
     ARCANE_AI_STORAGE_BUSY:'Another browser context is updating this exact authority.',
     ARCANE_AI_STORAGE_UNAVAILABLE:'App-scoped browser storage is unavailable.',
     ARCANE_AI_STORAGE_READ_FAILED:'The admitted speech cache could not be read.',
@@ -172,13 +173,14 @@ const roleOperations={
     stt:{controller:null,name:null,pageAbortHandler:null},
     tts:{controller:null,name:null,pageAbortHandler:null}
 };
-const speechProviders={stt:null,tts:null};
-const speechProviderOffline={stt:null,tts:null};
 const speechAuthorityCache={stt:undefined,tts:undefined};
+const speechRoleOffline={stt:null,tts:null};
+const speechRoleManaged={stt:false,tts:false};
 let dbopfsPromise=null;
-let speechStorePromise=null;
 let ai=null;
 let aiPromise=null;
+let speechAI=null;
+let speechHydrationPending=true;
 let pageDisposePromise=null;
 let requestNumber=0;
 let ttsAudioUrl=null;
@@ -260,7 +262,19 @@ function finishRoleOperation(role,controller){
 }
 
 function cancelRoleOperation(role){
-    roleOperations[role].controller?.abort('Cancelled by the application user.');
+    const operation=roleOperations[role];
+    operation.controller?.abort('Cancelled by the application user.');
+    if((role==='stt'||role==='tts')&&speechAI){
+        speechAI.providerRuntime.cancel(role);
+    }
+    if(role==='tts'&&operation.name?.includes('load')&&speechAI){
+        return speechAI.setSpeechMuted(true).catch(ignoreSpeechCancellationFailure);
+    }
+    return Promise.resolve();
+}
+
+function ignoreSpeechCancellationFailure(){
+    // The active operation reports the authoritative cancellation result.
 }
 
 function lifecycleState(){
@@ -282,7 +296,8 @@ function updateLlmControls(){
 
 function speechLifecycleState(role){
     if(!configuredSpeechAuthority(role))return 'authority-required';
-    return speechProviders[role]?.status?.().state??'unloaded';
+    if(!speechAI||!speechRoleManaged[role])return 'unloaded';
+    return speechAI.providerRuntime.status(role).state;
 }
 
 function updateSpeechControls(role){
@@ -296,7 +311,7 @@ function updateSpeechControls(role){
     controls.loadOffline.disabled=busy||state==='ready';
     controls.request.disabled=busy||state!=='ready';
     if(role==='stt')controls.file.disabled=busy||state!=='ready';
-    controls.unload.disabled=busy||speechProviders[role]===null||state==='unloaded';
+    controls.unload.disabled=busy||!speechRoleManaged[role]||state==='unloaded';
     controls.cancel.disabled=!busy||operation.name==='unload';
     controls.cancel.hidden=!busy||operation.name==='unload';
 }
@@ -350,29 +365,14 @@ function applicationDbopfs(){
     return dbopfsPromise;
 }
 
-async function initializeSpeechStore(){
-    return createDbopfsSpeechArtifactStore({dbopfs:await applicationDbopfs()});
-}
-
-function resetSpeechStorePromise(error){
-    speechStorePromise=null;
-    throw error;
-}
-
-function speechArtifactStore(){
-    if(speechStorePromise)return speechStorePromise;
-    speechStorePromise=initializeSpeechStore().catch(resetSpeechStorePromise);
-    return speechStorePromise;
-}
-
 function renderLlmProgress(value){
     if(!value||typeof value!=='object')return;
     const total=Number(value.total)||MODEL.bytes;
     const loaded=Math.min(total,Math.max(0,Number(value.loaded)||0));
     const phase={
         download:'Downloading model bytes',
-        'verify-download':'Verifying the downloaded model SHA-256',
-        'verify-cache':'Rehashing the DBOPFS cache',
+        'verify-download':'Running enabled download integrity checks',
+        'verify-cache':'Running enabled cache integrity checks',
         initialize:'Starting the browser-local runtime'
     }[value.phase]??'Preparing local AI';
     aiProgress.max=total;
@@ -403,7 +403,7 @@ async function createLocalAIInstance(){
     const created=createArcaneAI({
         provider,
         loadPolicy:'manual',
-        security:{secure:true}
+        security:AI_SECURITY
     });
     created.llm.addEventListener('progress',handleLlmProgressEvent);
     created.llm.addEventListener('statechange',updateLlmControls);
@@ -429,23 +429,28 @@ async function loadModel(options={}){
     const controller=beginRoleOperation('llm',offline?'offline-load':'load');
     if(!controller)return;
     aiStatus.textContent=offline
-        ?'Checking the verified DBOPFS cache without a model-source request. Packaged same-origin Wllama/WASM assets may still load.'
-        :'Checking the strict cache. A 1.86 GiB model download starts only if it is missing.';
+        ?'Checking the DBOPFS cache without a model-source request. Packaged same-origin Wllama/WASM assets may still load.'
+        :'Checking the cache. A 1.86 GiB model download starts only if it is missing.';
     aiProgress.hidden=true;
     aiProgressLabel.textContent='';
     try{
         const local=await localAI();
         const result=await local.load({signal:controller.signal,offline});
-        const cacheState=result.cache?.state??local.status().llm.cache?.state;
+        const snapshot=local.status().llm;
+        const cacheState=result.cache?.state??snapshot.cache?.state;
+        const integrityState=snapshot.integrity?.state??'unchecked';
+        const integrityCopy=integrityState==='verified'
+            ?'Enabled integrity checks completed successfully.'
+            :'Warn-first mode: byte-length and SHA-256 checks were not requested.';
         aiProgress.max=MODEL.bytes;
         aiProgress.value=MODEL.bytes;
         aiProgress.hidden=false;
         if(cacheState==='installed'){
-            aiStatus.textContent='Model downloaded, SHA-256 verified, admitted to app-scoped DBOPFS, and loaded locally.';
+            aiStatus.textContent=`Model downloaded, stored in app-scoped DBOPFS, and loaded locally. ${integrityCopy}`;
         }else{
             aiStatus.textContent=offline
-                ?'Verified DBOPFS cache loaded without a model-source request.'
-                :'Verified DBOPFS cache reused and loaded locally.';
+                ?`DBOPFS cache loaded without a model-source request. ${integrityCopy}`
+                :`DBOPFS cache reused and loaded locally. ${integrityCopy}`;
         }
         aiProgressLabel.textContent='Browser-local model ready.';
     }catch(error){
@@ -518,11 +523,11 @@ async function askLocalAI(){
 async function unloadModel(){
     const controller=beginRoleOperation('llm','unload');
     if(!controller)return;
-    aiStatus.textContent='Ending the browser model session without deleting any verified cache.';
+    aiStatus.textContent='Ending the browser model session without deleting the stored DBOPFS cache.';
     try{
         const local=await localAI();
         await local.unload();
-        aiStatus.textContent='Model unloaded. The browser model Worker is no longer active; any verified DBOPFS cache remains.';
+        aiStatus.textContent='Model unloaded. The browser model Worker is no longer active; the stored DBOPFS cache remains.';
     }catch(error){
         renderPublicError(aiStatus,error);
     }finally{
@@ -537,21 +542,25 @@ function configuredSpeechAuthority(role){
         speechAuthorityCache[role]=null;
         return null;
     }
-    try{
-        createBrowserSpeechAuthority({
-            providerId:SPEECH_PROVIDER_IDS[role],
-            role,
-            model:authority.model,
-            runtime:authority.runtime,
-            security:{
-                secure:true,
-                checks:{byteLength:true,sha256:true}
-            }
-        });
-        speechAuthorityCache[role]=authority;
-    }catch{
+    const model=authority.model;
+    const runtime=authority.runtime;
+    const expectedAdapter=role==='stt'?'transformers-whisper':'kokoro-js';
+    const complete=typeof model?.id==='string'
+        &&typeof model?.repository==='string'
+        &&typeof model?.revision==='string'
+        &&(model.files===undefined||Array.isArray(model.files))
+        &&(role!=='tts'||typeof model?.defaultVoice==='string')
+        &&runtime?.adapter===expectedAdapter
+        &&typeof runtime?.version==='string'
+        &&typeof runtime?.revision==='string'
+        &&typeof runtime?.entry==='string'
+        &&Array.isArray(runtime?.files)
+        &&runtime.files.length>0;
+    if(!complete){
         speechAuthorityCache[role]=null;
+        return null;
     }
+    speechAuthorityCache[role]=authority;
     return speechAuthorityCache[role];
 }
 
@@ -561,81 +570,135 @@ function requiredSpeechAuthority(role){
     return authority;
 }
 
-async function createSpeechProvider(role,offline,signal){
-    const authority=requiredSpeechAuthority(role);
-    const store=await speechArtifactStore();
-    throwIfAborted(signal);
-    const options={
-        id:SPEECH_PROVIDER_IDS[role],
-        localOnly:true,
-        model:authority.model,
-        runtime:authority.runtime,
-        appSecurity:{secure:true},
-        store,
-        offline
-    };
-    return role==='stt'
-        ?createBrowserWhisperProvider(options)
-        :createBrowserKokoroProvider(options);
+function normalizedSpeechAI(){
+    if(!speechAI)speechAI=new AI();
+    return speechAI;
 }
 
-async function speechProvider(role,offline,signal){
-    const current=speechProviders[role];
-    if(current&&speechProviderOffline[role]===offline)return current;
-    if(current){
-        await current.dispose();
-        if(speechProviders[role]===current){
-            speechProviders[role]=null;
-            speechProviderOffline[role]=null;
-        }
-    }
-    throwIfAborted(signal);
-    const created=await createSpeechProvider(role,offline,signal);
-    if(signal?.aborted){
-        await created.dispose();
-        throw createPublicError('ARCANE_AI_REQUEST_ABORTED');
-    }
-    speechProviders[role]=created;
-    speechProviderOffline[role]=offline;
-    updateSpeechControls(role);
-    return created;
-}
-
-function speechSelection(provider){
-    const catalog=provider.catalog();
+function speechRuntimeRoutes(runtime,role){
     return Object.freeze({
-        providerId:provider.id,
-        modelId:catalog[0].id,
-        localOnly:true
+        default:runtime.selection(role),
+        localOnly:runtime.selection(role,{localOnly:true})
     });
 }
 
-function speechPhaseLabel(phase){
-    return {
-        download:'Downloading declared artifacts',
-        'verify-download':'Verifying downloaded artifact authority',
-        'verify-cache':'Revalidating the admitted DBOPFS cache',
-        'runtime-import':'Importing the isolated runtime',
-        'model-load':'Loading the speech model in its Worker',
-        ready:'Speech Worker ready'
-    }[phase]??'Preparing browser-local speech';
+function pendingSpeechRoutes(authority){
+    const selection=Object.freeze({
+        providerId:authority.providerId,
+        modelId:authority.model.id,
+        localOnly:null
+    });
+    return Object.freeze({default:selection,localOnly:null});
+}
+
+function prepareSelectedSpeechHydration(owner,role,authority){
+    if(!speechHydrationPending)return null;
+    const runtime=owner.providerRuntime;
+    const previous=Object.freeze({
+        stt:speechRuntimeRoutes(runtime,'stt'),
+        tts:speechRuntimeRoutes(runtime,'tts')
+    });
+    const pending=Object.freeze({
+        providerId:SPEECH_PROVIDER_IDS[role],
+        model:authority.model
+    });
+    const next={stt:previous.stt,tts:previous.tts};
+    next[role]=pendingSpeechRoutes(pending);
+    runtime.configureSpeech(Object.freeze(next));
+    return previous;
+}
+
+function restoreSpeechRoutes(runtime,previous){
+    if(!previous)return;
+    try{
+        runtime.configureSpeech(previous);
+    }catch{
+        throw createPublicError('HELLO_WORLD_SPEECH_ROUTE_RESTORE_FAILED');
+    }
+}
+
+async function recoverInitialSpeechRoutes(owner,previous,error){
+    if(!previous)return;
+    if(error?.committed===true){
+        try{
+            await owner.disposeBrowserSpeech();
+        }catch{
+            throw createPublicError('HELLO_WORLD_SPEECH_ROUTE_RESTORE_FAILED');
+        }
+    }
+    restoreSpeechRoutes(owner.providerRuntime,previous);
+    speechHydrationPending=true;
+}
+
+async function ensureSpeechRoleConfigured(role,offline,signal){
+    if(speechRoleManaged[role]&&speechRoleOffline[role]===offline){
+        return normalizedSpeechAI().browserSpeechDescriptor;
+    }
+    const owner=normalizedSpeechAI();
+    const authority=requiredSpeechAuthority(role);
+    const dbopfs=await applicationDbopfs();
+    const previous=prepareSelectedSpeechHydration(owner,role,authority);
+    const roleConfiguration=Object.freeze({
+        providerId:SPEECH_PROVIDER_IDS[role],
+        model:authority.model,
+        runtime:authority.runtime,
+        security:AI_SECURITY,
+        offline
+    });
+    const configuration={
+        protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+        id:`hello-world-${role}-${offline?'offline':'network'}`,
+        dbopfs
+    };
+    configuration[role]=roleConfiguration;
+    try{
+        const descriptor=await owner.configureBrowserSpeech(
+            Object.freeze(configuration),
+            {signal}
+        );
+        speechRoleManaged[role]=true;
+        speechRoleOffline[role]=offline;
+        speechHydrationPending=false;
+        return descriptor;
+    }catch(error){
+        await recoverInitialSpeechRoutes(owner,previous,error);
+        throw error;
+    }
+}
+
+function speechProgressPhase(value){
+    const phase=typeof value?.phase==='string'&&value.phase
+        ?value.phase.replace(/[-_]+/gu,' ')
+        :'loading';
+    return phase[0].toUpperCase()+phase.slice(1);
 }
 
 function renderSpeechProgress(role,value){
+    if(!value||typeof value!=='object')return;
     const controls=speechControls[role];
-    if(!controls.progress||!value||typeof value!=='object')return;
-    const total=Math.max(0,Number(value.total)||0);
-    const completed=Math.min(total,Math.max(0,Number(value.completed)||0));
+    const total=Number(value.total);
+    const completed=Number(value.completed);
+    const determinate=Number.isFinite(total)&&total>0&&Number.isFinite(completed);
+    controls.progress.max=determinate?total:1;
+    controls.progress.value=determinate
+        ?Math.min(total,Math.max(0,completed))
+        :0;
     controls.progress.hidden=false;
-    if(value.heartbeat||total===0){
-        controls.progress.removeAttribute('value');
-    }else{
-        controls.progress.max=total;
-        controls.progress.value=completed;
+    const unit=typeof value.unit==='string'&&value.unit?` ${value.unit}`:'';
+    const amount=determinate
+        ?`${controls.progress.value} of ${total}${unit}`
+        :value.heartbeat===true?'active':'in progress';
+    controls.progressLabel.textContent=`${role.toUpperCase()} ${speechProgressPhase(value)}: ${amount}.`;
+}
+
+function handleAIRuntimeState(snapshot){
+    for(const role of ['tts','stt']){
+        if(!speechAI||!speechRoleManaged[role])continue;
+        updateSpeechControls(role);
+        if(!roleOperations[role].name?.includes('load'))continue;
+        const roleState=snapshot?.roles?.[role];
+        if(roleState?.state==='loading')renderSpeechProgress(role,roleState.progress);
     }
-    const unit=typeof value.unit==='string'?` ${value.unit}`:'';
-    const amount=total>0?` ${completed} of ${total}${unit}`:'';
-    controls.progressLabel.textContent=`${speechPhaseLabel(value.phase)}.${amount}`;
 }
 
 async function loadSpeechRole(role,offline){
@@ -643,31 +706,30 @@ async function loadSpeechRole(role,offline){
     if(!controller)return;
     const controls=speechControls[role];
     controls.status.textContent=offline
-        ?'Checking this exact role authority in DBOPFS with network access disabled.'
-        :'Checking the admitted cache. Missing declared artifacts download only after this explicit action.';
+        ?'Checking this exact role in DBOPFS with upstream requests disabled.'
+        :'Hydrating this selected browser role without changing the other speech route. Missing upstream artifacts download only after this explicit action.';
     controls.progress.hidden=true;
     controls.progressLabel.textContent='';
     try{
-        const provider=await speechProvider(role,offline,controller.signal);
-        const selection=speechSelection(provider);
-        function handleSpeechLoadProgress(progress){
-            renderSpeechProgress(role,progress);
+        const owner=normalizedSpeechAI();
+        await ensureSpeechRoleConfigured(role,offline,controller.signal);
+        throwIfAborted(controller.signal);
+        if(role==='tts'){
+            await owner.setSpeechMuted(false);
+        }else{
+            await owner.providerRuntime.load(role,{
+                signal:controller.signal,
+                localOnly:true
+            });
         }
-        const result=await provider.load({
-            role,
-            selection,
-            signal:controller.signal,
-            progress:handleSpeechLoadProgress
-        });
-        const cacheState=typeof result.cache==='string'
-            ?result.cache
-            :result.cache?.state??provider.status().cache;
-        controls.progress.hidden=true;
+        throwIfAborted(controller.signal);
+        controls.progress.max=1;
+        controls.progress.value=1;
+        controls.progress.hidden=false;
+        const securityCopy='Warn-first mode remains active; strict byte-length and SHA-256 admission was not requested.';
         controls.status.textContent=offline
-            ?'Admitted DBOPFS artifacts loaded with network access disabled.'
-            :cacheState==='installed'
-                ?'Declared artifacts downloaded, verified, admitted to DBOPFS, and loaded in this role Worker.'
-                :'Admitted DBOPFS artifacts reused and loaded in this role Worker.';
+            ?`Compatible app-scoped DBOPFS artifacts loaded with upstream requests disabled. ${securityCopy}`
+            :`Role loaded in its browser Worker after the SDK resolved app-scoped DBOPFS and any missing app-selected upstream artifacts. ${securityCopy}`;
         controls.progressLabel.textContent='Browser-local speech role ready.';
     }catch(error){
         controls.progress.hidden=true;
@@ -682,12 +744,15 @@ async function unloadSpeechRole(role){
     const controller=beginRoleOperation(role,'unload');
     if(!controller)return;
     const controls=speechControls[role];
-    const provider=speechProviders[role];
-    controls.status.textContent='Ending only this speech role session without deleting any admitted DBOPFS cache.';
+    const owner=speechAI;
+    controls.status.textContent='Ending only this speech role session without deleting its DBOPFS cache.';
     try{
-        if(provider)await provider.unload();
+        if(owner){
+            if(role==='tts')await owner.setSpeechMuted(true);
+            else await owner.providerRuntime.unload(role,{signal:controller.signal});
+        }
         if(role==='tts')revokeTtsAudioUrl();
-        controls.status.textContent='Role unloaded. Its Worker is no longer active and any admitted DBOPFS cache remains.';
+        controls.status.textContent='Role unloaded. Its Worker is no longer active and its DBOPFS cache remains.';
     }catch(error){
         renderPublicError(controls.status,error);
     }finally{
@@ -711,15 +776,17 @@ function revokeTtsAudioUrl(){
 }
 
 function installTtsAudio(result){
-    if(!(result?.audio instanceof Uint8Array)||result.contentType!=='audio/wav'){
+    const mediaType=typeof result?.type==='string'
+        ?result.type.split(';',1)[0].trim().toLowerCase()
+        :'';
+    if(!(result instanceof Blob)||mediaType!=='audio/wav'){
         throw createPublicError('ARCANE_AI_INVALID_PROVIDER_RESULT');
     }
     if(typeof Blob!=='function'||typeof globalThis.URL?.createObjectURL!=='function'){
         throw createPublicError('HELLO_WORLD_AUDIO_PLAYBACK_UNAVAILABLE');
     }
     revokeTtsAudioUrl();
-    const blob=new Blob([result.audio],{type:'audio/wav'});
-    ttsAudioUrl=globalThis.URL.createObjectURL(blob);
+    ttsAudioUrl=globalThis.URL.createObjectURL(result);
     speechControls.tts.audio.src=ttsAudioUrl;
     speechControls.tts.audio.hidden=false;
 }
@@ -735,21 +802,17 @@ async function synthesizeSpeech(){
         if(text.length>MAX_TTS_TEXT_LENGTH){
             throw createPublicError('HELLO_WORLD_TTS_TEXT_TOO_LONG');
         }
-        const provider=speechProviders.tts;
-        if(!provider)throw createPublicError('ARCANE_AI_NOT_READY');
-        const selection=speechSelection(provider);
-        const result=await provider.request({
-            role:'tts',
-            operation:'synthesize',
-            selection,
-            signal:controller.signal,
-            payload:{
-                model:selection.modelId,
-                input:text,
-                responseFormat:'wav',
-                speed:1
-            }
-        });
+        const owner=speechAI;
+        if(!owner||owner.providerRuntime.status('tts').state!=='ready'){
+            throw createPublicError('ARCANE_AI_NOT_READY');
+        }
+        const selection=owner.providerRuntime.selection('tts');
+        const result=await owner.fetchTTS({
+            model:selection.modelId,
+            input:text,
+            responseFormat:'wav',
+            speed:1
+        },controller.signal);
         installTtsAudio(result);
         controls.status.textContent='WAV synthesis complete. Press play when you choose; the application never autoplays it.';
     }catch(error){
@@ -776,24 +839,22 @@ async function transcribeSpeech(){
         if(!/^audio\/[a-z0-9!#$%&'*+.^_`|~-]+$/u.test(mimeEssence)){
             throw createPublicError('HELLO_WORLD_STT_MIME_TYPE_REQUIRED');
         }
-        const provider=speechProviders.stt;
-        if(!provider)throw createPublicError('ARCANE_AI_NOT_READY');
-        const selection=speechSelection(provider);
-        const result=await provider.request({
-            role:'stt',
-            operation:'transcribe',
-            selection,
-            signal:controller.signal,
-            payload:{
-                audio:file,
-                mimeType,
-                model:selection.modelId
-            }
-        });
-        if(typeof result?.text!=='string'){
+        const owner=speechAI;
+        if(!owner||owner.providerRuntime.status('stt').state!=='ready'){
+            throw createPublicError('ARCANE_AI_NOT_READY');
+        }
+        function receiveTranscript(value){
+            controls.transcript.textContent=value;
+        }
+        const result=await owner.fetchSTT(
+            file,
+            receiveTranscript,
+            controller.signal
+        );
+        if(typeof result!=='string'){
             throw createPublicError('ARCANE_AI_INVALID_PROVIDER_RESULT');
         }
-        controls.transcript.textContent=result.text;
+        controls.transcript.textContent=result;
         controls.status.textContent='File transcription complete. No microphone was opened or requested.';
     }catch(error){
         renderPublicError(controls.status,error);
@@ -850,6 +911,11 @@ function disposeResolvedAi(value){
     return value.dispose();
 }
 
+function disposeNormalizedSpeech(){
+    if(!speechAI)return Promise.resolve(false);
+    return speechAI.disposeBrowserSpeech();
+}
+
 function ignoreDisposeFailure(){
     // Page teardown is best effort after every active operation is aborted.
 }
@@ -863,10 +929,7 @@ function disposeApplication(){
     if(currentAi){
         disposals.push(Promise.resolve(currentAi).then(disposeResolvedAi,ignoreDisposeFailure));
     }
-    for(const role of ['stt','tts']){
-        const provider=speechProviders[role];
-        if(provider)disposals.push(provider.dispose().catch(ignoreDisposeFailure));
-    }
+    if(speechAI)disposals.push(disposeNormalizedSpeech().catch(ignoreDisposeFailure));
     pageDisposePromise=Promise.allSettled(disposals);
 }
 
@@ -892,6 +955,7 @@ speechControls.stt.unload?.addEventListener('click',unloadStt);
 speechControls.stt.request?.addEventListener('click',transcribeSpeech);
 globalThis.addEventListener('pagehide',disposeApplication,{once:true});
 globalThis.addEventListener('pageshow',reloadAfterBackForwardCache);
+subscribeAIRuntimeState(handleAIRuntimeState,{signal:pageController.signal});
 renderSpeechAuthorityStatus();
 updateLlmControls();
 updateSpeechControls('tts');

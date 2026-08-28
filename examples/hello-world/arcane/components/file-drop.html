@@ -46,6 +46,9 @@
 <script type="module">
     const host=this;
     const root=host.shadowRoot;
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.file-drop',eventTypes:['file-drop-selected','file-drop-state','file-drop-progress','file-drop-error','file-drop-ready']});
+    const lifecycleController=new AbortController();
     const dropZone=root.querySelector('#dropZone');
     const title=root.querySelector('#fileDropTitle');
     const hint=root.querySelector('#fileDropHint');
@@ -62,27 +65,38 @@
     let currentFiles=[];
     let progress=null;
     let options={};
+    let operationSequence=0;
+    let destroyed=false;
 
     host.clear=clear;
     host.configure=configure;
+    host.destroy=destroy;
     host.openPicker=openPicker;
     host.setBusy=setBusy;
     host.setError=setError;
     host.setProgress=setProgress;
 
     Object.defineProperties(host,{
-        busy:{get:()=>busy,set:setBusy},
-        files:{get:()=>currentFiles.slice()},
-        options:{get:getOptions,set:configure},
-        progress:{get:()=>progress,set:setProgress}
+        busy:{configurable:true,get:()=>busy,set:setBusy},
+        files:{configurable:true,get:()=>currentFiles.slice()},
+        options:{configurable:true,get:getOptions,set:configure},
+        progress:{configurable:true,get:()=>progress,set:setProgress}
     });
 
-    choose.addEventListener('click',openPicker);
-    picker.addEventListener('change',()=>acceptFiles(picker.files,'picker'));
-    dropZone.addEventListener('dragenter',dragEnter);
-    dropZone.addEventListener('dragover',dragOver);
-    dropZone.addEventListener('dragleave',dragLeave);
-    dropZone.addEventListener('drop',dropFiles);
+    choose.addEventListener('click',openPicker,{signal:lifecycleController.signal});
+    picker.addEventListener('change',()=>acceptFiles(picker.files,'picker'),{signal:lifecycleController.signal});
+    dropZone.addEventListener('dragenter',dragEnter,{signal:lifecycleController.signal});
+    dropZone.addEventListener('dragover',dragOver,{signal:lifecycleController.signal});
+    dropZone.addEventListener('dragleave',dragLeave,{signal:lifecycleController.signal});
+    dropZone.addEventListener('drop',dropFiles,{signal:lifecycleController.signal});
+
+    function emit(type,detail={},publicDetail={},operationId=null){
+        if(destroyed){
+            return false;
+        }
+        const publication=events.dispatch(type,detail,{publicDetail,operationId});
+        return projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});
+    }
 
     function datasetOptions(){
         return {
@@ -96,6 +110,9 @@
     }
 
     function configure(input={}){
+        if(destroyed){
+            return false;
+        }
         const previous={...datasetOptions(),...options};
         options={
             ...previous,
@@ -121,7 +138,7 @@
     }
 
     function openPicker(){
-        if(busy){
+        if(destroyed||busy){
             return false;
         }
         picker.click();
@@ -163,12 +180,23 @@
     }
 
     function acceptFiles(fileList=[],source='api'){
+        if(destroyed){
+            return false;
+        }
+        const operationId=`${events.descriptor.instanceId}:select:${++operationSequence}`;
         const files=Array.from(fileList||[]).filter(Boolean);
         if(!files.length){
             return false;
         }
         if(options.maxFiles>0&&files.length>options.maxFiles){
-            setError(`Select no more than ${options.maxFiles} file${options.maxFiles===1?'':'s'}.`);
+            setError(
+                `Select no more than ${options.maxFiles} file${options.maxFiles===1?'':'s'}.`,
+                {
+                    code:'ARCANE_FILE_DROP_FILE_COUNT_LIMIT_EXCEEDED',
+                    reason:'file-count-limit-exceeded'
+                },
+                operationId
+            );
             return false;
         }
         currentFiles=options.multiple?files:files.slice(0,1);
@@ -176,16 +204,14 @@
         feedback.hidden=false;
         statusElement.className='status';
         statusElement.innerText=`${currentFiles.length} file${currentFiles.length===1?'':'s'} selected.`;
-        host.dispatchEvent(new CustomEvent('file-drop-selected',{
-            bubbles:true,
-            cancelable:false,
-            composed:true,
-            detail:{files:currentFiles.slice(),source}
-        }));
+        emit('file-drop-selected',{files:currentFiles.slice(),source},{fileCount:currentFiles.length,source:String(source)},operationId);
         return currentFiles.slice();
     }
 
     function setBusy(value=true,message=''){
+        if(destroyed){
+            return busy;
+        }
         busy=Boolean(value);
         choose.disabled=busy;
         picker.disabled=busy;
@@ -196,15 +222,14 @@
             statusElement.className='status';
             statusElement.innerText=`${message}`;
         }
-        host.dispatchEvent(new CustomEvent('file-drop-state',{
-            bubbles:true,
-            composed:true,
-            detail:{busy,progress}
-        }));
+        emit('file-drop-state',{busy,progress},{busy,hasProgress:progress!==null});
         return busy;
     }
 
     function setProgress(value=null,label=''){
+        if(destroyed){
+            return progress;
+        }
         const numeric=Number(value);
         progress=value===null||value===undefined||!Number.isFinite(numeric)
             ?null
@@ -218,30 +243,35 @@
             progressElement.removeAttribute('value');
             progressLabel.innerText='';
         }
-        host.dispatchEvent(new CustomEvent('file-drop-progress',{
-            bubbles:true,
-            composed:true,
-            detail:{progress,label:progressLabel.innerText}
-        }));
+        emit('file-drop-progress',{progress,label:progressLabel.innerText},{progress});
         return progress;
     }
 
-    function setError(message=''){
+    function setError(message='',errorDetail={},operationId=null){
+        if(destroyed){
+            return '';
+        }
         const text=`${message||''}`;
         feedback.hidden=!text&&progress===null;
         statusElement.innerText=text;
         statusElement.className=text?'status arcane-error':'status';
         if(text){
-            host.dispatchEvent(new CustomEvent('file-drop-error',{
-                bubbles:true,
-                composed:true,
-                detail:{message:text}
-            }));
+            const code=String(errorDetail?.code||'ARCANE_FILE_DROP_INPUT_REJECTED');
+            const reason=String(errorDetail?.reason||'file-input-rejected');
+            emit(
+                'file-drop-error',
+                {message:text,code,reason},
+                {code,reason},
+                operationId||`${events.descriptor.instanceId}:error:${++operationSequence}`
+            );
         }
         return text;
     }
 
     function clear(){
+        if(destroyed){
+            return false;
+        }
         currentFiles=[];
         picker.value='';
         setBusy(false);
@@ -256,9 +286,25 @@
         return Number.isFinite(numeric)&&numeric>=0?numeric:fallback;
     }
 
+    function destroy(){
+        if(destroyed){
+            return false;
+        }
+        destroyed=true;
+        lifecycleController.abort('file-drop-destroyed');
+        dragDepth=0;
+        busy=false;
+        currentFiles=[];
+        progress=null;
+        picker.value='';
+        events.dispose();
+        host.ready=false;
+        return true;
+    }
+
     configure(datasetOptions());
     dropZone.dataset.dragActive='false';
     setBusy(false);
     host.ready=true;
-    host.dispatchEvent(new CustomEvent('file-drop-ready',{bubbles:true,composed:true}));
+    emit('file-drop-ready',{}, {ready:true});
 </script>

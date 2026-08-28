@@ -56,6 +56,9 @@
 <script type="module">
     const host=this;
     const root=host.shadowRoot;
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.file-inspector',eventTypes:['file-inspector-change','file-inspector-action','file-inspector-error','file-inspector-cleared','file-inspector-ready']});
+    const lifecycleController=new AbortController();
     const region=root.querySelector('#region');
     const empty=root.querySelector('#empty');
     const content=root.querySelector('#content');
@@ -71,9 +74,12 @@
     let actionItems=[];
     let current=null;
     let options={};
+    let operationSequence=0;
+    let destroyed=false;
 
     host.clear=clear;
     host.configure=configure;
+    host.destroy=destroy;
     host.setActions=setActions;
     host.setBusy=setBusy;
     host.setError=setError;
@@ -81,11 +87,20 @@
     host.show=show;
 
     Object.defineProperties(host,{
-        file:{get:()=>current?{...current}:null,set:show},
-        options:{get:()=>({...options}),set:configure}
+        file:{configurable:true,get:()=>current?{...current}:null,set:show},
+        options:{configurable:true,get:()=>({...options}),set:configure}
     });
 
-    actions.addEventListener('click',handleAction);
+    actions.addEventListener('click',handleAction,{signal:lifecycleController.signal});
+
+    function emit(type,detail={},publicDetail={},cancelable=false,operationId=null){
+        if(destroyed){
+            return false;
+        }
+        const publication=events.dispatch(type,detail,{publicDetail,cancelable,operationId});
+        if(cancelable&&!publication.accepted) return false;
+        return projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true,cancelable});
+    }
 
     function datasetOptions(){
         return {
@@ -96,6 +111,9 @@
     }
 
     function configure(input={}){
+        if(destroyed){
+            return false;
+        }
         options={...datasetOptions(),...options,...input};
         region.setAttribute('aria-label',`${options.ariaLabel||'File inspector'}`);
         empty.innerText=`${options.emptyLabel||'Select an item to inspect.'}`;
@@ -104,6 +122,9 @@
     }
 
     function show(input={}){
+        if(destroyed){
+            return false;
+        }
         if(!input){
             clear();
             return null;
@@ -118,11 +139,7 @@
         renderMetadata(input.metadata??defaultMetadata(input));
         setActions(input.actions||[]);
         setPreview(input.preview??input.content??'');
-        host.dispatchEvent(new CustomEvent('file-inspector-change',{
-            bubbles:true,
-            composed:true,
-            detail:{file:{...current}}
-        }));
+        emit('file-inspector-change',{file:{...current}},{hasFile:true,mimeType:String(input.mimeType||input.type||'')});
         return {...current};
     }
 
@@ -156,6 +173,9 @@
     }
 
     function setPreview(value=''){
+        if(destroyed){
+            return false;
+        }
         preview.replaceChildren();
         if(typeof Node!=='undefined'&&value instanceof Node){
             preview.append(value);
@@ -173,6 +193,9 @@
     }
 
     function setActions(values=[]){
+        if(destroyed){
+            return [];
+        }
         actionItems=Array.from(values||[]).map((value,index)=>({
             disabled:Boolean(value.disabled),
             id:`${value.id??value.action??`action-${index+1}`}`,
@@ -200,15 +223,13 @@
         if(!button||!action||action.disabled){
             return;
         }
-        host.dispatchEvent(new CustomEvent('file-inspector-action',{
-            bubbles:true,
-            cancelable:true,
-            composed:true,
-            detail:{action:{...action},file:current?{...current}:null,id:action.id}
-        }));
+        emit('file-inspector-action',{action:{...action},file:current?{...current}:null,id:action.id},{actionId:action.id,hasFile:Boolean(current)},true,`${events.descriptor.instanceId}:action:${++operationSequence}`);
     }
 
     function setStatus(value=''){
+        if(destroyed){
+            return false;
+        }
         const next=typeof value==='object'?value:{label:value,status:value};
         status.innerText=`${next.label||''}`;
         status.dataset.status=`${next.status||''}`;
@@ -216,6 +237,9 @@
     }
 
     function setBusy(value=true,message='Loading preview…'){
+        if(destroyed){
+            return false;
+        }
         const busy=Boolean(value);
         previewShell.setAttribute('aria-busy',`${busy}`);
         if(busy){
@@ -228,19 +252,26 @@
         return busy;
     }
 
-    function setError(message=''){
+    function setError(message='',errorDetail={}){
+        if(destroyed){
+            return '';
+        }
         const text=`${message||''}`;
         preview.replaceChildren();
         if(text){
+            const code=String(errorDetail?.code||'ARCANE_FILE_INSPECTOR_PREVIEW_REJECTED');
+            const reason=String(errorDetail?.reason||'file-preview-rejected');
             const state=document.createElement('p');
             state.className='arcane-state arcane-state--error';
             state.innerText=text;
             preview.append(state);
-            host.dispatchEvent(new CustomEvent('file-inspector-error',{
-                bubbles:true,
-                composed:true,
-                detail:{file:current?{...current}:null,message:text}
-            }));
+            emit(
+                'file-inspector-error',
+                {file:current?{...current}:null,message:text,code,reason},
+                {hasFile:Boolean(current),hasError:true,code,reason},
+                false,
+                `${events.descriptor.instanceId}:error:${++operationSequence}`
+            );
         }
         return text;
     }
@@ -272,6 +303,9 @@
     }
 
     function clear(){
+        if(destroyed){
+            return false;
+        }
         current=null;
         actionItems=[];
         content.hidden=true;
@@ -282,12 +316,28 @@
         preview.replaceChildren();
         actions.replaceChildren();
         footer.hidden=true;
-        host.dispatchEvent(new CustomEvent('file-inspector-cleared',{bubbles:true,composed:true}));
+        emit('file-inspector-cleared');
+        return true;
+    }
+
+    function destroy(){
+        if(destroyed){
+            return false;
+        }
+        destroyed=true;
+        lifecycleController.abort('file-inspector-destroyed');
+        current=null;
+        actionItems=[];
+        metadata.replaceChildren();
+        preview.replaceChildren();
+        actions.replaceChildren();
+        events.dispose();
+        host.ready=false;
         return true;
     }
 
     configure(datasetOptions());
     clear();
     host.ready=true;
-    host.dispatchEvent(new CustomEvent('file-inspector-ready',{bubbles:true,composed:true}));
+    emit('file-inspector-ready',{}, {ready:true});
 </script>

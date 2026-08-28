@@ -1,4 +1,78 @@
+import {
+    createArcaneEventSource,
+    projectArcaneDOMEvent
+} from 'arcane-os/event-manager';
+
 const own=(value,key)=>Object.prototype.hasOwnProperty.call(value,key);
+
+const STT_ACTIVATION_EVENT_TYPES=Object.freeze({
+    error:'speech-stt-activation-error',
+    request:'speech-stt-activation-request'
+});
+
+const STT_ACTIVATION_ERROR_CODES=Object.freeze({
+    buttonInvalid:'ARCANE_STT_ACTIVATION_BUTTON_INVALID',
+    buttonListenerFailed:'ARCANE_STT_ACTIVATION_BUTTON_LISTENER_FAILED',
+    domProjectionUnavailable:'ARCANE_STT_ACTIVATION_DOM_PROJECTION_UNAVAILABLE',
+    eventClassInvalid:'ARCANE_STT_ACTIVATION_EVENT_CLASS_INVALID',
+    eventSourceInvalid:'ARCANE_STT_ACTIVATION_EVENT_SOURCE_INVALID',
+    hostInvalid:'ARCANE_STT_ACTIVATION_HOST_INVALID',
+    onChangeInvalid:'ARCANE_STT_ACTIVATION_ON_CHANGE_INVALID',
+    presentationCallbackFailed:'ARCANE_STT_ACTIVATION_PRESENTATION_CALLBACK_FAILED',
+    requestRejected:'ARCANE_STT_ACTIVATION_REQUEST_REJECTED'
+});
+
+const STT_ACTIVATION_REASONS=Object.freeze({
+    explicitRequest:'explicit-request',
+    presentationCallbackThrew:'activation-presentation-callback-threw',
+    requestRejected:'activation-request-rejected'
+});
+
+function codedError(message,code,ErrorClass=Error,cause){
+    const error=new ErrorClass(message);
+    error.code=code;
+    if(cause!==undefined){
+        error.cause=cause;
+    }
+    return error;
+}
+
+function projectSTTActivationEvent(
+    host,
+    occurrence,
+    EventClass,
+    options={}
+){
+    if(typeof globalThis.CustomEvent!=='function'){
+        throw codedError(
+            'The STT activation DOM compatibility projection requires CustomEvent.',
+            STT_ACTIVATION_ERROR_CODES.domProjectionUnavailable
+        );
+    }
+    if(EventClass===globalThis.CustomEvent){
+        return projectArcaneDOMEvent(host,occurrence,options);
+    }
+    const compatibilityTarget={
+        dispatchEvent(projectedEvent){
+            const event=new EventClass(
+                projectedEvent.type,
+                {
+                    detail:projectedEvent.detail,
+                    bubbles:projectedEvent.bubbles,
+                    composed:projectedEvent.composed,
+                    cancelable:projectedEvent.cancelable
+                }
+            );
+            const accepted=host.dispatchEvent(event)!==false
+                &&!event.defaultPrevented;
+            if(!accepted&&projectedEvent.cancelable){
+                projectedEvent.preventDefault();
+            }
+            return accepted;
+        }
+    };
+    return projectArcaneDOMEvent(compatibilityTarget,occurrence,options);
+}
 
 function record(value,label){
     if(value===undefined){
@@ -327,6 +401,396 @@ function effectiveDashboardVisibility(definitions=[],visibility={}){
     );
 }
 
+function createSTTActivationController({
+    host,
+    button,
+    onChange,
+    EventClass=globalThis.CustomEvent,
+    eventSource=null
+}){
+    if(!host||typeof host.dispatchEvent!=='function'
+        ||typeof host.requestSTTActivation!=='function'){
+        throw codedError(
+            'The STT activation host must provide dispatchEvent() and requestSTTActivation().',
+            STT_ACTIVATION_ERROR_CODES.hostInvalid,
+            TypeError
+        );
+    }
+    if(typeof EventClass!=='function'){
+        throw codedError(
+            'The STT activation event class must be a constructor.',
+            STT_ACTIVATION_ERROR_CODES.eventClassInvalid,
+            TypeError
+        );
+    }
+    if(!button
+        ||typeof button.addEventListener!=='function'
+        ||typeof button.removeEventListener!=='function'){
+        throw codedError(
+            'The STT activation button must provide addEventListener() and removeEventListener().',
+            STT_ACTIVATION_ERROR_CODES.buttonInvalid,
+            TypeError
+        );
+    }
+    if(typeof onChange!=='function'){
+        throw codedError(
+            'The STT activation onChange callback must be a function.',
+            STT_ACTIVATION_ERROR_CODES.onChangeInvalid,
+            TypeError
+        );
+    }
+    if(eventSource!==null
+        &&(
+            typeof eventSource!=='object'
+            ||typeof eventSource.dispatch!=='function'
+            ||typeof eventSource.dispose!=='function'
+            ||typeof eventSource.instanceId!=='string'
+        )){
+        throw codedError(
+            'The STT activation event source must be a compatible Arcane event source.',
+            STT_ACTIVATION_ERROR_CODES.eventSourceInvalid,
+            TypeError
+        );
+    }
+    const ownsEventSource=eventSource===null;
+    const events=eventSource||createArcaneEventSource(
+        host,
+        {
+            source:'arcane.module.component-contracts.stt-activation',
+            eventTypes:Object.values(STT_ACTIVATION_EVENT_TYPES)
+        }
+    );
+    let role=null;
+    let requestPending=false;
+    let requestError='';
+    let requestGeneration=0;
+    let operationSequence=0;
+    let destroyed=false;
+
+    function visibleError(error,fallback){
+        const message=typeof error?.message==='string'
+            ?error.message.trim()
+            :'';
+        return (message||fallback).slice(0,240);
+    }
+
+    function cancellation(error){
+        return error?.name==='AbortError'
+            ||[
+                'ARCANE_AI_REQUEST_ABORTED',
+                'ARCANE_AI_OPERATION_SUPERSEDED'
+            ].includes(error?.code);
+    }
+
+    function selected(){
+        return typeof role?.providerId==='string'
+            &&role.providerId.length>0
+            &&typeof role?.modelId==='string'
+            &&role.modelId.length>0;
+    }
+
+    function action(){
+        if(!selected()){
+            return null;
+        }
+        if(role.state==='loading'){
+            return 'unload';
+        }
+        if(!role.busy&&['unloaded','error'].includes(role.state)){
+            return 'load';
+        }
+        return null;
+    }
+
+    function label(){
+        if(requestPending){
+            return 'Requesting…';
+        }
+        if(role?.state==='loading'){
+            return 'Cancel loading';
+        }
+        if(role?.state==='unloading'){
+            return 'Canceling…';
+        }
+        if(role?.state==='error'){
+            return 'Try again';
+        }
+        return 'Start transcription';
+    }
+
+    function title(){
+        if(requestPending){
+            return 'Requesting transcription activation.';
+        }
+        if(role?.state==='loading'){
+            return 'Cancel loading the selected transcription service.';
+        }
+        if(role?.state==='unloading'){
+            return 'The selected transcription service is being released.';
+        }
+        if(role?.state==='error'){
+            return requestError||visibleError(
+                role.error,
+                'Retry loading the selected transcription service.'
+            );
+        }
+        return 'Start the selected transcription service.';
+    }
+
+    function formatProgress(progress,fallback){
+        if(!progress){
+            return fallback;
+        }
+        const amount=progress.total===null
+            ?`${progress.completed} ${progress.unit}`
+            :`${progress.completed} of ${progress.total} ${progress.unit}`;
+        const heartbeat=progress.heartbeat?', active heartbeat':'';
+        return `${progress.phase}, ${amount}${heartbeat}`;
+    }
+
+    function status(){
+        if(requestError){
+            return `Transcription activation error: ${requestError}.`;
+        }
+        if(requestPending){
+            return 'Transcription activation requested.';
+        }
+        if(role?.state==='ready'){
+            return role.busy?'Transcription busy.':'Transcription ready.';
+        }
+        if(role?.state==='loading'){
+            return `Transcription ${formatProgress(role.progress,'loading')}; Cancel is available.`;
+        }
+        if(role?.state==='unloading'){
+            return `Transcription ${formatProgress(role.progress,'releasing')}.`;
+        }
+        if(role?.state==='error'){
+            return `Transcription error: ${visibleError(role.error,'Unknown error')}.`;
+        }
+        if(role?.state==='disposed'){
+            return 'Transcription disposed.';
+        }
+        if(role?.state==='unloaded'&&selected()){
+            return 'Transcription selected and waiting to load.';
+        }
+        return 'Transcription unavailable.';
+    }
+
+    function visible(){
+        return selected()
+            &&role.state!=='ready'
+            &&['unloaded','loading','unloading','error'].includes(role.state);
+    }
+
+    async function request(nextAction){
+        if(destroyed||requestPending||action()!==nextAction){
+            return false;
+        }
+        const generation=++requestGeneration;
+        requestError='';
+        const intent=Object.freeze(
+            {
+                role:'stt',
+                action:nextAction,
+                reason:'user'
+            }
+        );
+        const activationRequest=Object.freeze({intent,state:role});
+        const operationId=
+            `${events.instanceId}:stt-activation:${(++operationSequence).toString(36)}`;
+        let requestInvoked=false;
+        requestPending=true;
+        try{
+            const publication=events.dispatch(
+                STT_ACTIVATION_EVENT_TYPES.request,
+                activationRequest,
+                {
+                    cancelable:true,
+                    operationId,
+                    publicDetail:{
+                        role:'stt',
+                        action:nextAction,
+                        reason:STT_ACTIVATION_REASONS.explicitRequest,
+                        state:role.state,
+                        roleOperationId:typeof role?.operationId==='string'
+                            ?role.operationId
+                            :null
+                    }
+                }
+            );
+            if(!publication.accepted
+                ||!projectSTTActivationEvent(
+                    host,
+                    publication.occurrence,
+                    EventClass,
+                    {
+                        bubbles:true,
+                        composed:true,
+                        cancelable:true
+                    }
+                )
+                ||destroyed
+                ||generation!==requestGeneration
+                ||action()!==nextAction){
+                return false;
+            }
+            onChange();
+            if(destroyed
+                ||generation!==requestGeneration
+                ||action()!==nextAction){
+                return false;
+            }
+            requestInvoked=true;
+            await host.requestSTTActivation(intent);
+            if(destroyed||generation!==requestGeneration){
+                return false;
+            }
+            return true;
+        }catch(error){
+            if(destroyed||generation!==requestGeneration){
+                return false;
+            }
+            if(nextAction==='load'
+                &&cancellation(error)
+                &&['unloaded','unloading'].includes(role?.state)){
+                return false;
+            }
+            const message=visibleError(
+                error,
+                `The transcription ${nextAction} request failed.`
+            );
+            requestError=message;
+            const code=requestInvoked
+                ?STT_ACTIVATION_ERROR_CODES.requestRejected
+                :STT_ACTIVATION_ERROR_CODES.presentationCallbackFailed;
+            const reason=requestInvoked
+                ?STT_ACTIVATION_REASONS.requestRejected
+                :STT_ACTIVATION_REASONS.presentationCallbackThrew;
+            const errorPublication=events.dispatch(
+                STT_ACTIVATION_EVENT_TYPES.error,
+                Object.freeze(
+                    {
+                        request:activationRequest,
+                        error,
+                        message
+                    }
+                ),
+                {
+                    operationId,
+                    publicDetail:{
+                        role:'stt',
+                        action:nextAction,
+                        code,
+                        reason,
+                        causeCode:typeof error?.code==='string'
+                            ?error.code
+                            :null
+                    }
+                }
+            );
+            projectSTTActivationEvent(
+                host,
+                errorPublication.occurrence,
+                EventClass,
+                {
+                    bubbles:true,
+                    composed:true
+                }
+            );
+            return false;
+        }finally{
+            if(!destroyed&&generation===requestGeneration){
+                requestPending=false;
+                try{
+                    onChange();
+                }catch(error){
+                    console.error('Unable to render STT activation state:',error);
+                }
+            }
+        }
+    }
+
+    function activateSelectedSTT(){
+        const nextAction=action();
+        if(nextAction){
+            void request(nextAction).catch(
+                function reportSTTActivationRequestFailure(error){
+                    console.error('The STT activation request could not settle.',error);
+                }
+            );
+        }
+    }
+
+    function synchronize(nextRole){
+        if(destroyed){
+            return;
+        }
+        if(role?.state!==nextRole.state
+            ||role?.providerId!==nextRole.providerId
+            ||role?.modelId!==nextRole.modelId
+            ||role?.loaded!==nextRole.loaded
+            ||role?.busy!==nextRole.busy
+            ||role?.operationId!==nextRole.operationId){
+            requestGeneration+=1;
+            requestError='';
+            requestPending=false;
+        }
+        role=nextRole;
+    }
+
+    function destroy(){
+        if(destroyed){
+            return;
+        }
+        destroyed=true;
+        requestGeneration+=1;
+        requestPending=false;
+        try{
+            button.removeEventListener('click',activateSelectedSTT);
+        }catch(error){
+            throw codedError(
+                'The STT activation button listener could not be removed.',
+                STT_ACTIVATION_ERROR_CODES.buttonListenerFailed,
+                Error,
+                error
+            );
+        }finally{
+            if(ownsEventSource){
+                events.dispose();
+            }
+        }
+    }
+
+    try{
+        button.addEventListener('click',activateSelectedSTT);
+    }catch(error){
+        if(ownsEventSource){
+            events.dispose();
+        }
+        throw codedError(
+            'The STT activation button listener could not be installed.',
+            STT_ACTIVATION_ERROR_CODES.buttonListenerFailed,
+            Error,
+            error
+        );
+    }
+    return Object.freeze(
+        {
+            get action(){return action();},
+            get error(){return requestError;},
+            get label(){return label();},
+            get pending(){return requestPending;},
+            get selected(){return selected();},
+            get status(){return status();},
+            get title(){return title();},
+            get visible(){return visible();},
+            request,
+            synchronize,
+            destroy
+        }
+    );
+}
+
 const VOICE_LABELS=Object.freeze({
     complete:'Complete Transcription',
     description:'Record one or more segments. Each segment is transcribed after you press Stop.',
@@ -337,6 +801,7 @@ const VOICE_LABELS=Object.freeze({
 });
 
 const VOICE_MESSAGES=Object.freeze({
+    cancelled:'Transcription canceled.',
     complete:'Complete.',
     completeError:'Unable to complete this transcription.',
     completing:'Completing transcription...',
@@ -354,6 +819,7 @@ const VOICE_MESSAGES=Object.freeze({
     transcribed:'Transcription added. Record another segment or complete.',
     transcribeError:'Unable to transcribe this recording.',
     transcribing:'Transcribing this segment...',
+    transcriptReplaced:'Transcript replaced.',
     unsupported:'Audio recording is not supported by this browser.'
 });
 
@@ -570,10 +1036,14 @@ export {
     DASHBOARD_LABELS,
     MARKDOWN_FORMATS,
     MARKDOWN_LABELS,
+    STT_ACTIVATION_ERROR_CODES,
+    STT_ACTIVATION_EVENT_TYPES,
+    STT_ACTIVATION_REASONS,
     VOICE_LABELS,
     VOICE_MESSAGES,
     appendTranscription,
     applyMarkdownFormat,
+    createSTTActivationController,
     effectiveDashboardVisibility,
     normalizeChartOptions,
     normalizeChartRows,

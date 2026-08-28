@@ -12,6 +12,7 @@ export const AI_PROVIDER_RUNTIME_PROTOCOL = 'arcane-ai-runtime/2';
 export const AI_MODEL_AUTHORITY_PROTOCOL = 'arcane-ai-model-authority/1';
 
 const ROLE_SET = new Set(AI_RUNTIME_ROLES);
+const SPEECH_ROLES = Object.freeze(['stt', 'tts']);
 const PROVIDER_METHODS = Object.freeze([
     'catalog',
     'inspect',
@@ -265,16 +266,40 @@ function immutableSelections(value) {
     );
 }
 
+function immutableSpeechSelections(value) {
+    try {
+        assertClosedRecord(value, SPEECH_ROLES, 'AI speech provider selections');
+        return Object.freeze(
+            {
+                stt: immutableRoleRoutes('stt', value.stt),
+                tts: immutableRoleRoutes('tts', value.tts)
+            }
+        );
+    } catch (error) {
+        if (error?.code === 'ARCANE_AI_PROVIDER_RUNTIME_INVALID'
+            && !Object.hasOwn(error, 'reason')) {
+            error.reason = 'speech-configuration-contract-mismatch';
+        }
+        throw error;
+    }
+}
+
 function immutableStartupOptions(options) {
     if (options === undefined) {
-        return Object.freeze({startMuted: true, signal: null});
+        return Object.freeze({
+            startMuted: true,
+            startTranscription: false,
+            signal: null
+        });
     }
 
     assertPlainObject(options, 'AI provider startup options');
     const descriptors = Object.getOwnPropertyDescriptors(options);
     for (const key of Reflect.ownKeys(descriptors)) {
         if (typeof key === 'symbol'
-            || (key !== 'startMuted' && key !== 'signal')) {
+            || (key !== 'startMuted'
+                && key !== 'startTranscription'
+                && key !== 'signal')) {
             fail('AI provider startup options contain an unknown option.');
         }
         if (!Object.hasOwn(descriptors[key], 'value')) {
@@ -284,14 +309,20 @@ function immutableStartupOptions(options) {
     const startMuted = Object.hasOwn(descriptors, 'startMuted')
         ? descriptors.startMuted.value
         : true;
+    const startTranscription = Object.hasOwn(descriptors, 'startTranscription')
+        ? descriptors.startTranscription.value
+        : false;
     const signal = Object.hasOwn(descriptors, 'signal')
         ? descriptors.signal.value
         : null;
     if (typeof startMuted !== 'boolean') {
         fail('AI startup startMuted must be a boolean.');
     }
+    if (typeof startTranscription !== 'boolean') {
+        fail('AI startup startTranscription must be a boolean.');
+    }
     assertAbortSignal(signal);
-    return Object.freeze({startMuted, signal});
+    return Object.freeze({startMuted, startTranscription, signal});
 }
 
 function immutableInspectionOptions(options) {
@@ -416,6 +447,252 @@ function validateProvider(provider) {
     return admitted;
 }
 
+function speechProviderReplacementError(code, reason, message, cause) {
+    const error = cause === undefined
+        ? new Error(message)
+        : new Error(message, {cause});
+    error.code = code;
+    error.reason = reason;
+    return error;
+}
+
+function validateSpeechProviderReplacementProvider(provider, role, label) {
+    let admitted;
+    try {
+        admitted = validateProvider(provider);
+    } catch (cause) {
+        throw speechProviderReplacementError(
+            'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_PROVIDER_CONTRACT_MISMATCH',
+            'speech-provider-replacement-provider-contract-mismatch',
+            `${label} must implement the ${AI_PROVIDER_PROTOCOL} ${role} provider contract.`,
+            cause
+        );
+    }
+    if (admitted.role !== role) {
+        throw speechProviderReplacementError(
+            'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_PROVIDER_ROLE_MISMATCH',
+            'speech-provider-replacement-provider-role-mismatch',
+            `${label}.role must equal ${role}.`
+        );
+    }
+    return admitted;
+}
+
+function immutableSpeechProviderReplacement(value) {
+    try {
+        assertClosedRecord(
+            value,
+            ['providers', 'routes', 'expectedProviders'],
+            'AI speech provider replacement'
+        );
+        assertClosedRecord(
+            value.providers,
+            SPEECH_ROLES,
+            'AI speech provider replacement.providers'
+        );
+        assertClosedRecord(
+            value.expectedProviders,
+            SPEECH_ROLES,
+            'AI speech provider replacement.expectedProviders'
+        );
+    } catch (cause) {
+        throw speechProviderReplacementError(
+            'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_CONTRACT_MISMATCH',
+            'speech-provider-replacement-contract-mismatch',
+            'AI speech provider replacement must be a closed providers, routes, and expectedProviders record.',
+            cause
+        );
+    }
+
+    let routes;
+    try {
+        routes = immutableSpeechSelections(value.routes);
+    } catch (cause) {
+        throw speechProviderReplacementError(
+            'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_ROUTE_CONTRACT_MISMATCH',
+            'speech-provider-replacement-route-contract-mismatch',
+            'AI speech provider replacement.routes must be a closed STT/TTS route record.',
+            cause
+        );
+    }
+
+    const providers = {};
+    const expectedProviders = {};
+    const replacementProviderCount = SPEECH_ROLES.filter(
+        function hasSpeechReplacementProvider(role) {
+            return value.providers[role] !== null;
+        }
+    ).length;
+    const expectedProviderCount = SPEECH_ROLES.filter(
+        function hasExpectedSpeechProvider(role) {
+            return value.expectedProviders[role] !== null;
+        }
+    ).length;
+    if (replacementProviderCount !== 0
+        && replacementProviderCount !== SPEECH_ROLES.length) {
+        throw speechProviderReplacementError(
+            'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_PROVIDER_PAIR_MISMATCH',
+            'speech-provider-replacement-provider-pair-mismatch',
+            'AI speech provider replacement must supply both replacement providers or null for both.'
+        );
+    }
+    const removal = replacementProviderCount === 0;
+    if (removal && expectedProviderCount !== SPEECH_ROLES.length) {
+        throw speechProviderReplacementError(
+            'ARCANE_AI_SPEECH_PROVIDER_REMOVAL_EXPECTED_PROVIDER_REQUIRED',
+            'speech-provider-removal-expected-provider-required',
+            'AI speech provider removal requires exact expected STT and TTS provider identities.'
+        );
+    }
+    for (const role of SPEECH_ROLES) {
+        const provider = removal
+            ? null
+            : validateSpeechProviderReplacementProvider(
+                value.providers[role],
+                role,
+                `AI speech provider replacement.providers.${role}`
+            );
+        const expectedValue = value.expectedProviders[role];
+        if (expectedValue !== null) {
+            expectedProviders[role] = validateSpeechProviderReplacementProvider(
+                expectedValue,
+                role,
+                `AI speech provider replacement.expectedProviders.${role}`
+            );
+        } else {
+            expectedProviders[role] = null;
+        }
+        if (removal) {
+            if (routes[role].default || routes[role].localOnly) {
+                throw speechProviderReplacementError(
+                    'ARCANE_AI_SPEECH_PROVIDER_REMOVAL_ROUTE_NOT_EMPTY',
+                    'speech-provider-removal-route-not-empty',
+                    `AI speech provider removal routes for ${role} must both be null.`
+                );
+            }
+        } else if (!routes[role].default) {
+            throw speechProviderReplacementError(
+                'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_DEFAULT_ROUTE_REQUIRED',
+                'speech-provider-replacement-default-route-required',
+                `AI speech provider replacement.routes.${role}.default must select the replacement provider.`
+            );
+        }
+        for (const routeName of ROUTE_KEYS) {
+            const selection = routes[role][routeName];
+            if (!selection) {
+                continue;
+            }
+            if (!provider
+                || selection.providerId !== provider.id
+                || selection.localOnly !== provider.localOnly) {
+                throw speechProviderReplacementError(
+                    'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_ROUTE_PROVIDER_MISMATCH',
+                    'speech-provider-replacement-route-provider-mismatch',
+                    `AI speech provider replacement ${role} ${routeName} route must match its replacement provider identity and locality.`
+                );
+            }
+        }
+        providers[role] = provider;
+    }
+
+    return Object.freeze(
+        {
+            providers: Object.freeze(providers),
+            routes,
+            expectedProviders: Object.freeze(expectedProviders),
+            removal
+        }
+    );
+}
+
+function immutableSpeechProviderRoleReplacement(role, value) {
+    if (!SPEECH_ROLES.includes(role)) {
+        throw speechProviderReplacementError(
+            'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_CONTRACT_MISMATCH',
+            'speech-provider-replacement-contract-mismatch',
+            'AI speech provider role replacement requires role stt or tts.'
+        );
+    }
+    try {
+        assertClosedRecord(
+            value,
+            ['provider', 'routes', 'expectedProvider'],
+            'AI speech provider role replacement'
+        );
+    } catch (cause) {
+        throw speechProviderReplacementError(
+            'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_CONTRACT_MISMATCH',
+            'speech-provider-replacement-contract-mismatch',
+            'AI speech provider role replacement must be a closed provider, routes, and expectedProvider record.',
+            cause
+        );
+    }
+
+    let routes;
+    try {
+        routes = immutableRoleRoutes(role, value.routes);
+    } catch (cause) {
+        throw speechProviderReplacementError(
+            'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_ROUTE_CONTRACT_MISMATCH',
+            'speech-provider-replacement-route-contract-mismatch',
+            `AI speech provider role replacement.routes must be a closed ${role.toUpperCase()} route record.`,
+            cause
+        );
+    }
+    const removal = value.provider === null;
+    const provider = removal
+        ? null
+        : validateSpeechProviderReplacementProvider(
+            value.provider,
+            role,
+            'AI speech provider role replacement.provider'
+        );
+    const expectedProvider = value.expectedProvider === null
+        ? null
+        : validateSpeechProviderReplacementProvider(
+            value.expectedProvider,
+            role,
+            'AI speech provider role replacement.expectedProvider'
+        );
+    if (removal && expectedProvider === null) {
+        throw speechProviderReplacementError(
+            'ARCANE_AI_SPEECH_PROVIDER_REMOVAL_EXPECTED_PROVIDER_REQUIRED',
+            'speech-provider-removal-expected-provider-required',
+            'AI speech provider role removal requires its exact expected provider identity.'
+        );
+    }
+    if (removal && (routes.default || routes.localOnly)) {
+        throw speechProviderReplacementError(
+            'ARCANE_AI_SPEECH_PROVIDER_REMOVAL_ROUTE_NOT_EMPTY',
+            'speech-provider-removal-route-not-empty',
+            `AI speech provider removal routes for ${role} must both be null.`
+        );
+    }
+    if (!removal && !routes.default) {
+        throw speechProviderReplacementError(
+            'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_DEFAULT_ROUTE_REQUIRED',
+            'speech-provider-replacement-default-route-required',
+            'AI speech provider role replacement.routes.default must select the replacement provider.'
+        );
+    }
+    for (const routeName of ROUTE_KEYS) {
+        const selection = routes[routeName];
+        if (!selection) {
+            continue;
+        }
+        if (!provider
+            || selection.providerId !== provider.id
+            || selection.localOnly !== provider.localOnly) {
+            throw speechProviderReplacementError(
+                'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_ROUTE_PROVIDER_MISMATCH',
+                'speech-provider-replacement-route-provider-mismatch',
+                `AI speech provider role replacement ${role} ${routeName} route must match its replacement provider identity and locality.`
+            );
+        }
+    }
+    return Object.freeze({role, provider, routes, expectedProvider, removal});
+}
+
 function validateProviderStatus(status) {
     assertPlainObject(status, 'AI provider status');
     if (typeof status.state !== 'string'
@@ -460,10 +737,12 @@ function createRoleSlot(role) {
         selection: null,
         generation: 0,
         operationSequence: 0,
+        requestSequence: 0,
         loadController: null,
         loadPromise: null,
         unloadPromise: null,
         disposePromise: null,
+        requestAdmission: null,
         request: null,
         disposed: false,
         ready: false
@@ -482,6 +761,7 @@ export class AIProviderRuntime {
     #speechMuted = true;
     #speechDesiredMuted = true;
     #speechTransition = Promise.resolve();
+    #speechTransitionOwners = 0;
     #unsubscribeIntents = null;
     #closed = false;
     #closing = false;
@@ -587,18 +867,7 @@ export class AIProviderRuntime {
             }
         }
 
-        const runtime = this;
-        let active = true;
-        return function unregisterAIProvider() {
-            if (!active) {
-                return false;
-            }
-            const removed = runtime.unregister(admitted.role, admitted.id, admitted);
-            if (removed) {
-                active = false;
-            }
-            return removed;
-        };
+        return this.#createProviderUnregisterHandle(admitted);
     }
 
     unregister(role, providerId, expectedProvider = null) {
@@ -629,6 +898,37 @@ export class AIProviderRuntime {
         assertRole(role);
         assertIdentifier(providerId, 'AI provider id');
         return this.#providers.has(providerKey(role, providerId));
+    }
+
+    ownsProvider(role, expectedProvider) {
+        if (!ROLE_SET.has(role)) {
+            throw speechProviderReplacementError(
+                'ARCANE_AI_PROVIDER_IDENTITY_ROLE_INVALID',
+                'provider-identity-role-invalid',
+                `AI provider identity role must be one of ${AI_RUNTIME_ROLES.join(', ')}.`
+            );
+        }
+
+        let admitted;
+        try {
+            admitted = validateProvider(expectedProvider);
+        } catch (cause) {
+            throw speechProviderReplacementError(
+                'ARCANE_AI_PROVIDER_IDENTITY_CONTRACT_MISMATCH',
+                'provider-identity-contract-mismatch',
+                `Expected ${role} provider identity must implement the ${AI_PROVIDER_PROTOCOL} provider contract.`,
+                cause
+            );
+        }
+        if (admitted.role !== role) {
+            throw speechProviderReplacementError(
+                'ARCANE_AI_PROVIDER_IDENTITY_ROLE_MISMATCH',
+                'provider-identity-role-mismatch',
+                `Expected provider identity role ${admitted.role} does not match ${role}.`
+            );
+        }
+
+        return this.#providers.get(providerKey(role, admitted.id)) === admitted;
     }
 
     providerIdentity(role, providerId) {
@@ -695,6 +995,29 @@ export class AIProviderRuntime {
         return selections;
     }
 
+    validateSpeechConfiguration(value) {
+        this.#assertOpen();
+        const selections = immutableSpeechSelections(value);
+        for (const role of SPEECH_ROLES) {
+            for (const routeName of ROUTE_KEYS) {
+                const selection = selections[role][routeName];
+                if (!selection) {
+                    continue;
+                }
+                const provider = this.#providers.get(
+                    providerKey(role, selection.providerId)
+                ) ?? null;
+                if (provider && selection.localOnly !== provider.localOnly) {
+                    throw operationError(
+                        `AI ${role} route ${routeName} does not match provider locality.`,
+                        'ARCANE_AI_PROVIDER_LOCALITY_MISMATCH'
+                    );
+                }
+            }
+        }
+        return selections;
+    }
+
     configure(value) {
         this.#assertOpen();
         if (this.#configuring) {
@@ -737,6 +1060,412 @@ export class AIProviderRuntime {
             this.#configuring = false;
         }
         return selections;
+    }
+
+    configureSpeech(value) {
+        this.#assertOpen();
+        if (this.#configuring) {
+            throw operationError(
+                'AI speech provider configuration cannot be changed reentrantly.',
+                'ARCANE_AI_SPEECH_CONFIGURATION_REENTRANT'
+            );
+        }
+        const selections = this.validateSpeechConfiguration(value);
+        for (const role of SPEECH_ROLES) {
+            const slot = this.#slots[role];
+            if (this.#roleHasOwnedWork(slot)) {
+                throw operationError(
+                    `AI role ${role} must be unloaded before it is reconfigured.`,
+                    'ARCANE_AI_ROLE_BUSY'
+                );
+            }
+        }
+
+        this.#configuring = true;
+        try {
+            for (const role of SPEECH_ROLES) {
+                const slot = this.#slots[role];
+                slot.generation += 1;
+                slot.disposed = false;
+                slot.ready = false;
+                slot.routes = selections[role];
+                slot.selection = selections[role].default;
+            }
+            this.#speechDesiredMuted = true;
+            this.#speechMuted = true;
+            this.#configured = true;
+            publishAIRuntimeRolesState(
+                {
+                    llm: this.status('llm'),
+                    stt: roleRecord('stt', this.#slots.stt.selection),
+                    tts: roleRecord('tts', this.#slots.tts.selection)
+                }
+            );
+        } finally {
+            this.#configuring = false;
+        }
+        return selections;
+    }
+
+    replaceSpeechProvider(role, value) {
+        this.#assertOpen();
+        if (this.#configuring) {
+            throw speechProviderReplacementError(
+                'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_REENTRANT',
+                'speech-provider-replacement-reentrant',
+                'AI speech provider replacement cannot be committed reentrantly.'
+            );
+        }
+        this.#configuring = true;
+        try {
+            return this.#commitSpeechProviderRoleReplacement(role, value);
+        } finally {
+            this.#configuring = false;
+        }
+    }
+
+    #pendingSpeechProviderHydrationMatches(role, slot, provider, routes) {
+        if (!provider || !slot.selection || !routes.default) {
+            return false;
+        }
+        const pending = slot.selection;
+        if (this.#providers.has(providerKey(role, pending.providerId))
+            || provider.id !== pending.providerId
+            || routes.default.providerId !== pending.providerId
+            || routes.default.modelId !== pending.modelId) {
+            return false;
+        }
+        const currentSelections = [
+            slot.selection,
+            slot.routes.default,
+            slot.routes.localOnly
+        ].filter(Boolean);
+        return currentSelections.length > 0
+            && currentSelections.every(selection =>
+                selection.providerId === pending.providerId
+                && selection.modelId === pending.modelId
+                && selection.localOnly === null
+            );
+    }
+
+    #commitSpeechProviderRoleReplacement(role, value) {
+        const replacement = immutableSpeechProviderRoleReplacement(role, value);
+        const currentState = getAIRuntimeState();
+        const slot = this.#slots[role];
+        const roleState = currentState.roles[role];
+        if (this.#roleHasOwnedWork(slot)
+            || roleState.loaded
+            || roleState.busy
+            || (role === 'tts' && this.#speechTransitionOwners > 0)) {
+            throw speechProviderReplacementError(
+                'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_ROLE_NOT_UNLOADED',
+                'speech-provider-replacement-role-not-unloaded',
+                `AI role ${role} must be fully unloaded with no owned work before speech provider replacement.`
+            );
+        }
+
+        const expected = replacement.expectedProvider;
+        if (expected) {
+            const registered = this.#providers.get(
+                providerKey(role, expected.id)
+            ) ?? null;
+            if (registered !== expected) {
+                throw speechProviderReplacementError(
+                    'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_EXPECTED_PROVIDER_MISMATCH',
+                    'speech-provider-replacement-expected-provider-mismatch',
+                    `AI role ${role} expected provider identity is no longer registered.`
+                );
+            }
+            const routeProviderMismatch = ROUTE_KEYS.some(
+                function hasUnexpectedSelectedSpeechProvider(routeName) {
+                    const selection = slot.routes[routeName];
+                    return selection !== null
+                        && selection.providerId !== expected.id;
+                }
+            );
+            if (slot.routes.default?.providerId !== expected.id
+                || slot.selection?.providerId !== expected.id
+                || routeProviderMismatch) {
+                throw speechProviderReplacementError(
+                    'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_SELECTED_PROVIDER_MISMATCH',
+                    'speech-provider-replacement-selected-provider-mismatch',
+                    `AI role ${role} selected routes no longer belong to the expected provider identity.`
+                );
+            }
+        } else if ((slot.routes.default
+            || slot.routes.localOnly
+            || slot.selection)
+            && !this.#pendingSpeechProviderHydrationMatches(
+                role,
+                slot,
+                replacement.provider,
+                replacement.routes
+            )) {
+            throw speechProviderReplacementError(
+                'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_EXPECTED_PROVIDER_REQUIRED',
+                'speech-provider-replacement-expected-provider-required',
+                `AI role ${role} has a selected provider, so replacement requires its exact expected provider identity.`
+            );
+        }
+
+        const provider = replacement.provider;
+        if (provider) {
+            const registeredAtReplacementKey = this.#providers.get(
+                providerKey(role, provider.id)
+            ) ?? null;
+            if (registeredAtReplacementKey
+                && registeredAtReplacementKey !== expected) {
+                throw speechProviderReplacementError(
+                    'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_PROVIDER_ID_COLLISION',
+                    'speech-provider-replacement-provider-id-collision',
+                    `AI role ${role} replacement provider id is registered by a different provider identity.`
+                );
+            }
+        }
+
+        const currentProvider = this.#providerFor(slot);
+        const inspectedProviders = new Set([currentProvider, expected, provider]);
+        inspectedProviders.delete(null);
+        for (const inspected of inspectedProviders) {
+            let providerStatus;
+            try {
+                providerStatus = validateProviderStatus(inspected.status());
+            } catch (cause) {
+                throw speechProviderReplacementError(
+                    'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_PROVIDER_STATUS_INVALID',
+                    'speech-provider-replacement-provider-status-invalid',
+                    `AI role ${role} replacement boundary received an invalid provider status.`,
+                    cause
+                );
+            }
+            if (providerStatus.state !== 'unloaded'
+                || providerStatus.loaded
+                || providerStatus.busy) {
+                throw speechProviderReplacementError(
+                    'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_PROVIDER_NOT_UNLOADED',
+                    'speech-provider-replacement-provider-not-unloaded',
+                    `AI role ${role} replacement boundary requires selected, old, and new providers to report unloaded and idle.`
+                );
+            }
+        }
+        if (currentState.revision === Number.MAX_SAFE_INTEGER) {
+            throw speechProviderReplacementError(
+                'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_STATE_REVISION_EXHAUSTED',
+                'speech-provider-replacement-state-revision-exhausted',
+                'AI speech provider replacement cannot publish another runtime state revision.'
+            );
+        }
+
+        if (expected) {
+            this.#providers.delete(providerKey(role, expected.id));
+            this.#disposeAllCompletedProviders.delete(expected);
+        }
+        if (provider) {
+            this.#providers.set(providerKey(role, provider.id), provider);
+            this.#disposeAllCompletedProviders.delete(provider);
+        }
+        slot.generation += 1;
+        slot.disposed = false;
+        slot.ready = false;
+        slot.routes = replacement.routes;
+        slot.selection = replacement.routes.default;
+        this.#configured = true;
+        publishAIRuntimeRoleState(role, roleRecord(role, slot.selection));
+
+        return Object.freeze(
+            {
+                role,
+                routes: replacement.routes,
+                unregister: replacement.removal
+                    ? null
+                    : this.#createProviderUnregisterHandle(provider)
+            }
+        );
+    }
+
+    replaceSpeechProviders(value) {
+        this.#assertOpen();
+        if (this.#configuring) {
+            throw speechProviderReplacementError(
+                'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_REENTRANT',
+                'speech-provider-replacement-reentrant',
+                'AI speech provider replacement cannot be committed reentrantly.'
+            );
+        }
+        this.#configuring = true;
+        try {
+            return this.#commitSpeechProviderReplacement(value);
+        } finally {
+            this.#configuring = false;
+        }
+    }
+
+    #commitSpeechProviderReplacement(value) {
+        const replacement = immutableSpeechProviderReplacement(value);
+        const currentState = getAIRuntimeState();
+        for (const role of SPEECH_ROLES) {
+            const slot = this.#slots[role];
+            const roleState = currentState.roles[role];
+            if (this.#roleHasOwnedWork(slot)
+                || roleState.loaded
+                || roleState.busy
+                || this.#speechTransitionOwners > 0) {
+                throw speechProviderReplacementError(
+                    'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_ROLE_NOT_UNLOADED',
+                    'speech-provider-replacement-role-not-unloaded',
+                    `AI role ${role} must be fully unloaded with no owned work before speech provider replacement.`
+                );
+            }
+
+            const expected = replacement.expectedProviders[role];
+            if (expected) {
+                const registered = this.#providers.get(
+                    providerKey(role, expected.id)
+                ) ?? null;
+                if (registered !== expected) {
+                    throw speechProviderReplacementError(
+                        'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_EXPECTED_PROVIDER_MISMATCH',
+                        'speech-provider-replacement-expected-provider-mismatch',
+                        `AI role ${role} expected provider identity is no longer registered.`
+                    );
+                }
+                const routeProviderMismatch = ROUTE_KEYS.some(
+                    function hasUnexpectedSelectedSpeechProvider(routeName) {
+                        const selection = slot.routes[routeName];
+                        return selection !== null
+                            && selection.providerId !== expected.id;
+                    }
+                );
+                if (slot.routes.default?.providerId !== expected.id
+                    || slot.selection?.providerId !== expected.id
+                    || routeProviderMismatch) {
+                    throw speechProviderReplacementError(
+                        'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_SELECTED_PROVIDER_MISMATCH',
+                        'speech-provider-replacement-selected-provider-mismatch',
+                        `AI role ${role} selected routes no longer belong to the expected provider identity.`
+                    );
+                }
+            } else if ((slot.routes.default
+                || slot.routes.localOnly
+                || slot.selection)
+                && !this.#pendingSpeechProviderHydrationMatches(
+                    role,
+                    slot,
+                    replacement.providers[role],
+                    replacement.routes[role]
+                )) {
+                throw speechProviderReplacementError(
+                    'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_EXPECTED_PROVIDER_REQUIRED',
+                    'speech-provider-replacement-expected-provider-required',
+                    `AI role ${role} has a selected provider, so replacement requires its exact expected provider identity.`
+                );
+            }
+
+            const provider = replacement.providers[role];
+            if (provider) {
+                const registeredAtReplacementKey = this.#providers.get(
+                    providerKey(role, provider.id)
+                ) ?? null;
+                if (registeredAtReplacementKey
+                    && registeredAtReplacementKey !== expected) {
+                    throw speechProviderReplacementError(
+                        'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_PROVIDER_ID_COLLISION',
+                        'speech-provider-replacement-provider-id-collision',
+                        `AI role ${role} replacement provider id is registered by a different provider identity.`
+                    );
+                }
+            }
+
+            const currentProvider = this.#providerFor(slot);
+            const inspectedProviders = new Set([
+                currentProvider,
+                expected,
+                provider
+            ]);
+            inspectedProviders.delete(null);
+            for (const inspected of inspectedProviders) {
+                if (!inspected) {
+                    continue;
+                }
+                let providerStatus;
+                try {
+                    providerStatus = validateProviderStatus(inspected.status());
+                } catch (cause) {
+                    throw speechProviderReplacementError(
+                        'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_PROVIDER_STATUS_INVALID',
+                        'speech-provider-replacement-provider-status-invalid',
+                        `AI role ${role} replacement boundary received an invalid provider status.`,
+                        cause
+                    );
+                }
+                if (providerStatus.state !== 'unloaded'
+                    || providerStatus.loaded
+                    || providerStatus.busy) {
+                    throw speechProviderReplacementError(
+                        'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_PROVIDER_NOT_UNLOADED',
+                        'speech-provider-replacement-provider-not-unloaded',
+                        `AI role ${role} replacement boundary requires selected, old, and new providers to report unloaded and idle.`
+                    );
+                }
+            }
+        }
+        if (currentState.revision === Number.MAX_SAFE_INTEGER) {
+            throw speechProviderReplacementError(
+                'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_STATE_REVISION_EXHAUSTED',
+                'speech-provider-replacement-state-revision-exhausted',
+                'AI speech provider replacement cannot publish another runtime state revision.'
+            );
+        }
+
+        for (const role of SPEECH_ROLES) {
+            const expected = replacement.expectedProviders[role];
+            const provider = replacement.providers[role];
+            if (expected) {
+                this.#providers.delete(providerKey(role, expected.id));
+                this.#disposeAllCompletedProviders.delete(expected);
+            }
+            if (provider) {
+                this.#providers.set(providerKey(role, provider.id), provider);
+                this.#disposeAllCompletedProviders.delete(provider);
+            }
+
+            const slot = this.#slots[role];
+            slot.generation += 1;
+            slot.disposed = false;
+            slot.ready = false;
+            slot.routes = replacement.routes[role];
+            slot.selection = replacement.routes[role].default;
+        }
+        this.#speechDesiredMuted = true;
+        this.#speechMuted = true;
+        this.#configured = true;
+        publishAIRuntimeRolesState(
+            {
+                llm: currentState.roles.llm,
+                stt: roleRecord('stt', this.#slots.stt.selection),
+                tts: roleRecord('tts', this.#slots.tts.selection)
+            }
+        );
+
+        return Object.freeze(
+            {
+                routes: replacement.routes,
+                unregisters: Object.freeze(
+                    {
+                        stt: replacement.removal
+                            ? null
+                            : this.#createProviderUnregisterHandle(
+                                replacement.providers.stt
+                            ),
+                        tts: replacement.removal
+                            ? null
+                            : this.#createProviderUnregisterHandle(
+                                replacement.providers.tts
+                            )
+                    }
+                )
+            }
+        );
     }
 
     configureFromTuple(tuple) {
@@ -976,10 +1705,10 @@ export class AIProviderRuntime {
                 )
             );
         }
-        if (slot.request) {
+        if (slot.request || slot.requestAdmission) {
             return Promise.reject(
                 operationError(
-                    `AI role ${role} cannot load during an active request.`,
+                    `AI role ${role} cannot load during active request ownership.`,
                     'ARCANE_AI_ROLE_BUSY'
                 )
             );
@@ -1035,6 +1764,14 @@ export class AIProviderRuntime {
                         )
                     );
                     return Promise.resolve(this.status(role));
+                }
+                if (readyStatus?.busy === true) {
+                    return Promise.reject(
+                        operationError(
+                            `AI role ${role} cannot load while its provider remains busy.`,
+                            'ARCANE_AI_ROLE_BUSY'
+                        )
+                    );
                 }
             } catch {
                 // The private ready flag is revoked when provider proof is stale.
@@ -1211,11 +1948,16 @@ export class AIProviderRuntime {
             || providerStatus?.loaded === true
             || providerStatus?.busy === true;
         if (!slot.loadPromise
+            && !slot.requestAdmission
             && !slot.request
             && !providerOwned
             && (!provider || providerStatus)) {
             slot.ready = false;
-            return Promise.resolve(before);
+            publishAIRuntimeRoleState(
+                role,
+                roleRecord(role, slot.selection)
+            );
+            return Promise.resolve(this.status(role));
         }
 
         slot.generation += 1;
@@ -1225,6 +1967,7 @@ export class AIProviderRuntime {
             this.#speechMuted = true;
         }
         slot.loadController?.abort();
+        slot.requestAdmission?.controller.abort();
         slot.request?.controller.abort();
         const capturedLoad = slot.loadPromise;
         const capturedRequestRecord = slot.request;
@@ -1476,6 +2219,7 @@ export class AIProviderRuntime {
                 slot.loadPromise = null;
                 slot.unloadPromise = null;
                 slot.disposePromise = null;
+                slot.requestAdmission = null;
                 slot.request = null;
                 slot.ready = false;
                 slot.disposed = true;
@@ -1529,6 +2273,9 @@ export class AIProviderRuntime {
         } catch (error) {
             return Promise.reject(error);
         }
+        if (options.signal?.aborted) {
+            return Promise.reject(normalizedAbort());
+        }
         const slot = this.#slots[role];
         if (slot.disposed) {
             return Promise.reject(
@@ -1543,14 +2290,6 @@ export class AIProviderRuntime {
                 operationError(
                     `AI role ${role} is cleaning up.`,
                     'ARCANE_AI_OPERATION_SUPERSEDED'
-                )
-            );
-        }
-        if (slot.request) {
-            return Promise.reject(
-                operationError(
-                    `AI role ${role} already owns an active request.`,
-                    'ARCANE_AI_ROLE_BUSY'
                 )
             );
         }
@@ -1599,6 +2338,17 @@ export class AIProviderRuntime {
             this.#publishRoleError(slot, invalidStatus, false);
             return Promise.reject(invalidStatus);
         }
+        if (options.localOnly && targetSelection.localOnly !== true) {
+            return Promise.reject(
+                operationError(
+                    `AI role ${role} does not have a local-only route.`,
+                    'AI_LOCAL_MODEL_REQUIRED'
+                )
+            );
+        }
+        if (slot.request || slot.requestAdmission) {
+            return this.#supersedeRoleRequest(slot, provider, options);
+        }
         if (!slot.ready
             || providerStatus.state !== 'ready'
             || providerStatus.loaded !== true
@@ -1611,22 +2361,16 @@ export class AIProviderRuntime {
                 )
             );
         }
-        if (options.localOnly && targetSelection.localOnly !== true) {
-            return Promise.reject(
-                operationError(
-                    `AI role ${role} does not have a local-only route.`,
-                    'AI_LOCAL_MODEL_REQUIRED'
-                )
-            );
-        }
 
         const generation = slot.generation;
+        const requestSequence = this.#nextRequestSequence(slot);
         const operationId = this.#nextOperationId(slot, options.operation);
         const controller = new AbortController();
         const detachSignal = this.#forwardAbort(options.signal, controller);
         const runtime = this;
         const requestRecord = {
             controller,
+            requestSequence,
             promise: null,
             cancel: null
         };
@@ -1646,7 +2390,10 @@ export class AIProviderRuntime {
         );
 
         function restoreAIProviderRoleAfterRequest(error) {
-            if (slot.generation !== generation || slot.unloadPromise) {
+            if (slot.generation !== generation
+                || slot.requestSequence !== requestSequence
+                || slot.requestAdmission
+                || slot.unloadPromise) {
                 return;
             }
             let providerState = null;
@@ -1881,13 +2628,19 @@ export class AIProviderRuntime {
                     }
                     providerHandle = opened;
                     iterator = opened[Symbol.asyncIterator]();
-                    runtime.#assertCurrentOperation(slot, generation, controller.signal);
+                    runtime.#assertCurrentRequest(
+                        slot,
+                        generation,
+                        requestSequence,
+                        controller.signal
+                    );
                     Promise.resolve(opened.result).then(
                         function acceptAIProviderStreamResult(value) {
                             try {
-                                runtime.#assertCurrentOperation(
+                                runtime.#assertCurrentRequest(
                                     slot,
                                     generation,
+                                    requestSequence,
                                     controller.signal
                                 );
                                 settleAIProviderStream(null, value);
@@ -1915,7 +2668,14 @@ export class AIProviderRuntime {
                         cancel: cancelAIProviderStream,
                         async next(value) {
                             try {
-                                return await iterator.next(value);
+                                const result = await iterator.next(value);
+                                runtime.#assertCurrentRequest(
+                                    slot,
+                                    generation,
+                                    requestSequence,
+                                    controller.signal
+                                );
+                                return result;
                             } catch (error) {
                                 await cancelAIProviderStream(error);
                                 throw isAbort(error, controller.signal)
@@ -1998,7 +2758,12 @@ export class AIProviderRuntime {
                         signal: controller.signal
                     }
                 );
-                runtime.#assertCurrentOperation(slot, generation, controller.signal);
+                runtime.#assertCurrentRequest(
+                    slot,
+                    generation,
+                    requestSequence,
+                    controller.signal
+                );
                 return result;
             } catch (error) {
                 const normalized = isAbort(error, controller.signal)
@@ -2041,16 +2806,19 @@ export class AIProviderRuntime {
     cancel(role) {
         assertRole(role);
         const slot = this.#slots[role];
-        if (!slot.request) {
+        if (!slot.request && !slot.requestAdmission) {
             return false;
         }
-        slot.request.controller.abort();
-        slot.request.cancel?.(
+        slot.requestAdmission?.controller.abort();
+        const requestRecord = slot.request;
+        requestRecord?.controller.abort();
+        const cancellation = requestRecord?.cancel?.(
             operationError(
                 `AI role ${role} request was cancelled.`,
                 'ARCANE_AI_REQUEST_ABORTED'
             )
-        ).catch(function retainAIProviderCancelFailureInState() {});
+        );
+        cancellation?.catch(function retainAIProviderCancelFailureInState() {});
         return true;
     }
 
@@ -2067,6 +2835,7 @@ export class AIProviderRuntime {
             this.cancel('tts');
         }
         const runtime = this;
+        this.#speechTransitionOwners += 1;
         const transition = this.#speechTransition.catch(
             function retainPriorAISpeechTransitionFailure() {}
         ).then(
@@ -2095,6 +2864,10 @@ export class AIProviderRuntime {
                         return runtime.status('tts');
                     }
                 }
+            }
+        ).finally(
+            function releaseAIProviderSpeechTransitionOwnership() {
+                runtime.#speechTransitionOwners -= 1;
             }
         );
         this.#speechTransition = transition;
@@ -2132,6 +2905,128 @@ export class AIProviderRuntime {
                 signal
             }
         );
+    }
+
+    #supersedeRoleRequest(slot, provider, options) {
+        const generation = slot.generation;
+        const requestSequence = this.#nextRequestSequence(slot);
+        const priorAdmission = slot.requestAdmission;
+        const activeRequest = priorAdmission?.activeRequest ?? slot.request;
+        const controller = new AbortController();
+        const detachSignal = this.#forwardAbort(options.signal, controller);
+        let settlement = priorAdmission?.settlement ?? null;
+        if (!settlement && activeRequest) {
+            activeRequest.controller.abort();
+            settlement = Promise.allSettled(
+                [
+                    Promise.resolve().then(
+                        function cancelSupersededAIProviderRequest() {
+                            return activeRequest.cancel(
+                                operationError(
+                                    `AI role ${slot.role} request was superseded.`,
+                                    'ARCANE_AI_OPERATION_SUPERSEDED'
+                                )
+                            );
+                        }
+                    ),
+                    activeRequest.promise
+                ]
+            );
+        }
+        if (!settlement) {
+            settlement = Promise.resolve([]);
+        }
+        const admission = {
+            activeRequest,
+            controller,
+            generation,
+            requestSequence,
+            settlement
+        };
+        slot.requestAdmission = admission;
+        const runtime = this;
+        return (async function supersedeAIProviderRoleRequest() {
+            try {
+                const outcomes = await settlement;
+                runtime.#assertCurrentRequestAdmission(slot, admission);
+                if (outcomes[0]?.status === 'rejected') {
+                    throw outcomes[0].reason;
+                }
+                let providerStatus;
+                try {
+                    providerStatus = validateProviderStatus(provider.status());
+                } catch (error) {
+                    throw operationError(
+                        `The selected ${slot.role} provider did not return a valid status.`,
+                        'ARCANE_AI_PROVIDER_STATUS_INVALID',
+                        error
+                    );
+                }
+                if (!slot.ready
+                    || providerStatus.state !== 'ready'
+                    || providerStatus.loaded !== true
+                    || providerStatus.busy !== false) {
+                    slot.requestAdmission = null;
+                    slot.ready = false;
+                    const notReady = operationError(
+                        `AI role ${slot.role} is not ready after superseding its active request.`,
+                        'ARCANE_AI_ROLE_NOT_READY'
+                    );
+                    if (providerStatus.state === 'unloaded'
+                        && !providerStatus.loaded
+                        && !providerStatus.busy) {
+                        publishAIRuntimeRoleState(
+                            slot.role,
+                            roleRecord(slot.role, slot.selection)
+                        );
+                    } else if (providerStatus.state === 'ready'
+                        && providerStatus.loaded
+                        && providerStatus.busy) {
+                        slot.ready = true;
+                        publishAIRuntimeRoleState(
+                            slot.role,
+                            roleRecord(
+                                slot.role,
+                                slot.selection,
+                                {
+                                    state: 'ready',
+                                    loaded: true,
+                                    busy: true
+                                }
+                            )
+                        );
+                    } else {
+                        runtime.#publishRoleError(
+                            slot,
+                            notReady,
+                            providerStatus.loaded
+                        );
+                    }
+                    throw notReady;
+                }
+                slot.requestAdmission = null;
+                return await runtime.request(slot.role, options);
+            } catch (error) {
+                const normalized = isAbort(error, controller.signal)
+                    ? normalizedAbort(error)
+                    : error;
+                if (slot.requestAdmission === admission) {
+                    slot.requestAdmission = null;
+                    if (slot.generation === generation
+                        && !slot.unloadPromise
+                        && !slot.disposePromise) {
+                        runtime.#publishRequestAdmissionFailure(
+                            slot,
+                            provider,
+                            normalized
+                        );
+                    }
+                }
+                throw normalized;
+            } finally {
+                detachSignal();
+            }
+        })();
     }
 
     #sameSelection(left, right) {
@@ -2172,9 +3067,40 @@ export class AIProviderRuntime {
             slot.loadPromise
             || slot.unloadPromise
             || slot.disposePromise
+            || slot.requestAdmission
             || slot.request
             || slot.ready
         );
+    }
+
+    #createProviderUnregisterHandle(provider) {
+        const runtime = this;
+        let active = true;
+        return function unregisterAIProvider() {
+            if (!active) {
+                return false;
+            }
+            const removed = runtime.unregister(
+                provider.role,
+                provider.id,
+                provider
+            );
+            if (removed) {
+                active = false;
+            }
+            return removed;
+        };
+    }
+
+    #nextRequestSequence(slot) {
+        if (slot.requestSequence === Number.MAX_SAFE_INTEGER) {
+            throw operationError(
+                `AI role ${slot.role} exhausted its request sequence.`,
+                'ARCANE_AI_OPERATION_SEQUENCE_EXHAUSTED'
+            );
+        }
+        slot.requestSequence += 1;
+        return slot.requestSequence;
     }
 
     #nextOperationId(slot, operation) {
@@ -2195,6 +3121,30 @@ export class AIProviderRuntime {
         if (slot.generation !== generation) {
             throw operationError(
                 `AI role ${slot.role} operation was superseded.`,
+                'ARCANE_AI_OPERATION_SUPERSEDED'
+            );
+        }
+    }
+
+    #assertCurrentRequest(slot, generation, requestSequence, signal) {
+        this.#assertCurrentOperation(slot, generation, signal);
+        if (slot.requestSequence !== requestSequence) {
+            throw operationError(
+                `AI role ${slot.role} request was superseded.`,
+                'ARCANE_AI_OPERATION_SUPERSEDED'
+            );
+        }
+    }
+
+    #assertCurrentRequestAdmission(slot, admission) {
+        if (admission.controller.signal.aborted) {
+            throw normalizedAbort();
+        }
+        if (slot.generation !== admission.generation
+            || slot.requestSequence !== admission.requestSequence
+            || slot.requestAdmission !== admission) {
+            throw operationError(
+                `AI role ${slot.role} request admission was superseded.`,
                 'ARCANE_AI_OPERATION_SUPERSEDED'
             );
         }
@@ -2234,6 +3184,68 @@ export class AIProviderRuntime {
             )
         );
         return true;
+    }
+
+    #publishRequestAdmissionFailure(slot, provider, error) {
+        let providerStatus = null;
+        try {
+            providerStatus = validateProviderStatus(provider.status());
+        } catch {
+            // The admission error remains authoritative when status is malformed.
+        }
+        if (isAbort(error, null)
+            && providerStatus?.state === 'ready'
+            && providerStatus.loaded
+            && !providerStatus.busy) {
+            slot.ready = true;
+            publishAIRuntimeRoleState(
+                slot.role,
+                roleRecord(
+                    slot.role,
+                    slot.selection,
+                    {
+                        state: 'ready',
+                        loaded: true
+                    }
+                )
+            );
+            return;
+        }
+        if (isAbort(error, null)
+            && providerStatus?.state === 'unloaded'
+            && !providerStatus.loaded
+            && !providerStatus.busy) {
+            slot.ready = false;
+            publishAIRuntimeRoleState(
+                slot.role,
+                roleRecord(slot.role, slot.selection)
+            );
+            return;
+        }
+        if (providerStatus?.state === 'ready'
+            && providerStatus.loaded
+            && providerStatus.busy) {
+            slot.ready = true;
+            publishAIRuntimeRoleState(
+                slot.role,
+                roleRecord(
+                    slot.role,
+                    slot.selection,
+                    {
+                        state: 'ready',
+                        loaded: true,
+                        busy: true
+                    }
+                )
+            );
+            return;
+        }
+        slot.ready = false;
+        this.#publishRoleError(
+            slot,
+            error,
+            providerStatus?.loaded === true
+        );
     }
 
     #publishRoleError(slot, error, loaded) {

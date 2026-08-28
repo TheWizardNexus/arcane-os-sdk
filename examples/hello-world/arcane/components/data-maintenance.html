@@ -18,34 +18,62 @@
     const maintenanceModal=host.shadowRoot.querySelector('#maintenanceModal');
     const {default:waitForComponent}=await import('../modules/WaitForComponent.js');
     const {clearEmptyChatsAndMemories}=await import('../modules/DataMaintenance.js?v=3');
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.data-maintenance',eventTypes:['data-maintenance-complete','data-maintenance-ready']});
+    const lifecycleController=new AbortController();
 
     let content=null;
+    let openGeneration=0;
+    let clearGeneration=0;
+    let operationSequence=0;
+    let destroyed=false;
 
     host.open=openMaintenance;
+    host.destroy=destroy;
 
     openButton.addEventListener(
         'click',
         ()=>openMaintenance().catch(
-            error=>console.error('Unable to open maintenance:',error)
-        )
+            error=>{
+                if(!destroyed){
+                    console.error('Unable to open maintenance:',error);
+                }
+            }
+        ),
+        {signal:lifecycleController.signal}
     );
 
     async function openMaintenance(){
+        if(destroyed){
+            return false;
+        }
+        const generation=++openGeneration;
         const modal=await waitForComponent(
             maintenanceModal,
             {
                 methods:['populate','open'],
                 property:'ready',
-                event:'modal-ready'
+                event:'modal-ready',
+                signal:lifecycleController.signal
             }
         );
+        if(destroyed||generation!==openGeneration){
+            return false;
+        }
 
         if(!content){
             content=createContent();
             await modal.populate(content,false);
+            if(destroyed||generation!==openGeneration){
+                return false;
+            }
         }
 
-        modal.open();
+        const opened=await modal.open();
+        if(destroyed||generation!==openGeneration){
+            return false;
+        }
+        return opened===true;
     }
 
     function createContent(){
@@ -64,11 +92,19 @@
         clearButton.addEventListener(
             'click',
             async function clearChats(){
+                if(destroyed){
+                    return;
+                }
+                const generation=++clearGeneration;
+                const operationId=`${events.descriptor.instanceId}:clear:${++operationSequence}`;
                 clearButton.disabled=true;
                 status.innerText='Checking chat logs...';
 
                 try{
                     const result=await clearEmptyChatsAndMemories();
+                    if(destroyed||generation!==clearGeneration){
+                        return;
+                    }
 
                     if(result.deletedChats||result.deletedMemories){
                         status.innerText=`Deleted ${result.deletedChats} empty ${result.deletedChats===1?'chat':'chats'} and ${result.deletedMemories} empty or associated ${result.deletedMemories===1?'memory':'memories'}.`;
@@ -80,19 +116,25 @@
                         status.innerText+=` ${result.failed} could not be deleted.`;
                     }
 
-                    host.dispatchEvent(
-                        new CustomEvent(
-                            'data-maintenance-complete',
-                            {detail:result}
-                        )
+                    const publication=events.dispatch(
+                        'data-maintenance-complete',
+                        result,
+                        {operationId,publicDetail:{deletedChats:Number(result.deletedChats||0),deletedMemories:Number(result.deletedMemories||0),failed:Number(result.failed||0)}}
                     );
+                    projectArcaneDOMEvent(host,publication.occurrence);
                 }catch(error){
+                    if(destroyed||generation!==clearGeneration){
+                        return;
+                    }
                     status.innerText='Unable to complete data maintenance.';
                     console.error('Unable to clear empty chats and memories:',error);
                 }finally{
-                    clearButton.disabled=false;
+                    if(!destroyed&&generation===clearGeneration){
+                        clearButton.disabled=false;
+                    }
                 }
-            }
+            },
+            {signal:lifecycleController.signal}
         );
 
         section.append(
@@ -105,8 +147,21 @@
         return section;
     }
 
+    function destroy(){
+        if(destroyed){
+            return false;
+        }
+        destroyed=true;
+        openGeneration+=1;
+        clearGeneration+=1;
+        lifecycleController.abort('data-maintenance-destroyed');
+        maintenanceModal.destroy?.();
+        events.dispose();
+        host.ready=false;
+        return true;
+    }
+
     host.ready=true;
-    host.dispatchEvent(
-        new CustomEvent('data-maintenance-ready')
-    );
+    const readyPublication=events.dispatch('data-maintenance-ready',{}, {publicDetail:{ready:true}});
+    projectArcaneDOMEvent(host,readyPublication.occurrence);
 </script>

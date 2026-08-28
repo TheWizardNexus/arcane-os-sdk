@@ -97,6 +97,9 @@
 <script type="module">
     const host=this;
     const root=host.shadowRoot;
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.local-ai-status',eventTypes:['local-ai-retry','local-ai-status-dismissed','local-ai-status-ready']});
+    const lifecycleController=new AbortController();
     const panel=root.querySelector('#panel');
     const title=root.querySelector('#localAIStatusTitle');
     const summary=root.querySelector('#summary');
@@ -118,28 +121,36 @@
     let options={};
     let readyDismissTimer=null;
     let readyForDismiss=false;
+    let operationSequence=0;
+    let destroyed=false;
+
+    function emit(type,detail={},publicDetail={},operationId=null){
+        if(destroyed){
+            return false;
+        }
+        const publication=events.dispatch(type,detail,{publicDetail,operationId});
+        return projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});
+    }
 
     host.begin=begin;
     host.configure=configure;
+    host.destroy=destroy;
     host.present=present;
 
     retry.addEventListener('click',function dispatchRetryRequest(){
-        host.dispatchEvent(new CustomEvent('local-ai-retry',{
-            bubbles:true,
-            composed:true
-        }));
-    });
+        emit('local-ai-retry',{}, {},`${events.descriptor.instanceId}:retry:${++operationSequence}`);
+    },{signal:lifecycleController.signal});
     settings.addEventListener('click',function showNativeRecoveryHelp(){
         nativeHelp.hidden=false;
         nativeHelp.focus?.();
-    });
+    },{signal:lifecycleController.signal});
     dismiss.addEventListener('click',function dismissStatusManually(){
         hideStatus('manual');
-    });
-    host.addEventListener('pointerenter',cancelReadyDismiss);
-    host.addEventListener('pointerleave',scheduleReadyDismiss);
-    host.addEventListener('focusin',cancelReadyDismiss);
-    host.addEventListener('focusout',scheduleReadyDismiss);
+    },{signal:lifecycleController.signal});
+    host.addEventListener('pointerenter',cancelReadyDismiss,{signal:lifecycleController.signal});
+    host.addEventListener('pointerleave',scheduleReadyDismiss,{signal:lifecycleController.signal});
+    host.addEventListener('focusin',cancelReadyDismiss,{signal:lifecycleController.signal});
+    host.addEventListener('focusout',scheduleReadyDismiss,{signal:lifecycleController.signal});
 
     function cancelReadyDismiss(){
         if(readyDismissTimer!==null){
@@ -150,7 +161,7 @@
 
     function scheduleReadyDismiss(){
         cancelReadyDismiss();
-        if(!readyForDismiss){
+        if(destroyed||!readyForDismiss){
             return;
         }
         readyDismissTimer=setTimeout(autoDismissReadyStatus,readyDismissDelay);
@@ -158,7 +169,7 @@
 
     function autoDismissReadyStatus(){
         readyDismissTimer=null;
-        if(!readyForDismiss){
+        if(destroyed||!readyForDismiss){
             return;
         }
         if(host.matches(':hover')||root.activeElement){
@@ -171,14 +182,13 @@
         cancelReadyDismiss();
         readyForDismiss=false;
         host.hidden=true;
-        host.dispatchEvent(new CustomEvent('local-ai-status-dismissed',{
-            bubbles:true,
-            composed:true,
-            detail:{reason}
-        }));
+        emit('local-ai-status-dismissed',{reason},{reason:String(reason)},`${events.descriptor.instanceId}:dismiss:${++operationSequence}`);
     }
 
     function configure(input={}){
+        if(destroyed){
+            return false;
+        }
         options={
             profileHref:host.dataset.profileHref||null,
             ...options,
@@ -193,6 +203,9 @@
     }
 
     function begin(requirements={}){
+        if(destroyed){
+            return false;
+        }
         readyForDismiss=false;
         cancelReadyDismiss();
         host.hidden=false;
@@ -207,6 +220,9 @@
     }
 
     function present(report={}){
+        if(destroyed){
+            return false;
+        }
         const runtime=report.runtime||{};
         const results=report.slots||report.results||report;
         const requiredEntries=Object.keys(labels).map(function createRequiredEntry(key){
@@ -353,8 +369,21 @@
         services.replaceChildren(fragment);
     }
 
+    function destroy(){
+        if(destroyed){
+            return false;
+        }
+        destroyed=true;
+        cancelReadyDismiss();
+        readyForDismiss=false;
+        lifecycleController.abort('local-ai-status-destroyed');
+        events.dispose();
+        host.ready=false;
+        return true;
+    }
+
     configure();
     host.hidden=true;
     host.ready=true;
-    host.dispatchEvent(new CustomEvent('local-ai-status-ready',{bubbles:true,composed:true}));
+    emit('local-ai-status-ready',{}, {ready:true});
 </script>

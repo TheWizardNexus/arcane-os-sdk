@@ -3,17 +3,16 @@
 This maintained example is a browser Arcane application written with plain
 HTML, CSS, and JavaScript. The greeting runs without AI. Three independent role
 panels then present the SDK lifecycle for a local LLM, text to speech (TTS), and
-speech to text (STT): configure, load, use, cancel, unload, reload strictly from
+speech to text (STT): select, hydrate, load, use, cancel, unload, reload from
 cache, and dispose when the page closes.
 
-`arcane-os@0.2.1` ships the provider, Worker, verification, storage, and
-lifecycle machinery plus the licenses for its own packaged bytes. It does not
-ship model weights, caller-selected Whisper or Kokoro adapter closures, voices,
-or the licenses for those caller-selected speech artifacts. Importing the app
-starts no AI model or adapter-artifact download and creates no AI Worker. The
-LLM in this maintained fixture has a pinned caller-owned authority. Speech
-remains disabled until the application owner supplies equally immutable
-authorities in `modules/SpeechAuthorities.js`.
+`arcane-os@0.3.1` ships the normalized AI surface, provider and Worker
+machinery, DBOPFS storage, and the licenses for its own packaged bytes. It does
+not redistribute model weights, caller-selected Whisper or Kokoro runtimes,
+voices, third-party legal corpora, or corresponding source. Importing the app
+starts no AI download and creates no AI Worker. The LLM has an app-selected
+immutable source. Speech remains disabled until the application owner supplies
+version-pinned upstream authorities in `modules/SpeechAuthorities.js`.
 
 ## Requirements
 
@@ -23,7 +22,7 @@ authorities in `modules/SpeechAuthorities.js`.
 ## Create the same project shape
 
 ```sh
-npx arcane-os@0.2.1 new hello-world --path ./hello-world --display-name "Arcane Hello World" --git
+npx arcane-os@0.3.1 new hello-world --path ./hello-world --display-name "Arcane Hello World" --git
 cd hello-world
 npm install
 ```
@@ -35,7 +34,7 @@ fixture extends that generated app with the optional local-AI panel below.
 A global CLI is supported as a convenience:
 
 ```sh
-npm install --global arcane-os@0.2.1
+npm install --global arcane-os@0.3.1
 arcane new hello-world --path ./hello-world
 ```
 
@@ -78,6 +77,7 @@ hello-world/
 │   │   └── ThemeBootstrap.js
 │   ├── sdk/
 │   │   ├── ai/
+│   │   │   ├── ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json
 │   │   │   ├── browser-kokoro-worker.mjs
 │   │   │   ├── browser-speech.mjs
 │   │   │   ├── browser-wasm.mjs
@@ -110,6 +110,7 @@ packaged release use the same physical dependency bytes.
 ```json
 {
   "imports": {
+    "arcane/AI": "./arcane/modules/AI.js",
     "arcane/AppDataScope": "./arcane/modules/AppDataScope.js",
     "arcane/DBOPFS": "./arcane/modules/DBOPFS.js",
     "arcane/PersistentAIChatSession": "./arcane/modules/PersistentAIChatSession.js",
@@ -154,31 +155,33 @@ const countKey=resolveApplicationLocalStorageKey(
 
 ## Full browser-local AI lifecycle
 
-The import map resolves both public SDK entrypoints to authenticated physical
-installed-package routes. DBOPFS supplies one app-scoped persistent store, but
-none of the role providers loads and no artifact request starts until its own
-load button is chosen:
+The import map resolves the normalized runtime modules and public SDK entrypoint
+to authenticated physical installed-package routes. DBOPFS supplies one
+app-scoped persistent store, but no role loads and no artifact request starts
+until its own load button is chosen:
 
 ```js
 import DBOPFS from 'arcane/DBOPFS';
+import AI, {
+    AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL
+} from 'arcane/AI';
 import {
     createArcaneAI,
     createBrowserModelSource,
     createBrowserWasmLlmProvider,
     createDbopfsModelStore
 } from 'arcane-os/ai/browser-wasm';
-import {
-    createBrowserKokoroProvider,
-    createBrowserWhisperProvider,
-    createDbopfsSpeechArtifactStore
-} from 'arcane-os/ai/browser-speech';
 import speechAuthorities from './SpeechAuthorities.js';
+
+const AI_SECURITY=Object.freeze({secure:false});
 ```
 
 The app keeps separate operation state and `AbortController` instances for
 `llm`, `tts`, and `stt`. Loading, using, cancelling, or unloading one role does
 not silently select, reset, or fall back to another role. A role is usable only
-after its own provider reports ready.
+after its own provider reports ready. `AI_SECURITY` keeps the shipped ordinary
+warn-first default explicit: malformed inputs and failed runtimes still fail,
+while disabled optional byte checks are reported as `unchecked`, not verified.
 
 ### Application-owned speech authority
 
@@ -193,27 +196,58 @@ const speechAuthorities = Object.freeze({
 export default speechAuthorities;
 ```
 
-Do not replace either `null` with an unpinned example URL. A real STT or TTS
-authority must name the app-selected model, repository, immutable revision, and
-complete model file list. Each file declares its immutable URL, byte length,
-SHA-256 digest, and, when useful, its optional media type. The authority also
-declares the complete runtime module graph: adapter (`transformers-whisper` for
-STT or `kokoro-js` for TTS), version, immutable revision, entry module, and
-every runtime file with the same byte and digest evidence. TTS additionally
-names an app-selected default voice. The app owner must review and ship the
-corresponding licenses.
+Do not replace either `null` with a floating example URL. A real STT or TTS
+authority names the app-selected model, repository, version or immutable
+revision, and its selected upstream runtime entry. TTS also names the selected
+default voice. In ordinary warn-first mode the model file list may be empty or
+omitted so the version-pinned upstream provider can fetch its normal model and
+voice assets. Runtime files and any `wasmPaths` still identify a version-pinned
+npm/package distribution. The application remains responsible for checking the
+upstream terms; neither this example nor the SDK republishes those bytes or
+their legal corpus.
 
-When enabling either speech role, place its exact reviewed license and required
-notices under `apps/hello-world/licenses/speech/`. Then add `"licenses"` to the
-`package.include` array in `arcane-app.json` and to the top-level `include`
-array in `arcane-package.json`. Keep the two lists synchronized so the notices
-are present in the packaged application; the current fail-closed fixture has no
-caller-selected speech bytes or speech license to package.
-
-Until all of that policy is real, each speech role remains unavailable. Its
-load attempt reports `HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED` without creating a
+Until that policy is real, each speech role remains unavailable. Its load
+attempt reports `HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED` before creating a
 provider or starting a fetch. The SDK does not choose a model, runtime, voice,
 source, revision, or license for the application.
+
+On the first configured role, the app records the exact selected provider and
+model with `localOnly:null`. That is an intentionally selected-but-unregistered
+route. `AI.configureBrowserSpeech()` constructs the shared provider, atomically
+hydrates that exact route to `localOnly:true`, and leaves the other external
+Cloud or Core speech route unchanged. A later one-role call can add or replace
+the other browser role without reconstructing or rerouting the first:
+
+```js
+const speechAI=new AI();
+const runtime=speechAI.providerRuntime;
+const selected=Object.freeze({
+    providerId:'hello-world-browser-whisper',
+    modelId:speechAuthorities.stt.model.id,
+    localOnly:null
+});
+
+runtime.configureSpeech(Object.freeze({
+    stt:Object.freeze({default:selected,localOnly:null}),
+    tts:Object.freeze({default:runtime.selection('tts'),localOnly:null})
+}));
+
+await speechAI.configureBrowserSpeech(Object.freeze({
+    protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+    id:'hello-world-stt-network',
+    dbopfs,
+    stt:Object.freeze({
+        providerId:selected.providerId,
+        model:speechAuthorities.stt.model,
+        runtime:speechAuthorities.stt.runtime,
+        security:AI_SECURITY,
+        offline:false
+    })
+}),{signal});
+```
+
+Configuration alone does not load, download, choose a fallback, or change the
+omitted role.
 
 ### LLM
 
@@ -225,12 +259,15 @@ The configured caller-supplied model is IBM Granite 4.1 3B Q4_K_S:
 - SHA-256: `ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a`
 
 The network-permitted load first checks an app-scoped DBOPFS cache. On a miss,
-Arcane downloads the immutable URL, reports byte progress, verifies the full
-digest, writes a completion manifest, reopens and rehashes the file, and only
-then admits it. `load({offline:true})` makes no model-source request and succeeds
-only when that verified cache already exists. Packaged same-origin Wllama/WASM
-runtime assets may still load. Warm-cache loads still rehash the full model.
-This 0.2.1 browser path requires WebGPU, and the published provider owns its
+Arcane downloads the immutable URL, reports byte progress, records observed
+bytes and cache completion, and loads it. `load({offline:true})` makes no
+model-source request and succeeds only when a compatible cache already exists.
+Packaged same-origin Wllama/WASM runtime assets may still load. With the
+example's `secure:false` policy, byte-length and SHA-256 checks are disabled and
+status reports `integrity.state:'unchecked'`; the retained expected size and
+digest are metadata available for a later explicit strict load, not a claim
+that the ordinary load verified them. This 0.3.1 browser path requires WebGPU,
+and the published provider owns its
 full-offload setting; the application does not provide a `gpuLayers` override.
 
 Every inference request sets `localOnly:true`. That guarantees inference stays
@@ -242,12 +279,13 @@ before tokenization so LLM preparation remains bounded.
 
 ### Text to speech
 
-TTS uses `createBrowserKokoroProvider` only after `speechAuthorities.tts` is
-present. A synthesis request supplies the selected model, input text,
-`responseFormat: 'wav'`, and speed. The SDK returns WAV bytes and a content
-type; the application creates a `Blob` and object URL and assigns it to a
-standard `<audio controls>` element. Playback is always initiated and
-controlled by the user. The SDK and example do not autoplay generated speech.
+TTS is configured through normalized `arcane/AI` only after
+`speechAuthorities.tts` is present. `setSpeechMuted(false)` explicitly loads
+the selected TTS route. A synthesis request supplies the selected model, input
+text, `responseFormat:'wav'`, and speed. `fetchTTS()` returns a WAV `Blob`; the
+application creates only its object URL and assigns it to a standard
+`<audio controls>` element. Playback is always initiated and controlled by the
+user. The SDK and example do not autoplay generated speech.
 This tutorial limits each synthesis input to 500 characters before dispatch so
 runtime work and generated audio memory remain bounded.
 
@@ -257,10 +295,11 @@ ensures no TTS Worker remains active without changing the LLM or STT lifecycle.
 
 ### Speech to text
 
-STT uses `createBrowserWhisperProvider` only after
+STT is configured through normalized `arcane/AI` only after
 `speechAuthorities.stt` is present. The user explicitly chooses an audio file;
-the request passes that `File`, its media type, and the selected model to the
-SDK. The SDK decodes the file to the provider's input format and returns text.
+`fetchSTT()` passes that `File` to the selected route. The SDK decodes the file
+to the provider's input format and returns text to the supplied response
+handler.
 
 This example does not open a microphone, capture live audio, or request a
 microphone permission or Arcane Core capability. Choosing a local file is an
@@ -270,30 +309,38 @@ decodes them, bounding the tutorial's browser memory exposure.
 
 ### First use, cache, offline reuse, and cleanup
 
-A network-permitted load checks the app-scoped DBOPFS cache first. On a cache
-miss, the SDK obtains every declared immutable artifact, reports byte progress,
-checks the declared length and SHA-256 digest, admits only the verified closure,
-and records its completion. Partial, changed, undeclared, or mismatched bytes
-are rejected rather than blessed or used.
+A network-permitted load checks the app-scoped DBOPFS cache first. On a miss,
+the SDK obtains the app-selected upstream artifacts only after that role's
+button is used, reports provider progress, records the resulting cache, and
+starts that role's Worker. The default warn-first status includes
+`browser-speech-warn-first-secure-mode-disabled` and calls optional byte checks
+`unchecked` when they did not run.
 
-Strict offline reuse performs no artifact-source request. The LLM uses its
-offline load option. Because offline policy is fixed when a speech provider is
-constructed, the TTS or STT panel unloads and disposes its network-permitted
-provider, reconstructs the same role and authority with `offline: true`, and
-then loads from the same app-scoped store. An absent verified closure fails with
-`ARCANE_AI_ARTIFACT_OFFLINE_MISS`.
+Offline reuse performs no upstream artifact request. The LLM uses its offline
+load option. For speech, the normalized AI owner atomically replaces only the
+selected role with the same authority and `offline:true`, then loads it from the
+same app-scoped store. The omitted STT or TTS route remains unchanged. An absent
+compatible cache fails with `ARCANE_AI_ARTIFACT_OFFLINE_MISS` or the graph-mode
+offline miss code.
 
 Each role's Cancel button aborts only that role's active load or request. An
-interrupted download is not admitted. While a role is busy, its Unload control
+interrupted download is not completed. While a role is busy, its Unload control
 is disabled; cancel or let the operation settle first. Unload then ends that
-role session and ensures no role Worker remains active while retaining verified
-DBOPFS artifacts. Dispose performs that unload and permanently closes the
-provider instance. `pagehide` aborts all three roles, initiates best-effort
-disposal of their providers, and revokes the TTS audio object URL; browser
+role session and ensures no role Worker remains active while retaining DBOPFS
+artifacts. `pagehide` aborts all three roles, calls `dispose()` for the LLM and
+`disposeBrowserSpeech()` for the SDK-owned normalized speech configuration, and
+revokes the TTS audio object URL; browser
 termination releases any remaining live resources. If the browser restores that
 page from its back/forward cache, the example reloads once to create fresh
 lifecycle owners.
-Unload and dispose do not delete the verified persistent cache.
+Unload and dispose do not delete the persistent cache.
+
+Optional strict checks are a separate application decision. Changing the shared
+policy to `Object.freeze({secure:true})` requires a complete compatible
+content-addressed graph and file authority, lengths, digests, licenses, and an
+unload/reload. Strict mode rejects remote `wasmPaths`; immutable HTTPS graph
+sources remain supported. The example does not silently enable or claim that
+hardening.
 
 The UI maps expected failures to stable codes instead of exposing provider
 error text. Useful lifecycle boundaries include:

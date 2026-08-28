@@ -58,6 +58,7 @@
     "arcane/LocalAIReadinessController": "./arcane/modules/LocalAIReadinessController.js",
     "arcane/MD": "./arcane/modules/MD.js",
     "arcane/Mail": "./arcane/modules/Mail.js",
+    "arcane/MailOutbox": "./arcane/modules/MailOutbox.mjs",
     "arcane/MailTransport": "./arcane/modules/MailTransport.mjs",
     "arcane/Marked.min": "./arcane/modules/Marked.min.js",
     "arcane/MemoryRecords": "./arcane/modules/MemoryRecords.js",
@@ -137,8 +138,9 @@
                     <section class="app-feature app-feature--ai" aria-labelledby="ai-feature-title">
                         <h2 id="ai-feature-title">Full SDK AI lifecycle</h2>
                         <p>Arcane gives language, speech synthesis, and speech transcription separate provider lifecycles. Each role loads, runs, cancels, and unloads without changing the other two.</p>
-                        <p class="ai-model-note"><strong>No external AI model or adapter artifact downloads at import time.</strong> A role's network load is the only control that may fetch those external artifacts. Offline load is strict: it uses previously verified app-scoped DBOPFS bytes or reports a cache miss.</p>
-                        <p id="speech-authority-status" class="speech-authority-note" role="status" aria-live="polite"><strong>Speech authority required:</strong> Arcane ships no speech runtime bytes, model weights, or voices. Before using speech, the application must pin immutable, licensed STT and TTS authorities in <code>modules/SpeechAuthorities.js</code>.</p>
+                        <p>The normalized <code>arcane/AI</code> module hydrates only the selected browser speech route. An omitted Cloud or Core role stays unchanged, so STT and TTS can use different providers.</p>
+                        <p class="ai-model-note"><strong>No external AI model or adapter artifact downloads at import time.</strong> A role's network load is the only control that may fetch its upstream artifacts. Offline load uses compatible app-scoped DBOPFS data or reports a cache miss. The ordinary <code>secure:false</code> path warns when optional byte checks are not requested.</p>
+                        <p id="speech-authority-status" class="speech-authority-note" role="status" aria-live="polite"><strong>Speech authority required:</strong> Arcane ships no speech runtime bytes, model weights, or voices, nor any third-party legal corpora. Before using speech, the application must select version-pinned upstream STT and TTS authorities in <code>modules/SpeechAuthorities.js</code>.</p>
 
                         <div class="ai-role-grid">
                             <section class="ai-role" aria-labelledby="llm-role-title">
@@ -146,12 +148,12 @@
                                     <p class="ai-role__eyebrow">LLM</p>
                                     <h3 id="llm-role-title">Generate text and inspect tool calls</h3>
                                 </header>
-                                <p>The SDK verifies Granite 4.1 3B Q4_K_S before admitting its 1.86 GiB first-use download to this app's cache. This 0.2.1 LLM path requires a WebGPU-capable browser.</p>
+                                <p>The SDK loads Granite 4.1 3B Q4_K_S from this app's 1,998,371,424 bytes (1.86 GiB) first-use download or DBOPFS cache. Status distinguishes warn-first unchecked bytes from completed optional integrity checks. This 0.3.1 LLM path requires a WebGPU-capable browser.</p>
                                 <p id="ai-lifecycle" class="app-environment">Lifecycle: unloaded.</p>
                                 <p id="ai-status" class="role-status" role="status" aria-live="polite">Model not loaded. No model download has started.</p>
                                 <div class="ai-controls" aria-label="Language model lifecycle controls">
                                     <button id="ai-load" class="arcane-button" type="button">Network load LLM (1.86 GiB if not cached)</button>
-                                    <button id="ai-load-offline" class="arcane-button" type="button">Load LLM from verified cache</button>
+                                    <button id="ai-load-offline" class="arcane-button" type="button">Load LLM from app cache</button>
                                     <button id="ai-cancel" class="arcane-button" type="button" hidden disabled>Cancel LLM operation</button>
                                     <button id="ai-unload" class="arcane-button" type="button" disabled>Unload LLM</button>
                                 </div>
@@ -174,12 +176,12 @@
                                     <p class="ai-role__eyebrow">TTS</p>
                                     <h3 id="tts-role-title">Synthesize a WAV response</h3>
                                 </header>
-                                <p>Configure a licensed voice and immutable Kokoro runtime and model authority before loading. Arcane never autoplays the result.</p>
+                                <p>Configure a licensed voice and version-pinned upstream Kokoro runtime and model authority before loading. Arcane never autoplays the result.</p>
                                 <p id="tts-lifecycle" class="app-environment">Lifecycle: unavailable until speech authority is configured.</p>
                                 <p id="tts-status" class="role-status" role="status" aria-live="polite">Speech authority required. No speech download has started.</p>
                                 <div class="ai-controls" aria-label="Text-to-speech lifecycle controls">
                                     <button id="tts-load" class="arcane-button" type="button" disabled>Network load TTS</button>
-                                    <button id="tts-load-offline" class="arcane-button" type="button" disabled>Load TTS from verified cache</button>
+                                    <button id="tts-load-offline" class="arcane-button" type="button" disabled>Load TTS from app cache</button>
                                     <button id="tts-cancel" class="arcane-button" type="button" hidden disabled>Cancel TTS operation</button>
                                     <button id="tts-unload" class="arcane-button" type="button" disabled>Unload TTS</button>
                                 </div>
@@ -203,12 +205,12 @@
                                     <p class="ai-role__eyebrow">STT</p>
                                     <h3 id="stt-role-title">Transcribe a selected audio file</h3>
                                 </header>
-                                <p>Configure immutable, licensed Whisper runtime and model authority before loading. This example reads only the file you select; it never requests microphone access.</p>
+                                <p>Configure a licensed, version-pinned upstream Whisper runtime and model authority before loading. This example reads only the file you select; it never requests microphone access.</p>
                                 <p id="stt-lifecycle" class="app-environment">Lifecycle: unavailable until speech authority is configured.</p>
                                 <p id="stt-status" class="role-status" role="status" aria-live="polite">Speech authority required. No speech download has started.</p>
                                 <div class="ai-controls" aria-label="Speech-to-text lifecycle controls">
                                     <button id="stt-load" class="arcane-button" type="button" disabled>Network load STT</button>
-                                    <button id="stt-load-offline" class="arcane-button" type="button" disabled>Load STT from verified cache</button>
+                                    <button id="stt-load-offline" class="arcane-button" type="button" disabled>Load STT from app cache</button>
                                     <button id="stt-cancel" class="arcane-button" type="button" hidden disabled>Cancel STT operation</button>
                                     <button id="stt-unload" class="arcane-button" type="button" disabled>Unload STT</button>
                                 </div>

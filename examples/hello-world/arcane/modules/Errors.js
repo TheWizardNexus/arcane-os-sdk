@@ -1,4 +1,8 @@
 import waitForComponent from './WaitForComponent.js';
+import {
+    arcaneEvents,
+    createArcaneEventSource
+} from 'arcane-os/event-manager';
 
 const DEFAULT_DELAY_MS=2_000;
 const DEFAULT_MAX_REPORTS_PER_SESSION=10;
@@ -9,6 +13,19 @@ const LEDGER_STORAGE_KEY='arcane-global-errors-v1';
 const MAX_DETAIL_LENGTH=8_000;
 const HANDLER_MARKER=Symbol.for('arcane.global-errors.handler');
 const DEVELOPER_MODAL_HREF=new URL('../components/modal.html?v=13',import.meta.url).href;
+
+export const GLOBAL_ERROR_EVENT_TYPES=Object.freeze({
+    browserErrorCaptured:'arcane-error-captured',
+    unhandledRejectionCaptured:'arcane-unhandled-rejection-captured'
+});
+export const GLOBAL_ERROR_EVENT_CODES=Object.freeze({
+    browserErrorCaptured:'ARCANE_BROWSER_ERROR_CAPTURED',
+    unhandledRejectionCaptured:'ARCANE_UNHANDLED_REJECTION_CAPTURED'
+});
+export const GLOBAL_ERROR_REASONS=Object.freeze({
+    browserErrorCaptured:'browser-error-captured',
+    unhandledRejectionCaptured:'unhandled-promise-rejection-captured'
+});
 
 const MESSAGE_STYLE=[
     'Write a simple plain-text email showing the error and, when the available details support it, a possible solution.',
@@ -374,6 +391,12 @@ async function presentDeveloperIncidentModal(target,incident,fingerprint){
 }
 
 class Errors {
+    #events;
+
+    #operationSequence=0;
+
+    #stopUserLoaded=null;
+
     constructor(options={}) {
         const target=options.target||globalThis.window;
         if(!target||typeof target.addEventListener!=='function'){
@@ -384,6 +407,13 @@ class Errors {
             return target.errors;
         }
 
+        this.#events=createArcaneEventSource(this,{
+            source:'global-error-handler',
+            eventTypes:Object.freeze([
+                GLOBAL_ERROR_EVENT_TYPES.browserErrorCaptured,
+                GLOBAL_ERROR_EVENT_TYPES.unhandledRejectionCaptured
+            ])
+        });
         this[HANDLER_MARKER]=true;
         this.target=target;
         this.delayMs=options.delayMs??DEFAULT_DELAY_MS;
@@ -674,17 +704,15 @@ class Errors {
         }
 
         this.waitingForUser=true;
-        this.target.addEventListener(
+        this.#stopUserLoaded=arcaneEvents.subscribe(
             'user-entity-loaded',
-            this.onUserLoaded
+            this.onUserLoaded,
+            {once:true}
         );
     }
 
     onUserLoaded(){
-        this.target.removeEventListener(
-            'user-entity-loaded',
-            this.onUserLoaded
-        );
+        this.#stopUserLoaded=null;
         this.waitingForUser=false;
 
         const deferred=this.deferredDeveloperIncident;
@@ -753,6 +781,33 @@ class Errors {
         if(this.reported.has(fingerprint)){
             return false;
         }
+
+        const incidentKind=incident?.type==='unhandledrejection'
+            ?'unhandled-promise-rejection'
+            :'browser-error';
+        const eventType=incidentKind==='unhandled-promise-rejection'
+            ?GLOBAL_ERROR_EVENT_TYPES.unhandledRejectionCaptured
+            :GLOBAL_ERROR_EVENT_TYPES.browserErrorCaptured;
+        const code=incidentKind==='unhandled-promise-rejection'
+            ?GLOBAL_ERROR_EVENT_CODES.unhandledRejectionCaptured
+            :GLOBAL_ERROR_EVENT_CODES.browserErrorCaptured;
+        const reason=incidentKind==='unhandled-promise-rejection'
+            ?GLOBAL_ERROR_REASONS.unhandledRejectionCaptured
+            :GLOBAL_ERROR_REASONS.browserErrorCaptured;
+        this.#operationSequence+=1;
+        this.#events.dispatch(
+            eventType,
+            Object.freeze({...incident,code,fingerprint,reason}),
+            {
+                operationId:`global-error-handler-${this.#events.instanceId}-${this.#operationSequence.toString(36)}`,
+                publicDetail:Object.freeze({
+                    id:fingerprint,
+                    code,
+                    kind:incidentKind,
+                    reason
+                })
+            }
+        );
 
         this.offerDeveloperIncident(incident,fingerprint);
 
@@ -976,7 +1031,8 @@ class Errors {
         this.destroyed=true;
         this.target.removeEventListener('error',this.onError,true);
         this.target.removeEventListener('unhandledrejection',this.onRejection,true);
-        this.target.removeEventListener('user-entity-loaded',this.onUserLoaded);
+        this.#stopUserLoaded?.();
+        this.#stopUserLoaded=null;
         this.waitingForUser=false;
         this.deferredDeveloperIncident=null;
 
@@ -1015,6 +1071,8 @@ class Errors {
                 this.target.errors=undefined;
             }
         }
+
+        this.#events.dispose();
     }
 }
 

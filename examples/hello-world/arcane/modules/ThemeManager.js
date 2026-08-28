@@ -2,6 +2,10 @@ import Theme,{arcaneDarkThemeTokens,arcaneLightThemeTokens} from '../entities/Th
 import PreferenceStore from './PreferenceStore.js';
 import {applyAppearancePreferences,createAppearancePreferenceStore} from './AppearancePreferences.js';
 import SystemAppearance from './SystemAppearance.js';
+import {
+    createArcaneEventSource,
+    projectArcaneDOMEvent
+} from 'arcane-os/event-manager';
 
 const skinSchema=Object.freeze([
     {key:'appearance.activeSkin',type:'text',defaultValue:''},
@@ -9,6 +13,9 @@ const skinSchema=Object.freeze([
 ]);
 
 export default class ThemeManager{
+    #events;
+    #operationSequence=0;
+
     constructor({appearanceStore=null,skinStore=null,systemAppearance=null,root=null}={}){
         this.appearanceStore=appearanceStore||createAppearancePreferenceStore();
         this.skinStore=skinStore||new PreferenceStore({namespace:'arcane',schema:skinSchema});
@@ -17,6 +24,10 @@ export default class ThemeManager{
         this.appearance=this.appearanceStore.defaults();
         this.skinState=this.skinStore.defaults();
         this.customTheme=null;
+        this.#events=createArcaneEventSource(this,{
+            source:'theme-manager',
+            eventTypes:Object.freeze(['arcane-theme-change'])
+        });
     }
 
     async load(){
@@ -53,7 +64,7 @@ export default class ThemeManager{
         ]);
         this.appearance={...this.appearance,'appearance.colorScheme':normalized};
         this.skinState={...this.skinState,'appearance.activeSkin':''};
-        this.apply();await this.syncSystemAppearance();this.emit();
+        this.apply();await this.syncSystemAppearance();this.emit('color-scheme-changed');
         return this.current();
     }
 
@@ -67,7 +78,7 @@ export default class ThemeManager{
         this.customTheme=theme;
         this.skinState={...this.skinState,'appearance.customSkin':JSON.stringify(theme),'appearance.activeSkin':'custom'};
         this.appearance={...this.appearance,'appearance.colorScheme':theme.scheme};
-        this.apply();await this.syncSystemAppearance();this.emit();
+        this.apply();await this.syncSystemAppearance();this.emit('custom-theme-activated');
         return this.current();
     }
 
@@ -80,7 +91,7 @@ export default class ThemeManager{
         ]);
         this.skinState={...this.skinState,'appearance.activeSkin':'custom'};
         this.appearance={...this.appearance,'appearance.colorScheme':this.customTheme.scheme};
-        this.apply();await this.syncSystemAppearance();this.emit();
+        this.apply();await this.syncSystemAppearance();this.emit('custom-theme-activated');
         return this.current();
     }
 
@@ -97,7 +108,7 @@ export default class ThemeManager{
         ]);
         this.customTheme=null;
         this.skinState={...this.skinState,'appearance.customSkin':'','appearance.activeSkin':''};
-        this.apply();await this.syncSystemAppearance();this.emit();
+        this.apply();await this.syncSystemAppearance();this.emit('custom-theme-reset');
         return this.current();
     }
 
@@ -112,10 +123,31 @@ export default class ThemeManager{
         });
     }
 
-    emit(){
-        if(typeof globalThis.CustomEvent==='function'&&typeof globalThis.dispatchEvent==='function'){
-            globalThis.dispatchEvent(new CustomEvent('arcane-theme-change',{detail:this.current()}));
+    emit(reason='theme-state-applied'){
+        const state=this.current();
+        const detail=Object.freeze({...state,reason});
+        this.#operationSequence+=1;
+        const {occurrence}=this.#events.dispatch(
+            'arcane-theme-change',
+            detail,
+            {
+                operationId:`theme-manager-${this.#events.instanceId}-${this.#operationSequence}`,
+                publicDetail:Object.freeze({mode:detail.mode,reason})
+            }
+        );
+        if(typeof globalThis.CustomEvent==='function'
+            &&typeof globalThis.dispatchEvent==='function'){
+            projectArcaneDOMEvent(globalThis,occurrence);
         }
+        return occurrence;
+    }
+
+    dispose(){
+        return this.#events.dispose();
+    }
+
+    destroy(){
+        return this.dispose();
     }
 }
 

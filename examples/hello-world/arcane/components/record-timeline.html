@@ -28,18 +28,24 @@
   const host=this;
   const list=host.shadowRoot.querySelector('[data-list]');
   const empty=host.shadowRoot.querySelector('[data-empty]');
+  const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+  const events=createArcaneEventSource(host,{source:'arcane.component.record-timeline',eventTypes:['record-timeline-open','record-timeline-ready']});
+  let destroyed=false;
   let items=[];
   let options={emptyLabel:'No dated events match this view.'};
 
   host.setItems=setItems;
   host.populate=(value,input={})=>setItems(value,input);
+  host.destroy=destroy;
 
   list.addEventListener('click',event=>{
+    if(destroyed) return;
     const trigger=event.target.closest('[data-event-id]');
     if(!trigger) return;
     const item=items.find(candidate=>candidate.id===trigger.dataset.eventId);
     if(!item) return;
-    host.dispatchEvent(new CustomEvent('record-timeline-open',{bubbles:true,composed:true,detail:{id:item.id,item:{...item}}}));
+    const publication=events.dispatch('record-timeline-open',{id:item.id,item:{...item}},{publicDetail:{category:String(item.category||'')}});
+    projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});
   });
 
   function normalizeItem(item,index){
@@ -101,5 +107,15 @@
     }
   }
 
-  host.dispatchEvent(new CustomEvent('record-timeline-ready',{bubbles:true,composed:true}));
+  function destroy(){
+    if(destroyed) return false;
+    destroyed=true;
+    host.ready=false;
+    events.dispose();
+    return true;
+  }
+
+  host.ready=true;
+  const readyPublication=events.dispatch('record-timeline-ready',{}, {publicDetail:{ready:true}});
+  projectArcaneDOMEvent(host,readyPublication.occurrence,{bubbles:true,composed:true});
 </script>

@@ -1,5 +1,10 @@
 import Is from '../../node_modules/strong-type/index.js';
 import DBLS from '../modules/DBLS.js';
+import {
+    arcaneEvents,
+    createArcaneEventSource,
+    projectArcaneDOMEvent
+} from 'arcane-os/event-manager';
 
 /**
  * DBOPFS Module
@@ -47,6 +52,17 @@ const is = new Is(false);
 const EMAIL_REGEX =
 /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const USER_ENTITY_LOADED_EVENT='user-entity-loaded';
+const USER_ENTITY_LOADED_REASON='user-data-loaded';
+let singletonDBOPFSReadyUnsubscribe=null;
+
+function userEntityLifecycleError(code,reason,message){
+    const error=new Error(message);
+    error.code=code;
+    error.reason=reason;
+    return error;
+}
+
 
 /**
  * Canonical schema for a UserEntity record.
@@ -84,6 +100,16 @@ const EMAIL_REGEX =
 
 
 class UserEntity {
+
+    #events;
+
+    #disposed = false;
+
+    #loadGeneration = 0;
+
+    #operationSequence = 0;
+
+    #stopDBOPFSReady = null;
 
     /** @type {string} */
     #tableName = 'users';
@@ -192,14 +218,22 @@ class UserEntity {
         }
 
         this.fileName = fileName;
-
-        window.addEventListener(
-            'dbopfs-ready',
-            this.load.bind(this)
-        );
+        this.#events=createArcaneEventSource(this,{
+            source:'user-entity',
+            eventTypes:Object.freeze([USER_ENTITY_LOADED_EVENT])
+        });
 
         if(window.dbopfs?.ready){
             this.load();
+        }else{
+            this.#stopDBOPFSReady=arcaneEvents.subscribe(
+                'dbopfs-ready',
+                ()=>{
+                    this.#stopDBOPFSReady=null;
+                    this.load();
+                },
+                {once:true}
+            );
         }
 
         return this;
@@ -912,6 +946,14 @@ class UserEntity {
      * only await if you need to ensure data is loaded before proceeding
      */
     async load(){
+        if(this.#disposed){
+            throw userEntityLifecycleError(
+                'ARCANE_USER_ENTITY_DISPOSED',
+                'user-entity-disposed',
+                'The user entity has been disposed.'
+            );
+        }
+
         if(this.ready){
             return this.explicit;
         }
@@ -920,12 +962,17 @@ class UserEntity {
             return this.#loadPromise;
         }
 
-        this.#loadPromise=this.#load();
+        const generation=++this.#loadGeneration;
+        const operationId=`${this.#events.instanceId}:load:${(++this.#operationSequence).toString(36)}`;
+        const loadPromise=this.#load(generation,operationId);
+        this.#loadPromise=loadPromise;
 
         try{
-            return await this.#loadPromise;
+            return await loadPromise;
         }finally{
-            this.#loadPromise=null;
+            if(this.#loadPromise===loadPromise){
+                this.#loadPromise=null;
+            }
         }
     }
 
@@ -956,11 +1003,25 @@ class UserEntity {
         return this.explicit;
     }
 
-    async #load(){
+    async #load(generation,operationId){
         const user=await dbopfs.get(
             this.#tableName,
             this.fileName
         );
+
+        if(this.#disposed||generation!==this.#loadGeneration){
+            throw userEntityLifecycleError(
+                this.#disposed
+                    ?'ARCANE_USER_ENTITY_DISPOSED'
+                    :'ARCANE_USER_ENTITY_LOAD_SUPERSEDED',
+                this.#disposed
+                    ?'user-entity-disposed'
+                    :'user-entity-load-superseded',
+                this.#disposed
+                    ?'The user entity was disposed before its data load settled.'
+                    :'The user entity data load was superseded before settlement.'
+            );
+        }
 
         if(user){
             const persist=this.persist;
@@ -975,16 +1036,21 @@ class UserEntity {
 
         this.ready=true;
 
-        window.dispatchEvent(
-            new CustomEvent(
-                'user-entity-loaded',
-                {
-                    detail:{
-                        user:this
-                    }
-                }
-            )
+        const {occurrence}=this.#events.dispatch(
+            USER_ENTITY_LOADED_EVENT,
+            Object.freeze({
+                reason:USER_ENTITY_LOADED_REASON,
+                user:this
+            }),
+            {
+                operationId,
+                publicDetail:Object.freeze({
+                    ready:true,
+                    reason:USER_ENTITY_LOADED_REASON
+                })
+            }
         );
+        projectArcaneDOMEvent(window,occurrence);
 
         return this.explicit;
     }
@@ -1025,18 +1091,39 @@ class UserEntity {
 
         return true;
     }
-}
 
-window.addEventListener(
-    'dbopfs-ready',
-    initSingletonUserEntity
-);
+    dispose(){
+        if(this.#disposed)return false;
+        this.#disposed=true;
+        this.#loadGeneration+=1;
+        this.ready=false;
+        this.#stopDBOPFSReady?.();
+        this.#stopDBOPFSReady=null;
+        if(window.user===this){
+            delete window.user;
+            singletonDBOPFSReadyUnsubscribe?.();
+            singletonDBOPFSReadyUnsubscribe=null;
+        }
+        return this.#events.dispose();
+    }
+
+    destroy(){
+        return this.dispose();
+    }
+}
 
 if(window.dbopfs?.ready){
     initSingletonUserEntity();
+}else{
+    singletonDBOPFSReadyUnsubscribe=arcaneEvents.subscribe(
+        'dbopfs-ready',
+        initSingletonUserEntity,
+        {once:true}
+    );
 }
 
 function initSingletonUserEntity(){
+    singletonDBOPFSReadyUnsubscribe=null;
     if(!window.user){
         window.user = new UserEntity();
     }

@@ -1,3 +1,5 @@
+import {createArcaneEventSource} from 'arcane-os/event-manager';
+
 const DEFAULT_MAX_TESTS=64;
 const HARD_MAX_TESTS=256;
 const DEFAULT_TIMEOUT_MS=5000;
@@ -6,6 +8,45 @@ const MAX_MESSAGE_CHARACTERS=1000;
 const CONTROL_CHARACTERS=/[\u0000-\u001f\u007f]/;
 const TEST_ID_PATTERN=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const RESULT_STATUSES=new Set(['fail','pass','skip']);
+
+export const BROWSER_TEST_SUITE_EVENT_TYPES=Object.freeze({
+    runCompleted:'browser-test-suite-complete',
+    runStarted:'browser-test-suite-start',
+    testCompleted:'browser-test-result',
+    testStarted:'browser-test-start'
+});
+
+export const BROWSER_TEST_SUITE_ERROR_CODES=Object.freeze({
+    assertion:'BROWSER_TEST_ASSERTION',
+    busy:'BROWSER_TEST_BUSY',
+    callbackRejectedLegacy:'BROWSER_TEST_ERROR',
+    clockInvalid:'BROWSER_TEST_INVALID_CLOCK',
+    descriptorCaseCollision:'BROWSER_TEST_CASE_COLLISION',
+    descriptorInvalid:'BROWSER_TEST_INVALID_DESCRIPTOR',
+    disposed:'BROWSER_TEST_SUITE_DISPOSED',
+    limitExceeded:'BROWSER_TEST_LIMIT',
+    limitInvalid:'BROWSER_TEST_INVALID_LIMIT',
+    optionsInvalid:'BROWSER_TEST_INVALID_OPTIONS',
+    resultInvalid:'BROWSER_TEST_INVALID_RESULT',
+    runAborted:'BROWSER_TEST_ABORTED',
+    skipped:'BROWSER_TEST_SKIP',
+    timedOut:'BROWSER_TEST_TIMEOUT'
+});
+
+export const BROWSER_TEST_SUITE_REASONS=Object.freeze({
+    runAborted:'browser-test-run-aborted',
+    runCompleted:'browser-test-run-completed',
+    runFailed:'browser-test-run-failed',
+    runStarted:'browser-test-run-started',
+    runWithoutPassesCompleted:'browser-test-run-without-passes-completed',
+    suiteDisposed:'browser-test-suite-disposed',
+    testCallbackRejected:'browser-test-callback-rejected',
+    testFailed:'browser-test-failed',
+    testPassed:'browser-test-passed',
+    testSkipped:'browser-test-skipped',
+    testStarted:'browser-test-started',
+    testTimedOut:'browser-test-timed-out'
+});
 
 function isPlainRecord(value){
     return Boolean(value)
@@ -107,13 +148,6 @@ function normalizeRunOptions(input){
     return Object.freeze({context:input.context,signal});
 }
 
-function detailEvent(type,detail){
-    if(typeof globalThis.CustomEvent==='function') return new CustomEvent(type,{detail});
-    const event=new Event(type);
-    Object.defineProperty(event,'detail',{enumerable:true,value:detail});
-    return event;
-}
-
 function elapsed(now,start){
     const end=Number(now());
     if(!Number.isFinite(end)) fail('now() must return a finite number.','BROWSER_TEST_INVALID_CLOCK');
@@ -138,20 +172,26 @@ function assertionError(message){
     return error;
 }
 
-function abortError(){
-    const error=coded(new Error('The browser test run was aborted.'),'BROWSER_TEST_ABORTED');
+function abortError(cause){
+    const error=coded(
+        new Error('The browser test run was aborted.'),
+        BROWSER_TEST_SUITE_ERROR_CODES.runAborted
+    );
     error.name='AbortError';
+    error.reason=BROWSER_TEST_SUITE_REASONS.runAborted;
+    if(cause!==undefined)error.cause=cause;
     return error;
 }
 
 function timeoutError(milliseconds){
     const error=coded(new Error(`The check exceeded ${milliseconds} milliseconds.`),'BROWSER_TEST_TIMEOUT');
     error.name='BrowserTestTimeoutError';
+    error.reason=BROWSER_TEST_SUITE_REASONS.testTimedOut;
     return error;
 }
 
 function runWithTimeout(callback,{signal,timeoutMs}){
-    if(signal?.aborted) return Promise.reject(abortError());
+    if(signal?.aborted) return Promise.reject(abortError(signal.reason));
     const controller=new AbortController();
     return new Promise((resolve,reject)=>{
         let settled=false;
@@ -163,8 +203,8 @@ function runWithTimeout(callback,{signal,timeoutMs}){
             handler(value);
         };
         const onAbort=()=>{
-            controller.abort();
-            finish(reject,abortError());
+            controller.abort(signal.reason);
+            finish(reject,abortError(signal.reason));
         };
         const timer=setTimeout(()=>{
             controller.abort();
@@ -199,7 +239,7 @@ function outcomeFromError(error){
     if(error?.code==='BROWSER_TEST_SKIP'){
         return Object.freeze({status:'skip',message:resultMessage(error.message,'Skipped.'),code:error.code});
     }
-    if(error?.code==='BROWSER_TEST_ABORTED'){
+    if(error?.code===BROWSER_TEST_SUITE_ERROR_CODES.runAborted){
         return Object.freeze({status:'skip',message:resultMessage(error.message,'The run was aborted.'),code:error.code});
     }
     return Object.freeze({
@@ -226,6 +266,79 @@ function skippedResult(test,message,code='BROWSER_TEST_ABORTED'){
     return resultRecord(test,{status:'skip',message,code},0);
 }
 
+function browserTestResultReason(result){
+    if(result.code===BROWSER_TEST_SUITE_ERROR_CODES.runAborted){
+        return BROWSER_TEST_SUITE_REASONS.runAborted;
+    }
+    if(result.code===BROWSER_TEST_SUITE_ERROR_CODES.timedOut){
+        return BROWSER_TEST_SUITE_REASONS.testTimedOut;
+    }
+    if(result.code===BROWSER_TEST_SUITE_ERROR_CODES.callbackRejectedLegacy){
+        return BROWSER_TEST_SUITE_REASONS.testCallbackRejected;
+    }
+    if(result.status==='pass')return BROWSER_TEST_SUITE_REASONS.testPassed;
+    if(result.status==='skip')return BROWSER_TEST_SUITE_REASONS.testSkipped;
+    return BROWSER_TEST_SUITE_REASONS.testFailed;
+}
+
+function browserTestPublicDetail(type,detail){
+    const result=detail?.result;
+    const test=detail?.test;
+    const testCount=Number.isSafeInteger(detail?.total)
+        ?detail.total
+        :Number.isSafeInteger(detail?.totals?.total)
+            ?detail.totals.total
+            :null;
+    if(type===BROWSER_TEST_SUITE_EVENT_TYPES.runStarted){
+        return Object.freeze({
+            reason:BROWSER_TEST_SUITE_REASONS.runStarted,
+            testCount
+        });
+    }
+    if(type===BROWSER_TEST_SUITE_EVENT_TYPES.testStarted){
+        return Object.freeze({
+            reason:BROWSER_TEST_SUITE_REASONS.testStarted,
+            testId:test.id,
+            testIndex:detail.index,
+            testCount
+        });
+    }
+    if(type===BROWSER_TEST_SUITE_EVENT_TYPES.testCompleted){
+        return Object.freeze({
+            reason:browserTestResultReason(result),
+            testId:result.id,
+            testIndex:detail.index,
+            testCount,
+            status:result.status,
+            ...(typeof result.code==='string'?{code:result.code}:{})
+        });
+    }
+    const reason=detail.status==='aborted'
+        ?BROWSER_TEST_SUITE_REASONS.runAborted
+        :detail.status==='fail'
+            ?BROWSER_TEST_SUITE_REASONS.runFailed
+            :detail.status==='skip'
+                ?BROWSER_TEST_SUITE_REASONS.runWithoutPassesCompleted
+                :BROWSER_TEST_SUITE_REASONS.runCompleted;
+    return Object.freeze({
+        reason,
+        status:detail.status,
+        testCount,
+        passedTestCount:detail.totals.pass,
+        failedTestCount:detail.totals.fail,
+        skippedTestCount:detail.totals.skip
+    });
+}
+
+function disposedError(){
+    const error=coded(
+        new Error('The browser test suite has been disposed.'),
+        BROWSER_TEST_SUITE_ERROR_CODES.disposed
+    );
+    error.reason=BROWSER_TEST_SUITE_REASONS.suiteDisposed;
+    return error;
+}
+
 /**
  * Runs a fixed inventory of parent-supplied browser checks sequentially.
  *
@@ -236,7 +349,11 @@ function skippedResult(test,message,code='BROWSER_TEST_ABORTED'){
  * the page and stop work they started after their abort signal fires.
  */
 export default class BrowserTestSuite extends EventTarget{
+    #activeRun=null;
+    #disposed=false;
+    #events;
     #now;
+    #operationSequence=0;
     #running=false;
     #tests;
 
@@ -245,7 +362,16 @@ export default class BrowserTestSuite extends EventTarget{
         const normalized=normalizeOptions(options);
         this.#now=normalized.now;
         this.#tests=normalized.tests;
+        this.#events=createArcaneEventSource(this,{
+            source:'browser-test-suite',
+            eventTypes:Object.freeze(Object.values(BROWSER_TEST_SUITE_EVENT_TYPES))
+        });
     }
+
+    addEventListener(type,listener,options){return this.#events.addEventListener(type,listener,options);}
+    removeEventListener(type,listener,options){return this.#events.removeEventListener(type,listener,options);}
+    on(type,listener,options){return this.#events.on(type,listener,options);}
+    dispatchEvent(value){return this.#events.dispatchEvent(value);}
 
     get running(){return this.#running;}
 
@@ -257,33 +383,67 @@ export default class BrowserTestSuite extends EventTarget{
         })));
     }
 
-    #emit(type,detail){
-        this.dispatchEvent(detailEvent(type,Object.freeze(detail)));
+    #emit(type,detail,operationId){
+        if(this.#disposed)return false;
+        const compatibilityDetail=Object.freeze(detail);
+        return this.#events.dispatch(type,compatibilityDetail,{
+            operationId,
+            publicDetail:browserTestPublicDetail(type,compatibilityDetail)
+        });
     }
 
     async run(options={}){
+        if(this.#disposed)throw disposedError();
         if(this.#running) fail('A browser test run is already active.','BROWSER_TEST_BUSY',Error);
         const settings=normalizeRunOptions(options);
         const suiteStart=startTime(this.#now);
+        const controller=new AbortController();
+        const operationId=`${this.#events.instanceId}:run:${(++this.#operationSequence).toString(36)}`;
+        let removeAbortListener=null;
+        function abortBrowserTestRun(){
+            if(!controller.signal.aborted)controller.abort(settings.signal?.reason);
+        }
+        if(settings.signal){
+            settings.signal.addEventListener('abort',abortBrowserTestRun,{once:true});
+            removeAbortListener=function removeBrowserTestRunAbortListener(){
+                settings.signal.removeEventListener('abort',abortBrowserTestRun);
+            };
+            if(settings.signal.aborted)abortBrowserTestRun();
+        }
+        const runRecord=Object.freeze({controller,operationId});
+        this.#activeRun=runRecord;
         const results=[];
-        let aborted=Boolean(settings.signal?.aborted);
+        let aborted=controller.signal.aborted;
         this.#running=true;
-        this.#emit('browser-test-suite-start',{tests:this.list(),total:this.#tests.length});
         try{
+            this.#emit(
+                BROWSER_TEST_SUITE_EVENT_TYPES.runStarted,
+                {tests:this.list(),total:this.#tests.length},
+                operationId
+            );
             for(let index=0;index<this.#tests.length;index++){
                 const descriptor=this.#tests[index];
-                if(aborted||settings.signal?.aborted){
+                const testOperationId=`${operationId}:test:${(index+1).toString(36)}`;
+                if(aborted||controller.signal.aborted){
                     aborted=true;
                     const result=skippedResult(descriptor,'Skipped because the browser test run was aborted.');
                     results.push(result);
-                    this.#emit('browser-test-result',{index,result,total:this.#tests.length});
+                    this.#emit(
+                        BROWSER_TEST_SUITE_EVENT_TYPES.testCompleted,
+                        {index,result,total:this.#tests.length},
+                        testOperationId
+                    );
                     continue;
                 }
-                this.#emit('browser-test-start',{
-                    index,
-                    test:Object.freeze({id:descriptor.id,name:descriptor.name,timeoutMs:descriptor.timeoutMs}),
-                    total:this.#tests.length,
-                });
+                this.#emit(
+                    BROWSER_TEST_SUITE_EVENT_TYPES.testStarted,
+                    {
+                        index,
+                        test:Object.freeze({id:descriptor.id,name:descriptor.name,timeoutMs:descriptor.timeoutMs}),
+                        total:this.#tests.length,
+                    },
+                    testOperationId
+                );
                 const testStart=startTime(this.#now);
                 let outcome;
                 try{
@@ -292,18 +452,24 @@ export default class BrowserTestSuite extends EventTarget{
                         context:settings.context,
                         signal,
                         skip(message){throw skipError(message);},
-                    })),{signal:settings.signal,timeoutMs:descriptor.timeoutMs});
+                    })),{signal:controller.signal,timeoutMs:descriptor.timeoutMs});
                     outcome=normalizedOutcome(value);
                 }catch(error){
                     outcome=outcomeFromError(error);
-                    if(error?.code==='BROWSER_TEST_ABORTED') aborted=true;
+                    if(error?.code===BROWSER_TEST_SUITE_ERROR_CODES.runAborted) aborted=true;
                 }
                 const result=resultRecord(descriptor,outcome,elapsed(this.#now,testStart));
                 results.push(result);
-                this.#emit('browser-test-result',{index,result,total:this.#tests.length});
+                this.#emit(
+                    BROWSER_TEST_SUITE_EVENT_TYPES.testCompleted,
+                    {index,result,total:this.#tests.length},
+                    testOperationId
+                );
             }
         }finally{
             this.#running=false;
+            removeAbortListener?.();
+            if(this.#activeRun===runRecord)this.#activeRun=null;
         }
         const totals=Object.freeze({
             total:results.length,
@@ -318,9 +484,20 @@ export default class BrowserTestSuite extends EventTarget{
             durationMs:elapsed(this.#now,suiteStart),
             results:Object.freeze(results),
         });
-        this.#emit('browser-test-suite-complete',summary);
+        this.#emit(BROWSER_TEST_SUITE_EVENT_TYPES.runCompleted,summary,operationId);
         return summary;
     }
+
+    dispose(){
+        if(this.#disposed)return false;
+        this.#disposed=true;
+        if(this.#activeRun&&!this.#activeRun.controller.signal.aborted){
+            this.#activeRun.controller.abort(disposedError());
+        }
+        this.#events.dispose();
+        return true;
+    }
+    destroy(){return this.dispose();}
 }
 
 export {assertionError,skipError};

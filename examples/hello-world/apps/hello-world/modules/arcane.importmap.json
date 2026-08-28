@@ -51,6 +51,7 @@
     "arcane/LocalAIReadinessController": "./arcane/modules/LocalAIReadinessController.js",
     "arcane/MD": "./arcane/modules/MD.js",
     "arcane/Mail": "./arcane/modules/Mail.js",
+    "arcane/MailOutbox": "./arcane/modules/MailOutbox.mjs",
     "arcane/MailTransport": "./arcane/modules/MailTransport.mjs",
     "arcane/Marked.min": "./arcane/modules/Marked.min.js",
     "arcane/MemoryRecords": "./arcane/modules/MemoryRecords.js",

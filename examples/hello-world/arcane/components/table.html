@@ -16,32 +16,39 @@
     </tbody>
 </table>
 
-<script typr="module">
+<script type="module">
     const host = this;
     const shadowRoot=this.shadowRoot;
+    const {createArcaneEventSource,projectArcaneDOMEvent}=
+        await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{
+        source:'arcane.component.table',
+        eventTypes:['table-ready','header-update','body-update']
+    });
+    let destroyed=false;
+    let eventOperationSequence=0;
     host.buildHeader=buildHeader;
     host.buildTable=buildTable;
+    host.destroy=destroy;
     host.ready=false;
 
-    const tableReady=new CustomEvent(
-        'table-ready', {
-            detail: {  }
-        }
-    );
-
-    const headerUpdate=new CustomEvent(
-        'header-update', {
-            detail: {  }
-        }
-    );
-
-    const bodyUpdate=new CustomEvent(
-        'body-update', {
-            detail: {  }
-        }
-    );
+    function emit(type,detail={},publicDetail={}){
+        if(destroyed)return false;
+        const operationId=
+            `${events.instanceId}:${type}:${(++eventOperationSequence).toString(36)}`;
+        const publication=events.dispatch(
+            type,
+            detail,
+            {
+                operationId,
+                publicDetail:{...publicDetail,reason:type}
+            }
+        );
+        return projectArcaneDOMEvent(host,publication.occurrence);
+    }
 
     async function buildHeader(headerArray=['','']){
+        if(destroyed)return false;
         const tableHead = shadowRoot.querySelector('thead');
         tableHead.innerHTML = '';
         const th = tableHead.insertRow();
@@ -51,10 +58,12 @@
                 th.insertCell(-1).innerText=header;
             }
         );
-        host.dispatchEvent(headerUpdate);
+        emit('header-update',{}, {columnCount:headerArray.length});
+        return true;
     }
 
     async function buildTable(tableArray=[['', ''], ['','']]){
+        if(destroyed)return false;
         const tableBody = shadowRoot.querySelector('tbody');
         tableBody.innerHTML = '';
 
@@ -68,10 +77,19 @@
                 );
             }
         );
-        host.dispatchEvent(bodyUpdate);
+        emit('body-update',{}, {rowCount:tableArray.length});
+        return true;
+    }
+
+    function destroy(){
+        if(destroyed)return false;
+        destroyed=true;
+        host.ready=false;
+        events.dispose();
+        return true;
     }
     
     host.ready=true;
-    host.dispatchEvent(tableReady);
+    emit('table-ready',{}, {ready:true});
 
 </script>

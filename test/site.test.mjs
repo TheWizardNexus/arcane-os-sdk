@@ -1437,9 +1437,9 @@ test('documentation describes the consumer source-to-portable-browser-package co
     assert.match(quickStart,/Node[.]js 22[.]23[.]2/u);
     assert.match(external,/arcane-os@0[.]1[.]1/u);
     assert.match(external,/packaged HTML, CSS, and JavaScript/u);
-    assert.match(hello,/npx arcane-os@0[.]2[.]1 new hello-world/u);
+    assert.match(hello,/npx arcane-os@0[.]3[.]1 new hello-world/u);
     assert.match(hello,/npm install/u);
-    assert.match(hello,/npm install --global arcane-os@0[.]2[.]1/u);
+    assert.match(hello,/npm install --global arcane-os@0[.]3[.]1/u);
     assert.match(hello,/--target browser/u);
     assert.match(hello,/What Arcane adds/u);
     assert.match(hello,/arcane\/[\s\S]*dependencies\/[\s\S]*sdk\//u);
@@ -1487,7 +1487,7 @@ test('documentation describes the consumer source-to-portable-browser-package co
     assert.match(alias,/<a\b[^>]*href="[.][.]\/"[^>]*>/u);
     assert.match(
         hello,
-        /Model downloaded, SHA-256 verified, admitted to app-scoped DBOPFS, and loaded locally/u
+        /Model downloaded, stored in app-scoped DBOPFS, and loaded locally/u
     );
     assert.match(native,/portable[\s\S]*Not directly runnable[\s\S]*Unsigned local test/u);
     assert.match(native,/Architecture-neutral APK/u);
@@ -1632,12 +1632,12 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         readJson(path.join(exampleRoot,'arcane-packager.json'))
     ]);
     await t.test('pins the current npm and runtime identities',()=>{
-        assert.equal(rootPackage.version,'0.2.1');
-        assert.equal(examplePackage.devDependencies['arcane-os'],'0.2.1');
+        assert.equal(rootPackage.version,'0.3.1');
+        assert.equal(examplePackage.devDependencies['arcane-os'],'0.3.1');
         assert.equal(examplePackage.engines.node,'>=22.23.2');
         assert.equal(packageLock.lockfileVersion,3);
         assert.equal(packageLock.requires,true);
-        assert.equal(packageLock.packages[''].devDependencies['arcane-os'],'0.2.1');
+        assert.equal(packageLock.packages[''].devDependencies['arcane-os'],'0.3.1');
         assert.equal(packageLock.packages[''].engines.node,'>=22.23.2');
         const installedSdk=packageLock.packages['node_modules/arcane-os'];
         assert.deepEqual(
@@ -1650,15 +1650,15 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
                 node:installedSdk.engines.node
             },
             {
-                version:'0.2.1',
-                resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.2.1.tgz',
-                integrity:'sha512-FJ7zCFvQVZEMLQ8kn9IqddnFkfw397S87tENfLULwt0bN5hYn22wmN2zU50BqYC4zDKI/fdf4Rcl5G6A6KwlCg==',
+                version:'0.3.1',
+                resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.3.1.tgz',
+                integrity:'sha512-g9C0cXK6Xim4Mu8D7zLKn3XErIo8UZEjIaGUA1fwnU6nVbB8XXgLD6/AjaVln+na6ihIHLzsHGgyTeic4yNggg==',
                 dev:true,
                 license:'AGPL-3.0-only',
                 node:'>=22.23.2'
             }
         );
-        assert.equal(lock.sdk.version,'0.2.1');
+        assert.equal(lock.sdk.version,'0.3.1');
         assert.equal(lock.runtime.contentSha256,runtimeRelease.contentSha256);
         assert.equal(lock.runtime.upstreamCommit,runtimeRelease.source.legacyProjection.commit);
         assert.equal(lock.protocols.arcane,runtimeRelease.source.protocol);
@@ -1810,8 +1810,9 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
             'arcane/css/theme.css'
         ]);
         assert.deepEqual(scriptRuntimeImports,[
-            'arcane-os/ai/browser-speech',
             'arcane-os/ai/browser-wasm',
+            'arcane/AI',
+            'arcane/AIRuntimeState',
             'arcane/AppDataScope',
             'arcane/DBOPFS',
             'arcane/ThemeBootstrap'
@@ -1839,26 +1840,31 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         assert.match(script,/new DBOPFS\(\{applicationId:appId\}\)/u);
         assert.match(script,/await dbopfs[.]readyPromise/u);
         assert.match(script,/dbopfs[.]applicationId!==appId/u);
-        assert.match(script,/createArcaneAI\(\{[\s\S]*provider,[\s\S]*loadPolicy:'manual',[\s\S]*security:\{secure:true\}[\s\S]*\}\)/u);
+        assert.match(script,/AI_SECURITY=Object[.]freeze\(\{secure:false\}\)/u);
+        assert.match(script,/createArcaneAI\(\{[\s\S]*provider,[\s\S]*loadPolicy:'manual',[\s\S]*security:AI_SECURITY[\s\S]*\}\)/u);
         assert.match(script,/renderLlmProgress\(event[.]detail[?][.]progress\)/u);
         assert.match(script,/local[.]load\(\{signal:controller[.]signal,offline\}\)/u);
         assert.match(script,/local[.]streamRequest\(\{[\s\S]*localOnly:true,[\s\S]*signal:controller[.]signal,[\s\S]*tools:\[SHOW_GREETING_TOOL\]/u);
         assert.match(script,/roleOperations=\{[\s\S]*llm:\{controller:null[\s\S]*stt:\{controller:null[\s\S]*tts:\{controller:null/u);
-        assert.match(script,/roleOperations\[role\][.]controller[?][.]abort\('Cancelled by the application user[.]'\)/u);
+        assert.match(script,/operation[.]controller[?][.]abort\('Cancelled by the application user[.]'\)/u);
         assert.match(script,/await local[.]unload\(\)/u);
-        assert.match(script,/createDbopfsSpeechArtifactStore\(\{dbopfs:await applicationDbopfs\(\)\}\)/u);
-        assert.match(script,/createBrowserSpeechAuthority\(\{[\s\S]*security:\{[\s\S]*secure:true,[\s\S]*byteLength:true,sha256:true/u);
-        assert.match(script,/createBrowserWhisperProvider\(options\)/u);
-        assert.match(script,/createBrowserKokoroProvider\(options\)/u);
-        assert.match(script,/appSecurity:\{secure:true\}/u);
-        assert.doesNotMatch(script,/security:authority[.]security/u);
+        assert.match(script,/AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL/u);
+        assert.match(script,/runtime[.]configureSpeech\(Object[.]freeze\(next\)\)/u);
+        assert.match(script,/localOnly:null/u);
+        assert.match(script,/owner[.]configureBrowserSpeech/u);
+        assert.match(script,/subscribeAIRuntimeState\(handleAIRuntimeState,\{signal:pageController[.]signal\}\)/u);
+        assert.match(script,/renderSpeechProgress\(role,roleState[.]progress\)/u);
+        assert.match(script,/security:AI_SECURITY/u);
+        assert.doesNotMatch(script,/createBrowserWhisperProvider|createBrowserKokoroProvider|createDbopfsSpeechArtifactStore|createBrowserSpeechAuthority/u);
+        assert.doesNotMatch(script,/providerRuntime[.]inspect/u);
         assert.match(script,/offline/u);
-        assert.match(script,/await provider[.]unload\(\)/u);
-        assert.match(script,/payload:\{[\s\S]*audio:file,[\s\S]*mimeType,[\s\S]*model:selection[.]modelId/u);
+        assert.match(script,/owner[.]providerRuntime[.]unload\(role,\{signal:controller[.]signal\}\)/u);
+        assert.match(script,/owner[.]fetchSTT/u);
+        assert.match(script,/owner[.]fetchTTS/u);
         assert.match(script,/responseFormat:'wav'/u);
-        assert.match(script,/new Blob\(\[result[.]audio\],\{type:'audio\/wav'\}\)/u);
+        assert.match(script,/result instanceof Blob/u);
         assert.match(script,/pageController[.]abort\('The page is closing[.]'\)/u);
-        assert.match(script,/provider[.]dispose\(\)/u);
+        assert.match(script,/disposeBrowserSpeech\(\)/u);
         assert.match(script,/globalThis[.]URL[?][.]revokeObjectURL/u);
         assert.match(script,/HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED/u);
         assert.match(script,/MAX_LLM_PROMPT_LENGTH=2000/u);
@@ -1884,9 +1890,9 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
             assert.equal(renderedTutorial.includes(source.trim()),true);
             assert.equal(renderedAlias.includes(source.trim()),false);
         }
-        assert.match(readme,/npx arcane-os@0[.]2[.]1 new[\s\S]*npm install/u);
+        assert.match(readme,/npx arcane-os@0[.]3[.]1 new[\s\S]*npm install/u);
         assert.match(readme,/generated project pins `arcane-os` exactly[\s\S]*project-local CLI/u);
-        assert.match(readme,/npm install --global arcane-os@0[.]2[.]1/u);
+        assert.match(readme,/npm install --global arcane-os@0[.]3[.]1/u);
         assert.match(readme,/## Source shape[\s\S]*same physical runtime paths[\s\S]*arcane[.]importmap[.]json/u);
         assert.match(
             readme,
@@ -1902,7 +1908,9 @@ test('maintained Hello World example matches current SDK contracts',async t=>{
         assert.match(readme,/2,000 characters[\s\S]*tokenization remains bounded/u);
         assert.match(readme,/500 characters[\s\S]*synthesis[\s\S]*bounded/u);
         assert.match(readme,/8 MiB[\s\S]*before the SDK reads or\s+decodes/u);
-        assert.match(readme,/licenses\/speech\/[\s\S]*arcane-app[.]json[\s\S]*arcane-package[.]json/u);
+        assert.match(readme,/does not redistribute model weights[\s\S]*third-party legal corpora/u);
+        assert.match(readme,/selected-but-unregistered[\s\S]*localOnly:null/u);
+        assert.match(readme,/secure:false[\s\S]*unchecked/u);
         assert.match(readme,/directly fetchable[\s\S]*non-redirecting/u);
         assert.match(
             readme,

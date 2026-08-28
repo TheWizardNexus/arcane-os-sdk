@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "kind": "arcane-ai-browser-speech-components",
+  "protocol": "arcane-ai-browser-speech-artifact-graph/1",
+  "packageExport": "arcane-os/ai/browser-speech",
+  "browserEntry": "ai/browser-speech.mjs",
+  "closureStatus": "browser-speech-runtime-resolved-from-upstream-packages-and-provider-downloads",
+  "publicationStatus": "browser-speech-public-runtime-ready-warn-first-secure-opt-in",
+  "runtimeBytesPacked": false,
+  "modelWeightsPacked": false,
+  "voiceBytesPacked": false,
+  "materializedLegalCorpus": false,
+  "evidenceBoundary": "The SDK redistributes no browser speech runtime, model, voice, license corpus, or corresponding-source payload. Applications select upstream npm/provider download authorities. Warn-first is the default; secure:true enables exact byte and capability enforcement.",
+  "components": [
+    {
+      "name": "kokoro-js",
+      "version": "1.2.1",
+      "publisher": "xenova",
+      "declaredLicenseSpdx": "Apache-2.0",
+      "effectiveArtifactLicenseExpression": null,
+      "sourceRepository": "https://github.com/hexgrad/kokoro.git",
+      "sourceRevision": "664c76a704021239ba59c84dcbaa4d3dece01fe9",
+      "npm": {
+        "resolved": "https://registry.npmjs.org/kokoro-js/-/kokoro-js-1.2.1.tgz",
+        "integrity": "sha512-oq0HZJWis3t8lERkMJh84WLU86dpYD0EuBPtqYnLlQzyFP1OkyBRDcweAqCfhNOpltyN9j/azp1H6uuC47gShw==",
+        "shasum": "a6a9b0ffc1ab354fa3f9cb71ee95b6e9f0a13527",
+        "tarballBytes": 26887218,
+        "tarballSha256": "1f0d0383ef0349af0bd9440d81dc12abbea3a5392eb645283eda876f537f5860"
+      },
+      "selectedArtifacts": [
+        {
+          "role": "tts-runtime-entrypoint",
+          "path": "dist/kokoro.web.js",
+          "mediaType": "application/javascript",
+          "bytes": 2135146,
+          "sha256": "6067712fe4c43cdb36c762f860a5ab8d96ea1d9c8882466438eb9f3d0d20be8f"
+        }
+      ],
+      "candidateObligations": [
+        "Apache-2.0",
+        "MIT",
+        "GPL-3.0-or-later"
+      ],
+      "noticeClosureStatus": "upstream-publisher-owned-not-sdk-runtime-or-publication-gate",
+      "correspondingSourceStatus": "upstream-publisher-owned-not-sdk-runtime-or-publication-gate"
+    },
+    {
+      "name": "@huggingface/transformers",
+      "version": "3.5.1",
+      "publisher": "xenova",
+      "declaredLicenseSpdx": "Apache-2.0",
+      "effectiveArtifactLicenseExpression": null,
+      "sourceRepository": "https://github.com/huggingface/transformers.js.git",
+      "sourceRevision": "746c8c25bf27c5e0684a20f76889b4bb8d23e295",
+      "npm": {
+        "resolved": "https://registry.npmjs.org/@huggingface/transformers/-/transformers-3.5.1.tgz",
+        "integrity": "sha512-qWsPoJMBPYcrGuzRMVL//3dwcLXED9r+j+Hzw+hZpBfrMPdyq57ehNs7lew0D34Paj0DO0E0kZQjOZcIVN17hQ==",
+        "shasum": "8022b616ed8f1ec88d8e56def06d5b0ef5c7a1ee",
+        "tarballBytes": 10249112,
+        "tarballSha256": "b8e9d201f92c7e2001de3601ef47d5a257985921f8f6ffc76734a5ec021bb53e"
+      },
+      "selectedArtifacts": [
+        {
+          "role": "stt-runtime-entrypoint-with-bundled-onnx-runtime-javascript",
+          "path": "dist/transformers.js",
+          "mediaType": "application/javascript",
+          "bytes": 2141070,
+          "sha256": "730d42f06974f547e1f6a5f5b7313fc731ff21a3d3ac4c8e47d1f69b0a375547"
+        },
+        {
+          "role": "onnx-runtime-jsep-module",
+          "path": "dist/ort-wasm-simd-threaded.jsep.mjs",
+          "mediaType": "application/javascript",
+          "bytes": 44484,
+          "sha256": "08fb86ec433c78bfb032c5d84a68b8e8e5a8d81268fa39e24314179a5767a5b9"
+        },
+        {
+          "role": "onnx-runtime-jsep-wasm",
+          "path": "dist/ort-wasm-simd-threaded.jsep.wasm",
+          "mediaType": "application/wasm",
+          "bytes": 21596019,
+          "sha256": "c46655e8a94afc45338d4cb2b840475f88e5012d524509916e505079c00bfa39"
+        }
+      ],
+      "candidateObligations": [
+        "Apache-2.0",
+        "MIT",
+        "BSD-3-Clause",
+        "ISC"
+      ],
+      "noticeClosureStatus": "upstream-publisher-owned-not-sdk-runtime-or-publication-gate",
+      "correspondingSourceStatus": "upstream-publisher-owned-not-sdk-runtime-or-publication-gate"
+    },
+    {
+      "name": "phonemizer",
+      "version": "1.2.1",
+      "publisher": "xenova",
+      "declaredLicenseSpdx": "Apache-2.0",
+      "embeddedBy": "kokoro-js@1.2.1",
+      "sourceRepository": "https://github.com/xenova/phonemizer.js.git",
+      "sourceRevision": "6835144b7ee9043129222549c1ed2f6a27216278",
+      "npm": {
+        "resolved": "https://registry.npmjs.org/phonemizer/-/phonemizer-1.2.1.tgz",
+        "integrity": "sha512-v0KJ4mi2T4Q7eJQ0W15Xd4G9k4kICSXE8bpDeJ8jisL4RyJhNWsweKTOi88QXFc4r4LZlz5jVL5lCHhkpdT71A==",
+        "shasum": "175aed7034b49b9169fc6adf13c16134374d238d",
+        "tarballBytes": 1369002,
+        "tarballSha256": "12f9f3582f8b5d557a0577180d83ff0458a4a5c15b2efb625ee71c3ebbee22e9"
+      },
+      "embeddedEspeak": {
+        "declaredUpstreamLicenseSpdx": "GPL-3.0-or-later",
+        "exactUpstreamRevision": null,
+        "generatedWorkerPath": "src/espeakng.worker.js",
+        "generatedWorkerBytes": 1449799,
+        "generatedWorkerSha256": "6bab8f2f2cf25d65b596b87471cb17567a496012ee6ce649cfa88b284c1fb9f8",
+        "dataPath": "data/espeakng.worker.data",
+        "dataBytes": 890802,
+        "dataSha256": "6262621f3f8267fb61ef41fe7af75b8fe7e2315d6c9092afd29d7629bb21a60b",
+        "buildToolchainReceipt": null,
+        "generatedOutputToCorrespondingSourceBinding": null,
+        "noticeClosureStatus": "upstream-publisher-owned-not-sdk-runtime-or-publication-gate",
+        "correspondingSourceStatus": "upstream-publisher-owned-not-sdk-runtime-or-publication-gate"
+      }
+    },
+    {
+      "name": "onnxruntime-web",
+      "version": "1.22.0-dev.20250409-89f8206ba4",
+      "publisher": "onnxruntime",
+      "declaredLicenseSpdx": "MIT",
+      "embeddedBy": "@huggingface/transformers@3.5.1",
+      "sourceRepository": "https://github.com/microsoft/onnxruntime.git",
+      "sourceRevision": "89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0",
+      "npm": {
+        "resolved": "https://registry.npmjs.org/onnxruntime-web/-/onnxruntime-web-1.22.0-dev.20250409-89f8206ba4.tgz",
+        "integrity": "sha512-0uS76OPgH0hWCPrFKlL8kYVV7ckM7t/36HfbgoFw6Nd0CZVVbQC4PkrR8mBX8LtNUFZO25IQBqV2Hx2ho3FlbQ==",
+        "shasum": "d1e3a04e03dfee392b41d420ef547b6a0351b06b",
+        "tarballBytes": 20239097,
+        "tarballSha256": "9758fa28ba1acc1b5c9ffef8d60c97b56fd2105a9476a690ed4db16a5588ae10",
+        "licenseMemberPresent": false,
+        "thirdPartyNoticesMemberPresent": false
+      },
+      "selectedArtifacts": [
+        {
+          "role": "onnx-runtime-jsep-module",
+          "path": "dist/ort-wasm-simd-threaded.jsep.mjs",
+          "mediaType": "application/javascript",
+          "bytes": 44484,
+          "sha256": "08fb86ec433c78bfb032c5d84a68b8e8e5a8d81268fa39e24314179a5767a5b9",
+          "packagedBy": "@huggingface/transformers@3.5.1"
+        },
+        {
+          "role": "onnx-runtime-jsep-wasm",
+          "path": "dist/ort-wasm-simd-threaded.jsep.wasm",
+          "mediaType": "application/wasm",
+          "bytes": 21596019,
+          "sha256": "c46655e8a94afc45338d4cb2b840475f88e5012d524509916e505079c00bfa39",
+          "packagedBy": "@huggingface/transformers@3.5.1"
+        }
+      ],
+      "noticeClosureStatus": "upstream-publisher-owned-not-sdk-runtime-or-publication-gate"
+    }
+  ],
+  "legalEvidence": [
+    {
+      "role": "package-license",
+      "appliesTo": ["kokoro-js@1.2.1", "phonemizer@1.2.1"],
+      "sourceKind": "registry-integrity-verified-tarball-member",
+      "sourcePath": "package/LICENSE",
+      "mediaType": "text/plain",
+      "bytes": 11357,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "role": "package-license",
+      "appliesTo": ["@huggingface/transformers@3.5.1"],
+      "sourceKind": "registry-integrity-verified-tarball-member",
+      "sourcePath": "package/LICENSE",
+      "mediaType": "text/plain",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "role": "upstream-license",
+      "appliesTo": ["onnxruntime-web@1.22.0-dev.20250409-89f8206ba4"],
+      "sourceKind": "immutable-upstream-source-revision",
+      "sourceUrl": "https://raw.githubusercontent.com/microsoft/onnxruntime/89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0/LICENSE",
+      "sourceRevision": "89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0",
+      "mediaType": "text/plain",
+      "bytes": 1073,
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+    },
+    {
+      "role": "upstream-third-party-notices",
+      "appliesTo": ["onnxruntime-web@1.22.0-dev.20250409-89f8206ba4"],
+      "sourceKind": "immutable-upstream-source-revision",
+      "sourceUrl": "https://raw.githubusercontent.com/microsoft/onnxruntime/89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0/ThirdPartyNotices.txt",
+      "sourceRevision": "89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0",
+      "mediaType": "text/plain",
+      "bytes": 326866,
+      "sha256": "e9e90971a8e75a9a8ac0c6412e29c1202d079998389915aa485f46c816c3b4cc"
+    }
+  ],
+  "publicationBlocks": []
+}

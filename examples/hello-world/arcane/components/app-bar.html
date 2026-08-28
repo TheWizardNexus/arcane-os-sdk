@@ -234,6 +234,9 @@
 <script type="module">
     const host=this;
     const root=host.shadowRoot;
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{source:'arcane.component.app-bar',eventTypes:['app-bar-ready']});
+    const lifecycleController=new AbortController();
     const nav=root.querySelector('nav');
     const brandLink=root.querySelector('#brandLink');
     const navigationSlot=root.querySelector('#navigationSlot');
@@ -242,11 +245,13 @@
     const statusTones=new Set(['default','success','warning','error','muted']);
 
     let navigation=[];
+    let destroyed=false;
 
     host.setNavigation=setNavigation;
     host.setActiveRoute=setActiveRoute;
     host.setStatus=setStatus;
     host.refresh=refresh;
+    host.destroy=destroy;
 
     Object.defineProperties(
         host,
@@ -269,9 +274,9 @@
         }
     );
 
-    navigationSlot.addEventListener('slotchange',updateCurrent);
-    window.addEventListener('hashchange',onLocationChange);
-    window.addEventListener('popstate',onLocationChange);
+    navigationSlot.addEventListener('slotchange',updateCurrent,{signal:lifecycleController.signal});
+    window.addEventListener('hashchange',onLocationChange,{signal:lifecycleController.signal});
+    window.addEventListener('popstate',onLocationChange,{signal:lifecycleController.signal});
 
     const observer=new MutationObserver(
         records=>{
@@ -322,6 +327,9 @@
     }
 
     function setNavigation(items=[]){
+        if(destroyed){
+            return false;
+        }
         navigation=normalizeNavigation(items);
         generatedNavigation.replaceChildren(
             ...navigation.map(
@@ -395,6 +403,9 @@
     }
 
     function setActiveRoute(route=''){
+        if(destroyed){
+            return false;
+        }
         if(route){
             host.setAttribute('data-active-route',String(route).replace(/^#/,''));
         }else{
@@ -424,6 +435,9 @@
     }
 
     function setStatus(message='',tone='default'){
+        if(destroyed){
+            return false;
+        }
         if(message===null||message===''){
             host.removeAttribute('data-status');
         }else{
@@ -443,10 +457,25 @@
     }
 
     function refresh(){
+        if(destroyed){
+            return false;
+        }
         syncBrand();
         syncStatus();
         updateCurrent();
         return host;
+    }
+
+    function destroy(){
+        if(destroyed){
+            return false;
+        }
+        destroyed=true;
+        lifecycleController.abort();
+        observer.disconnect();
+        events.dispose();
+        host.ready=false;
+        return true;
     }
 
     syncBrand();
@@ -455,14 +484,6 @@
     updateCurrent();
 
     host.ready=true;
-    host.dispatchEvent(
-        new CustomEvent(
-            'app-bar-ready',
-            {
-                detail:{appBar:host},
-                bubbles:true,
-                composed:true
-            }
-        )
-    );
+    const readyPublication=events.dispatch('app-bar-ready',{appBar:host},{publicDetail:{ready:true}});
+    projectArcaneDOMEvent(host,readyPublication.occurrence,{bubbles:true,composed:true});
 </script>

@@ -61,6 +61,8 @@ button{min-width:2.5rem}
 <script type="module">
 const host=this;
 const root=host.shadowRoot;
+const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+const events=createArcaneEventSource(host,{source:'arcane.component.web-navigator',eventTypes:['web-navigation-blocked','web-navigate','web-open-external','web-navigator-ready']});
 const address=root.querySelector('#address');
 const frame=root.querySelector('#frame');
 const blocked=root.querySelector('#blocked');
@@ -72,6 +74,20 @@ let history=[];
 let position=-1;
 let navigationGuard=null;
 let navigationSequence=0;
+let eventOperationSequence=0;
+let destroyed=false;
+
+function emit(type,detail={},publicDetail={}){
+    if(destroyed)return false;
+    const operationId=
+        `${events.instanceId}:${type}:${(++eventOperationSequence).toString(36)}`;
+    const publication=events.dispatch(
+        type,
+        detail,
+        {operationId,publicDetail:{...publicDetail,reason:type}}
+    );
+    return projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});
+}
 
 function normalize(value){
     let text=String(value||'').trim();
@@ -143,7 +159,7 @@ function showBlocked(url,decision){
     root.querySelector('#blockedEvidence').textContent=[decision.ruleId&&`Rule ${decision.ruleId}`,decision.policyGeneration&&`Policy generation ${decision.policyGeneration}`,decision.decisionId&&`Decision ${decision.decisionId}`,decision.decidedAt].filter(Boolean).join(' · ');
     status.textContent='Blocked by the Arcane global deny policy.';
     blocked.focus();
-    host.dispatchEvent(new CustomEvent('web-navigation-blocked',{bubbles:true,composed:true,detail:{url,decision}}));
+    emit('web-navigation-blocked',{url,decision},{blocked:true,ruleId:String(decision.ruleId||''),policyGeneration:decision.policyGeneration??null});
 }
 
 function showFrame(url){
@@ -151,17 +167,18 @@ function showFrame(url){
     frame.hidden=false;
     frame.src=url;
     status.textContent='Loading…';
-    host.dispatchEvent(new CustomEvent('web-navigate',{bubbles:true,composed:true,detail:{url}}));
+    emit('web-navigate',{url},{intent:'embedded'});
 }
 
 async function navigate(value,{record=true}={}){
+    if(destroyed)return '';
     const sequence=++navigationSequence;
     try{
         const url=normalize(value);
         address.value=url;
         status.textContent='Checking the global deny policy…';
         const decision=await evaluate(url,'embedded');
-        if(sequence!==navigationSequence)return'';
+        if(destroyed||sequence!==navigationSequence)return'';
         recordHistory(url,record);
         updateButtons();
         if(decision.blocked){
@@ -177,26 +194,29 @@ async function navigate(value,{record=true}={}){
 }
 
 async function openExternal(){
+    if(destroyed)return false;
     const sequence=++navigationSequence;
     try{
         const url=normalize(currentUrl()||address.value||homeUrl);
         status.textContent='Checking the global deny policy…';
         const decision=await evaluate(url,'external');
-        if(sequence!==navigationSequence)return;
+        if(destroyed||sequence!==navigationSequence)return false;
         if(decision.blocked){
             showBlocked(url,decision);
             return;
         }
         status.textContent='Handing the allowed address to the system browser…';
-        host.dispatchEvent(new CustomEvent('web-open-external',{bubbles:true,composed:true,detail:{url}}));
+        emit('web-open-external',{url},{intent:'external'});
+        return true;
     }catch(error){
-        if(sequence===navigationSequence)status.textContent=error.message;
+        if(!destroyed&&sequence===navigationSequence)status.textContent=error.message;
+        return false;
     }
 }
 
 function ownNavigation(operation){
     operation.catch(function reportUnexpectedNavigationFailure(error){
-        status.textContent=error.message;
+        if(!destroyed)status.textContent=error.message;
     });
 }
 
@@ -208,6 +228,7 @@ function move(amount){
 }
 
 function configure(options){
+    if(destroyed)return false;
     if(options?.homeUrl)homeUrl=normalize(options.homeUrl);
     navigationGuard=typeof options?.navigationGuard==='function'?options.navigationGuard:null;
     if(options?.initialUrl)ownNavigation(navigate(options.initialUrl));
@@ -223,7 +244,26 @@ function handleBackClick(){move(-1);}
 function handleForwardClick(){move(1);}
 function handleFrameLoad(){if(blocked.hidden)status.textContent='Loaded. If the page is blank, its site does not permit embedded viewing.';}
 
+function destroy(){
+    if(destroyed)return false;
+    destroyed=true;
+    navigationSequence+=1;
+    navigationGuard=null;
+    host.ready=false;
+    root.querySelector('#addressForm').removeEventListener('submit',handleAddressSubmit);
+    root.querySelector('#home').removeEventListener('click',handleHomeClick);
+    root.querySelector('#reload').removeEventListener('click',handleReloadClick);
+    root.querySelector('#external').removeEventListener('click',handleExternalClick);
+    back.removeEventListener('click',handleBackClick);
+    forward.removeEventListener('click',handleForwardClick);
+    frame.removeEventListener('load',handleFrameLoad);
+    frame.removeAttribute('src');
+    events.dispose();
+    return true;
+}
+
 host.configure=configure;
+host.destroy=destroy;
 host.navigate=navigate;
 host.currentUrl=currentUrl;
 root.querySelector('#addressForm').addEventListener('submit',handleAddressSubmit);
@@ -235,5 +275,5 @@ forward.addEventListener('click',handleForwardClick);
 frame.addEventListener('load',handleFrameLoad);
 updateButtons();
 host.ready=true;
-host.dispatchEvent(new CustomEvent('web-navigator-ready',{bubbles:true,composed:true}));
+emit('web-navigator-ready',{}, {ready:true});
 </script>
