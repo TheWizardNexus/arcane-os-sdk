@@ -104,12 +104,12 @@ import ollama from 'arcane/Ollama';
 ```
 
 The authenticated physical-v1 tree lives entirely beneath `arcane/`. SDK
-`0.2.3` projects it from two canonical release receipts:
+`0.3.0` projects it from two canonical release receipts:
 
 | Canonical receipt | Source authority and protocol | Receipt inventory |
 | --- | --- | --- |
-| `runtime/ARCANE_RUNTIME_RELEASE.json` | `sdk-canonical`; `arcane/1`; builder `arcane-sdk-runtime-v1` | 160 files; 3,655,536 bytes; content SHA-256 `f96a27bd79a809201708f73ca729bc60ab02696daf619365f77267a28b47b4b3` |
-| `browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json` | `arcane-os-sdk`; `arcane-sdk-browser-runtime/1`; builder `arcane-sdk-browser-runtime-v1` | 25 files; 9,280,047 bytes; content SHA-256 `3c82ed11b24c7b7b91b62f6dc52e0b1dcd444112a29cd48413eedc008380eb61` |
+| `runtime/ARCANE_RUNTIME_RELEASE.json` | `sdk-canonical`; `arcane/1`; builder `arcane-sdk-runtime-v1` | 161 files; 4,159,000 bytes; content SHA-256 `5dab0c9cadd9e5ca97f90ab63ce755940318198d5b1efc0b7b666de4075302e9` |
+| `browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json` | `arcane-os-sdk`; `arcane-sdk-browser-runtime/1`; builder `arcane-sdk-browser-runtime-v1` | 26 files; 9,548,478 bytes; content SHA-256 `0d41531e9a2d6ce97a357eeeebde5fbac8af59639a52f4f682717097b13dc6dc` |
 
 The runtime receipt is the current byte authority. Its Arcane OS
 `c540014afe69f14cf5ae60493b7295f36dbcec64` / bundle `0.8.12` record is
@@ -121,12 +121,12 @@ browser receipt binds `event-pubsub` `6.1.0`, `strong-type` `2.0.0`, and
 `arcane/sdk/`. This URL-key separation prevents runtime and SDK dependency
 versions from aliasing one another.
 
-Those two receipt inventories contain 185 entries in total. That sum is a
+Those two receipt inventories contain 187 entries in total. That sum is a
 release-inventory fact, not an import-map entry count and not an assertion about
-one maintained example. The `0.2.3` map deterministically roots every admitted
+one maintained example. The `0.3.0` map deterministically roots every admitted
 top-level runtime ESM plus the authenticated SDK browser roots, then follows
 those roots for runtime entities and dependency compatibility. Application
-source imports do not select the 91 entries. Its public operation receipt is the
+source imports do not select a fixed entry count. Its public operation receipt is the
 authority for the exact `imports`, `entryCount`, and `excludedModules`;
 reached-file traversal is internal and is not exposed in that receipt. The
 managed graph exposes `arcane-os/event-manager`, `arcane-os/ai/browser-wasm`,
@@ -188,8 +188,8 @@ authority with exactly `dependencyName`, `packageSource`,
 `canonicalPackageRoot`, `packageName`, `packageVersion`, `runtimeRoot`,
 `browserRuntimeRoot`, `runtimeManifest`, and `browserRuntimeManifest`. A
 workspace may use the canonical dependency name or one exact npm alias such as
-`npm:arcane-os@0.2.3`; the physical package manifest must still identify
-exactly as `arcane-os@0.2.3`. Canonical-plus-alias duplicates, multiple aliases,
+`npm:arcane-os@0.3.0`; the physical package manifest must still identify
+exactly as `arcane-os@0.3.0`. Canonical-plus-alias duplicates, multiple aliases,
 links/junctions, indirect package roots, or version drift fail closed.
 
 The imported module can be pure browser logic, standard-Web-API logic, or a
@@ -225,19 +225,19 @@ heartbeat is event telemetry only and never regenerates browser state.
 </details>
 
 <details>
-<summary>SDK 0.2.3 browser-runtime admission and exact receipt fields</summary>
+<summary>SDK 0.3.0 browser-runtime admission and exact receipt fields</summary>
 
 `arcane.lock.json.sdkBrowserRuntime` persists the trusted manifest path,
 `manifestSha256`, `contentSha256`, `builder`, `sdkVersion`, and `source` record.
-For SDK `0.2.3`, the manifest itself records:
+For SDK `0.3.0`, the manifest itself records:
 
 ```text
 manifest: node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json
-fileCount: 25
-totalBytes: 9280047
-contentSha256: 3c82ed11b24c7b7b91b62f6dc52e0b1dcd444112a29cd48413eedc008380eb61
+fileCount: 26
+totalBytes: 9548478
+contentSha256: 0d41531e9a2d6ce97a357eeeebde5fbac8af59639a52f4f682717097b13dc6dc
 builder: arcane-sdk-browser-runtime-v1
-sdkVersion: 0.2.3
+sdkVersion: 0.3.0
 source.protocol: arcane-sdk-browser-runtime/1
 source.browserEntry: arcane-os/event-manager
 ```
@@ -263,7 +263,7 @@ Application code should select a normalized role, not an internal protocol.
 The exported
 [`getAIProviderRuntime()` singleton](runtime-modules.md#aiproviderruntimejs)
 comes from authenticated runtime bytes and owns independent `llm`, `stt`, and
-`tts` selections. SDK `0.2.3` ships browser-WASM LLM and browser
+`tts` selections. SDK `0.3.0` ships browser-WASM LLM and browser
 speech provider/2 adapters and also adapts selected legacy OpenAI LLM/STT/TTS,
 Core-backed Ollama LLM, and admitted Core speech STT/TTS routes into provider/2;
 other native, Core, or cloud routes require an externally supplied compatible
@@ -300,7 +300,7 @@ compatible completed cache, otherwise it rejects with
 `ARCANE_AI_MODEL_OFFLINE_MISS`. Unload releases the active Wllama session but
 does not silently delete the app-owned cache.
 
-SDK `0.2.3` requires WebGPU. Load requests full offload with exactly 99,999 GPU
+SDK `0.3.0` requires WebGPU. Load requests full offload with exactly 99,999 GPU
 layers and admits the model only after observing an adapter, full layer offload,
 buffer and queue work, and a settled fence. `navigator.gpu` presence alone is
 not readiness. There is no CPU fallback, partial-offload success mode, or
@@ -363,7 +363,8 @@ part of the graph identity.
 
 The speech Worker establishes a private `MessageChannel` on its first load and
 routes subsequent request, progress, and cancellation settlement through that
-port. In secure graph mode, scanned runtime edges are rewritten through one authenticated guard.
+port. In explicit `secure:true` graph mode, scanned runtime edges are rewritten
+through one authenticated guard.
 Fetch and each declared cache-open edge can read only exact graph routes backed
 by already verified object URLs; raw fetch/cache calls and cache writes reject.
 The Worker also denies Function-family constructor escape, string timers,
@@ -371,9 +372,10 @@ IndexedDB, OPFS, and raw `BroadcastChannel`, `EventSource`, `RTCPeerConnection`,
 `ShadowRealm`, `SharedWorker`, `WebSocket`, `WebSocketStream`, `WebTransport`,
 `Worker`, `XMLHttpRequest`, `eval`, and `importScripts` capability. Declared
 nested module Workers start through the SDK role Worker and receive the same
-authenticated graph. In default warn-first mode these capability restrictions
-are not installed; the pinned upstream runtime keeps ordinary browser
-fetch/cache behavior. An exact secure-graph runtime request alias, including Kokoro's audited
+authenticated graph. Default warn-first operation uses the direct runtime/model
+authority instead; these capability restrictions are not installed and the
+selected upstream runtime keeps ordinary browser fetch/cache behavior. An exact
+secure-graph runtime request alias, including Kokoro's audited
 mutable voice request, is a local route to caller-authenticated bytes and is
 never a source or network authority.
 

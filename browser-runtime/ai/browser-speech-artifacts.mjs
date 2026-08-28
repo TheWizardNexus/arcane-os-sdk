@@ -2863,6 +2863,13 @@ function assertArtifactGraphStaticImportClosure(metadata) {
 }
 
 async function inspectArtifactGraphRuntime(admitted, metadata, signal, security) {
+  if (security?.secure !== true) {
+    return Object.freeze({
+      plans: new Map(),
+      order: Object.freeze([]),
+      warnings: Object.freeze(["artifact-graph-runtime-unchecked"]),
+    });
+  }
   const admittedByPath = new Map(admitted.files.map((entry) => [entry.descriptor.path, entry]));
   const plans = new Map();
   for (const descriptor of metadata.runtimeFiles) {
@@ -3010,7 +3017,7 @@ async function blobDigest(blob) {
   return Object.freeze({ bytes, sha256: digest.digestHex() });
 }
 
-async function createArtifactGraphObjectUrls(admitted, metadata, inspection) {
+async function createArtifactGraphObjectUrls(admitted, metadata, inspection, security) {
   if (
     typeof PLATFORM_CREATE_OBJECT_URL !== "function"
     || typeof PLATFORM_REVOKE_OBJECT_URL !== "function"
@@ -3030,9 +3037,16 @@ async function createArtifactGraphObjectUrls(admitted, metadata, inspection) {
     const blob = body instanceof Blob && body.type === descriptor.mediaType
       ? body
       : new Blob([body], { type: descriptor.mediaType });
-    const expected = ARTIFACT_GRAPH_JAVASCRIPT_KINDS.has(descriptor.kind)
-      ? await blobDigest(blob)
-      : Object.freeze({ bytes: descriptor.bytes, sha256: descriptor.sha256 });
+    const source = await blobDigest(blob);
+    const transformed = ARTIFACT_GRAPH_JAVASCRIPT_KINDS.has(descriptor.kind);
+    const expected = Object.freeze({
+      bytes: transformed || security.checks.byteLength !== true
+        ? source.bytes
+        : descriptor.bytes,
+      sha256: transformed || security.checks.sha256 !== true
+        ? source.sha256
+        : descriptor.sha256,
+    });
     const moduleUrl = PLATFORM_CREATE_OBJECT_URL(blob);
     if (typeof moduleUrl !== "string" || !moduleUrl.startsWith("blob:")) {
       throw artifactGraphError(
@@ -3151,6 +3165,20 @@ async function createArtifactGraphObjectUrls(admitted, metadata, inspection) {
     }
     throw error;
   }
+}
+
+function artifactGraphAdmissionStatus(cache, offline, security) {
+  const verification = security.checks.byteLength && security.checks.sha256
+    ? "verified"
+    : security.checks.byteLength || security.checks.sha256
+      ? "partially-checked"
+      : "unchecked";
+  const source = cache === "installed"
+    ? "network-dbopfs"
+    : offline
+      ? "offline-dbopfs-cache"
+      : "dbopfs-cache";
+  return `artifact-graph-${source}-${verification}`;
 }
 
 function createObjectUrls(files, factory) {
@@ -3396,7 +3424,11 @@ export function createDbopfsSpeechArtifactStore({
         security,
         signal,
         onProgress,
-        graph ? "artifact-graph-dbopfs-cache-rehash" : "verify-cache",
+        graph
+          ? security.checks.sha256
+            ? "artifact-graph-dbopfs-cache-rehash"
+            : "artifact-graph-dbopfs-cache-readback"
+          : "verify-cache",
       )) {
         await removeUnlocked(authority);
         return null;
@@ -3404,9 +3436,11 @@ export function createDbopfsSpeechArtifactStore({
       files.push({ descriptor, file });
     }
     try {
-      const inspection = graph
+      const inspection = graph && security.secure
         ? await inspectArtifactGraphRuntime({ files }, metadata, signal, security)
-        : (await assertSelfContainedRuntime({ files }, metadata, security), null);
+        : graph
+          ? null
+          : (await assertSelfContainedRuntime({ files }, metadata, security), null);
       throwIfAborted(signal);
       return Object.freeze({
         files: Object.freeze(files),
@@ -3683,7 +3717,11 @@ export function createDbopfsSpeechArtifactStore({
           security,
           signal,
           onProgress,
-          graph ? "artifact-graph-dbopfs-persisted-rehash" : "verify-cache",
+          graph
+            ? security.checks.sha256
+              ? "artifact-graph-dbopfs-persisted-rehash"
+              : "artifact-graph-dbopfs-persisted-readback"
+            : "verify-cache",
         )) {
           if (graph) {
             throw graphVerificationError(
@@ -3696,9 +3734,11 @@ export function createDbopfsSpeechArtifactStore({
         }
         installed.push({ descriptor, file });
       }
-      const inspection = graph
+      const inspection = graph && security.secure
         ? await inspectArtifactGraphRuntime({ files: installed }, metadata, signal, security)
-        : (await assertSelfContainedRuntime({ files: installed }, metadata, security), null);
+        : graph
+          ? null
+          : (await assertSelfContainedRuntime({ files: installed }, metadata, security), null);
       throwIfAborted(signal);
       const manifest = Object.freeze({
         schema: graph ? ARTIFACT_GRAPH_MANIFEST_SCHEMA : MANIFEST_SCHEMA,
@@ -3749,6 +3789,12 @@ export function createDbopfsSpeechArtifactStore({
       throw error;
     }
     const metadata = artifactMetadata(authority);
+    if (graph && effectiveSecurity.secure !== true) {
+      throw artifactGraphError(
+        "artifact-graph-secure-mode-required",
+        "Browser speech artifact graphs require explicit secure:true.",
+      );
+    }
     assertSecurityDescriptors(metadata.files, effectiveSecurity);
     const cached = await openCached(authority, {
       signal,
@@ -3772,15 +3818,16 @@ export function createDbopfsSpeechArtifactStore({
       throw speechError("ARCANE_AI_ARTIFACT_OFFLINE_MISS", "No admitted offline speech cache is available.");
     }
     if (graph) {
-      const artifactGraphAdmission = admitted.cache === "installed"
-        ? "artifact-graph-network-dbopfs-verified"
-        : offline
-          ? "artifact-graph-offline-dbopfs-cache-verified"
-          : "artifact-graph-dbopfs-cache-verified";
+      const artifactGraphAdmission = artifactGraphAdmissionStatus(
+        admitted.cache,
+        offline,
+        effectiveSecurity,
+      );
       const materialized = await createArtifactGraphObjectUrls(
         admitted,
         metadata,
         admitted.inspection,
+        effectiveSecurity,
       );
       const runtimeFiles = Object.freeze(materialized.files.filter((file) =>
         file.kind.startsWith("runtime-")));
@@ -3790,6 +3837,7 @@ export function createDbopfsSpeechArtifactStore({
         cache: artifactGraphAdmission,
         artifactGraphId: authority.identitySha256,
         artifactGraphAdmission,
+        security: effectiveSecurity,
         runtime: Object.freeze({
           ...metadata.runtime,
           files: runtimeFiles,

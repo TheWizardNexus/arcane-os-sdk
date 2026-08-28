@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "builder": "arcane-sdk-browser-runtime-v1",
-  "sdkVersion": "0.2.3",
+  "sdkVersion": "0.3.0",
   "source": {
     "authority": "arcane-os-sdk",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
@@ -28,10 +28,17 @@
       }
     ]
   },
-  "fileCount": 25,
-  "totalBytes": 9280047,
-  "contentSha256": "3c82ed11b24c7b7b91b62f6dc52e0b1dcd444112a29cd48413eedc008380eb61",
+  "fileCount": 26,
+  "totalBytes": 9551253,
+  "contentSha256": "164c30c71f4de1affaa335e0d435aa3cca31294f2c98be937b219e5e13e35959",
   "files": [
+    {
+      "path": "ai/ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json",
+      "sourcePath": "browser-runtime/ai/ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json",
+      "provenance": "sdk-source-identity",
+      "bytes": 9233,
+      "sha256": "5ff2e20d2a15b4a867ec66810f196cf6225b79aa734ab3b018e8b006abfa5d39"
+    },
     {
       "path": "ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json",
       "sourcePath": "browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json",
@@ -43,29 +50,29 @@
       "path": "ai/browser-kokoro-worker.mjs",
       "sourcePath": "browser-runtime/ai/browser-kokoro-worker.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 110,
-      "sha256": "5c08370aeefa6a99f4018ddaf7c0d7ac8e7189811957947ce2eba4131e19a76f"
+      "bytes": 345,
+      "sha256": "9a910b3a6818814bfd7548251e3989ac6fe5c105d541bc16fc8124ea1ba39737"
     },
     {
       "path": "ai/browser-speech-artifacts.mjs",
       "sourcePath": "browser-runtime/ai/browser-speech-artifacts.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 36576,
-      "sha256": "6504c01f6548a37291619cc6b69ae85da2cc1463ef12e83101eefdc92ad2ea74"
+      "bytes": 135328,
+      "sha256": "d5eb7d74000f8d91f6e9d19a1f5bffc12feb292d004605b28fc35d368419427d"
     },
     {
       "path": "ai/browser-speech-providers.mjs",
       "sourcePath": "browser-runtime/ai/browser-speech-providers.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 26055,
-      "sha256": "6a2c0caa227d78028f42434b86231236055f0cfe0e3d6b71a4f651f7005a2614"
+      "bytes": 56765,
+      "sha256": "abe453aad718f9abc1e1b0911ea45a8f07e77f916e48d87cd661397e06084195"
     },
     {
       "path": "ai/browser-speech.mjs",
       "sourcePath": "browser-runtime/ai/browser-speech.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 266,
-      "sha256": "fceadaafc0755ebb39071550bb2f497df14e23bef169779f970195d678e73ffc"
+      "bytes": 344,
+      "sha256": "4e060177a1aa5ed990b54c6455085973f3edbcd8810ad50367a9618ffdadb35a"
     },
     {
       "path": "ai/browser-wasm-llm-provider.mjs",
@@ -85,8 +92,8 @@
       "path": "ai/browser-whisper-worker.mjs",
       "sourcePath": "browser-runtime/ai/browser-whisper-worker.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 110,
-      "sha256": "949a4dddfae712855fb83c2aed2608657fea62d09b03e131bf8faa95be7e3aed"
+      "bytes": 345,
+      "sha256": "51f332a86c8b4809ce6a25d34d7cf2de9f0664bd9fbc35bc7ef273c5c550291d"
     },
     {
       "path": "ai/browser-wllama-runtime.mjs",
@@ -106,22 +113,22 @@
       "path": "ai/model-controller.mjs",
       "sourcePath": "browser-runtime/ai/model-controller.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 23672,
-      "sha256": "a36aea3e62835cf568bd03ebc4be0fa8e0112a15dc9fec3c213b1c8cefa33b56"
+      "bytes": 31466,
+      "sha256": "5a67cd4e6e08c5e754a7ccf667e472ba8ba5269c071279f135889ad91dd235fe"
     },
     {
       "path": "ai/speech-worker-client.mjs",
       "sourcePath": "browser-runtime/ai/speech-worker-client.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 6501,
-      "sha256": "ebfa4272725482a89ad6f89a1ff732c1e5b9803075f0d559c046800350abf75d"
+      "bytes": 14130,
+      "sha256": "833565bcad0cb6091bfccc4b5e42542362b149a9ffd6ecc0b1b0440ae70efb58"
     },
     {
       "path": "ai/speech-worker-runtime.mjs",
       "sourcePath": "browser-runtime/ai/speech-worker-runtime.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 17308,
-      "sha256": "feff8873f7d1c7b82f9cd797afe5beb47fa34113e491b2916ada0fcc3e62b101"
+      "bytes": 90700,
+      "sha256": "4449fddbc1963f2c51f524b4a44993d88a28124482d96d183cd3e28f4ebdf1c8"
     },
     {
       "path": "ai/wllama/LICENCE",
@@ -204,8 +211,8 @@
       "path": "event-manager.mjs",
       "sourcePath": "src/event-manager.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 52508,
-      "sha256": "96eb36e87fe212e6926f1069cb5305af9fa067774234bb53b11dac7525d2b7f6"
+      "bytes": 95656,
+      "sha256": "a9367654a9d17fb04e14e1135447d00ce6f975f596633281d76eba7155754dba"
     }
   ]
 }

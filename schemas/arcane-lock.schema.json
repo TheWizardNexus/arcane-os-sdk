@@ -28,7 +28,7 @@
           "const": "arcane-os"
         },
         "version": {
-          "const": "0.2.3"
+          "const": "0.3.0"
         }
       }
     },
@@ -82,7 +82,7 @@
           "const": "arcane-sdk-browser-runtime-v1"
         },
         "sdkVersion": {
-          "const": "0.2.3"
+          "const": "0.3.0"
         },
         "source": {
           "type": "object",

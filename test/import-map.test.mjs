@@ -217,7 +217,7 @@ test('shipped Arcane modules and transitive dependencies produce the exact named
         onEvent:event=>events.push(event)
     });
 
-    assert.equal(receipt.entryCount,91);
+    assert.equal(receipt.entryCount,Object.keys(receipt.imports).length);
     assert.deepEqual(receipt.cleanupWarnings,[]);
     assert.deepEqual(receipt.excludedModules,['modules/CaseEvidenceIndexer.js']);
     assert.equal(receipt.artifactPath,path.join(appRoot,'modules','arcane.importmap.json'));
@@ -299,6 +299,7 @@ test('shipped Arcane modules and transitive dependencies produce the exact named
     assert.deepEqual(entitySpecifiers,[
         'arcane/entities/ApiModelRecord',
         'arcane/entities/Calculation',
+        'arcane/entities/Chat',
         'arcane/entities/CommunicationMessage',
         'arcane/entities/CommunicationThread',
         'arcane/entities/Preference',

@@ -6,6 +6,8 @@ It supplies immutable artifact-graph validation, DBOPFS admission, role Workers,
 provider/2 adapters, audio normalization, cancellation, and cleanup. It does
 not ship or select runtime modules, model weights, voice bytes, a default
 catalog, credentials, a native provider, or a cloud fallback.
+The package contains no speech runtime, model, or voice payload and
+never downloads one before explicit `load()`.
 
 Use this entrypoint when an application deliberately owns every browser-local
 speech choice. Higher-level selection, startup policy, shared state, and event
@@ -240,11 +242,11 @@ ignores it and uses module-captured native Blob URL creation, revocation, and
 fetch so a caller cannot substitute the executable materialization boundary.
 
 For a graph, `prepare(graph,{signal,onProgress,offline=false,security})` follows
-the shared model-security flag. Omitted security or `secure:false` is the
-default warn-first mode: the declared runtime remains functional and capability
-warnings are observable without imposing byte-length or SHA-256 checks.
-`secure:true` enables strict byte-length, SHA-256, and undeclared-capability
-enforcement. Either check may also be selected explicitly through `checks`.
+the shared model-security flag and requires explicit `secure:true`. The graph is
+the opt-in strict path: it enables byte-length, SHA-256, and undeclared-
+capability enforcement. Ordinary warn-first operation uses the direct
+`model`/`runtime` authority described below and does not construct or admit an
+artifact graph.
 
 ### Cold admission
 
@@ -470,7 +472,8 @@ createBrowserKokoroProvider({
 } = {})
 ```
 
-`graph` is mutually exclusive with the legacy `model`/`runtime` options. Both
+`graph` is mutually exclusive with the legacy `model`/`runtime` options and may
+load only when effective security explicitly selects `secure:true`. Both
 constructors require an SDK-created DBOPFS speech store and return one frozen
 `arcane-ai-provider/2` object:
 
@@ -1214,8 +1217,9 @@ advanced strict-control option; it is not required for normal speech use.
 - The SDK redistributes no speech runtime, model, voice, third-party license,
   or corresponding-source payload. Explicit `load()` resolves them from the
   caller-selected npm/package/provider authorities.
-- Default operation is warn-first and preserves ordinary upstream fetch/cache
-  behavior. `secure:true` opts into strict graph/file verification and
+- Default direct-authority operation is warn-first and preserves ordinary
+  upstream fetch/cache behavior. An artifact graph is admitted only when
+  `secure:true` explicitly opts into strict graph/file verification and
   capability isolation.
 - Every graph byte is caller-selected, immutable, exact-length, SHA-256 bound,
   revision bound, media-type bound, license-declaration bound, and reachable

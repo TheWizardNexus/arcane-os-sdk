@@ -171,12 +171,12 @@ function validateString(contract,key){
 }
 
 export function createReferenceModuleContractMap(records){
-    if(!Array.isArray(records)||records.length!==85){
-        contractError('exactly 85 inventory records are required.');
+    if(!Array.isArray(records)||records.length!==86){
+        contractError('exactly 86 inventory records are required.');
     }
     const contracts=[...referenceModuleContractsA,...referenceModuleContractsB];
-    if(contracts.length!==85){
-        contractError(`expected 85 curated overlays, received ${contracts.length}.`);
+    if(contracts.length!==86){
+        contractError(`expected 86 curated overlays, received ${contracts.length}.`);
     }
     const map=new Map();
     for(const contract of contracts){

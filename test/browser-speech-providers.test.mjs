@@ -854,7 +854,7 @@ test("authenticated graph Worker rejects detached dynamic-code constructors", as
   assert.equal(globalThis.__arcaneBrowserSpeechArtifactGraphGuardsV1, undefined);
 });
 
-test("warn-first graph Worker preserves ordinary runtime capabilities", async () => {
+test("graph Worker requires explicit secure admission", async () => {
   const source = `
     const runtimeGlobal = Function("return globalThis")();
     export const env = {
@@ -880,24 +880,16 @@ test("warn-first graph Worker preserves ordinary runtime capabilities", async ()
     secure: false,
     transforms: false,
   });
-  await runtime.handleMessage({
-    protocol: SPEECH_WORKER_PROTOCOL,
-    id: 1,
-    op: "load",
-    payload: { configuration },
-  });
-  assert.deepEqual(await runtime.handleMessage({
-    protocol: SPEECH_WORKER_PROTOCOL,
-    id: 2,
-    op: "use",
-    payload: { audio: new Float32Array([0]), sampleRate: 16_000 },
-  }), { text: "warn-first" });
-  await runtime.handleMessage({
-    protocol: SPEECH_WORKER_PROTOCOL,
-    id: 3,
-    op: "unload",
-    payload: null,
-  });
+  await assert.rejects(
+    runtime.handleMessage({
+      protocol: SPEECH_WORKER_PROTOCOL,
+      id: 1,
+      op: "load",
+      payload: { configuration },
+    }),
+    (error) => error?.code === "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID"
+      && error?.reason === "artifact-graph-worker-configuration-incomplete",
+  );
   assert.equal(globalThis.__arcaneBrowserSpeechArtifactGraphGuardsV1, undefined);
 });
 
@@ -939,6 +931,7 @@ test("artifact graph DBOPFS admission proves cold, warm, and zero-network offlin
 
   const warm = await store.prepare(fixture.graph, {
     onProgress: ({ phase }) => phases.push(phase),
+    security: { secure: true },
   });
   assert.equal(warm.cache, "artifact-graph-dbopfs-cache-verified");
   assert.equal(fetches, fixture.sources.size);
@@ -952,7 +945,10 @@ test("artifact graph DBOPFS admission proves cold, warm, and zero-network offlin
       throw new Error("offline admission must not call fetch");
     },
   });
-  const offline = await offlineStore.prepare(fixture.graph, { offline: true });
+  const offline = await offlineStore.prepare(fixture.graph, {
+    offline: true,
+    security: { secure: true },
+  });
   assert.equal(offline.cache, "artifact-graph-offline-dbopfs-cache-verified");
   assert.equal(offlineFetches, 0);
   offline.release();
@@ -961,7 +957,10 @@ test("artifact graph DBOPFS admission proves cold, warm, and zero-network offlin
     name.endsWith(".artifact"));
   dbopfs.entries.set(persistedFileName, new Blob([new Uint8Array([9, 9, 9])]));
   await assert.rejects(
-    offlineStore.prepare(fixture.graph, { offline: true }),
+    offlineStore.prepare(fixture.graph, {
+      offline: true,
+      security: { secure: true },
+    }),
     (error) => error?.reason === "artifact-graph-offline-cache-miss",
   );
   assert.equal(offlineFetches, 0);
@@ -1187,7 +1186,7 @@ test("speech Worker distinguishes missing and rejected Transformers settings", a
 test("artifact graph materialization rewrites exact cache and typed-array sites", async () => {
   const fixture = artifactGraphFixture("tts");
   const prepared = await graphStore(createMemoryDbopfs(), fixture.sources)
-    .prepare(fixture.graph);
+    .prepare(fixture.graph, { security: { secure: true } });
   try {
     const entry = prepared.runtime.files.find((file) =>
       file.path === "runtime/entry.mjs");
@@ -1219,7 +1218,9 @@ test("artifact graph source verification propagates exact rejection boundaries",
     mediaType: "application/javascript",
   }));
   await assert.rejects(
-    graphStore(createMemoryDbopfs(), wrongMediaSources).prepare(fixture.graph),
+    graphStore(createMemoryDbopfs(), wrongMediaSources).prepare(fixture.graph, {
+      security: { secure: true },
+    }),
     (error) => error?.reason === "artifact-graph-entrypoint-media-type-mismatch",
   );
 
@@ -1265,7 +1266,7 @@ test("artifact graph source verification propagates exact rejection boundaries",
     objectUrlFactory: { create: () => "blob:redirect-never", revoke: () => undefined },
   });
   await assert.rejects(
-    redirectedStore.prepare(fixture.graph),
+    redirectedStore.prepare(fixture.graph, { security: { secure: true } }),
     (error) => error?.reason === "artifact-graph-source-redirected",
   );
 });
@@ -1311,7 +1312,7 @@ test("artifact graph cold redirects require declared final origin and source med
       });
     },
   });
-  const cold = await store.prepare(graph);
+  const cold = await store.prepare(graph, { security: { secure: true } });
   assert.equal(cold.cache, "artifact-graph-network-dbopfs-verified");
   assert.equal(
     fetches.find((entry) => entry.sourceUrl === target.sourceUrl).redirect,
@@ -1322,11 +1323,14 @@ test("artifact graph cold redirects require declared final origin and source med
   cold.release();
 
   const fetchCount = fetches.length;
-  const warm = await store.prepare(graph);
+  const warm = await store.prepare(graph, { security: { secure: true } });
   assert.equal(warm.cache, "artifact-graph-dbopfs-cache-verified");
   assert.equal(fetches.length, fetchCount);
   warm.release();
-  const offline = await store.prepare(graph, { offline: true });
+  const offline = await store.prepare(graph, {
+    offline: true,
+    security: { secure: true },
+  });
   assert.equal(offline.cache, "artifact-graph-offline-dbopfs-cache-verified");
   assert.equal(fetches.length, fetchCount);
   offline.release();
@@ -1364,7 +1368,9 @@ test("artifact graph cold redirects require declared final origin and source med
   }
 
   await assert.rejects(
-    redirectFailureStore("https://undeclared.example/xet/model").prepare(graph),
+    redirectFailureStore("https://undeclared.example/xet/model").prepare(graph, {
+      security: { secure: true },
+    }),
     (error) => error?.reason === "artifact-graph-source-redirect-final-origin-mismatch",
   );
   for (const invalidResponse of [null, Object.freeze({})]) {
@@ -1372,52 +1378,62 @@ test("artifact graph cold redirects require declared final origin and source med
       createDbopfsSpeechArtifactStore({
         dbopfs: createMemoryDbopfs(),
         fetchImpl: async () => invalidResponse,
-      }).prepare(graph),
+      }).prepare(graph, { security: { secure: true } }),
       (error) => error?.reason === "artifact-graph-source-http-response-rejected",
     );
   }
   await assert.rejects(
     redirectFailureStore("https://undeclared.example/xet/model", {
       status: 404,
-    }).prepare(graph),
+    }).prepare(graph, { security: { secure: true } }),
     (error) => error?.reason === "artifact-graph-source-redirect-final-origin-mismatch",
   );
   await assert.rejects(
     redirectFailureStore("https://huggingface.co/xet/model", {
       status: 404,
-    }).prepare(graph),
+    }).prepare(graph, { security: { secure: true } }),
     (error) => error?.reason === "artifact-graph-source-http-response-rejected",
   );
   await assert.rejects(
-    redirectFailureStore("not a final URL").prepare(graph),
+    redirectFailureStore("not a final URL").prepare(graph, {
+      security: { secure: true },
+    }),
     (error) => error?.reason === "artifact-graph-source-response-url-unreadable",
   );
   await assert.rejects(
-    redirectFailureStore("http://huggingface.co/xet/model").prepare(graph),
+    redirectFailureStore("http://huggingface.co/xet/model").prepare(graph, {
+      security: { secure: true },
+    }),
     (error) => error?.reason === "artifact-graph-source-response-url-protocol-not-https",
   );
   await assert.rejects(
-    redirectFailureStore("https://user:secret@huggingface.co/xet/model").prepare(graph),
+    redirectFailureStore("https://user:secret@huggingface.co/xet/model").prepare(graph, {
+      security: { secure: true },
+    }),
     (error) => error?.reason === "artifact-graph-source-response-url-credentials-rejected",
   );
   await assert.rejects(
-    redirectFailureStore("https://huggingface.co/xet/model#fragment").prepare(graph),
+    redirectFailureStore("https://huggingface.co/xet/model#fragment").prepare(graph, {
+      security: { secure: true },
+    }),
     (error) => error?.reason === "artifact-graph-source-response-url-fragment-rejected",
   );
   await assert.rejects(
-    redirectFailureStore("https://huggingface.co:444/xet/model").prepare(graph),
+    redirectFailureStore("https://huggingface.co:444/xet/model").prepare(graph, {
+      security: { secure: true },
+    }),
     (error) => error?.reason === "artifact-graph-source-redirect-final-origin-mismatch",
   );
   await assert.rejects(
     redirectFailureStore("https://huggingface.co/not-a-redirect", {
       redirected: false,
-    }).prepare(graph),
+    }).prepare(graph, { security: { secure: true } }),
     (error) => error?.reason === "artifact-graph-source-response-url-mismatch",
   );
   await assert.rejects(
     redirectFailureStore("https://huggingface.co/xet/model", {
       mediaType: "application/json",
-    }).prepare(graph),
+    }).prepare(graph, { security: { secure: true } }),
     (error) => error?.reason === "artifact-graph-model-configuration-json-source-media-type-mismatch",
   );
   await assert.rejects(
@@ -1428,7 +1444,7 @@ test("artifact graph cold redirects require declared final origin and source med
   );
 });
 
-test("graph Kokoro defaults to warn-first and supports explicit secure admission", async (t) => {
+test("graph Kokoro requires explicit secure admission", async (t) => {
   const fixture = artifactGraphFixture("tts");
   const dbopfs = createMemoryDbopfs();
   const store = graphStore(dbopfs, fixture.sources);
@@ -1439,19 +1455,28 @@ test("graph Kokoro defaults to warn-first and supports explicit secure admission
     return contract;
   });
 
+  await assert.rejects(
+    store.prepare(fixture.graph),
+    (error) => error?.reason === "artifact-graph-secure-mode-required",
+  );
+
   const warnFirst = createBrowserKokoroProvider({
     id: fixture.graph.providerId,
     graph: fixture.graph,
     store,
     appSecurity: { secure: false },
   });
-  await warnFirst.load({
-    role: "tts",
-    selection: selection(warnFirst),
-    progress: () => undefined,
-  });
-  assert.equal(contracts.length, 1);
-  assert.equal(warnFirst.status().state, "ready");
+  await assert.rejects(
+    warnFirst.load({
+      role: "tts",
+      selection: selection(warnFirst),
+      progress: () => undefined,
+    }),
+    (error) => error?.code === "ARCANE_AI_SECURE_MODE_REQUIRED"
+      && error?.reason === "tts-artifact-graph-secure-mode-required",
+  );
+  assert.equal(contracts.length, 0);
+  assert.equal(warnFirst.status().state, "unloaded");
   await warnFirst.dispose();
   contracts.length = 0;
 
@@ -1485,7 +1510,7 @@ test("graph Kokoro defaults to warn-first and supports explicit secure admission
   assert.equal(kokoro.status().artifactGraphId, fixture.graph.identitySha256);
   assert.equal(
     kokoro.status().artifactGraphAdmission,
-    "artifact-graph-dbopfs-cache-verified",
+    "artifact-graph-network-dbopfs-verified",
   );
 
   const speech = await kokoro.request({
@@ -1519,6 +1544,7 @@ test("graph Whisper uses caller sample-rate authority over a private Worker chan
   const whisper = createBrowserWhisperProvider({
     id: fixture.graph.providerId,
     graph: fixture.graph,
+    security: { secure: true },
     store: graphStore(createMemoryDbopfs(), fixture.sources),
   });
   assert.deepEqual(
@@ -1593,6 +1619,7 @@ test("browser speech rejects foreign and incomplete Worker error envelopes", asy
     const whisper = createBrowserWhisperProvider({
       id: fixture.graph.providerId,
       graph: fixture.graph,
+      security: { secure: true },
       store: graphStore(createMemoryDbopfs(), fixture.sources),
     });
     await assert.rejects(

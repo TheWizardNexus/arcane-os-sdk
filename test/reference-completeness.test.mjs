@@ -162,7 +162,7 @@ test('the public package API inventory matches every JavaScript export and MDN e
     const exportGraph=await livePackageExportGraph(packageDocument);
 
     await t.test('the inventory has stable unique records',()=>{
-        assert.equal(packageDocument.version,'0.2.3');
+        assert.equal(packageDocument.version,'0.3.0');
         assert.equal(inventory.sdkVersion,packageDocument.version);
         assert.equal(inventory.memberCount,exportGraph.length);
         assert.equal(inventory.members.length,inventory.memberCount);
@@ -427,7 +427,7 @@ test('the public package API inventory matches every JavaScript export and MDN e
             'Providers',
             'Lifecycle, progress, cancellation, and cleanup',
             'Stable errors and reasons',
-            '`createBrowserSpeechAuthority()` legacy compatibility',
+            '`createBrowserSpeechAuthority()` upstream package mode',
             'Security and ownership summary',
             'Related'
         ]);

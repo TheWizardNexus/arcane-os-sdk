@@ -2,34 +2,38 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
-  <meta name="description" content="EventManager gives Arcane applications one synchronous event bus and an optional, bounded diagnostic timeline. Use it to observe SDK operation events, add s…">
+  <meta name="description" content="arcaneEvents gives Arcane SDK publishers one canonical synchronous event authority per JavaScript realm. EventManager remains the constructor for an isolate…">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
   <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/event-manager/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="EventManager and time-travel diagnostics · Arcane OS SDK"><meta property="og:description" content="EventManager gives Arcane applications one synchronous event bus and an optional, bounded diagnostic timeline. Use it to observe SDK operation events, add s…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/event-manager/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="EventManager and time-travel diagnostics · Arcane OS SDK"><meta name="twitter:description" content="EventManager gives Arcane applications one synchronous event bus and an optional, bounded diagnostic timeline. Use it to observe SDK operation events, add s…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="EventManager and time-travel diagnostics · Arcane OS SDK"><meta property="og:description" content="arcaneEvents gives Arcane SDK publishers one canonical synchronous event authority per JavaScript realm. EventManager remains the constructor for an isolate…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/event-manager/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="EventManager and time-travel diagnostics · Arcane OS SDK"><meta name="twitter:description" content="arcaneEvents gives Arcane SDK publishers one canonical synchronous event authority per JavaScript realm. EventManager remains the constructor for an isolate…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
   <title>EventManager and time-travel diagnostics | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../sdk-api/">API</a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">EventManager and time-travel diagnostics</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="eventmanager-and-time-travel-diagnostics">EventManager and time-travel diagnostics</h1><p class="doc-lead">EventManager gives Arcane applications one synchronous event bus and an optional, bounded diagnostic timeline. Use it to observe SDK operation events, add s…</p><div class="doc-meta"><span>SDK 0.2.2</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">EventManager and time-travel diagnostics</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="eventmanager-and-time-travel-diagnostics">EventManager and time-travel diagnostics</h1><p class="doc-lead">arcaneEvents gives Arcane SDK publishers one canonical synchronous event authority per JavaScript realm. EventManager remains the constructor for an isolate…</p><div class="doc-meta"><span>SDK 0.3.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="./" aria-current="page">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/event-manager.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#quick-start">Quick start</a><a href="#availability-and-normalization">Availability and normalization</a><a href="#export-summary">Export summary</a><a href="#eventmanager">EventManager</a><a href="#createeventmanager">createEventManager()</a><a href="#arcaneevents">arcaneEvents</a><a href="#parseeventstack">parseEventStack()</a><a href="#createdominstrumentation">createDOMInstrumentation()</a><a href="#domselector">domSelector()</a><a href="#describedomtarget">describeDOMTarget()</a><a href="#defaultdomeventtypes">DEFAULTDOMEVENTTYPES</a><a href="#arcaneeventstackprotocol">ARCANEEVENTSTACKPROTOCOL</a><a href="#timetravelseekevent">TIMETRAVELSEEKEVENT</a><a href="#playbackstartedevent">PLAYBACKSTARTEDEVENT</a><a href="#playbackrecordevent">PLAYBACKRECORDEVENT</a><a href="#playbackcompletedevent">PLAYBACKCOMPLETEDEVENT</a><a href="#playbackcancelledevent">PLAYBACKCANCELLEDEVENT</a><a href="#playbackfailedevent">PLAYBACKFAILEDEVENT</a><a href="#timetraveloverflowevent">TIMETRAVELOVERFLOWEVENT</a><a href="#dominteractionevent">DOMINTERACTIONEVENT</a><a href="#dommutationevent">DOMMUTATIONEVENT</a><a href="#domobservationstartedevent">DOMOBSERVATIONSTARTEDEVENT</a><a href="#domobservationstoppedevent">DOMOBSERVATIONSTOPPEDEVENT</a><a href="#event-stack-document-and-record-shapes">Event-stack document and record shapes</a><a href="#errors-and-recovery">Errors and recovery</a><a href="#behavioral-tests">Behavioral tests</a></nav></details><p><code>EventManager</code> gives Arcane applications one synchronous event bus and an optional,
-bounded diagnostic timeline. Use it to observe SDK operation events, add semantic
-application events, capture browser interactions, export evidence, and review a
-recording without implying that Arcane has restored live state.</p>
+      <article class="prose reference-prose" data-reference-source="docs/reference/event-manager.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#quick-start">Quick start</a><a href="#availability-and-normalization">Availability and normalization</a><a href="#export-summary">Export summary</a><a href="#eventmanager">EventManager</a><a href="#createeventmanager">createEventManager()</a><a href="#arcaneevents">arcaneEvents</a><a href="#createarcaneeventsource">createArcaneEventSource()</a><a href="#projectarcanedomevent">projectArcaneDOMEvent()</a><a href="#isarcaneeventoccurrence">isArcaneEventOccurrence()</a><a href="#arcaneeventauthoritybrand">ARCANEEVENTAUTHORITYBRAND</a><a href="#arcaneeventauthoritykind">ARCANEEVENTAUTHORITYKIND</a><a href="#arcaneeventauthorityprotocol">ARCANEEVENTAUTHORITYPROTOCOL</a><a href="#arcaneeventerrorcodes">ARCANEEVENTERRORCODES</a><a href="#arcaneeventlistenererrorevent">ARCANEEVENTLISTENERERROREVENT</a><a href="#arcaneeventoccurrenceprotocol">ARCANEEVENTOCCURRENCEPROTOCOL</a><a href="#arcaneeventsourcedisposedevent">ARCANEEVENTSOURCEDISPOSEDEVENT</a><a href="#arcaneeventsourcekind">ARCANEEVENTSOURCEKIND</a><a href="#arcaneeventsourceprotocol">ARCANEEVENTSOURCEPROTOCOL</a><a href="#parseeventstack">parseEventStack()</a><a href="#createdominstrumentation">createDOMInstrumentation()</a><a href="#domselector">domSelector()</a><a href="#describedomtarget">describeDOMTarget()</a><a href="#defaultdomeventtypes">DEFAULTDOMEVENTTYPES</a><a href="#arcaneeventstackprotocol">ARCANEEVENTSTACKPROTOCOL</a><a href="#timetravelseekevent">TIMETRAVELSEEKEVENT</a><a href="#playbackstartedevent">PLAYBACKSTARTEDEVENT</a><a href="#playbackrecordevent">PLAYBACKRECORDEVENT</a><a href="#playbackcompletedevent">PLAYBACKCOMPLETEDEVENT</a><a href="#playbackcancelledevent">PLAYBACKCANCELLEDEVENT</a><a href="#playbackfailedevent">PLAYBACKFAILEDEVENT</a><a href="#timetraveloverflowevent">TIMETRAVELOVERFLOWEVENT</a><a href="#dominteractionevent">DOMINTERACTIONEVENT</a><a href="#dommutationevent">DOMMUTATIONEVENT</a><a href="#domobservationstartedevent">DOMOBSERVATIONSTARTEDEVENT</a><a href="#domobservationstoppedevent">DOMOBSERVATIONSTOPPEDEVENT</a><a href="#event-stack-document-and-record-shapes">Event-stack document and record shapes</a><a href="#errors-and-recovery">Errors and recovery</a><a href="#behavioral-tests">Behavioral tests</a></nav></details><p><code>arcaneEvents</code> gives Arcane SDK publishers one canonical synchronous event
+authority per JavaScript realm. <code>EventManager</code> remains the constructor for an
+isolated strict pub/sub bus and optional bounded diagnostic timeline. Use source
+handles for SDK semantic events; use isolated managers for local diagnostics,
+DOM capture, export, and review.</p>
 <p>The API is capability-first:</p>
 <ul>
 <li>ordinary pub/sub works in Node and browser JavaScript;</li>
+<li>duplicate module URLs reuse the same branded <code>globalThis.arcaneEvents</code> value;</li>
+<li>canonical occurrences expose only deeply frozen privacy-admitted public detail;</li>
+<li>rich compatibility detail remains local to source listeners and DOM projection;</li>
 <li>recording creates immutable, normalized <code>arcane-event-stack/1</code> records;</li>
 <li>browser DOM capture is opt-in and privacy-preserving by default;</li>
 <li>review playback is safe by default; live event redispatch is explicitly effectful;</li>
 <li>no event stack is uploaded, persisted, bridged to Core, or sent to a cloud service
 automatically.</li>
 </ul>
-<p>All 20 JavaScript exports are available from both <code>arcane-os</code> and
+<p>All 32 JavaScript exports are available from both <code>arcane-os</code> and
 <code>arcane-os/event-manager</code>. The bindings are identical, so choose the focused
 subpath when event instrumentation is the only SDK capability you need. Node
 can resolve either package entrypoint. The generated browser map intentionally
@@ -38,30 +42,36 @@ root.</p>
 <h2 id="quick-start">Quick start</h2>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {
     arcaneEvents,
+    createArcaneEventSource,
+    createEventManager,
+    projectArcaneDOMEvent,
     PLAYBACK_RECORD_EVENT
 } from &#39;arcane-os/event-manager&#39;;
 
-arcaneEvents.on(&#39;document.save.completed&#39;,event=&gt;{
-    console.info(&#39;Saved&#39;,event.documentId);
+const events=createArcaneEventSource(editorController,{
+    source:&#39;app.editor&#39;,
+    eventTypes:[&#39;document.save.completed&#39;]
 });
 
-arcaneEvents.enableTimeTravel();
-try{
-    arcaneEvents.instrument(
-        &#39;document.save.completed&#39;,
-        {documentId:&#39;example&#39;},
-        {source:&#39;app:editor&#39;,category:&#39;operation&#39;,correlationId:&#39;save-42&#39;}
-    );
-}finally{
-    arcaneEvents.disableTimeTravel();
-}
+const unsubscribe=arcaneEvents.subscribe(&#39;document.save.completed&#39;,occurrence=&gt;{
+    console.info(&#39;Saved&#39;,occurrence.detail.documentId);
+});
 
-const stack=arcaneEvents.exportStack();
-arcaneEvents.on(PLAYBACK_RECORD_EVENT,record=&gt;console.info(record.type));
-await arcaneEvents.playback({stack,mode:&#39;review&#39;,speed:0});
+const publication=events.dispatch(
+    &#39;document.save.completed&#39;,
+    Object.freeze({documentId:&#39;example&#39;,document:liveDocument}),
+    {operationId:&#39;save-42&#39;,publicDetail:{documentId:&#39;example&#39;}}
+);
+projectArcaneDOMEvent(editorElement,publication.occurrence);
+unsubscribe();
+
+const diagnostics=createEventManager({timeTravel:true});
+const stack=diagnostics.exportStack();
+diagnostics.on(PLAYBACK_RECORD_EVENT,record=&gt;console.info(record.type));
+await diagnostics.playback({stack,mode:&#39;review&#39;,speed:0});
 </code></pre></div>
-<p>Recording is disabled on <code>arcaneEvents</code> by default. Keep diagnostic sessions
-bounded, export intentionally, then call <code>clearHistory()</code>.</p>
+<p>Recording is disabled by default. Keep isolated diagnostic sessions bounded,
+export intentionally, then call <code>clearHistory()</code>.</p>
 <h2 id="availability-and-normalization">Availability and normalization</h2>
 <div class="table-wrap" data-columns="6" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
@@ -75,6 +85,14 @@ bounded, export intentionally, then call <code>clearHistory()</code>.</p>
 </tr>
 </thead>
 <tbody><tr>
+<td>Canonical per-realm authority and source occurrences</td>
+<td>Yes</td>
+<td>Yes, per window or worker realm</td>
+<td>Only when the SDK module runs in that JavaScript realm</td>
+<td>No automatic transport</td>
+<td><code>arcane-event-authority/1</code>, <code>arcane-event-source/1</code>, and <code>arcane-event-occurrence/1</code></td>
+</tr>
+<tr>
 <td>Pub/sub, semantic instrumentation, parse/export, seek, playback</td>
 <td>Yes</td>
 <td>Yes, through a bundler or the managed Arcane import map</td>
@@ -131,6 +149,51 @@ service.</p>
 <td><code>ARCANE_EVENT_STACK_PROTOCOL</code></td>
 <td>String constant</td>
 <td>Identify the durable stack format</td>
+</tr>
+<tr>
+<td><code>ARCANE_EVENT_AUTHORITY_PROTOCOL</code></td>
+<td>String constant</td>
+<td>Identify singleton authority compatibility</td>
+</tr>
+<tr>
+<td><code>ARCANE_EVENT_OCCURRENCE_PROTOCOL</code></td>
+<td>String constant</td>
+<td>Identify canonical occurrences</td>
+</tr>
+<tr>
+<td><code>ARCANE_EVENT_SOURCE_PROTOCOL</code></td>
+<td>String constant</td>
+<td>Identify source handles</td>
+</tr>
+<tr>
+<td><code>ARCANE_EVENT_AUTHORITY_BRAND</code></td>
+<td>Global symbol</td>
+<td>Inspect the authority brand descriptor</td>
+</tr>
+<tr>
+<td><code>ARCANE_EVENT_AUTHORITY_KIND</code></td>
+<td>String constant</td>
+<td>Identify an authority descriptor</td>
+</tr>
+<tr>
+<td><code>ARCANE_EVENT_SOURCE_KIND</code></td>
+<td>String constant</td>
+<td>Identify a source descriptor</td>
+</tr>
+<tr>
+<td><code>ARCANE_EVENT_LISTENER_ERROR_EVENT</code></td>
+<td>String constant</td>
+<td>Observe privacy-safe listener failures</td>
+</tr>
+<tr>
+<td><code>ARCANE_EVENT_SOURCE_DISPOSED_EVENT</code></td>
+<td>String constant</td>
+<td>Observe a source&#39;s final occurrence</td>
+</tr>
+<tr>
+<td><code>ARCANE_EVENT_ERROR_CODES</code></td>
+<td>Frozen object</td>
+<td>Match stable authority error codes</td>
 </tr>
 <tr>
 <td><code>TIME_TRAVEL_SEEK_EVENT</code></td>
@@ -224,8 +287,23 @@ service.</p>
 </tr>
 <tr>
 <td><code>arcaneEvents</code></td>
-<td><code>EventManager</code> singleton</td>
-<td>Observe shared SDK events</td>
+<td>Branded <code>EventManager</code> authority</td>
+<td>Observe canonical SDK events in this realm</td>
+</tr>
+<tr>
+<td><code>createArcaneEventSource()</code></td>
+<td>Function</td>
+<td>Register one declared semantic source per owner</td>
+</tr>
+<tr>
+<td><code>projectArcaneDOMEvent()</code></td>
+<td>Function</td>
+<td>Project one occurrence to one <code>CustomEvent</code></td>
+</tr>
+<tr>
+<td><code>isArcaneEventOccurrence()</code></td>
+<td>Function</td>
+<td>Recognize authority-created occurrences and views</td>
 </tr>
 </tbody></table>
 </div>
@@ -434,21 +512,350 @@ const events=createEventManager({timeTravel:true,maxEvents:1_000});
 </code></pre></div>
 <h2 id="arcaneevents"><code>arcaneEvents</code></h2>
 <h3 id="overview-2">Overview</h3>
-<p>The SDK-wide <code>EventManager</code> singleton. Recording is off by default. SDK operation
-queues forward each normalized event object through this manager before their
-awaited callback; nested queues deduplicate the same object identity.</p>
+<p>The SDK&#39;s canonical per-realm event authority. Module evaluation first inspects
+the own descriptor of <code>globalThis.arcaneEvents</code>. If absent, it constructs,
+brands, and installs one authority as a non-enumerable, non-writable,
+non-configurable data property. A duplicate module URL validates and reuses that
+exact object without constructing a transient second bus. Accessor collisions,
+unbranded values, malformed descriptors, incompatible protocols, and incomplete
+APIs fail closed with stable <code>ARCANE_EVENT_AUTHORITY_*</code> codes.</p>
 <h3 id="value">Value</h3>
-<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const arcaneEvents = new EventManager()
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">globalThis.arcaneEvents === arcaneEvents
+arcaneEvents.protocol === &#39;arcane-event-authority/1&#39;
+arcaneEvents[ARCANE_EVENT_AUTHORITY_BRAND] === &#39;arcane-event-authority/1&#39;
 </code></pre></div>
 <h3 id="availability-and-normalization-3">Availability and normalization</h3>
-<p>One singleton per resolved SDK module graph in Node or a browser bundle. It is not
-a cross-process, cross-frame, Core, native, or cloud singleton.</p>
+<p>Exactly one authority per JavaScript realm. A window, worker, frame, Node realm,
+or process has its own boundary. Nothing automatically transports occurrences
+to another realm, Core, a native host, or a remote service.</p>
+<p><code>subscribe(type,handler,{once=false,signal}={})</code> observes one exact canonical
+event type. <code>handler</code> is a function or EventListener object and receives the
+canonical occurrence as its sole argument. The returned idempotent unsubscribe
+has <code>unsubscribe.dispose === unsubscribe</code>. An already-aborted signal installs
+nothing; later abort marks the listener inactive synchronously and removes it
+without corrupting an in-progress dispatch. <code>&#39;*&#39;</code> is not a canonical subscription
+type.</p>
+<p><code>createSource(owner,{source,eventTypes,onListenerError?})</code> is the authority
+method used by the exported
+<code>createArcaneEventSource(owner,{source,eventTypes,onListenerError?})</code> wrapper.
+Both return the same frozen singleton-backed source handle; neither constructs
+an EventManager, EventTarget, or component-local bus.</p>
+<p><code>addEventListener()</code> and <code>removeEventListener()</code> expose EventTarget-shaped
+canonical registration, including function/EventListener-object callbacks,
+type/listener/capture deduplication, <code>once</code>, and <code>signal</code>. They return
+<code>undefined</code>. Authority-level <code>dispatchEvent()</code> is a deprecated admission adapter
+for older <code>aiRuntimeEvents</code> callers. It accepts an Event-like value with a valid
+type and data <code>detail</code>, creates one new occurrence from source
+<code>event-target-compatibility</code>, preserves preexisting and observer cancellation,
+and never uses raw <code>EventManager.emit()</code> as a parallel path.</p>
+<p>The inherited <code>on</code>, <code>once</code>, <code>off</code>, <code>reset</code>, <code>emit</code>, <code>instrument</code>, and <code>forward</code>
+surface is retained for legacy direct diagnostics. Its registrations are
+separate: source dispatch does not re-emit raw compatibility detail to legacy
+listeners, and legacy <code>off()</code>/<code>reset()</code> cannot remove canonical or source-owned
+registrations. New SDK publishers use <code>createArcaneEventSource()</code>.</p>
 <h3 id="example-2">Example</h3>
-<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {arcaneEvents} from &#39;arcane-os&#39;;
-arcaneEvents.on(&#39;sdk.operation.completed&#39;,event=&gt;console.info(event));
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {arcaneEvents} from &#39;arcane-os/event-manager&#39;;
+
+const unsubscribe=arcaneEvents.subscribe(&#39;sdk.operation.completed&#39;,occurrence=&gt;{
+    console.info(occurrence.occurrenceId,occurrence.detail);
+});
+unsubscribe();
+</code></pre></div>
+<h2 id="createarcaneeventsource"><code>createArcaneEventSource()</code></h2>
+<h3 id="overview-3">Overview</h3>
+<p>Registers one active semantic source for a non-null object or function owner.
+The options object has only <code>source</code>, <code>eventTypes</code>, and optional
+<code>onListenerError</code>. Source and event names are trimmed lowercase identifiers of
+at most 128 characters matching
+<code>^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$</code>. <code>eventTypes</code> contains 1 through 256 unique
+declared types. A second active source for the same owner fails closed.</p>
+<h3 id="signature-and-result">Signature and result</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createArcaneEventSource(owner, options)
+</code></pre></div>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const source=createArcaneEventSource(owner,{
+    source:&#39;sdk.document-store&#39;,
+    eventTypes:[&#39;document.saved&#39;],
+    onListenerError(error,errorOccurrence){
+        reportOwnerLocalFailure(error,errorOccurrence?.occurrenceId??null);
+    }
+});
+</code></pre></div>
+<p>The returned handle and its descriptor are frozen. The descriptor identifies
+<code>arcane-event-source/1</code>, the stable source name, an authority-sequenced opaque
+<code>arcane-source-&lt;base36&gt;</code> instance id, and the declared event types plus the final
+<code>arcane.event.source.disposed</code> event. IDs are unique only during one authority&#39;s
+lifetime in one realm.</p>
+<p>The authority descriptor is exactly
+<code>{kind:&#39;arcane-event-authority&#39;,protocol:&#39;arcane-event-authority/1&#39;,realm:&#39;current&#39;}</code>.
+The source descriptor is exactly
+<code>{kind:&#39;arcane-event-source&#39;,protocol:&#39;arcane-event-source/1&#39;,source,instanceId, eventTypes}</code>; <code>eventTypes</code> is frozen and includes the declared types followed by
+<code>arcane.event.source.disposed</code>.</p>
+<h3 id="dispatch">Dispatch</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const {occurrence,accepted}=source.dispatch(
+    &#39;document.saved&#39;,
+    Object.freeze({document:liveDocument,documentId:&#39;document-7&#39;}),
+    {
+        operationId:&#39;save-42&#39;,
+        publicDetail:{documentId:&#39;document-7&#39;},
+        cancelable:true
+    }
+);
+</code></pre></div>
+<p><code>dispatch()</code> is synchronous. Exact canonical subscribers run first in
+registration order, followed by this source&#39;s exact <code>on()</code>/EventListener
+registrations in registration order. Source listeners receive one frozen
+EventTarget-compatible view whose <code>detail</code> is the locally held compatibility
+detail, whose <code>target</code> and <code>currentTarget</code> are the source owner, and whose
+cancellation state is shared with the occurrence. Function listeners also
+receive that owner as <code>this</code>. The public
+occurrence contains:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const result = {
+    protocol:&#39;arcane-event-occurrence/1&#39;,
+    occurrenceId:&#39;arcane-event-&lt;base36&gt;&#39;,
+    type,
+    source,
+    instanceId,
+    operationId,       // string or null
+    detail,            // defensive, privacy-admitted, deeply frozen snapshot
+    cancelable,
+    get defaultPrevented(),
+    preventDefault()
+};
+</code></pre></div>
+<p>The frozen result is <code>{occurrence,accepted:!occurrence.defaultPrevented}</code>.
+Cancellation does not roll back domain work automatically. All active listeners
+run even when one prevents default or throws. Listener exceptions create one
+nonrecursive, privacy-safe <code>arcane.event.listener.error</code> occurrence and are
+reported through <code>reportError</code> or <code>console.error</code>; committed source dispatch does
+not throw because an observer failed. <code>onListenerError(error,errorOccurrence)</code>
+is invoked synchronously only at the source-owner boundary after canonical error
+publication and platform reporting. Its second argument is the canonical
+listener-error occurrence, or <code>null</code> only if that secondary publication could
+not be constructed. If the callback throws, its failure is reported directly
+without another listener-error occurrence. The listener-error public detail is
+exactly <code>{code:&#39;ARCANE_EVENT_LISTENER_CALLBACK_FAILED&#39;,reason:&#39;listener-threw&#39;, eventType,occurrenceId,source,instanceId,operationId}</code>.</p>
+<p>Canonical publication never awaits a listener return value and exposes no
+Promise-returning publication API. Domain promises and <code>createEventQueue()</code> own
+asynchronous work, ordered callback backpressure, and async failure. Synchronous
+source generation, occurrence creation, sticky state commits, subscription
+installation, and cancellation admission stay on the authority call stack.</p>
+<p><code>on(type,handler,{once=false,signal}={})</code> and <code>subscribe()</code> on the source are
+aliases returning an idempotent disposable unsubscribe. <code>once()</code> is the
+one-delivery form. <code>addEventListener()</code>/<code>removeEventListener()</code> use EventTarget
+deduplication, ignore null or non-listener callbacks, and return <code>undefined</code>.
+The stricter <code>on()</code>/<code>subscribe()</code> APIs reject invalid handlers.
+<code>dispatchEvent(event)</code> is a compatibility
+adapter that accepts only a declared type, preserves cancellation, and publishes
+a new canonical occurrence rather than the raw input.</p>
+<p><code>dispose()</code> is idempotent: the first call publishes the final noncancelable
+<code>arcane.event.source.disposed</code> occurrence, removes source-owned registrations,
+and returns <code>true</code>; reentrant or later calls return <code>false</code>. Dispatch or new
+registration after disposal fails with <code>ARCANE_EVENT_SOURCE_DISPOSED</code>. The owner
+may register a new source after disposal. Its compatibility detail is
+<code>{source,instanceId,reason:&#39;source-disposed&#39;}</code> and its public detail is
+<code>{reason:&#39;source-disposed&#39;}</code>. <code>destroy()</code> aliases <code>dispose()</code>.</p>
+<p>Already-frozen compatibility detail retains its identity. Other rich
+compatibility detail is shallow-copied and frozen when it is a plain record or
+array; host objects such as DOM nodes, <code>File</code>, or <code>Error</code> remain local and are
+not recursively frozen. Compatibility detail never enters canonical
+EventPubSub/time-travel payloads. Only privacy-admitted <code>publicDetail</code> enters the
+occurrence and optional diagnostics.</p>
+<h3 id="availability-and-normalization-4">Availability and normalization</h3>
+<p><strong>Node and browser/bundler, within the current JavaScript realm.</strong> This wrapper
+reuses <code>globalThis.arcaneEvents</code>; it creates no second bus or asynchronous work
+owner. Admission, publication, cancellation, and teardown remain synchronous.</p>
+<h3 id="example-3">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createArcaneEventSource} from &#39;arcane-os/event-manager&#39;;
+
+const source=createArcaneEventSource({}, {
+    source:&#39;sdk.example&#39;,
+    eventTypes:[&#39;sdk.example.completed&#39;]
+});
+source.dispatch(&#39;sdk.example.completed&#39;,{}, {publicDetail:{status:&#39;completed&#39;}});
+source.dispose();
+</code></pre></div>
+<h2 id="projectarcanedomevent"><code>projectArcaneDOMEvent()</code></h2>
+<h3 id="overview-4">Overview</h3>
+<p>Projects one authority-created occurrence to one <code>CustomEvent</code>. This is a
+one-way compatibility boundary; DOM dispatch never republishes into
+<code>arcaneEvents</code>.</p>
+<h3 id="signature-and-result-1">Signature and result</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">projectArcaneDOMEvent(target, occurrence, options)
+</code></pre></div>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">projectArcaneDOMEvent(target,occurrence,{
+    type=occurrence.type,
+    bubbles=false,
+    composed=false,
+    cancelable=occurrence.cancelable
+}={})
+</code></pre></div>
+<p>The authority retrieves the centrally held compatibility detail, creates a
+frozen outer projection detail, and additively supplies <code>occurrenceId</code>, <code>source</code>,
+<code>arcaneSource</code>, <code>instanceId</code>, and <code>operationId</code>. <code>arcaneSource</code> is always the
+canonical emitter identity. A caller-owned compatibility <code>source</code> value is
+preserved; when absent, <code>source</code> is added as an alias of <code>arcaneSource</code>. A
+conflicting caller-owned reserved metadata value fails
+with <code>ARCANE_EVENT_DOM_DETAIL_COLLISION</code>. If the occurrence is already canceled,
+the function skips DOM dispatch and returns <code>false</code>. Otherwise it dispatches
+exactly one event, propagates DOM cancellation to a cancelable occurrence, and
+returns the combined acceptance result.</p>
+<h3 id="availability-and-normalization-5">Availability and normalization</h3>
+<p><strong>Browser DOM or a DOM-compatible host with <code>CustomEvent</code> and
+<code>dispatchEvent</code>.</strong> Only an occurrence created by this realm&#39;s authority is
+accepted. Projection is synchronous and one-way and creates no listener state.</p>
+<h3 id="example-4">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {projectArcaneDOMEvent} from &#39;arcane-os/event-manager&#39;;
+
+projectArcaneDOMEvent(button,publication.occurrence,{bubbles:true});
+</code></pre></div>
+<h2 id="isarcaneeventoccurrence"><code>isArcaneEventOccurrence()</code></h2>
+<h3 id="overview-5">Overview</h3>
+<p>Returns <code>true</code> only for a canonical occurrence or source compatibility view
+created by the current realm&#39;s authority. It does not authenticate hostile
+same-realm code; the brand and protocol are compatibility boundaries.</p>
+<h3 id="signature-and-result-2">Signature and result</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">isArcaneEventOccurrence(value)
+</code></pre></div>
+<p>Returns a boolean; a structurally similar foreign value returns <code>false</code>.</p>
+<h3 id="availability-and-normalization-6">Availability and normalization</h3>
+<p><strong>Node and browser/bundler, within the current JavaScript realm.</strong> Recognition
+is synchronous and identity-based, with no parsing, cloning, or transport.</p>
+<h3 id="example-5">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {isArcaneEventOccurrence} from &#39;arcane-os/event-manager&#39;;
+
+console.log(isArcaneEventOccurrence(publication.occurrence));
+</code></pre></div>
+<h2 id="arcaneeventauthoritybrand"><code>ARCANE_EVENT_AUTHORITY_BRAND</code></h2>
+<h3 id="overview-6">Overview</h3>
+<p>Global registry symbol that brands the one compatible authority in a realm.</p>
+<h3 id="value-and-import">Value and import</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">const ARCANE_EVENT_AUTHORITY_BRAND
+</code></pre></div>
+<p>Its exact value is <code>Symbol.for(&#39;arcane-os.arcane-events-authority&#39;)</code>.</p>
+<h3 id="availability-and-normalization-7">Availability and normalization</h3>
+<p><strong>Node and browser/bundler.</strong> The brand property is an immutable,
+non-enumerable compatibility marker, not cross-realm transport or authenticity.</p>
+<h3 id="example-6">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {ARCANE_EVENT_AUTHORITY_BRAND,arcaneEvents} from &#39;arcane-os/event-manager&#39;;
+console.log(arcaneEvents[ARCANE_EVENT_AUTHORITY_BRAND]);
+</code></pre></div>
+<h2 id="arcaneeventauthoritykind"><code>ARCANE_EVENT_AUTHORITY_KIND</code></h2>
+<h3 id="overview-7">Overview</h3>
+<p>Stable kind discriminator for the frozen authority descriptor.</p>
+<h3 id="value-and-import-1">Value and import</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">const ARCANE_EVENT_AUTHORITY_KIND
+</code></pre></div>
+<p>Its exact value is <code>arcane-event-authority</code>.</p>
+<h3 id="availability-and-normalization-8">Availability and normalization</h3>
+<p><strong>Node and browser/bundler.</strong> Reading it creates no authority or listener.</p>
+<h3 id="example-7">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {ARCANE_EVENT_AUTHORITY_KIND,arcaneEvents} from &#39;arcane-os/event-manager&#39;;
+console.log(arcaneEvents.descriptor.kind===ARCANE_EVENT_AUTHORITY_KIND);
+</code></pre></div>
+<h2 id="arcaneeventauthorityprotocol"><code>ARCANE_EVENT_AUTHORITY_PROTOCOL</code></h2>
+<h3 id="overview-8">Overview</h3>
+<p>Stable protocol discriminator for compatible per-realm authorities.</p>
+<h3 id="value-and-import-2">Value and import</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">const ARCANE_EVENT_AUTHORITY_PROTOCOL
+</code></pre></div>
+<p>Its exact value is <code>arcane-event-authority/1</code>.</p>
+<h3 id="availability-and-normalization-9">Availability and normalization</h3>
+<p><strong>Node and browser/bundler.</strong> An incompatible installed protocol fails closed
+and is never replaced or wrapped.</p>
+<h3 id="example-8">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {ARCANE_EVENT_AUTHORITY_PROTOCOL,arcaneEvents} from &#39;arcane-os/event-manager&#39;;
+console.log(arcaneEvents.protocol===ARCANE_EVENT_AUTHORITY_PROTOCOL);
+</code></pre></div>
+<h2 id="arcaneeventerrorcodes"><code>ARCANE_EVENT_ERROR_CODES</code></h2>
+<h3 id="overview-9">Overview</h3>
+<p>Frozen registry of every stable event-authority failure code.</p>
+<h3 id="value-and-import-3">Value and import</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">const ARCANE_EVENT_ERROR_CODES
+</code></pre></div>
+<p>Every key maps to its identical string value; thrown authority failures expose
+the matching value as <code>error.code</code>.</p>
+<h3 id="availability-and-normalization-10">Availability and normalization</h3>
+<p><strong>Node and browser/bundler.</strong> The registry has no mutable registration surface
+or vague fallback code.</p>
+<h3 id="example-9">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {ARCANE_EVENT_ERROR_CODES} from &#39;arcane-os/event-manager&#39;;
+console.log(ARCANE_EVENT_ERROR_CODES.ARCANE_EVENT_SOURCE_DISPOSED);
+</code></pre></div>
+<h2 id="arcaneeventlistenererrorevent"><code>ARCANE_EVENT_LISTENER_ERROR_EVENT</code></h2>
+<h3 id="overview-10">Overview</h3>
+<p>Canonical observational event emitted when an event listener throws.</p>
+<h3 id="value-and-import-4">Value and import</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">const ARCANE_EVENT_LISTENER_ERROR_EVENT
+</code></pre></div>
+<p>Its exact value is <code>arcane.event.listener.error</code>.</p>
+<h3 id="availability-and-normalization-11">Availability and normalization</h3>
+<p><strong>Node and browser/bundler.</strong> Its frozen public detail carries the exact failure
+code and source occurrence identifiers, never the raw error. Its shape is
+exactly <code>{code:&#39;ARCANE_EVENT_LISTENER_CALLBACK_FAILED&#39;,reason:&#39;listener-threw&#39;, eventType,occurrenceId,source,instanceId,operationId}</code>. Publication is
+synchronous and nonrecursive.</p>
+<h3 id="example-10">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {ARCANE_EVENT_LISTENER_ERROR_EVENT,arcaneEvents} from &#39;arcane-os/event-manager&#39;;
+const unsubscribe=arcaneEvents.subscribe(ARCANE_EVENT_LISTENER_ERROR_EVENT,console.log);
+</code></pre></div>
+<h2 id="arcaneeventoccurrenceprotocol"><code>ARCANE_EVENT_OCCURRENCE_PROTOCOL</code></h2>
+<h3 id="overview-11">Overview</h3>
+<p>Stable protocol discriminator for immutable canonical occurrences.</p>
+<h3 id="value-and-import-5">Value and import</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">const ARCANE_EVENT_OCCURRENCE_PROTOCOL
+</code></pre></div>
+<p>Its exact value is <code>arcane-event-occurrence/1</code>.</p>
+<h3 id="availability-and-normalization-12">Availability and normalization</h3>
+<p><strong>Node and browser/bundler.</strong> Occurrences are realm-owned identity values with
+deeply frozen public detail and synchronous cancellation state.</p>
+<h3 id="example-11">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {ARCANE_EVENT_OCCURRENCE_PROTOCOL} from &#39;arcane-os/event-manager&#39;;
+console.log(publication.occurrence.protocol===ARCANE_EVENT_OCCURRENCE_PROTOCOL);
+</code></pre></div>
+<h2 id="arcaneeventsourcedisposedevent"><code>ARCANE_EVENT_SOURCE_DISPOSED_EVENT</code></h2>
+<h3 id="overview-12">Overview</h3>
+<p>Final noncancelable occurrence published during a source&#39;s first disposal.</p>
+<h3 id="value-and-import-6">Value and import</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">const ARCANE_EVENT_SOURCE_DISPOSED_EVENT
+</code></pre></div>
+<p>Its exact value is <code>arcane.event.source.disposed</code>.</p>
+<h3 id="availability-and-normalization-13">Availability and normalization</h3>
+<p><strong>Node and browser/bundler.</strong> Public detail is exactly
+<code>{reason:&#39;source-disposed&#39;}</code>. Delivery precedes source-listener cleanup;
+reentrant or later disposal publishes nothing and returns <code>false</code>.</p>
+<h3 id="example-12">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {ARCANE_EVENT_SOURCE_DISPOSED_EVENT} from &#39;arcane-os/event-manager&#39;;
+source.once(ARCANE_EVENT_SOURCE_DISPOSED_EVENT,console.log);
+source.dispose();
+</code></pre></div>
+<h2 id="arcaneeventsourcekind"><code>ARCANE_EVENT_SOURCE_KIND</code></h2>
+<h3 id="overview-13">Overview</h3>
+<p>Stable kind discriminator for frozen source descriptors.</p>
+<h3 id="value-and-import-7">Value and import</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">const ARCANE_EVENT_SOURCE_KIND
+</code></pre></div>
+<p>Its exact value is <code>arcane-event-source</code>.</p>
+<h3 id="availability-and-normalization-14">Availability and normalization</h3>
+<p><strong>Node and browser/bundler.</strong> Reading it does not register or dispose a source.</p>
+<h3 id="example-13">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {ARCANE_EVENT_SOURCE_KIND} from &#39;arcane-os/event-manager&#39;;
+console.log(source.descriptor.kind===ARCANE_EVENT_SOURCE_KIND);
+</code></pre></div>
+<h2 id="arcaneeventsourceprotocol"><code>ARCANE_EVENT_SOURCE_PROTOCOL</code></h2>
+<h3 id="overview-14">Overview</h3>
+<p>Stable protocol discriminator for frozen source handles and descriptors.</p>
+<h3 id="value-and-import-8">Value and import</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">const ARCANE_EVENT_SOURCE_PROTOCOL
+</code></pre></div>
+<p>Its exact value is <code>arcane-event-source/1</code>.</p>
+<h3 id="availability-and-normalization-15">Availability and normalization</h3>
+<p><strong>Node and browser/bundler.</strong> One handle belongs to one active owner in one
+realm and declares every publishable type before use.</p>
+<h3 id="example-14">Example</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {ARCANE_EVENT_SOURCE_PROTOCOL} from &#39;arcane-os/event-manager&#39;;
+console.log(source.protocol===ARCANE_EVENT_SOURCE_PROTOCOL);
 </code></pre></div>
 <h2 id="parseeventstack"><code>parseEventStack()</code></h2>
-<h3 id="overview-3">Overview</h3>
+<h3 id="overview-15">Overview</h3>
 <p>Strictly imports a JSON string or data object, rejects ambiguous or malformed
 structures, returns null-prototype normalized data objects, and deeply freezes the
 result. Validation includes exact document/record keys, canonical timestamps,
@@ -472,17 +879,17 @@ must be valid, status must agree with completion/error fields, and parent,
 depth, and causation data must form a valid earlier-record relationship. Unknown
 keys, missing keys, sparse arrays, forged identities, incomplete records, and
 nonterminal or forged overflow markers are rejected instead of repaired.</p>
-<h3 id="availability-and-normalization-4">Availability and normalization</h3>
+<h3 id="availability-and-normalization-16">Availability and normalization</h3>
 <p>Pure host-neutral JavaScript. It performs no I/O and does not revive tagged values
 into executable JavaScript types.</p>
-<h3 id="example-3">Example</h3>
+<h3 id="example-15">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {parseEventStack} from &#39;arcane-os/event-manager&#39;;
 
 const document=parseEventStack(receivedText,{maxEvents:2_000});
 for(const record of document.events)console.info(record.sequence,record.type);
 </code></pre></div>
 <h2 id="createdominstrumentation"><code>createDOMInstrumentation()</code></h2>
-<h3 id="overview-4">Overview</h3>
+<h3 id="overview-16">Overview</h3>
 <p>Creates a frozen, opt-in browser controller that records capture-phase DOM
 interactions and <code>MutationObserver</code> changes through an event manager. It observes
 the supplied root and, by default, open shadow roots already present or later
@@ -515,10 +922,10 @@ Sensitive attributes and URLs are redacted. Document URLs are represented only a
 <p>DOM capture is not complete application-state capture. It cannot observe closed
 shadow roots, cross-origin frames, CSSOM/canvas rendering, most property-only
 writes, native/kernel actions, external content, or activity before startup.</p>
-<h3 id="availability-and-normalization-5">Availability and normalization</h3>
+<h3 id="availability-and-normalization-17">Availability and normalization</h3>
 <p>Browser/DOM renderer only, or a compatible test shim. Records use the same
 host-neutral event-stack format as semantic events.</p>
-<h3 id="example-4">Example</h3>
+<h3 id="example-16">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createEventManager} from &#39;arcane-os/event-manager&#39;;
 
 const events=createEventManager({timeTravel:true,maxEvents:2_000});
@@ -534,136 +941,136 @@ const text=events.exportStack();
 events.clearHistory();
 </code></pre></div>
 <h2 id="domselector"><code>domSelector()</code></h2>
-<h3 id="overview-5">Overview</h3>
+<h3 id="overview-17">Overview</h3>
 <p>Builds a diagnostic selector from ids, <code>data-arcane-id</code>, <code>data-testid</code>, tag names,
 and sibling positions. <code>:document</code> and <code>:shadow-root</code> identify roots; <code>&gt;&gt;&gt;</code> marks
 an open-shadow boundary and is not a standard <code>querySelector()</code> combinator.</p>
 <h3 id="signature-3">Signature</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">domSelector(target, root)
 </code></pre></div>
-<h3 id="availability-and-normalization-6">Availability and normalization</h3>
+<h3 id="availability-and-normalization-18">Availability and normalization</h3>
 <p>Browser DOM or DOM-like test values. Returns a string or <code>null</code>.</p>
-<h3 id="example-5">Example</h3>
+<h3 id="example-17">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {domSelector} from &#39;arcane-os/event-manager&#39;;
 console.info(domSelector(button,document));
 </code></pre></div>
 <h2 id="describedomtarget"><code>describeDOMTarget()</code></h2>
-<h3 id="overview-6">Overview</h3>
+<h3 id="overview-18">Overview</h3>
 <p>Returns a frozen descriptor for a document, shadow root, text node, element,
 global object, or generic event target. Element descriptors include selector, tag,
 id, role, name, type, and private-state metadata.</p>
 <h3 id="signature-4">Signature</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">describeDOMTarget(target, root)
 </code></pre></div>
-<h3 id="availability-and-normalization-7">Availability and normalization</h3>
+<h3 id="availability-and-normalization-19">Availability and normalization</h3>
 <p>Browser DOM or DOM-like test values. Returns a frozen descriptor or <code>null</code>.</p>
-<h3 id="example-6">Example</h3>
+<h3 id="example-18">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {describeDOMTarget} from &#39;arcane-os/event-manager&#39;;
 console.info(describeDOMTarget(document.activeElement,document));
 </code></pre></div>
 <h2 id="defaultdomeventtypes"><code>DEFAULT_DOM_EVENT_TYPES</code></h2>
-<h3 id="overview-7">Overview</h3>
+<h3 id="overview-19">Overview</h3>
 <p>A frozen array of 44 keyboard, composition, pointer, mouse, touch, form, focus,
 clipboard, drag, selection, scroll, and wheel event names used by default DOM
 instrumentation.</p>
 <h3 id="value-1">Value</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const DEFAULT_DOM_EVENT_TYPES = Object.freeze([/* 44 event names */])
 </code></pre></div>
-<h3 id="availability-and-normalization-8">Availability and normalization</h3>
+<h3 id="availability-and-normalization-20">Availability and normalization</h3>
 <p>Importable in Node and browsers; operational only with DOM event targets.</p>
-<h3 id="example-7">Example</h3>
+<h3 id="example-19">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {DEFAULT_DOM_EVENT_TYPES} from &#39;arcane-os/event-manager&#39;;
 const eventTypes=DEFAULT_DOM_EVENT_TYPES.filter(type=&gt;type!==&#39;pointermove&#39;);
 </code></pre></div>
 <h2 id="arcaneeventstackprotocol"><code>ARCANE_EVENT_STACK_PROTOCOL</code></h2>
-<h3 id="overview-8">Overview</h3>
+<h3 id="overview-20">Overview</h3>
 <p>Identifies the immutable event-stack JSON contract.</p>
 <h3 id="value-2">Value</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">ARCANE_EVENT_STACK_PROTOCOL === &#39;arcane-event-stack/1&#39;
 </code></pre></div>
-<h3 id="availability-and-normalization-9">Availability and normalization</h3>
+<h3 id="availability-and-normalization-21">Availability and normalization</h3>
 <p>All JavaScript hosts; exact string, never negotiated or silently upgraded.</p>
-<h3 id="example-8">Example</h3>
+<h3 id="example-20">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">if(document.protocol!==ARCANE_EVENT_STACK_PROTOCOL)throw new Error(&#39;Unsupported stack&#39;);
 </code></pre></div>
 <h2 id="timetravelseekevent"><code>TIME_TRAVEL_SEEK_EVENT</code></h2>
-<h3 id="overview-9">Overview</h3>
+<h3 id="overview-21">Overview</h3>
 <p>Names the cursor event. Its payload is <code>{sessionId,sequence,record}</code>. The event is
 delivered synchronously but is not added to the diagnostic history.</p>
 <h3 id="value-3">Value</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">TIME_TRAVEL_SEEK_EVENT === &#39;arcane.time-travel.seek&#39;
 </code></pre></div>
-<h3 id="availability-and-normalization-10">Availability and normalization</h3>
+<h3 id="availability-and-normalization-22">Availability and normalization</h3>
 <p>Node and browser event managers; normalized payload, no state restoration.</p>
-<h3 id="example-9">Example</h3>
+<h3 id="example-21">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">events.on(TIME_TRAVEL_SEEK_EVENT,({sequence})=&gt;timeline.select(sequence));
 events.seek(0);
 </code></pre></div>
 <h2 id="playbackstartedevent"><code>PLAYBACK_STARTED_EVENT</code></h2>
-<h3 id="overview-10">Overview</h3>
+<h3 id="overview-22">Overview</h3>
 <p>Names the lifecycle event emitted with
 <code>{sessionId,count,fromSequence,toSequence,speed,mode}</code> before playback delivery.</p>
 <h3 id="value-4">Value</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">PLAYBACK_STARTED_EVENT === &#39;arcane.time-travel.playback.started&#39;
 </code></pre></div>
-<h3 id="availability-and-normalization-11">Availability and normalization</h3>
+<h3 id="availability-and-normalization-23">Availability and normalization</h3>
 <p>Node and browser event managers; synchronous lifecycle notification.</p>
-<h3 id="example-10">Example</h3>
+<h3 id="example-22">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">events.on(PLAYBACK_STARTED_EVENT,({count})=&gt;console.info(`Reviewing ${count}`));
 </code></pre></div>
 <h2 id="playbackrecordevent"><code>PLAYBACK_RECORD_EVENT</code></h2>
-<h3 id="overview-11">Overview</h3>
+<h3 id="overview-23">Overview</h3>
 <p>Names the per-record event used by safe <code>mode:&#39;review&#39;</code> playback. Its only payload
 is the immutable record.</p>
 <h3 id="value-5">Value</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">PLAYBACK_RECORD_EVENT === &#39;arcane.time-travel.playback.record&#39;
 </code></pre></div>
-<h3 id="availability-and-normalization-12">Availability and normalization</h3>
+<h3 id="availability-and-normalization-24">Availability and normalization</h3>
 <p>Node and browser event managers; the payload remains a normalized record.</p>
-<h3 id="example-11">Example</h3>
+<h3 id="example-23">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">events.on(PLAYBACK_RECORD_EVENT,record=&gt;timeline.append(record));
 await events.playback({mode:&#39;review&#39;});
 </code></pre></div>
 <h2 id="playbackcompletedevent"><code>PLAYBACK_COMPLETED_EVENT</code></h2>
-<h3 id="overview-12">Overview</h3>
+<h3 id="overview-24">Overview</h3>
 <p>Names the successful terminal event. Payload:
 <code>{sessionId,delivered,cursor,completed:true}</code>.</p>
 <h3 id="value-6">Value</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">PLAYBACK_COMPLETED_EVENT === &#39;arcane.time-travel.playback.completed&#39;
 </code></pre></div>
-<h3 id="availability-and-normalization-13">Availability and normalization</h3>
+<h3 id="availability-and-normalization-25">Availability and normalization</h3>
 <p>Node and browser event managers; immutable result payload.</p>
-<h3 id="example-12">Example</h3>
+<h3 id="example-24">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">events.once(PLAYBACK_COMPLETED_EVENT,result=&gt;console.info(result.delivered));
 </code></pre></div>
 <h2 id="playbackcancelledevent"><code>PLAYBACK_CANCELLED_EVENT</code></h2>
-<h3 id="overview-13">Overview</h3>
+<h3 id="overview-25">Overview</h3>
 <p>Names the cancelled terminal event. Payload:
 <code>{sessionId,delivered,cursor,completed:false,error}</code>. Playback still rejects with
 the original cancellation reason.</p>
 <h3 id="value-7">Value</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">PLAYBACK_CANCELLED_EVENT === &#39;arcane.time-travel.playback.cancelled&#39;
 </code></pre></div>
-<h3 id="availability-and-normalization-14">Availability and normalization</h3>
+<h3 id="availability-and-normalization-26">Availability and normalization</h3>
 <p>Node and browser event managers; immutable error snapshot in the event payload.</p>
-<h3 id="example-13">Example</h3>
+<h3 id="example-25">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">events.once(PLAYBACK_CANCELLED_EVENT,({delivered})=&gt;console.info(delivered));
 controller.abort(&#39;review closed&#39;);
 </code></pre></div>
 <h2 id="playbackfailedevent"><code>PLAYBACK_FAILED_EVENT</code></h2>
-<h3 id="overview-14">Overview</h3>
+<h3 id="overview-26">Overview</h3>
 <p>Names the failed terminal event. It uses the same failed result shape as
 cancelled playback, and the original failure rejects <code>playback()</code>.</p>
 <h3 id="value-8">Value</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">PLAYBACK_FAILED_EVENT === &#39;arcane.time-travel.playback.failed&#39;
 </code></pre></div>
-<h3 id="availability-and-normalization-15">Availability and normalization</h3>
+<h3 id="availability-and-normalization-27">Availability and normalization</h3>
 <p>Node and browser event managers; immutable error snapshot in the event payload.</p>
-<h3 id="example-14">Example</h3>
+<h3 id="example-26">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">events.once(PLAYBACK_FAILED_EVENT,({error})=&gt;console.error(error.message));
 </code></pre></div>
 <h2 id="timetraveloverflowevent"><code>TIME_TRAVEL_OVERFLOW_EVENT</code></h2>
-<h3 id="overview-15">Overview</h3>
+<h3 id="overview-27">Overview</h3>
 <p>Identifies the final retention marker added when another recordable string event
 arrives after <code>maxEvents</code> ordinary records have been retained. The marker has
 <code>source:&#39;event-manager&#39;</code>, <code>category:&#39;overflow&#39;</code>, no parent, completed status, and
@@ -678,10 +1085,10 @@ the overflow state.</p>
 <h3 id="value-9">Value</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">TIME_TRAVEL_OVERFLOW_EVENT === &#39;arcane.time-travel.overflow&#39;
 </code></pre></div>
-<h3 id="availability-and-normalization-16">Availability and normalization</h3>
+<h3 id="availability-and-normalization-28">Availability and normalization</h3>
 <p>Node and browser event managers; deterministic terminal record in
 <code>arcane-event-stack/1</code>.</p>
-<h3 id="example-15">Example</h3>
+<h3 id="example-27">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">if(events.overflowed){
     persistLocallyForReview(events.exportStack());
     events.clearHistory();
@@ -689,55 +1096,55 @@ the overflow state.</p>
 }
 </code></pre></div>
 <h2 id="dominteractionevent"><code>DOM_INTERACTION_EVENT</code></h2>
-<h3 id="overview-16">Overview</h3>
+<h3 id="overview-28">Overview</h3>
 <p>Identifies captured DOM interactions. Payload includes the DOM event type,
 normalized target and composed path, event flags, bounded/redacted optional
 details, and an optional captured value.</p>
 <h3 id="value-10">Value</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">DOM_INTERACTION_EVENT === &#39;arcane.dom.interaction&#39;
 </code></pre></div>
-<h3 id="availability-and-normalization-17">Availability and normalization</h3>
+<h3 id="availability-and-normalization-29">Availability and normalization</h3>
 <p>Produced only by browser/DOM instrumentation; stored as a host-neutral record.</p>
-<h3 id="example-16">Example</h3>
+<h3 id="example-28">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const clicks=events.getEventStack({type:DOM_INTERACTION_EVENT});
 </code></pre></div>
 <h2 id="dommutationevent"><code>DOM_MUTATION_EVENT</code></h2>
-<h3 id="overview-17">Overview</h3>
+<h3 id="overview-29">Overview</h3>
 <p>Identifies normalized attribute, character-data, and child-list mutations. A
 mutation captured immediately after an interaction may carry that interaction&#39;s
 record id as its causation id.</p>
 <h3 id="value-11">Value</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">DOM_MUTATION_EVENT === &#39;arcane.dom.mutation&#39;
 </code></pre></div>
-<h3 id="availability-and-normalization-18">Availability and normalization</h3>
+<h3 id="availability-and-normalization-30">Availability and normalization</h3>
 <p>Produced only by browser <code>MutationObserver</code>; stored as a host-neutral record.</p>
-<h3 id="example-17">Example</h3>
+<h3 id="example-29">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">for(const record of events.getEventStack({type:DOM_MUTATION_EVENT})){
     console.info(record.payload[0].mutationType);
 }
 </code></pre></div>
 <h2 id="domobservationstartedevent"><code>DOM_OBSERVATION_STARTED_EVENT</code></h2>
-<h3 id="overview-18">Overview</h3>
+<h3 id="overview-30">Overview</h3>
 <p>Identifies successful DOM capture startup. Payload describes the redacted root,
 event types, and capture flags.</p>
 <h3 id="value-12">Value</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">DOM_OBSERVATION_STARTED_EVENT === &#39;arcane.dom.observation.started&#39;
 </code></pre></div>
-<h3 id="availability-and-normalization-19">Availability and normalization</h3>
+<h3 id="availability-and-normalization-31">Availability and normalization</h3>
 <p>Browser/DOM instrumentation lifecycle record.</p>
-<h3 id="example-18">Example</h3>
+<h3 id="example-30">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">events.once(DOM_OBSERVATION_STARTED_EVENT,details=&gt;console.info(details.eventTypes.length));
 </code></pre></div>
 <h2 id="domobservationstoppedevent"><code>DOM_OBSERVATION_STOPPED_EVENT</code></h2>
-<h3 id="overview-19">Overview</h3>
+<h3 id="overview-31">Overview</h3>
 <p>Identifies normal DOM capture shutdown. Payload is <code>{root}</code>. Overflow cleanup uses
 <code>emitLifecycle:false</code>, so the overflow marker remains the final retained record.</p>
 <h3 id="value-13">Value</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">DOM_OBSERVATION_STOPPED_EVENT === &#39;arcane.dom.observation.stopped&#39;
 </code></pre></div>
-<h3 id="availability-and-normalization-20">Availability and normalization</h3>
+<h3 id="availability-and-normalization-32">Availability and normalization</h3>
 <p>Browser/DOM instrumentation lifecycle record.</p>
-<h3 id="example-19">Example</h3>
+<h3 id="example-31">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">events.once(DOM_OBSERVATION_STOPPED_EVENT,()=&gt;console.info(&#39;DOM capture stopped&#39;));
 events.disableTimeTravel();
 </code></pre></div>
@@ -827,6 +1234,121 @@ kernel/application snapshot.</p>
 </tr>
 </thead>
 <tbody><tr>
+<td><code>globalThis.arcaneEvents</code> is an accessor</td>
+<td><code>ARCANE_EVENT_AUTHORITY_ACCESSOR_COLLISION</code></td>
+<td>Remove the incompatible realm bootstrap before importing the SDK</td>
+</tr>
+<tr>
+<td>Authority value is unbranded</td>
+<td><code>ARCANE_EVENT_AUTHORITY_VALUE_COLLISION</code></td>
+<td>Install no competing global value</td>
+</tr>
+<tr>
+<td>Global, brand, or protocol descriptor flags differ</td>
+<td><code>ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH</code></td>
+<td>Use the exact non-enumerable/non-writable/non-configurable authority and brand contract</td>
+</tr>
+<tr>
+<td>Authority brand/protocol differs</td>
+<td><code>ARCANE_EVENT_AUTHORITY_PROTOCOL_MISMATCH</code></td>
+<td>Load a compatible SDK authority protocol</td>
+</tr>
+<tr>
+<td>Required authority method is absent, non-callable, or an accessor</td>
+<td><code>ARCANE_EVENT_AUTHORITY_API_MISMATCH</code></td>
+<td>Remove the incompatible authority; accessors are never evaluated for admission</td>
+</tr>
+<tr>
+<td>Authority cannot be installed</td>
+<td><code>ARCANE_EVENT_AUTHORITY_INSTALL_FAILED</code></td>
+<td>Make the realm global extensible before first import</td>
+</tr>
+<tr>
+<td>Source owner/options/name/event types/callback invalid</td>
+<td><code>ARCANE_EVENT_SOURCE_INVALID</code></td>
+<td>Use one owner, exact data options, valid names, and 1–256 unique declared types</td>
+</tr>
+<tr>
+<td>Owner already has an active source</td>
+<td><code>ARCANE_EVENT_SOURCE_ALREADY_REGISTERED</code></td>
+<td>Reuse or dispose the current handle</td>
+</tr>
+<tr>
+<td>Source is disposing or disposed</td>
+<td><code>ARCANE_EVENT_SOURCE_DISPOSED</code></td>
+<td>Stop publishing or create a new source after disposal completes</td>
+</tr>
+<tr>
+<td>Source publishes/listens to an undeclared type</td>
+<td><code>ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED</code></td>
+<td>Add the exact type to <code>eventTypes</code> before source creation</td>
+</tr>
+<tr>
+<td>Occurrence/options invalid</td>
+<td><code>ARCANE_EVENT_OCCURRENCE_INVALID</code></td>
+<td>Use the authority-created occurrence and documented dispatch options</td>
+</tr>
+<tr>
+<td>Realm occurrence sequence exhausted</td>
+<td><code>ARCANE_EVENT_OCCURRENCE_SEQUENCE_EXHAUSTED</code></td>
+<td>Start a new JavaScript realm</td>
+</tr>
+<tr>
+<td>Realm source sequence exhausted</td>
+<td><code>ARCANE_EVENT_SOURCE_SEQUENCE_EXHAUSTED</code></td>
+<td>Start a new JavaScript realm</td>
+</tr>
+<tr>
+<td>Compatibility detail cannot be safely admitted</td>
+<td><code>ARCANE_EVENT_COMPATIBILITY_DETAIL_INVALID</code></td>
+<td>Use a host object directly or a plain/array value with data properties only</td>
+</tr>
+<tr>
+<td>Canonical listener throws</td>
+<td><code>ARCANE_EVENT_LISTENER_CALLBACK_FAILED</code> in a listener-error occurrence</td>
+<td>Fix the observer; committed domain dispatch remains successful</td>
+</tr>
+<tr>
+<td>Subscription type invalid</td>
+<td><code>ARCANE_EVENT_SUBSCRIPTION_TYPE_INVALID</code></td>
+<td>Use a nonempty trimmed name matching the authority event-name grammar; canonical wildcard subscription is not admitted</td>
+</tr>
+<tr>
+<td>Subscription handler invalid</td>
+<td><code>ARCANE_EVENT_SUBSCRIPTION_HANDLER_INVALID</code></td>
+<td>Use a function or EventListener object</td>
+</tr>
+<tr>
+<td>Subscription options invalid</td>
+<td><code>ARCANE_EVENT_SUBSCRIPTION_OPTIONS_INVALID</code></td>
+<td>Use a data-only <code>{once?,signal?}</code> record with a boolean <code>once</code> value</td>
+</tr>
+<tr>
+<td>Subscription signal invalid</td>
+<td><code>ARCANE_EVENT_SUBSCRIPTION_SIGNAL_INVALID</code></td>
+<td>Pass an AbortSignal-compatible value or omit <code>signal</code></td>
+</tr>
+<tr>
+<td>EventTarget adapter input lacks a valid type or data detail</td>
+<td><code>ARCANE_EVENT_DISPATCH_EVENT_INVALID</code></td>
+<td>Pass an Event or an Event-like data object; do not use accessors</td>
+</tr>
+<tr>
+<td>DOM target invalid</td>
+<td><code>ARCANE_EVENT_DOM_TARGET_INVALID</code></td>
+<td>Supply a target with <code>dispatchEvent</code> in a realm with <code>CustomEvent</code> support</td>
+</tr>
+<tr>
+<td>DOM options invalid</td>
+<td><code>ARCANE_EVENT_DOM_OPTIONS_INVALID</code></td>
+<td>Use only <code>type</code>, <code>bubbles</code>, <code>composed</code>, and <code>cancelable</code>, with boolean flags</td>
+</tr>
+<tr>
+<td>DOM detail conflicts with authority identifiers</td>
+<td><code>ARCANE_EVENT_DOM_DETAIL_COLLISION</code></td>
+<td>Remove conflicting <code>occurrenceId</code>, <code>arcaneSource</code>, <code>instanceId</code>, or <code>operationId</code> fields; compatibility <code>source</code> is preserved</td>
+</tr>
+<tr>
 <td>Constructor flags, clocks, or session id invalid</td>
 <td><code>TypeError</code></td>
 <td>Correct types; keep session id non-empty and at most 256 characters</td>
@@ -911,7 +1433,10 @@ pollution-safe and accessor-safe snapshots, safe capture failures, redaction and
 stack-suppression defaults, minimum-budget BigInt/collision/truncation round
 trips, strict forged-import rejection, cursor behavior, review and event
 playback, cancellation, bounded overflow, attach-at-limit cleanup, recovery,
-and central queue mirroring;</li>
+central queue mirroring, singleton descriptor/collision admission, duplicate
+module reuse, source order/privacy/lifecycle, dispatch-safe unsubscribe,
+EventTarget adapters, one-way DOM projection, and observational listener
+failures;</li>
 <li><code>test/dom-event-instrumentation.test.mjs</code>: browser interaction/mutation capture,
 open-shadow observation, privacy defaults, lifecycle, and cleanup;</li>
 <li><code>test/contracts.test.mjs</code>: published schema and package-export stability;</li>
@@ -925,9 +1450,9 @@ strictly importable bounded export.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>shell</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-shell">npm run check
 </code></pre></div>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#quick-start">Quick start</a><a href="#availability-and-normalization">Availability and normalization</a><a href="#export-summary">Export summary</a><a href="#eventmanager">EventManager</a><a href="#createeventmanager">createEventManager()</a><a href="#arcaneevents">arcaneEvents</a><a href="#parseeventstack">parseEventStack()</a><a href="#createdominstrumentation">createDOMInstrumentation()</a><a href="#domselector">domSelector()</a><a href="#describedomtarget">describeDOMTarget()</a><a href="#defaultdomeventtypes">DEFAULTDOMEVENTTYPES</a><a href="#arcaneeventstackprotocol">ARCANEEVENTSTACKPROTOCOL</a><a href="#timetravelseekevent">TIMETRAVELSEEKEVENT</a><a href="#playbackstartedevent">PLAYBACKSTARTEDEVENT</a><a href="#playbackrecordevent">PLAYBACKRECORDEVENT</a><a href="#playbackcompletedevent">PLAYBACKCOMPLETEDEVENT</a><a href="#playbackcancelledevent">PLAYBACKCANCELLEDEVENT</a><a href="#playbackfailedevent">PLAYBACKFAILEDEVENT</a><a href="#timetraveloverflowevent">TIMETRAVELOVERFLOWEVENT</a><a href="#dominteractionevent">DOMINTERACTIONEVENT</a><a href="#dommutationevent">DOMMUTATIONEVENT</a><a href="#domobservationstartedevent">DOMOBSERVATIONSTARTEDEVENT</a><a href="#domobservationstoppedevent">DOMOBSERVATIONSTOPPEDEVENT</a><a href="#event-stack-document-and-record-shapes">Event-stack document and record shapes</a><a href="#errors-and-recovery">Errors and recovery</a><a href="#behavioral-tests">Behavioral tests</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#quick-start">Quick start</a><a href="#availability-and-normalization">Availability and normalization</a><a href="#export-summary">Export summary</a><a href="#eventmanager">EventManager</a><a href="#createeventmanager">createEventManager()</a><a href="#arcaneevents">arcaneEvents</a><a href="#createarcaneeventsource">createArcaneEventSource()</a><a href="#projectarcanedomevent">projectArcaneDOMEvent()</a><a href="#isarcaneeventoccurrence">isArcaneEventOccurrence()</a><a href="#arcaneeventauthoritybrand">ARCANEEVENTAUTHORITYBRAND</a><a href="#arcaneeventauthoritykind">ARCANEEVENTAUTHORITYKIND</a><a href="#arcaneeventauthorityprotocol">ARCANEEVENTAUTHORITYPROTOCOL</a><a href="#arcaneeventerrorcodes">ARCANEEVENTERRORCODES</a><a href="#arcaneeventlistenererrorevent">ARCANEEVENTLISTENERERROREVENT</a><a href="#arcaneeventoccurrenceprotocol">ARCANEEVENTOCCURRENCEPROTOCOL</a><a href="#arcaneeventsourcedisposedevent">ARCANEEVENTSOURCEDISPOSEDEVENT</a><a href="#arcaneeventsourcekind">ARCANEEVENTSOURCEKIND</a><a href="#arcaneeventsourceprotocol">ARCANEEVENTSOURCEPROTOCOL</a><a href="#parseeventstack">parseEventStack()</a><a href="#createdominstrumentation">createDOMInstrumentation()</a><a href="#domselector">domSelector()</a><a href="#describedomtarget">describeDOMTarget()</a><a href="#defaultdomeventtypes">DEFAULTDOMEVENTTYPES</a><a href="#arcaneeventstackprotocol">ARCANEEVENTSTACKPROTOCOL</a><a href="#timetravelseekevent">TIMETRAVELSEEKEVENT</a><a href="#playbackstartedevent">PLAYBACKSTARTEDEVENT</a><a href="#playbackrecordevent">PLAYBACKRECORDEVENT</a><a href="#playbackcompletedevent">PLAYBACKCOMPLETEDEVENT</a><a href="#playbackcancelledevent">PLAYBACKCANCELLEDEVENT</a><a href="#playbackfailedevent">PLAYBACKFAILEDEVENT</a><a href="#timetraveloverflowevent">TIMETRAVELOVERFLOWEVENT</a><a href="#dominteractionevent">DOMINTERACTIONEVENT</a><a href="#dommutationevent">DOMMUTATIONEVENT</a><a href="#domobservationstartedevent">DOMOBSERVATIONSTARTEDEVENT</a><a href="#domobservationstoppedevent">DOMOBSERVATIONSTOPPEDEVENT</a><a href="#event-stack-document-and-record-shapes">Event-stack document and record shapes</a><a href="#errors-and-recovery">Errors and recovery</a><a href="#behavioral-tests">Behavioral tests</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.2.2, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK source candidate 0.3.0, runtime bundle 0.8.12, and protocol arcane/1; the latest verified published package is 0.2.3.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>

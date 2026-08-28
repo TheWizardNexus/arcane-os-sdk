@@ -1790,23 +1790,23 @@ function contractSummary(modules){
 }
 
 const EXPECTED_RUNTIME_SUMMARY=Object.freeze({
-    artifactCount:85,
-    esmModuleCount:79,
-    esmExportCount:318,
+    artifactCount:86,
+    esmModuleCount:80,
+    esmExportCount:384,
     exportForms:Object.freeze({
-        function:164,
-        variable:65,
-        class:15,
+        function:168,
+        variable:124,
+        class:17,
         alias:26,
         're-export':4,
-        default:44
+        default:45
     }),
     reviewedCallableCount:183,
     reviewedModuleCount:56,
-    literalCustomEventCount:11,
-    directCodedFailureCount:37,
-    exportedErrorSubclassCount:3,
-    publicMemberCount:456
+    literalCustomEventCount:0,
+    directCodedFailureCount:58,
+    exportedErrorSubclassCount:4,
+    publicMemberCount:579
 });
 
 function assertExpectedSummary(summary){

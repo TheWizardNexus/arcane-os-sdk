@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.0
+
+- Added the branded, versioned, per-realm `globalThis.arcaneEvents` authority
+  and moved SDK semantic publishers onto one event-pubsub-backed source while
+  retaining bounded legacy EventTarget and DOM projections.
+- Added independent Browser Speech STT/TTS provider ownership with initial or
+  later role-scoped replacement, mixed Cloud/Core/browser routes, explicit
+  lifecycle, and no omitted-role unload, mute, disposal, or state clobbering.
+- Made Browser Speech warn-first by default: applications select version-pinned
+  upstream runtime/model/voice downloads and browser cache behavior, while
+  `secure:true` remains the explicit strict authenticated-graph option.
+- Added the portable `arcane-os/mail` API, durable DBOPFS-compatible outbox,
+  secure local Resend gateway and CLI, event-owned reconnect drain, bounded
+  retries, cancellation, cleanup, and provider-acceptance evidence.
+- Kept speech runtimes, model and voice bytes, third-party legal/notice files,
+  and corresponding-source archives out of the SDK package and release assets.
+
 ## 0.2.3
 
 - Made shared voice transcription consume authoritative sticky STT state,

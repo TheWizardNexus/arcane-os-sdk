@@ -88,6 +88,19 @@ const config = resolveMailConfig(
 console.log(config);`
     }),
     Object.freeze({
+        name:'MailOutbox.mjs',
+        classification:'public-first-party',
+        lifecycleSideEffects:'Construction validates caller-owned DBOPFS-compatible storage, Web Locks, delivery, clock, and online-event adapters. enqueue() persists before delivery; start() owns the online listener; drain() serializes bounded FIFO attempts; stop() and dispose() detach lifecycle work without deleting records.',
+        paramsResults:'new MailOutbox(options={}); enqueue({report,reportKey,serializedReport?}); drain({reason,signal?}={}); list(); get(reportKey); removeInvalid(reportKey); start(); stop(); dispose(). createMailOutbox(options) returns the same validated contract.',
+        events:Object.freeze(['mail-outbox-state','mail-outbox-delivery','mail-outbox-drain']),
+        errors:Object.freeze(['MAIL_OUTBOX_INVALID','MAIL_OUTBOX_RECORD_INVALID','MAIL_OUTBOX_CAPACITY_EXCEEDED','MAIL_OUTBOX_DELIVERY_FAILED','MAIL_OUTBOX_DISPOSED']),
+        capabilitiesCore:'None. Delivery authority belongs to the injected transport or admitted Core adapter; acceptance is not inbox-delivery proof.',
+        example:String.raw`import {createMailOutbox} from '/arcane/modules/MailOutbox.mjs';
+
+const outbox=createMailOutbox({storage,locks,deliver});
+await outbox.start();`
+    }),
+    Object.freeze({
         name:'MailTransport.mjs',
         classification:'public-first-party',
         lifecycleSideEffects:'normalizeMailEndpoint() is pure. sendMailReport() performs one bounded HTTP(S) POST with timeout, same-origin credentials, no-referrer, redirect rejection, idempotency/app headers, and a response limited to 65,536 bytes.',

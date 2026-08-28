@@ -143,6 +143,7 @@ export {
     selectApp,
     validateWorkspace
 } from './workspace.mjs';
+export {materializeInstalledSdkRuntime} from './installed-sdk-runtime.mjs';
 export {startDevServer} from './dev-server.mjs';
 export {
     NATIVE_BUILD_PLAN_PROTOCOL,

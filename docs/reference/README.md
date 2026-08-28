@@ -39,9 +39,9 @@ This repository contains explicitly versioned surfaces with different owners:
 
 | Surface | Source identity | Meaning |
 | --- | --- | --- |
-| SDK and CLI | `arcane-os` `0.2.3` | The Node.js toolchain plus the browser-only `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints in this checkout. |
-| Browser runtime | SDK source commit `f97ac4f2e7cc92a00a3a466c38a67446dd112acf`, SDK `0.2.3`, protocol `arcane/1` | The SDK-canonical exact 160-file runtime shipped under `runtime/`; Arcane OS commit `c540014afe69f14cf5ae60493b7295f36dbcec64` is legacy projection provenance, not a second source authority. |
-| Browser SDK runtime | SDK source commit `f97ac4f2e7cc92a00a3a466c38a67446dd112acf`, SDK `0.2.3` | The exact 25-file authenticated browser closure: EventManager/DOM instrumentation and pinned event dependencies, Wllama runtime assets, and SDK browser speech provider/store/Worker mechanisms. It contains no model weights or speech adapter/model bytes. |
+| SDK and CLI | `arcane-os` `0.3.0` | The Node.js toolchain plus the browser-only `arcane-os/ai/browser-wasm`, `arcane-os/ai/browser-speech`, and portable `arcane-os/mail` entrypoints in this checkout. |
+| Browser runtime | `runtime/ARCANE_RUNTIME_RELEASE.json`, SDK `0.3.0`, protocol `arcane/1` | The SDK-canonical dynamic runtime inventory shipped under `runtime/`; the receipt binds its exact paths, bytes, inventory, and digest. |
+| Browser SDK runtime | `browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json`, SDK `0.3.0` | The dynamically derived browser closure for events, Wllama, and Browser Speech mechanisms. It contains no speech runtime, model, voice, third-party legal/notice, or corresponding-source payloads. |
 | Core reference snapshot | Arcane OS commit `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, protocol `arcane/1` | The application-facing Core contract derived into `docs/reference/core/`. Canonical inventory and focused-member content was verified unchanged at Arcane OS `main` commit `13f3ce0ae34f77a3495331c8b4c30b1bb105f8ed`; SDK-local provenance, link, and package-boundary annotations are added explicitly. |
 
 The SDK runtime receipt and Core reference are distinct evidence and have
@@ -58,25 +58,25 @@ See [Core reference provenance](core/README.md) for the imported inventory and
 the exact distinction between a documentation snapshot and shipped runtime
 bytes.
 
-## Published 0.2.2
+## Published 0.2.3
 
-The published package is exactly `arcane-os@0.2.2` from source commit
-`d5326d206bf0bec6ad82d53605e666841aa79899`. The npm `latest` dist-tag resolves
-to `0.2.2`; the separate `dev` dist-tag remains `0.1.0-dev.5`.
+The most recently verified published package before this 0.3.0 source candidate
+is exactly `arcane-os@0.2.3` from source commit
+`d717f21d45664d20e4ed6377596db87c47492e11`. The npm `latest` dist-tag resolves
+to `0.2.3`; the separate `dev` dist-tag remains `0.1.0-dev.5`.
 
-The admission-aware `voice-transcription.html` lifecycle and shared
-`createSTTActivationController()` contract documented below are newer canonical
-source. They are not package authority in `0.2.2`; consumers require a fresh
-numeric publication before relying on them.
+The singleton-event, Mail, warn-first Browser Speech, and mixed-route contracts
+documented below are newer canonical source. They are not package authority in
+`0.2.3`; consumers require the numeric 0.3.0 publication before relying on them.
 
 | Evidence | Exact value |
 | --- | --- |
-| npm integrity | `sha512-JnLzZ4+FqX9tMgRv8HMcaCPSFx3xNNRf8BF8T03fD2ymg2g8cIGZRdD/3Tbd9PLtpx1PIKCpxz6nCP6ztnu1Nw==` |
-| npm shasum | `0b0d314acce48dcb5518470cd45a54221589d4d4` |
-| Immutable release tarball | `arcane-os-0.2.2.manifest.json`; artifact `9631659213`; 6,993,999 bytes; SHA-256 `e0fe1a556b603f67f5e3c142be7154b433312d3c0f3b58632df2e7fc43cc0ca7` |
-| GitHub release | [`0.2.2`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.2.2) (tag and title are both exactly `0.2.2`) |
-| Hosted source/artifact gate | [Check run 33034955277](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33034955277) |
-| Trusted publication | [Run 33035086265](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33035086265) |
+| npm integrity | `sha512-TZewkGM7dh9PdVnOtnkBO7QalJ6qyWWdKruCmsTxoHyeoG5XpqVbkNgiJhtBLhrIzgUV3vydYplxZQkIbIWoHg==` |
+| npm shasum | `8e978a23289a41db130253e6475a0c8bb0c0d73f` |
+| Immutable release tarball | `arcane-os-0.2.3.tgz`; 6,999,078 bytes; SHA-256 `857f179c2f9d4549e7691b4e6cebc49e5ab5e18600816443b26319c61fc1f85d` |
+| GitHub release | [`0.2.3`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.2.3) (tag and title are both exactly `0.2.3`) |
+| Hosted source/artifact gate | [Check run 33052271534](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33052271534) |
+| Trusted publication | [Run 33052383457](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33052383457) |
 
 The npm SLSA provenance binds the published package to that exact source commit
 and `.github/workflows/publish-dev.yml`. Hashes prove byte identity or
@@ -102,10 +102,10 @@ Public reference entries follow the established Arcane documentation model:
 
 ## Public runtime inventory
 
-The package exposes 169 semantic JavaScript records across 13 JavaScript
+The package exposes 200 semantic JavaScript records across 14 JavaScript
 entrypoints, plus eight JSON Schemas, its exact runtime manifest, and package
 metadata. Ten entrypoints are Node.js control-plane surfaces,
-`arcane-os/event-manager` runs in Node and browsers, and
+`arcane-os/event-manager` and `arcane-os/mail` run in Node and browsers, and
 `arcane-os/ai/browser-wasm` plus `arcane-os/ai/browser-speech` are browser-only.
 The [machine-readable package
 inventory](inventory/package-api.json) and [SDK member reference](sdk-api.md)
@@ -116,7 +116,7 @@ download, install, or self-update.
 
 The synchronized browser payload exposes:
 
-- 83 JavaScript module artifacts under `runtime/arcane/modules/`, including
+- 84 JavaScript module artifacts under `runtime/arcane/modules/`, including
   ESM modules, classic vendor globals, one worker protocol, and one Node-oriented
   mail transport;
 - 15 shared entity modules under `runtime/arcane/entities/`;

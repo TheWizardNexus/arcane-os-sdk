@@ -37,6 +37,7 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/session-provisioning-diagnostics-development/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/event-manager/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/inventory/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/mail/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/overview/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/protocols/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-components/</loc></url>
@@ -88,6 +89,7 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/isolated-model-question-runner/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/local-ai-readiness-controller/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/local-ai-readiness/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/mail-outbox/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/mail-transport/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/mail/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/marked-min/</loc></url>

@@ -476,7 +476,7 @@ function validateLock(lock,sdkDeclaration){
     return lock;
 }
 
-async function resolveInstalledSdkInstallation(workspaceRoot,declaration){
+export async function resolveInstalledSdkInstallation(workspaceRoot,declaration){
     let current=workspaceRoot;
     for(const segment of declaration.packageSource.split('/')){
         current=path.join(current,segment);

@@ -396,11 +396,11 @@ function normalizeBrowserSpeechRole(value,role){
     const hasModel=Object.hasOwn(descriptors,'model');
     const hasRuntime=Object.hasOwn(descriptors,'runtime');
     const hasSecurity=Object.hasOwn(descriptors,'security');
-    if(hasGraph&&(hasModel||hasRuntime||hasSecurity)){
+    if(hasGraph&&(hasModel||hasRuntime)){
         throw aiBrowserSpeechError(
             AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
             AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
-            `${label}.graph is mutually exclusive with model, runtime, and security.`
+            `${label}.graph is mutually exclusive with model and runtime.`
         );
     }
     if(!hasGraph&&(!hasModel||!hasRuntime)){
@@ -417,6 +417,26 @@ function normalizeBrowserSpeechRole(value,role){
                 AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
                 AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
                 `${label}.graph must be an SDK-created frozen artifact graph.`
+            );
+        }
+        if(!hasSecurity){
+            throw aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+                AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+                `${label}.security with secure:true is required for an artifact graph.`
+            );
+        }
+        const security=frozenClosedRecord(
+            descriptors.security.value,
+            ['secure','checks'],
+            ['secure'],
+            `${label}.security`
+        );
+        if(security.secure.value!==true){
+            throw aiBrowserSpeechError(
+                AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+                AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+                `${label}.security.secure must be true for an artifact graph.`
             );
         }
     }else{
@@ -441,7 +461,10 @@ function normalizeBrowserSpeechRole(value,role){
     return Object.freeze({
         providerId,
         ...(hasGraph
-            ?{graph:descriptors.graph.value}
+            ?{
+                graph:descriptors.graph.value,
+                security:descriptors.security.value
+            }
             :{
                 model:descriptors.model.value,
                 runtime:descriptors.runtime.value,
@@ -2578,7 +2601,10 @@ class AI {
                 candidateProviders[role]=factory({
                     id:configured.providerId,
                     ...(configured.graph
-                        ?{graph:configured.graph}
+                        ?{
+                            graph:configured.graph,
+                            security:configured.security
+                        }
                         :{
                             model:configured.model,
                             runtime:configured.runtime,

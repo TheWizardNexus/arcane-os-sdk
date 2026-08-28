@@ -20,6 +20,11 @@ const SDK_BROWSER_ENTRY='sdk/event-manager.mjs';
 const SDK_BROWSER_AI_ENTRY='sdk/ai/browser-wasm.mjs';
 const SDK_BROWSER_SPEECH_ENTRY='sdk/ai/browser-speech.mjs';
 const SDK_BROWSER_SPEECH_WORKER_RUNTIME='sdk/ai/speech-worker-runtime.mjs';
+const SDK_BROWSER_SELF_IMPORTS=new Map([
+    ['arcane-os/event-manager',SDK_BROWSER_ENTRY],
+    ['arcane-os/ai/browser-wasm',SDK_BROWSER_AI_ENTRY],
+    ['arcane-os/ai/browser-speech',SDK_BROWSER_SPEECH_ENTRY]
+]);
 const SDK_BROWSER_FILES=Object.freeze([
     'sdk/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json',
     'sdk/ai/browser-kokoro-worker.mjs',
@@ -761,8 +766,8 @@ function nonliteralDynamic(importer,offset){
 
 function isAuthorizedSpeechRuntimeImport(tokens,index,close,importer){
     if(importer!==SDK_BROWSER_SPEECH_WORKER_RUNTIME||close!==index+5)return false;
-    const [entry,dot,moduleUrl]=tokens.slice(index+2,close);
-    return entry?.type==='identifier'&&entry.value==='entry'
+    const [binding,dot,moduleUrl]=tokens.slice(index+2,close);
+    return binding?.type==='identifier'&&['entry','target'].includes(binding.value)
         &&dot?.value==='.'
         &&moduleUrl?.type==='identifier'&&moduleUrl.value==='moduleUrl';
 }
@@ -888,6 +893,19 @@ function resolveImport(importer,specifier,files){
             'contains percent-encoded path bytes whose browser URL normalization is outside the '
                 +'deterministic shipped-runtime subset'
         );
+    }
+    const sdkBrowserTarget=SDK_BROWSER_SELF_IMPORTS.get(reachableSpecifier);
+    if(sdkBrowserTarget){
+        if(reachableSpecifier!==specifier){
+            unresolved(
+                importer,
+                specifier,
+                sdkBrowserTarget,
+                'uses a query or fragment that cannot match its exact browser import-map key'
+            );
+        }
+        if(!files.has(sdkBrowserTarget))unresolved(importer,specifier,sdkBrowserTarget);
+        return {target:sdkBrowserTarget};
     }
     if(reachableSpecifier===RUNTIME_STRONG_TYPE_IMPORT){
         const target='dependencies/strong-type/index.js';
@@ -1860,7 +1878,7 @@ function renderManagedHtml(html,json,baseHref='../../'){
         ...base,
         href:structuralAttribute(parseTagAttributes(base.open),'href','base')
     }));
-    if(renderedBases.length!==1||renderedBases[0].href!=='../../'
+    if(renderedBases.length!==1||renderedBases[0].href!==baseHref
         ||renderedBases[0].end>managedPosition
         ||!/^[\t\n\f\r ]*$/u.test(rendered.slice(renderedBases[0].end,managedPosition))){
         fail('Generated Arcane import-map HTML has an invalid or late base element.');

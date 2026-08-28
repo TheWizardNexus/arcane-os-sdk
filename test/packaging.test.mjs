@@ -517,7 +517,10 @@ test('authenticated external package refreshes maps and preserves both runtime a
     ));
     assert.deepEqual(distMapBytes,sourceMapBytes);
     const sourceMap=JSON.parse(sourceMapBytes.toString('utf8'));
-    assert.equal(Object.keys(sourceMap.imports).length,91);
+    assert.equal(
+        Object.keys(sourceMap.imports).length,
+        packaged.importMapReceipt.entryCount
+    );
     assert.equal(
         sourceMap.imports['./node_modules/strong-type/index.js'],
         './arcane/dependencies/strong-type/index.js'
@@ -845,7 +848,9 @@ test('package rejects terminal import-map listener removal, truncation, and mism
     }
 });
 
-test('release verification rejects removed or coherently rehashed runtime authority and projection metadata',async t=>{
+// This aggregate performs one authenticated workspace copy plus five complete
+// package and verification traversals; retain a bounded measured watchdog.
+test('release verification rejects removed or coherently rehashed runtime authority and projection metadata',{timeout:60_000},async t=>{
     const appId='authority-tamper';
     const workspaceRoot=await authenticatedWorkspace(t,{
         prefix:'arcane-runtime-authority-tamper-',

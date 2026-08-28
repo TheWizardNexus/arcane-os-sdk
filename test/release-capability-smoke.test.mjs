@@ -341,6 +341,11 @@ sourceTest('browser-WASM provider serializes unload and retries failed disposal 
     const aiDirectory=path.join(browserRuntime,'ai');
     const internal=path.join(aiDirectory,'internal');
     await mkdir(internal,{recursive:true});
+    await writeFile(path.join(temporary,'package.json'),`${JSON.stringify({
+        name:'arcane-os',
+        type:'module',
+        exports:{'./event-manager':'./browser-runtime/event-manager.mjs'}
+    },null,2)}\n`);
     await copyFile(
         path.resolve('browser-runtime/ai/browser-wasm-llm-provider.mjs'),
         path.join(aiDirectory,'browser-wasm-llm-provider.mjs')
@@ -365,6 +370,15 @@ export const arcaneEvents=Object.freeze({
         state.events.push(Object.freeze({type,payload,metadata}));
     }
 });
+export function createArcaneEventSource(){
+    return Object.freeze({
+        instanceId:'release-capability-smoke-model-controller',
+        addEventListener(){},
+        removeEventListener(){},
+        dispatch(){},
+        dispose(){}
+    });
+}
 `);
     await writeFile(path.join(aiDirectory,'browser-wllama-runtime.mjs'),`
 const state=globalThis[${JSON.stringify(stateKey)}];
@@ -508,11 +522,24 @@ sourceTest('packaged Wllama runtime retains and retries failed session exits',as
     const runtimeState={failNextLoad:true,sessions:[]};
     globalThis[stateKey]=runtimeState;
     t.after(()=>{delete globalThis[stateKey];});
+    const navigatorDescriptor=Object.getOwnPropertyDescriptor(globalThis,'navigator');
+    Object.defineProperty(globalThis,'navigator',{
+        value:Object.freeze({
+            ...(globalThis.navigator??{}),
+            gpu:Object.freeze({})
+        }),
+        configurable:true
+    });
+    t.after(()=>{
+        if(navigatorDescriptor)Object.defineProperty(globalThis,'navigator',navigatorDescriptor);
+        else delete globalThis.navigator;
+    });
     await writeFile(path.join(wllamaDirectory,'index.mjs'),`
 const state=globalThis[${JSON.stringify(stateKey)}];
 export class Wllama{
-    constructor(paths){
+    constructor(paths,{logger}={}){
         this.paths=paths;
+        this.logger=logger;
         this.proxy=null;
         this.loaded=false;
         this.exitCalls=0;
@@ -526,6 +553,32 @@ export class Wllama{
             throw new Error('synthetic Wllama load failure');
         }
         this.loaded=true;
+    }
+    async arcaneLoadModel(files,options,signal){
+        await this.loadModel(files,options,signal);
+        this.logger?.log?.('ggml_webgpu: adapter_info: vendor_id: 0 | vendor: synthetic | architecture: fixture | device_id: 0 | name: fixture | device_desc: fixture');
+        this.logger?.log?.('llm_load_tensors: offloaded 1/1 layers to GPU');
+    }
+    async arcaneTelemetry(){
+        return {
+            protocol:'arcane-wllama-webgpu-evidence/1',
+            worker:{
+                protocol:'arcane-wllama-webgpu-evidence/1',
+                adapter:{vendor:'synthetic',architecture:'fixture',name:'fixture',description:'fixture'},
+                bufferCount:this.loaded?1:0,
+                bufferBytes:this.loaded?1:0,
+                queueSubmissions:this.loaded?1:0,
+                commandBuffers:this.loaded?1:0,
+                queueFenceRequests:this.loaded?1:0,
+                queueFenceCompletions:this.loaded?1:0,
+                invalid:false
+            },
+            cleanup:this.loaded?null:{kind:'worker-terminated'}
+        };
+    }
+    async arcaneTerminate(){
+        await this.exit();
+        return this.arcaneTelemetry();
     }
     getModelMetadata(){return {fixture:true};}
     isModelLoaded(){return this.loaded;}
@@ -544,7 +597,7 @@ export class Wllama{
     const failedLoadRuntime=createPackagedWllamaRuntime({logger:{}});
     await assert.rejects(
         failedLoadRuntime.load([file]),
-        /synthetic Wllama load failure/u
+        errorWithCode('ARCANE_AI_WORKER_TERMINATION_UNCONFIRMED')
     );
     assert.equal(runtimeState.sessions[0].exitCalls,1);
     assert.equal(failedLoadRuntime.isLoading(),true);
@@ -629,6 +682,7 @@ test('the exact npm artifact exposes the supported installed capability contract
     ));
     assert.equal(installedPackage.name,verified.manifest.name);
     assert.equal(installedPackage.version,verified.manifest.version);
+    assert.equal(installedPackage.exports['./mail'],'./src/mail-api.mjs');
     const browserRuntimeReceipt=JSON.parse(await readFile(
         path.join(installedRoot,'browser-runtime','ARCANE_SDK_BROWSER_RELEASE.json'),
         'utf8'
@@ -700,6 +754,7 @@ import runtimeRelease from 'arcane-os/runtime/manifest' with {type:'json'};
 import test from 'arcane-os/testing';
 import * as browserSpeech from 'arcane-os/ai/browser-speech';
 import * as browserWasm from 'arcane-os/ai/browser-wasm';
+import * as mail from 'arcane-os/mail';
 
 test('installed public SDK capabilities are coherent',async()=>{
     assert.equal(SDK_VERSION,${JSON.stringify(verified.manifest.version)});
@@ -718,13 +773,40 @@ test('installed public SDK capabilities are coherent',async()=>{
     assert.equal(observed,42);
     assert.equal(manager.history[0]?.protocol,ARCANE_EVENT_STACK_PROTOCOL);
 
+    assert.deepEqual(Object.keys(mail).sort(),[
+        'DEFAULT_MAIL_REQUEST_TIMEOUT_MS',
+        'MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES',
+        'MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS',
+        'MAIL_OUTBOX_PROTOCOL',
+        'MAIL_OUTBOX_STATES',
+        'MAIL_OUTBOX_TABLE',
+        'MAX_MAIL_RESPONSE_BYTES',
+        'Mail',
+        'MailOutbox',
+        'MailTransportError',
+        'createMailOutbox',
+        'default',
+        'normalizeMailEndpoint',
+        'resolveMailConfig',
+        'sendMailReport',
+        'serializeMailReport'
+    ]);
+    assert.equal(mail.default,mail.Mail);
+    assert.equal(mail.MAIL_OUTBOX_PROTOCOL,'arcane-mail-outbox/1');
+
     assert.deepEqual(Object.keys(browserSpeech).sort(),[
+        'BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL',
         'BROWSER_SPEECH_ARTIFACT_PROTOCOL',
         'createBrowserKokoroProvider',
+        'createBrowserSpeechArtifactGraph',
         'createBrowserSpeechAuthority',
         'createBrowserWhisperProvider',
         'createDbopfsSpeechArtifactStore'
     ]);
+    assert.equal(
+        browserSpeech.BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL,
+        'arcane-ai-browser-speech-artifact-graph/1'
+    );
     assert.equal(
         browserSpeech.BROWSER_SPEECH_ARTIFACT_PROTOCOL,
         'arcane-ai-browser-speech-artifacts/1'

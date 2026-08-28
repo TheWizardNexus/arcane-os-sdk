@@ -197,10 +197,11 @@ identical executable alias.
 The generated artifact is
 `apps/<id>/modules/arcane.importmap.json`. Its exact JSON is also installed in
 the app entry as `<script type="importmap" data-arcane-import-map>` before
-module loading. In SDK `0.2.2`, the complete authenticated physical-v1 runtime
-produces 91 entries and intentionally has no package-root mapping. That count
-describes the shipped SDK closure; the command receipt remains authoritative
-for the exact map written to the selected application.
+module loading. In SDK `0.3.0`, the complete physical-v1 runtime derives its
+entries from the installed runtime and browser-runtime inventories and
+intentionally has no package-root mapping. The command receipt remains
+authoritative for the exact map written to the selected application; no fixed
+entry count is a release contract.
 
 ### Result and safety
 
@@ -219,7 +220,7 @@ Success returns the normal selected-workspace wrapper:
         documentPaths,
         documentCount:1,
         imports,
-        entryCount:91,
+        entryCount:Object.keys(imports).length,
         excludedModules:['modules/CaseEvidenceIndexer.js'],
         files:[
             {role:'artifact',path,bytes,sha256},

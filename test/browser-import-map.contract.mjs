@@ -47,8 +47,6 @@ const TASKKILL_TIMEOUT_MS=3_000;
 const TASKKILL_DRAIN_TIMEOUT_MS=2_000;
 const CHROME_DRAIN_TIMEOUT_MS=5_000;
 const PROFILE_CLEANUP_TIMEOUT_MS=5_000;
-const EXPECTED_IMPORT_COUNT=94;
-const EXPECTED_ARCANE_FILE_COUNT=185;
 const HOSTILE_DEPENDENCY_PATHS=Object.freeze([
     'node_modules/event-pubsub/index.js',
     'node_modules/event-pubsub/package.json',
@@ -141,7 +139,7 @@ async function fileRecords(root,relativePaths){
     return records;
 }
 
-async function paritySnapshot(root){
+async function paritySnapshot(root,{expectedArcaneFileCount}){
     const mapRelative=`apps/${APP_ID}/modules/arcane.importmap.json`;
     const htmlRelative=`apps/${APP_ID}/index.html`;
     const probeRelative=`apps/${APP_ID}/modules/App.js`;
@@ -155,7 +153,6 @@ async function paritySnapshot(root){
     assert.equal(managedMaps[0][1],`\n${mapBytes.toString('utf8')}`);
     assert.deepEqual(JSON.parse(managedMaps[0][1]),map);
     assert.deepEqual(Object.keys(map),['imports']);
-    assert.equal(Object.keys(map.imports).length,EXPECTED_IMPORT_COUNT);
     assert.equal(
         map.imports['./node_modules/strong-type/index.js'],
         './arcane/dependencies/strong-type/index.js'
@@ -202,12 +199,13 @@ async function paritySnapshot(root){
     ])assert.equal(typeof map.imports[specifier],'string',specifier);
 
     const arcaneFiles=await realFileInventory(path.join(root,'arcane'));
-    assert.equal(arcaneFiles.length,EXPECTED_ARCANE_FILE_COUNT);
+    assert.equal(arcaneFiles.length,expectedArcaneFileCount);
     const mappedTargets=Object.values(map.imports).map(target=>{
         assert.match(target,/^\.\/arcane\//u);
         return target.slice(2);
     });
     return {
+        importCount:Object.keys(map.imports).length,
         contract:await fileRecords(root,[mapRelative,htmlRelative,probeRelative]),
         mappedTargets:await fileRecords(root,mappedTargets),
         arcane:await fileRecords(
@@ -1777,6 +1775,19 @@ if(process.env.ARCANE_BROWSER_LIFECYCLE_SELF_TEST==='1'){
         actualPath:resolvedToolchainPath,
         expectedPath:expectedToolchainPath
     });
+    const installedSdkRoot=path.dirname(path.dirname(expectedToolchainPath));
+    const [runtimeManifest,browserRuntimeManifest]=await Promise.all([
+        readFile(path.join(installedSdkRoot,'runtime','ARCANE_RUNTIME_RELEASE.json'),'utf8')
+            .then(JSON.parse),
+        readFile(
+            path.join(installedSdkRoot,'browser-runtime','ARCANE_SDK_BROWSER_RELEASE.json'),
+            'utf8'
+        ).then(JSON.parse)
+    ]);
+    const expectedProjection=Object.freeze({
+        expectedArcaneFileCount:
+            runtimeManifest.files.length+browserRuntimeManifest.files.length
+    });
 
     const identityProbeRoot=await mkdtemp(path.join(os.tmpdir(),'arcane-toolchain-identity-'));
     t.after(()=>rm(identityProbeRoot,{recursive:true,force:true}));
@@ -1883,11 +1894,15 @@ if(process.env.ARCANE_BROWSER_LIFECYCLE_SELF_TEST==='1'){
             instances.delete(source);
         }
     }
-    const sourceBeforePackage=await paritySnapshot(workspaceRoot);
+    const sourceBeforePackage=await paritySnapshot(workspaceRoot,expectedProjection);
     assert.deepEqual(await fileRecords(workspaceRoot,HOSTILE_DEPENDENCY_PATHS),trapBaseline);
 
     const packaged=await packageApplication({workspaceRoot,appId:APP_ID});
     assert.equal(packaged.release.app,APP_ID);
+    assert.equal(
+        sourceBeforePackage.importCount,
+        packaged.release.importMapReceipt.entryCount
+    );
     const verified=await verifyApplication({workspaceRoot,appId:APP_ID});
     assert.equal(verified.release.verified,true);
 
@@ -1926,9 +1941,9 @@ if(process.env.ARCANE_BROWSER_LIFECYCLE_SELF_TEST==='1'){
     assert.deepEqual(distributionReport.nodeModuleResources,sourceReport.nodeModuleResources);
     assert.deepEqual(await fileRecords(workspaceRoot,HOSTILE_DEPENDENCY_PATHS),trapBaseline);
 
-    const sourceAfterPackage=await paritySnapshot(workspaceRoot);
+    const sourceAfterPackage=await paritySnapshot(workspaceRoot,expectedProjection);
     const distRoot=path.join(workspaceRoot,'dist',APP_ID);
-    const distSnapshot=await paritySnapshot(distRoot);
+    const distSnapshot=await paritySnapshot(distRoot,expectedProjection);
     assert.deepEqual(sourceAfterPackage,sourceBeforePackage);
     assert.deepEqual(distSnapshot,sourceBeforePackage);
 

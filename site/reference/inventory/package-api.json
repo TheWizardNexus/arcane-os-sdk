@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.2.2",
+  "sdkVersion": "0.3.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 169,
+  "memberCount": 200,
   "members": [
     {
       "id": "root:APP_BUNDLE_DESCRIPTOR_NAME",
@@ -1223,6 +1223,22 @@
       "normalization": "SDK-normalized inputs, errors, events, and documented result"
     },
     {
+      "id": "root:materializeInstalledSdkRuntime",
+      "name": "materializeInstalledSdkRuntime",
+      "displayName": "materializeInstalledSdkRuntime()",
+      "kind": "function",
+      "signature": "async materializeInstalledSdkRuntime({workspaceRoot,sdkPackageSource,signal,onEvent}={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Runtime and app descriptors",
+      "summary": "Verifies the workspace's exact installed SDK runtime and browser runtime, then materializes their dynamic inventories.",
+      "availability": "Node",
+      "protocol": "Installed SDK runtime materialization",
+      "normalization": "Canonical workspace and installed-package identity, verified runtime receipts, and a frozen materialization result"
+    },
+    {
       "id": "root:NATIVE_BUILD_PLAN_PROTOCOL",
       "name": "NATIVE_BUILD_PLAN_PROTOCOL",
       "displayName": "NATIVE_BUILD_PLAN_PROTOCOL",
@@ -2176,6 +2192,159 @@
       "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
     },
     {
+      "id": "root:ARCANE_EVENT_AUTHORITY_BRAND",
+      "name": "ARCANE_EVENT_AUTHORITY_BRAND",
+      "displayName": "ARCANE_EVENT_AUTHORITY_BRAND",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_AUTHORITY_BRAND",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Global registry symbol that brands the canonical per-realm Arcane event authority.",
+      "availability": "Node and browser/bundler",
+      "protocol": "Symbol.for('arcane-os.arcane-events-authority') with arcane-event-authority/1",
+      "normalization": "Exact global symbol key; the authority brand descriptor is non-enumerable, non-writable, and non-configurable"
+    },
+    {
+      "id": "root:ARCANE_EVENT_AUTHORITY_KIND",
+      "name": "ARCANE_EVENT_AUTHORITY_KIND",
+      "displayName": "ARCANE_EVENT_AUTHORITY_KIND",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_AUTHORITY_KIND",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Identifies the frozen canonical authority descriptor kind.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-authority",
+      "normalization": "Exact immutable descriptor-kind discriminator"
+    },
+    {
+      "id": "root:ARCANE_EVENT_AUTHORITY_PROTOCOL",
+      "name": "ARCANE_EVENT_AUTHORITY_PROTOCOL",
+      "displayName": "ARCANE_EVENT_AUTHORITY_PROTOCOL",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_AUTHORITY_PROTOCOL",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Identifies compatible canonical Arcane event authorities.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-authority/1",
+      "normalization": "Exact authority protocol discriminator; incompatible globals fail closed"
+    },
+    {
+      "id": "root:ARCANE_EVENT_ERROR_CODES",
+      "name": "ARCANE_EVENT_ERROR_CODES",
+      "displayName": "ARCANE_EVENT_ERROR_CODES",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_ERROR_CODES",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Frozen map of every stable event-authority error code to its identical string value.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-authority/1 failures",
+      "normalization": "Exact frozen string-to-itself code map"
+    },
+    {
+      "id": "root:ARCANE_EVENT_LISTENER_ERROR_EVENT",
+      "name": "ARCANE_EVENT_LISTENER_ERROR_EVENT",
+      "displayName": "ARCANE_EVENT_LISTENER_ERROR_EVENT",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_LISTENER_ERROR_EVENT",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Canonical observational event emitted for a privacy-safe listener failure.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane.event.listener.error over arcane-event-authority/1",
+      "normalization": "Frozen public failure detail; raw listener errors remain at the owner-local reporting boundary"
+    },
+    {
+      "id": "root:ARCANE_EVENT_OCCURRENCE_PROTOCOL",
+      "name": "ARCANE_EVENT_OCCURRENCE_PROTOCOL",
+      "displayName": "ARCANE_EVENT_OCCURRENCE_PROTOCOL",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_OCCURRENCE_PROTOCOL",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Identifies immutable canonical event occurrences.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-occurrence/1",
+      "normalization": "Exact occurrence protocol discriminator; public detail is privacy-admitted and deeply frozen"
+    },
+    {
+      "id": "root:ARCANE_EVENT_SOURCE_DISPOSED_EVENT",
+      "name": "ARCANE_EVENT_SOURCE_DISPOSED_EVENT",
+      "displayName": "ARCANE_EVENT_SOURCE_DISPOSED_EVENT",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_SOURCE_DISPOSED_EVENT",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Final noncancelable canonical occurrence published when a source is disposed.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane.event.source.disposed over arcane-event-authority/1",
+      "normalization": "Frozen public detail with exact source-disposed reason before source listener cleanup"
+    },
+    {
+      "id": "root:ARCANE_EVENT_SOURCE_KIND",
+      "name": "ARCANE_EVENT_SOURCE_KIND",
+      "displayName": "ARCANE_EVENT_SOURCE_KIND",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_SOURCE_KIND",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Identifies the frozen canonical source descriptor kind.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-source",
+      "normalization": "Exact immutable descriptor-kind discriminator"
+    },
+    {
+      "id": "root:ARCANE_EVENT_SOURCE_PROTOCOL",
+      "name": "ARCANE_EVENT_SOURCE_PROTOCOL",
+      "displayName": "ARCANE_EVENT_SOURCE_PROTOCOL",
+      "kind": "constant",
+      "signature": "const ARCANE_EVENT_SOURCE_PROTOCOL",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Identifies frozen canonical event source handles and descriptors.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-source/1",
+      "normalization": "Exact source protocol discriminator with declared event types and one realm-local instance id"
+    },
+    {
       "id": "root:ARCANE_EVENT_STACK_PROTOCOL",
       "name": "ARCANE_EVENT_STACK_PROTOCOL",
       "displayName": "ARCANE_EVENT_STACK_PROTOCOL",
@@ -2431,6 +2600,23 @@
       "normalization": "Same module singleton through root and focused subpath; time travel starts disabled"
     },
     {
+      "id": "root:createArcaneEventSource",
+      "name": "createArcaneEventSource",
+      "displayName": "createArcaneEventSource()",
+      "kind": "function",
+      "signature": "createArcaneEventSource(owner, options)",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Registers one declared semantic event source for a non-null object or function owner.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-source/1 over the per-realm arcane-event-authority/1 singleton",
+      "normalization": "Returns one frozen source handle with declared event types, a realm-local instance id, synchronous publication, and deterministic disposal"
+    },
+    {
       "id": "root:createDOMInstrumentation",
       "name": "createDOMInstrumentation",
       "displayName": "createDOMInstrumentation()",
@@ -2499,6 +2685,23 @@
       "normalization": "Returns a best-effort selector or null; triple-chevron separates open shadow boundaries"
     },
     {
+      "id": "root:isArcaneEventOccurrence",
+      "name": "isArcaneEventOccurrence",
+      "displayName": "isArcaneEventOccurrence()",
+      "kind": "function",
+      "signature": "isArcaneEventOccurrence(value)",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Recognizes canonical occurrences and compatibility views created by the current realm authority.",
+      "availability": "Node and browser/bundler",
+      "protocol": "arcane-event-occurrence/1 realm-local recognition",
+      "normalization": "Returns a boolean from authority-owned identity records; protocol-shaped foreign objects are not admitted"
+    },
+    {
       "id": "root:parseEventStack",
       "name": "parseEventStack",
       "displayName": "parseEventStack()",
@@ -2514,6 +2717,23 @@
       "availability": "Node and browser/bundler",
       "protocol": "arcane-event-stack/1",
       "normalization": "Rejects extra keys, invalid bounds, malformed nesting, unsafe values, and nonterminal overflow; returns a deeply frozen canonical document"
+    },
+    {
+      "id": "root:projectArcaneDOMEvent",
+      "name": "projectArcaneDOMEvent",
+      "displayName": "projectArcaneDOMEvent()",
+      "kind": "function",
+      "signature": "projectArcaneDOMEvent(target, occurrence, options)",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/event-manager"
+      ],
+      "primaryImport": "arcane-os/event-manager",
+      "group": "Central events, time travel, and DOM instrumentation",
+      "summary": "Projects one canonical occurrence to one CustomEvent without republishing it into the authority.",
+      "availability": "Browser DOM or a DOM-compatible test host",
+      "protocol": "One-way arcane-event-occurrence/1 to CustomEvent compatibility projection",
+      "normalization": "Adds immutable occurrence, source, instance, and operation identifiers; DOM cancellation propagates only to a cancelable occurrence"
     },
     {
       "id": "root:SDK_UPDATE_REGISTRY",
@@ -2725,6 +2945,22 @@
       "normalization": "Returns cached or installed receipts with observed byte count and per-check outcomes; disabled expected-length and SHA-256 checks do not compare or hash, while enabled checks fail closed"
     },
     {
+      "id": "browser-speech:BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL",
+      "name": "BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL",
+      "displayName": "BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL",
+      "kind": "constant",
+      "signature": "const BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL",
+      "entrypoints": [
+        "arcane-os/ai/browser-speech"
+      ],
+      "primaryImport": "arcane-os/ai/browser-speech",
+      "group": "Browser speech providers",
+      "summary": "Stable protocol identifier for a complete caller-owned authenticated browser speech artifact graph.",
+      "availability": "Browser metadata; graph construction is side-effect free and provider use requires the selected browser storage and Worker capabilities",
+      "protocol": "arcane-ai-browser-speech-artifact-graph/1",
+      "normalization": "Exact immutable protocol value for one closed runtime, model, and voice dependency graph; it selects no artifacts or policy"
+    },
+    {
       "id": "browser-speech:BROWSER_SPEECH_ARTIFACT_PROTOCOL",
       "name": "BROWSER_SPEECH_ARTIFACT_PROTOCOL",
       "displayName": "BROWSER_SPEECH_ARTIFACT_PROTOCOL",
@@ -2755,6 +2991,22 @@
       "availability": "Browser with DBOPFS, Web Locks, Workers, object URLs, and a caller-admitted self-contained kokoro-js runtime/model closure",
       "protocol": "arcane-ai-provider/2 tts/synthesize",
       "normalization": "Independent load, status, request, unload, cancellation, and disposal; provider-native requests return 24000 Hz Float32Array PCM, while shared AI.js requests admit only wav and return frozen Uint8Array audio/wav data; never selects a cloud fallback"
+    },
+    {
+      "id": "browser-speech:createBrowserSpeechArtifactGraph",
+      "name": "createBrowserSpeechArtifactGraph",
+      "displayName": "createBrowserSpeechArtifactGraph()",
+      "kind": "function",
+      "signature": "createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', identitySha256, providerId=null, role, model, runtime, files, edges, transforms }={})",
+      "entrypoints": [
+        "arcane-os/ai/browser-speech"
+      ],
+      "primaryImport": "arcane-os/ai/browser-speech",
+      "group": "Browser speech providers",
+      "summary": "Validates, canonicalizes, identifies, and freezes one complete caller-owned browser speech artifact graph.",
+      "availability": "Browser metadata; construction starts no fetch, cache, Worker, provider, or event operation",
+      "protocol": "arcane-ai-browser-speech-artifact-graph/1",
+      "normalization": "Returns one closed graph with lexically normalized inventories, a canonical SHA-256 identity, declared runtime edges, explicit STT/TTS model policy, and no SDK-selected artifacts"
     },
     {
       "id": "browser-speech:createBrowserSpeechAuthority",
@@ -2803,6 +3055,230 @@
       "availability": "Browser with a ready DBOPFS instance, Web Locks, Fetch or an explicit fetch implementation, File/Blob, and object URLs",
       "protocol": "arcane.ai.browser-speech.assets.v1 completion manifests under arcane-ai-browser-speech-artifacts/1",
       "normalization": "Serializes each authority, commits its completion manifest last, deletes partial state on failure, and supports strict offline cache admission"
+    },
+    {
+      "id": "mail:DEFAULT_MAIL_REQUEST_TIMEOUT_MS",
+      "name": "DEFAULT_MAIL_REQUEST_TIMEOUT_MS",
+      "displayName": "DEFAULT_MAIL_REQUEST_TIMEOUT_MS",
+      "kind": "constant",
+      "signature": "const DEFAULT_MAIL_REQUEST_TIMEOUT_MS",
+      "entrypoints": ["arcane-os/mail"],
+      "primaryImport": "arcane-os/mail",
+      "group": "Portable Mail",
+      "summary": "Default upper bound for one Mail HTTP request in milliseconds.",
+      "availability": "Node and browser with Fetch and AbortController for transport use",
+      "protocol": "Arcane Mail HTTP transport",
+      "normalization": "Exact immutable value of 590000 milliseconds"
+    },
+    {
+      "id": "mail:MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES",
+      "name": "MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES",
+      "displayName": "MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES",
+      "kind": "constant",
+      "signature": "const MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES",
+      "entrypoints": ["arcane-os/mail"],
+      "primaryImport": "arcane-os/mail",
+      "group": "Portable Mail",
+      "summary": "Frozen acceptance-authority allowlist for durable outbox delivery evidence.",
+      "availability": "Node and browser metadata",
+      "protocol": "arcane-mail-outbox/1",
+      "normalization": "Exact immutable authority names; acceptance means admitted provider or Core acceptance, not inbox delivery"
+    },
+    {
+      "id": "mail:MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS",
+      "name": "MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS",
+      "displayName": "MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS",
+      "kind": "constant",
+      "signature": "const MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS",
+      "entrypoints": ["arcane-os/mail"],
+      "primaryImport": "arcane-os/mail",
+      "group": "Portable Mail",
+      "summary": "Duration for same-key retry before an ambiguous delivery requires reconciliation.",
+      "availability": "Node and browser metadata",
+      "protocol": "arcane-mail-outbox/1",
+      "normalization": "Exact immutable value of 86400000 milliseconds"
+    },
+    {
+      "id": "mail:MAIL_OUTBOX_PROTOCOL",
+      "name": "MAIL_OUTBOX_PROTOCOL",
+      "displayName": "MAIL_OUTBOX_PROTOCOL",
+      "kind": "constant",
+      "signature": "const MAIL_OUTBOX_PROTOCOL",
+      "entrypoints": ["arcane-os/mail"],
+      "primaryImport": "arcane-os/mail",
+      "group": "Portable Mail",
+      "summary": "Stable protocol identifier written to durable Mail outbox records.",
+      "availability": "Node and browser metadata",
+      "protocol": "arcane-mail-outbox/1",
+      "normalization": "Exact immutable protocol value"
+    },
+    {
+      "id": "mail:MAIL_OUTBOX_STATES",
+      "name": "MAIL_OUTBOX_STATES",
+      "displayName": "MAIL_OUTBOX_STATES",
+      "kind": "constant",
+      "signature": "const MAIL_OUTBOX_STATES",
+      "entrypoints": ["arcane-os/mail"],
+      "primaryImport": "arcane-os/mail",
+      "group": "Portable Mail",
+      "summary": "Frozen ordered vocabulary for durable Mail outbox lifecycle states.",
+      "availability": "Node and browser metadata",
+      "protocol": "arcane-mail-outbox/1",
+      "normalization": "Exact queued, sending, retry_wait, accepted, failed, and reconciliation_required state list"
+    },
+    {
+      "id": "mail:MAIL_OUTBOX_TABLE",
+      "name": "MAIL_OUTBOX_TABLE",
+      "displayName": "MAIL_OUTBOX_TABLE",
+      "kind": "constant",
+      "signature": "const MAIL_OUTBOX_TABLE",
+      "entrypoints": ["arcane-os/mail"],
+      "primaryImport": "arcane-os/mail",
+      "group": "Portable Mail",
+      "summary": "Default DBOPFS-compatible table name for durable Mail outbox records.",
+      "availability": "Node and browser metadata",
+      "protocol": "arcane-mail-outbox/1",
+      "normalization": "Exact immutable value mail_outbox"
+    },
+    {
+      "id": "mail:MAX_MAIL_RESPONSE_BYTES",
+      "name": "MAX_MAIL_RESPONSE_BYTES",
+      "displayName": "MAX_MAIL_RESPONSE_BYTES",
+      "kind": "constant",
+      "signature": "const MAX_MAIL_RESPONSE_BYTES",
+      "entrypoints": ["arcane-os/mail"],
+      "primaryImport": "arcane-os/mail",
+      "group": "Portable Mail",
+      "summary": "Maximum response-body bytes admitted by the Mail HTTP transport.",
+      "availability": "Node and browser metadata",
+      "protocol": "Arcane Mail HTTP transport",
+      "normalization": "Exact immutable value of 65536 bytes"
+    },
+    {
+      "id": "mail:Mail",
+      "name": "Mail",
+      "displayName": "Mail",
+      "kind": "class",
+      "signature": "new Mail(config=globalThis.arcane?.config?.mail||{}, options={})",
+      "entrypoints": ["arcane-os/mail"],
+      "primaryImport": "arcane-os/mail",
+      "group": "Portable Mail",
+      "summary": "Owns the application Mail singleton, durable lifecycle, report normalization, and explicit transport selection.",
+      "availability": "Node with injected host adapters, or browser/native WebView with durable storage and Web Locks",
+      "protocol": "arcane-mail-outbox/1 with native Arcane.mail or bounded HTTP delivery",
+      "normalization": "Validates bounded reports, persists before delivery, and returns frozen provider-neutral send results"
+    },
+    {
+      "id": "mail:MailOutbox",
+      "name": "MailOutbox",
+      "displayName": "MailOutbox",
+      "kind": "class",
+      "signature": "new MailOutbox(options={})",
+      "entrypoints": ["arcane-os/mail"],
+      "primaryImport": "arcane-os/mail",
+      "group": "Portable Mail",
+      "summary": "Persists bounded reports before delivery and owns FIFO draining, retry classification, and explicit invalid-record maintenance.",
+      "availability": "Node or browser with injected DBOPFS-compatible storage and a Web Locks-compatible lock manager",
+      "protocol": "arcane-mail-outbox/1",
+      "normalization": "Returns deeply frozen records and bounded summaries; ambiguous attempts remain same-key retries or require reconciliation"
+    },
+    {
+      "id": "mail:MailTransportError",
+      "name": "MailTransportError",
+      "displayName": "MailTransportError",
+      "kind": "class",
+      "signature": "new MailTransportError(message, options={})",
+      "entrypoints": ["arcane-os/mail"],
+      "primaryImport": "arcane-os/mail",
+      "group": "Portable Mail",
+      "summary": "Normalized Mail transport failure with stable retry, uncertainty, status, and delay metadata.",
+      "availability": "Node and browser",
+      "protocol": "Arcane Mail HTTP transport",
+      "normalization": "Exposes code, retryable, retryAfterMs, statusCode, and uncertain without unbounded remote detail"
+    },
+    {
+      "id": "mail:createMailOutbox",
+      "name": "createMailOutbox",
+      "displayName": "createMailOutbox()",
+      "kind": "function",
+      "signature": "createMailOutbox(options)",
+      "entrypoints": ["arcane-os/mail"],
+      "primaryImport": "arcane-os/mail",
+      "group": "Portable Mail",
+      "summary": "Creates a MailOutbox from caller-owned storage, locking, delivery, and lifecycle adapters.",
+      "availability": "Node or browser with the required injected outbox adapters",
+      "protocol": "arcane-mail-outbox/1",
+      "normalization": "Returns the same validated MailOutbox contract as direct construction"
+    },
+    {
+      "id": "mail:default",
+      "name": "default",
+      "displayName": "Mail default export",
+      "kind": "class",
+      "signature": "default as Mail",
+      "entrypoints": ["arcane-os/mail"],
+      "primaryImport": "arcane-os/mail",
+      "group": "Portable Mail",
+      "summary": "Default package binding for the same Mail class exposed by the named export.",
+      "availability": "Node with injected host adapters, or browser/native WebView with durable storage and Web Locks",
+      "protocol": "arcane-mail-outbox/1 with native Arcane.mail or bounded HTTP delivery",
+      "normalization": "Binding identity is exactly equal to the named Mail export"
+    },
+    {
+      "id": "mail:normalizeMailEndpoint",
+      "name": "normalizeMailEndpoint",
+      "displayName": "normalizeMailEndpoint()",
+      "kind": "function",
+      "signature": "normalizeMailEndpoint(endpoint, base=globalThis.location?.href)",
+      "entrypoints": ["arcane-os/mail"],
+      "primaryImport": "arcane-os/mail",
+      "group": "Portable Mail",
+      "summary": "Resolves and validates one credential-free HTTPS or loopback-HTTP Mail endpoint.",
+      "availability": "Node and browser with URL support; relative endpoints require an explicit or global base URL",
+      "protocol": "Arcane Mail HTTP transport",
+      "normalization": "Returns an absolute URL and rejects credentials, query strings, fragments, and insecure non-loopback transport"
+    },
+    {
+      "id": "mail:resolveMailConfig",
+      "name": "resolveMailConfig",
+      "displayName": "resolveMailConfig()",
+      "kind": "function",
+      "signature": "resolveMailConfig(config=globalThis.arcane?.config?.mail||{}, options={})",
+      "entrypoints": ["arcane-os/mail"],
+      "primaryImport": "arcane-os/mail",
+      "group": "Portable Mail",
+      "summary": "Resolves application identity, key, endpoint, and timeout from explicit or host Mail configuration.",
+      "availability": "Node with explicit configuration, or browser/native WebView with optional document and location defaults",
+      "protocol": "Arcane Mail configuration",
+      "normalization": "Returns a frozen appName, appKey, endpoint, and requestTimeout record without initiating delivery"
+    },
+    {
+      "id": "mail:sendMailReport",
+      "name": "sendMailReport",
+      "displayName": "sendMailReport()",
+      "kind": "function",
+      "signature": "sendMailReport({ appKey, appName, endpoint, fetchImpl=globalThis.fetch, report, reportKey, requestTimeout=590000, serializedReport, signal })",
+      "entrypoints": ["arcane-os/mail"],
+      "primaryImport": "arcane-os/mail",
+      "group": "Portable Mail",
+      "summary": "Sends one immutable Mail report with an idempotency key through a bounded HTTP request.",
+      "availability": "Node and browser with Fetch and AbortController, or an explicit fetch implementation",
+      "protocol": "Arcane Mail HTTP transport",
+      "normalization": "Validates request identity and body equality, bounds response bytes, and returns normalized acceptance or throws MailTransportError"
+    },
+    {
+      "id": "mail:serializeMailReport",
+      "name": "serializeMailReport",
+      "displayName": "serializeMailReport()",
+      "kind": "function",
+      "signature": "serializeMailReport(report)",
+      "entrypoints": ["arcane-os/mail"],
+      "primaryImport": "arcane-os/mail",
+      "group": "Portable Mail",
+      "summary": "Serializes one JSON-object Mail report for immutable request-body comparison and delivery.",
+      "availability": "Node and browser",
+      "protocol": "Arcane Mail HTTP transport",
+      "normalization": "Returns compact JSON and rejects non-object or non-serializable reports"
     }
   ]
 }

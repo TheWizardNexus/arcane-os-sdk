@@ -9,7 +9,7 @@ page is the focused local-browser path beneath the normalized AI decision
 guide.
 
 The wiring example assumes a scaffolded or materialized Arcane application
-with SDK `0.2.2`'s authenticated runtime tree and generated browser import map.
+with SDK `0.3.0`'s runtime tree and generated browser import map.
 `arcane/DBOPFS` is a managed browser-map specifier, not an npm package export.
 See [browser runtime delivery](../protocols.md#browser-runtime-delivery) before
 using the example in a custom host or bundler.
@@ -128,8 +128,9 @@ default for its check.
 An enabled byte-length check requires descriptor `bytes` and compares it with
 the actual cached or downloaded byte count. A disabled byte-length check permits
 `bytes` to be absent and never rejects a cached or downloaded model by comparing
-it with an expected size. The store still counts and records the observed byte
-length for storage and progress metadata on every install and cache reuse.
+it with an expected size. The store still counts and records the
+observed byte length for storage and progress metadata on every install and
+cache reuse.
 
 An enabled SHA-256 check requires descriptor `sha256` and hashes the actual
 stored or cached file. A disabled SHA-256 check permits `sha256` to be absent
@@ -158,8 +159,8 @@ console.log(integrity.byteLength.observed); // actual cached/downloaded bytes
 For one-file compatibility, older descriptors can supply `immutableUrl` as the
 URL alias and `name` as a cache-filename hint. If both `url` and
 `immutableUrl` are present, they must match. Legacy `licenseSpdx` and
-`sourceRevision` properties are not canonical descriptor fields or runtime
-admission checks; applications remain responsible for model selection,
+`sourceRevision` properties are
+not canonical descriptor fields or runtime admission checks; applications remain responsible for model selection,
 provenance, and license compliance. Version-2/3 compatibility is internal; a
 new successful completion is always recorded as version 4 without inventing an
 integrity result.
@@ -316,8 +317,8 @@ The SDK default is `secure:false`; `ai.load({security})` can override inherited
 fields for that operation.
 
 When `llm` is an existing `ModelController`, that controller keeps the security
-and load policy with which it was created. This function does not reapply its
-`loadPolicy` argument in that case, and supplying `security` alongside the
+and load policy with which it was created. This function
+does not reapply its `loadPolicy` argument in that case, and supplying `security` alongside the
 existing controller throws `TypeError`. Passing a provider instead creates a
 new controller with the requested policy and security.
 
@@ -489,6 +490,16 @@ The frozen result exposes `{protocol:'arcane-ai-provider/2',role:'llm',id,
 localOnly:true,catalog,inspect,status,load,request,unload,dispose}`. Inspection
 returns `arcane-ai-model-authority/1` only for an exact catalog selection.
 `request()` admits only `chat` and `stream` and preserves structural tool data.
+
+### Availability and normalization
+
+The adapter is available anywhere the caller can supply an admitted
+`arcane-ai-browser-wasm/1` provider object. It performs only the versioned
+provider-shape normalization into `arcane-ai-provider/2`; it does not create a
+runtime, choose or download a model, grant host capability, change local-only
+behavior, or make an arbitrary provider authoritative. Provider lifecycle,
+cancellation, catalog selection, and failures remain owned by the wrapped
+provider and are forwarded through the normalized role contract.
 
 ### Example
 

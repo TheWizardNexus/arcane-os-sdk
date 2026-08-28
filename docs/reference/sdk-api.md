@@ -17,7 +17,7 @@ This table is the Node `package.json#exports` map: it defines package
 entrypoints for SDK/tooling code. It is distinct from the generated browser
 import map that resolves application-facing `arcane/*` modules and the focused
 EventManager entry. See [browser runtime delivery](protocols.md#browser-runtime-delivery)
-for that 91-entry physical-runtime contract in SDK `0.2.2`.
+for the installed-inventory-derived physical-runtime contract in SDK `0.3.0`.
 
 | Specifier | Purpose |
 | --- | --- |
@@ -34,6 +34,7 @@ for that 91-entry physical-runtime contract in SDK `0.2.2`.
 | `arcane-os/event-manager` | Central synchronous events, bounded time-travel history, playback, and optional DOM instrumentation. |
 | `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, configurable DBOPFS model checks, streaming, cancellation, and structural tool-call results. |
 | `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS provider mechanisms, authenticated DBOPFS artifacts, Workers, and cancellation; no model or adapter bytes. |
+| `arcane-os/mail` | Portable Mail runtime, durable outbox, bounded transport, and provider-neutral acceptance contracts. |
 
 JSON schemas, the runtime manifest, and `package.json` are data-only export subpaths. In Node ESM, import JSON with `with {type: 'json'}`, or resolve and read it explicitly.
 
@@ -144,6 +145,7 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `loadArcaneNativeProvider()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `loadArcanePortableProvider()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `loadRuntimeRelease()` | function | `arcane-os` | Runtime and app descriptors | Node |
+| `materializeInstalledSdkRuntime()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `NATIVE_BUILD_PLAN_PROTOCOL` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `NATIVE_BUILDER_PROTOCOL` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `normalizeError()` | function | `arcane-os` | Errors | Node |
@@ -241,6 +243,22 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `isArcaneEventOccurrence()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `parseEventStack()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `projectArcaneDOMEvent()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Browser DOM or a DOM-compatible test host |
+| `DEFAULT_MAIL_REQUEST_TIMEOUT_MS` | constant | `arcane-os/mail` | Portable Mail | Node and browser with Fetch and AbortController for transport use |
+| `MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
+| `MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
+| `MAIL_OUTBOX_PROTOCOL` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
+| `MAIL_OUTBOX_STATES` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
+| `MAIL_OUTBOX_TABLE` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
+| `MAX_MAIL_RESPONSE_BYTES` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
+| `Mail` | class | `arcane-os/mail` | Portable Mail | Node with injected host adapters, or browser/native WebView with durable storage and Web Locks |
+| `MailOutbox` | class | `arcane-os/mail` | Portable Mail | Node or browser with injected DBOPFS-compatible storage and a Web Locks-compatible lock manager |
+| `MailTransportError` | class | `arcane-os/mail` | Portable Mail | Node and browser |
+| `createMailOutbox()` | function | `arcane-os/mail` | Portable Mail | Node or browser with the required injected outbox adapters |
+| `Mail default export` | class | `arcane-os/mail` | Portable Mail | Node with injected host adapters, or browser/native WebView with durable storage and Web Locks |
+| `normalizeMailEndpoint()` | function | `arcane-os/mail` | Portable Mail | Node and browser with URL support; relative endpoints require an explicit or global base URL |
+| `resolveMailConfig()` | function | `arcane-os/mail` | Portable Mail | Node with explicit configuration, or browser/native WebView with optional document and location defaults |
+| `sendMailReport()` | function | `arcane-os/mail` | Portable Mail | Node and browser with Fetch and AbortController, or an explicit fetch implementation |
+| `serializeMailReport()` | function | `arcane-os/mail` | Portable Mail | Node and browser |
 
 # Packaging and release bundles
 
@@ -831,7 +849,7 @@ same deterministic map. The package root also contains the public
 {
   schemaVersion: 1,
   kind: 'arcane-app-runtime-projection',
-  sdkVersion: '0.2.2',
+  sdkVersion: '0.3.0',
   pathPrefix: 'arcane/',
   fileCount,
   totalBytes,
@@ -1380,6 +1398,32 @@ import {loadRuntimeRelease} from 'arcane-os';
 async function useloadRuntimeRelease(...arguments_) {
     return loadRuntimeRelease(...arguments_);
 }
+```
+
+## materializeInstalledSdkRuntime()
+
+### Overview
+
+Verifies the workspace's exact installed SDK runtime and browser runtime, then materializes their dynamic inventories.
+
+### Signature and result
+
+```text
+async materializeInstalledSdkRuntime({workspaceRoot,sdkPackageSource,signal,onEvent}={})
+```
+
+Import it from `arcane-os`. It resolves the workspace's exact installed SDK declaration, verifies both physical runtime receipts, materializes the authenticated runtime projection, and returns a frozen result containing the installation and all three receipts. Cancellation and progress remain caller-owned through `signal` and `onEvent`.
+
+### Availability and normalization
+
+**Node.** Canonical workspace and installed-package identity, verified runtime receipts, and a frozen materialization result. Deep protocol: [Installed SDK runtime materialization](protocols.md).
+
+### Example
+
+```javascript
+import {materializeInstalledSdkRuntime} from 'arcane-os';
+
+const result=await materializeInstalledSdkRuntime({workspaceRoot});
 ```
 
 ## projectNativeDescriptor()
@@ -2715,7 +2759,7 @@ The import-map operation also reports the stable operation-specific strings
 `ARCANE_IMPORT_MAP_COLLISION`; package assembly can additionally report
 `ARCANE_IMPORT_MAP_CLEANUP_FAILED`. They are normalized `ArcaneError.code`
 values, but are not properties added to this frozen general registry in SDK
-`0.2.2`.
+`0.3.0`.
 
 ### Value and import
 
@@ -3381,7 +3425,7 @@ workspace it additionally returns the exact installed package authority:
     packageSource,
     canonicalPackageRoot,
     packageName: 'arcane-os',
-    packageVersion: '0.2.2',
+    packageVersion: '0.3.0',
     runtimeRoot,
     browserRuntimeRoot,
     runtimeManifest,
@@ -3391,9 +3435,9 @@ workspace it additionally returns the exact installed package authority:
 ```
 
 The dependency can be named `arcane-os` or be one exact npm alias for
-`npm:arcane-os@0.2.2`. The selected installation must still be one direct,
+`npm:arcane-os@0.3.0`. The selected installation must still be one direct,
 physical, non-link package directory whose manifest identifies exactly as
-`arcane-os@0.2.2`; duplicate canonical/alias declarations fail closed.
+`arcane-os@0.3.0`; duplicate canonical/alias declarations fail closed.
 `allowMissingManagedImportMap` is an internal packaging/development seam. An
 ordinary caller should leave it `false`.
 
@@ -3570,7 +3614,7 @@ const toolchain = createToolchain({
 
 // Only this explicit call refreshes the managed map and configured HTML entry.
 const result = await toolchain.importMap();
-console.log(result.importMap.entryCount); // 91 in SDK 0.2.2
+console.log(result.importMap.entryCount); // derived from installed inventories
 console.log(result.importMap.documentPaths, result.importMap.documentCount);
 ```
 
@@ -6263,6 +6307,386 @@ async function synthesizeAfterUserChoice() {
     });
     console.log(speech.audio, speech.contentType);
 }
+```
+
+# Portable Mail
+
+The `arcane-os/mail` subpath is the dependency-free portable Mail boundary.
+Node credentials, Resend commands, and the loopback gateway remain toolchain
+and CLI responsibilities rather than browser-package exports.
+
+## DEFAULT_MAIL_REQUEST_TIMEOUT_MS
+
+### Overview
+
+Default upper bound for one Mail HTTP request in milliseconds.
+
+### Value and import
+
+```text
+const DEFAULT_MAIL_REQUEST_TIMEOUT_MS
+```
+
+### Availability and normalization
+
+Node and browser with Fetch and AbortController. The immutable value is 590000.
+
+### Example
+
+```js
+import {DEFAULT_MAIL_REQUEST_TIMEOUT_MS} from 'arcane-os/mail';
+```
+
+## MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES
+
+### Overview
+
+Frozen acceptance-authority allowlist for durable outbox delivery evidence.
+
+### Value and import
+
+```text
+const MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES
+```
+
+### Availability and normalization
+
+Node and browser metadata. Acceptance means admitted provider or Core
+acceptance, not independent inbox delivery.
+
+### Example
+
+```js
+import {MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES} from 'arcane-os/mail';
+```
+
+## MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS
+
+### Overview
+
+Duration for same-key retry before ambiguous delivery requires reconciliation.
+
+### Value and import
+
+```text
+const MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS
+```
+
+### Availability and normalization
+
+Node and browser metadata. The immutable value is 86400000 milliseconds.
+
+### Example
+
+```js
+import {MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS} from 'arcane-os/mail';
+```
+
+## MAIL_OUTBOX_PROTOCOL
+
+### Overview
+
+Stable protocol identifier written to durable Mail outbox records.
+
+### Value and import
+
+```text
+const MAIL_OUTBOX_PROTOCOL
+```
+
+### Availability and normalization
+
+Node and browser metadata. The immutable value is `arcane-mail-outbox/1`.
+
+### Example
+
+```js
+import {MAIL_OUTBOX_PROTOCOL} from 'arcane-os/mail';
+```
+
+## MAIL_OUTBOX_STATES
+
+### Overview
+
+Frozen ordered vocabulary for durable Mail outbox lifecycle states.
+
+### Value and import
+
+```text
+const MAIL_OUTBOX_STATES
+```
+
+### Availability and normalization
+
+Node and browser metadata. States are queued, sending, retry_wait, accepted,
+failed, and reconciliation_required.
+
+### Example
+
+```js
+import {MAIL_OUTBOX_STATES} from 'arcane-os/mail';
+```
+
+## MAIL_OUTBOX_TABLE
+
+### Overview
+
+Default DBOPFS-compatible table name for durable Mail outbox records.
+
+### Value and import
+
+```text
+const MAIL_OUTBOX_TABLE
+```
+
+### Availability and normalization
+
+Node and browser metadata. The immutable value is `mail_outbox`.
+
+### Example
+
+```js
+import {MAIL_OUTBOX_TABLE} from 'arcane-os/mail';
+```
+
+## MAX_MAIL_RESPONSE_BYTES
+
+### Overview
+
+Maximum response-body bytes admitted by the Mail HTTP transport.
+
+### Value and import
+
+```text
+const MAX_MAIL_RESPONSE_BYTES
+```
+
+### Availability and normalization
+
+Node and browser metadata. The immutable bound is 65536 bytes.
+
+### Example
+
+```js
+import {MAX_MAIL_RESPONSE_BYTES} from 'arcane-os/mail';
+```
+
+## Mail
+
+### Overview
+
+Owns the application Mail singleton, durable lifecycle, report normalization,
+and explicit transport selection.
+
+### Signature and result
+
+```text
+new Mail(config=globalThis.arcane?.config?.mail||{}, options={})
+```
+
+### Availability and normalization
+
+Node with injected host adapters, or browser/native WebView with durable
+storage and Web Locks. Reports persist before delivery and results are frozen.
+
+### Example
+
+```js
+import {Mail} from 'arcane-os/mail';
+const mail = new Mail({}, options);
+```
+
+## MailOutbox
+
+### Overview
+
+Owns durable FIFO delivery, retry classification, and invalid-record
+maintenance.
+
+### Signature and result
+
+```text
+new MailOutbox(options={})
+```
+
+### Availability and normalization
+
+Node or browser with injected DBOPFS-compatible storage and a Web
+Locks-compatible lock manager. Records and summaries are deeply frozen.
+
+### Example
+
+```js
+import {MailOutbox} from 'arcane-os/mail';
+const outbox = new MailOutbox(options);
+```
+
+## MailTransportError
+
+### Overview
+
+Normalized Mail transport failure with stable retry and uncertainty metadata.
+
+### Signature and result
+
+```text
+new MailTransportError(message, options={})
+```
+
+### Availability and normalization
+
+Node and browser. It exposes code, retryable, retryAfterMs, statusCode, and
+uncertain without unbounded remote detail.
+
+### Example
+
+```js
+import {MailTransportError} from 'arcane-os/mail';
+```
+
+## createMailOutbox()
+
+### Overview
+
+Creates a MailOutbox from caller-owned storage, locking, delivery, and
+lifecycle adapters.
+
+### Signature and result
+
+```text
+createMailOutbox(options)
+```
+
+### Availability and normalization
+
+Node or browser with the required injected adapters. The result is the same
+validated contract as direct MailOutbox construction.
+
+### Example
+
+```js
+import {createMailOutbox} from 'arcane-os/mail';
+const outbox = createMailOutbox(options);
+```
+
+## Mail default export
+
+### Overview
+
+Default package binding for the same Mail class exposed by the named export.
+
+### Signature and result
+
+```text
+default as Mail
+```
+
+### Availability and normalization
+
+Node with injected host adapters, or browser/native WebView with durable
+storage and Web Locks. Binding identity equals the named `Mail` export.
+
+### Example
+
+```js
+import Mail from 'arcane-os/mail';
+```
+
+## normalizeMailEndpoint()
+
+### Overview
+
+Resolves and validates one credential-free HTTPS or loopback-HTTP endpoint.
+
+### Signature and result
+
+```text
+normalizeMailEndpoint(endpoint, base=globalThis.location?.href)
+```
+
+### Availability and normalization
+
+Node and browser with URL support. Relative endpoints require a base;
+credentials, queries, fragments, and insecure non-loopback transport reject.
+
+### Example
+
+```js
+import {normalizeMailEndpoint} from 'arcane-os/mail';
+const endpoint = normalizeMailEndpoint('/v1/mail', location.href);
+```
+
+## resolveMailConfig()
+
+### Overview
+
+Resolves application identity, key, endpoint, and timeout without delivery.
+
+### Signature and result
+
+```text
+resolveMailConfig(config=globalThis.arcane?.config?.mail||{}, options={})
+```
+
+### Availability and normalization
+
+Node with explicit configuration, or browser/native WebView with optional
+document and location defaults. The returned configuration is frozen.
+
+### Example
+
+```js
+import {resolveMailConfig} from 'arcane-os/mail';
+const config = resolveMailConfig();
+```
+
+## sendMailReport()
+
+### Overview
+
+Sends one immutable Mail report with an idempotency key through bounded HTTP.
+
+### Signature and result
+
+```text
+sendMailReport({ appKey, appName, endpoint, fetchImpl=globalThis.fetch, report, reportKey, requestTimeout=590000, serializedReport, signal })
+```
+
+### Availability and normalization
+
+Node and browser with Fetch and AbortController, or an explicit fetch
+implementation. The response is bounded and normalized as acceptance or a
+`MailTransportError`.
+
+### Example
+
+```js
+import {sendMailReport} from 'arcane-os/mail';
+const result = await sendMailReport(options);
+```
+
+## serializeMailReport()
+
+### Overview
+
+Serializes one JSON-object Mail report for immutable body comparison.
+
+### Signature and result
+
+```text
+serializeMailReport(report)
+```
+
+### Availability and normalization
+
+Node and browser. Returns compact JSON and rejects non-object or
+non-serializable reports.
+
+### Example
+
+```js
+import {serializeMailReport} from 'arcane-os/mail';
+const body = serializeMailReport(report);
 ```
 
 ## Data export subpaths

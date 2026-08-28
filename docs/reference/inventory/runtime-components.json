@@ -5,7 +5,7 @@
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
     "commit": "75b01e7ddcd751f7970d8c1aaf18bfff05b706b7",
     "path": "runtime/arcane/components",
-    "sdkVersion": "0.2.3",
+    "sdkVersion": "0.3.0",
     "legacyProjection": {
       "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
       "commit": "c540014afe69f14cf5ae60493b7295f36dbcec64",

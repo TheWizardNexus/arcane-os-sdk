@@ -310,6 +310,7 @@ function publicStatus({
   lifecycleReason,
   activeOperation,
   artifactGraphAdmission,
+  security,
 }) {
   return Object.freeze({
     role,
@@ -324,6 +325,7 @@ function publicStatus({
     generation,
     errorCode,
     cache,
+    security,
     artifactGraphId: authority.artifactGraphId ?? null,
     artifactGraphAdmission,
   });
@@ -1058,6 +1060,10 @@ function createBrowserSpeechProvider({
     runtime,
     security: configuredProviderSecurity,
   });
+  const defaultSecurity = resolveModelSecurity({
+    app: configuredAppSecurity,
+    binding: configuredProviderSecurity,
+  });
   const operation = ROLE_OPERATION[role];
   const speech = role === "stt"
     ? Object.freeze({ inputSampleRate: inputSampleRate(authority) })
@@ -1109,6 +1115,7 @@ function createBrowserSpeechProvider({
       lifecycleReason,
       activeOperation,
       artifactGraphAdmission,
+      security: active?.security ?? loadOperation?.security ?? defaultSecurity,
     });
   }
 
@@ -1263,6 +1270,14 @@ function createBrowserSpeechProvider({
               "Browser speech graph load security",
             ),
           });
+          if (effectiveSecurity.secure !== true) {
+            throw providerError(
+              "ARCANE_AI_SECURE_MODE_REQUIRED",
+              "Authenticated browser speech artifact graphs require explicit secure:true.",
+              undefined,
+              `${role}-artifact-graph-secure-mode-required`,
+            );
+          }
         } else {
           effectiveSecurity = resolveModelSecurity({
             app: configuredAppSecurity,

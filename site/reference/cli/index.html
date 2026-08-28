@@ -13,10 +13,10 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../sdk-api/">API</a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane CLI reference</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-cli-reference">Arcane CLI reference</h1><p class="doc-lead">The arcane and arcane-os executables invoke the same headless SDK toolchain. Use the command name that is unambiguous in the current project; project-local…</p><div class="doc-meta"><span>SDK 0.2.2</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane CLI reference</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-cli-reference">Arcane CLI reference</h1><p class="doc-lead">The arcane and arcane-os executables invoke the same headless SDK toolchain. Use the command name that is unambiguous in the current project; project-local…</p><div class="doc-meta"><span>SDK 0.3.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="./" aria-current="page">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/cli.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#command-inventory">Command inventory</a><a href="#parser-wide-options">Parser-wide options</a><a href="#output-and-exit-contract">Output and exit contract</a><a href="#arcane-new">arcane new</a><a href="#arcane-init">arcane init</a><a href="#arcane-doctor">arcane doctor</a><a href="#arcane-import-map">arcane import-map</a><a href="#arcane-dev">arcane dev</a><a href="#arcane-test">arcane test</a><a href="#arcane-check">arcane check</a><a href="#arcane-package">arcane package</a><a href="#arcane-verify">arcane verify</a><a href="#arcane-bundle">arcane bundle</a><a href="#arcane-verify-bundle">arcane verify-bundle</a><a href="#arcane-native-doctor">arcane native-doctor</a><a href="#arcane-native-prepare">arcane native-prepare</a><a href="#arcane-build">arcane build</a><a href="#arcane-run">arcane run</a><a href="#arcane-update-check">arcane update-check</a><a href="#arcane-targets">arcane targets</a><a href="#arcane-repo">arcane repo</a><a href="#machine-output">Machine output</a><a href="#programmatic-only-operation-names">Programmatic-only operation names</a></nav></details><p>The <code>arcane</code> and <code>arcane-os</code> executables invoke the same headless SDK toolchain.
+      <article class="prose reference-prose" data-reference-source="docs/reference/cli.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#command-inventory">Command inventory</a><a href="#parser-wide-options">Parser-wide options</a><a href="#output-and-exit-contract">Output and exit contract</a><a href="#arcane-new">arcane new</a><a href="#arcane-init">arcane init</a><a href="#arcane-doctor">arcane doctor</a><a href="#arcane-import-map">arcane import-map</a><a href="#arcane-dev">arcane dev</a><a href="#arcane-test">arcane test</a><a href="#arcane-check">arcane check</a><a href="#arcane-package">arcane package</a><a href="#arcane-verify">arcane verify</a><a href="#arcane-bundle">arcane bundle</a><a href="#arcane-verify-bundle">arcane verify-bundle</a><a href="#arcane-native-doctor">arcane native-doctor</a><a href="#arcane-native-prepare">arcane native-prepare</a><a href="#arcane-build">arcane build</a><a href="#arcane-run">arcane run</a><a href="#arcane-update-check">arcane update-check</a><a href="#arcane-targets">arcane targets</a><a href="#arcane-repo">arcane repo</a><a href="#arcane-mail">arcane mail</a><a href="#machine-output">Machine output</a><a href="#programmatic-only-operation-names">Programmatic-only operation names</a></nav></details><p>The <code>arcane</code> and <code>arcane-os</code> executables invoke the same headless SDK toolchain.
 Use the command name that is unambiguous in the current project; project-local
 scripts should resolve the exact package version pinned by the app&#39;s lockfile.</p>
 <p>Every potentially blocking operation acknowledges before it begins, owns its
@@ -103,6 +103,18 @@ and exits nonzero on failure. Machine output is defined by
 <td><code>arcane repo status|pull|push</code></td>
 <td>Runs one selected repository operation for the current app workspace.</td>
 </tr>
+<tr>
+<td><code>arcane mail key set|status|delete</code></td>
+<td>Manages one server-only Resend API-key profile in Windows Credential Manager.</td>
+</tr>
+<tr>
+<td><code>arcane mail send</code></td>
+<td>Performs one explicit, idempotency-keyed Resend attempt from a bounded JSON report on redirected stdin.</td>
+</tr>
+<tr>
+<td><code>arcane mail serve</code></td>
+<td>Starts one authenticated numeric-loopback Arcane-to-Resend gateway with exact app, Origin, and recipient admission.</td>
+</tr>
 </tbody></table>
 </div>
 <h2 id="parser-wide-options">Parser-wide options</h2>
@@ -134,7 +146,7 @@ meaning and cardinality rules:</p>
 <tr>
 <td><code>--app</code></td>
 <td>app id</td>
-<td>Workspace/app operations except shared scope and <code>verify-bundle</code>.</td>
+<td>Workspace/app operations except shared scope and <code>verify-bundle</code>; also the exact <code>mail serve</code> caller id.</td>
 </tr>
 <tr>
 <td><code>--arcane-root</code></td>
@@ -144,7 +156,7 @@ meaning and cardinality rules:</p>
 <tr>
 <td><code>--host</code> / <code>--port</code></td>
 <td>host / integer 0–65535</td>
-<td>Browser <code>dev</code> and <code>run</code>; defaults to <code>127.0.0.1:8000</code>.</td>
+<td>Browser <code>dev</code>/<code>run</code> default to <code>127.0.0.1:8000</code>; <code>mail serve</code> defaults to <code>127.0.0.1:8025</code> and admits numeric loopback only.</td>
 </tr>
 <tr>
 <td><code>--target</code></td>
@@ -177,6 +189,36 @@ meaning and cardinality rules:</p>
 <td><code>bundle</code>, <code>verify-bundle</code></td>
 </tr>
 <tr>
+<td><code>--profile</code></td>
+<td>credential profile id</td>
+<td><code>mail send</code>, <code>mail serve</code></td>
+</tr>
+<tr>
+<td><code>--from</code></td>
+<td>verified sender</td>
+<td><code>mail send</code>, <code>mail serve</code></td>
+</tr>
+<tr>
+<td><code>--origin</code></td>
+<td>exact browser origin</td>
+<td><code>mail serve</code></td>
+</tr>
+<tr>
+<td><code>--allow-to</code></td>
+<td>one to 50 comma-separated addresses</td>
+<td><code>mail serve</code></td>
+</tr>
+<tr>
+<td><code>--report-key</code></td>
+<td>8–128 safe characters</td>
+<td><code>mail send</code>; caller-owned stable Resend idempotency key</td>
+</tr>
+<tr>
+<td><code>--request-timeout</code></td>
+<td>integer 1000–600000 ms</td>
+<td><code>mail send</code>, <code>mail serve</code></td>
+</tr>
+<tr>
 <td><code>--output</code></td>
 <td><code>human</code>, <code>json</code>, <code>ndjson</code></td>
 <td>Every invocation; the final occurrence wins.</td>
@@ -205,6 +247,21 @@ meaning and cardinality rules:</p>
 <td><code>--overwrite</code></td>
 <td>flag</td>
 <td><code>bundle</code> only</td>
+</tr>
+<tr>
+<td><code>--secret-stdin</code></td>
+<td>flag</td>
+<td><code>mail key set</code>; requires redirected input</td>
+</tr>
+<tr>
+<td><code>--app-key-stdin</code></td>
+<td>flag</td>
+<td><code>mail serve</code>; requires redirected input</td>
+</tr>
+<tr>
+<td><code>--report-stdin</code></td>
+<td>flag</td>
+<td><code>mail send</code>; requires redirected JSON input</td>
 </tr>
 <tr>
 <td><code>--help</code>, <code>-h</code></td>
@@ -302,10 +359,11 @@ identical executable alias.</p>
 <p>The generated artifact is
 <code>apps/&lt;id&gt;/modules/arcane.importmap.json</code>. Its exact JSON is also installed in
 the app entry as <code>&lt;script type=&quot;importmap&quot; data-arcane-import-map&gt;</code> before
-module loading. In SDK <code>0.2.2</code>, the complete authenticated physical-v1 runtime
-produces 91 entries and intentionally has no package-root mapping. That count
-describes the shipped SDK closure; the command receipt remains authoritative
-for the exact map written to the selected application.</p>
+module loading. In SDK <code>0.3.0</code>, the complete physical-v1 runtime derives its
+entries from the installed runtime and browser-runtime inventories and
+intentionally has no package-root mapping. The command receipt remains
+authoritative for the exact map written to the selected application; no fixed
+entry count is a release contract.</p>
 <h3 id="result-and-safety">Result and safety</h3>
 <p>Success returns the normal selected-workspace wrapper:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const result = {
@@ -320,7 +378,7 @@ for the exact map written to the selected application.</p>
         documentPaths,
         documentCount:1,
         imports,
-        entryCount:91,
+        entryCount:Object.keys(imports).length,
         excludedModules:[&#39;modules/CaseEvidenceIndexer.js&#39;],
         files:[
             {role:&#39;artifact&#39;,path,bytes,sha256},
@@ -605,6 +663,76 @@ loop across workspaces.</p>
 <h3 id="example-17">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm exec -- arcane repo status
 </code></pre></div>
+<h2 id="arcane-mail"><code>arcane mail</code></h2>
+<h3 id="resend-credential-profiles">Resend credential profiles</h3>
+<p>The credential subcommands select one local profile:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane mail key set &lt;profile&gt; [--secret-stdin]
+arcane mail key status &lt;profile&gt;
+arcane mail key delete &lt;profile&gt;
+</code></pre></div>
+<p><code>key set</code> reads the Resend API key from a hidden terminal prompt. The
+<code>--secret-stdin</code> form is for deliberately redirected non-interactive input and
+rejects a TTY before reading. The key is sent to the Windows Credential Manager
+helper over child-process stdin, never argv, and no plaintext fallback is
+created. Status reports only whether the profile exists. Delete returns the
+selected profile with <code>exists:false</code>; it intentionally does not distinguish a
+new deletion from an already-absent profile. Non-Windows hosts fail closed.</p>
+<p>Machine output for <code>key set</code> requires <code>--secret-stdin</code>. Raw CLI arguments are
+not included in acceptance events, and usage errors do not echo unknown option
+or positional values.</p>
+<h3 id="one-shot-provider-send">One-shot provider send</h3>
+<p><code>mail send</code> performs exactly one Resend provider attempt without starting a
+loopback server:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane mail send --profile &lt;profile&gt; --from &lt;verified-sender&gt; --report-key &lt;id&gt; --report-stdin [--request-timeout &lt;ms&gt;]
+</code></pre></div>
+<p><code>--report-stdin</code> is mandatory and rejects a terminal before attaching input
+listeners. It accepts one UTF-8 JSON object up to 52 MiB using the existing
+gateway report shape:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>json</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-json">{
+  &quot;type&quot;: &quot;report&quot;,
+  &quot;to&quot;: [&quot;recipient@example.com&quot;],
+  &quot;subject&quot;: &quot;Example&quot;,
+  &quot;text&quot;: &quot;Message content&quot;
+}
+</code></pre></div>
+<p>The exact closed report keys are <code>type</code>, <code>to</code>, <code>subject</code>, and at least one of
+<code>text</code> or <code>html</code>. Direct CLI sending requires one to 50 explicit unique
+recipients, including for <code>error</code> reports. The Resend credential comes only
+from the selected Windows Credential Manager profile; neither it nor report
+content is accepted through argv, environment variables, or result fields.</p>
+<p>The caller owns <code>--report-key</code>. It must contain 8–128 ASCII letters, digits,
+periods, underscores, colons, or hyphens. Reuse the same key only with the same
+byte-equivalent logical report when deliberately reconciling or retrying an
+ambiguous attempt. The CLI never retries automatically.</p>
+<p>Exit zero means Resend returned a successful response with a valid provider
+acceptance id. The privacy-safe result contains only provider, status,
+classification, request id, provider id, provider HTTP status, and recipient
+count. It proves provider API acceptance, not inbox delivery. Permanent,
+retryable, and ambiguous outcomes exit nonzero with only normalized code,
+status, retry, uncertainty, and count metadata. Cancellation before the
+provider attempt exits 130 without sending; cancellation, timeout, or transport
+loss after the attempt begins is ambiguous because Resend may have accepted it.</p>
+<h3 id="authenticated-local-gateway">Authenticated local gateway</h3>
+<p><code>mail serve</code> starts one owned Node HTTP gateway:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane mail serve --profile &lt;profile&gt; --from &lt;verified-sender&gt; --app &lt;id&gt; --origin &lt;exact-origin&gt; --allow-to &lt;addresses&gt; [--app-key-stdin] [--host 127.0.0.1] [--port 8025] [--request-timeout &lt;ms&gt;]
+</code></pre></div>
+<p>The selected credential profile supplies only the server-side Resend API key.
+A separate local mail app key is read through a hidden prompt. Structured
+output requires <code>--app-key-stdin</code> with redirected input; the app key is never an
+argv value or part of the server result. The browser must use the same value as
+<code>arcane.config.mail.appKey</code>.</p>
+<p>The CLI admits only numeric loopback host values accepted by the gateway. The
+gateway also binds the exact app id, Origin, sender, and recipient allowlist,
+and it requires the separate app key by default. <code>--allow-to</code> accepts one to 50
+comma-separated unique recipients. <code>--request-timeout</code> is the one provider
+attempt timeout in milliseconds and defaults to <code>30000</code>.</p>
+<p>After binding, <code>server.ready</code> reports only sanitized lifecycle fields such as
+protocol, app id, loopback address, port, URL, and caller-authentication mode.
+The command owns the server until its lifecycle ends or <code>SIGINT</code>/<code>SIGTERM</code>
+cancels it. Neither Resend nor local app credentials, sender/recipient policy,
+or message content appear in the result or observer events.</p>
+<p>See <a href="../mail/">Mail gateway and durable outbox</a> for request, retry,
+idempotency, DBOPFS, and provider-acceptance semantics.</p>
 <h2 id="machine-output">Machine output</h2>
 <p><code>--output json</code> returns one complete JSON document after structured progress is
 collected. <code>--output ndjson</code> emits one event record per line as work proceeds.
@@ -622,9 +750,9 @@ documented JavaScript operations directly when that lower-level lifecycle is
 required; do not present those names as user commands or infer them from the
 parser&#39;s recognized option set.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#command-inventory">Command inventory</a><a href="#parser-wide-options">Parser-wide options</a><a href="#output-and-exit-contract">Output and exit contract</a><a href="#arcane-new">arcane new</a><a href="#arcane-init">arcane init</a><a href="#arcane-doctor">arcane doctor</a><a href="#arcane-import-map">arcane import-map</a><a href="#arcane-dev">arcane dev</a><a href="#arcane-test">arcane test</a><a href="#arcane-check">arcane check</a><a href="#arcane-package">arcane package</a><a href="#arcane-verify">arcane verify</a><a href="#arcane-bundle">arcane bundle</a><a href="#arcane-verify-bundle">arcane verify-bundle</a><a href="#arcane-native-doctor">arcane native-doctor</a><a href="#arcane-native-prepare">arcane native-prepare</a><a href="#arcane-build">arcane build</a><a href="#arcane-run">arcane run</a><a href="#arcane-update-check">arcane update-check</a><a href="#arcane-targets">arcane targets</a><a href="#arcane-repo">arcane repo</a><a href="#machine-output">Machine output</a><a href="#programmatic-only-operation-names">Programmatic-only operation names</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#command-inventory">Command inventory</a><a href="#parser-wide-options">Parser-wide options</a><a href="#output-and-exit-contract">Output and exit contract</a><a href="#arcane-new">arcane new</a><a href="#arcane-init">arcane init</a><a href="#arcane-doctor">arcane doctor</a><a href="#arcane-import-map">arcane import-map</a><a href="#arcane-dev">arcane dev</a><a href="#arcane-test">arcane test</a><a href="#arcane-check">arcane check</a><a href="#arcane-package">arcane package</a><a href="#arcane-verify">arcane verify</a><a href="#arcane-bundle">arcane bundle</a><a href="#arcane-verify-bundle">arcane verify-bundle</a><a href="#arcane-native-doctor">arcane native-doctor</a><a href="#arcane-native-prepare">arcane native-prepare</a><a href="#arcane-build">arcane build</a><a href="#arcane-run">arcane run</a><a href="#arcane-update-check">arcane update-check</a><a href="#arcane-targets">arcane targets</a><a href="#arcane-repo">arcane repo</a><a href="#arcane-mail">arcane mail</a><a href="#machine-output">Machine output</a><a href="#programmatic-only-operation-names">Programmatic-only operation names</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.2.2, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK source candidate 0.3.0, runtime bundle 0.8.12, and protocol arcane/1; the latest verified published package is 0.2.3.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>

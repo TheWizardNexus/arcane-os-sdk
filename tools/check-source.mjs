@@ -122,6 +122,7 @@ function assertPackageMetadata(packageDocument){
         './toolchain',
         './events',
         './event-manager',
+        './mail',
         './targets',
         './native',
         './integrated-provider',

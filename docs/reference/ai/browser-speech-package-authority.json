@@ -733,7 +733,7 @@
       "requestPattern": "https://cdn.jsdelivr.net/npm/@huggingface/transformers@${version}/dist/",
       "admissionRequirement": "warn-first-uses-the-caller-selected-version-pinned-upstream-wasmPaths-secure-graph-mode-requires-materialized-runtime-files"
     },
-    "workerBoundary": "The dedicated SDK Worker uses declared graph routes for configured artifact aliases. In default warn-first mode ordinary browser capabilities remain available; secure:true installs strict graph isolation.",
+    "workerBoundary": "The dedicated SDK Worker uses declared graph routes only for explicit secure:true artifact aliases. Default warn-first mode uses the direct upstream runtime/model authority and ordinary browser capabilities.",
     "failClosedBoundary": "Strict rejection of undeclared capabilities is opt-in through secure:true. Default operation warns and proceeds so optional hardening cannot disable the selected provider."
   },
   "exclusions": {

@@ -7,10 +7,16 @@ const ARTIFACT_GRAPH_MODULE_GRAPH =
 const GRAPH_GUARD_NAME = "__arcaneBrowserSpeechArtifactGraphGuardsV1";
 const NESTED_WORKER_PROTOCOL =
   "arcane-ai-browser-speech-artifact-module-worker/1";
-const GRAPH_ADMISSIONS = new Set([
+const STRICT_GRAPH_ADMISSIONS = new Set([
   "artifact-graph-network-dbopfs-verified",
   "artifact-graph-dbopfs-cache-verified",
   "artifact-graph-offline-dbopfs-cache-verified",
+  "artifact-graph-network-dbopfs-partially-checked",
+  "artifact-graph-dbopfs-cache-partially-checked",
+  "artifact-graph-offline-dbopfs-cache-partially-checked",
+  "artifact-graph-network-dbopfs-unchecked",
+  "artifact-graph-dbopfs-cache-unchecked",
+  "artifact-graph-offline-dbopfs-cache-unchecked",
 ]);
 const ADAPTERS = Object.freeze({
   stt: "transformers-whisper",
@@ -690,18 +696,21 @@ function validateConfiguration(configuration, role) {
     }
     const runtimePaths = new Set(configuration.runtime.files.map((file) => file.path));
     if (
-      typeof configuration.runtime.artifactGraphId !== "string"
+      configuration.security?.secure !== true
+      || typeof configuration.runtime.artifactGraphId !== "string"
       || !/^[a-f0-9]{64}$/u.test(configuration.runtime.artifactGraphId)
-      || typeof configuration.runtime.guardCapability !== "string"
-      || !/^[a-f0-9]{64}$/u.test(configuration.runtime.guardCapability)
-      || !GRAPH_ADMISSIONS.has(configuration.runtime.artifactGraphAdmission)
-      || !configuration.runtime.edges
-      || typeof configuration.runtime.edges !== "object"
-      || !Array.isArray(configuration.runtime.transforms)
+      || (
+        typeof configuration.runtime.guardCapability !== "string"
+        || !/^[a-f0-9]{64}$/u.test(configuration.runtime.guardCapability)
+        || !STRICT_GRAPH_ADMISSIONS.has(configuration.runtime.artifactGraphAdmission)
+        || !configuration.runtime.edges
+        || typeof configuration.runtime.edges !== "object"
+        || !Array.isArray(configuration.runtime.transforms)
+      )
     ) {
       throw workerError(
         "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
-        "Authenticated artifact graph identity, admission, edges, and transforms are required.",
+        "Explicit secure:true plus authenticated artifact graph identity, admission, edges, and transforms are required.",
         undefined,
         "artifact-graph-worker-configuration-incomplete",
       );
@@ -2245,6 +2254,15 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
 
   function status() {
     const state = disposed ? "disposed" : engine ? "ready" : "unloaded";
+    const security = configuration?.security
+      ? Object.freeze({
+        secure: configuration.security.secure === true,
+        checks: Object.freeze({
+          byteLength: configuration.security.checks?.byteLength === true,
+          sha256: configuration.security.checks?.sha256 === true,
+        }),
+      })
+      : null;
     return Object.freeze({
       state,
       lifecycleStatus: `${role}-worker-${state}`,
@@ -2253,6 +2271,7 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
       loaded: engine !== null,
       busy: operations.size > 0,
       activeOperation: operations.values().next().value?.publicOperation ?? null,
+      security,
       artifactGraphId: configuration?.runtime?.artifactGraphId ?? null,
       artifactGraphAdmission: configuration?.runtime?.artifactGraphAdmission ?? null,
     });
@@ -2274,7 +2293,7 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
       configuration = validateConfiguration(request.payload?.configuration, role);
       const entry = configuration.runtime.files.find((file) =>
         file.path === configuration.runtime.entry);
-      if (graphConfiguration(configuration)) {
+      if (graphConfiguration(configuration) && configuration.security?.secure === true) {
         environment = installArtifactGraphEnvironment(scope, configuration, role);
       } else if (configuration.security?.secure === true) {
         const legacyFetch = installLegacyAuthorizedFetch(scope, configuration);

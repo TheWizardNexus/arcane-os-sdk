@@ -172,6 +172,7 @@ test('packed npm artifact installs and drives an external repository end to end'
         assert.ok(packReport.files.some(file=>file.path==='schemas/arcane-app-bundle.schema.json'));
         assert.ok(packReport.files.some(file=>file.path==='schemas/event-stack.schema.json'));
         assert.ok(packReport.files.some(file=>file.path==='src/event-manager.mjs'));
+        assert.ok(packReport.files.some(file=>file.path==='src/mail-api.mjs'));
         assert.ok(packReport.files.some(file=>
             file.path==='browser-runtime/ai/ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json'
         ));
@@ -396,6 +397,7 @@ test('packed npm artifact installs and drives an external repository end to end'
             '--input-type=module',
             '--eval',
             `const eventManager=await import('arcane-os/event-manager');
+const mail=await import('arcane-os/mail');
 const eventStackSchema=await import('arcane-os/schemas/event-stack.json',{with:{type:'json'}});
 const manager=eventManager.createEventManager({timeTravel:true,sessionId:'packed-artifact'});
 let observed=null;
@@ -406,7 +408,10 @@ process.stdout.write(JSON.stringify({
     schemaProtocol:eventStackSchema.default.properties.protocol.const,
     observed,
     eventCount:manager.eventCount,
-    eventType:manager.history[0]?.type
+    eventType:manager.history[0]?.type,
+    mailExports:Object.keys(mail).sort(),
+    mailDefaultMatchesNamed:mail.default===mail.Mail,
+    mailOutboxProtocol:mail.MAIL_OUTBOX_PROTOCOL
 }));`
         ],{cwd:harnessRoot,timeout:60_000});
         assert.equal(imported.code,0,imported.stderr);
@@ -415,7 +420,27 @@ process.stdout.write(JSON.stringify({
             schemaProtocol:'arcane-event-stack/1',
             observed:42,
             eventCount:1,
-            eventType:'packed.artifact.proof'
+            eventType:'packed.artifact.proof',
+            mailExports:[
+                'DEFAULT_MAIL_REQUEST_TIMEOUT_MS',
+                'MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES',
+                'MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS',
+                'MAIL_OUTBOX_PROTOCOL',
+                'MAIL_OUTBOX_STATES',
+                'MAIL_OUTBOX_TABLE',
+                'MAX_MAIL_RESPONSE_BYTES',
+                'Mail',
+                'MailOutbox',
+                'MailTransportError',
+                'createMailOutbox',
+                'default',
+                'normalizeMailEndpoint',
+                'resolveMailConfig',
+                'sendMailReport',
+                'serializeMailReport'
+            ],
+            mailDefaultMatchesNamed:true,
+            mailOutboxProtocol:'arcane-mail-outbox/1'
         });
     });
 

@@ -24,7 +24,7 @@ const referenceSourceRoot=path.join(repositoryRoot,'docs','reference');
 const referenceOutputRoot=path.join(repositoryRoot,'site','reference');
 const canonicalRoot='https://thewizardnexus.github.io/arcane-os-sdk/';
 const publishedVersions=Object.freeze({
-    sdk:'0.2.2',
+    sdk:'0.3.0',
     runtime:'0.8.12',
     protocol:'arcane/1'
 });
@@ -33,37 +33,37 @@ const referenceCssOutput='site/reference/reference.css';
 const referenceScriptOutput='site/reference/reference.js';
 const maximumTableOfContentsEntries=40;
 const expectedRuntimeContractSummary=Object.freeze({
-    artifactCount:85,
-    esmModuleCount:79,
-    esmExportCount:318,
+    artifactCount:86,
+    esmModuleCount:80,
+    esmExportCount:384,
     exportForms:Object.freeze({
-        function:164,
-        variable:65,
-        class:15,
+        function:168,
+        variable:124,
+        class:17,
         alias:26,
         're-export':4,
-        default:44
+        default:45
     }),
     reviewedCallableCount:183,
     reviewedModuleCount:56,
-    literalCustomEventCount:11,
-    directCodedFailureCount:37,
-    exportedErrorSubclassCount:3,
-    publicMemberCount:456
+    literalCustomEventCount:0,
+    directCodedFailureCount:58,
+    exportedErrorSubclassCount:4,
+    publicMemberCount:579
 });
 const publishedReleaseMarkdown=[
-    '## Published 0.2.2',
+    '## Published 0.2.3',
     '',
-    'The published package is exactly `arcane-os@0.2.2` from source commit `d5326d206bf0bec6ad82d53605e666841aa79899`. The npm `latest` dist-tag resolves to `0.2.2`; the separate `dev` dist-tag remains `0.1.0-dev.5`.',
+    'The most recently verified published package before this 0.3.0 source candidate is exactly `arcane-os@0.2.3` from source commit `d717f21d45664d20e4ed6377596db87c47492e11`. The npm `latest` dist-tag resolves to `0.2.3`; the separate `dev` dist-tag remains `0.1.0-dev.5`.',
     '',
     '| Evidence | Exact value |',
     '| --- | --- |',
-    '| npm integrity | `sha512-JnLzZ4+FqX9tMgRv8HMcaCPSFx3xNNRf8BF8T03fD2ymg2g8cIGZRdD/3Tbd9PLtpx1PIKCpxz6nCP6ztnu1Nw==` |',
-    '| npm shasum | `0b0d314acce48dcb5518470cd45a54221589d4d4` |',
-    '| Immutable release tarball | `arcane-os-0.2.2.manifest.json`; artifact `9631659213`; 6,993,999 bytes; SHA-256 `e0fe1a556b603f67f5e3c142be7154b433312d3c0f3b58632df2e7fc43cc0ca7` |',
-    '| GitHub release | [`0.2.2`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.2.2) (tag and title are both exactly `0.2.2`) |',
-    '| Hosted source/artifact gate | [Check run 33034955277](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33034955277) |',
-    '| Trusted publication | [Run 33035086265](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33035086265) |',
+    '| npm integrity | `sha512-TZewkGM7dh9PdVnOtnkBO7QalJ6qyWWdKruCmsTxoHyeoG5XpqVbkNgiJhtBLhrIzgUV3vydYplxZQkIbIWoHg==` |',
+    '| npm shasum | `8e978a23289a41db130253e6475a0c8bb0c0d73f` |',
+    '| Immutable release tarball | `arcane-os-0.2.3.tgz`; 6,999,078 bytes; SHA-256 `857f179c2f9d4549e7691b4e6cebc49e5ab5e18600816443b26319c61fc1f85d` |',
+    '| GitHub release | [`0.2.3`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.2.3) (tag and title are both exactly `0.2.3`) |',
+    '| Hosted source/artifact gate | [Check run 33052271534](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33052271534) |',
+    '| Trusted publication | [Run 33052383457](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33052383457) |',
     '',
     'The npm SLSA provenance binds the published package to that exact source commit and `.github/workflows/publish-dev.yml`. Hashes prove byte identity or consistency; provenance establishes the recorded source/workflow relationship. Neither claim alone proves browser hardware support, native admission, or a particular application\'s provider/model policy.'
 ].join('\n');
@@ -1033,7 +1033,7 @@ function publicReferenceMarkdown(markdown,source){
     if(source==='docs/reference/README.md'){
         output=output.replace(
             /\n## Version scope and provenance[\s\S]*?\n## MDN-style page contract/u,
-            '\n## Version scope\n\nThis site documents SDK `0.2.2`, runtime bundle `0.8.12`, and protocol `arcane/1`. Native availability still depends on the selected Core satisfying the current build plan\'s feature, capability, method, provider, and application-identity checks. A matching protocol label alone is not authority or compatibility.\n\n'
+            '\n## Version scope\n\nThis site documents SDK `0.3.0`, runtime bundle `0.8.12`, and protocol `arcane/1`. Native availability still depends on the selected Core satisfying the current build plan\'s feature, capability, method, provider, and application-identity checks. A matching protocol label alone is not authority or compatibility.\n\n'
                 +publishedReleaseMarkdown
                 +'\n\n## MDN-style page contract'
         );
@@ -1202,7 +1202,7 @@ function renderPage({
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p>${tableOfContentsHtml(tableOfContents)}</aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="${escapeHtml(siteHome)}" aria-label="Arcane OS SDK documentation home"><img src="${escapeHtml(icon)}" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK ${publishedVersions.sdk}, runtime bundle ${publishedVersions.runtime}, and protocol ${publishedVersions.protocol}.</p><nav aria-label="Footer navigation"><a href="${escapeHtml(architecture)}">Architecture</a><a href="${escapeHtml(compatibility)}">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="${escapeHtml(siteHome)}" aria-label="Arcane OS SDK documentation home"><img src="${escapeHtml(icon)}" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK source candidate ${publishedVersions.sdk}, runtime bundle ${publishedVersions.runtime}, and protocol ${publishedVersions.protocol}; the latest verified published package is 0.2.3.</p><nav aria-label="Footer navigation"><a href="${escapeHtml(architecture)}">Architecture</a><a href="${escapeHtml(compatibility)}">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>
 `;
@@ -1910,8 +1910,11 @@ export async function createReferenceSite(){
     }
     const runtimeModuleInventory=JSON.parse(runtimeModuleInventoryInput.bytes.toString('utf8'));
     const runtimeModuleRecords=runtimeModuleInventory.artifacts;
-    if(!Array.isArray(runtimeModuleRecords)||runtimeModuleRecords.length!==85){
-        throw new Error('Expected exactly 85 runtime module artifacts.');
+    if(!Array.isArray(runtimeModuleRecords)
+        ||runtimeModuleRecords.length!==expectedRuntimeContractSummary.artifactCount){
+        throw new Error(
+            `Expected exactly ${String(expectedRuntimeContractSummary.artifactCount)} runtime module artifacts.`
+        );
     }
     const runtimeContracts=await verifyRuntimeReferenceContracts({
         repositoryRoot,
@@ -1970,11 +1973,11 @@ export async function createReferenceSite(){
             targets
         });
         const moduleDirectory=input.source==='docs/reference/runtime-modules.md'
-            ?`<h2 id="runtime-module-directory">Search all 85 runtime artifacts</h2><p>Every shipped artifact has one first-party contract page. Search by exact filename, export, behavior, availability, transport, or normalization boundary.</p>${moduleDirectoryBody({records:runtimeModuleRecords,output:input.output,targets,idPrefix:'runtime-module-index'})}`
+            ?`<h2 id="runtime-module-directory">Search all ${String(expectedRuntimeContractSummary.artifactCount)} runtime artifacts</h2><p>Every shipped artifact has one first-party contract page. Search by exact filename, export, behavior, availability, transport, or normalization boundary.</p>${moduleDirectoryBody({records:runtimeModuleRecords,output:input.output,targets,idPrefix:'runtime-module-index'})}`
             :'';
         const body=`${aiPreamble({source:input.source,output:input.output,targets})}${moduleDirectory}${rendered.body}${extensionOverlay.body}`;
         const tableOfContents=moduleDirectory
-            ?[{id:'runtime-module-directory',label:'Search all 85 runtime artifacts'},...rendered.tableOfContents,...extensionOverlay.tableOfContents]
+            ?[{id:'runtime-module-directory',label:`Search all ${String(expectedRuntimeContractSummary.artifactCount)} runtime artifacts`},...rendered.tableOfContents,...extensionOverlay.tableOfContents]
             :[...rendered.tableOfContents,...extensionOverlay.tableOfContents];
         const html=Buffer.from(renderPage({
             output:input.output,

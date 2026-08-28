@@ -218,11 +218,13 @@ const speechConfiguration = Object.freeze({
   stt: Object.freeze({
     providerId: 'app-whisper',
     graph: sttGraph,
+    security: Object.freeze({secure: true}),
     offline: false
   }),
   tts: Object.freeze({
     providerId: 'app-kokoro',
     graph: ttsGraph,
+    security: Object.freeze({secure: true}),
     offline: false
   })
 });
@@ -243,11 +245,12 @@ await ai.disposeBrowserSpeech({signal});
 
 The record must be a frozen plain data record with exactly
 `{protocol,id,dbopfs,tableName?,stt?,tts?}` and at least one role. Each supplied
-frozen role is exactly `{providerId,graph,offline}` or
+frozen role is exactly `{providerId,graph,security,offline}` or
 `{providerId,model,runtime,security?,offline}`. The graph and direct authority
 forms are mutually exclusive; `providerId` and `id` are trimmed 1-128 character
 strings, `graph` is the role-matching frozen graph returned by the SDK browser
-speech artifact API, and `offline` is boolean. The direct form forwards its
+speech artifact API, graph `security` must explicitly select `secure:true`, and
+`offline` is boolean. The direct form forwards its
 caller-selected model, runtime, and optional security descriptors to the shared
 provider. In warn-first mode it may use an empty `model.files` inventory and a
 version-pinned upstream `runtime.wasmPaths`; secure graph mode remains the
@@ -1421,7 +1424,7 @@ source body as implicit authority, and never persists a caller-owned body.
 **Browser or compatible host with an injected DBOPFS adapter.** The adapter
 keeps the existing `get`, `set`, `getAllKeys`, and `delete` method names; Node
 can use the same class only through an explicitly imported runtime module and a
-compatible storage adapter; SDK `0.2.2` publishes no Node package subpath or
+compatible storage adapter; SDK `0.3.0` publishes no Node package subpath or
 Node storage implementation for it. Bootstrap uses a bounded concurrent
 generation, commits its manifest last, cleans partial data on failure, and
 rejects case-colliding IDs. Search

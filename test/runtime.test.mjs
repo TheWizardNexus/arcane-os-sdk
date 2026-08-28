@@ -262,8 +262,11 @@ test('SDK browser receipt authenticates its exact package sources and rejects la
     assert.equal(attributes.at(-1),'runtime/** -text -whitespace');
     const {packageRoot,browserRuntimeRoot}=await browserRuntimePackageCopy(t);
     const receipt=await verifySdkBrowserRuntime({browserRuntimeRoot});
-    assert.equal(receipt.fileCount,25);
-    assert.equal(receipt.sourceIdentities.length,22);
+    assert.equal(receipt.fileCount,receipt.identities.length);
+    assert.deepEqual(
+        receipt.identities.map(({path})=>path),
+        receipt.files.map(({path})=>path)
+    );
     assert.equal(
         await authenticateSdkBrowserRuntimeReceipt(receipt,{browserRuntimeRoot}),
         receipt
@@ -336,7 +339,10 @@ test('composed workspace receipt rejects tampered projected SDK browser bytes',a
         browserRuntimeRoot:sdkBrowserRuntimeReceipt.canonicalLocation,
         sdkBrowserRuntimeReceipt
     });
-    assert.equal(receipt.fileCount,185);
+    assert.equal(
+        receipt.fileCount,
+        runtimeReceipt.files.length+sdkBrowserRuntimeReceipt.files.length
+    );
     assert.equal(receipt.sources.arcane.authority,'arcane-os-sdk');
     assert.equal(receipt.sources.arcane.contentSha256,runtimeReceipt.contentSha256);
     assert.equal(

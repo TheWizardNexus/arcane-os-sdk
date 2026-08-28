@@ -13,10 +13,10 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../sdk-api/">API</a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane runtime component catalog</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-runtime-component-catalog">Arcane runtime component catalog</h1><p class="doc-lead">Arcane components are reusable HTML fragments loaded through the shared element. They are browser UI, so they run in an ordinary supported browser renderer…</p><div class="doc-meta"><span>SDK 0.2.2</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane runtime component catalog</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-runtime-component-catalog">Arcane runtime component catalog</h1><p class="doc-lead">Arcane components are reusable HTML fragments loaded through the shared element. They are browser UI, so they run in an ordinary supported browser renderer…</p><div class="doc-meta"><span>SDK 0.3.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="./" aria-current="page">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/runtime-components.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#basic-loading-pattern">Basic loading pattern</a><a href="#canonical-inventory">Canonical inventory</a><a href="#app-barhtml">app-bar.html</a><a href="#assistant-panelhtml">assistant-panel.html</a><a href="#calculatorhtml">calculator.html</a><a href="#charthtml">chart.html</a><a href="#chathtml">chat.html</a><a href="#conversation-viewhtml">conversation-view.html</a><a href="#dashboard-confightml">dashboard-config.html</a><a href="#data-maintenancehtml">data-maintenance.html</a><a href="#data-viewhtml">data-view.html</a><a href="#directory-pickerhtml">directory-picker.html</a><a href="#document-inspectorhtml">document-inspector.html</a><a href="#file-drophtml">file-drop.html</a><a href="#file-inspectorhtml">file-inspector.html</a><a href="#file-managerhtml">file-manager.html</a><a href="#headerhtml">header.html</a><a href="#integration-settingshtml">integration-settings.html</a><a href="#local-ai-statushtml">local-ai-status.html</a><a href="#markdown-documenthtml">markdown-document.html</a><a href="#markdown-editorhtml">markdown-editor.html</a><a href="#media-embedhtml">media-embed.html</a><a href="#modalhtml">modal.html</a><a href="#output-panelhtml">output-panel.html</a><a href="#preferences-formhtml">preferences-form.html</a><a href="#record-timelinehtml">record-timeline.html</a><a href="#relationship-boardhtml">relationship-board.html</a><a href="#screen-capturehtml">screen-capture.html</a><a href="#source-code-viewerhtml">source-code-viewer.html</a><a href="#source-explanationhtml">source-explanation.html</a><a href="#speechhtml">speech.html</a><a href="#summary-striphtml">summary-strip.html</a><a href="#tablehtml">table.html</a><a href="#task-progresshtml">task-progress.html</a><a href="#terminal-workspacehtml">terminal-workspace.html</a><a href="#theme-editorhtml">theme-editor.html</a><a href="#theme-switcherhtml">theme-switcher.html</a><a href="#unified-inboxhtml">unified-inbox.html</a><a href="#voice-transcriptionhtml">voice-transcription.html</a><a href="#weather-widgethtml">weather-widget.html</a></nav><p class="toc-more">2 additional sections remain searchable in the page.</p></details><p>Arcane components are reusable HTML fragments loaded through the shared <code>&lt;html-import&gt;</code> element. They are browser UI, so they run in an ordinary supported browser renderer and in native Arcane WebViews. They do not run in Node or as cloud services.</p>
+      <article class="prose reference-prose" data-reference-source="docs/reference/runtime-components.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#basic-loading-pattern">Basic loading pattern</a><a href="#shared-semantic-event-and-lifecycle-contract">Shared semantic-event and lifecycle contract</a><a href="#canonical-inventory">Canonical inventory</a><a href="#app-barhtml">app-bar.html</a><a href="#assistant-panelhtml">assistant-panel.html</a><a href="#calculatorhtml">calculator.html</a><a href="#charthtml">chart.html</a><a href="#chathtml">chat.html</a><a href="#conversation-viewhtml">conversation-view.html</a><a href="#dashboard-confightml">dashboard-config.html</a><a href="#data-maintenancehtml">data-maintenance.html</a><a href="#data-viewhtml">data-view.html</a><a href="#directory-pickerhtml">directory-picker.html</a><a href="#document-inspectorhtml">document-inspector.html</a><a href="#file-drophtml">file-drop.html</a><a href="#file-inspectorhtml">file-inspector.html</a><a href="#file-managerhtml">file-manager.html</a><a href="#headerhtml">header.html</a><a href="#integration-settingshtml">integration-settings.html</a><a href="#local-ai-statushtml">local-ai-status.html</a><a href="#markdown-documenthtml">markdown-document.html</a><a href="#markdown-editorhtml">markdown-editor.html</a><a href="#media-embedhtml">media-embed.html</a><a href="#modalhtml">modal.html</a><a href="#output-panelhtml">output-panel.html</a><a href="#preferences-formhtml">preferences-form.html</a><a href="#record-timelinehtml">record-timeline.html</a><a href="#relationship-boardhtml">relationship-board.html</a><a href="#screen-capturehtml">screen-capture.html</a><a href="#source-code-viewerhtml">source-code-viewer.html</a><a href="#source-explanationhtml">source-explanation.html</a><a href="#speechhtml">speech.html</a><a href="#summary-striphtml">summary-strip.html</a><a href="#tablehtml">table.html</a><a href="#task-progresshtml">task-progress.html</a><a href="#terminal-workspacehtml">terminal-workspace.html</a><a href="#theme-editorhtml">theme-editor.html</a><a href="#theme-switcherhtml">theme-switcher.html</a><a href="#unified-inboxhtml">unified-inbox.html</a><a href="#voice-transcriptionhtml">voice-transcription.html</a></nav><p class="toc-more">3 additional sections remain searchable in the page.</p></details><p>Arcane components are reusable HTML fragments loaded through the shared <code>&lt;html-import&gt;</code> element. They are browser UI, so they run in an ordinary supported browser renderer and in native Arcane WebViews. They do not run in Node or as cloud services.</p>
 <p>A component file does not register its own custom element. The <code>&lt;html-import&gt;</code> host fetches the fragment from the same origin, attaches an open shadow root, runs its inline scripts with <code>this</code> bound to the host, and publishes <code>html-import-ready</code> or <code>html-import-error</code>. Component methods and properties are attached to that host.</p>
 <h2 id="basic-loading-pattern">Basic loading pattern</h2>
 <div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;script type=&quot;module&quot;&gt;
@@ -32,6 +32,35 @@
   }, {once: true});
 &lt;/script&gt;
 </code></pre></div>
+<h2 id="shared-semantic-event-and-lifecycle-contract">Shared semantic-event and lifecycle contract</h2>
+<p>Except for the legacy <code>header.html</code> and platform-owned <code>theme-switcher.html</code>,
+each component owns exactly one source created through
+<code>createArcaneEventSource(host,{source:&#39;arcane.component.&lt;name&gt;&#39;,eventTypes})</code>.
+That source publishes synchronously to the realm&#39;s branded
+<code>globalThis.arcaneEvents</code> authority. Component DOM events are one-way
+compatibility projections of the same canonical occurrence; they are never
+republished into the authority. Every projected detail has the canonical
+<code>occurrenceId</code>, <code>arcaneSource</code>, <code>instanceId</code>, and <code>operationId</code> fields and a
+frozen outer record. A compatibility payload&#39;s existing <code>source</code> field remains
+source-local and may differ from <code>arcaneSource</code>; the payload may additionally
+retain source-local browser or provider objects.</p>
+<p>When a component uses a cancelable event as an admission gate, cancellation on
+either the canonical occurrence or its DOM projection makes the publication
+unaccepted, and the component does not continue the guarded operation. A
+cancelable compatibility notification emitted after committed work does not
+roll that work back unless its component section explicitly says otherwise.
+Asynchronous work keeps its own <code>AbortSignal</code>, operation generation, and
+promise ownership; canonical publication is synchronous and does not become an
+async queue.</p>
+<p>Every singleton-backed component publishes its ready event only after its host
+members are installed. Its idempotent <code>destroy()</code> (unless a more specific
+return is documented) disposes the canonical source and marks the host
+unready. Cleanup of owned listeners, pending work, nested subscriptions, and
+controllers is component-specific and is stated below where it forms part of
+that component&#39;s public contract. Removing an <code>&lt;html-import&gt;</code> host calls an
+imported component&#39;s <code>destroy()</code> through <code>HTMLImport</code>; callers that invoke
+<code>destroy()</code> directly retain responsibility for removing the element when
+appropriate.</p>
 <h2 id="canonical-inventory">Canonical inventory</h2>
 <div class="table-wrap" data-columns="5" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
@@ -46,21 +75,21 @@
 <tbody><tr>
 <td><a href="#app-barhtml"><code>app-bar.html</code></a></td>
 <td>Responsive application navigation, route state, status, and trailing actions.</td>
-<td><code>setNavigation()</code><br><code>setActiveRoute()</code><br><code>setStatus()</code><br><code>refresh()</code></td>
+<td><code>setNavigation()</code><br><code>setActiveRoute()</code><br><code>setStatus()</code><br><code>refresh()</code><br><code>destroy()</code></td>
 <td><code>app-bar-ready</code></td>
 <td>DOM-normalized</td>
 </tr>
 <tr>
 <td><a href="#assistant-panelhtml"><code>assistant-panel.html</code></a></td>
 <td>Reusable assistant drawer, message area, composer, pending/streaming/empty/error state, and actions.</td>
-<td><code>open()</code><br><code>close()</code><br><code>toggle()</code><br><code>send()</code><br><code>clear()</code><br><code>setState()</code><br><code>focusComposer()</code><br><code>scrollToEnd()</code></td>
-<td><code>assistant-ready</code><br><code>assistant-send</code><br><code>assistant-clear</code></td>
+<td><code>open()</code><br><code>close()</code><br><code>toggle()</code><br><code>send()</code><br><code>clear()</code><br><code>setState()</code><br><code>focusComposer()</code><br><code>scrollToEnd()</code><br><code>destroy()</code></td>
+<td><code>assistant-ready</code><br><code>assistant-opened</code><br><code>assistant-closed</code><br><code>assistant-send</code><br><code>assistant-clear</code></td>
 <td>DOM-normalized; caller/provider results remain external</td>
 </tr>
 <tr>
 <td><a href="#calculatorhtml"><code>calculator.html</code></a></td>
 <td>Calculator keypad and result/error event surface backed by CalculatorEngine.</td>
-<td><code>calculate()</code></td>
+<td><code>calculate()</code><br><code>destroy()</code></td>
 <td><code>calculator-ready</code><br><code>calculation-complete</code><br><code>calculation-error</code></td>
 <td>Normalized Calculation/error events</td>
 </tr>
@@ -75,69 +104,69 @@
 <td><a href="#chathtml"><code>chat.html</code></a></td>
 <td>Shared chat, visible selected-model activation request, file upload, streaming, speech, language, availability, and conversation-timebox surface.</td>
 <td><code>streamMessage()</code><br><code>setMessageProgress()</code><br><code>setAIAvailability()</code><br><code>setInitialSpeechMuted()</code><br><code>setConversationComplete()</code><br><code>bindConversationTimebox()</code><br><code>submitMessage()</code><br><code>sendMessage()</code><br><code>languageChanged()</code><br><code>requestAIActivation()</code><br><code>destroy()</code></td>
-<td><code>chat-ready</code><br><code>chat-send-message</code><br><code>chat-send-error</code><br><code>chat-file-uploaded</code><br><code>chat-language-changed</code><br><code>chat-ai-activation-request</code><br><code>chat-ai-activation-error</code><br><code>conversation-timebox-error</code></td>
+<td><code>chat-ready</code><br><code>chat-send-message</code><br><code>chat-send-error</code><br><code>chat-file-uploaded</code><br><code>chat-file-upload-error</code><br><code>chat-language-changed</code><br><code>chat-language-change-error</code><br><code>chat-ai-activation-request</code><br><code>chat-ai-activation-error</code><br><code>chat-speech-synthesis-error</code><br><code>conversation-timebox-error</code></td>
 <td>UI/runtime state and explicit user activation intent normalized; AI/storage/media behavior mixed</td>
 </tr>
 <tr>
 <td><a href="#conversation-viewhtml"><code>conversation-view.html</code></a></td>
 <td>Provider-neutral conversation display, advisory actions, composer, busy state, and status.</td>
-<td><code>setConversation()</code><br><code>setBusy()</code><br><code>setStatus()</code><br><code>clearComposer()</code></td>
+<td><code>setConversation()</code><br><code>setBusy()</code><br><code>setStatus()</code><br><code>clearComposer()</code><br><code>destroy()</code></td>
 <td><code>conversation-view-ready</code><br><code>communication-send</code><br><code>communication-advisory-action</code></td>
 <td>DOM-normalized</td>
 </tr>
 <tr>
 <td><a href="#dashboard-confightml"><code>dashboard-config.html</code></a></td>
 <td>Selects which normalized chart definitions are visible on a dashboard.</td>
-<td><code>configure()</code><br><code>setDefinitions()</code><br><code>setVisibility()</code><br><code>getChartOptions()</code><br><code>getEffectiveVisibility()</code><br><code>open()</code><br><code>close()</code></td>
+<td><code>configure()</code><br><code>setDefinitions()</code><br><code>setVisibility()</code><br><code>getChartOptions()</code><br><code>getEffectiveVisibility()</code><br><code>open()</code><br><code>close()</code><br><code>destroy()</code></td>
 <td><code>dashboard-config-ready</code><br><code>dashboard-config-opened</code><br><code>dashboard-config-closed</code><br><code>dashboard-config-change</code></td>
 <td>Fully normalized definitions and visibility</td>
 </tr>
 <tr>
 <td><a href="#data-maintenancehtml"><code>data-maintenance.html</code></a></td>
 <td>Runs destructive cleanup of empty chats and memories inside the current app data scope.</td>
-<td><code>open()</code></td>
+<td><code>open()</code><br><code>destroy()</code></td>
 <td><code>data-maintenance-ready</code><br><code>data-maintenance-complete</code></td>
 <td>Normalized counts; DBOPFS failures mixed</td>
 </tr>
 <tr>
 <td><a href="#data-viewhtml"><code>data-view.html</code></a></td>
 <td>Opens a generic modal-style data view around an injected provider.</td>
-<td><code>beforeOpen()</code><br><code>open()</code></td>
+<td><code>beforeOpen()</code><br><code>open()</code><br><code>destroy()</code></td>
 <td><code>data-view-ready</code></td>
 <td>DOM-native result</td>
 </tr>
 <tr>
 <td><a href="#directory-pickerhtml"><code>directory-picker.html</code></a></td>
 <td>Presents the provider-owned OS directory chooser with change/cancel/error states.</td>
-<td><code>configure()</code><br><code>focus()</code><br><code>select()</code></td>
+<td><code>configure()</code><br><code>focus()</code><br><code>select()</code><br><code>destroy()</code></td>
 <td><code>directory-picker-ready</code><br><code>directory-picker-change</code><br><code>directory-picker-cancel</code><br><code>directory-picker-error</code></td>
 <td>Strict normalized native selection/error</td>
 </tr>
 <tr>
 <td><a href="#document-inspectorhtml"><code>document-inspector.html</code></a></td>
 <td>Inspects PDF, text, or source documents and records review state.</td>
-<td><code>loadDocument()</code><br><code>selectView()</code><br><code>markSaved()</code></td>
+<td><code>loadDocument()</code><br><code>selectView()</code><br><code>markSaved()</code><br><code>destroy()</code></td>
 <td><code>document-inspector-ready</code><br><code>document-review-change</code></td>
 <td>Document state normalized; browser document APIs mixed</td>
 </tr>
 <tr>
 <td><a href="#file-drophtml"><code>file-drop.html</code></a></td>
 <td>Acquires files by drag/drop or picker and presents busy, progress, error, and cleared state.</td>
-<td><code>configure()</code><br><code>openPicker()</code><br><code>clear()</code><br><code>setBusy()</code><br><code>setError()</code><br><code>setProgress()</code></td>
+<td><code>configure()</code><br><code>openPicker()</code><br><code>clear()</code><br><code>setBusy()</code><br><code>setError()</code><br><code>setProgress()</code><br><code>destroy()</code></td>
 <td><code>file-drop-ready</code><br><code>file-drop-selected</code><br><code>file-drop-progress</code><br><code>file-drop-state</code><br><code>file-drop-error</code></td>
 <td>State normalized; browser File/drop errors mixed</td>
 </tr>
 <tr>
 <td><a href="#file-inspectorhtml"><code>file-inspector.html</code></a></td>
 <td>Displays file metadata, preview, busy/error state, and caller-defined actions.</td>
-<td><code>configure()</code><br><code>show()</code><br><code>clear()</code><br><code>setActions()</code><br><code>setBusy()</code><br><code>setError()</code><br><code>setPreview()</code></td>
+<td><code>configure()</code><br><code>show()</code><br><code>clear()</code><br><code>setActions()</code><br><code>setBusy()</code><br><code>setError()</code><br><code>setPreview()</code><br><code>destroy()</code></td>
 <td><code>file-inspector-ready</code><br><code>file-inspector-action</code><br><code>file-inspector-change</code><br><code>file-inspector-cleared</code><br><code>file-inspector-error</code></td>
 <td>State normalized; preview/provider behavior mixed</td>
 </tr>
 <tr>
 <td><a href="#file-managerhtml"><code>file-manager.html</code></a></td>
 <td>Browses, filters, selects, opens, and acts on app-scoped files.</td>
-<td><code>setProvider()</code><br><code>loadAll()</code><br><code>setFilter()</code><br><code>select()</code><br><code>clearSelection()</code></td>
+<td><code>setProvider()</code><br><code>loadAll()</code><br><code>setFilter()</code><br><code>select()</code><br><code>clearSelection()</code><br><code>destroy()</code></td>
 <td><code>file-manager-ready</code><br><code>file-manager-select</code><br><code>file-manager-open</code><br><code>file-manager-action</code></td>
 <td>Selection/filter state normalized; storage/provider behavior mixed</td>
 </tr>
@@ -151,133 +180,133 @@
 <tr>
 <td><a href="#integration-settingshtml"><code>integration-settings.html</code></a></td>
 <td>Edits non-secret communication service configuration and service actions.</td>
-<td><code>configure()</code><br><code>getValues()</code><br><code>setStatus()</code></td>
+<td><code>configure()</code><br><code>getValues()</code><br><code>setStatus()</code><br><code>destroy()</code></td>
 <td><code>integration-settings-ready</code><br><code>integration-settings-save</code><br><code>integration-settings-close</code><br><code>integration-action</code></td>
 <td>Normalized non-secret values</td>
 </tr>
 <tr>
 <td><a href="#local-ai-statushtml"><code>local-ai-status.html</code></a></td>
 <td>Presents local-AI standby, failure, recovery, guidance, retry, and dismissal states.</td>
-<td><code>configure()</code><br><code>begin()</code><br><code>present(); hidden property</code></td>
+<td><code>configure()</code><br><code>begin()</code><br><code>present()</code><br><code>destroy()</code><br><code>hidden</code></td>
 <td><code>local-ai-status-ready</code><br><code>local-ai-status-dismissed</code><br><code>local-ai-retry</code></td>
 <td>Fully normalized LocalAIReadiness report</td>
 </tr>
 <tr>
 <td><a href="#markdown-documenthtml"><code>markdown-document.html</code></a></td>
 <td>Safely renders and navigates a Markdown document with focusable fragments.</td>
-<td><code>configure()</code><br><code>load()</code><br><code>render()</code><br><code>clear()</code><br><code>fail()</code><br><code>focus()</code><br><code>focusFragment()</code></td>
-<td><code>markdown-document-ready</code><br><code>markdown-document-state</code><br><code>markdown-document-navigate</code></td>
+<td><code>configure()</code><br><code>load()</code><br><code>render()</code><br><code>clear()</code><br><code>fail()</code><br><code>focus()</code><br><code>focusFragment()</code><br><code>destroy()</code></td>
+<td><code>markdown-document-ready</code><br><code>markdown-document-state</code><br><code>markdown-document-loading</code><br><code>markdown-document-rendered</code><br><code>markdown-document-empty</code><br><code>markdown-document-error</code><br><code>markdown-document-navigate</code></td>
 <td>State/sanitized output normalized; Marked/DOM failures mixed</td>
 </tr>
 <tr>
 <td><a href="#markdown-editorhtml"><code>markdown-editor.html</code></a></td>
 <td>Configurable Markdown authoring, toolbar, preview, title, and save surface.</td>
-<td><code>configure()</code><br><code>focus()</code><br><code>clear()</code><br><code>saveEntry()</code></td>
+<td><code>configure()</code><br><code>focus()</code><br><code>clear()</code><br><code>saveEntry()</code><br><code>destroy()</code></td>
 <td><code>markdown-editor-ready</code><br><code>markdown-editor-change</code><br><code>markdown-editor-saved</code></td>
 <td>Editor values normalized; injected save result mixed</td>
 </tr>
 <tr>
 <td><a href="#media-embedhtml"><code>media-embed.html</code></a></td>
 <td>Loads a validated YouTube video or playlist embed and exposes external-platform action.</td>
-<td><code>configure()</code><br><code>load()</code></td>
+<td><code>configure()</code><br><code>load()</code><br><code>destroy()</code></td>
 <td><code>media-embed-ready</code><br><code>media-load</code><br><code>media-error</code><br><code>media-open-platform</code></td>
 <td>URL/error normalized; iframe/platform behavior native</td>
 </tr>
 <tr>
 <td><a href="#modalhtml"><code>modal.html</code></a></td>
 <td>Generic modal with population, open/close, actions, and sequential task execution.</td>
-<td><code>populate()</code><br><code>open()</code><br><code>close()</code><br><code>runTasks()</code></td>
+<td><code>populate()</code><br><code>open()</code><br><code>close()</code><br><code>runTasks()</code><br><code>destroy()</code></td>
 <td><code>modal-ready</code><br><code>modal-opened</code><br><code>modal-closed</code><br><code>modal-action</code></td>
 <td>Modal state normalized; injected task results mixed</td>
 </tr>
 <tr>
 <td><a href="#output-panelhtml"><code>output-panel.html</code></a></td>
 <td>Presents status, output, body, coverage, actions, pending, error, and cleared states.</td>
-<td><code>configure()</code><br><code>setOutput()</code><br><code>setBody()</code><br><code>setCoverage()</code><br><code>setActions()</code><br><code>setPending()</code><br><code>setStatus()</code><br><code>setError()</code><br><code>clear()</code></td>
+<td><code>configure()</code><br><code>setOutput()</code><br><code>setBody()</code><br><code>setCoverage()</code><br><code>setActions()</code><br><code>setPending()</code><br><code>setStatus()</code><br><code>setError()</code><br><code>clear()</code><br><code>destroy()</code></td>
 <td><code>output-panel-ready</code><br><code>output-panel-state</code><br><code>output-panel-change</code><br><code>output-panel-action</code><br><code>output-panel-error</code><br><code>output-panel-cleared</code></td>
 <td>DOM-normalized</td>
 </tr>
 <tr>
 <td><a href="#preferences-formhtml"><code>preferences-form.html</code></a></td>
 <td>Builds a schema-driven preferences form with submit, reset, busy, and status behavior.</td>
-<td><code>configure()</code><br><code>getValues()</code><br><code>setValues()</code><br><code>setBusy()</code><br><code>setStatus()</code></td>
+<td><code>configure()</code><br><code>getValues()</code><br><code>setValues()</code><br><code>setBusy()</code><br><code>setStatus()</code><br><code>destroy()</code></td>
 <td><code>preferences-form-ready</code><br><code>preferences-change</code><br><code>preferences-submit</code><br><code>preferences-reset</code></td>
 <td>Normalized form values</td>
 </tr>
 <tr>
 <td><a href="#record-timelinehtml"><code>record-timeline.html</code></a></td>
 <td>Displays chronological records/evidence and emits open actions.</td>
-<td><code>setItems()</code><br><code>populate()</code></td>
+<td><code>setItems()</code><br><code>populate()</code><br><code>destroy()</code></td>
 <td><code>record-timeline-ready</code><br><code>record-timeline-open</code></td>
 <td>DOM-normalized</td>
 </tr>
 <tr>
 <td><a href="#relationship-boardhtml"><code>relationship-board.html</code></a></td>
 <td>Displays normalized relationship nodes/edges in graph and list forms.</td>
-<td><code>setGraph()</code><br><code>populate()</code></td>
+<td><code>setGraph()</code><br><code>populate()</code><br><code>destroy()</code></td>
 <td><code>relationship-board-ready</code><br><code>relationship-node-open</code><br><code>relationship-edge-open</code></td>
 <td>DOM-normalized</td>
 </tr>
 <tr>
 <td><a href="#screen-capturehtml"><code>screen-capture.html</code></a></td>
 <td>Presents image, video, or GIF display-capture workflow.</td>
-<td><code>capture()</code></td>
+<td><code>capture</code> (<code>ScreenCapture</code> instance)<br><code>destroy()</code></td>
 <td><code>screen-capture-ready</code><br><code>screen-capture-result</code></td>
 <td>State/result normalized; media permission/codec failures mixed</td>
 </tr>
 <tr>
 <td><a href="#source-code-viewerhtml"><code>source-code-viewer.html</code></a></td>
 <td>Renders line-addressable source code with load, error, focus, and state behavior.</td>
-<td><code>configure()</code><br><code>load()</code><br><code>render()</code><br><code>clear()</code><br><code>fail()</code><br><code>focus()</code><br><code>focusLine()</code></td>
-<td><code>source-code-viewer-ready</code><br><code>source-code-viewer-state</code></td>
+<td><code>configure()</code><br><code>load()</code><br><code>render()</code><br><code>clear()</code><br><code>fail()</code><br><code>focus()</code><br><code>focusLine()</code><br><code>destroy()</code></td>
+<td><code>source-code-viewer-ready</code><br><code>source-code-viewer-state</code><br><code>source-code-viewer-state-loading</code><br><code>source-code-viewer-state-ready</code><br><code>source-code-viewer-state-empty</code><br><code>source-code-viewer-state-error</code></td>
 <td>Normalized source/state</td>
 </tr>
 <tr>
 <td><a href="#source-explanationhtml"><code>source-explanation.html</code></a></td>
 <td>Presents an evidence finding, source selection, explanation, and save state.</td>
-<td><code>showFinding()</code><br><code>populate()</code><br><code>selectSource()</code><br><code>markSaved()</code></td>
+<td><code>showFinding()</code><br><code>populate()</code><br><code>selectSource()</code><br><code>markSaved()</code><br><code>destroy()</code></td>
 <td><code>source-explanation-ready</code><br><code>source-explanation-save</code><br><code>source-explanation-source-selected</code></td>
 <td>DOM-normalized</td>
 </tr>
 <tr>
 <td><a href="#speechhtml"><code>speech.html</code></a></td>
 <td>Coordinates explicit STT activation, speech controls, transcription completion, mute state, and microphone availability.</td>
-<td><code>configure()</code><br><code>setAvailability()</code><br><code>setMuted()</code><br><code>requestSTTActivation()</code><br><code>destroy()</code><br><code>availability</code><br><code>muted</code><br><code>initialMuted</code><br><code>componentReady</code></td>
-<td><code>speech-ready</code><br><code>speech-transcription-complete</code><br><code>speech-transcription-error</code><br><code>speech-transcription-cancelled</code><br><code>speech-microphone-unavailable</code><br><code>speech-stt-activation-request</code><br><code>speech-stt-activation-error</code><br><code>speech-tts-lifecycle-error</code></td>
+<td><code>configure()</code><br><code>setAvailability()</code><br><code>setMuted()</code><br><code>reportTTSError()</code><br><code>requestSTTActivation()</code><br><code>destroy()</code><br><code>availability</code><br><code>muted</code><br><code>initialMuted</code><br><code>componentReady</code></td>
+<td><code>speech-ready</code><br><code>speech-transcription-complete</code><br><code>speech-transcription-error</code><br><code>speech-transcription-cancelled</code><br><code>speech-microphone-unavailable</code><br><code>speech-stt-activation-request</code><br><code>speech-stt-activation-error</code><br><code>speech-tts-lifecycle-error</code><br><code>speech-synthesis-error</code></td>
 <td>Sticky runtime speech readiness, explicit STT activation, request cancellation, and TTS mute lifecycle intent normalized; provider/model authority and media behavior remain external</td>
 </tr>
 <tr>
 <td><a href="#summary-striphtml"><code>summary-strip.html</code></a></td>
 <td>Displays compact selectable KPI or summary items.</td>
-<td><code>configure()</code><br><code>setItems()</code><br><code>updateItem()</code><br><code>clear()</code></td>
+<td><code>configure()</code><br><code>setItems()</code><br><code>updateItem()</code><br><code>clear()</code><br><code>destroy()</code></td>
 <td><code>summary-strip-ready</code><br><code>summary-strip-change</code><br><code>summary-strip-select</code></td>
 <td>DOM-normalized</td>
 </tr>
 <tr>
 <td><a href="#tablehtml"><code>table.html</code></a></td>
 <td>Builds and updates a simple header/body table.</td>
-<td><code>buildHeader()</code><br><code>buildTable()</code></td>
+<td><code>buildHeader()</code><br><code>buildTable()</code><br><code>destroy()</code></td>
 <td><code>table-ready</code><br><code>header-update</code><br><code>body-update</code></td>
 <td>DOM-normalized</td>
 </tr>
 <tr>
 <td><a href="#task-progresshtml"><code>task-progress.html</code></a></td>
 <td>Runs and displays a task list with started/change/complete/error state.</td>
-<td><code>configure()</code><br><code>setTasks()</code><br><code>updateTask()</code><br><code>runTasks()</code><br><code>clear()</code></td>
+<td><code>configure()</code><br><code>setTasks()</code><br><code>updateTask()</code><br><code>runTasks()</code><br><code>clear()</code><br><code>destroy()</code></td>
 <td><code>task-progress-ready</code><br><code>task-progress-started</code><br><code>task-progress-change</code><br><code>task-progress-complete</code><br><code>task-progress-error</code></td>
 <td>Task state normalized; injected task results mixed</td>
 </tr>
 <tr>
 <td><a href="#terminal-workspacehtml"><code>terminal-workspace.html</code></a></td>
 <td>Presents multiple terminal sessions, output, active selection, theme, and terminal actions.</td>
-<td><code>configure()</code><br><code>addSession()</code><br><code>removeSession()</code><br><code>activateSession()</code><br><code>append()</code><br><code>clear()</code><br><code>setState()</code><br><code>setTheme()</code><br><code>focus()</code></td>
+<td><code>configure()</code><br><code>addSession()</code><br><code>removeSession()</code><br><code>activateSession()</code><br><code>append()</code><br><code>clear()</code><br><code>setState()</code><br><code>setTheme()</code><br><code>focus()</code><br><code>destroy()</code></td>
 <td><code>terminal-workspace-ready</code><br><code>terminal-submit</code><br><code>terminal-interrupt</code><br><code>terminal-clear</code><br><code>terminal-session-new</code><br><code>terminal-session-close</code><br><code>terminal-session-select</code><br><code>terminal-settings</code></td>
 <td>UI/session state normalized; native command results supplied externally</td>
 </tr>
 <tr>
 <td><a href="#theme-editorhtml"><code>theme-editor.html</code></a></td>
 <td>Edits, previews, saves, and resets semantic custom theme tokens.</td>
-<td><code>configure()</code><br><code>getTheme()</code><br><code>setTheme()</code><br><code>setBusy()</code><br><code>setStatus()</code></td>
+<td><code>configure()</code><br><code>getTheme()</code><br><code>setTheme()</code><br><code>setBusy()</code><br><code>setStatus()</code><br><code>destroy()</code></td>
 <td><code>theme-editor-ready</code><br><code>theme-preview</code><br><code>theme-save</code><br><code>theme-reset</code></td>
 <td>Fully normalized Theme values</td>
 </tr>
@@ -291,28 +320,28 @@
 <tr>
 <td><a href="#unified-inboxhtml"><code>unified-inbox.html</code></a></td>
 <td>Displays provider-neutral communication threads with active/loading state.</td>
-<td><code>configure()</code><br><code>setThreads()</code><br><code>setActive()</code><br><code>setLoading()</code></td>
+<td><code>configure()</code><br><code>setThreads()</code><br><code>setActive()</code><br><code>setLoading()</code><br><code>destroy()</code></td>
 <td><code>unified-inbox-ready</code><br><code>inbox-refresh</code><br><code>thread-select</code></td>
 <td>DOM-normalized</td>
 </tr>
 <tr>
 <td><a href="#voice-transcriptionhtml"><code>voice-transcription.html</code></a></td>
-<td>Records segmented microphone audio, transcribes, persists, and completes a combined transcript.</td>
-<td><code>configure()</code><br><code>startRecording()</code><br><code>stopRecording()</code><br><code>save()</code><br><code>completeTranscription()/complete()</code><br><code>clear()</code><br><code>reset()</code><br><code>destroy()</code></td>
-<td><code>voice-transcription-ready</code><br><code>voice-transcription-state</code><br><code>voice-transcription-segment</code><br><code>voice-transcription-change</code><br><code>voice-transcription-complete</code><br><code>speech-transcription-complete</code></td>
-<td>State/text normalized; media/provider behavior mixed</td>
+<td>Records segmented microphone audio only after authoritative STT admission, exposes explicit selected-STT activation, transcribes with cancellation, persists, and completes a combined transcript.</td>
+<td><code>configure()</code><br><code>requestSTTActivation()</code><br><code>startRecording()</code><br><code>stopRecording()</code><br><code>save()</code><br><code>completeTranscription()/complete()</code><br><code>clear()</code><br><code>reset()</code><br><code>destroy()</code></td>
+<td><code>voice-transcription-ready</code><br><code>voice-transcription-state</code><br><code>voice-transcription-segment</code><br><code>voice-transcription-change</code><br><code>voice-transcription-complete</code><br><code>speech-transcription-complete</code><br><code>speech-transcription-cancelled</code><br><code>speech-stt-activation-request</code><br><code>speech-stt-activation-error</code></td>
+<td>Sticky runtime STT readiness, explicit activation, request cancellation, and state/text are normalized; media/provider behavior remains external</td>
 </tr>
 <tr>
 <td><a href="#weather-widgethtml"><code>weather-widget.html</code></a></td>
 <td>Displays normalized current and daily weather with refresh intent.</td>
-<td><code>setWeather()</code><br><code>clear()</code></td>
+<td><code>setWeather()</code><br><code>clear()</code><br><code>destroy()</code></td>
 <td><code>weather-widget-ready</code><br><code>weather-refresh</code></td>
 <td>Display normalized; provider supplied externally</td>
 </tr>
 <tr>
 <td><a href="#web-navigatorhtml"><code>web-navigator.html</code></a></td>
 <td>Guards embedded/external navigation and surfaces allow/block/open intents.</td>
-<td><code>configure()</code><br><code>navigate()</code><br><code>currentUrl()</code></td>
+<td><code>configure()</code><br><code>navigate()</code><br><code>currentUrl()</code><br><code>destroy()</code></td>
 <td><code>web-navigator-ready</code><br><code>web-navigate</code><br><code>web-navigation-blocked</code><br><code>web-open-external</code></td>
 <td>Navigation intent/decision normalized; browser navigation result platform-native</td>
 </tr>
@@ -322,7 +351,7 @@
 <h3 id="overview">Overview</h3>
 <p>Responsive application navigation, route state, status, and trailing actions.</p>
 <h3 id="public-surface">Public surface</h3>
-<p>Methods/properties: <code>setNavigation()</code>, <code>setActiveRoute()</code>, <code>setStatus()</code>, <code>refresh()</code>.</p>
+<p>Methods/properties: <code>setNavigation()</code>, <code>setActiveRoute()</code>, <code>setStatus()</code>, <code>refresh()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>app-bar-ready</code>.</p>
 <p>Slots: <code>brand-mark</code>, <code>product-name</code>, <code>navigation</code>, <code>status</code>, <code>trailing</code>.</p>
 <h3 id="availability-and-normalization">Availability and normalization</h3>
@@ -337,8 +366,9 @@
 <h3 id="overview-1">Overview</h3>
 <p>Reusable assistant drawer, message area, composer, pending/streaming/empty/error state, and actions.</p>
 <h3 id="public-surface-1">Public surface</h3>
-<p>Methods/properties: <code>open()</code>, <code>close()</code>, <code>toggle()</code>, <code>send()</code>, <code>clear()</code>, <code>setState()</code>, <code>focusComposer()</code>, <code>scrollToEnd()</code>.</p>
-<p>Events: <code>assistant-ready</code>, <code>assistant-send</code>, <code>assistant-clear</code>.</p>
+<p>Methods/properties: <code>open()</code>, <code>close()</code>, <code>toggle()</code>, <code>send()</code>, <code>clear()</code>, <code>setState()</code>, <code>focusComposer()</code>, <code>scrollToEnd()</code>, <code>destroy()</code>.</p>
+<p>Events: <code>assistant-ready</code>, <code>assistant-opened</code>, <code>assistant-closed</code>,
+<code>assistant-send</code>, <code>assistant-clear</code>.</p>
 <p>Slots: <code>title</code>, <code>subtitle</code>, <code>identity</code>, <code>messages/message</code>, <code>composer</code>, <code>actions</code>, <code>pending</code>, <code>streaming</code>, <code>empty</code>, <code>error</code>, <code>footer</code>.</p>
 <h3 id="availability-and-normalization-1">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> DOM-normalized; caller/provider results remain external. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
@@ -352,7 +382,7 @@
 <h3 id="overview-2">Overview</h3>
 <p>Calculator keypad and result/error event surface backed by CalculatorEngine.</p>
 <h3 id="public-surface-2">Public surface</h3>
-<p>Methods/properties: <code>calculate()</code>.</p>
+<p>Methods/properties: <code>calculate()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>calculator-ready</code>, <code>calculation-complete</code>, <code>calculation-error</code>.</p>
 <p>Shared dependencies: <a href="../runtime-modules/#calculatorenginejs"><code>CalculatorEngine.js</code></a>.</p>
 <h3 id="availability-and-normalization-2">Availability and normalization</h3>
@@ -391,6 +421,16 @@ speech, language, availability, and conversation-timebox surface.</p>
 extension callbacks. The component installs warning-only defaults when the host
 does not supply them; applications may instead consume the corresponding
 <code>chat-send-message</code> and <code>chat-language-changed</code> events.</p>
+<p><code>submitMessage(textOverride=&#39;&#39;,context={})</code> returns <code>Promise&lt;boolean&gt;</code>.
+<code>context</code> accepts <code>source</code>, <code>preserveDraft</code>, <code>synthetic</code>, an optional exact
+<code>operationId</code>, and an optional caller-owned <code>AbortSignal</code>. The component owns a
+derived signal for each submission, supplies it in the frozen compatibility
+<code>{message,context}</code> detail, and aborts it on canonical/DOM cancellation,
+component destruction, or caller cancellation. <code>chat-send-message</code> is
+cancelable and is the gate before <code>sendMessage(text,context)</code>; a canceled event
+never reaches the host callback. Rejected host promises are observed as
+<code>chat-send-error</code>, and stale settlement after abort or destruction is
+suppressed.</p>
 <p><code>setAIAvailability()</code> remains an LLM compatibility input, but selected sticky
 <code>AIRuntimeState</code> LLM state wins over that boolean. STT and TTS readiness always
 comes from sticky runtime role state; the method never forwards compatibility
@@ -413,9 +453,35 @@ activation controller, removes its <code>pagehide</code> listener, calls the opt
 speech controller&#39;s <code>destroy()</code>, sets <code>ready</code> to <code>false</code>, and returns
 <code>undefined</code>. It does not initiate a provider load or unload.</p>
 <p>Events: <code>chat-ready</code>, <code>chat-send-message</code>, <code>chat-send-error</code>,
-<code>chat-file-uploaded</code>, <code>chat-language-changed</code>,
-<code>chat-ai-activation-request</code>, <code>chat-ai-activation-error</code>, and
+<code>chat-file-uploaded</code>, <code>chat-file-upload-error</code>, <code>chat-language-changed</code>,
+<code>chat-language-change-error</code>, <code>chat-ai-activation-request</code>,
+<code>chat-ai-activation-error</code>, <code>chat-speech-synthesis-error</code>, and
 <code>conversation-timebox-error</code>.</p>
+<p>All chat operation ids have the form
+<code>&lt;component-instance-id&gt;:&lt;kind&gt;:&lt;sequence&gt;</code>. The stable public reasons are
+<code>chat-ready</code>, <code>message-submission-requested</code>,
+<code>message-submission-cancelled</code>, <code>caller-signal-aborted</code>,
+<code>component-destroyed</code>, <code>host-message-submission-rejected</code>,
+<code>file-storage-completed</code>, <code>file-storage-rejected</code>,
+<code>language-change-requested</code>, <code>language-change-callback-rejected</code>,
+<code>language-model-activation-requested</code>,
+<code>language-model-activation-rejected</code>, <code>speech-synthesis-rejected</code>, and
+<code>conversation-timebox-delivery-rejected</code>.</p>
+<p>The stable chat boundary codes are:</p>
+<ul>
+<li><code>ARCANE_CHAT_MESSAGE_SUBMISSION_ABORTED</code> for the owned submission signal;</li>
+<li><code>ARCANE_CHAT_LANGUAGE_MODEL_ACTIVATION_REQUEST_REJECTED</code>;</li>
+<li><code>ARCANE_CHAT_HOST_MESSAGE_SUBMISSION_REJECTED</code>;</li>
+<li><code>ARCANE_CHAT_FILE_STORAGE_REJECTED</code>;</li>
+<li><code>ARCANE_CHAT_LANGUAGE_CHANGE_CALLBACK_REJECTED</code>;</li>
+<li><code>ARCANE_CHAT_SPEECH_SYNTHESIS_REQUEST_REJECTED</code>;</li>
+<li><code>ARCANE_CHAT_CONVERSATION_TIMEBOX_DELIVERY_REJECTED</code>.</li>
+</ul>
+<p>Error projections expose the boundary <code>code</code> and include <code>causeCode</code> only when
+the rejected dependency supplies a distinct code. File projections expose only
+size/type metadata canonically while retaining the live <code>File</code> locally.
+Language and LLM activation request projections are cancelable gates before
+their host callbacks. Every public detail is frozen by the canonical authority.</p>
 <p>Shared dependencies: <a href="../runtime-modules/#mdjs"><code>MD.js</code></a>, <a href="../runtime-entities/#filejs"><code>File.js</code></a>, <a href="../runtime-modules/#conversationtimeboxjs"><code>ConversationTimebox.js</code></a>, <a href="../runtime-modules/#airuntimestatejs"><code>AIRuntimeState.js</code></a>.</p>
 <h3 id="availability-and-normalization-4">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> UI and provider-runtime state are
@@ -436,7 +502,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-5">Overview</h3>
 <p>Provider-neutral conversation display, advisory actions, composer, busy state, and status.</p>
 <h3 id="public-surface-5">Public surface</h3>
-<p>Methods/properties: <code>setConversation()</code>, <code>setBusy()</code>, <code>setStatus()</code>, <code>clearComposer()</code>.</p>
+<p>Methods/properties: <code>setConversation()</code>, <code>setBusy()</code>, <code>setStatus()</code>, <code>clearComposer()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>conversation-view-ready</code>, <code>communication-send</code>, <code>communication-advisory-action</code>.</p>
 <h3 id="availability-and-normalization-5">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
@@ -450,7 +516,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-6">Overview</h3>
 <p>Selects which normalized chart definitions are visible on a dashboard.</p>
 <h3 id="public-surface-6">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>setDefinitions()</code>, <code>setVisibility()</code>, <code>getChartOptions()</code>, <code>getEffectiveVisibility()</code>, <code>open()</code>, <code>close()</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>setDefinitions()</code>, <code>setVisibility()</code>, <code>getChartOptions()</code>, <code>getEffectiveVisibility()</code>, <code>open()</code>, <code>close()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>dashboard-config-ready</code>, <code>dashboard-config-opened</code>, <code>dashboard-config-closed</code>, <code>dashboard-config-change</code>.</p>
 <p>Shared dependencies: <a href="../runtime-modules/#componentcontractsjs"><code>ComponentContracts.js</code></a>, <a href="../runtime-modules/#waitforcomponentjs"><code>WaitForComponent.js</code></a>.</p>
 <h3 id="availability-and-normalization-6">Availability and normalization</h3>
@@ -465,7 +531,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-7">Overview</h3>
 <p>Runs destructive cleanup of empty chats and memories inside the current app data scope.</p>
 <h3 id="public-surface-7">Public surface</h3>
-<p>Methods/properties: <code>open()</code>.</p>
+<p>Methods/properties: <code>open()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>data-maintenance-ready</code>, <code>data-maintenance-complete</code>.</p>
 <p>Shared dependencies: <a href="../runtime-modules/#datamaintenancejs"><code>DataMaintenance.js</code></a>, <a href="../runtime-modules/#waitforcomponentjs"><code>WaitForComponent.js</code></a>.</p>
 <h3 id="availability-and-normalization-7">Availability and normalization</h3>
@@ -480,7 +546,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-8">Overview</h3>
 <p>Opens a generic modal-style data view around an injected provider.</p>
 <h3 id="public-surface-8">Public surface</h3>
-<p>Methods/properties: <code>beforeOpen()</code>, <code>open()</code>.</p>
+<p>Methods/properties: <code>beforeOpen()</code>, <code>open()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>data-view-ready</code>.</p>
 <p>Shared dependencies: <a href="../runtime-modules/#waitforcomponentjs"><code>WaitForComponent.js</code></a>.</p>
 <h3 id="availability-and-normalization-8">Availability and normalization</h3>
@@ -495,7 +561,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-9">Overview</h3>
 <p>Presents the provider-owned OS directory chooser with change/cancel/error states.</p>
 <h3 id="public-surface-9">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>focus()</code>, <code>select()</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>focus()</code>, <code>select()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>directory-picker-ready</code>, <code>directory-picker-change</code>, <code>directory-picker-cancel</code>, <code>directory-picker-error</code>.</p>
 <p>Shared dependencies: <a href="../runtime-modules/#directorypickerjs"><code>DirectoryPicker.js</code></a>.</p>
 <h3 id="availability-and-normalization-9">Availability and normalization</h3>
@@ -510,7 +576,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-10">Overview</h3>
 <p>Inspects PDF, text, or source documents and records review state.</p>
 <h3 id="public-surface-10">Public surface</h3>
-<p>Methods/properties: <code>loadDocument()</code>, <code>selectView()</code>, <code>markSaved()</code>.</p>
+<p>Methods/properties: <code>loadDocument()</code>, <code>selectView()</code>, <code>markSaved()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>document-inspector-ready</code>, <code>document-review-change</code>.</p>
 <p>Shared dependencies: <a href="../runtime-modules/#mdjs"><code>MD.js</code></a>.</p>
 <h3 id="availability-and-normalization-10">Availability and normalization</h3>
@@ -525,7 +591,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-11">Overview</h3>
 <p>Acquires files by drag/drop or picker and presents busy, progress, error, and cleared state.</p>
 <h3 id="public-surface-11">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>openPicker()</code>, <code>clear()</code>, <code>setBusy()</code>, <code>setError()</code>, <code>setProgress()</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>openPicker()</code>, <code>clear()</code>, <code>setBusy()</code>, <code>setError()</code>, <code>setProgress()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>file-drop-ready</code>, <code>file-drop-selected</code>, <code>file-drop-progress</code>, <code>file-drop-state</code>, <code>file-drop-error</code>.</p>
 <h3 id="availability-and-normalization-11">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> State normalized; browser File/drop errors mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
@@ -539,7 +605,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-12">Overview</h3>
 <p>Displays file metadata, preview, busy/error state, and caller-defined actions.</p>
 <h3 id="public-surface-12">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>show()</code>, <code>clear()</code>, <code>setActions()</code>, <code>setBusy()</code>, <code>setError()</code>, <code>setPreview()</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>show()</code>, <code>clear()</code>, <code>setActions()</code>, <code>setBusy()</code>, <code>setError()</code>, <code>setPreview()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>file-inspector-ready</code>, <code>file-inspector-action</code>, <code>file-inspector-change</code>, <code>file-inspector-cleared</code>, <code>file-inspector-error</code>.</p>
 <p>Slots: <code>title</code>, <code>preview</code>, <code>metadata</code>, <code>actions</code>.</p>
 <h3 id="availability-and-normalization-12">Availability and normalization</h3>
@@ -554,7 +620,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-13">Overview</h3>
 <p>Browses, filters, selects, opens, and acts on app-scoped files.</p>
 <h3 id="public-surface-13">Public surface</h3>
-<p>Methods/properties: <code>setProvider()</code>, <code>loadAll()</code>, <code>setFilter()</code>, <code>select()</code>, <code>clearSelection()</code>.</p>
+<p>Methods/properties: <code>setProvider()</code>, <code>loadAll()</code>, <code>setFilter()</code>, <code>select()</code>, <code>clearSelection()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>file-manager-ready</code>, <code>file-manager-select</code>, <code>file-manager-open</code>, <code>file-manager-action</code>.</p>
 <p>Shared dependencies: <a href="../runtime-modules/#dbopfsjs"><code>DBOPFS.js</code></a>, <a href="../runtime-entities/#filejs"><code>File.js</code></a>, <a href="../runtime-modules/#waitforcomponentjs"><code>WaitForComponent.js</code></a>.</p>
 <h3 id="availability-and-normalization-13">Availability and normalization</h3>
@@ -583,7 +649,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-15">Overview</h3>
 <p>Edits non-secret communication service configuration and service actions.</p>
 <h3 id="public-surface-15">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>getValues()</code>, <code>setStatus()</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>getValues()</code>, <code>setStatus()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>integration-settings-ready</code>, <code>integration-settings-save</code>, <code>integration-settings-close</code>, <code>integration-action</code>.</p>
 <h3 id="availability-and-normalization-15">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> Normalized non-secret values. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
@@ -597,7 +663,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-16">Overview</h3>
 <p>Presents local-AI standby, failure, recovery, guidance, retry, and dismissal states.</p>
 <h3 id="public-surface-16">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>begin()</code>, <code>present(); hidden property</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>begin()</code>, <code>present()</code>, <code>destroy()</code>, and the <code>hidden</code> property.</p>
 <p>Events: <code>local-ai-status-ready</code>, <code>local-ai-status-dismissed</code>, <code>local-ai-retry</code>.</p>
 <p>Shared dependencies: <a href="../runtime-modules/#localaireadinessjs"><code>LocalAIReadiness.js</code></a>.</p>
 <h3 id="availability-and-normalization-16">Availability and normalization</h3>
@@ -612,8 +678,11 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-17">Overview</h3>
 <p>Safely renders and navigates a Markdown document with focusable fragments.</p>
 <h3 id="public-surface-17">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>load()</code>, <code>render()</code>, <code>clear()</code>, <code>fail()</code>, <code>focus()</code>, <code>focusFragment()</code>.</p>
-<p>Events: <code>markdown-document-ready</code>, <code>markdown-document-state</code>, <code>markdown-document-navigate</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>load()</code>, <code>render()</code>, <code>clear()</code>, <code>fail()</code>, <code>focus()</code>, <code>focusFragment()</code>, <code>destroy()</code>.</p>
+<p>Events: <code>markdown-document-ready</code>, <code>markdown-document-state</code>,
+<code>markdown-document-loading</code>, <code>markdown-document-rendered</code>,
+<code>markdown-document-empty</code>, <code>markdown-document-error</code>, and
+<code>markdown-document-navigate</code>.</p>
 <p>Shared dependencies: <a href="../runtime-modules/#mdjs"><code>MD.js</code></a>.</p>
 <h3 id="availability-and-normalization-17">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> State/sanitized output normalized; Marked/DOM failures mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
@@ -627,7 +696,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-18">Overview</h3>
 <p>Configurable Markdown authoring, toolbar, preview, title, and save surface.</p>
 <h3 id="public-surface-18">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>focus()</code>, <code>clear()</code>, <code>saveEntry()</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>focus()</code>, <code>clear()</code>, <code>saveEntry()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>markdown-editor-ready</code>, <code>markdown-editor-change</code>, <code>markdown-editor-saved</code>.</p>
 <p>Shared dependencies: <a href="../runtime-modules/#mdjs"><code>MD.js</code></a>, <a href="../runtime-modules/#componentcontractsjs"><code>ComponentContracts.js</code></a>.</p>
 <h3 id="availability-and-normalization-18">Availability and normalization</h3>
@@ -642,7 +711,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-19">Overview</h3>
 <p>Loads a validated YouTube video or playlist embed and exposes external-platform action.</p>
 <h3 id="public-surface-19">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>load()</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>load()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>media-embed-ready</code>, <code>media-load</code>, <code>media-error</code>, <code>media-open-platform</code>.</p>
 <p>Shared dependencies: <a href="../runtime-modules/#youtubemediajs"><code>YouTubeMedia.js</code></a>.</p>
 <h3 id="availability-and-normalization-19">Availability and normalization</h3>
@@ -657,7 +726,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-20">Overview</h3>
 <p>Generic modal with population, open/close, actions, and sequential task execution.</p>
 <h3 id="public-surface-20">Public surface</h3>
-<p>Methods/properties: <code>populate()</code>, <code>open()</code>, <code>close()</code>, <code>runTasks()</code>.</p>
+<p>Methods/properties: <code>populate()</code>, <code>open()</code>, <code>close()</code>, <code>runTasks()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>modal-ready</code>, <code>modal-opened</code>, <code>modal-closed</code>, <code>modal-action</code>.</p>
 <p>Slots: <code>header</code>, <code>body</code>, <code>footer</code>.</p>
 <h3 id="availability-and-normalization-20">Availability and normalization</h3>
@@ -672,7 +741,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-21">Overview</h3>
 <p>Presents status, output, body, coverage, actions, pending, error, and cleared states.</p>
 <h3 id="public-surface-21">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>setOutput()</code>, <code>setBody()</code>, <code>setCoverage()</code>, <code>setActions()</code>, <code>setPending()</code>, <code>setStatus()</code>, <code>setError()</code>, <code>clear()</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>setOutput()</code>, <code>setBody()</code>, <code>setCoverage()</code>, <code>setActions()</code>, <code>setPending()</code>, <code>setStatus()</code>, <code>setError()</code>, <code>clear()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>output-panel-ready</code>, <code>output-panel-state</code>, <code>output-panel-change</code>, <code>output-panel-action</code>, <code>output-panel-error</code>, <code>output-panel-cleared</code>.</p>
 <p>Slots: <code>title</code>, <code>header-actions</code>, <code>body</code>, <code>coverage</code>, <code>actions</code>.</p>
 <h3 id="availability-and-normalization-21">Availability and normalization</h3>
@@ -687,7 +756,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-22">Overview</h3>
 <p>Builds a schema-driven preferences form with submit, reset, busy, and status behavior.</p>
 <h3 id="public-surface-22">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>getValues()</code>, <code>setValues()</code>, <code>setBusy()</code>, <code>setStatus()</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>getValues()</code>, <code>setValues()</code>, <code>setBusy()</code>, <code>setStatus()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>preferences-form-ready</code>, <code>preferences-change</code>, <code>preferences-submit</code>, <code>preferences-reset</code>.</p>
 <h3 id="availability-and-normalization-22">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> Normalized form values. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
@@ -701,7 +770,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-23">Overview</h3>
 <p>Displays chronological records/evidence and emits open actions.</p>
 <h3 id="public-surface-23">Public surface</h3>
-<p>Methods/properties: <code>setItems()</code>, <code>populate()</code>.</p>
+<p>Methods/properties: <code>setItems()</code>, <code>populate()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>record-timeline-ready</code>, <code>record-timeline-open</code>.</p>
 <h3 id="availability-and-normalization-23">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
@@ -715,7 +784,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-24">Overview</h3>
 <p>Displays normalized relationship nodes/edges in graph and list forms.</p>
 <h3 id="public-surface-24">Public surface</h3>
-<p>Methods/properties: <code>setGraph()</code>, <code>populate()</code>.</p>
+<p>Methods/properties: <code>setGraph()</code>, <code>populate()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>relationship-board-ready</code>, <code>relationship-node-open</code>, <code>relationship-edge-open</code>.</p>
 <h3 id="availability-and-normalization-24">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
@@ -729,8 +798,13 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-25">Overview</h3>
 <p>Presents image, video, or GIF display-capture workflow.</p>
 <h3 id="public-surface-25">Public surface</h3>
-<p>Methods/properties: <code>capture()</code>.</p>
+<p>Methods/properties: <code>capture</code> (the component-owned <code>ScreenCapture</code> instance) and <code>destroy()</code>.</p>
 <p>Events: <code>screen-capture-ready</code>, <code>screen-capture-result</code>.</p>
+<p>Ready uses operation id <code>screen-capture-ready-&lt;component-instance-id&gt;</code>;
+capture results use the current instance-owned generation. <code>destroy()</code>
+invalidates that generation, aborts UI listeners, revokes the preview URL,
+destroys the <code>ScreenCapture</code> instance, disposes the source, marks the host
+unready, and returns <code>true</code>; repeated calls return <code>false</code>.</p>
 <p>Shared dependencies: <a href="../runtime-modules/#screencapturejs"><code>ScreenCapture.js</code></a>.</p>
 <h3 id="availability-and-normalization-25">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> State/result normalized; media permission/codec failures mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
@@ -744,8 +818,10 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-26">Overview</h3>
 <p>Renders line-addressable source code with load, error, focus, and state behavior.</p>
 <h3 id="public-surface-26">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>load()</code>, <code>render()</code>, <code>clear()</code>, <code>fail()</code>, <code>focus()</code>, <code>focusLine()</code>.</p>
-<p>Events: <code>source-code-viewer-ready</code>, <code>source-code-viewer-state</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>load()</code>, <code>render()</code>, <code>clear()</code>, <code>fail()</code>, <code>focus()</code>, <code>focusLine()</code>, <code>destroy()</code>.</p>
+<p>Events: <code>source-code-viewer-ready</code>, <code>source-code-viewer-state</code>,
+<code>source-code-viewer-state-loading</code>, <code>source-code-viewer-state-ready</code>,
+<code>source-code-viewer-state-empty</code>, and <code>source-code-viewer-state-error</code>.</p>
 <h3 id="availability-and-normalization-26">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> Normalized source/state. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
 <h3 id="example-26">Example</h3>
@@ -758,7 +834,7 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <h3 id="overview-27">Overview</h3>
 <p>Presents an evidence finding, source selection, explanation, and save state.</p>
 <h3 id="public-surface-27">Public surface</h3>
-<p>Methods/properties: <code>showFinding()</code>, <code>populate()</code>, <code>selectSource()</code>, <code>markSaved()</code>.</p>
+<p>Methods/properties: <code>showFinding()</code>, <code>populate()</code>, <code>selectSource()</code>, <code>markSaved()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>source-explanation-ready</code>, <code>source-explanation-save</code>, <code>source-explanation-source-selected</code>.</p>
 <h3 id="availability-and-normalization-27">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
@@ -774,14 +850,16 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 completion, mute state, and microphone availability.</p>
 <h3 id="public-surface-28">Public surface</h3>
 <p>Methods/properties: <code>configure()</code>, <code>setAvailability()</code>, <code>setMuted()</code>,
-<code>requestSTTActivation()</code>, <code>destroy()</code>, <code>availability</code>, <code>muted</code>, <code>initialMuted</code>,
-and <code>componentReady</code>.</p>
+<code>reportTTSError(error,boundary=&#39;synthesis&#39;)</code>, <code>requestSTTActivation()</code>,
+<code>destroy()</code>, <code>availability</code>, <code>muted</code>, <code>initialMuted</code>, and <code>componentReady</code>.</p>
 <p>Events: <code>speech-ready</code>, <code>speech-transcription-complete</code>,
 <code>speech-transcription-error</code>, <code>speech-transcription-cancelled</code>,
 <code>speech-microphone-unavailable</code>, <code>speech-stt-activation-request</code>,
-<code>speech-stt-activation-error</code>, and <code>speech-tts-lifecycle-error</code>.</p>
+<code>speech-stt-activation-error</code>, <code>speech-tts-lifecycle-error</code>, and
+<code>speech-synthesis-error</code>.</p>
 <p>Shared dependencies: <a href="../runtime-modules/#aijs"><code>AI.js</code></a>,
-<a href="../runtime-modules/#airuntimestatejs"><code>AIRuntimeState.js</code></a>, and
+<a href="../runtime-modules/#airuntimestatejs"><code>AIRuntimeState.js</code></a>,
+<a href="../runtime-modules/#componentcontractsjs"><code>ComponentContracts.js</code></a>, and
 <a href="../runtime-modules/#dblsjs"><code>DBLS.js</code></a>.</p>
 <p>The Hold to talk control remains disabled unless sticky STT state is <code>ready</code>,
 the role is not busy, and microphone capture is available. For an explicitly
@@ -819,6 +897,27 @@ or with publishing the TTS load intent, so the runtime can legally load TTS.
 Mute calls <code>AI.setSpeechMuted(true)</code>, stops playback, cancels active TTS work,
 and unloads the selected TTS role. Lifecycle failures remain visible through
 <code>speech-tts-lifecycle-error</code> and sticky role state.</p>
+<p>Speech operation ids are
+<code>&lt;component-instance-id&gt;:&lt;kind&gt;:&lt;sequence&gt;</code>. Canonical cancellation reasons are
+<code>stt-role-unready</code>, <code>stt-provider-transcription-cancelled</code>, <code>stt-role-busy</code>,
+<code>microphone-unavailable</code>, <code>component-destroyed</code>, and
+<code>stt-transcription-cancelled</code>. Microphone capture-failure reasons are
+<code>microphone-input-missing</code>, <code>microphone-input-unavailable</code>,
+<code>microphone-capture-denied</code>, and <code>microphone-capture-rejected</code>. Component
+boundary codes are <code>ARCANE_SPEECH_MICROPHONE_CAPTURE_REJECTED</code>,
+<code>ARCANE_SPEECH_STT_TRANSCRIPTION_REQUEST_REJECTED</code>,
+<code>ARCANE_SPEECH_TTS_LOAD_REJECTED</code>, <code>ARCANE_SPEECH_TTS_UNLOAD_REJECTED</code>,
+<code>ARCANE_SPEECH_TTS_SYNTHESIS_REQUEST_REJECTED</code>, and
+<code>ARCANE_SPEECH_TTS_PLAYBACK_RESUME_REJECTED</code>. Each of those component-boundary
+public projections keeps the exact boundary in <code>code</code> and preserves a distinct
+string code from the browser, runtime, or provider additively as <code>causeCode</code>.
+A missing STT method therefore uses boundary
+<code>ARCANE_SPEECH_STT_TRANSCRIPTION_REQUEST_REJECTED</code> with
+<code>causeCode:&#39;ARCANE_SPEECH_STT_RUNTIME_METHOD_UNAVAILABLE&#39;</code>.</p>
+<p>Stable rejection reasons are <code>stt-transcription-rejected</code>,
+<code>tts-load-rejected</code>, <code>tts-unload-rejected</code>, <code>tts-synthesis-rejected</code>, and
+<code>tts-playback-resume-rejected</code>. Shared activation rejection uses
+<code>ARCANE_STT_ACTIVATION_REQUEST_REJECTED</code> and <code>activation-request-rejected</code>.</p>
 <h3 id="availability-and-normalization-28">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> UI/runtime state and explicit user
 STT activation intent are normalized; provider/model authority and media
@@ -835,7 +934,7 @@ where listed. Native methods remain subject to the bound app&#39;s capabilities.
 <h3 id="overview-29">Overview</h3>
 <p>Displays compact selectable KPI or summary items.</p>
 <h3 id="public-surface-29">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>setItems()</code>, <code>updateItem()</code>, <code>clear()</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>setItems()</code>, <code>updateItem()</code>, <code>clear()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>summary-strip-ready</code>, <code>summary-strip-change</code>, <code>summary-strip-select</code>.</p>
 <h3 id="availability-and-normalization-29">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
@@ -849,7 +948,7 @@ where listed. Native methods remain subject to the bound app&#39;s capabilities.
 <h3 id="overview-30">Overview</h3>
 <p>Builds and updates a simple header/body table.</p>
 <h3 id="public-surface-30">Public surface</h3>
-<p>Methods/properties: <code>buildHeader()</code>, <code>buildTable()</code>.</p>
+<p>Methods/properties: <code>buildHeader()</code>, <code>buildTable()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>table-ready</code>, <code>header-update</code>, <code>body-update</code>.</p>
 <h3 id="availability-and-normalization-30">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
@@ -863,7 +962,7 @@ where listed. Native methods remain subject to the bound app&#39;s capabilities.
 <h3 id="overview-31">Overview</h3>
 <p>Runs and displays a task list with started/change/complete/error state.</p>
 <h3 id="public-surface-31">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>setTasks()</code>, <code>updateTask()</code>, <code>runTasks()</code>, <code>clear()</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>setTasks()</code>, <code>updateTask()</code>, <code>runTasks()</code>, <code>clear()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>task-progress-ready</code>, <code>task-progress-started</code>, <code>task-progress-change</code>, <code>task-progress-complete</code>, <code>task-progress-error</code>.</p>
 <h3 id="availability-and-normalization-31">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> Task state normalized; injected task results mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
@@ -877,7 +976,7 @@ where listed. Native methods remain subject to the bound app&#39;s capabilities.
 <h3 id="overview-32">Overview</h3>
 <p>Presents multiple terminal sessions, output, active selection, theme, and terminal actions.</p>
 <h3 id="public-surface-32">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>addSession()</code>, <code>removeSession()</code>, <code>activateSession()</code>, <code>append()</code>, <code>clear()</code>, <code>setState()</code>, <code>setTheme()</code>, <code>focus()</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>addSession()</code>, <code>removeSession()</code>, <code>activateSession()</code>, <code>append()</code>, <code>clear()</code>, <code>setState()</code>, <code>setTheme()</code>, <code>focus()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>terminal-workspace-ready</code>, <code>terminal-submit</code>, <code>terminal-interrupt</code>, <code>terminal-clear</code>, <code>terminal-session-new</code>, <code>terminal-session-close</code>, <code>terminal-session-select</code>, <code>terminal-settings</code>.</p>
 <p>Shared dependencies: <a href="../runtime-modules/#ansitextjs"><code>AnsiText.js</code></a>.</p>
 <h3 id="availability-and-normalization-32">Availability and normalization</h3>
@@ -892,7 +991,7 @@ where listed. Native methods remain subject to the bound app&#39;s capabilities.
 <h3 id="overview-33">Overview</h3>
 <p>Edits, previews, saves, and resets semantic custom theme tokens.</p>
 <h3 id="public-surface-33">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>getTheme()</code>, <code>setTheme()</code>, <code>setBusy()</code>, <code>setStatus()</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>getTheme()</code>, <code>setTheme()</code>, <code>setBusy()</code>, <code>setStatus()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>theme-editor-ready</code>, <code>theme-preview</code>, <code>theme-save</code>, <code>theme-reset</code>.</p>
 <p>Shared dependencies: <a href="../runtime-entities/#themejs"><code>Theme.js</code></a>.</p>
 <h3 id="availability-and-normalization-33">Availability and normalization</h3>
@@ -922,7 +1021,7 @@ where listed. Native methods remain subject to the bound app&#39;s capabilities.
 <h3 id="overview-35">Overview</h3>
 <p>Displays provider-neutral communication threads with active/loading state.</p>
 <h3 id="public-surface-35">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>setThreads()</code>, <code>setActive()</code>, <code>setLoading()</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>setThreads()</code>, <code>setActive()</code>, <code>setLoading()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>unified-inbox-ready</code>, <code>inbox-refresh</code>, <code>thread-select</code>.</p>
 <h3 id="availability-and-normalization-35">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
@@ -934,13 +1033,77 @@ where listed. Native methods remain subject to the bound app&#39;s capabilities.
 </code></pre></div>
 <h2 id="voice-transcriptionhtml">voice-transcription.html</h2>
 <h3 id="overview-36">Overview</h3>
-<p>Records segmented microphone audio, transcribes, persists, and completes a combined transcript.</p>
+<p>Records segmented microphone audio only after authoritative STT admission,
+exposes explicit selected-STT activation, transcribes with cancellation,
+persists, and completes a combined transcript.</p>
 <h3 id="public-surface-36">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>startRecording()</code>, <code>stopRecording()</code>, <code>save()</code>, <code>completeTranscription()/complete()</code>, <code>clear()</code>, <code>reset()</code>, <code>destroy()</code>.</p>
-<p>Events: <code>voice-transcription-ready</code>, <code>voice-transcription-state</code>, <code>voice-transcription-segment</code>, <code>voice-transcription-change</code>, <code>voice-transcription-complete</code>, <code>speech-transcription-complete</code>.</p>
-<p>Shared dependencies: <a href="../runtime-modules/#mdjs"><code>MD.js</code></a>, <a href="../runtime-modules/#componentcontractsjs"><code>ComponentContracts.js</code></a>, <a href="../runtime-modules/#aijs"><code>AI.js</code></a>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>requestSTTActivation()</code>, <code>startRecording()</code>,
+<code>stopRecording()</code>, <code>save()</code>, <code>completeTranscription()/complete()</code>, <code>clear()</code>,
+<code>reset()</code>, <code>destroy()</code>.</p>
+<p>Events: <code>voice-transcription-ready</code>, <code>voice-transcription-state</code>,
+<code>voice-transcription-segment</code>, <code>voice-transcription-change</code>,
+<code>voice-transcription-complete</code>, <code>speech-transcription-complete</code>,
+<code>speech-transcription-cancelled</code>, <code>speech-stt-activation-request</code>, and
+<code>speech-stt-activation-error</code>.</p>
+<p>Shared dependencies: <a href="../runtime-modules/#mdjs"><code>MD.js</code></a>,
+<a href="../runtime-modules/#componentcontractsjs"><code>ComponentContracts.js</code></a>,
+<a href="../runtime-modules/#airuntimestatejs"><code>AIRuntimeState.js</code></a>, and
+<a href="../runtime-modules/#aijs"><code>AI.js</code></a>.</p>
 <h3 id="availability-and-normalization-36">Availability and normalization</h3>
-<p><strong>Browser and supported native WebViews.</strong> State/text normalized; media/provider behavior mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<p><strong>Browser and supported native WebViews.</strong> The component subscribes
+synchronously to sticky <code>AIRuntimeState.roles.stt</code>; its recording Start button
+and public <code>startRecording()</code> both fail closed unless that role is exactly
+<code>ready</code> and not busy. A configured <code>transcribe(file,context)</code> callback remains
+request plumbing rather than readiness authority. Its context now includes the
+owned <code>signal</code> additively. The default route calls
+<code>AI.fetchSTT(file,undefined,signal)</code> so the callback position remains valid and
+readiness loss or destruction can abort delivery.</p>
+<p>For a selected <code>unloaded</code>, <code>loading</code>, <code>unloading</code>, or <code>error</code> role, the component
+keeps recording Start disabled and presents the same keyboard-operable Start
+transcription/Try again or Cancel loading control as <code>speech.html</code>. Both use the
+shared <code>createSTTActivationController()</code> contract. User operation emits the
+cancelable <code>speech-stt-activation-request</code> event with frozen <code>{intent,state}</code>;
+<code>preventDefault()</code> suppresses the callback. The default
+<code>requestSTTActivation(intent)</code> publishes the frozen
+<code>{role:&#39;stt&#39;,action:&#39;load&#39;|&#39;unload&#39;,reason:&#39;user&#39;}</code> intent. Callback failure emits
+<code>speech-stt-activation-error</code> with frozen <code>{request,error,message}</code>. Import and
+state observation emit no activation request and never begin a model download.</p>
+<p>If sticky readiness is lost during microphone acquisition, capture, or the STT
+request, the component invalidates the session, aborts the owned request signal,
+releases media, discards late completion, and emits
+<code>speech-transcription-cancelled</code>. Its local compatibility reason is
+<code>runtime-unready</code>, while its canonical/public reason is <code>stt-role-unready</code>. A
+busy role uses <code>stt-role-busy</code> in both views. A current provider cancellation
+returns the component workflow to <code>idle</code> with local
+<code>stt-provider-request-cancelled</code> and canonical/public
+<code>stt-provider-transcription-cancelled</code>; destruction uses
+<code>component-destroyed</code> in both views. Replacing configuration without an
+<code>initialValue</code> during active work uses <code>configuration-replaced</code> in both views.
+Stale teardown results remain suppressed. A
+current save failure, including <code>AbortError</code>, enters the visible <code>error</code> state.
+Readiness loss after transcription has finished does not invalidate an already
+pending application save or completion callback: its settlement remains
+observable, while any new recording remains gated by current sticky readiness.
+Assigning <code>value</code> or calling <code>configure({initialValue})</code> explicitly supersedes
+an in-flight microphone start, STT request, save, or completion. The component
+advances its generation, aborts owned STT delivery, releases owned media, emits
+<code>speech-transcription-cancelled</code> with
+<code>reason:&#39;transcript-replaced&#39;</code>, and suppresses
+late settlement before publishing the assigned transcript. Assigning transcript
+text during active recording preserves that recording and changes the transcript
+to which the captured segment will be appended.
+<code>destroy()</code> aborts the state subscription, cancels active work, removes the
+activation listener, sets component <code>ready</code> to <code>false</code>, and returns <code>true</code>;
+repeated destruction is
+idempotent. Destruction is terminal: Start, activation, and Complete remain
+disabled and status remains unavailable. <code>voice-transcription-state</code> detail is
+the frozen <code>{message,state,stt}</code> record, where <code>state</code> remains the component
+workflow and <code>stt</code> is the authoritative immutable role record. Transcript
+completion stays available when STT is unavailable before destruction.
+State/text, explicit activation, and request cancellation are normalized;
+provider/model authority and media behavior remain external. HTMLImport + DOM;
+injected Arcane/provider modules where listed.
+Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
 <h3 id="example-36">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
   id=&quot;voice-transcription.html&quot;
@@ -951,7 +1114,7 @@ where listed. Native methods remain subject to the bound app&#39;s capabilities.
 <h3 id="overview-37">Overview</h3>
 <p>Displays normalized current and daily weather with refresh intent.</p>
 <h3 id="public-surface-37">Public surface</h3>
-<p>Methods/properties: <code>setWeather()</code>, <code>clear()</code>.</p>
+<p>Methods/properties: <code>setWeather()</code>, <code>clear()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>weather-widget-ready</code>, <code>weather-refresh</code>.</p>
 <h3 id="availability-and-normalization-37">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> Display normalized; provider supplied externally. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
@@ -965,7 +1128,7 @@ where listed. Native methods remain subject to the bound app&#39;s capabilities.
 <h3 id="overview-38">Overview</h3>
 <p>Guards embedded/external navigation and surfaces allow/block/open intents.</p>
 <h3 id="public-surface-38">Public surface</h3>
-<p>Methods/properties: <code>configure()</code>, <code>navigate()</code>, <code>currentUrl()</code>.</p>
+<p>Methods/properties: <code>configure()</code>, <code>navigate()</code>, <code>currentUrl()</code>, <code>destroy()</code>.</p>
 <p>Events: <code>web-navigator-ready</code>, <code>web-navigate</code>, <code>web-navigation-blocked</code>, <code>web-open-external</code>.</p>
 <h3 id="availability-and-normalization-38">Availability and normalization</h3>
 <p><strong>Browser and supported native WebViews.</strong> Navigation intent/decision normalized; browser navigation result platform-native. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
@@ -978,9 +1141,9 @@ where listed. Native methods remain subject to the bound app&#39;s capabilities.
 <h2 id="readiness-caveats">Readiness caveats</h2>
 <p><code>header.html</code> and <code>theme-switcher.html</code> do not currently publish a component-specific ready event/property. Consumers can observe <code>html-import-ready</code> for completed fragment execution and then feature-detect their methods. Other fragments publish the exact ready event listed above.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#basic-loading-pattern">Basic loading pattern</a><a href="#canonical-inventory">Canonical inventory</a><a href="#app-barhtml">app-bar.html</a><a href="#assistant-panelhtml">assistant-panel.html</a><a href="#calculatorhtml">calculator.html</a><a href="#charthtml">chart.html</a><a href="#chathtml">chat.html</a><a href="#conversation-viewhtml">conversation-view.html</a><a href="#dashboard-confightml">dashboard-config.html</a><a href="#data-maintenancehtml">data-maintenance.html</a><a href="#data-viewhtml">data-view.html</a><a href="#directory-pickerhtml">directory-picker.html</a><a href="#document-inspectorhtml">document-inspector.html</a><a href="#file-drophtml">file-drop.html</a><a href="#file-inspectorhtml">file-inspector.html</a><a href="#file-managerhtml">file-manager.html</a><a href="#headerhtml">header.html</a><a href="#integration-settingshtml">integration-settings.html</a><a href="#local-ai-statushtml">local-ai-status.html</a><a href="#markdown-documenthtml">markdown-document.html</a><a href="#markdown-editorhtml">markdown-editor.html</a><a href="#media-embedhtml">media-embed.html</a><a href="#modalhtml">modal.html</a><a href="#output-panelhtml">output-panel.html</a><a href="#preferences-formhtml">preferences-form.html</a><a href="#record-timelinehtml">record-timeline.html</a><a href="#relationship-boardhtml">relationship-board.html</a><a href="#screen-capturehtml">screen-capture.html</a><a href="#source-code-viewerhtml">source-code-viewer.html</a><a href="#source-explanationhtml">source-explanation.html</a><a href="#speechhtml">speech.html</a><a href="#summary-striphtml">summary-strip.html</a><a href="#tablehtml">table.html</a><a href="#task-progresshtml">task-progress.html</a><a href="#terminal-workspacehtml">terminal-workspace.html</a><a href="#theme-editorhtml">theme-editor.html</a><a href="#theme-switcherhtml">theme-switcher.html</a><a href="#unified-inboxhtml">unified-inbox.html</a><a href="#voice-transcriptionhtml">voice-transcription.html</a><a href="#weather-widgethtml">weather-widget.html</a></nav><p class="toc-more">2 additional sections remain searchable in the page.</p></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#basic-loading-pattern">Basic loading pattern</a><a href="#shared-semantic-event-and-lifecycle-contract">Shared semantic-event and lifecycle contract</a><a href="#canonical-inventory">Canonical inventory</a><a href="#app-barhtml">app-bar.html</a><a href="#assistant-panelhtml">assistant-panel.html</a><a href="#calculatorhtml">calculator.html</a><a href="#charthtml">chart.html</a><a href="#chathtml">chat.html</a><a href="#conversation-viewhtml">conversation-view.html</a><a href="#dashboard-confightml">dashboard-config.html</a><a href="#data-maintenancehtml">data-maintenance.html</a><a href="#data-viewhtml">data-view.html</a><a href="#directory-pickerhtml">directory-picker.html</a><a href="#document-inspectorhtml">document-inspector.html</a><a href="#file-drophtml">file-drop.html</a><a href="#file-inspectorhtml">file-inspector.html</a><a href="#file-managerhtml">file-manager.html</a><a href="#headerhtml">header.html</a><a href="#integration-settingshtml">integration-settings.html</a><a href="#local-ai-statushtml">local-ai-status.html</a><a href="#markdown-documenthtml">markdown-document.html</a><a href="#markdown-editorhtml">markdown-editor.html</a><a href="#media-embedhtml">media-embed.html</a><a href="#modalhtml">modal.html</a><a href="#output-panelhtml">output-panel.html</a><a href="#preferences-formhtml">preferences-form.html</a><a href="#record-timelinehtml">record-timeline.html</a><a href="#relationship-boardhtml">relationship-board.html</a><a href="#screen-capturehtml">screen-capture.html</a><a href="#source-code-viewerhtml">source-code-viewer.html</a><a href="#source-explanationhtml">source-explanation.html</a><a href="#speechhtml">speech.html</a><a href="#summary-striphtml">summary-strip.html</a><a href="#tablehtml">table.html</a><a href="#task-progresshtml">task-progress.html</a><a href="#terminal-workspacehtml">terminal-workspace.html</a><a href="#theme-editorhtml">theme-editor.html</a><a href="#theme-switcherhtml">theme-switcher.html</a><a href="#unified-inboxhtml">unified-inbox.html</a><a href="#voice-transcriptionhtml">voice-transcription.html</a></nav><p class="toc-more">3 additional sections remain searchable in the page.</p></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.2.2, runtime bundle 0.8.12, and protocol arcane/1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK source candidate 0.3.0, runtime bundle 0.8.12, and protocol arcane/1; the latest verified published package is 0.2.3.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>

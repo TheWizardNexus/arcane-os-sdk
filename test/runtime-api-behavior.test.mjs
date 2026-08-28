@@ -2234,6 +2234,7 @@ test(
                         providerId,
                         suffix
                     ),
+                    security:Object.freeze({secure:true}),
                     offline:false
                 });
             };
