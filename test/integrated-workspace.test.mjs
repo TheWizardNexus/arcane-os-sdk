@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import {cp,lstat,mkdir,readFile,rm,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
+import {SDK_NAME,SDK_VERSION} from '../src/constants.mjs';
 import {
     buildApplication,
     checkApplication,
     createApplication,
     developApplication,
     initializeApplication,
+    materializeInstalledSdkRuntime,
     packageApplication,
     projectPackageManifest,
     runApplication,
@@ -33,6 +35,39 @@ async function authorize(instance){
     const cookie=response.headers.get('set-cookie')?.split(';',1)[0];
     assert.match(cookie||'',/^Arcane-Dev-Session-[0-9a-f]{16}=[0-9a-f]{64}$/);
     return cookie;
+}
+
+async function installSdkAliasRuntime(workspaceRoot,dependencyName='arcane-sdk'){
+    const installedRoot=path.join(workspaceRoot,'node_modules',dependencyName);
+    await mkdir(path.join(installedRoot,'src'),{recursive:true});
+    await Promise.all([
+        cp(path.join(repositoryRoot,'runtime'),path.join(installedRoot,'runtime'),{recursive:true}),
+        cp(
+            path.join(repositoryRoot,'browser-runtime'),
+            path.join(installedRoot,'browser-runtime'),
+            {recursive:true}
+        ),
+        cp(
+            path.join(repositoryRoot,'node_modules','event-pubsub'),
+            path.join(installedRoot,'node_modules','event-pubsub'),
+            {recursive:true}
+        ),
+        cp(
+            path.join(repositoryRoot,'node_modules','strong-type'),
+            path.join(installedRoot,'node_modules','strong-type'),
+            {recursive:true}
+        ),
+        cp(
+            path.join(repositoryRoot,'src','event-manager.mjs'),
+            path.join(installedRoot,'src','event-manager.mjs')
+        ),
+        cp(
+            path.join(repositoryRoot,'src','dom-event-instrumentation.mjs'),
+            path.join(installedRoot,'src','dom-event-instrumentation.mjs')
+        ),
+        cp(path.join(repositoryRoot,'package.json'),path.join(installedRoot,'package.json'))
+    ]);
+    return installedRoot;
 }
 
 async function request(instance,requestPath,cookie){
@@ -147,6 +182,79 @@ async function configureLegacyIntegratedWorkspace(workspaceRoot){
         {recursive:true}
     );
 }
+
+test('installed SDK materialization refreshes an alias projection transactionally',async t=>{
+    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-installed-runtime-'});
+    await writeJson(path.join(workspaceRoot,'package.json'),{
+        name:'installed-runtime-fixture',
+        private:true,
+        type:'module',
+        devDependencies:{'arcane-sdk':`npm:${SDK_NAME}@${SDK_VERSION}`}
+    });
+    const installedRoot=await installSdkAliasRuntime(workspaceRoot);
+
+    const created=await materializeInstalledSdkRuntime({workspaceRoot});
+    assert.equal(created.status,'created');
+    assert.match(created.generation,/^[a-f0-9-]{36}$/u);
+    assert.equal(created.installation.dependencyName,'arcane-sdk');
+    assert.equal(created.installation.packageSource,'node_modules/arcane-sdk');
+    assert.equal(created.persistentReceipt.installedPackage.dependencyName,'arcane-sdk');
+    assert.equal(created.persistentReceipt.installedPackage.packageName,SDK_NAME);
+    assert.equal(created.persistentReceipt.installedPackage.packageVersion,SDK_VERSION);
+    assert.equal(created.persistentReceipt.generation,created.generation);
+    assert.equal(created.persistentReceipt.projection.fileCount,created.workspaceRuntimeReceipt.fileCount);
+    assert.equal(
+        created.persistentReceipt.projection.contentSha256,
+        created.workspaceRuntimeReceipt.contentSha256
+    );
+    const createdReceiptBytes=await readFile(created.receiptPath);
+
+    const reused=await materializeInstalledSdkRuntime({workspaceRoot});
+    assert.equal(reused.status,'reused');
+    assert.equal(reused.generation,created.generation);
+    assert.deepEqual(await readFile(reused.receiptPath),createdReceiptBytes);
+
+    await rm(reused.receiptPath);
+    const stalePath=path.join(workspaceRoot,'arcane','stale-runtime-byte.txt');
+    await writeFile(stalePath,'stale\n');
+    const legacyRefreshed=await materializeInstalledSdkRuntime({workspaceRoot});
+    assert.equal(legacyRefreshed.status,'refreshed');
+    assert.notEqual(legacyRefreshed.generation,created.generation);
+    await assert.rejects(lstat(stalePath),{code:'ENOENT'});
+
+    const priorReceiptBytes=await readFile(legacyRefreshed.receiptPath);
+    const priorRuntimeBytes=await readFile(
+        path.join(workspaceRoot,'arcane','css','theme.css')
+    );
+    await writeFile(path.join(installedRoot,'materialization-generation.txt'),'next\n');
+    const cancellation=new AbortController();
+    await assert.rejects(
+        materializeInstalledSdkRuntime({
+            workspaceRoot,
+            signal:cancellation.signal,
+            onEvent:event=>{
+                if(event.type==='workspace.runtime.materialize.progress'){
+                    cancellation.abort(new Error('cancel before materialization commit'));
+                }
+            }
+        }),
+        error=>error?.code==='ARCANE_CANCELLED'
+    );
+    assert.deepEqual(await readFile(legacyRefreshed.receiptPath),priorReceiptBytes);
+    assert.deepEqual(
+        await readFile(path.join(workspaceRoot,'arcane','css','theme.css')),
+        priorRuntimeBytes
+    );
+
+    const refreshed=await materializeInstalledSdkRuntime({workspaceRoot});
+    assert.equal(refreshed.status,'refreshed');
+    assert.notEqual(refreshed.generation,legacyRefreshed.generation);
+    assert.equal(refreshed.persistentReceipt.installedPackage.canonicalLocation,installedRoot);
+    assert.deepEqual(
+        JSON.parse(await readFile(refreshed.receiptPath,'utf8')),
+        refreshed.persistentReceipt
+    );
+});
 
 test('unchanged two-route integrated Arcane workspace keeps legacy dev and package behavior',async t=>{
     const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-integrated-legacy-'});

@@ -16,7 +16,7 @@
     <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser speech providers</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-speech-providers">Browser speech providers</h1><p class="doc-lead">arcane-os/ai/browser-speech is the browser-only, event-neutral SDK boundary for caller-supplied Whisper speech-to-text and Kokoro text-to-speech runtimes. I…</p><div class="doc-meta"><span>SDK 0.3.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../">Normalized AI</a><a href="../browser-wasm/">Browser-WASM AI</a><a href="./" aria-current="page">Browser speech</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/ai/browser-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-and-enum-registry">Protocol and enum registry</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#authenticated-worker-host">Authenticated Worker host</a><a href="#providers">Providers</a><a href="#lifecycle-progress-cancellation-and-cleanup">Lifecycle, progress, cancellation, and cleanup</a><a href="#stable-errors-and-reasons">Stable errors and reasons</a><a href="#createbrowserspeechauthority-upstream-package-mode">createBrowserSpeechAuthority() upstream package mode</a><a href="#security-and-ownership-summary">Security and ownership summary</a><a href="#related">Related</a></nav></details><p><code>arcane-os/ai/browser-speech</code> is the browser-only, event-neutral SDK boundary
+      <article class="prose reference-prose" data-reference-source="docs/reference/ai/browser-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-and-enum-registry">Protocol and enum registry</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#graph-worker-host">Graph Worker host</a><a href="#providers">Providers</a><a href="#lifecycle-progress-cancellation-and-cleanup">Lifecycle, progress, cancellation, and cleanup</a><a href="#stable-errors-and-reasons">Stable errors and reasons</a><a href="#createbrowserspeechauthority-upstream-package-mode">createBrowserSpeechAuthority() upstream package mode</a><a href="#security-and-ownership-summary">Security and ownership summary</a><a href="#related">Related</a></nav></details><p><code>arcane-os/ai/browser-speech</code> is the browser-only, event-neutral SDK boundary
 for caller-supplied Whisper speech-to-text and Kokoro text-to-speech runtimes.
 It supplies immutable artifact-graph validation, DBOPFS admission, role Workers,
 provider/2 adapters, audio normalization, cancellation, and cleanup. It does
@@ -490,11 +490,14 @@ the authenticated graph above and an SDK-created legacy authority.
 ignores it and uses module-captured native Blob URL creation, revocation, and
 fetch so a caller cannot substitute the executable materialization boundary.</p>
 <p>For a graph, <code>prepare(graph,{signal,onProgress,offline=false,security})</code> follows
-the shared model-security flag and requires explicit <code>secure:true</code>. The graph is
-the opt-in strict path: it enables byte-length, SHA-256, and undeclared-
-capability enforcement. Ordinary warn-first operation uses the direct
-<code>model</code>/<code>runtime</code> authority described below and does not construct or admit an
-artifact graph.</p>
+the shared model-security flag. Its default <code>secure:false</code> path retains the
+selected graph, scans and rewrites its declared module edges, and reports
+unchecked or partially checked admission without enabling optional strict
+capability isolation. Explicit <code>secure:true</code> defaults byte-length and SHA-256
+checks on and adds strict Worker isolation. Either mode rejects malformed graph
+records, unreadable Fetch responses, media-type mismatches, structurally
+unmaterializable runtime modules, failed object-URL readback, and every enabled
+byte-length or SHA-256 mismatch.</p>
 <h3 id="cold-admission">Cold admission</h3>
 <ol>
 <li>Acquire the exact authority&#39;s exclusive Web Lock.</li>
@@ -508,23 +511,26 @@ immutable <code>sourceUrl</code>. After a followed redirect, require a readable 
 HTTPS URL without credentials or a fragment and require its canonical origin
 to occur in that file&#39;s declared final-origin inventory.</li>
 <li>Require the response Content-Type to equal <code>sourceMediaType</code> (which defaults
-to <code>mediaType</code>), then stream exact byte-length and SHA-256 verification into
-DBOPFS.</li>
-<li>Reopen and rehash every persisted file.</li>
+to <code>mediaType</code>), then stream into DBOPFS while applying each enabled
+byte-length or SHA-256 check. <code>secure:true</code> enables both checks by default;
+<code>secure:false</code> leaves both disabled unless the caller selects them.</li>
+<li>Reopen every persisted file and repeat only the enabled byte-length or
+SHA-256 checks.</li>
 <li>Decode and scan every runtime JavaScript file and prove exact edge/transform
 closure.</li>
 <li>Persist <code>arcane.ai.browser-speech.authenticated-artifact-graph.v1</code> only
 after every file and the complete runtime graph pass.</li>
 </ol>
-<p>The returned admission is
-<code>artifact-graph-network-dbopfs-verified</code>. A failure before manifest completion
-removes the graph&#39;s incomplete records.</p>
+<p>The returned admission is <code>artifact-graph-network-dbopfs-verified</code>,
+<code>artifact-graph-network-dbopfs-partially-checked</code>, or
+<code>artifact-graph-network-dbopfs-unchecked</code> according to the effective checks. A
+failure before manifest completion removes the graph&#39;s incomplete records.</p>
 <p><code>redirectFinalOrigins</code> admits only a final origin, not a final path, query, or
 signed/expiring URL. The browser may follow such an implementation-specific
 final URL, but that URL is neither persisted nor accepted as source, revision,
-signature, graph identity, or future download authority. Trust remains bound to
-the immutable starting <code>sourceUrl</code> and the exact authenticated length and
-SHA-256 of the received bytes.</p>
+signature, graph identity, or future download authority. The graph remains
+bound to its immutable starting <code>sourceUrl</code>; selected length and SHA-256 checks
+apply only when enabled and are reported honestly by the admission status.</p>
 <p>Browser Fetch exposes the final CORS response, not an inspectable list of every
 intermediate redirect hop. The SDK therefore cannot authenticate intermediate
 hop origins or headers. CORS must succeed for the browser-managed chain, and
@@ -534,19 +540,24 @@ every hop to be independently pinned must use a direct immutable source rather
 than this redirect opt-in.</p>
 <h3 id="warm-and-offline-admission">Warm and offline admission</h3>
 <p>A warm prepare requires the exact manifest authority and file count, reopens
-every DBOPFS record, checks the manifest&#39;s observed bytes and declared SHA-256,
-rehashes every file, and rescans the runtime graph before returning
-<code>artifact-graph-dbopfs-cache-verified</code>.</p>
+every DBOPFS record, checks the manifest&#39;s observed byte count and declared
+descriptor identity, repeats the enabled byte-length or SHA-256 checks, and
+rescans the runtime graph. It returns the corresponding
+<code>artifact-graph-dbopfs-cache-verified</code>,
+<code>artifact-graph-dbopfs-cache-partially-checked</code>, or
+<code>artifact-graph-dbopfs-cache-unchecked</code> status.</p>
 <p><code>offline:true</code> runs the same cache verification and never calls the source
 fetch function. It returns
-<code>artifact-graph-offline-dbopfs-cache-verified</code>, or rejects with code
+<code>artifact-graph-offline-dbopfs-cache-{verified|partially-checked|unchecked}</code>,
+or rejects with code
 <code>ARCANE_AI_ARTIFACT_GRAPH_OFFLINE_CACHE_MISS</code> and reason
 <code>artifact-graph-offline-cache-miss</code>. There is no network repair, runtime CDN,
 private Cache Storage fallback, or partial-cache admission.</p>
 <p>The manifest authority binds each file&#39;s <code>sourceMediaType</code> and
 <code>redirectFinalOrigins</code> through the graph identity. A valid warm or offline
 admission does not resolve the starting URL again, follow a redirect, or reuse a
-prior final URL; it authenticates only the complete cached bytes and graph.</p>
+prior final URL; it admits only the complete cached records and graph under the
+selected checks.</p>
 <p>After every cold, warm, or offline admission, the store materializes a fresh
 set of unique native <code>blob:</code> URLs. Each URL is fetched back with omitted
 credentials and redirect rejection, and its exact URL identity, media type,
@@ -561,9 +572,10 @@ by the caller nor persisted in the manifest or graph identity.</p>
   cache,                    // the exact graph admission value
   artifactGraphId,
   artifactGraphAdmission,
+  warnings,                 // frozen runtime-inspection warnings
   runtime: {
     ...normalizedRuntime,
-    files, edges, transforms,
+    files, edges, transforms, warnings,
     guardCapability,
     artifactGraphId,
     artifactGraphAdmission
@@ -575,29 +587,38 @@ by the caller nor persisted in the manifest or graph identity.</p>
 <p><code>release()</code> revokes the materialized object URLs after Worker termination. It
 does not delete the caller-owned DBOPFS cache. <code>remove(graph)</code> is the explicit
 cache-deletion operation.</p>
-<h2 id="authenticated-worker-host">Authenticated Worker host</h2>
-<p>Graph loading creates one dedicated Worker for the selected role. Its first
-load envelope transfers a new private <code>MessagePort</code>; all graph responses,
-progress, cancellation settlement, and later operations stay on that port.
-Graph loading rejects if <code>MessageChannel</code>/<code>MessagePort</code> is unavailable, if a
-legacy global transport was already selected, or if the Worker receives a graph
-load without the private port. The published single-module compatibility path
-continues to use the original Worker-global message transport.</p>
-<p>Before importing the entrypoint, the graph Worker installs these fail-closed
-boundaries:</p>
+<h2 id="graph-worker-host">Graph Worker host</h2>
+<p>Graph loading creates one dedicated Worker for the selected role. With explicit
+<code>secure:true</code>, its first load envelope transfers a new private <code>MessagePort</code>;
+all graph responses, progress, cancellation settlement, and later operations
+stay on that port. Strict loading rejects if <code>MessageChannel</code>/<code>MessagePort</code> is
+unavailable, if a Worker-global transport was already selected, or if the
+Worker receives a strict graph load without the private port. Default
+<code>secure:false</code> graph loading uses the ordinary Worker-global message transport,
+as does the published single-module compatibility path.</p>
+<p>Before importing the entrypoint in either mode, the graph Worker installs the
+functional graph boundary:</p>
 <ul>
 <li>exact graph routes map declared source URLs, runtime aliases, and materialized
-URLs to already authenticated object URLs;</li>
+URLs to the selected materialized object URLs;</li>
 <li>the ephemeral guard capability must match at every rewritten call;</li>
-<li>global <code>fetch</code> rejects unless the scanned source was rewritten to one
-declared fetch edge;</li>
-<li>global Cache Storage <code>open</code> and <code>match</code> reject unless the scanned
-<code>caches.open(...)</code> was rewritten to one exact declared cache-open edge; its
-returned read-only cache serves only <code>targetPaths</code>, while <code>put</code>, <code>add</code>, and
-<code>addAll</code> reject, so DBOPFS remains the sole durable store;</li>
+<li>each rewritten fetch, cache-open, import, and child-Worker edge resolves
+through its declared graph route and local materialized bytes;</li>
+<li>the returned graph cache facade serves only declared <code>targetPaths</code>, while
+<code>put</code>, <code>add</code>, and <code>addAll</code> reject, so DBOPFS remains the graph&#39;s sole durable
+store;</li>
 <li>a <code>typed-array-constructor</code> rewrite returns only the intrinsic constructor of
-a verified typed-array receiver; an own or non-intrinsic <code>constructor</code>
+a typed-array receiver; an own or non-intrinsic <code>constructor</code>
 rejects;</li>
+<li>an admitted child module Worker is created through the SDK&#39;s role Worker,
+receives the graph configuration, installs the same guard, and imports only
+its declared materialized target.</li>
+</ul>
+<p>Explicit <code>secure:true</code> additionally installs these strict isolation controls:</p>
+<ul>
+<li>raw global <code>fetch</code> rejects unless scanned source was rewritten to one
+declared fetch edge, and raw Cache Storage access is replaced by the graph
+facade;</li>
 <li>the <code>Function</code>, <code>AsyncFunction</code>, <code>GeneratorFunction</code>, and
 <code>AsyncGeneratorFunction</code> prototype constructor escape is replaced before
 import, and string callbacks to <code>setTimeout</code> or <code>setInterval</code> reject;</li>
@@ -605,15 +626,13 @@ import, and string callbacks to <code>setTimeout</code> or <code>setInterval</co
 <li>raw <code>BroadcastChannel</code>, <code>EventSource</code>, <code>Function</code>, <code>RTCPeerConnection</code>,
 <code>ShadowRealm</code>, <code>SharedWorker</code>, <code>WebSocket</code>, <code>WebSocketStream</code>, <code>WebTransport</code>,
 <code>Worker</code>, <code>XMLHttpRequest</code>, <code>eval</code>, and <code>importScripts</code> capabilities are
-denied; and</li>
-<li>an admitted child module Worker is created through the SDK&#39;s role Worker,
-receives the authenticated graph configuration, installs the same guard, and
-imports only its declared materialized target.</li>
+denied.</li>
 </ul>
-<p>An immutable <code>sourceUrl</code> may be an explicitly caller-selected HTTPS origin,
-but runtime execution cannot escalate to that or another network origin. Its
-declared request is answered from authenticated local object bytes, and any
-other request or import edge rejects.</p>
+<p>An immutable <code>sourceUrl</code> may be an explicitly caller-selected HTTPS origin.
+Every rewritten declared request is answered from local object bytes and an
+undeclared transformed edge rejects. Explicit <code>secure:true</code> additionally
+prevents raw runtime access from escalating to that or another network origin;
+default warn-first mode does not make that isolation claim.</p>
 <h3 id="onnx-runtime-web-configuration">ONNX Runtime Web configuration</h3>
 <p>The Worker accepts only the two mechanically verified namespace shapes:</p>
 <ul>
@@ -624,15 +643,17 @@ retain the exact assignment rejects as
 <code>kokoro-env-wasm-paths-assignment-rejected</code>.</li>
 <li>Transformers: <code>namespace.env.backends.onnx.wasm.wasmPaths = {mjs,wasm}</code>.
 The Worker also requires the verified outer <code>env</code> fields, sets
-<code>allowLocalModels:false</code>, <code>allowRemoteModels:true</code>, <code>useBrowserCache:false</code>,
-and <code>useFSCache:false</code>. With no admitted <code>cacheOpens</code> edge named exactly
-<code>transformers-cache</code>, it assigns <code>useCustomCache:false</code> and <code>customCache:null</code>.
-With exactly one such edge it assigns <code>useCustomCache:true</code> and the
-target-limited read-only graph facade; more than one rejects as ambiguous.
-Only a caller-declared STT <code>numThreads</code> is assigned. The
+<code>allowLocalModels:false</code> and <code>allowRemoteModels:true</code>. In explicit
+<code>secure:true</code>, it additionally sets <code>useBrowserCache:false</code> and
+<code>useFSCache:false</code>; with no admitted <code>cacheOpens</code> edge named exactly
+<code>transformers-cache</code>, it assigns <code>useCustomCache:false</code> and <code>customCache:null</code>,
+while exactly one such edge selects the target-limited read-only graph
+facade. Default <code>secure:false</code> leaves those optional upstream cache settings
+unchanged. More than one declared Transformers cache edge rejects as
+ambiguous in either mode. Only a caller-declared STT <code>numThreads</code> is assigned. The
 <code>allowRemoteModels</code> value permits the audited library code path to issue its
-declared request; the graph guard still prevents network access and serves
-only exact local graph routes.</li>
+declared request; the rewritten graph edge still serves its selected local
+route. Strict mode separately prevents unrewritten network access.</li>
 </ul>
 <p>For Transformers, the exact missing-field reasons are
 <code>transformers-env-backends-onnx-wasm-unavailable</code>,
@@ -697,17 +718,18 @@ createBrowserKokoroProvider({
   security
 } = {})
 </code></pre></div>
-<p><code>graph</code> is mutually exclusive with the legacy <code>model</code>/<code>runtime</code> options and may
-load only when effective security explicitly selects <code>secure:true</code>. Both
-constructors require an SDK-created DBOPFS speech store and return one frozen
-<code>arcane-ai-provider/2</code> object:</p>
+<p><code>graph</code> is mutually exclusive with the legacy <code>model</code>/<code>runtime</code> options. It may
+load under default <code>secure:false</code> warn-first operation or explicit
+<code>secure:true</code> strict operation. Both constructors require an SDK-created
+DBOPFS speech store and return one frozen <code>arcane-ai-provider/2</code> object:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">{
   protocol, role, id, localOnly,
   catalog, inspect, status, load, request, unload, dispose
 }
 </code></pre></div>
 <p><code>localOnly</code> must remain <code>true</code>. <code>offline:true</code> makes every later explicit load
-use strict offline graph/cache admission; it does not trigger a load itself.</p>
+use the selected offline graph/cache admission policy; it does not trigger a
+load itself.</p>
 <p><code>catalog()</code> exposes only the caller&#39;s selected model/runtime/files. A graph
 catalog also reports <code>artifactGraphId</code>, caller dtype, exact sample rate, and the
 caller voice inventory. Its one exact catalog record is
@@ -807,11 +829,15 @@ synthesis request; load, unload, and dispose remain visible through <code>state<
 while enabled checks have not completed, <code>verified</code> only after every enabled
 check passes, and <code>failed</code> when an enabled verification attempt rejects. This
 verification outcome is independent of later Worker initialization and remains
-visible after a failed or unloaded provider. Default <code>secure:false</code> status includes the frozen warning code
-<code>browser-speech-warn-first-secure-mode-disabled</code>, and the first explicit load
-emits one concise console warning without blocking upstream package, provider,
-model, voice, fetch, cache, or Worker behavior. Strict graph admission and
-capability isolation remain exclusive to explicit <code>secure:true</code>.</p>
+visible after a failed or unloaded provider. Default <code>secure:false</code> status
+includes the frozen warning code
+<code>browser-speech-warn-first-secure-mode-disabled</code> without blocking upstream
+package, provider, model, voice, fetch, cache, or Worker behavior. Graph runtime
+inspection warnings are deduplicated into the same frozen status array. The
+high-level AI runtime owns the single configuration warning event; providers
+and Workers do not create a competing event source. Strict byte admission,
+private transport, and capability isolation remain exclusive to explicit
+<code>secure:true</code>.</p>
 <p>Provider-owned lifecycle reasons are:</p>
 <ul>
 <li>creation and load: <code>stt-provider-created</code>, <code>tts-provider-created</code>,
@@ -1662,19 +1688,23 @@ advanced strict-control option; it is not required for normal speech use.</p>
 <li>The SDK redistributes no speech runtime, model, voice, third-party license,
 or corresponding-source payload. Explicit <code>load()</code> resolves them from the
 caller-selected npm/package/provider authorities.</li>
-<li>Default direct-authority operation is warn-first and preserves ordinary
-upstream fetch/cache behavior. An artifact graph is admitted only when
-<code>secure:true</code> explicitly opts into strict graph/file verification and
-capability isolation.</li>
-<li>Every graph byte is caller-selected, immutable, exact-length, SHA-256 bound,
-revision bound, media-type bound, license-declaration bound, and reachable
-through one closed graph identity.</li>
+<li>Default direct-authority and graph operation is warn-first and preserves
+ordinary upstream Worker capabilities. <code>secure:true</code> explicitly opts into
+strict graph/file verification, private transport, and capability isolation.</li>
+<li>Every graph descriptor is caller-selected and binds immutable source,
+declared length, SHA-256, revision, media type, license declaration, and
+closed graph identity. Runtime status calls the bytes <code>verified</code> only when
+both byte checks actually complete; warn-first can honestly report
+<code>partially-checked</code> or <code>unchecked</code>.</li>
 <li>Redirects are rejected by default. An undeclared redirect, an undeclared or
 non-HTTPS final origin, a mutable starting source authority, an ambiguous
-path/route, an undeclared code/data edge, a raw network transport, a cache
-write, or an incomplete offline closure fails closed.</li>
-<li>DBOPFS is the sole durable artifact store; the Worker sees only authenticated
-local object bytes and an exact read-only cache facade.</li>
+path/route, an undeclared transformed code/data edge, a graph-cache write, or
+an incomplete offline closure fails closed. Explicit <code>secure:true</code> also
+rejects raw network and other undeclared Worker capabilities.</li>
+<li>DBOPFS is the graph&#39;s sole SDK-owned durable artifact store. Declared graph
+routes resolve to local object bytes and an exact read-only cache facade;
+default warn-first mode does not claim to deny every ordinary upstream
+browser capability.</li>
 <li>Runtime/model/sample-rate/default-voice/voice inventory and optional
 Transformers thread count remain caller authority. No hardware heuristic,
 hidden fallback, startup download, native/Core call, or cloud retry is added.</li>
@@ -1697,7 +1727,7 @@ with the one shared SDK state/event owner.</li>
 <li><a href="../../protocols/#portable-ai-provider-runtime">Protocol architecture</a></li>
 </ul>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-and-enum-registry">Protocol and enum registry</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#authenticated-worker-host">Authenticated Worker host</a><a href="#providers">Providers</a><a href="#lifecycle-progress-cancellation-and-cleanup">Lifecycle, progress, cancellation, and cleanup</a><a href="#stable-errors-and-reasons">Stable errors and reasons</a><a href="#createbrowserspeechauthority-upstream-package-mode">createBrowserSpeechAuthority() upstream package mode</a><a href="#security-and-ownership-summary">Security and ownership summary</a><a href="#related">Related</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-and-enum-registry">Protocol and enum registry</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#graph-worker-host">Graph Worker host</a><a href="#providers">Providers</a><a href="#lifecycle-progress-cancellation-and-cleanup">Lifecycle, progress, cancellation, and cleanup</a><a href="#stable-errors-and-reasons">Stable errors and reasons</a><a href="#createbrowserspeechauthority-upstream-package-mode">createBrowserSpeechAuthority() upstream package mode</a><a href="#security-and-ownership-summary">Security and ownership summary</a><a href="#related">Related</a></nav></aside>
     </div>
   </main>
   <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.3.0, runtime bundle 0.8.12, and protocol arcane/1; the latest verified published package is 0.3.0.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>

@@ -71,8 +71,8 @@
       "source": "docs/reference/ai/browser-speech.md",
       "output": "site/reference/ai/browser-speech/index.html",
       "route": "reference/ai/browser-speech/",
-      "sourceSha256": "52970eab735dd162c3931f3e281fe35b509b0528f90087ed6699753d8722c573",
-      "outputSha256": "be388b29db3e9ff31013dc1405c7ffee813498672e7706808149572cf549c3e3",
+      "sourceSha256": "e0a14690ae090ee2b121e913f3b4175e9c1aa6fe9323072e0444e947d80d4ba3",
+      "outputSha256": "4e1ff291207c29fa2d8ad5766fbc209887e5c70137b6fe25fb798287583cbbe6",
       "kind": "markdown",
       "behaviorEvidence": {
         "scope": [
@@ -317,8 +317,8 @@
       "source": "docs/reference/protocols.md",
       "output": "site/reference/protocols/index.html",
       "route": "reference/protocols/",
-      "sourceSha256": "afcaee830828a57f6702605439025d4ed1040f7db85412bb28ed4444bb03fa36",
-      "outputSha256": "9a3886244534cb6a65aebb8491fe971723c78423f22f54607606aad7b1cf4b9d",
+      "sourceSha256": "8a8a8d58d6c839537a2d3f1c1684e431188114a8155aa5053923fc8059d7673a",
+      "outputSha256": "31d6a107ecdd77c88b49da8071e92ad43371fccfbf7bcced75a995b4539f525f",
       "kind": "markdown"
     },
     {
@@ -2015,8 +2015,8 @@
       "source": "docs/reference/sdk-api.md",
       "output": "site/reference/sdk-api/index.html",
       "route": "reference/sdk-api/",
-      "sourceSha256": "ac35cd136bb8697a2ca5795c6a47ae6b1e06e8d6974cc871dda4a9d326d11f09",
-      "outputSha256": "0ceb06f422c34f9211b6558c01d46d13f7e8123112dec5ed31aeb88b70e77db2",
+      "sourceSha256": "a25fa1d4a6c35abfe75eaae9cc8be4a1ba00a1936526b9d7361cc1a0a2734eae",
+      "outputSha256": "31ad2ac87b807d623c4854db7c7d293dffe87ebb5a75ff1cd971c5fba3858a0d",
       "kind": "markdown"
     }
   ],

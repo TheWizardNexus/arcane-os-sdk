@@ -55,6 +55,48 @@ same app-scoped operation, not three import-map formats. There is no exported
 `importMapApplication()` function, `generateImportMap()` function, or
 `arcane-os/import-map` package subpath.
 
+## Installed SDK runtime materialization
+
+`materializeInstalledSdkRuntime()` is the Node entrypoint for refreshing one
+external workspace's checked-in `arcane/` projection from its one exact
+installed SDK declaration. Import the function through the dependency key that
+the workspace actually declares: `arcane-os` for the canonical package name or,
+for example, `arcane-sdk` for the exact `npm:arcane-os@<version>` alias. No
+application- or Arcane OS-local copier owns this operation.
+
+The operation resolves that declaration again while holding the shared
+workspace-operation lock, authenticates the physical package plus its runtime
+and browser-runtime receipts, derives the destination inventory dynamically,
+and returns one of three statuses:
+
+- `created` when no prior `arcane/` projection or persistent receipt existed;
+- `reused` only after the current process reauthenticates the recorded physical
+  package, both source receipts, and every destination byte;
+- `refreshed` when a safe legacy projection or an authenticated older generation
+  is replaced.
+
+Each committed generation writes the canonical workspace-local receipt
+`.arcane/installed-sdk-runtime.json`. Its
+`arcane-installed-sdk-runtime-projection` schema binds a UUID generation, the
+workspace location identity, declared dependency name/group/specifier and
+package source, physical package location/name/version/identity, both source
+receipt identities and content hashes, and the exact projected path/byte/hash
+inventory. The file is durable evidence, not standalone authority: a later
+process must authenticate it against the current physical package, freshly
+issued source receipts, and the complete destination tree before reporting
+`reused`.
+
+Creation and refresh write and authenticate a complete staging tree and staged
+receipt before the commit boundary. Refresh moves the prior tree and receipt to
+owned backups, installs the new pair without invoking callbacks or observing
+cancellation inside that bounded commit, and restores the prior pair if commit
+or post-commit verification fails. Cancellation remains effective through the
+last pre-commit check; after commit begins the operation finishes verification
+or rollback. Successful whole-tree replacement removes bytes absent from the
+new dynamic inventory. Symbolic links, non-files, malformed receipts, receipt
+tampering, unsafe paths, and corrupt selected source bytes remain errors rather
+than refresh inputs.
+
 ## Central events and time-travel data
 
 `arcane-os/event-manager` is host-neutral JavaScript. Its live event path is

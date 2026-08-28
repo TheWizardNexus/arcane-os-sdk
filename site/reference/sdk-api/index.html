@@ -2176,15 +2176,18 @@ async function useloadRuntimeRelease(...arguments_) {
 </code></pre></div>
 <h3 id="materializeinstalledsdkruntime">materializeInstalledSdkRuntime()</h3>
 <h4 id="overview-40">Overview</h4>
-<p>Verifies the workspace&#39;s exact installed SDK runtime and browser runtime, then materializes their dynamic inventories.</p>
+<p>Verifies the workspace&#39;s exact installed SDK runtime and browser runtime, then creates, reuses, or transactionally refreshes their dynamic projection.</p>
 <h4 id="signature-and-result-24">Signature and result</h4>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async materializeInstalledSdkRuntime({workspaceRoot,sdkPackageSource,signal,onEvent}={})
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async materializeInstalledSdkRuntime({workspaceRoot,sdkPackageSource,workspaceOperationLease,signal,onEvent}={})
 </code></pre></div>
-<p>Import it from <code>arcane-os</code>. It resolves the workspace&#39;s exact installed SDK declaration, verifies both physical runtime receipts, materializes the authenticated runtime projection, and returns a frozen result containing the installation and all three receipts. Cancellation and progress remain caller-owned through <code>signal</code> and <code>onEvent</code>.</p>
+<p>Import it through the exact dependency key declared by the workspace: normally <code>arcane-os</code>, or the alias name such as <code>arcane-sdk</code> when the declaration is <code>npm:arcane-os@&lt;version&gt;</code>. It resolves that declaration under the shared workspace-operation lock, verifies both physical runtime receipts, and creates or refreshes the complete projection by staged whole-tree replacement. The frozen result includes <code>status</code> (<code>created</code>, <code>reused</code>, or <code>refreshed</code>), <code>generation</code>, <code>receiptPath</code>, <code>persistentReceipt</code>, <code>cleanupWarnings</code>, the installed-package authority, and all three process-local verification receipts.</p>
+<p>The canonical <code>.arcane/installed-sdk-runtime.json</code> receipt binds the physical package and exact destination inventory. A later process reauthenticates that receipt against the current installed package, freshly issued source receipts, and all destination bytes before returning <code>reused</code>; the JSON file alone grants no authority. Refresh prunes bytes absent from the new inventory and restores the prior tree and receipt on commit or post-commit verification failure. <code>signal</code> and <code>onEvent</code> remain caller-owned before commit. Once the bounded commit starts, it completes verification or rollback without observing cancellation or invoking callbacks.</p>
 <h4 id="availability-and-normalization-40">Availability and normalization</h4>
-<p><strong>Node.</strong> Canonical workspace and installed-package identity, verified runtime receipts, and a frozen materialization result. Deep protocol: <a href="../protocols/">Installed SDK runtime materialization</a>.</p>
+<p><strong>Node.</strong> Canonical workspace and installed-package identity, verified runtime receipts, a persistent reauthenticatable generation receipt, and a frozen materialization result. Deep protocol: <a href="../protocols/#installed-sdk-runtime-materialization">Installed SDK runtime materialization</a>.</p>
 <h4 id="example-40">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {materializeInstalledSdkRuntime} from &#39;arcane-os&#39;;
+// If package.json declares the SDK under the arcane-sdk alias, import from
+// &#39;arcane-sdk&#39; instead.
 
 const result=await materializeInstalledSdkRuntime({workspaceRoot});
 </code></pre></div>

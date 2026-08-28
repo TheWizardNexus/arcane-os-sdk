@@ -1404,24 +1404,28 @@ async function useloadRuntimeRelease(...arguments_) {
 
 ### Overview
 
-Verifies the workspace's exact installed SDK runtime and browser runtime, then materializes their dynamic inventories.
+Verifies the workspace's exact installed SDK runtime and browser runtime, then creates, reuses, or transactionally refreshes their dynamic projection.
 
 ### Signature and result
 
 ```text
-async materializeInstalledSdkRuntime({workspaceRoot,sdkPackageSource,signal,onEvent}={})
+async materializeInstalledSdkRuntime({workspaceRoot,sdkPackageSource,workspaceOperationLease,signal,onEvent}={})
 ```
 
-Import it from `arcane-os`. It resolves the workspace's exact installed SDK declaration, verifies both physical runtime receipts, materializes the authenticated runtime projection, and returns a frozen result containing the installation and all three receipts. Cancellation and progress remain caller-owned through `signal` and `onEvent`.
+Import it through the exact dependency key declared by the workspace: normally `arcane-os`, or the alias name such as `arcane-sdk` when the declaration is `npm:arcane-os@<version>`. It resolves that declaration under the shared workspace-operation lock, verifies both physical runtime receipts, and creates or refreshes the complete projection by staged whole-tree replacement. The frozen result includes `status` (`created`, `reused`, or `refreshed`), `generation`, `receiptPath`, `persistentReceipt`, `cleanupWarnings`, the installed-package authority, and all three process-local verification receipts.
+
+The canonical `.arcane/installed-sdk-runtime.json` receipt binds the physical package and exact destination inventory. A later process reauthenticates that receipt against the current installed package, freshly issued source receipts, and all destination bytes before returning `reused`; the JSON file alone grants no authority. Refresh prunes bytes absent from the new inventory and restores the prior tree and receipt on commit or post-commit verification failure. `signal` and `onEvent` remain caller-owned before commit. Once the bounded commit starts, it completes verification or rollback without observing cancellation or invoking callbacks.
 
 ### Availability and normalization
 
-**Node.** Canonical workspace and installed-package identity, verified runtime receipts, and a frozen materialization result. Deep protocol: [Installed SDK runtime materialization](protocols.md).
+**Node.** Canonical workspace and installed-package identity, verified runtime receipts, a persistent reauthenticatable generation receipt, and a frozen materialization result. Deep protocol: [Installed SDK runtime materialization](protocols.md#installed-sdk-runtime-materialization).
 
 ### Example
 
 ```javascript
 import {materializeInstalledSdkRuntime} from 'arcane-os';
+// If package.json declares the SDK under the arcane-sdk alias, import from
+// 'arcane-sdk' instead.
 
 const result=await materializeInstalledSdkRuntime({workspaceRoot});
 ```

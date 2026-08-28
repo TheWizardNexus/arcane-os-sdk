@@ -315,7 +315,8 @@ private Cache Storage fallback, or partial-cache admission.
 The manifest authority binds each file's `sourceMediaType` and
 `redirectFinalOrigins` through the graph identity. A valid warm or offline
 admission does not resolve the starting URL again, follow a redirect, or reuse a
-prior final URL; it authenticates only the complete cached bytes and graph.
+prior final URL; it admits only the complete cached records and graph under the
+selected checks.
 
 After every cold, warm, or offline admission, the store materializes a fresh
 set of unique native `blob:` URLs. Each URL is fetched back with omitted
@@ -351,7 +352,7 @@ Successful graph preparation returns:
 does not delete the caller-owned DBOPFS cache. `remove(graph)` is the explicit
 cache-deletion operation.
 
-## Authenticated Worker host
+## Graph Worker host
 
 Graph loading creates one dedicated Worker for the selected role. With explicit
 `secure:true`, its first load envelope transfers a new private `MessagePort`;
@@ -394,10 +395,11 @@ Explicit `secure:true` additionally installs these strict isolation controls:
   `Worker`, `XMLHttpRequest`, `eval`, and `importScripts` capabilities are
   denied.
 
-An immutable `sourceUrl` may be an explicitly caller-selected HTTPS origin,
-but runtime execution cannot escalate to that or another network origin. Its
-declared request is answered from authenticated local object bytes, and any
-other request or import edge rejects.
+An immutable `sourceUrl` may be an explicitly caller-selected HTTPS origin.
+Every rewritten declared request is answered from local object bytes and an
+undeclared transformed edge rejects. Explicit `secure:true` additionally
+prevents raw runtime access from escalating to that or another network origin;
+default warn-first mode does not make that isolation claim.
 
 ### ONNX Runtime Web configuration
 
@@ -419,8 +421,8 @@ The Worker accepts only the two mechanically verified namespace shapes:
   unchanged. More than one declared Transformers cache edge rejects as
   ambiguous in either mode. Only a caller-declared STT `numThreads` is assigned. The
   `allowRemoteModels` value permits the audited library code path to issue its
-  declared request; the graph guard still prevents network access and serves
-  only exact local graph routes.
+  declared request; the rewritten graph edge still serves its selected local
+  route. Strict mode separately prevents unrewritten network access.
 
 For Transformers, the exact missing-field reasons are
 `transformers-env-backends-onnx-wasm-unavailable`,
@@ -491,10 +493,10 @@ createBrowserKokoroProvider({
 } = {})
 ```
 
-`graph` is mutually exclusive with the legacy `model`/`runtime` options and may
-load only when effective security explicitly selects `secure:true`. Both
-constructors require an SDK-created DBOPFS speech store and return one frozen
-`arcane-ai-provider/2` object:
+`graph` is mutually exclusive with the legacy `model`/`runtime` options. It may
+load under default `secure:false` warn-first operation or explicit
+`secure:true` strict operation. Both constructors require an SDK-created
+DBOPFS speech store and return one frozen `arcane-ai-provider/2` object:
 
 ```text
 {
@@ -504,7 +506,8 @@ constructors require an SDK-created DBOPFS speech store and return one frozen
 ```
 
 `localOnly` must remain `true`. `offline:true` makes every later explicit load
-use strict offline graph/cache admission; it does not trigger a load itself.
+use the selected offline graph/cache admission policy; it does not trigger a
+load itself.
 
 `catalog()` exposes only the caller's selected model/runtime/files. A graph
 catalog also reports `artifactGraphId`, caller dtype, exact sample rate, and the
@@ -622,11 +625,15 @@ synthesis request; load, unload, and dispose remain visible through `state` and
 while enabled checks have not completed, `verified` only after every enabled
 check passes, and `failed` when an enabled verification attempt rejects. This
 verification outcome is independent of later Worker initialization and remains
-visible after a failed or unloaded provider. Default `secure:false` status includes the frozen warning code
-`browser-speech-warn-first-secure-mode-disabled`, and the first explicit load
-emits one concise console warning without blocking upstream package, provider,
-model, voice, fetch, cache, or Worker behavior. Strict graph admission and
-capability isolation remain exclusive to explicit `secure:true`.
+visible after a failed or unloaded provider. Default `secure:false` status
+includes the frozen warning code
+`browser-speech-warn-first-secure-mode-disabled` without blocking upstream
+package, provider, model, voice, fetch, cache, or Worker behavior. Graph runtime
+inspection warnings are deduplicated into the same frozen status array. The
+high-level AI runtime owns the single configuration warning event; providers
+and Workers do not create a competing event source. Strict byte admission,
+private transport, and capability isolation remain exclusive to explicit
+`secure:true`.
 
 Provider-owned lifecycle reasons are:
 
@@ -1249,19 +1256,23 @@ advanced strict-control option; it is not required for normal speech use.
 - The SDK redistributes no speech runtime, model, voice, third-party license,
   or corresponding-source payload. Explicit `load()` resolves them from the
   caller-selected npm/package/provider authorities.
-- Default direct-authority operation is warn-first and preserves ordinary
-  upstream fetch/cache behavior. An artifact graph is admitted only when
-  `secure:true` explicitly opts into strict graph/file verification and
-  capability isolation.
-- Every graph byte is caller-selected, immutable, exact-length, SHA-256 bound,
-  revision bound, media-type bound, license-declaration bound, and reachable
-  through one closed graph identity.
+- Default direct-authority and graph operation is warn-first and preserves
+  ordinary upstream Worker capabilities. `secure:true` explicitly opts into
+  strict graph/file verification, private transport, and capability isolation.
+- Every graph descriptor is caller-selected and binds immutable source,
+  declared length, SHA-256, revision, media type, license declaration, and
+  closed graph identity. Runtime status calls the bytes `verified` only when
+  both byte checks actually complete; warn-first can honestly report
+  `partially-checked` or `unchecked`.
 - Redirects are rejected by default. An undeclared redirect, an undeclared or
   non-HTTPS final origin, a mutable starting source authority, an ambiguous
-  path/route, an undeclared code/data edge, a raw network transport, a cache
-  write, or an incomplete offline closure fails closed.
-- DBOPFS is the sole durable artifact store; the Worker sees only authenticated
-  local object bytes and an exact read-only cache facade.
+  path/route, an undeclared transformed code/data edge, a graph-cache write, or
+  an incomplete offline closure fails closed. Explicit `secure:true` also
+  rejects raw network and other undeclared Worker capabilities.
+- DBOPFS is the graph's sole SDK-owned durable artifact store. Declared graph
+  routes resolve to local object bytes and an exact read-only cache facade;
+  default warn-first mode does not claim to deny every ordinary upstream
+  browser capability.
 - Runtime/model/sample-rate/default-voice/voice inventory and optional
   Transformers thread count remain caller authority. No hardware heuristic,
   hidden fallback, startup download, native/Core call, or cloud retry is added.
