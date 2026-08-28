@@ -3,6 +3,7 @@ import path from 'node:path';
 import {verifyRuntime} from './runtime.mjs';
 import {verifySdkBrowserRuntime} from './sdk-browser-runtime.mjs';
 import {materializeWorkspaceRuntime} from './workspace-runtime.mjs';
+import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
 import {
     resolveInstalledSdkInstallation,
     resolveSdkPackageDeclaration
@@ -71,42 +72,59 @@ async function readRootPackage(workspaceRoot){
 export async function materializeInstalledSdkRuntime({
     workspaceRoot,
     sdkPackageSource,
+    workspaceOperationLease,
     signal,
     onEvent
 }={}){
     throwIfAborted(signal);
     const canonicalRoot=await canonicalWorkspaceRoot(workspaceRoot);
-    const rootPackage=await readRootPackage(canonicalRoot);
-    const declaration=resolveSdkPackageDeclaration(rootPackage,
-        sdkPackageSource===undefined?{}:{packageSource:sdkPackageSource});
-    const installation=await resolveInstalledSdkInstallation(canonicalRoot,declaration);
-    const [runtimeReceipt,sdkBrowserRuntimeReceipt]=await Promise.all([
-        verifyRuntime({
-            runtimeRoot:installation.runtimeRoot,
-            signal,
-            onEvent
-        }),
-        verifySdkBrowserRuntime({
-            browserRuntimeRoot:installation.browserRuntimeRoot,
-            signal,
-            onEvent
-        })
-    ]);
-    const workspaceRuntimeReceipt=await materializeWorkspaceRuntime({
+    return withWorkspaceOperationLock({
         workspaceRoot:canonicalRoot,
-        runtimeRoot:installation.runtimeRoot,
-        runtimeReceipt,
-        browserRuntimeRoot:installation.browserRuntimeRoot,
-        sdkBrowserRuntimeReceipt,
+        operation:'installed-sdk-runtime',
         signal,
-        onEvent
-    });
-    return Object.freeze({
-        schemaVersion:1,
-        kind:'arcane-installed-sdk-runtime-materialization',
-        installation,
-        runtimeReceipt,
-        sdkBrowserRuntimeReceipt,
-        workspaceRuntimeReceipt
+        onEvent,
+        workspaceOperationLease
+    },async()=>{
+        throwIfAborted(signal);
+        const rootPackage=await readRootPackage(canonicalRoot);
+        const declaration=resolveSdkPackageDeclaration(rootPackage,
+            sdkPackageSource===undefined?{}:{packageSource:sdkPackageSource});
+        const installation=await resolveInstalledSdkInstallation(canonicalRoot,declaration);
+        const [runtimeReceipt,sdkBrowserRuntimeReceipt]=await Promise.all([
+            verifyRuntime({
+                runtimeRoot:installation.runtimeRoot,
+                signal,
+                onEvent
+            }),
+            verifySdkBrowserRuntime({
+                browserRuntimeRoot:installation.browserRuntimeRoot,
+                signal,
+                onEvent
+            })
+        ]);
+        const workspaceRuntimeReceipt=await materializeWorkspaceRuntime({
+            workspaceRoot:canonicalRoot,
+            runtimeRoot:installation.runtimeRoot,
+            runtimeReceipt,
+            browserRuntimeRoot:installation.browserRuntimeRoot,
+            sdkBrowserRuntimeReceipt,
+            installedSdkAuthority:Object.freeze({declaration,installation}),
+            signal,
+            onEvent
+        });
+        const materialization=workspaceRuntimeReceipt.materialization;
+        return Object.freeze({
+            schemaVersion:1,
+            kind:'arcane-installed-sdk-runtime-materialization',
+            status:materialization.status,
+            generation:materialization.generation,
+            receiptPath:materialization.receiptPath,
+            persistentReceipt:materialization.persistentReceipt,
+            cleanupWarnings:materialization.cleanupWarnings,
+            installation,
+            runtimeReceipt,
+            sdkBrowserRuntimeReceipt,
+            workspaceRuntimeReceipt
+        });
     });
 }

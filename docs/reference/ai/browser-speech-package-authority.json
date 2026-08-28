@@ -822,7 +822,7 @@
       "closureStatus": "browser-speech-runtime-resolved-from-upstream-packages-and-provider-downloads",
       "publicationStatus": "browser-speech-public-runtime-ready-warn-first-secure-opt-in"
     },
-    "deferredReleaseBoundary": "The combined numeric 0.3.0 package, runtime/browser receipts, npm integrity/provenance, tag, and GitHub release remain assigned to the shared release owner after Browser Speech, singleton events, and Mail source increments are reconciled."
+    "deferredReleaseBoundary": "The additive numeric 0.3.1 package, runtime/browser receipts, npm integrity/provenance, tag, and GitHub release remain assigned to the shared release owner after the warn-first and exact selected-route corrections are reconciled."
   },
   "omittedUntilVerified": [
     "Final composite SPDX license expressions for the bundled JavaScript entrypoints.",

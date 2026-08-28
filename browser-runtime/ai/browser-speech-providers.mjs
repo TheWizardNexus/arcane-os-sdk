@@ -321,21 +321,12 @@ function providerIntegrity(security, outcome = "pending") {
   });
 }
 
-function providerWarnings(security) {
-  return security.secure === true
-    ? NO_PROVIDER_WARNINGS
-    : WARN_FIRST_PROVIDER_WARNINGS;
-}
-
-function warnFirstLoad(role, providerId, security) {
-  if (security.secure === true) return;
-  try {
-    globalThis.console?.warn?.(
-      `[Arcane browser speech] ${role} provider ${providerId} is loading in warn-first mode (${WARN_FIRST_WARNING}); strict admission is disabled and integrity remains unchecked unless an explicit check is enabled.`,
-    );
-  } catch {
-    // A diagnostic console cannot own or block the provider lifecycle.
-  }
+function providerWarnings(security, runtimeWarnings = NO_PROVIDER_WARNINGS) {
+  const warnings = security.secure === true
+    ? runtimeWarnings
+    : [...WARN_FIRST_PROVIDER_WARNINGS, ...runtimeWarnings];
+  if (warnings.length === 0) return NO_PROVIDER_WARNINGS;
+  return Object.freeze([...new Set(warnings)]);
 }
 
 function publicStatus({
@@ -1145,7 +1136,7 @@ function createBrowserSpeechProvider({
   let unloadOperation = null;
   let disposeOperation = null;
   let requestOperation = null;
-  let warnedFirstLoad = false;
+  let lastWarnings = NO_PROVIDER_WARNINGS;
   let lastIntegrity = Object.freeze({
     security: defaultSecurity,
     integrity: providerIntegrity(defaultSecurity),
@@ -1158,6 +1149,9 @@ function createBrowserSpeechProvider({
     const integrity = active?.integrity
       ?? loadOperation?.integrity
       ?? lastIntegrity.integrity;
+    const runtimeWarnings = active?.warnings
+      ?? loadOperation?.warnings
+      ?? lastWarnings;
     return publicStatus({
       role,
       id: providerId,
@@ -1172,7 +1166,7 @@ function createBrowserSpeechProvider({
       artifactGraphAdmission,
       security: effectiveSecurity,
       integrity,
-      warnings: providerWarnings(effectiveSecurity),
+      warnings: providerWarnings(effectiveSecurity, runtimeWarnings),
     });
   }
 
@@ -1327,14 +1321,6 @@ function createBrowserSpeechProvider({
               "Browser speech graph load security",
             ),
           });
-          if (effectiveSecurity.secure !== true) {
-            throw providerError(
-              "ARCANE_AI_SECURE_MODE_REQUIRED",
-              "Authenticated browser speech artifact graphs require explicit secure:true.",
-              undefined,
-              `${role}-artifact-graph-secure-mode-required`,
-            );
-          }
         } else {
           effectiveSecurity = resolveModelSecurity({
             app: configuredAppSecurity,
@@ -1345,10 +1331,6 @@ function createBrowserSpeechProvider({
         throwIfAborted(loadSignal, `${role}-load-cancelled`);
       } catch (error) {
         return Promise.reject(trustedLoadFailure(error, role));
-      }
-      if (effectiveSecurity.secure !== true && warnedFirstLoad === false) {
-        warnedFirstLoad = true;
-        warnFirstLoad(role, providerId, effectiveSecurity);
       }
       if (state === "ready" && active) {
         if (sameModelSecurity(active.security, effectiveSecurity)) {
@@ -1382,6 +1364,7 @@ function createBrowserSpeechProvider({
         promise: null,
         security: effectiveSecurity,
         integrity: providerIntegrity(effectiveSecurity),
+        warnings: NO_PROVIDER_WARNINGS,
         observers: new Set(),
         settled: false,
         hasProgress: false,
@@ -1400,6 +1383,7 @@ function createBrowserSpeechProvider({
         security: effectiveSecurity,
         integrity: record.integrity,
       });
+      lastWarnings = NO_PROVIDER_WARNINGS;
       const promise = Promise.resolve().then(async () => {
         let prepared = null;
         let slot = null;
@@ -1411,10 +1395,14 @@ function createBrowserSpeechProvider({
             security: effectiveSecurity,
           });
           record.integrity = providerIntegrity(effectiveSecurity, "verified");
+          record.warnings = Array.isArray(prepared.warnings)
+            ? Object.freeze([...prepared.warnings])
+            : NO_PROVIDER_WARNINGS;
           lastIntegrity = Object.freeze({
             security: effectiveSecurity,
             integrity: record.integrity,
           });
+          lastWarnings = record.warnings;
           throwIfAborted(
             linked.controller.signal,
             () => linked.reason(`${role}-load-cancelled`),
@@ -1435,6 +1423,7 @@ function createBrowserSpeechProvider({
             client: null,
             security: effectiveSecurity,
             integrity: record.integrity,
+            warnings: record.warnings,
           };
           slot.client = createSpeechWorkerClient({
             role,

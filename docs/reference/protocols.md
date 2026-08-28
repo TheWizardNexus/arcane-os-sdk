@@ -104,12 +104,12 @@ import ollama from 'arcane/Ollama';
 ```
 
 The authenticated physical-v1 tree lives entirely beneath `arcane/`. SDK
-`0.3.0` projects it from two canonical release receipts:
+`0.3.1` projects it from two canonical release receipts:
 
 | Canonical receipt | Source authority and protocol | Receipt inventory |
 | --- | --- | --- |
-| `runtime/ARCANE_RUNTIME_RELEASE.json` | `sdk-canonical`; `arcane/1`; builder `arcane-sdk-runtime-v1` | 161 files; 4,159,000 bytes; content SHA-256 `5dab0c9cadd9e5ca97f90ab63ce755940318198d5b1efc0b7b666de4075302e9` |
-| `browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json` | `arcane-os-sdk`; `arcane-sdk-browser-runtime/1`; builder `arcane-sdk-browser-runtime-v1` | 26 files; 9,548,478 bytes; content SHA-256 `0d41531e9a2d6ce97a357eeeebde5fbac8af59639a52f4f682717097b13dc6dc` |
+| `runtime/ARCANE_RUNTIME_RELEASE.json` | `sdk-canonical`; `arcane/1`; builder `arcane-sdk-runtime-v1` | 161 files; 4,161,715 bytes; content SHA-256 `9ed39694d9f286e0994404a82fb6002c3ba48be0d085a6b68d51c7facc17c56f` |
+| `browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json` | `arcane-os-sdk`; `arcane-sdk-browser-runtime/1`; builder `arcane-sdk-browser-runtime-v1` | 26 files; 9,554,968 bytes; content SHA-256 `1493497265c330507abed847e52e65dc2ce22c15efaf5646ed7ae544b107ad6f` |
 
 The runtime receipt is the current byte authority. Its Arcane OS
 `c540014afe69f14cf5ae60493b7295f36dbcec64` / bundle `0.8.12` record is
@@ -123,7 +123,7 @@ versions from aliasing one another.
 
 Those two receipt inventories contain 187 entries in total. That sum is a
 release-inventory fact, not an import-map entry count and not an assertion about
-one maintained example. The `0.3.0` map deterministically roots every admitted
+one maintained example. The `0.3.1` map deterministically roots every admitted
 top-level runtime ESM plus the authenticated SDK browser roots, then follows
 those roots for runtime entities and dependency compatibility. Application
 source imports do not select a fixed entry count. Its public operation receipt is the
@@ -188,8 +188,8 @@ authority with exactly `dependencyName`, `packageSource`,
 `canonicalPackageRoot`, `packageName`, `packageVersion`, `runtimeRoot`,
 `browserRuntimeRoot`, `runtimeManifest`, and `browserRuntimeManifest`. A
 workspace may use the canonical dependency name or one exact npm alias such as
-`npm:arcane-os@0.3.0`; the physical package manifest must still identify
-exactly as `arcane-os@0.3.0`. Canonical-plus-alias duplicates, multiple aliases,
+`npm:arcane-os@0.3.1`; the physical package manifest must still identify
+exactly as `arcane-os@0.3.1`. Canonical-plus-alias duplicates, multiple aliases,
 links/junctions, indirect package roots, or version drift fail closed.
 
 The imported module can be pure browser logic, standard-Web-API logic, or a
@@ -225,19 +225,19 @@ heartbeat is event telemetry only and never regenerates browser state.
 </details>
 
 <details>
-<summary>SDK 0.3.0 browser-runtime admission and exact receipt fields</summary>
+<summary>SDK 0.3.1 browser-runtime admission and exact receipt fields</summary>
 
 `arcane.lock.json.sdkBrowserRuntime` persists the trusted manifest path,
 `manifestSha256`, `contentSha256`, `builder`, `sdkVersion`, and `source` record.
-For SDK `0.3.0`, the manifest itself records:
+For SDK `0.3.1`, the manifest itself records:
 
 ```text
 manifest: node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json
 fileCount: 26
-totalBytes: 9548478
-contentSha256: 0d41531e9a2d6ce97a357eeeebde5fbac8af59639a52f4f682717097b13dc6dc
+totalBytes: 9554968
+contentSha256: 1493497265c330507abed847e52e65dc2ce22c15efaf5646ed7ae544b107ad6f
 builder: arcane-sdk-browser-runtime-v1
-sdkVersion: 0.3.0
+sdkVersion: 0.3.1
 source.protocol: arcane-sdk-browser-runtime/1
 source.browserEntry: arcane-os/event-manager
 ```
@@ -263,7 +263,7 @@ Application code should select a normalized role, not an internal protocol.
 The exported
 [`getAIProviderRuntime()` singleton](runtime-modules.md#aiproviderruntimejs)
 comes from authenticated runtime bytes and owns independent `llm`, `stt`, and
-`tts` selections. SDK `0.3.0` ships browser-WASM LLM and browser
+`tts` selections. SDK `0.3.1` ships browser-WASM LLM and browser
 speech provider/2 adapters and also adapts selected legacy OpenAI LLM/STT/TTS,
 Core-backed Ollama LLM, and admitted Core speech STT/TTS routes into provider/2;
 other native, Core, or cloud routes require an externally supplied compatible
@@ -300,7 +300,7 @@ compatible completed cache, otherwise it rejects with
 `ARCANE_AI_MODEL_OFFLINE_MISS`. Unload releases the active Wllama session but
 does not silently delete the app-owned cache.
 
-SDK `0.3.0` requires WebGPU. Load requests full offload with exactly 99,999 GPU
+SDK `0.3.1` requires WebGPU. Load requests full offload with exactly 99,999 GPU
 layers and admits the model only after observing an adapter, full layer offload,
 buffer and queue work, and a settled fence. `navigator.gpu` presence alone is
 not readiness. There is no CPU fallback, partial-offload success mode, or

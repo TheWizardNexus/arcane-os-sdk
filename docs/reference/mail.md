@@ -22,7 +22,7 @@ plaintext fallback.
 
 ## Public npm import
 
-The 0.3.0 portable programmatic contract is one subpath:
+The 0.3.1 portable programmatic contract is one subpath:
 
 ```javascript
 import Mail,{

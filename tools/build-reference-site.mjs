@@ -52,18 +52,18 @@ const expectedRuntimeContractSummary=Object.freeze({
     publicMemberCount:579
 });
 const publishedReleaseMarkdown=[
-    '## Published 0.2.3',
+    '## Published 0.3.0',
     '',
-    'The most recently verified published package before this 0.3.0 source candidate is exactly `arcane-os@0.2.3` from source commit `d717f21d45664d20e4ed6377596db87c47492e11`. The npm `latest` dist-tag resolves to `0.2.3`; the separate `dev` dist-tag remains `0.1.0-dev.5`.',
+    'The verified published package is exactly `arcane-os@0.3.0` from source commit `72239d0221279b461f1be08b02a70105f4cf7364`. The npm `latest` dist-tag resolves to `0.3.0`; the separate `dev` dist-tag remains `0.1.0-dev.5`.',
     '',
     '| Evidence | Exact value |',
     '| --- | --- |',
-    '| npm integrity | `sha512-TZewkGM7dh9PdVnOtnkBO7QalJ6qyWWdKruCmsTxoHyeoG5XpqVbkNgiJhtBLhrIzgUV3vydYplxZQkIbIWoHg==` |',
-    '| npm shasum | `8e978a23289a41db130253e6475a0c8bb0c0d73f` |',
-    '| Immutable release tarball | `arcane-os-0.2.3.tgz`; 6,999,078 bytes; SHA-256 `857f179c2f9d4549e7691b4e6cebc49e5ab5e18600816443b26319c61fc1f85d` |',
-    '| GitHub release | [`0.2.3`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.2.3) (tag and title are both exactly `0.2.3`) |',
-    '| Hosted source/artifact gate | [Check run 33052271534](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33052271534) |',
-    '| Trusted publication | [Run 33052383457](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33052383457) |',
+    '| npm integrity | `sha512-dh7QfM1ur48hOyMez1XWjym/LJcOAYy+Xl3KcvVQ6ewwX5N7ER82PQx6LE+zSb5sHVtz4TOU2AuARsrFNSwuVw==` |',
+    '| npm shasum | `94075dad9c3974b0e069ecfe09f8d612d8a30ea7` |',
+    '| Immutable release tarball | `arcane-os-0.3.0.tgz`; 7,230,292 bytes; SHA-256 `4afdb8113d8408b03917b73ce45e25bf4d302577fc6f199165d4931dda8ca081` |',
+    '| GitHub release | [`0.3.0`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.3.0) (tag and title are both exactly `0.3.0`) |',
+    '| Hosted source/artifact gate | [Check run 33130699235](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33130699235) |',
+    '| Trusted publication | [Run 33131083176](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33131083176) |',
     '',
     'The npm SLSA provenance binds the published package to that exact source commit and `.github/workflows/publish-dev.yml`. Hashes prove byte identity or consistency; provenance establishes the recorded source/workflow relationship. Neither claim alone proves browser hardware support, native admission, or a particular application\'s provider/model policy.'
 ].join('\n');
@@ -1202,7 +1202,7 @@ function renderPage({
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p>${tableOfContentsHtml(tableOfContents)}</aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="${escapeHtml(siteHome)}" aria-label="Arcane OS SDK documentation home"><img src="${escapeHtml(icon)}" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK source candidate ${publishedVersions.sdk}, runtime bundle ${publishedVersions.runtime}, and protocol ${publishedVersions.protocol}; the latest verified published package is 0.2.3.</p><nav aria-label="Footer navigation"><a href="${escapeHtml(architecture)}">Architecture</a><a href="${escapeHtml(compatibility)}">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="${escapeHtml(siteHome)}" aria-label="Arcane OS SDK documentation home"><img src="${escapeHtml(icon)}" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK ${publishedVersions.sdk}, runtime bundle ${publishedVersions.runtime}, and protocol ${publishedVersions.protocol}; the latest verified published package is 0.3.0.</p><nav aria-label="Footer navigation"><a href="${escapeHtml(architecture)}">Architecture</a><a href="${escapeHtml(compatibility)}">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>
 `;

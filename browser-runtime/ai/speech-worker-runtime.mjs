@@ -7,7 +7,7 @@ const ARTIFACT_GRAPH_MODULE_GRAPH =
 const GRAPH_GUARD_NAME = "__arcaneBrowserSpeechArtifactGraphGuardsV1";
 const NESTED_WORKER_PROTOCOL =
   "arcane-ai-browser-speech-artifact-module-worker/1";
-const STRICT_GRAPH_ADMISSIONS = new Set([
+const GRAPH_ADMISSIONS = new Set([
   "artifact-graph-network-dbopfs-verified",
   "artifact-graph-dbopfs-cache-verified",
   "artifact-graph-offline-dbopfs-cache-verified",
@@ -695,14 +695,24 @@ function validateConfiguration(configuration, role) {
       paths.add(file.path);
     }
     const runtimePaths = new Set(configuration.runtime.files.map((file) => file.path));
+    const security = configuration.security;
+    const securityChecks = security?.checks;
     if (
-      configuration.security?.secure !== true
+      !security
+      || typeof security !== "object"
+      || Array.isArray(security)
+      || typeof security.secure !== "boolean"
+      || !securityChecks
+      || typeof securityChecks !== "object"
+      || Array.isArray(securityChecks)
+      || typeof securityChecks.byteLength !== "boolean"
+      || typeof securityChecks.sha256 !== "boolean"
       || typeof configuration.runtime.artifactGraphId !== "string"
       || !/^[a-f0-9]{64}$/u.test(configuration.runtime.artifactGraphId)
       || (
         typeof configuration.runtime.guardCapability !== "string"
         || !/^[a-f0-9]{64}$/u.test(configuration.runtime.guardCapability)
-        || !STRICT_GRAPH_ADMISSIONS.has(configuration.runtime.artifactGraphAdmission)
+        || !GRAPH_ADMISSIONS.has(configuration.runtime.artifactGraphAdmission)
         || !configuration.runtime.edges
         || typeof configuration.runtime.edges !== "object"
         || !Array.isArray(configuration.runtime.transforms)
@@ -710,7 +720,7 @@ function validateConfiguration(configuration, role) {
     ) {
       throw workerError(
         "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
-        "Explicit secure:true plus authenticated artifact graph identity, admission, edges, and transforms are required.",
+        "Artifact graph security, identity, admission, edges, and transforms are required.",
         undefined,
         "artifact-graph-worker-configuration-incomplete",
       );
@@ -2293,7 +2303,7 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
       configuration = validateConfiguration(request.payload?.configuration, role);
       const entry = configuration.runtime.files.find((file) =>
         file.path === configuration.runtime.entry);
-      if (graphConfiguration(configuration) && configuration.security?.secure === true) {
+      if (graphConfiguration(configuration)) {
         environment = installArtifactGraphEnvironment(scope, configuration, role);
       } else if (configuration.security?.secure === true) {
         const legacyFetch = installLegacyAuthorizedFetch(scope, configuration);
@@ -2561,8 +2571,10 @@ export function installBrowserSpeechWorker(role, scope = globalThis) {
     const requestedPort = privatePort(event.data?.privatePort);
     const isGraphLoad = event.data?.op === "load"
       && graphConfiguration(event.data?.payload?.configuration);
+    const isStrictGraphLoad = isGraphLoad
+      && event.data?.payload?.configuration?.security?.secure === true;
     if (requestedPort) {
-      if (!isGraphLoad || transportMode !== null) return;
+      if (!isStrictGraphLoad || transportMode !== null) return;
       transportMode = "private-message-port";
       transport = requestedPort;
       requestedPort.addEventListener("message", (portEvent) => receive(portEvent.data));
@@ -2572,14 +2584,14 @@ export function installBrowserSpeechWorker(role, scope = globalThis) {
       receive(request);
       return;
     }
-    if (isGraphLoad) {
+    if (isStrictGraphLoad) {
       scope.postMessage({
         protocol: SPEECH_WORKER_PROTOCOL,
         id: event.data.id,
         ok: false,
         error: serializedError(workerError(
           "ARCANE_AI_ARTIFACT_GRAPH_ISOLATION_UNAVAILABLE",
-          "Authenticated artifact graph loading requires a private MessagePort.",
+          "Strict artifact graph loading requires a private MessagePort.",
           undefined,
           "artifact-graph-private-message-port-missing",
         ), role, "load"),

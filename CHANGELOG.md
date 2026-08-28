@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.1
+
+- Restored ordinary warn-first Browser Speech operation with explicit
+  `secure:false` defaults, one concise load warning, and truthful
+  `unchecked`/`pending`/`verified`/`failed` integrity telemetry while keeping
+  strict authenticated-graph admission behind explicit `secure:true`.
+- Added atomic hydration for exact saved-but-unregistered STT/TTS selections
+  without a transient provider fallback, including independent mixed
+  browser/Cloud/Core role ownership and mismatch-safe rollback.
+- Continued to resolve speech runtimes, models, voices, and providers from
+  their upstream npm/fetch distribution paths; the SDK package redistributes
+  none of those third-party payloads or their legal corpora.
+
 ## 0.3.0
 
 - Added the branded, versioned, per-realm `globalThis.arcaneEvents` authority

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "builder": "arcane-sdk-browser-runtime-v1",
-  "sdkVersion": "0.3.0",
+  "sdkVersion": "0.3.1",
   "source": {
     "authority": "arcane-os-sdk",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
@@ -29,8 +29,8 @@
     ]
   },
   "fileCount": 26,
-  "totalBytes": 9551253,
-  "contentSha256": "164c30c71f4de1affaa335e0d435aa3cca31294f2c98be937b219e5e13e35959",
+  "totalBytes": 9554968,
+  "contentSha256": "1493497265c330507abed847e52e65dc2ce22c15efaf5646ed7ae544b107ad6f",
   "files": [
     {
       "path": "ai/ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json",
@@ -57,15 +57,15 @@
       "path": "ai/browser-speech-artifacts.mjs",
       "sourcePath": "browser-runtime/ai/browser-speech-artifacts.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 135328,
-      "sha256": "d5eb7d74000f8d91f6e9d19a1f5bffc12feb292d004605b28fc35d368419427d"
+      "bytes": 135988,
+      "sha256": "2587922a708f014ae8b4e819a607b1a5b322fc4eb969e470cd6c068b33b3adcd"
     },
     {
       "path": "ai/browser-speech-providers.mjs",
       "sourcePath": "browser-runtime/ai/browser-speech-providers.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 56765,
-      "sha256": "abe453aad718f9abc1e1b0911ea45a8f07e77f916e48d87cd661397e06084195"
+      "bytes": 59278,
+      "sha256": "84802cba366c3a54013214240ebaf3ae2896322efc965aab4054a61ca9d06aab"
     },
     {
       "path": "ai/browser-speech.mjs",
@@ -120,15 +120,15 @@
       "path": "ai/speech-worker-client.mjs",
       "sourcePath": "browser-runtime/ai/speech-worker-client.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 14130,
-      "sha256": "833565bcad0cb6091bfccc4b5e42542362b149a9ffd6ecc0b1b0440ae70efb58"
+      "bytes": 14247,
+      "sha256": "2e5580a86d5adc4f44a0d680e1820437b8d22b5555bf73a36b361ee50d24b3f5"
     },
     {
       "path": "ai/speech-worker-runtime.mjs",
       "sourcePath": "browser-runtime/ai/speech-worker-runtime.mjs",
       "provenance": "sdk-source-identity",
-      "bytes": 90700,
-      "sha256": "4449fddbc1963f2c51f524b4a44993d88a28124482d96d183cd3e28f4ebdf1c8"
+      "bytes": 91125,
+      "sha256": "c865ad9a84df30ea1d14c81e7bb5c38666afdb65d5237472cdabfb11e7c66de4"
     },
     {
       "path": "ai/wllama/LICENCE",

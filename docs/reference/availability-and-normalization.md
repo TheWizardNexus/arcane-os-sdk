@@ -91,7 +91,7 @@ surface does not require an Arcane Core method grant because it does not call a
 Core host. Browser Fetch, CORS, storage policy, secure-context behavior, and
 resource limits still apply.
 
-The shipped `0.3.0` runtime requires WebGPU and has no CPU fallback. A successful
+The shipped `0.3.1` runtime requires WebGPU and has no CPU fallback. A successful
 load requests full GPU offload (`gpuLayers: 99999`) and admits actual adapter,
 full-offload, buffer, queue, and settled-fence evidence. `navigator.gpu`
 presence by itself is not readiness. The provider emits the instrumented
@@ -130,7 +130,7 @@ The projected [`AIProviderRuntime`](runtime-modules.md#aiproviderruntimejs)
 normalizes those browser providers and can admit an externally supplied native
 or cloud provider/2 adapter. `AI.js` also supplies compatibility adapters for
 an already-selected legacy OpenAI route, Ollama route, or admitted Core speech
-route. SDK `0.3.0` publishes no privileged Core implementation, credential,
+route. SDK `0.3.1` publishes no privileged Core implementation, credential,
 model, or speech-runtime authority, and those adapters never probe, select,
 download, or fall back. The sticky
 [`AIRuntimeState`](runtime-modules.md#airuntimestatejs) surface keeps

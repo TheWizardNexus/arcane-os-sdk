@@ -98,7 +98,7 @@ imports such as:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import ollama from &#39;arcane/Ollama&#39;;
 </code></pre></div>
 <p>The authenticated physical-v1 tree lives entirely beneath <code>arcane/</code>. SDK
-<code>0.3.0</code> projects it from two canonical release receipts:</p>
+<code>0.3.1</code> projects it from two canonical release receipts:</p>
 <div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
 <tr>
@@ -110,12 +110,12 @@ imports such as:</p>
 <tbody><tr>
 <td><code>runtime/ARCANE_RUNTIME_RELEASE.json</code></td>
 <td><code>sdk-canonical</code>; <code>arcane/1</code>; builder <code>arcane-sdk-runtime-v1</code></td>
-<td>161 files; 4,159,000 bytes; content SHA-256 <code>5dab0c9cadd9e5ca97f90ab63ce755940318198d5b1efc0b7b666de4075302e9</code></td>
+<td>161 files; 4,161,715 bytes; content SHA-256 <code>9ed39694d9f286e0994404a82fb6002c3ba48be0d085a6b68d51c7facc17c56f</code></td>
 </tr>
 <tr>
 <td><code>browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json</code></td>
 <td><code>arcane-os-sdk</code>; <code>arcane-sdk-browser-runtime/1</code>; builder <code>arcane-sdk-browser-runtime-v1</code></td>
-<td>26 files; 9,548,478 bytes; content SHA-256 <code>0d41531e9a2d6ce97a357eeeebde5fbac8af59639a52f4f682717097b13dc6dc</code></td>
+<td>26 files; 9,554,768 bytes; content SHA-256 <code>b94511327f3ffcbdeb22b6f399d8a25ce831b133dcc8dbd589ca587c189f76d1</code></td>
 </tr>
 </tbody></table>
 </div>
@@ -130,7 +130,7 @@ browser receipt binds <code>event-pubsub</code> <code>6.1.0</code>, <code>strong
 versions from aliasing one another.</p>
 <p>Those two receipt inventories contain 187 entries in total. That sum is a
 release-inventory fact, not an import-map entry count and not an assertion about
-one maintained example. The <code>0.3.0</code> map deterministically roots every admitted
+one maintained example. The <code>0.3.1</code> map deterministically roots every admitted
 top-level runtime ESM plus the authenticated SDK browser roots, then follows
 those roots for runtime entities and dependency compatibility. Application
 source imports do not select a fixed entry count. Its public operation receipt is the
@@ -208,8 +208,8 @@ authority with exactly <code>dependencyName</code>, <code>packageSource</code>,
 <code>canonicalPackageRoot</code>, <code>packageName</code>, <code>packageVersion</code>, <code>runtimeRoot</code>,
 <code>browserRuntimeRoot</code>, <code>runtimeManifest</code>, and <code>browserRuntimeManifest</code>. A
 workspace may use the canonical dependency name or one exact npm alias such as
-<code>npm:arcane-os@0.3.0</code>; the physical package manifest must still identify
-exactly as <code>arcane-os@0.3.0</code>. Canonical-plus-alias duplicates, multiple aliases,
+<code>npm:arcane-os@0.3.1</code>; the physical package manifest must still identify
+exactly as <code>arcane-os@0.3.1</code>. Canonical-plus-alias duplicates, multiple aliases,
 links/junctions, indirect package roots, or version drift fail closed.</p>
 <p>The imported module can be pure browser logic, standard-Web-API logic, or a
 client of <code>globalThis.Arcane</code>. Import-map resolution is not a new Arcane wire
@@ -235,16 +235,16 @@ for both files and not a durable crash journal.</p>
 <p>No app watches, polls, downloads, or self-updates this map. An active operation&#39;s
 heartbeat is event telemetry only and never regenerates browser state.</p>
 </details>
-<details><summary>SDK 0.3.0 browser-runtime admission and exact receipt fields</summary>
+<details><summary>SDK 0.3.1 browser-runtime admission and exact receipt fields</summary>
 <p><code>arcane.lock.json.sdkBrowserRuntime</code> persists the trusted manifest path,
 <code>manifestSha256</code>, <code>contentSha256</code>, <code>builder</code>, <code>sdkVersion</code>, and <code>source</code> record.
-For SDK <code>0.3.0</code>, the manifest itself records:</p>
+For SDK <code>0.3.1</code>, the manifest itself records:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">manifest: node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json
 fileCount: 26
-totalBytes: 9548478
-contentSha256: 0d41531e9a2d6ce97a357eeeebde5fbac8af59639a52f4f682717097b13dc6dc
+totalBytes: 9554768
+contentSha256: b94511327f3ffcbdeb22b6f399d8a25ce831b133dcc8dbd589ca587c189f76d1
 builder: arcane-sdk-browser-runtime-v1
-sdkVersion: 0.3.0
+sdkVersion: 0.3.1
 source.protocol: arcane-sdk-browser-runtime/1
 source.browserEntry: arcane-os/event-manager
 </code></pre></div>
@@ -266,7 +266,7 @@ does not recreate authority.</p>
 The exported
 <a href="../runtime-modules/#aiproviderruntimejs"><code>getAIProviderRuntime()</code> singleton</a>
 comes from authenticated runtime bytes and owns independent <code>llm</code>, <code>stt</code>, and
-<code>tts</code> selections. SDK <code>0.3.0</code> ships browser-WASM LLM and browser
+<code>tts</code> selections. SDK <code>0.3.1</code> ships browser-WASM LLM and browser
 speech provider/2 adapters and also adapts selected legacy OpenAI LLM/STT/TTS,
 Core-backed Ollama LLM, and admitted Core speech STT/TTS routes into provider/2;
 other native, Core, or cloud routes require an externally supplied compatible
@@ -298,7 +298,7 @@ HTTPS sources; <code>offline:true</code> performs no model request and admits on
 compatible completed cache, otherwise it rejects with
 <code>ARCANE_AI_MODEL_OFFLINE_MISS</code>. Unload releases the active Wllama session but
 does not silently delete the app-owned cache.</p>
-<p>SDK <code>0.3.0</code> requires WebGPU. Load requests full offload with exactly 99,999 GPU
+<p>SDK <code>0.3.1</code> requires WebGPU. Load requests full offload with exactly 99,999 GPU
 layers and admits the model only after observing an adapter, full layer offload,
 buffer and queue work, and a settled fence. <code>navigator.gpu</code> presence alone is
 not readiness. There is no CPU fallback, partial-offload success mode, or
@@ -614,6 +614,6 @@ broker with retained handles and peer-process/generation binding.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#layer-map">Layer map</a><a href="#sdk-package-and-cli-protocols">SDK package and CLI protocols</a><a href="#central-events-and-time-travel-data">Central events and time-travel data</a><a href="#browser-runtime-delivery">Browser runtime delivery</a><a href="#portable-ai-provider-runtime">Portable AI provider runtime</a><a href="#arcane-application-protocol">Arcane application protocol</a><a href="#native-host-transports">Native host transports</a><a href="#development-and-remote-http-transport">Development and remote HTTP transport</a><a href="#core-dispatch-and-capability-admission">Core dispatch and capability admission</a><a href="#arcane-ollama-protocol-path">Arcane Ollama protocol path</a><a href="#explicit-cloud-provider-path">Explicit cloud provider path</a><a href="#events-streaming-and-cancellation">Events, streaming, and cancellation</a><a href="#cross-kernel-normalization-boundary">Cross-kernel normalization boundary</a><a href="#receipt-and-generation-boundaries">Receipt and generation boundaries</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK source candidate 0.3.0, runtime bundle 0.8.12, and protocol arcane/1; the latest verified published package is 0.2.3.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.3.0, runtime bundle 0.8.12, and protocol arcane/1; the latest verified published package is 0.3.0.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>

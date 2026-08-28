@@ -176,7 +176,7 @@ class SpeechWorkerClient {
     if (typeof MessageChannelConstructor !== "function") {
       throw clientError(
         "ARCANE_AI_WORKER_MESSAGE_ERROR",
-        "Authenticated artifact graph loading requires MessageChannel.",
+        "Strict artifact graph loading requires MessageChannel.",
         undefined,
         "artifact-graph-private-message-channel-unavailable",
       );
@@ -294,18 +294,20 @@ class SpeechWorkerClient {
       worker = this.#start();
       const graphLoad = op === "load"
         && payload?.configuration?.runtime?.moduleGraph === ARTIFACT_GRAPH_MODULE_GRAPH;
-      if (graphLoad) {
+      const strictGraphLoad = graphLoad
+        && payload?.configuration?.security?.secure === true;
+      if (strictGraphLoad) {
         initialPrivatePort = this.#establishPrivateTransport();
       } else if (this.#transportMode === null) {
         this.#transportMode = "worker-global-message";
         this.#transport = worker;
       }
       if (op === "load"
-        && !graphLoad
+        && !strictGraphLoad
         && this.#transportMode === "private-message-port") {
         throw clientError(
           "ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH",
-          "A private artifact graph Worker cannot load a legacy runtime descriptor.",
+          "A private strict artifact graph Worker cannot load an ordinary runtime descriptor.",
           undefined,
           `${this.#role}-worker-runtime-transport-mode-mismatch`,
         );

@@ -781,6 +781,9 @@ substituted.</p>
   generation,
   errorCode,
   cache,
+  security,
+  integrity,
+  warnings,
   artifactGraphId,
   artifactGraphAdmission
 }
@@ -798,7 +801,17 @@ substituted.</p>
 <p><code>loaded</code> is true only for <code>ready</code>. <code>busy</code> reports an active transcription or
 synthesis request; load, unload, and dispose remain visible through <code>state</code> and
 <code>activeOperation</code>. <code>cache</code> is <code>null</code>, a graph admission value, or the legacy
-<code>installed</code>/<code>cached</code> value. Graph identity and admission are otherwise <code>null</code>.</p>
+<code>installed</code>/<code>cached</code> value. Graph identity and admission are otherwise <code>null</code>.
+<code>security</code> reports the effective <code>secure</code>, <code>byteLength</code>, and <code>sha256</code> choices.
+<code>integrity.state</code> is <code>unchecked</code> when no integrity check is enabled, <code>pending</code>
+while enabled checks have not completed, <code>verified</code> only after every enabled
+check passes, and <code>failed</code> when an enabled verification attempt rejects. This
+verification outcome is independent of later Worker initialization and remains
+visible after a failed or unloaded provider. Default <code>secure:false</code> status includes the frozen warning code
+<code>browser-speech-warn-first-secure-mode-disabled</code>, and the first explicit load
+emits one concise console warning without blocking upstream package, provider,
+model, voice, fetch, cache, or Worker behavior. Strict graph admission and
+capability isolation remain exclusive to explicit <code>secure:true</code>.</p>
 <p>Provider-owned lifecycle reasons are:</p>
 <ul>
 <li>creation and load: <code>stt-provider-created</code>, <code>tts-provider-created</code>,
@@ -1687,6 +1700,6 @@ with the one shared SDK state/event owner.</li>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-and-enum-registry">Protocol and enum registry</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#authenticated-worker-host">Authenticated Worker host</a><a href="#providers">Providers</a><a href="#lifecycle-progress-cancellation-and-cleanup">Lifecycle, progress, cancellation, and cleanup</a><a href="#stable-errors-and-reasons">Stable errors and reasons</a><a href="#createbrowserspeechauthority-upstream-package-mode">createBrowserSpeechAuthority() upstream package mode</a><a href="#security-and-ownership-summary">Security and ownership summary</a><a href="#related">Related</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK source candidate 0.3.0, runtime bundle 0.8.12, and protocol arcane/1; the latest verified published package is 0.2.3.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.3.0, runtime bundle 0.8.12, and protocol arcane/1; the latest verified published package is 0.3.0.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>

@@ -881,7 +881,7 @@ test('the complete API reference is a first-party generated Pages corpus',async 
             sdk,
             /There is no exported\s+<code>importMapApplication\(\)<\/code> or <code>generateImportMap\(\)<\/code> binding/u
         );
-        assert.equal(packageApi.sdkVersion,'0.3.0');
+        assert.equal(packageApi.sdkVersion,'0.3.1');
         assert.equal(packageApi.memberCount,200);
         assert.deepEqual(
             packageApi.members

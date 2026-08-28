@@ -1429,7 +1429,7 @@ source body as implicit authority, and never persists a caller-owned body.
 **Browser or compatible host with an injected DBOPFS adapter.** The adapter
 keeps the existing `get`, `set`, `getAllKeys`, and `delete` method names; Node
 can use the same class only through an explicitly imported runtime module and a
-compatible storage adapter; SDK `0.3.0` publishes no Node package subpath or
+compatible storage adapter; SDK `0.3.1` publishes no Node package subpath or
 Node storage implementation for it. Bootstrap uses a bounded concurrent
 generation, commits its manifest last, cleans partial data on failure, and
 rejects case-colliding IDs. Search

@@ -17,7 +17,7 @@ This table is the Node `package.json#exports` map: it defines package
 entrypoints for SDK/tooling code. It is distinct from the generated browser
 import map that resolves application-facing `arcane/*` modules and the focused
 EventManager entry. See [browser runtime delivery](protocols.md#browser-runtime-delivery)
-for the installed-inventory-derived physical-runtime contract in SDK `0.3.0`.
+for the installed-inventory-derived physical-runtime contract in SDK `0.3.1`.
 
 | Specifier | Purpose |
 | --- | --- |
@@ -849,7 +849,7 @@ same deterministic map. The package root also contains the public
 {
   schemaVersion: 1,
   kind: 'arcane-app-runtime-projection',
-  sdkVersion: '0.3.0',
+  sdkVersion: '0.3.1',
   pathPrefix: 'arcane/',
   fileCount,
   totalBytes,
@@ -2759,7 +2759,7 @@ The import-map operation also reports the stable operation-specific strings
 `ARCANE_IMPORT_MAP_COLLISION`; package assembly can additionally report
 `ARCANE_IMPORT_MAP_CLEANUP_FAILED`. They are normalized `ArcaneError.code`
 values, but are not properties added to this frozen general registry in SDK
-`0.3.0`.
+`0.3.1`.
 
 ### Value and import
 
@@ -3425,7 +3425,7 @@ workspace it additionally returns the exact installed package authority:
     packageSource,
     canonicalPackageRoot,
     packageName: 'arcane-os',
-    packageVersion: '0.3.0',
+    packageVersion: '0.3.1',
     runtimeRoot,
     browserRuntimeRoot,
     runtimeManifest,
@@ -3435,9 +3435,9 @@ workspace it additionally returns the exact installed package authority:
 ```
 
 The dependency can be named `arcane-os` or be one exact npm alias for
-`npm:arcane-os@0.3.0`. The selected installation must still be one direct,
+`npm:arcane-os@0.3.1`. The selected installation must still be one direct,
 physical, non-link package directory whose manifest identifies exactly as
-`arcane-os@0.3.0`; duplicate canonical/alias declarations fail closed.
+`arcane-os@0.3.1`; duplicate canonical/alias declarations fail closed.
 `allowMissingManagedImportMap` is an internal packaging/development seam. An
 ordinary caller should leave it `false`.
 

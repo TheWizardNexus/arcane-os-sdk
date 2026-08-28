@@ -197,7 +197,7 @@ identical executable alias.
 The generated artifact is
 `apps/<id>/modules/arcane.importmap.json`. Its exact JSON is also installed in
 the app entry as `<script type="importmap" data-arcane-import-map>` before
-module loading. In SDK `0.3.0`, the complete physical-v1 runtime derives its
+module loading. In SDK `0.3.1`, the complete physical-v1 runtime derives its
 entries from the installed runtime and browser-runtime inventories and
 intentionally has no package-root mapping. The command receipt remains
 authoritative for the exact map written to the selected application; no fixed

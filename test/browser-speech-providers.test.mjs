@@ -424,7 +424,9 @@ function directGraphWorkerConfiguration(source, {
       moduleGraph: "browser-speech-authenticated-artifact-graph",
       entry: "runtime/entry.mjs",
       artifactGraphId: graphId,
-      artifactGraphAdmission: "artifact-graph-network-dbopfs-verified",
+      artifactGraphAdmission: secure
+        ? "artifact-graph-network-dbopfs-verified"
+        : "artifact-graph-network-dbopfs-unchecked",
       guardCapability: capability,
       onnxWasm: Object.freeze({
         namespace: "transformers-env-backends-onnx-wasm",
@@ -562,7 +564,7 @@ test("warn-first authorities use upstream package and provider downloads", async
   });
 });
 
-test("warn-first provider/store loads unchecked upstream bytes with one visible warning", async (t) => {
+test("warn-first provider/store loads unchecked upstream bytes with one status warning", async (t) => {
   const dbopfs = createMemoryDbopfs();
   const base = providerOptions("stt", null);
   const sources = new Map([
@@ -590,12 +592,6 @@ test("warn-first provider/store loads unchecked upstream bytes with one visible 
     },
   });
   installContractWorker(t, () => createSpeechWorkerContract({ role: "stt" }));
-  const observedWarnings = [];
-  const originalWarn = globalThis.console.warn;
-  globalThis.console.warn = (...values) => observedWarnings.push(values.join(" "));
-  t.after(() => {
-    globalThis.console.warn = originalWarn;
-  });
 
   const whisper = createBrowserWhisperProvider({
     ...base,
@@ -627,9 +623,6 @@ test("warn-first provider/store loads unchecked upstream bytes with one visible 
   assert.deepEqual(ready.warnings, [
     "browser-speech-warn-first-secure-mode-disabled",
   ]);
-  assert.equal(observedWarnings.length, 1);
-  assert.match(observedWarnings[0], /loading in warn-first mode/u);
-  assert.match(observedWarnings[0], /strict admission is disabled/u);
   assert.equal(
     dbopfs.mutations.some((entry) => entry.name.endsWith(".complete.json")),
     true,
@@ -640,7 +633,9 @@ test("warn-first provider/store loads unchecked upstream bytes with one visible 
     selection: selection(whisper),
     progress: () => undefined,
   });
-  assert.equal(observedWarnings.length, 1);
+  assert.deepEqual(whisper.status().warnings, [
+    "browser-speech-warn-first-secure-mode-disabled",
+  ]);
   await whisper.dispose();
 });
 
@@ -1011,7 +1006,7 @@ test("authenticated graph Worker rejects detached dynamic-code constructors", as
   assert.equal(globalThis.__arcaneBrowserSpeechArtifactGraphGuardsV1, undefined);
 });
 
-test("graph Worker requires explicit secure admission", async () => {
+test("warn-first graph Worker keeps ordinary capabilities and graph routing", async () => {
   const source = `
     const runtimeGlobal = Function("return globalThis")();
     export const env = {
@@ -1037,16 +1032,30 @@ test("graph Worker requires explicit secure admission", async () => {
     secure: false,
     transforms: false,
   });
-  await assert.rejects(
-    runtime.handleMessage({
-      protocol: SPEECH_WORKER_PROTOCOL,
-      id: 1,
-      op: "load",
-      payload: { configuration },
-    }),
-    (error) => error?.code === "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID"
-      && error?.reason === "artifact-graph-worker-configuration-incomplete",
+  const loaded = await runtime.handleMessage({
+    protocol: SPEECH_WORKER_PROTOCOL,
+    id: 1,
+    op: "load",
+    payload: { configuration },
+  });
+  assert.equal(loaded.lifecycleStatus, "stt-worker-ready");
+  assert.equal(loaded.security.secure, false);
+  assert.equal(
+    loaded.artifactGraphAdmission,
+    "artifact-graph-network-dbopfs-unchecked",
   );
+  assert.deepEqual(await runtime.handleMessage({
+    protocol: SPEECH_WORKER_PROTOCOL,
+    id: 2,
+    op: "use",
+    payload: { audio: new Float32Array([0]), sampleRate: 16_000 },
+  }), { text: "warn-first" });
+  await runtime.handleMessage({
+    protocol: SPEECH_WORKER_PROTOCOL,
+    id: 3,
+    op: "unload",
+    payload: null,
+  });
   assert.equal(globalThis.__arcaneBrowserSpeechArtifactGraphGuardsV1, undefined);
 });
 
@@ -1601,7 +1610,7 @@ test("artifact graph cold redirects require declared final origin and source med
   );
 });
 
-test("graph Kokoro requires explicit secure admission", async (t) => {
+test("graph Kokoro supports warn-first and strict admission independently", async (t) => {
   const fixture = artifactGraphFixture("tts");
   const dbopfs = createMemoryDbopfs();
   const store = graphStore(dbopfs, fixture.sources);
@@ -1612,10 +1621,14 @@ test("graph Kokoro requires explicit secure admission", async (t) => {
     return contract;
   });
 
-  await assert.rejects(
-    store.prepare(fixture.graph),
-    (error) => error?.reason === "artifact-graph-secure-mode-required",
+  const preparedWarnFirst = await store.prepare(fixture.graph);
+  assert.equal(
+    preparedWarnFirst.artifactGraphAdmission,
+    "artifact-graph-network-dbopfs-unchecked",
   );
+  assert.equal(preparedWarnFirst.security.secure, false);
+  assert.deepEqual(preparedWarnFirst.warnings, []);
+  preparedWarnFirst.release();
 
   const warnFirst = createBrowserKokoroProvider({
     id: fixture.graph.providerId,
@@ -1623,17 +1636,23 @@ test("graph Kokoro requires explicit secure admission", async (t) => {
     store,
     appSecurity: { secure: false },
   });
-  await assert.rejects(
-    warnFirst.load({
-      role: "tts",
-      selection: selection(warnFirst),
-      progress: () => undefined,
-    }),
-    (error) => error?.code === "ARCANE_AI_SECURE_MODE_REQUIRED"
-      && error?.reason === "tts-artifact-graph-secure-mode-required",
+  await warnFirst.load({
+    role: "tts",
+    selection: selection(warnFirst),
+    progress: () => undefined,
+  });
+  assert.equal(contracts.length, 1);
+  assert.equal(contracts[0].privateTransport, false);
+  assert.equal(contracts[0].privatePortTransferred, false);
+  assert.equal(warnFirst.status().state, "ready");
+  assert.equal(warnFirst.status().security.secure, false);
+  assert.equal(
+    warnFirst.status().artifactGraphAdmission,
+    "artifact-graph-dbopfs-cache-unchecked",
   );
-  assert.equal(contracts.length, 0);
-  assert.equal(warnFirst.status().state, "unloaded");
+  assert.deepEqual(warnFirst.status().warnings, [
+    "browser-speech-warn-first-secure-mode-disabled",
+  ]);
   await warnFirst.dispose();
   contracts.length = 0;
 

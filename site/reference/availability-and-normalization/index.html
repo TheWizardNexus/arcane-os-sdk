@@ -193,7 +193,7 @@ Wllama engine and caller-supplied model run inside the browser. This
 surface does not require an Arcane Core method grant because it does not call a
 Core host. Browser Fetch, CORS, storage policy, secure-context behavior, and
 resource limits still apply.</p>
-<p>The shipped <code>0.3.0</code> runtime requires WebGPU and has no CPU fallback. A successful
+<p>The shipped <code>0.3.1</code> runtime requires WebGPU and has no CPU fallback. A successful
 load requests full GPU offload (<code>gpuLayers: 99999</code>) and admits actual adapter,
 full-offload, buffer, queue, and settled-fence evidence. <code>navigator.gpu</code>
 presence by itself is not readiness. The provider emits the instrumented
@@ -228,7 +228,7 @@ through an SDK-created authority and DBOPFS artifact store.</p>
 normalizes those browser providers and can admit an externally supplied native
 or cloud provider/2 adapter. <code>AI.js</code> also supplies compatibility adapters for
 an already-selected legacy OpenAI route, Ollama route, or admitted Core speech
-route. SDK <code>0.3.0</code> publishes no privileged Core implementation, credential,
+route. SDK <code>0.3.1</code> publishes no privileged Core implementation, credential,
 model, or speech-runtime authority, and those adapters never probe, select,
 download, or fall back. The sticky
 <a href="../runtime-modules/#airuntimestatejs"><code>AIRuntimeState</code></a> surface keeps
@@ -272,6 +272,6 @@ native host.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#availability-labels">Availability labels</a><a href="#capability-first-matrix">Capability-first matrix</a><a href="#the-normalized-application-path">The normalized application path</a><a href="#normalization-levels">Normalization levels</a><a href="#no-implicit-protocol-or-provider-fallback">No implicit protocol or provider fallback</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK source candidate 0.3.0, runtime bundle 0.8.12, and protocol arcane/1; the latest verified published package is 0.2.3.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.3.0, runtime bundle 0.8.12, and protocol arcane/1; the latest verified published package is 0.3.0.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>

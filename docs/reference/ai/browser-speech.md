@@ -242,11 +242,14 @@ ignores it and uses module-captured native Blob URL creation, revocation, and
 fetch so a caller cannot substitute the executable materialization boundary.
 
 For a graph, `prepare(graph,{signal,onProgress,offline=false,security})` follows
-the shared model-security flag and requires explicit `secure:true`. The graph is
-the opt-in strict path: it enables byte-length, SHA-256, and undeclared-
-capability enforcement. Ordinary warn-first operation uses the direct
-`model`/`runtime` authority described below and does not construct or admit an
-artifact graph.
+the shared model-security flag. Its default `secure:false` path retains the
+selected graph, scans and rewrites its declared module edges, and reports
+unchecked or partially checked admission without enabling optional strict
+capability isolation. Explicit `secure:true` defaults byte-length and SHA-256
+checks on and adds strict Worker isolation. Either mode rejects malformed graph
+records, unreadable Fetch responses, media-type mismatches, structurally
+unmaterializable runtime modules, failed object-URL readback, and every enabled
+byte-length or SHA-256 mismatch.
 
 ### Cold admission
 
@@ -261,24 +264,27 @@ artifact graph.
    HTTPS URL without credentials or a fragment and require its canonical origin
    to occur in that file's declared final-origin inventory.
 5. Require the response Content-Type to equal `sourceMediaType` (which defaults
-   to `mediaType`), then stream exact byte-length and SHA-256 verification into
-   DBOPFS.
-6. Reopen and rehash every persisted file.
+   to `mediaType`), then stream into DBOPFS while applying each enabled
+   byte-length or SHA-256 check. `secure:true` enables both checks by default;
+   `secure:false` leaves both disabled unless the caller selects them.
+6. Reopen every persisted file and repeat only the enabled byte-length or
+   SHA-256 checks.
 7. Decode and scan every runtime JavaScript file and prove exact edge/transform
    closure.
 8. Persist `arcane.ai.browser-speech.authenticated-artifact-graph.v1` only
    after every file and the complete runtime graph pass.
 
-The returned admission is
-`artifact-graph-network-dbopfs-verified`. A failure before manifest completion
-removes the graph's incomplete records.
+The returned admission is `artifact-graph-network-dbopfs-verified`,
+`artifact-graph-network-dbopfs-partially-checked`, or
+`artifact-graph-network-dbopfs-unchecked` according to the effective checks. A
+failure before manifest completion removes the graph's incomplete records.
 
 `redirectFinalOrigins` admits only a final origin, not a final path, query, or
 signed/expiring URL. The browser may follow such an implementation-specific
 final URL, but that URL is neither persisted nor accepted as source, revision,
-signature, graph identity, or future download authority. Trust remains bound to
-the immutable starting `sourceUrl` and the exact authenticated length and
-SHA-256 of the received bytes.
+signature, graph identity, or future download authority. The graph remains
+bound to its immutable starting `sourceUrl`; selected length and SHA-256 checks
+apply only when enabled and are reported honestly by the admission status.
 
 Browser Fetch exposes the final CORS response, not an inspectable list of every
 intermediate redirect hop. The SDK therefore cannot authenticate intermediate
@@ -291,13 +297,17 @@ than this redirect opt-in.
 ### Warm and offline admission
 
 A warm prepare requires the exact manifest authority and file count, reopens
-every DBOPFS record, checks the manifest's observed bytes and declared SHA-256,
-rehashes every file, and rescans the runtime graph before returning
-`artifact-graph-dbopfs-cache-verified`.
+every DBOPFS record, checks the manifest's observed byte count and declared
+descriptor identity, repeats the enabled byte-length or SHA-256 checks, and
+rescans the runtime graph. It returns the corresponding
+`artifact-graph-dbopfs-cache-verified`,
+`artifact-graph-dbopfs-cache-partially-checked`, or
+`artifact-graph-dbopfs-cache-unchecked` status.
 
 `offline:true` runs the same cache verification and never calls the source
 fetch function. It returns
-`artifact-graph-offline-dbopfs-cache-verified`, or rejects with code
+`artifact-graph-offline-dbopfs-cache-{verified|partially-checked|unchecked}`,
+or rejects with code
 `ARCANE_AI_ARTIFACT_GRAPH_OFFLINE_CACHE_MISS` and reason
 `artifact-graph-offline-cache-miss`. There is no network repair, runtime CDN,
 private Cache Storage fallback, or partial-cache admission.
@@ -324,9 +334,10 @@ Successful graph preparation returns:
   cache,                    // the exact graph admission value
   artifactGraphId,
   artifactGraphAdmission,
+  warnings,                 // frozen runtime-inspection warnings
   runtime: {
     ...normalizedRuntime,
-    files, edges, transforms,
+    files, edges, transforms, warnings,
     guardCapability,
     artifactGraphId,
     artifactGraphAdmission
@@ -342,29 +353,38 @@ cache-deletion operation.
 
 ## Authenticated Worker host
 
-Graph loading creates one dedicated Worker for the selected role. Its first
-load envelope transfers a new private `MessagePort`; all graph responses,
-progress, cancellation settlement, and later operations stay on that port.
-Graph loading rejects if `MessageChannel`/`MessagePort` is unavailable, if a
-legacy global transport was already selected, or if the Worker receives a graph
-load without the private port. The published single-module compatibility path
-continues to use the original Worker-global message transport.
+Graph loading creates one dedicated Worker for the selected role. With explicit
+`secure:true`, its first load envelope transfers a new private `MessagePort`;
+all graph responses, progress, cancellation settlement, and later operations
+stay on that port. Strict loading rejects if `MessageChannel`/`MessagePort` is
+unavailable, if a Worker-global transport was already selected, or if the
+Worker receives a strict graph load without the private port. Default
+`secure:false` graph loading uses the ordinary Worker-global message transport,
+as does the published single-module compatibility path.
 
-Before importing the entrypoint, the graph Worker installs these fail-closed
-boundaries:
+Before importing the entrypoint in either mode, the graph Worker installs the
+functional graph boundary:
 
 - exact graph routes map declared source URLs, runtime aliases, and materialized
-  URLs to already authenticated object URLs;
+  URLs to the selected materialized object URLs;
 - the ephemeral guard capability must match at every rewritten call;
-- global `fetch` rejects unless the scanned source was rewritten to one
-  declared fetch edge;
-- global Cache Storage `open` and `match` reject unless the scanned
-  `caches.open(...)` was rewritten to one exact declared cache-open edge; its
-  returned read-only cache serves only `targetPaths`, while `put`, `add`, and
-  `addAll` reject, so DBOPFS remains the sole durable store;
+- each rewritten fetch, cache-open, import, and child-Worker edge resolves
+  through its declared graph route and local materialized bytes;
+- the returned graph cache facade serves only declared `targetPaths`, while
+  `put`, `add`, and `addAll` reject, so DBOPFS remains the graph's sole durable
+  store;
 - a `typed-array-constructor` rewrite returns only the intrinsic constructor of
-  a verified typed-array receiver; an own or non-intrinsic `constructor`
+  a typed-array receiver; an own or non-intrinsic `constructor`
   rejects;
+- an admitted child module Worker is created through the SDK's role Worker,
+  receives the graph configuration, installs the same guard, and imports only
+  its declared materialized target.
+
+Explicit `secure:true` additionally installs these strict isolation controls:
+
+- raw global `fetch` rejects unless scanned source was rewritten to one
+  declared fetch edge, and raw Cache Storage access is replaced by the graph
+  facade;
 - the `Function`, `AsyncFunction`, `GeneratorFunction`, and
   `AsyncGeneratorFunction` prototype constructor escape is replaced before
   import, and string callbacks to `setTimeout` or `setInterval` reject;
@@ -372,10 +392,7 @@ boundaries:
 - raw `BroadcastChannel`, `EventSource`, `Function`, `RTCPeerConnection`,
   `ShadowRealm`, `SharedWorker`, `WebSocket`, `WebSocketStream`, `WebTransport`,
   `Worker`, `XMLHttpRequest`, `eval`, and `importScripts` capabilities are
-  denied; and
-- an admitted child module Worker is created through the SDK's role Worker,
-  receives the authenticated graph configuration, installs the same guard, and
-  imports only its declared materialized target.
+  denied.
 
 An immutable `sourceUrl` may be an explicitly caller-selected HTTPS origin,
 but runtime execution cannot escalate to that or another network origin. Its
@@ -393,12 +410,14 @@ The Worker accepts only the two mechanically verified namespace shapes:
   `kokoro-env-wasm-paths-assignment-rejected`.
 - Transformers: `namespace.env.backends.onnx.wasm.wasmPaths = {mjs,wasm}`.
   The Worker also requires the verified outer `env` fields, sets
-  `allowLocalModels:false`, `allowRemoteModels:true`, `useBrowserCache:false`,
-  and `useFSCache:false`. With no admitted `cacheOpens` edge named exactly
-  `transformers-cache`, it assigns `useCustomCache:false` and `customCache:null`.
-  With exactly one such edge it assigns `useCustomCache:true` and the
-  target-limited read-only graph facade; more than one rejects as ambiguous.
-  Only a caller-declared STT `numThreads` is assigned. The
+  `allowLocalModels:false` and `allowRemoteModels:true`. In explicit
+  `secure:true`, it additionally sets `useBrowserCache:false` and
+  `useFSCache:false`; with no admitted `cacheOpens` edge named exactly
+  `transformers-cache`, it assigns `useCustomCache:false` and `customCache:null`,
+  while exactly one such edge selects the target-limited read-only graph
+  facade. Default `secure:false` leaves those optional upstream cache settings
+  unchanged. More than one declared Transformers cache edge rejects as
+  ambiguous in either mode. Only a caller-declared STT `numThreads` is assigned. The
   `allowRemoteModels` value permits the audited library code path to issue its
   declared request; the graph guard still prevents network access and serves
   only exact local graph routes.

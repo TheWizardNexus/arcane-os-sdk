@@ -58,25 +58,23 @@ See [Core reference provenance](core/README.md) for the imported inventory and
 the exact distinction between a documentation snapshot and shipped runtime
 bytes.
 
-## Published 0.2.3
+## Published 0.3.0
 
-The most recently verified published package before this 0.3.0 source candidate
-is exactly `arcane-os@0.2.3` from source commit
-`d717f21d45664d20e4ed6377596db87c47492e11`. The npm `latest` dist-tag resolves
-to `0.2.3`; the separate `dev` dist-tag remains `0.1.0-dev.5`.
+The verified published package is exactly `arcane-os@0.3.0` from source commit
+`72239d0221279b461f1be08b02a70105f4cf7364`. The npm `latest` dist-tag resolves
+to `0.3.0`; the separate `dev` dist-tag remains `0.1.0-dev.5`.
 
-The singleton-event, Mail, warn-first Browser Speech, and mixed-route contracts
-documented below are newer canonical source. They are not package authority in
-`0.2.3`; consumers require the numeric 0.3.0 publication before relying on them.
+The singleton-event, Mail, warn-first Browser Speech, and independent mixed-route
+contracts documented below are included in this exact package authority.
 
 | Evidence | Exact value |
 | --- | --- |
-| npm integrity | `sha512-TZewkGM7dh9PdVnOtnkBO7QalJ6qyWWdKruCmsTxoHyeoG5XpqVbkNgiJhtBLhrIzgUV3vydYplxZQkIbIWoHg==` |
-| npm shasum | `8e978a23289a41db130253e6475a0c8bb0c0d73f` |
-| Immutable release tarball | `arcane-os-0.2.3.tgz`; 6,999,078 bytes; SHA-256 `857f179c2f9d4549e7691b4e6cebc49e5ab5e18600816443b26319c61fc1f85d` |
-| GitHub release | [`0.2.3`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.2.3) (tag and title are both exactly `0.2.3`) |
-| Hosted source/artifact gate | [Check run 33052271534](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33052271534) |
-| Trusted publication | [Run 33052383457](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33052383457) |
+| npm integrity | `sha512-dh7QfM1ur48hOyMez1XWjym/LJcOAYy+Xl3KcvVQ6ewwX5N7ER82PQx6LE+zSb5sHVtz4TOU2AuARsrFNSwuVw==` |
+| npm shasum | `94075dad9c3974b0e069ecfe09f8d612d8a30ea7` |
+| Immutable release tarball | `arcane-os-0.3.0.tgz`; 7,230,292 bytes; SHA-256 `4afdb8113d8408b03917b73ce45e25bf4d302577fc6f199165d4931dda8ca081` |
+| GitHub release | [`0.3.0`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.3.0) (tag and title are both exactly `0.3.0`) |
+| Hosted source/artifact gate | [Check run 33130699235](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33130699235) |
+| Trusted publication | [Run 33131083176](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33131083176) |
 
 The npm SLSA provenance binds the published package to that exact source commit
 and `.github/workflows/publish-dev.yml`. Hashes prove byte identity or

@@ -2863,13 +2863,6 @@ function assertArtifactGraphStaticImportClosure(metadata) {
 }
 
 async function inspectArtifactGraphRuntime(admitted, metadata, signal, security) {
-  if (security?.secure !== true) {
-    return Object.freeze({
-      plans: new Map(),
-      order: Object.freeze([]),
-      warnings: Object.freeze(["artifact-graph-runtime-unchecked"]),
-    });
-  }
   const admittedByPath = new Map(admitted.files.map((entry) => [entry.descriptor.path, entry]));
   const plans = new Map();
   for (const descriptor of metadata.runtimeFiles) {
@@ -2903,13 +2896,23 @@ async function inspectArtifactGraphRuntime(admitted, metadata, signal, security)
   const order = assertArtifactGraphStaticImportClosure(metadata);
   const warnings = [...new Set([...plans.values()].flatMap((plan) => plan.warnings))]
     .sort();
-  if (security?.secure !== true && warnings.length > 0) {
-    globalThis.console?.warn?.(
-      `Arcane browser speech warn-first mode allowed runtime capabilities: ${warnings.join(", ")}.`,
-    );
-  }
   throwIfAborted(signal);
   return Object.freeze({ plans, order, warnings: Object.freeze(warnings) });
+}
+
+function assertArtifactGraphRuntimeInspection(inspection) {
+  if (
+    !inspection
+    || !(inspection.plans instanceof Map)
+    || !Array.isArray(inspection.order)
+    || !Array.isArray(inspection.warnings)
+  ) {
+    throw artifactGraphError(
+      "artifact-graph-runtime-inspection-missing",
+      "Artifact graph runtime inspection is required before executable materialization.",
+    );
+  }
+  return inspection;
 }
 
 function applyArtifactGraphModuleTransforms(plan, materializedByPath, guardCapability) {
@@ -3033,6 +3036,7 @@ async function createArtifactGraphObjectUrls(admitted, metadata, inspection, sec
   const created = [];
   const createdIdentities = new Set();
   const guardCapability = artifactGraphGuardCapability();
+  const runtimeInspection = assertArtifactGraphRuntimeInspection(inspection);
   async function materialize(descriptor, body) {
     const blob = body instanceof Blob && body.type === descriptor.mediaType
       ? body
@@ -3131,20 +3135,42 @@ async function createArtifactGraphObjectUrls(admitted, metadata, inspection, sec
   try {
     for (const descriptor of metadata.files) {
       if (ARTIFACT_GRAPH_JAVASCRIPT_KINDS.has(descriptor.kind)) continue;
-      await materialize(descriptor, admittedByPath.get(descriptor.path).file);
+      const admittedFile = admittedByPath.get(descriptor.path)?.file;
+      if (!admittedFile) {
+        throw artifactGraphError(
+          "artifact-graph-materialized-source-file-missing",
+          `Artifact graph file ${descriptor.path} is unavailable for materialization.`,
+        );
+      }
+      await materialize(descriptor, admittedFile);
     }
-    for (const path of inspection.order) {
+    for (const path of runtimeInspection.order) {
       const descriptor = metadata.filesByPath.get(path);
-      const plan = inspection.plans.get(path);
+      const plan = runtimeInspection.plans.get(path);
+      if (!descriptor || !plan) {
+        throw artifactGraphError(
+          "artifact-graph-runtime-inspection-incomplete",
+          `Artifact graph runtime inspection is incomplete for ${path}.`,
+        );
+      }
       await materialize(
         descriptor,
         applyArtifactGraphModuleTransforms(plan, materializedByPath, guardCapability),
       );
     }
+    const files = metadata.files.map((descriptor) => {
+      const materialized = materializedByPath.get(descriptor.path);
+      if (!materialized) {
+        throw artifactGraphError(
+          "artifact-graph-materialization-incomplete",
+          `Artifact graph file ${descriptor.path} was not materialized.`,
+        );
+      }
+      return materialized;
+    });
     return Object.freeze({
       guardCapability,
-      files: Object.freeze(metadata.files.map((descriptor) =>
-        materializedByPath.get(descriptor.path))),
+      files: Object.freeze(files),
       release() {
         for (const url of created.splice(0).reverse()) {
           try {
@@ -3436,11 +3462,9 @@ export function createDbopfsSpeechArtifactStore({
       files.push({ descriptor, file });
     }
     try {
-      const inspection = graph && security.secure
+      const inspection = graph
         ? await inspectArtifactGraphRuntime({ files }, metadata, signal, security)
-        : graph
-          ? null
-          : (await assertSelfContainedRuntime({ files }, metadata, security), null);
+        : (await assertSelfContainedRuntime({ files }, metadata, security), null);
       throwIfAborted(signal);
       return Object.freeze({
         files: Object.freeze(files),
@@ -3734,11 +3758,9 @@ export function createDbopfsSpeechArtifactStore({
         }
         installed.push({ descriptor, file });
       }
-      const inspection = graph && security.secure
+      const inspection = graph
         ? await inspectArtifactGraphRuntime({ files: installed }, metadata, signal, security)
-        : graph
-          ? null
-          : (await assertSelfContainedRuntime({ files: installed }, metadata, security), null);
+        : (await assertSelfContainedRuntime({ files: installed }, metadata, security), null);
       throwIfAborted(signal);
       const manifest = Object.freeze({
         schema: graph ? ARTIFACT_GRAPH_MANIFEST_SCHEMA : MANIFEST_SCHEMA,
@@ -3789,12 +3811,6 @@ export function createDbopfsSpeechArtifactStore({
       throw error;
     }
     const metadata = artifactMetadata(authority);
-    if (graph && effectiveSecurity.secure !== true) {
-      throw artifactGraphError(
-        "artifact-graph-secure-mode-required",
-        "Browser speech artifact graphs require explicit secure:true.",
-      );
-    }
     assertSecurityDescriptors(metadata.files, effectiveSecurity);
     const cached = await openCached(authority, {
       signal,
@@ -3812,7 +3828,7 @@ export function createDbopfsSpeechArtifactStore({
       if (graph) {
         throw artifactGraphError(
           "artifact-graph-offline-cache-miss",
-          "No complete verified offline artifact graph cache is available.",
+          "No complete admitted offline artifact graph cache is available.",
         );
       }
       throw speechError("ARCANE_AI_ARTIFACT_OFFLINE_MISS", "No admitted offline speech cache is available.");
@@ -3837,12 +3853,14 @@ export function createDbopfsSpeechArtifactStore({
         cache: artifactGraphAdmission,
         artifactGraphId: authority.identitySha256,
         artifactGraphAdmission,
+        warnings: admitted.inspection.warnings,
         security: effectiveSecurity,
         runtime: Object.freeze({
           ...metadata.runtime,
           files: runtimeFiles,
           edges: metadata.edges,
           transforms: metadata.transforms,
+          warnings: admitted.inspection.warnings,
           guardCapability: materialized.guardCapability,
           artifactGraphId: authority.identitySha256,
           artifactGraphAdmission,
