@@ -272,11 +272,11 @@ async function sendPersistentSupportTurnAfterUserChoice(documents){
     Object.freeze({
         name:'PreferenceStore.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Construction validates schema and initializes defaults only. load/set/reset use an injected adapter when supplied. Otherwise an Android bridge selects app-scoped localStorage immediately and does not call Arcane.preferences; non-Android native hosts select Arcane.preferences, whose exact ANDROID_CAPABILITY_UNSUPPORTED failure switches that selected adapter to local fallback. Other failures propagate.',
-        paramsResults:"new PreferenceStore({namespace='arcane',schema=[],adapter?}); defaults(), storageKey(), definition(); load() resolves a values snapshot; set(key,value) resolves the normalized value; setAll(values) and reset() resolve snapshots. Also re-exports Preference and preferenceSchema.",
+        lifecycleSideEffects:'Construction validates schema and initializes defaults only. load/set/reset use an injected adapter when supplied. setAll normalizes the complete selected batch before I/O and uses one optional adapter setMany call when advertised for one to 32 selected values; larger batches and adapters without setMany retain the serial compatibility route under one queued operation. Otherwise an Android bridge selects app-scoped localStorage immediately and does not call Arcane.preferences; non-Android native hosts select Arcane.preferences, whose exact ANDROID_CAPABILITY_UNSUPPORTED failure switches that selected adapter to local fallback. Other failures propagate.',
+        paramsResults:"new PreferenceStore({namespace='arcane',schema=[],adapter?}); adapters require get(key,context), set(key,value,context), and delete(key,context), and may expose setMany(entries,context). defaults(), storageKey(), definition(); load() resolves a values snapshot; set(key,value) resolves the normalized value; setAll(values,options) and reset() resolve snapshots. Also re-exports Preference and preferenceSchema.",
         events:['preference-load with {values}','preference-change with {values,key,value}','preference-reset with {values}'],
-        errors:['RangeError for unknown key.','Preference validation and adapter/storage errors propagate except the exact unsupported fallback.'],
-        capabilitiesCore:'Non-Android native get uses preferences.read; set/delete use preferences.write. Android and browser localStorage need no preference capability, while application scoping may resolve capability-free app.current.',
+        errors:['RangeError for unknown key.','Preference validation and adapter/storage errors propagate except the exact unsupported fallback. A dispatched setMany rejection never retries as serial writes.'],
+        capabilitiesCore:'Non-Android native get uses preferences.read; set/delete and optional atomic setMany use preferences.write. Android and browser localStorage need no preference capability, while application scoping may resolve capability-free app.current.',
         example:String.raw`import PreferenceStore from '/arcane/modules/PreferenceStore.js';
 
 const data = new Map();

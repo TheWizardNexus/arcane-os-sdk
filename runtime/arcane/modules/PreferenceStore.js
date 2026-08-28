@@ -2,6 +2,8 @@ import {createArcaneEventSource} from 'arcane-os/event-manager';
 import Preference,{preferenceSchema} from '../entities/Preference.js';
 import {resolveApplicationLocalStorageKey} from './AppDataScope.js';
 
+const MAXIMUM_ATOMIC_PREFERENCE_BATCH_ENTRIES=32;
+
 export const PREFERENCE_STORE_ERROR_CODES=Object.freeze({
     adapterInvalid:'ARCANE_PREFERENCE_STORE_ADAPTER_INVALID',
     disposed:'ARCANE_PREFERENCE_STORE_DISPOSED',
@@ -110,11 +112,13 @@ function validateAdapter(adapter){
     if(!adapter
         ||typeof adapter.get!=='function'
         ||typeof adapter.set!=='function'
-        ||typeof adapter.delete!=='function'){
+        ||typeof adapter.delete!=='function'
+        ||(Reflect.has(adapter,'setMany')&&typeof adapter.setMany!=='function')){
         throw preferenceStoreError(
             PREFERENCE_STORE_ERROR_CODES.adapterInvalid,
             'preference-storage-adapter-invalid',
-            'The preference storage adapter must provide get, set, and delete methods.',
+            'The preference storage adapter must provide get, set, and delete methods; '
+                +'setMany must be a function when provided.',
             TypeError
         );
     }
@@ -142,7 +146,9 @@ function localAdapter(prefix){
 
 function nativeAdapter(){
     const preferences=globalThis.Arcane?.preferences;
-    if(!preferences?.get||!preferences?.set||!preferences?.delete) return null;
+    if(typeof preferences?.get!=='function'
+        ||typeof preferences?.set!=='function'
+        ||typeof preferences?.delete!=='function') return null;
     return preferences;
 }
 
@@ -162,10 +168,12 @@ function preferenceAdapter(){
         }catch(error){
             if(active!==native||!isUnsupportedNativeAdapter(error)) throw error;
             active=local;
+            delete adapter.setMany;
+            if(typeof active[method]!=='function') throw error;
             return active[method](...args);
         }
     }
-    return {
+    const adapter={
         async get(key){
             return call('get',[key]);
         },
@@ -176,6 +184,12 @@ function preferenceAdapter(){
             return call('delete',[key]);
         }
     };
+    if(typeof native.setMany==='function'){
+        adapter.setMany=async function setMany(entries,context){
+            return call('setMany',[entries,context]);
+        };
+    }
+    return adapter;
 }
 
 export default class PreferenceStore extends EventTarget{
@@ -295,13 +309,65 @@ export default class PreferenceStore extends EventTarget{
                 TypeError
             );
         }
+        const selected=[];
         for(const definition of this.schema){
             if(Object.prototype.hasOwnProperty.call(values,definition.key)){
-                await this.set(definition.key,values[definition.key],operation);
+                selected.push(Object.freeze({
+                    key:definition.key,
+                    storageKey:this.storageKey(definition.key),
+                    value:definition.value(values[definition.key])
+                }));
             }
         }
-        this.#assertOperationActive(operation.signal);
-        return frozenPreferenceValues(this.values);
+        if(selected.length===0){
+            this.#assertOperationActive(operation.signal);
+            return frozenPreferenceValues(this.values);
+        }
+        const operationId=this.#nextOperationId('set-all');
+        const store=this;
+        const entries=Object.freeze(selected);
+        return this.#enqueueOperation(
+            async function setAllPreferences(commitPreferenceOperation){
+                const context=Object.freeze({operationId,signal:operation.signal});
+                if(typeof store.adapter.setMany==='function'
+                    &&entries.length<=MAXIMUM_ATOMIC_PREFERENCE_BATCH_ENTRIES){
+                    const batch={};
+                    for(const entry of entries){
+                        setDataProperty(batch,entry.storageKey,entry.value);
+                    }
+                    await store.adapter.setMany(Object.freeze(batch),context);
+                    store.#assertOperationActive(operation.signal);
+                    commitPreferenceOperation();
+                    const next={...store.values};
+                    for(const entry of entries) setDataProperty(next,entry.key,entry.value);
+                    store.values=frozenPreferenceValues(next);
+                    for(const entry of entries){
+                        store.#publish(
+                            PREFERENCE_STORE_EVENT_TYPES.change,
+                            {key:entry.key,value:entry.value},
+                            operationId
+                        );
+                    }
+                    return frozenPreferenceValues(store.values);
+                }
+                for(const entry of entries){
+                    await store.adapter.set(entry.storageKey,entry.value,context);
+                    store.#assertOperationActive(operation.signal);
+                    store.values=frozenPreferenceValues({
+                        ...store.values,
+                        [entry.key]:entry.value
+                    });
+                    store.#publish(
+                        PREFERENCE_STORE_EVENT_TYPES.change,
+                        {key:entry.key,value:entry.value},
+                        operationId
+                    );
+                    store.#assertOperationActive(operation.signal);
+                }
+                return frozenPreferenceValues(store.values);
+            },
+            operation.signal
+        );
     }
 
     async reset(options={}){
@@ -388,6 +454,7 @@ export default class PreferenceStore extends EventTarget{
     #enqueueOperation(operation,signal){
         this.#assertOperationActive(signal);
         const store=this;
+        let committed=false;
         let abortHandler=null;
         let rejectResult;
         let resolveResult;
@@ -410,6 +477,14 @@ export default class PreferenceStore extends EventTarget{
         function cancelPreferenceOperation(error){
             return settlePreferenceOperation(rejectResult,error);
         }
+        function commitPreferenceOperation(){
+            store.#assertOperationActive(signal);
+            if(settled) return false;
+            committed=true;
+            signal?.removeEventListener('abort',abortHandler);
+            store.#pendingOperations.delete(cancelPreferenceOperation);
+            return true;
+        }
         abortHandler=function abortPreferenceOperation(){
             cancelPreferenceOperation(operationAbortedError(signal.reason));
         };
@@ -421,8 +496,8 @@ export default class PreferenceStore extends EventTarget{
             if(settled) return;
             try{
                 store.#assertOperationActive(signal);
-                const value=await operation();
-                store.#assertOperationActive(signal);
+                const value=await operation(commitPreferenceOperation);
+                if(!committed) store.#assertOperationActive(signal);
                 settlePreferenceOperation(resolveResult,value);
             }catch(error){
                 settlePreferenceOperation(rejectResult,error);

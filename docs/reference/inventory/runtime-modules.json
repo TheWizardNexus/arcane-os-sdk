@@ -1030,8 +1030,8 @@
       "summary": "Loads and updates schema-defined app preferences through native storage with a narrow browser fallback.",
       "availability": "Browser/native hybrid",
       "protocol": "Arcane.preferences or app-scoped localStorage + per-realm globalThis.arcaneEvents authority",
-      "normalization": "Values normalized; only exact unsupported capability falls back.",
-      "surface": "Event/error constants, default `PreferenceStore`, re-exported `Preference`/schema; load/set/reset APIs, state-free EventTarget/on compatibility, and `dispose()`."
+      "normalization": "Values normalized before I/O; setAll uses one optional atomic adapter batch when advertised for one to 32 selected values, retains serial per-key compatibility above that Core limit, never retries a rejected dispatched batch serially, and only exact unsupported native capability changes future operations to the browser fallback.",
+      "surface": "Event/error constants, default `PreferenceStore`, re-exported `Preference`/schema; load/set/setAll/reset APIs, required adapter get/set/delete plus optional setMany, state-free EventTarget/on compatibility, and `dispose()`."
     },
     {
       "file": "runtime/arcane/modules/QRCode.min.js",

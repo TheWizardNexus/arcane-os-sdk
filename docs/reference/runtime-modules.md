@@ -99,7 +99,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`OllamaSettings.js`](#ollamasettingsjs) | esm | Defines bounded runtime/service preference schemas and deterministic Arcane brain alias names. | Cross-host | Fully normalized settings/name contract. |
 | [`OpenMeteoWeatherProvider.js`](#openmeteoweatherproviderjs) | esm | Searches and loads Open-Meteo data into frozen Arcane weather entities. | Browser / native WebView / server with fetch + cloud | Provider data normalized to entities; transport errors mixed. |
 | [`PersistentAIChatSession.js`](#persistentaichatsessionjs) | esm | Adds explicit durable history/memory policy to bounded configured chat without changing DBOPFS or ChatEntity semantics. | Browser / native WebView with DBOPFS and configured chat | Live context commits atomically; persistence stays coherent across user/assistant/tool turns. |
-| [`PreferenceStore.js`](#preferencestorejs) | esm | Loads and updates schema-defined app preferences through native storage with a narrow browser fallback. | Browser/native hybrid | Values normalized; only exact unsupported capability falls back. |
+| [`PreferenceStore.js`](#preferencestorejs) | esm | Loads and updates schema-defined app preferences through native storage with a narrow browser fallback. | Browser/native hybrid | Values normalized before I/O; setAll uses one optional atomic adapter batch when advertised for one to 32 selected values, retains serial per-key compatibility above that Core limit, never retries a rejected dispatched batch serially, and only exact unsupported native capability changes future operations to the browser fallback. |
 | [`QRCode.min.js`](#qrcodeminjs) | classic-script | Vendored QRCode generator for DOM, canvas, SVG, and image output. | Browser vendor script | Vendor-native. |
 | [`Questionnaire.js`](#questionnairejs) | esm | Evaluates whether a one-time questionnaire prompt is due without performing the prompt. | Cross-host | Normalized fail-closed boolean. |
 | [`RecordLinkIndex.js`](#recordlinkindexjs) | esm | Parses record links and builds their normalized index. | Cross-host | Fully normalized. |
@@ -2243,7 +2243,19 @@ Loads and updates schema-defined app preferences through native storage with a n
 
 ### Public surface
 
-default `PreferenceStore`, re-exported `Preference`/schema; load/set/reset APIs and events.
+default `PreferenceStore`, re-exported `Preference`/schema; load/set/setAll/reset APIs and events.
+
+Adapters provide `get(key, context)`, `set(key, value, context)`, and
+`delete(key, context)`. An adapter may also provide
+`setMany(entries, context)`, where `entries` is one frozen plain object keyed by
+the store's namespaced storage keys. `setAll(values, {signal})` normalizes every
+selected schema value before storage work. For one to 32 selected values it calls
+an advertised `setMany()` once and publishes the existing per-key change events
+only after that batch succeeds. A dispatched batch rejection propagates without
+a serial retry, in-memory state change, or change event. Larger batches and
+adapters without `setMany()` retain ordered serial storage compatibility inside
+one queued operation, including state and events for each successful write before
+a later write fails.
 
 Exact exports: `PREFERENCE_STORE_ERROR_CODES`,
 `PREFERENCE_STORE_EVENT_TYPES`, `Preference`, `default`, and
@@ -2251,7 +2263,13 @@ Exact exports: `PREFERENCE_STORE_ERROR_CODES`,
 
 ### Availability and normalization
 
-**Browser/native hybrid.** Values normalized; only exact unsupported capability falls back. Transport: Arcane.preferences or app-scoped localStorage. [Deep protocol details](protocols.md).
+**Browser/native hybrid.** Values are normalized before I/O. Non-Android
+`Arcane.preferences.setMany()` supplies the optional atomic batch. Only exact
+unsupported native capability changes future operations to app-scoped
+localStorage; an in-flight advertised batch is never downgraded after rejection.
+If cancellation settles after a native batch was dispatched, reload the store to
+reconcile any atomic host commit that completed before cancellation. Transport:
+Arcane.preferences or app-scoped localStorage. [Deep protocol details](protocols.md).
 
 ### Example
 

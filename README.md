@@ -246,6 +246,7 @@ verification, and same-process run lifecycle as an external app repository.
 arcane new <id> [--path <directory>] [--display-name <name>] [--target <target>] [--git]
 arcane init [id] [--workspace <directory>] [--display-name <name>] [--target <target>]
 arcane doctor [--workspace <directory>] [--arcane-root <directory>]
+arcane import-map [--workspace <directory>] [--app <id>]
 arcane dev [--app <id>] [--host 127.0.0.1] [--port 8000]
 arcane test [--app <id>] [--scope app]
 arcane test --scope shared --test-file <repo-relative.test.mjs>

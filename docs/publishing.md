@@ -69,9 +69,10 @@ When `npm view arcane-os@dev version` reports the package unavailable, run
 `node ./bin/arcane.mjs new ...`, and install the resulting `.tgz` into the app
 with `npm install --save-dev --save-exact <path>`. Keep the tarball at the path
 recorded by `package-lock.json`; subsequent `npm ci` verifies its recorded npm
-integrity. Arcane separately requires the installed package to identify exactly
-as `arcane-os@0.1.0-dev.5` and verifies the locked runtime. A local directory
-`file:` install is intentionally unsupported because it may be linked.
+integrity. Arcane separately authenticates the installed package's exact name
+and version against the root dependency declaration and verifies the locked
+runtime. A local directory `file:` install is intentionally unsupported because
+it may be linked.
 
 The first-version bootstrap established these permanent audit boundaries:
 
@@ -113,11 +114,12 @@ exact registry release (or deliberately vendor the tarball) before remote CI.
 
 External app repositories can call `.github/workflows/release-app.yml` by an
 immutable SDK repository revision. The reusable workflow checks out the exact
-caller SHA, installs only the caller's committed dependency lock, requires
-`arcane-os@0.1.0-dev.5`, and checks, packages, bundles, independently verifies,
-and uploads one explicitly selected app. Every third-party action reference is
-pinned to a full commit SHA. The workflow never publishes npm, creates a GitHub
-Release, loops across apps, or changes Arcane admission state.
+caller SHA, installs only the caller's committed dependency lock, requires the
+exact public `arcane-os` authority encoded by that immutable workflow revision,
+and checks, packages, bundles, independently verifies, and uploads one explicitly
+selected app. Every third-party action reference is pinned to a full commit SHA.
+The workflow never publishes npm, creates a GitHub Release, loops across apps,
+or changes Arcane admission state.
 
 The build job holds only `contents: read`; its caller-owned checks, package
 scripts, and adapters never receive `id-token: write` or `attestations: write`.

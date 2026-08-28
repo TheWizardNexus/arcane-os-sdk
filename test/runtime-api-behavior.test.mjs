@@ -48,8 +48,188 @@ import {
     createSTTActivationController
 } from '../runtime/arcane/modules/ComponentContracts.js';
 import ConfiguredAIChatSession from '../runtime/arcane/modules/ConfiguredAIChatSession.js';
+import PreferenceStore from '../runtime/arcane/modules/PreferenceStore.js';
 
 const repositoryRoot=new URL('../',import.meta.url);
+
+test('preference setAll uses the admitted native atomic batch once',async()=>{
+    const previousArcane=globalThis.Arcane;
+    const previousArcaneAndroid=globalThis.arcaneAndroid;
+    const previousDocument=globalThis.document;
+    const batches=[];
+    let serialWrites=0;
+    const preferences={
+        async get(){return {found:false,value:null};},
+        async set(){serialWrites+=1;},
+        async delete(){},
+        async setMany(entries,context){
+            assert.equal(this,preferences);
+            batches.push({entries,context});
+            return {keys:Object.keys(entries),count:Object.keys(entries).length};
+        }
+    };
+    let store=null;
+    const controller=new AbortController();
+    try{
+        globalThis.Arcane={preferences};
+        delete globalThis.arcaneAndroid;
+        globalThis.document={
+            querySelector(selector){
+                return selector==='meta[name="arcane-app-id"]'
+                    ?{getAttribute(){return 'spellwire';}}
+                    :null;
+            },
+            documentElement:{dataset:{}}
+        };
+        store=new PreferenceStore({
+            namespace:'spellwire',
+            schema:[
+                {key:'enabled',type:'boolean',defaultValue:false},
+                {key:'volume',type:'number',defaultValue:0,minimum:0,maximum:1}
+            ]
+        });
+        const changed=[];
+        store.addEventListener('preference-change',event=>{
+            changed.push(event.detail);
+            if(changed.length===1) controller.abort('atomic-batch-committed');
+        });
+        const result=await store.setAll(
+            {enabled:'true',volume:5,unknown:'ignored'},
+            {signal:controller.signal}
+        );
+        assert.equal(serialWrites,0);
+        assert.equal(batches.length,1);
+        assert.deepEqual(
+            batches[0].entries,
+            {'spellwire.enabled':true,'spellwire.volume':1}
+        );
+        assert.equal(Object.isFrozen(batches[0].entries),true);
+        assert.equal(Object.isFrozen(batches[0].context),true);
+        assert.equal(batches[0].context.signal,controller.signal);
+        assert.equal(controller.signal.aborted,true);
+        assert.deepEqual(result,{enabled:true,volume:1});
+        assert.deepEqual(changed.map(detail=>detail.key),['enabled','volume']);
+        assert.equal(changed.every(detail=>Object.isFrozen(detail.values)),true);
+        assert.equal(changed.every(detail=>{
+            return detail.values.enabled===true&&detail.values.volume===1;
+        }),true);
+    }finally{
+        store?.dispose();
+        if(previousArcane===undefined) delete globalThis.Arcane;
+        else globalThis.Arcane=previousArcane;
+        if(previousArcaneAndroid===undefined) delete globalThis.arcaneAndroid;
+        else globalThis.arcaneAndroid=previousArcaneAndroid;
+        if(previousDocument===undefined) delete globalThis.document;
+        else globalThis.document=previousDocument;
+    }
+});
+
+test('preference setAll fails closed after an advertised batch rejects',async()=>{
+    const failure=new Error('Atomic preference batch rejected.');
+    let batchCalls=0;
+    let serialWrites=0;
+    let changeEvents=0;
+    const store=new PreferenceStore({
+        namespace:'batch-failure',
+        schema:[
+            {key:'enabled',type:'boolean',defaultValue:false},
+            {key:'label',type:'text',defaultValue:'original'}
+        ],
+        adapter:{
+            async get(){return {found:false,value:null};},
+            async set(){serialWrites+=1;},
+            async delete(){},
+            async setMany(){batchCalls+=1;throw failure;}
+        }
+    });
+    store.addEventListener('preference-change',()=>{changeEvents+=1;});
+    try{
+        await assert.rejects(
+            store.setAll({enabled:true,label:'replacement'}),
+            error=>error===failure
+        );
+        assert.equal(batchCalls,1);
+        assert.equal(serialWrites,0);
+        assert.equal(changeEvents,0);
+        assert.deepEqual(store.values,{enabled:false,label:'original'});
+    }finally{
+        store.dispose();
+    }
+});
+
+test('preference setAll preserves successful serial writes before a later failure',async()=>{
+    const writes=[];
+    const changes=[];
+    const failure=new Error('Second serial preference write rejected.');
+    const store=new PreferenceStore({
+        namespace:'serial',
+        schema:[
+            {key:'enabled',type:'boolean',defaultValue:false},
+            {key:'label',type:'text',defaultValue:''}
+        ],
+        adapter:{
+            async get(){return {found:false,value:null};},
+            async set(key,value,context){
+                writes.push({key,value,context});
+                if(writes.length===2) throw failure;
+            },
+            async delete(){}
+        }
+    });
+    store.addEventListener('preference-change',event=>changes.push(event.detail.key));
+    try{
+        await assert.rejects(
+            store.setAll({enabled:true,label:'ready'}),
+            error=>error===failure
+        );
+        assert.deepEqual(
+            writes.map(({key,value})=>({key,value})),
+            [
+                {key:'serial.enabled',value:true},
+                {key:'serial.label',value:'ready'}
+            ]
+        );
+        assert.equal(writes[0].context,writes[1].context);
+        assert.match(writes[0].context.operationId,/:set-all:/u);
+        assert.deepEqual(store.values,{enabled:true,label:''});
+        assert.deepEqual(changes,['enabled']);
+    }finally{
+        store.dispose();
+    }
+});
+
+test('preference setAll keeps batches above the Core limit on the serial route',async()=>{
+    const schema=Array.from({length:33},(_,index)=>({
+        key:`entry-${index+1}`,
+        type:'number',
+        defaultValue:0
+    }));
+    const values=Object.fromEntries(schema.map((definition,index)=>[
+        definition.key,
+        index+1
+    ]));
+    let batchCalls=0;
+    const writes=[];
+    const store=new PreferenceStore({
+        namespace:'bounded-batch',
+        schema,
+        adapter:{
+            async get(){return {found:false,value:null};},
+            async set(key,value){writes.push({key,value});},
+            async delete(){},
+            async setMany(){batchCalls+=1;}
+        }
+    });
+    try{
+        assert.deepEqual(await store.setAll(values),values);
+        assert.equal(batchCalls,0);
+        assert.equal(writes.length,33);
+        assert.deepEqual(writes[0],{key:'bounded-batch.entry-1',value:1});
+        assert.deepEqual(writes.at(-1),{key:'bounded-batch.entry-33',value:33});
+    }finally{
+        store.dispose();
+    }
+});
 
 test(
     'local readiness availability is fail-closed and grants no provider readiness',
