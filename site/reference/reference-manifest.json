@@ -3,7 +3,7 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.3.0",
+    "sdk": "0.3.1",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
@@ -64,7 +64,7 @@
       "output": "site/reference/ai/index.html",
       "route": "reference/ai/",
       "sourceSha256": "af610ab77829a990de2116d4ad71516bed3903cb818c2c6ea242bd46c741f2aa",
-      "outputSha256": "8b7ee5747a86118162b3bd4371dfbe5ecc0adc0612191b917ccd19359b8db032",
+      "outputSha256": "ce0207dc1c810ceb884a7c5174caf8b645e120e6371db0006c748cc9fd22b517",
       "kind": "generated"
     },
     {
@@ -72,7 +72,7 @@
       "output": "site/reference/ai/browser-speech/index.html",
       "route": "reference/ai/browser-speech/",
       "sourceSha256": "e0a14690ae090ee2b121e913f3b4175e9c1aa6fe9323072e0444e947d80d4ba3",
-      "outputSha256": "4e1ff291207c29fa2d8ad5766fbc209887e5c70137b6fe25fb798287583cbbe6",
+      "outputSha256": "1f2840755ebe4b8c76867b5972b89361c6d42efcb1b5c59a5f5b7ef71af4d94c",
       "kind": "markdown",
       "behaviorEvidence": {
         "scope": [
@@ -99,7 +99,7 @@
       "output": "site/reference/ai/browser-wasm/index.html",
       "route": "reference/ai/browser-wasm/",
       "sourceSha256": "cad12989fd20177958767c3fa0d7950b2a5af82b154b4b41f75fd5fdf7c409e5",
-      "outputSha256": "f6fc5490796fc2b45cc558952ed4560c3acdc5cb58fef151963fb39030a418c1",
+      "outputSha256": "bb1d5364256cf6922274b52881cbe0654f1b786884f7ada7121012f3aba9e2e3",
       "kind": "markdown"
     },
     {
@@ -107,7 +107,7 @@
       "output": "site/reference/arcane-ollama/index.html",
       "route": "reference/arcane-ollama/",
       "sourceSha256": "bdd73f6ba8ea13e77a37b83c72fd0f10b1d8c4e3d7b6c480dd6011fbc6d9a390",
-      "outputSha256": "0680ff2e453eb202b86867f8441862fd1e4169999c12741f3f2c4b842c4eac92",
+      "outputSha256": "d75fb04c893b21720e4e046033f71ea7b38e009daf15b41247654e1a85066241",
       "kind": "markdown"
     },
     {
@@ -115,7 +115,7 @@
       "output": "site/reference/availability-and-normalization/index.html",
       "route": "reference/availability-and-normalization/",
       "sourceSha256": "0fd2c3e79e00113cddf2f8d3184cca58926706ab16073b6f0a67a0ed9799f193",
-      "outputSha256": "6b54e76216658af82392ed504fbb1cf4856c8c6b734dd91527974219bdce905c",
+      "outputSha256": "321e32e04c6b2ba9efe9a109d13633eaa4303c019c849603a44c66f3caad7131",
       "kind": "markdown"
     },
     {
@@ -123,7 +123,7 @@
       "output": "site/reference/behavioral-testing/index.html",
       "route": "reference/behavioral-testing/",
       "sourceSha256": "e20f9d7f5d4ff63058b34b4aafda119e00fabb27c6b27b0bfce64c9142f9aa64",
-      "outputSha256": "43b9811166a3f082cdc98413527e09548d669677e2dd3512c6407e8abe94fd00",
+      "outputSha256": "a61226c23d8ac71eb2a074a70ed28ab2591dd0198c117f94164eb871e51ddc5a",
       "kind": "markdown"
     },
     {
@@ -131,7 +131,7 @@
       "output": "site/reference/cli/index.html",
       "route": "reference/cli/",
       "sourceSha256": "dbb5b4744ceb5f6ede8632b819ae696639b5da767549ddef4c3daa88077ec3f2",
-      "outputSha256": "d0b332f6d4d4ecbc89df2b90d3ac930d93cd0682710c09d51d50a4c10805e188",
+      "outputSha256": "e09329c60b0d72d05cc9b60528e98c550a5937b783292320fbfe32ec0793b428",
       "kind": "markdown",
       "behaviorEvidence": {
         "scope": [
@@ -166,7 +166,7 @@
       "output": "site/reference/core/index.html",
       "route": "reference/core/",
       "sourceSha256": "3b3b94328d12cb36e78b10928a23ffc254e52117866903e154ac3e38401b7322",
-      "outputSha256": "23a24f97d6069f6245b5a987e51efb9ac2510f24d1c6a20851401c39faabdecc",
+      "outputSha256": "e2a11b149163586209a959e17d559c4725830a36fd694a838a4dd3a130f04501",
       "kind": "markdown"
     },
     {
@@ -174,7 +174,7 @@
       "output": "site/reference/core/arcane-ai-contracts/index.html",
       "route": "reference/core/arcane-ai-contracts/",
       "sourceSha256": "6139d09a16b163fac1a60ab12e7fb10f3eac935546275d0f9c72ced412ca3ab3",
-      "outputSha256": "008655939d7ed86039f49c0b9dca24a58767660533a13070b3554c7619fb73d4",
+      "outputSha256": "99db04e5c1226b7139b3556b65dfc85bda2fdbca7f5a428c1ebcb996ed15901a",
       "kind": "markdown"
     },
     {
@@ -182,7 +182,7 @@
       "output": "site/reference/core/arcane-api/index.html",
       "route": "reference/core/arcane-api/",
       "sourceSha256": "3e1c5bfdf4b033758713614e54a40465f8766a8821a250e7353182603cc461c5",
-      "outputSha256": "242f97fc3bd51c62d64ef207837d7e5504c7ceb45cf4002911a16ffb355192f8",
+      "outputSha256": "ab326c6d47170ba749ec5fece0c4366fcbf4dafa1157231c2c641d4f664ebea7",
       "kind": "markdown"
     },
     {
@@ -190,7 +190,7 @@
       "output": "site/reference/core/arcane-entities/index.html",
       "route": "reference/core/arcane-entities/",
       "sourceSha256": "815e9b122c501ee44d47ad49b568b10963ed6aec989b946a53ea340397cd0e3a",
-      "outputSha256": "f5c213bdd5ac686d600fda3c7fdfdbe81c07c3863a18c25f6b1f7e4de8c2b036",
+      "outputSha256": "3a23959b8b28675b188e4033a8fb40fe366e2ab24ed5117c48b93ee95201e0ca",
       "kind": "markdown"
     },
     {
@@ -198,7 +198,7 @@
       "output": "site/reference/core/arcane-events/index.html",
       "route": "reference/core/arcane-events/",
       "sourceSha256": "a3dc4d04eea5b1b572d8d48bc88ed8fdf6aa85c25c6d417c373fc21ddb566c68",
-      "outputSha256": "2a4cc2aa6b1cbb767a785065045cc3aba0eae2cce37efd303d6f150f89e92c73",
+      "outputSha256": "a82affc98c2ef62a2b335c37d88d429b9f13e93f59423b776712ca97281f6860",
       "kind": "markdown"
     },
     {
@@ -206,7 +206,7 @@
       "output": "site/reference/core/capabilities/index.html",
       "route": "reference/core/capabilities/",
       "sourceSha256": "56009d523e85f1ec3f42b6b57c56b544a42290f060914327970096fc3d1be1db",
-      "outputSha256": "7329b29d1b0e2bf41ee42b025906fb233c3304bc569447724ce5ad27e1fe72db",
+      "outputSha256": "1cb47ec466d0152bfe331a9cda64143d55803a4da3dba6f0bb5c6f9a6371e898",
       "kind": "generated"
     },
     {
@@ -214,7 +214,7 @@
       "output": "site/reference/core/ollama-module/index.html",
       "route": "reference/core/ollama-module/",
       "sourceSha256": "b43fc03cba88210437868a8d377e71ef3b224262bbc6a00fd695beb6dd71a0ad",
-      "outputSha256": "3efb6ec779520e08f1543fa07dbb64ea8a8ae8437962def14147b0e4c1ca6f07",
+      "outputSha256": "b5e34bc88fae9806d727a19a0ba14c489e4d0502edde29a5e43536145ac56b18",
       "kind": "markdown"
     },
     {
@@ -222,7 +222,7 @@
       "output": "site/reference/core/reference/arcane-api/index.html",
       "route": "reference/core/reference/arcane-api/",
       "sourceSha256": "f4223aa8e51656047010de37dfa6d882a0bb04679ac1513f2f65568cd3030a55",
-      "outputSha256": "97aae519d07967d3a1423db05ea3328b6d77bd6e8bb8838687d74dc072a5f729",
+      "outputSha256": "e680356a8153fc7a0e197afec505bcbbf0b61ceaa132ca086f268a204a8c3c6e",
       "kind": "collection"
     },
     {
@@ -230,7 +230,7 @@
       "output": "site/reference/core/reference/arcane-api/ai-and-ollama/index.html",
       "route": "reference/core/reference/arcane-api/ai-and-ollama/",
       "sourceSha256": "77ff9c7b278ffc7940895049cf46c33845238d62bffed7a743becf4a2c2e011d",
-      "outputSha256": "5492819fb303625ffd6668cc5c471c240fae90f6b142a79e5a87f928c8277f81",
+      "outputSha256": "5112fa1f1ecaec072b406ae987c817f2b37726d381c853b83077e49cb29d6485",
       "kind": "markdown"
     },
     {
@@ -238,7 +238,7 @@
       "output": "site/reference/core/reference/arcane-api/applications-terminal-capabilities/index.html",
       "route": "reference/core/reference/arcane-api/applications-terminal-capabilities/",
       "sourceSha256": "dae32bbbd3be2a98c680f919a0d299af9494fa86c3e87e77f4f2a04fbc284188",
-      "outputSha256": "e3f27004fe648437bbb183381c11c7ff1bbeecf8e5f11de723f949f640a2eb8e",
+      "outputSha256": "59dec904f80caaf57183f819785bb9bc9c3e5c78af1b7a80d92aba405ea3b31b",
       "kind": "markdown"
     },
     {
@@ -246,7 +246,7 @@
       "output": "site/reference/core/reference/arcane-api/core-and-events/index.html",
       "route": "reference/core/reference/arcane-api/core-and-events/",
       "sourceSha256": "b0b73d0c3a0fdb7a0326129f1898961525b72c6627e81d6720d20a7555060063",
-      "outputSha256": "788e8ed05535554e8d95ae5258cec52cb6c85d0e07d6780c75bbf7bf7553db63",
+      "outputSha256": "52adafd5c028e38cc118a09e491aa337a1618a1d42d0ed7fdf086298f8443ffa",
       "kind": "markdown"
     },
     {
@@ -254,7 +254,7 @@
       "output": "site/reference/core/reference/arcane-api/filesystem-storage-preferences-appearance/index.html",
       "route": "reference/core/reference/arcane-api/filesystem-storage-preferences-appearance/",
       "sourceSha256": "57c4f2baeb953507924a7785869b1289af171acaa326c635d9e912b28d856275",
-      "outputSha256": "ff3ddb019323fb2f3edda5f2386bb503be5164182ff94baa8a32656c99e127f5",
+      "outputSha256": "b96d9fe132df20149fa0b963d79bb34b32756ef6a52f4fda38bbf8877b16b3da",
       "kind": "markdown"
     },
     {
@@ -262,7 +262,7 @@
       "output": "site/reference/core/reference/arcane-api/namespaces/index.html",
       "route": "reference/core/reference/arcane-api/namespaces/",
       "sourceSha256": "1bb882f5957ec16f1a64b0bb3f3e47ea6f951301147d05d3ff05aca622b307fa",
-      "outputSha256": "af31d3523be430234d540207c4f468a181c7efad909f2d6656c7b3931763fbaa",
+      "outputSha256": "6d2c7166ef28ca0566297d36f470f65c39afbf9423715da57dc27ea09ace037d",
       "kind": "markdown"
     },
     {
@@ -270,7 +270,7 @@
       "output": "site/reference/core/reference/arcane-api/platform-installation-users-system/index.html",
       "route": "reference/core/reference/arcane-api/platform-installation-users-system/",
       "sourceSha256": "495aaa76aed1f98ce6ed182adbe0ff3b9e79ddf285fad37ca24ba7df82e61b7b",
-      "outputSha256": "d9e2c0ecd8ec58c06253076319f53942064f15304982baf6495d7a202a0abee3",
+      "outputSha256": "72be9f65d22efd9d9e70fbb68e8dff82aab0cc67ac0a3bc39df89382bfa557fc",
       "kind": "markdown"
     },
     {
@@ -278,7 +278,7 @@
       "output": "site/reference/core/reference/arcane-api/session-provisioning-diagnostics-development/index.html",
       "route": "reference/core/reference/arcane-api/session-provisioning-diagnostics-development/",
       "sourceSha256": "b34552f86504f7ce7aa1618065209a004ecb236e4de7eba0290af32be7511901",
-      "outputSha256": "765c07fcbcc7825b10f48cd3e511a16eedb6a1677c6c2d0eec20e79ceb0b29f7",
+      "outputSha256": "f9967c3338d411fad02800932c2d79b25642c7c97359d9550bd493965b281067",
       "kind": "markdown"
     },
     {
@@ -286,7 +286,7 @@
       "output": "site/reference/event-manager/index.html",
       "route": "reference/event-manager/",
       "sourceSha256": "bdbe1cadd08145d781620272947cf8953c207c0b43a76451bc67e8344b6121b1",
-      "outputSha256": "855491b61ea7ad61db84f49de726175601722db9730c2d1507bc7c13358b1dfb",
+      "outputSha256": "687b8bb341db44432bc035c70bd8fa6e36c33c5ef657baf91297016cf52e8380",
       "kind": "markdown"
     },
     {
@@ -294,7 +294,7 @@
       "output": "site/reference/inventory/index.html",
       "route": "reference/inventory/",
       "sourceSha256": "556c9fcd23388584d20a676143beb957d3804c8f5de4d5092349d7baa66e804b",
-      "outputSha256": "758b6416b6846bd75381fb0b5640779f379dd453830c70957b1eb6b41ab03ae7",
+      "outputSha256": "ae0ce26071f1cbe4f3515da4886cbbfaaf5786cb62a2586d3d6857b5ba5eea25",
       "kind": "collection"
     },
     {
@@ -302,15 +302,15 @@
       "output": "site/reference/mail/index.html",
       "route": "reference/mail/",
       "sourceSha256": "c1b392e18d7a18d454266742596cee5505334b75ed0ae978e7a51d08ea1466f7",
-      "outputSha256": "245673d548a1a959201ed510fae81099ec301101121c1c1ac48ff10394271b71",
+      "outputSha256": "abb34750b5e62acde8529a8e547da892156ccf59ed9dfb5057993bf44f5ce4d5",
       "kind": "markdown"
     },
     {
       "source": "docs/reference/README.md",
       "output": "site/reference/overview/index.html",
       "route": "reference/overview/",
-      "sourceSha256": "560bfdade27fbad066a5e5cb140ec46576517729397dce437e80feb9efb80d89",
-      "outputSha256": "5a03a34a83e06fde49a0ed365f2b70e9f9ae62e1168d6a9b6a14555c61fe147a",
+      "sourceSha256": "85d9d3d72ef7a741f961b74a9b14428f422f163f9dd5de2a42db3c3b3e09b2ab",
+      "outputSha256": "036f3039d49fa22934e8b3c8e639c0b001eaac2bc1cefe8ff8d7d139450fdc47",
       "kind": "markdown"
     },
     {
@@ -318,7 +318,7 @@
       "output": "site/reference/protocols/index.html",
       "route": "reference/protocols/",
       "sourceSha256": "8a8a8d58d6c839537a2d3f1c1684e431188114a8155aa5053923fc8059d7673a",
-      "outputSha256": "31d6a107ecdd77c88b49da8071e92ad43371fccfbf7bcced75a995b4539f525f",
+      "outputSha256": "ed715f4b12921116c9352eb103f1a8684b558df13a05037ae6f3b24cd58c7831",
       "kind": "markdown"
     },
     {
@@ -326,7 +326,7 @@
       "output": "site/reference/runtime-components/index.html",
       "route": "reference/runtime-components/",
       "sourceSha256": "effb0529fc1b97c53ce69b3e4e0f1ebaea6f35dd85d850500bf14e7ff34108b1",
-      "outputSha256": "987f2a0ffd938b578ef799b81c161b5b1a5c75ba8a35b33a5a42737af7511922",
+      "outputSha256": "bdce46246945bd183bc7e9b9fa455126a4bf911a89ad739d2274543d5caede80",
       "kind": "markdown",
       "behaviorEvidence": {
         "scope": [
@@ -358,7 +358,7 @@
       "output": "site/reference/runtime-entities/index.html",
       "route": "reference/runtime-entities/",
       "sourceSha256": "59c2d3299f9e3e06313fed29d712742395527bd4ecd3c35345098fbbf1d4c34d",
-      "outputSha256": "57eface06453e385b2f997a0edc6ec9cd71aceed50d1c5e436b375ea575e051c",
+      "outputSha256": "088759072f256ebcf9592c4f7da4214ae856050e55e53248ae6efb1a90435953",
       "kind": "markdown"
     },
     {
@@ -366,7 +366,7 @@
       "output": "site/reference/runtime-modules/index.html",
       "route": "reference/runtime-modules/",
       "sourceSha256": "43ff7c9b424664d3544cfd6f8a6448473d2146fb212ff6a3f9eab9a5af44234c",
-      "outputSha256": "a5ada6827eca1e17ae125feedbfe331ef70e8bba7009bda727c5eeb276565db0",
+      "outputSha256": "455e68444e9d230734dba42e652a4293456ca59adb29fc3de494a69b882a770c",
       "kind": "markdown"
     },
     {
@@ -374,7 +374,7 @@
       "output": "site/reference/runtime-modules/ai-preference-runtime/index.html",
       "route": "reference/runtime-modules/ai-preference-runtime/",
       "sourceSha256": "d5a2428067a86319f3e90dbe00d0f885156b3d7ea062379d3513760096ca6a32",
-      "outputSha256": "1a8ef94ae3bf0af8906ddcb40ef126e5b7f72b2354e60f7266473decf93da6c5",
+      "outputSha256": "0d1d29bcebcbc87f6689ec784bbfa25154281013910a7c9037f01f6206201792",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -391,7 +391,7 @@
       "output": "site/reference/runtime-modules/ai-preference-tuple/index.html",
       "route": "reference/runtime-modules/ai-preference-tuple/",
       "sourceSha256": "7fd028fd9e7f3eb309a6a2b7612a5fc67d4c7289adc4168d681224579220ac09",
-      "outputSha256": "77f16fb0a7404c51634a37087c34ea1a96312667766c40c3d4bb93c7d27b45d8",
+      "outputSha256": "784bc3ca6d21d4aecd15d6adf50cfb33d242651bac6e709c06d2c30a3e0ee5e3",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -408,7 +408,7 @@
       "output": "site/reference/runtime-modules/ai-provider-runtime/index.html",
       "route": "reference/runtime-modules/ai-provider-runtime/",
       "sourceSha256": "65234004cc7ed64060475d5f6076712f926ae3786f8b57cc5321d6e0d5cd97c8",
-      "outputSha256": "d499c0dcee9924e2296158f1d6dd76405d5ab90464589e304d67d9afedfb8d20",
+      "outputSha256": "f7c46c7255ee5aebc7dd4db48037b8fbe4d7ec641de95ce73579a898a09335e4",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -425,7 +425,7 @@
       "output": "site/reference/runtime-modules/ai-response-length/index.html",
       "route": "reference/runtime-modules/ai-response-length/",
       "sourceSha256": "fc295940a7cdeb959eba2fe465de88abee8832330551b6776ee0d0f743c0df6f",
-      "outputSha256": "b457c237a866117a57411dd244412338a40aec40fa82c548e3d658e981332858",
+      "outputSha256": "7c6acffe1219c58051071decec584d144706cd893e1efcec9edf88beff85bdc3",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -442,7 +442,7 @@
       "output": "site/reference/runtime-modules/ai-response-url-policy/index.html",
       "route": "reference/runtime-modules/ai-response-url-policy/",
       "sourceSha256": "905af15d5d4912a68fa96ea44b0f6ac2eef90c69c6486ce507e00a7850acd626",
-      "outputSha256": "4245212e9be145c9e8295028221c5577ff732ac85681c32ad92d510425899dd0",
+      "outputSha256": "8bed7136d88dac8a65bb2823fb1778eed43404ec4c84e64d3ac7914a4c142298",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -459,7 +459,7 @@
       "output": "site/reference/runtime-modules/ai-runtime-state/index.html",
       "route": "reference/runtime-modules/ai-runtime-state/",
       "sourceSha256": "6f16f56724399db365b7078341c72ced0e926ce16177557b8b763fd02a9318ff",
-      "outputSha256": "325fc59b97531995d57515f766a1aa80edd6da81006c570f2ce5ddb7128c8c50",
+      "outputSha256": "119c4304b2c10823202ff0c7aae9cbf4f0d3e3d695a03d623b95a742209912f8",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -476,7 +476,7 @@
       "output": "site/reference/runtime-modules/ai/index.html",
       "route": "reference/runtime-modules/ai/",
       "sourceSha256": "2224391b2b22e93cb8be321382fcecd25cb5a2e8d09211dd6ce88b901df9c9ab",
-      "outputSha256": "767ce97b4a6483d947e852eb8acdeccde92df389baee2752cc3cfa9303c498bb",
+      "outputSha256": "639521eb1d7c7a3b36b143f8a02712ce08074512df4a9dc3ed0cdff7b9ab12be",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -508,7 +508,7 @@
       "output": "site/reference/runtime-modules/ansi-text/index.html",
       "route": "reference/runtime-modules/ansi-text/",
       "sourceSha256": "6df757951352eea5261feb8723678caea6481a013abc91a7811e748361819070",
-      "outputSha256": "ea0cadb08448beec953c1e30a65c1bc8634a74ae16c05a5f8a9a39630bc249cd",
+      "outputSha256": "51c2ffbfd97f9daf8580b161dd348b0098c68454a9c310ccfb20158693ed38b6",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -540,7 +540,7 @@
       "output": "site/reference/runtime-modules/api-model-database/index.html",
       "route": "reference/runtime-modules/api-model-database/",
       "sourceSha256": "7544af3e7503e23d71954a4a36c95372c83a00df594d897bfba22539be85a28c",
-      "outputSha256": "68cb3ca5812f698bf2b7b9dfac322c73714e57d3f71a0f2efd1f760ca56c007b",
+      "outputSha256": "d12f4d7923b0ef6134f16d5c6983123c03e6df2788601fe332ff7502478ac905",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -557,7 +557,7 @@
       "output": "site/reference/runtime-modules/app-data-scope/index.html",
       "route": "reference/runtime-modules/app-data-scope/",
       "sourceSha256": "4ac7be2fc8c7e0e3dfae4d748ed6dfd7a9169464b3ffb91e12c65d6d69574a06",
-      "outputSha256": "ddc6225d6b7630ba981c6c6c933457763edf750c4fa38f4e8f371c207bdd3f25",
+      "outputSha256": "0e2880a7ccb2bdbb8535947546e18be6ca01a0fdcf905734da0c9737a61cfbb8",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -589,7 +589,7 @@
       "output": "site/reference/runtime-modules/appearance-preferences/index.html",
       "route": "reference/runtime-modules/appearance-preferences/",
       "sourceSha256": "0badfd8ee000658a05d4c18d2f676cf2a7b420aff1a1ce6ee91cf38a0a3201a3",
-      "outputSha256": "b71945dcfe7ed327949cf6027c961dbabf16f971da460657db7939bbc4f4c4b9",
+      "outputSha256": "4f31fd8168438715818124bb67cedcf702b9b39605501980b7ea3dbde0ea1d43",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -606,7 +606,7 @@
       "output": "site/reference/runtime-modules/arcane-communication-bridge/index.html",
       "route": "reference/runtime-modules/arcane-communication-bridge/",
       "sourceSha256": "19ae03e874bd36193fe3f232118e11ddef6b7076264117c927d91179c29ede98",
-      "outputSha256": "bab9efef1e68d2823edbed4dc2d0093b0cacb0bfef62be57591d97a07449de02",
+      "outputSha256": "c6fd556dc2dcc03e501e8ebd02f52371ca498fd0831e40b25d15bd7f5835f5ab",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -623,7 +623,7 @@
       "output": "site/reference/runtime-modules/arcane-navigation-policy/index.html",
       "route": "reference/runtime-modules/arcane-navigation-policy/",
       "sourceSha256": "11d2be4420644bc6bd701d3637376ab5de5a0c410a840e60d877d1fc995acb3b",
-      "outputSha256": "f3573c460ae2f770378a9fe1b21e05e0239f02691f191f15496d7d54976b49b0",
+      "outputSha256": "78d1a597255e23867a98ef7741aa06f0913d10757ab2a7d61abf2e6b74bae4c1",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -640,7 +640,7 @@
       "output": "site/reference/runtime-modules/arcane-network-policy/index.html",
       "route": "reference/runtime-modules/arcane-network-policy/",
       "sourceSha256": "3cd27dddf26d70b745af6a4b6d1406b6d2b4387b6c396e3976d837c19ee44085",
-      "outputSha256": "52f7f81d899511c83c15a6a399b7e631c16d5e7910bdf62525911c78a4921ae4",
+      "outputSha256": "7074c0b7a5cb3dd4acacb0780e55b40a0c5330c96686a68869b1aa8a07947f7c",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -657,7 +657,7 @@
       "output": "site/reference/runtime-modules/async-boundary/index.html",
       "route": "reference/runtime-modules/async-boundary/",
       "sourceSha256": "80688df370a8e1b3c4f0540fd5a594dbc66b15021c3b6556ce5b91a921d03358",
-      "outputSha256": "a722d2b2afa72dc78196fea5c1e3e7035c6a7bbc281f3801004d3a63886c36d8",
+      "outputSha256": "90aafb0427fcacea85daa916acf851f8bd460d173ec6d7e949f1f50fe60413e3",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -674,7 +674,7 @@
       "output": "site/reference/runtime-modules/browser-test-suite/index.html",
       "route": "reference/runtime-modules/browser-test-suite/",
       "sourceSha256": "439f43268288b714dc2032468a5e3563f7d1175945afcea23a02c02ede54e365",
-      "outputSha256": "5e0e4f15e6068fb4dc94446a77f27c600b81ebea4939030599211e1ff3bc3e03",
+      "outputSha256": "76a239a5baa77ee68760e28afe0171ad7fcd9164b3b8140f0e514a5bebb4dc7f",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -691,7 +691,7 @@
       "output": "site/reference/runtime-modules/calculator-engine/index.html",
       "route": "reference/runtime-modules/calculator-engine/",
       "sourceSha256": "90f98f53c11e551f9b4623f0887b3fe51e3cc221c8f93ffbca8a9b619949c446",
-      "outputSha256": "7a7e54e55298e835e9687e1ac13a0370a28cc045c93c8cccedcb3df88c0b85a1",
+      "outputSha256": "fb7c0c9abed2a5984b3d0c81cad6c7fad1b6f2f4120af5f1e888ad6ac7329492",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -723,7 +723,7 @@
       "output": "site/reference/runtime-modules/case-evidence-indexer/index.html",
       "route": "reference/runtime-modules/case-evidence-indexer/",
       "sourceSha256": "649afbd5690d2e6e3080213607fb737a759e24168ff07804a26bc9792d528cd6",
-      "outputSha256": "7110931d18f2d06464bb72154c17e53dc58ca1e35c1238440ad105650e972116",
+      "outputSha256": "0f10dd3964c368338053101983217cf1614799d86f7247b6ee12e2a15e6d9d7d",
       "kind": "runtime-module",
       "moduleClassification": "host-internal",
       "contractCounts": {
@@ -740,7 +740,7 @@
       "output": "site/reference/runtime-modules/chart-library/index.html",
       "route": "reference/runtime-modules/chart-library/",
       "sourceSha256": "b64019006a8045362759268a311fe165cdcad5276ea8b2e67fa8c059b5d5c783",
-      "outputSha256": "2b67e90f0fbaa28f431a6654ba69931388ea3e80f741c40f4a6acb82f9378355",
+      "outputSha256": "2122a3cf627704499d20aa35aa446f31ea75184366e9b1be630d011cbf68bce9",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -757,7 +757,7 @@
       "output": "site/reference/runtime-modules/chat-records/index.html",
       "route": "reference/runtime-modules/chat-records/",
       "sourceSha256": "48ee413d23a4dd44634e6bc2bd75dcb5f0ca05a848aaf4fd3f27b1ed611ff2ff",
-      "outputSha256": "5e8bc5a1e22d89e66aa7cbda8d5f211919cd7cc4397c2dcf2ff552ebd2189cb5",
+      "outputSha256": "5bb1fbeede61298a4267d1b8e23bfc0b88130b8b2fa4239b2f26582a5bc627cf",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -774,7 +774,7 @@
       "output": "site/reference/runtime-modules/communication-app-controller/index.html",
       "route": "reference/runtime-modules/communication-app-controller/",
       "sourceSha256": "8b9d77c9589d28b2da55a93e2ee7e4d7dd37285992bc3b93888825d84d8cf540",
-      "outputSha256": "26954d1d3019495891f918701c043ea5f53c44c0980c31b3da1a974634e73206",
+      "outputSha256": "6961e9231f10a291b2ec3278571f90c2dee29e0531b130a578cbbe53b01dde65",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -791,7 +791,7 @@
       "output": "site/reference/runtime-modules/communication-hub/index.html",
       "route": "reference/runtime-modules/communication-hub/",
       "sourceSha256": "f0bc2de132bd2471d189e81ae56c548cbe5bd288150514f7e33e5c940473b66b",
-      "outputSha256": "76cf80018c8a404209e1c023f84edd920dd37625007692f0d2b34c92a6498e52",
+      "outputSha256": "21b5ed55ecc3a6ecfa48d59666194c32c82a6a9fd09fa02685ec94e33054ccef",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -808,7 +808,7 @@
       "output": "site/reference/runtime-modules/communication-preferences/index.html",
       "route": "reference/runtime-modules/communication-preferences/",
       "sourceSha256": "2c095d5d71e8ccb096b896a687de46269c0021f3dc089417cc5acd4cdd0fbcbe",
-      "outputSha256": "a86abcb77a2cb1a5b50ce68ff4e5f59b840f3fd77d966f7fd1dd99a9e8794147",
+      "outputSha256": "50c0c3ee52afa924fa659a9c0e821abaa1f3830da6d91665efc38907cde5d746",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -825,7 +825,7 @@
       "output": "site/reference/runtime-modules/communication-provider-registry/index.html",
       "route": "reference/runtime-modules/communication-provider-registry/",
       "sourceSha256": "9782dc1385744603149f4e97b879899b91a7bba3b748c7a4771df17400615d43",
-      "outputSha256": "5b8700be3d2ff2363bcad6395ae478769ad80622a6fd6844dd47e42dd27a731b",
+      "outputSha256": "6c3aa08b03310c2463c924a74d012aaa31d646f86aaa40f818e4ae213e85733b",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -842,7 +842,7 @@
       "output": "site/reference/runtime-modules/component-contracts/index.html",
       "route": "reference/runtime-modules/component-contracts/",
       "sourceSha256": "21bb0578d7f81c937fde04120c0040961d914a0dd34e381df829841dc98c3ef2",
-      "outputSha256": "9d74a6e3b72a7e48d250490fdff1d6aea1b8eeeaf6631cb820fe277aac574cf6",
+      "outputSha256": "57371130c071e48911adbf3e10ed04785fae37875787ee40a58e23ebee664a28",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -859,7 +859,7 @@
       "output": "site/reference/runtime-modules/configured-ai-chat-session/index.html",
       "route": "reference/runtime-modules/configured-ai-chat-session/",
       "sourceSha256": "f95c3421bf07397e987f77fc3d02166cf780059dd3d6de90ceaded990752f51b",
-      "outputSha256": "b9fa469819d5bb5710d430c26133a51d67b89b2555f0aae46689ec958d9aaac3",
+      "outputSha256": "758a298f150f251fcd724b4397c89dc1a9bcbbb21fe44567c19d9fd93f1798af",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -891,7 +891,7 @@
       "output": "site/reference/runtime-modules/conversation-action-items/index.html",
       "route": "reference/runtime-modules/conversation-action-items/",
       "sourceSha256": "2929adf4d8580a27d548e6a29e11484aaa6908e6c33b4edd60a7fca86127c6b9",
-      "outputSha256": "84bad3ec15c1eefcd64d891ddf4cc9bf1084bdef60dd3b478f9cc8245bcf8cfa",
+      "outputSha256": "770c8d030498a96958618ebc72a02ff958f7cd1a4a286acaac5e8bbc2f6f60c5",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -908,7 +908,7 @@
       "output": "site/reference/runtime-modules/conversation-closing-report/index.html",
       "route": "reference/runtime-modules/conversation-closing-report/",
       "sourceSha256": "11e76f1fcf46c0166420188a8dc8140edb9540c30190324e1fa4c6936036ebb6",
-      "outputSha256": "11527fcb559cc712a2c011106b0d86d6c921e9e3cf9c7c00a730ae398141cee8",
+      "outputSha256": "279b85ded7dde83da08a31c93b5e9d733b490f914f88a244187fb49d4f07e8c2",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -925,7 +925,7 @@
       "output": "site/reference/runtime-modules/conversation-timebox/index.html",
       "route": "reference/runtime-modules/conversation-timebox/",
       "sourceSha256": "ae73be462a5264114c38cb3b325709cbfc25f1e6da39d651a8f8a8c26fb4e5fe",
-      "outputSha256": "e45572b86838eab1d0644f494dc7144dcfb6c88a985e5830c4250f52e12d68c9",
+      "outputSha256": "d4e759b32841f7eafc4d9d86d4e7d657462d455775bc4a73c84574dfdd602cc4",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -942,7 +942,7 @@
       "output": "site/reference/runtime-modules/core-local-model-catalog/index.html",
       "route": "reference/runtime-modules/core-local-model-catalog/",
       "sourceSha256": "c9aaf806f7f1defaeb145c20602a30018bde0e15209ec70e0eb7c82184e9a7c4",
-      "outputSha256": "924949dc1127f28f55f97e0716a166f39f2dab9099c2dc13c692aa314aae4c34",
+      "outputSha256": "72c08e24e1fda4cfe35f9481993502603f56a02e57b78ecbf1f90c5ca910f7fe",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -959,7 +959,7 @@
       "output": "site/reference/runtime-modules/data-maintenance/index.html",
       "route": "reference/runtime-modules/data-maintenance/",
       "sourceSha256": "462dc4e83d5e5572ff5a3994981a50c89a1c7ebe02f47e3384aef5c2d31f29e8",
-      "outputSha256": "ad9fab43caf90708ce6bb65af77fb853c1913752e7024a375fd6e25bcbef5b7d",
+      "outputSha256": "afeec009c865d3d641ebecb2166c668cbf527a8f52c88b932ed5dc169fa84bd8",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -976,7 +976,7 @@
       "output": "site/reference/runtime-modules/dbls/index.html",
       "route": "reference/runtime-modules/dbls/",
       "sourceSha256": "5ff348c1be9d83e31e58a7a0fd480a08f9b778d9edfcf792ca217e587ebb3f67",
-      "outputSha256": "e2309f3e6564cd584e43615a7f918f11364d3ccb737d092c3781ed4d859e1ed1",
+      "outputSha256": "6e6a98bc2d8e03813d47ef638e4b9ec9374139f9bf759f0ef9d35ae5a398c0bc",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -993,7 +993,7 @@
       "output": "site/reference/runtime-modules/dbopfs-document-library/index.html",
       "route": "reference/runtime-modules/dbopfs-document-library/",
       "sourceSha256": "2831470ce54c3393595bf068d60c2e774804cbd51dba7491ad734bbfbea7f32f",
-      "outputSha256": "510d6ace94387f62335a7babbdad4d5a0b67728b1376c8f9b41a56877c18d303",
+      "outputSha256": "97677194ec51cdb8d94b68a7942aab52841dac718d28e473a028366ded463e6a",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1025,7 +1025,7 @@
       "output": "site/reference/runtime-modules/dbopfs-worker/index.html",
       "route": "reference/runtime-modules/dbopfs-worker/",
       "sourceSha256": "7b3f1b5176431a104a0faa80063577362cc57eef0800212abafc209f7912d14e",
-      "outputSha256": "7e40f2b26ccb28a7d9a31d5fbd1bd02c341729313f0c61e4874e0fe75d732262",
+      "outputSha256": "46b9a321cc49c6ef4a30c226f31c4a4fb90dd8e7e8fd497c58dd4ccc1d7d4514",
       "kind": "runtime-module",
       "moduleClassification": "internal-worker",
       "contractCounts": {
@@ -1042,7 +1042,7 @@
       "output": "site/reference/runtime-modules/dbopfs/index.html",
       "route": "reference/runtime-modules/dbopfs/",
       "sourceSha256": "3bf9033dbe5064801e92bf15764e88b22cd14e706b2cf44ed770d54f42e762c2",
-      "outputSha256": "c50474c8ed01433b5d1e460ca4123d86a1910fd2081acd92450e132c1c2a84d0",
+      "outputSha256": "01900cf4b5c7eefe060679a67c784ab5b375126d44b219d623038d1ddd8ecd11",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1059,7 +1059,7 @@
       "output": "site/reference/runtime-modules/development-workspace/index.html",
       "route": "reference/runtime-modules/development-workspace/",
       "sourceSha256": "892b4128433d075bc7d4829adc9f52b3f1f7020e9eb7c5b10848c3fa03162d5a",
-      "outputSha256": "30da9a3d578f2e651736ab65d1a46646e87dcec010e08996f090aece1d021204",
+      "outputSha256": "65c8452a3e4259baf963c08b41f4d3d7b3465aed403b95b694ca149b1a896d0e",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1076,7 +1076,7 @@
       "output": "site/reference/runtime-modules/directory-picker/index.html",
       "route": "reference/runtime-modules/directory-picker/",
       "sourceSha256": "da1eaab03aa5d5ee64d236b5d6bd11a792c811110a1d57fa43d43e26ff97d169",
-      "outputSha256": "2d3c10a33b8f9787387c36facf2ec52f2fb413a7e9cf7c17806a16833b1d8f4e",
+      "outputSha256": "e59cb5497e5e069be477f664b222f8d40977d4319f1d44b5be579c3216ef7780",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1108,7 +1108,7 @@
       "output": "site/reference/runtime-modules/document-lexical-search/index.html",
       "route": "reference/runtime-modules/document-lexical-search/",
       "sourceSha256": "f83a8428e5080cd61bbecac39104a768457d4c7b4825acaf9add9286c6b84b09",
-      "outputSha256": "c74a4df9c56734353d82f9190ce349cabb2b730e7c8d22562645c767e0908334",
+      "outputSha256": "486ed511363e796fe35cc00be740dc1c908a1798dea21e551e353f0917fca57e",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1125,7 +1125,7 @@
       "output": "site/reference/runtime-modules/document-navigation/index.html",
       "route": "reference/runtime-modules/document-navigation/",
       "sourceSha256": "289519a1d3b956f54280e9462ce3f5b0d9776feae2c94db371d9a996df9f0435",
-      "outputSha256": "bde8e7d7d928c8215e55602c47fd7a2044a1e89ee64206339bb548d6e33cfc5c",
+      "outputSha256": "b6d4b16b54db876e285794c587a3692fd4585ebf40b3ff57c6ef97c54004c8aa",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1142,7 +1142,7 @@
       "output": "site/reference/runtime-modules/errors/index.html",
       "route": "reference/runtime-modules/errors/",
       "sourceSha256": "fe4dc569dc997c8d0635e8d389c7bafc3fc3c217d30d00b1e940c78fd7569032",
-      "outputSha256": "85cf280005502c313ff10e0c884b49bf46271077bebf35549bb041e1f630b572",
+      "outputSha256": "8be6276e9cff1eb9c715d35112c04ef90eb31e42262a80028bc1c2599cc2a99e",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1159,7 +1159,7 @@
       "output": "site/reference/runtime-modules/gif-encoder/index.html",
       "route": "reference/runtime-modules/gif-encoder/",
       "sourceSha256": "3d32014695e4c7a0327f79ebf05512510605ac5ea63968f8f6d2e83c0c81338a",
-      "outputSha256": "0f019cb51bdd1d6d5cdc7a08dd56ff85c66aebfb4aaf9664b20e31ef795a8e5e",
+      "outputSha256": "f0c710136986c2efbeec569b43da3f1244923689d4a9c8eb7057282ad65be1ec",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1176,7 +1176,7 @@
       "output": "site/reference/runtime-modules/html-import/index.html",
       "route": "reference/runtime-modules/html-import/",
       "sourceSha256": "71da0c0601f3f9a2c5f6fdebba4c00eb6c4c2b03e3e1b6a1ee9f4733f115db54",
-      "outputSha256": "4c784780f42a89186602f896a2f27a70239de469bfadd61a7b90f787c8b77b79",
+      "outputSha256": "43bfd6941ce27031e70e979ed4656d7b48ab470bfe4ce4f31d1c193571ccfa36",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1193,7 +1193,7 @@
       "output": "site/reference/runtime-modules/in-memory-communication-provider/index.html",
       "route": "reference/runtime-modules/in-memory-communication-provider/",
       "sourceSha256": "68604439786f663e2b7ae38ac5e7b0a7bbeb5d02e8cd840501640528c016ca43",
-      "outputSha256": "145cea735fee049f1d6b45dc749a1ac6d82f4b8745aa93ba7349b7e4f2a7be5f",
+      "outputSha256": "013ce802aca0b7af2e99fed674a23d91c1ef2eef4e885789d8c2e1ccb1037147",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1210,7 +1210,7 @@
       "output": "site/reference/runtime-modules/isolated-model-question-runner/index.html",
       "route": "reference/runtime-modules/isolated-model-question-runner/",
       "sourceSha256": "78fd5f2fe6e2bc6d051fa4fa01af490c09ddd3e148f6e8f63adf4c8033eed78e",
-      "outputSha256": "1fbea2ac85c5b4de2183bbb21bb46b0641f8422ab551ac4ff5863d7c6c31a701",
+      "outputSha256": "7a3f984766fc52349ead78fcb528f88de6a27de06e80c0879fe279d3843bc70f",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1242,7 +1242,7 @@
       "output": "site/reference/runtime-modules/local-ai-readiness-controller/index.html",
       "route": "reference/runtime-modules/local-ai-readiness-controller/",
       "sourceSha256": "ce9b6861e2913c9ae644c1d10a82541f32d6ec9a1c5bc7a5f61ad4272cc6c49f",
-      "outputSha256": "175004472d1b035aa43d35f78b07981af3e98a5cfb2792ec444b87935ea8bcf1",
+      "outputSha256": "2d164d3ac1099a3957940afb27f4065c3d400ea950a691ca3fbe44b29bb0a950",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1259,7 +1259,7 @@
       "output": "site/reference/runtime-modules/local-ai-readiness/index.html",
       "route": "reference/runtime-modules/local-ai-readiness/",
       "sourceSha256": "a3b9218407afcee2b58bc54de76df4ffcae3fe3bdc1383ea3c81e63c809cddca",
-      "outputSha256": "5ab59122bd1260dc1857dc054e87e0878444bc8afdb540a26cb3be54865f462c",
+      "outputSha256": "8f7c9ac9b71b306a130808dfc8d55b6f705301259b4eb053db30adf37815d197",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1276,7 +1276,7 @@
       "output": "site/reference/runtime-modules/mail-outbox/index.html",
       "route": "reference/runtime-modules/mail-outbox/",
       "sourceSha256": "2f1d6419d158deb2a9cd33061323f78e886b0c40478372d15267d74f265c1833",
-      "outputSha256": "faf28347ef6383fd6ebc9b00907f2585cae8308453d56015eec95f7ca23fe901",
+      "outputSha256": "d83dacbd79a2be43c28892687f2d3f93a63008968fad606ab211ab222fcccebc",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1293,7 +1293,7 @@
       "output": "site/reference/runtime-modules/mail-transport/index.html",
       "route": "reference/runtime-modules/mail-transport/",
       "sourceSha256": "13e8c9285fe686295c56195891d4183c60459cc6a795ae467481ef70ae40f639",
-      "outputSha256": "7c62a9d5f6a987dc84db92f4489cb1c71bdddd5b5375e4b5f6df5206ae947f3f",
+      "outputSha256": "446663b8fdb79c596ea1ba8adecf5b1e375609259a2169ae23828389820f922c",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1310,7 +1310,7 @@
       "output": "site/reference/runtime-modules/mail/index.html",
       "route": "reference/runtime-modules/mail/",
       "sourceSha256": "f1bb1f4555e9923d009c8d01429359dfccb8ca6a391bdb0e214b21fb9ba7df29",
-      "outputSha256": "e1f2bdeb43095d8ad949760595eb5a1c78e3029c061b032332cc911bd9569bb0",
+      "outputSha256": "5ef38ed681b4b96e71eea9097b6d65b58eee79187bbac788f4e2b43623b10955",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1327,7 +1327,7 @@
       "output": "site/reference/runtime-modules/marked-min/index.html",
       "route": "reference/runtime-modules/marked-min/",
       "sourceSha256": "51a9c85cb05410e0dc26544700fc56a59e544be586413db7f4e2f01f5c9e6387",
-      "outputSha256": "e92f9928f164673b63de1a15843e0e274571dfe0cca638a411df8c6f6368d953",
+      "outputSha256": "0b967eba9d5ba15694f11aebbef024e185fb727e781ab2045206fb119cd63fd2",
       "kind": "runtime-module",
       "moduleClassification": "vendor",
       "contractCounts": {
@@ -1344,7 +1344,7 @@
       "output": "site/reference/runtime-modules/md/index.html",
       "route": "reference/runtime-modules/md/",
       "sourceSha256": "54c3ef2c4be763a9fa68244cc5fbbd324d9a4e34bda77d79d84e1ed81ec728eb",
-      "outputSha256": "e9704814cb10837a8e314069ad535e3c26e2c50d5967500d902807285e37b011",
+      "outputSha256": "4b080fead3a9118cc06977e02f1b21f2b86343a30b0368285c733088bbddfb31",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1361,7 +1361,7 @@
       "output": "site/reference/runtime-modules/memory-records/index.html",
       "route": "reference/runtime-modules/memory-records/",
       "sourceSha256": "8e7b398a1884c3d7c6695d120384953e3072f3eeb2d64d278a5436acc25fa079",
-      "outputSha256": "02c674bb16253ec123614d18ff8c0be54e1c4f43940c7756e20eca2c70061167",
+      "outputSha256": "4136c5cdb0514f7343a27720ad3484a2efe5f55e5dbb1e2570208937bb467063",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1378,7 +1378,7 @@
       "output": "site/reference/runtime-modules/message-advisory/index.html",
       "route": "reference/runtime-modules/message-advisory/",
       "sourceSha256": "ed5bf8125247a2adeea728d44de50778c3aac330a4b59c837a3ca003c04106be",
-      "outputSha256": "e3448916b5318e160a9d3d8646bb3e8c3cad0089ce18e9c84f540419070f3fbd",
+      "outputSha256": "ce791f7620f7b212fdd0011a58d81795a991cb5bf8124bc721cce0718ae56d8b",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1395,7 +1395,7 @@
       "output": "site/reference/runtime-modules/model-definition/index.html",
       "route": "reference/runtime-modules/model-definition/",
       "sourceSha256": "1e768f70504fac80825a737b89bf272671f1eb43f95745f38346e8384aceef6c",
-      "outputSha256": "662f9e1790eadeabd87bb466913e7ba2cb67654de3375af2cf6fc820b141228a",
+      "outputSha256": "e65f21995c3de864bec70f01cd8edf6764f5164fb97c4b4fe059c049f857ba4e",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1412,7 +1412,7 @@
       "output": "site/reference/runtime-modules/ollama-model-identifier/index.html",
       "route": "reference/runtime-modules/ollama-model-identifier/",
       "sourceSha256": "bbf567b6c2624368edd27e5ff0924876ba71b260f668e2b0d9ec919560a6dd21",
-      "outputSha256": "dc5397c42681d7c557ddf03f54c359ca9052f7e98703aa0415cc38b7f59741ed",
+      "outputSha256": "79a95b1b4007f10f525b650ae2ea91e75aadbd95278997dbc0aa1d34f13cfa28",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1429,7 +1429,7 @@
       "output": "site/reference/runtime-modules/ollama-settings/index.html",
       "route": "reference/runtime-modules/ollama-settings/",
       "sourceSha256": "4f446edbaa3d065d0a759ff1771626195e8fadd9c2a9698d705f0b75218cd4ff",
-      "outputSha256": "59b7f9ea0d31ea3efa5076b7288e6800f5b3454cd70ba2d4683b9843a71920ac",
+      "outputSha256": "3356eae836cf882ba41e87cf45ed23371d6181cf69110a6e636e7c007970dd00",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1446,7 +1446,7 @@
       "output": "site/reference/runtime-modules/ollama/index.html",
       "route": "reference/runtime-modules/ollama/",
       "sourceSha256": "53818a876ef1406a074e7d4bc1aaac667ed1a8380432e24a74166db3f13444b4",
-      "outputSha256": "192d2c1431dd6aa95c15d419da868d246935d044dc5a6431de742016ba257f99",
+      "outputSha256": "07027a30a9048454c0f4b6ea7921517ce78baeb3edba186966ae4f4755150615",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1478,7 +1478,7 @@
       "output": "site/reference/runtime-modules/open-meteo-weather-provider/index.html",
       "route": "reference/runtime-modules/open-meteo-weather-provider/",
       "sourceSha256": "dc61676aa22485021b037fcb6b935e8d0dacd15fbc36531c2ff03a9f3508b995",
-      "outputSha256": "ed0df833ddbd5f242cd4511ce61ac61e4d9f4f3b70fd331b3b36b8d7500c718d",
+      "outputSha256": "a38d726b373e228ead1bb639c2c3380918016298e5d2a17426c7f98fa4acf6bc",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1495,7 +1495,7 @@
       "output": "site/reference/runtime-modules/persistent-ai-chat-session/index.html",
       "route": "reference/runtime-modules/persistent-ai-chat-session/",
       "sourceSha256": "4bb4980e09f3cfcf20ca7c5130e1e133042554b8e1fae4fd613e0e2a9acdbee0",
-      "outputSha256": "cfd12ac293a37d1608a690e7301c4a3c2d42fa6bd58dd31b52873459ff52f015",
+      "outputSha256": "07620162ad69707a6061daeab4fd5d9e313a6ecafd3774dbf1caca811fb1fd98",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1512,7 +1512,7 @@
       "output": "site/reference/runtime-modules/preference-store/index.html",
       "route": "reference/runtime-modules/preference-store/",
       "sourceSha256": "80a44099a592c8914c0c2fe0bf124896e7d016ef307b23dd55062f4bc2343a6a",
-      "outputSha256": "7105f463310a4804f5e86f8a8109d802dfe4f22ef18317bc97fc82e3d93f4889",
+      "outputSha256": "244a2c93cade271f322cf9a16ab40c72962d6f74f89a80256c830d26a1e48fc4",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1529,7 +1529,7 @@
       "output": "site/reference/runtime-modules/qr-code-min/index.html",
       "route": "reference/runtime-modules/qr-code-min/",
       "sourceSha256": "c541ef06327885a8415bca8df6071e14189b4855336def4f36db54bde8484f36",
-      "outputSha256": "710d0fa8caf3765571bcf219436fd1e68c5c36616b2d20ebf057eb1a4ebd3f60",
+      "outputSha256": "861b2157fca7a75339a7d4647fd4542a5c314a7becad7b10c413e36d733368f9",
       "kind": "runtime-module",
       "moduleClassification": "vendor",
       "contractCounts": {
@@ -1546,7 +1546,7 @@
       "output": "site/reference/runtime-modules/questionnaire/index.html",
       "route": "reference/runtime-modules/questionnaire/",
       "sourceSha256": "f1afa089073f9c7c49dfe59cef615a5bbeceb0687ebcead228d2114bf3908af8",
-      "outputSha256": "6d3f8dc18839cb7a49605a7734358447e2fbba6c6793bd972e237a69ab87b6a3",
+      "outputSha256": "f49c03f23d8f41204c89944fbd2b05e6113541affaff221bc677454e6661507f",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1563,7 +1563,7 @@
       "output": "site/reference/runtime-modules/record-link-index/index.html",
       "route": "reference/runtime-modules/record-link-index/",
       "sourceSha256": "f9d9b0e734bc96bd3130b80023f9f1a446daabdd10178b8a83637e36d8af1090",
-      "outputSha256": "916dfb488c89ffff077ff6c6be87f8c76c4055af6b86ab9f1a2082d834b7d7e5",
+      "outputSha256": "7d06d0fe914db6bd5454f23e35bfc007a27f3912e70a5b62338cc1025a8b9afb",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1580,7 +1580,7 @@
       "output": "site/reference/runtime-modules/record-passage-index/index.html",
       "route": "reference/runtime-modules/record-passage-index/",
       "sourceSha256": "d9c501a82782db08257cdc4dabe77249176424e4b7ca3b9244d29314662b2044",
-      "outputSha256": "f14cd26aeb6e311160dcf5e795e924beb1ab5d41bb7d8dce1fef1e2c772dd903",
+      "outputSha256": "8029f81f71f38f8223a9204c2ecd7b06dc1cb0e8808601046fee893e220283c7",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1597,7 +1597,7 @@
       "output": "site/reference/runtime-modules/record-review-store/index.html",
       "route": "reference/runtime-modules/record-review-store/",
       "sourceSha256": "f5ba5296add8d30a5ca23400ca70c73d593a0b7ba422f1166e445178966dde37",
-      "outputSha256": "6e095e29e3db55e831bf59df8a62954da028664453093799f147a971924f14b5",
+      "outputSha256": "8bce1c976b85913a4bc1c2f960fd12ab00c1236ad522e3d34bb9dc508d4aa9bb",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1614,7 +1614,7 @@
       "output": "site/reference/runtime-modules/revocable-projection-ledger/index.html",
       "route": "reference/runtime-modules/revocable-projection-ledger/",
       "sourceSha256": "3bf0dbd1cb589aed703314676c67c045b61340191dc8d2f3cab3238894831859",
-      "outputSha256": "b423f5336cdbbf8c5dddcbca87203c92f132c8bbd2f0582e90b98808d7c17d42",
+      "outputSha256": "c6599632668e5c57c6854e2e7a775f659731c4e8cf3bdbac70bc2595d8d7897b",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1631,7 +1631,7 @@
       "output": "site/reference/runtime-modules/risk-signal-analyzer/index.html",
       "route": "reference/runtime-modules/risk-signal-analyzer/",
       "sourceSha256": "ce3e3f17da0ee34c3c7de100fcaa25b1bb9535016b3f4278b18e6607dd1f52c7",
-      "outputSha256": "60fc974a2c5c00b7efe05fa596ce99bc80314e762cf5d3c9926178376cee9a96",
+      "outputSha256": "723b2153ea5b81055828fabeca0c6e2a13967076d118edfa4b956ce4fb15d411",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1648,7 +1648,7 @@
       "output": "site/reference/runtime-modules/scam-risk-policy/index.html",
       "route": "reference/runtime-modules/scam-risk-policy/",
       "sourceSha256": "de1a8ee3e43b8ea59f06e2fc7c9dcb5b3933f0862440d6db006916208adc1343",
-      "outputSha256": "71a4da8904254e2612e568267f3f99f43f68ded4b0dcd2f430c4f33abd0262d5",
+      "outputSha256": "06a4b28d785f866cee31580fad725e50fd428422937cbc63e5ff38c943496e75",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1665,7 +1665,7 @@
       "output": "site/reference/runtime-modules/scoped-opfs-cache/index.html",
       "route": "reference/runtime-modules/scoped-opfs-cache/",
       "sourceSha256": "71247d8b98db29ebe521fc874648601143bd8857173e18436718987bfa751d02",
-      "outputSha256": "4022affa5a21edb890bc7744e6d1f347cc30096b24559b8476ba15b43e974d51",
+      "outputSha256": "91d4ee6d0e10ed1f9a93f471d252c9638701298d0add82bc8c074eff17525f46",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1682,7 +1682,7 @@
       "output": "site/reference/runtime-modules/screen-capture/index.html",
       "route": "reference/runtime-modules/screen-capture/",
       "sourceSha256": "43c9f469df7d7fb810b2976bdc4364343a311b6e9565bf38f78c54c6cf692233",
-      "outputSha256": "1a8a349434fc916825ece154148495c23a7be8534812553a1c8a6074b6dfebfb",
+      "outputSha256": "c56286c185790d7efacd7d7559fb71fb2ade88897fd87fcfd3e1c03e0551845b",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1699,7 +1699,7 @@
       "output": "site/reference/runtime-modules/speech-playback/index.html",
       "route": "reference/runtime-modules/speech-playback/",
       "sourceSha256": "c8936533c190996394a215e40f46074bde136c10c0bdca303848e1f789f30e53",
-      "outputSha256": "cb775c393d31b61c4f9b35f048fda17b69e6886171fd6b1146de3701b628c2df",
+      "outputSha256": "d609933fcf4a52b7ee87c535a4400b9a68735c5ec899ab85e8e360a592aa06a0",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1731,7 +1731,7 @@
       "output": "site/reference/runtime-modules/static-document-catalog/index.html",
       "route": "reference/runtime-modules/static-document-catalog/",
       "sourceSha256": "002ab228c2ec80006c6365eb5bbdde33e5951c7424ca15aa16b4d9663bcc77f8",
-      "outputSha256": "e505da2504d0c4647ac99837ffb8ba8a077f6cce7cc63ac4eed19f9884c4cccd",
+      "outputSha256": "123b484ea36bbe88a0a73a8ac6dcf41c936b860d0422b4675badaf976af99bbf",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1748,7 +1748,7 @@
       "output": "site/reference/runtime-modules/system-appearance/index.html",
       "route": "reference/runtime-modules/system-appearance/",
       "sourceSha256": "35a96ee2dd24e80ec825b8eaf8f01c239bea7fbc1c03605d953fee1ee4ce7d1e",
-      "outputSha256": "1d697946fba002dfdcb13ef828c84cbb7f4b8e64b56f94f4dd910ddd8d8858a1",
+      "outputSha256": "6b2fe72f800858ff119c31170f848f208cec3f04fc56e35ad19b477c9cf06ba2",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1765,7 +1765,7 @@
       "output": "site/reference/runtime-modules/system-platform-presentation/index.html",
       "route": "reference/runtime-modules/system-platform-presentation/",
       "sourceSha256": "ed981ce7b503b26173b479a540c092f70409715cc6d0bf8e9afd7ab7c674b38f",
-      "outputSha256": "b8951e04b38a53c03bca3571c0b9e61868bf2325a0d1c57ae30caa056701ca95",
+      "outputSha256": "897540f6b492ade88aeb001cb1897243c79a27818ad01fe9cbaf4f8797604e10",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1782,7 +1782,7 @@
       "output": "site/reference/runtime-modules/system-tool-registry/index.html",
       "route": "reference/runtime-modules/system-tool-registry/",
       "sourceSha256": "50cc61054521bb1fb8328067f70e8f0a05b827d8da6ce07e24bd77d25528f60b",
-      "outputSha256": "d25260a4b8b04c7c2e09d0f59e91c97412e66aeae1e57a4d29a6e442ad8a3f1d",
+      "outputSha256": "22a5f8c23944d4ccc63a5c78e158207404a02824a0db56ba45a35b1feef857b3",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1799,7 +1799,7 @@
       "output": "site/reference/runtime-modules/terminal-client/index.html",
       "route": "reference/runtime-modules/terminal-client/",
       "sourceSha256": "8fedad71db45a2a6d2cf3989127857d493224a0c204029e0306010348fb3b5c0",
-      "outputSha256": "e151161b3161050d33f0e2300f2e229be5fb933dbf90628a00ce362fbddea6a0",
+      "outputSha256": "9e60255470089b1d11055dec246e5e5fc71d34cc76b8e62a3bb97a0b84f46bc7",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1831,7 +1831,7 @@
       "output": "site/reference/runtime-modules/terminal-command-registry/index.html",
       "route": "reference/runtime-modules/terminal-command-registry/",
       "sourceSha256": "628bdda1d4934e2825cdd84e698ba85038db1ab4ff700ff722f20654e64ad307",
-      "outputSha256": "674a81dcfeaa55ac6b6fdd3e6007372ad7ac54c04577ab33410a3e5bf11a68a5",
+      "outputSha256": "5dbdf6abec38a3dded2c96cdd07fe1ded6800949ad6e1535857de81331b1c66c",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1848,7 +1848,7 @@
       "output": "site/reference/runtime-modules/theme-bootstrap/index.html",
       "route": "reference/runtime-modules/theme-bootstrap/",
       "sourceSha256": "d11578a3753821a9bf361e4303f392d36c298c1ec1df4e03c299410def026105",
-      "outputSha256": "8e6c9d0abd5e3764f1cb8568c56e3d87459706473a75e4dd28f9cd09a31a588c",
+      "outputSha256": "e470330f686fd09fff3ee5bcd8c918f15392015cac97889505c647def2733ef3",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1880,7 +1880,7 @@
       "output": "site/reference/runtime-modules/theme-manager/index.html",
       "route": "reference/runtime-modules/theme-manager/",
       "sourceSha256": "c23b6e62c56a0d07cd9caf3435bfa902a3d7131f075223cd464a415bccab2136",
-      "outputSha256": "a684d60d9c3a8e0a0bba8bac074c3ade46cdf792d72704aed396e78c535988ad",
+      "outputSha256": "b1cf3fce0ca50a6c6992efd2d672668a76eea0c037453544c8fd5674779e45d4",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1897,7 +1897,7 @@
       "output": "site/reference/runtime-modules/time-guard/index.html",
       "route": "reference/runtime-modules/time-guard/",
       "sourceSha256": "d2e3ba4979d94354d0b1f345f6f1c66f49044e3e8543db430f8db8624141118b",
-      "outputSha256": "f223e81389b165274f7bc58ea5602da09563ae15b7ab5d281a35f353c8839f08",
+      "outputSha256": "77264dedddf4b5194f711089343a90212eac0a96980fcfd0eb1e4b232b8780e3",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1914,7 +1914,7 @@
       "output": "site/reference/runtime-modules/tool-call-router/index.html",
       "route": "reference/runtime-modules/tool-call-router/",
       "sourceSha256": "67447b0ed2429b54cb4e5d3e8743cf8ffadcb7d118b90942722ca34b689a8bf4",
-      "outputSha256": "cfbfbedfd4b2c79219a65e7c75f301ee5d93c522aeb84ee718e0e312dbac71ce",
+      "outputSha256": "137624820630cec1da595d40b2bf507bad6eb4d115e246cfb59d3e5b60d41508",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1931,7 +1931,7 @@
       "output": "site/reference/runtime-modules/u-plot-iife-min/index.html",
       "route": "reference/runtime-modules/u-plot-iife-min/",
       "sourceSha256": "19c8d4c6ad88929a79f4ae49d6f7161566dfd0ba3d15cc495e974f787eb78f1f",
-      "outputSha256": "ab07b0545b073460eb574841e147430881ccdedd8f92ba77508ca61151722e79",
+      "outputSha256": "e67e160e650e6df0dc454e762db30ff6c95cccdf827b08e16eb33c7b24b264ed",
       "kind": "runtime-module",
       "moduleClassification": "vendor",
       "contractCounts": {
@@ -1948,7 +1948,7 @@
       "output": "site/reference/runtime-modules/u-plot-license/index.html",
       "route": "reference/runtime-modules/u-plot-license/",
       "sourceSha256": "3421f0033bae76860e165efab33d4bbbcc2d8fc1a4a708ef4f6742eef434ab47",
-      "outputSha256": "3479ad61504fb774d6a24f923c5c44eb5af59117d9a5fa1faa3262b25902a8e2",
+      "outputSha256": "c5a68c17d4a143f0b465b933d320a19554ff917c4e5a513968f1999cbd910320",
       "kind": "runtime-module",
       "moduleClassification": "vendor",
       "contractCounts": {
@@ -1965,7 +1965,7 @@
       "output": "site/reference/runtime-modules/u-plot-min/index.html",
       "route": "reference/runtime-modules/u-plot-min/",
       "sourceSha256": "df630c6a8d6f8eeaff264b50f73ce5b114f646ffd9a0bb74f049b0a00135fa04",
-      "outputSha256": "9f691d227c7e1dd091919db6a8d3124460a0f9b48117809b73b769b0c617fbab",
+      "outputSha256": "59e8ac7198e75c58090228837817b05515d7429ef788668d8d83bfc05272f817",
       "kind": "runtime-module",
       "moduleClassification": "vendor",
       "contractCounts": {
@@ -1982,7 +1982,7 @@
       "output": "site/reference/runtime-modules/wait-for-component/index.html",
       "route": "reference/runtime-modules/wait-for-component/",
       "sourceSha256": "9fcb8edea119d3ed7a4a1c4d148b8270c978088c42b73f4e148dbdce6315d3a4",
-      "outputSha256": "2de3b26d8473f6c3a05c689113ea888fed73615a15c2fd3031a5b806ae255077",
+      "outputSha256": "77cbe7f7f8fb0bdddf3b2c4a63150ebbe5995e779391cff74077a84379755ed7",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -1999,7 +1999,7 @@
       "output": "site/reference/runtime-modules/you-tube-media/index.html",
       "route": "reference/runtime-modules/you-tube-media/",
       "sourceSha256": "0bf3aab64fe422a904cfb9df9ef7c14be73d53e18e0ee557c0c99e286631c228",
-      "outputSha256": "d1a9cd73c1e8b4fdcd6cee08b00b5b74cc6c0d4d37eac9a8c21c6cf9235c97b2",
+      "outputSha256": "48a6a986d0c6558b0b339219dea4de05b48a03cf2e7be790f592204d077b310c",
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
@@ -2016,7 +2016,7 @@
       "output": "site/reference/sdk-api/index.html",
       "route": "reference/sdk-api/",
       "sourceSha256": "a25fa1d4a6c35abfe75eaae9cc8be4a1ba00a1936526b9d7361cc1a0a2734eae",
-      "outputSha256": "31ad2ac87b807d623c4854db7c7d293dffe87ebb5a75ff1cd971c5fba3858a0d",
+      "outputSha256": "32aa6249f9385e8fd008f1f9eb6ceb884c2867f845d6b8d0c56eee8574a98a56",
       "kind": "markdown"
     }
   ],

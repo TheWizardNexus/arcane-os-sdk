@@ -536,7 +536,7 @@ test('the complete API reference is a first-party generated Pages corpus',async 
     const manifest=await loadReferenceManifest();
     assert.equal(manifest.schema,'arcane-reference-site/1');
     assert.deepEqual(manifest.versions,{
-        sdk:'0.3.0',
+        sdk:'0.3.1',
         runtime:'0.8.12',
         protocol:'arcane/1'
     });

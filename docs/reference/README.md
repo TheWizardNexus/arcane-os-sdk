@@ -39,9 +39,9 @@ This repository contains explicitly versioned surfaces with different owners:
 
 | Surface | Source identity | Meaning |
 | --- | --- | --- |
-| SDK and CLI | `arcane-os` `0.3.0` | The Node.js toolchain plus the browser-only `arcane-os/ai/browser-wasm`, `arcane-os/ai/browser-speech`, and portable `arcane-os/mail` entrypoints in this checkout. |
-| Browser runtime | `runtime/ARCANE_RUNTIME_RELEASE.json`, SDK `0.3.0`, protocol `arcane/1` | The SDK-canonical dynamic runtime inventory shipped under `runtime/`; the receipt binds its exact paths, bytes, inventory, and digest. |
-| Browser SDK runtime | `browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json`, SDK `0.3.0` | The dynamically derived browser closure for events, Wllama, and Browser Speech mechanisms. It contains no speech runtime, model, voice, third-party legal/notice, or corresponding-source payloads. |
+| SDK and CLI | `arcane-os` `0.3.1` | The Node.js toolchain plus the browser-only `arcane-os/ai/browser-wasm`, `arcane-os/ai/browser-speech`, and portable `arcane-os/mail` entrypoints in this checkout. |
+| Browser runtime | `runtime/ARCANE_RUNTIME_RELEASE.json`, SDK `0.3.1`, protocol `arcane/1` | The SDK-canonical dynamic runtime inventory shipped under `runtime/`; the receipt binds its exact paths, bytes, inventory, and digest. |
+| Browser SDK runtime | `browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json`, SDK `0.3.1` | The dynamically derived browser closure for events, Wllama, and Browser Speech mechanisms. It contains no speech runtime, model, voice, third-party legal/notice, or corresponding-source payloads. |
 | Core reference snapshot | Arcane OS commit `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, protocol `arcane/1` | The application-facing Core contract derived into `docs/reference/core/`. Canonical inventory and focused-member content was verified unchanged at Arcane OS `main` commit `13f3ce0ae34f77a3495331c8b4c30b1bb105f8ed`; SDK-local provenance, link, and package-boundary annotations are added explicitly. |
 
 The SDK runtime receipt and Core reference are distinct evidence and have
@@ -58,23 +58,23 @@ See [Core reference provenance](core/README.md) for the imported inventory and
 the exact distinction between a documentation snapshot and shipped runtime
 bytes.
 
-## Published 0.3.0
+## Published 0.3.1
 
-The verified published package is exactly `arcane-os@0.3.0` from source commit
-`72239d0221279b461f1be08b02a70105f4cf7364`. The npm `latest` dist-tag resolves
-to `0.3.0`; the separate `dev` dist-tag remains `0.1.0-dev.5`.
+The verified published package is exactly `arcane-os@0.3.1` from source commit
+`d118cee133f41773dab9c8841ab0fccfd776c0bc`. The npm `latest` dist-tag resolves
+to `0.3.1`; the separate `dev` dist-tag remains `0.1.0-dev.5`.
 
 The singleton-event, Mail, warn-first Browser Speech, and independent mixed-route
 contracts documented below are included in this exact package authority.
 
 | Evidence | Exact value |
 | --- | --- |
-| npm integrity | `sha512-dh7QfM1ur48hOyMez1XWjym/LJcOAYy+Xl3KcvVQ6ewwX5N7ER82PQx6LE+zSb5sHVtz4TOU2AuARsrFNSwuVw==` |
-| npm shasum | `94075dad9c3974b0e069ecfe09f8d612d8a30ea7` |
-| Immutable release tarball | `arcane-os-0.3.0.tgz`; 7,230,292 bytes; SHA-256 `4afdb8113d8408b03917b73ce45e25bf4d302577fc6f199165d4931dda8ca081` |
-| GitHub release | [`0.3.0`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.3.0) (tag and title are both exactly `0.3.0`) |
-| Hosted source/artifact gate | [Check run 33130699235](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33130699235) |
-| Trusted publication | [Run 33131083176](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33131083176) |
+| npm integrity | `sha512-g9C0cXK6Xim4Mu8D7zLKn3XErIo8UZEjIaGUA1fwnU6nVbB8XXgLD6/AjaVln+na6ihIHLzsHGgyTeic4yNggg==` |
+| npm shasum | `b02c2d9bbd69c74ec69bed94174eeb09a523f093` |
+| Immutable release tarball | `arcane-os-0.3.1.tgz`; 7,238,316 bytes; SHA-256 `ac09c64f9d326f86dd560c7b4387c6956ef24553611cfd22f0ba68810daaff4f` |
+| GitHub release | [`0.3.1`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.3.1) (tag and title are both exactly `0.3.1`) |
+| Hosted source/artifact gate | [Check run 33140411052](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33140411052) |
+| Trusted publication | [Run 33140501395](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33140501395) |
 
 The npm SLSA provenance binds the published package to that exact source commit
 and `.github/workflows/publish-dev.yml`. Hashes prove byte identity or

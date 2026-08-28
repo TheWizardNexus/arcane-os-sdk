@@ -13,10 +13,10 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../sdk-api/">API</a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK developer reference</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-developer-reference">Arcane OS SDK developer reference</h1><p class="doc-lead">This reference answers developer questions in this order:</p><div class="doc-meta"><span>SDK 0.3.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK developer reference</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-developer-reference">Arcane OS SDK developer reference</h1><p class="doc-lead">This reference answers developer questions in this order:</p><div class="doc-meta"><span>SDK 0.3.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="./" aria-current="page">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/README.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#reference-map">Reference map</a><a href="#version-scope">Version scope</a><a href="#published-030">Published 0.3.0</a><a href="#mdn-style-page-contract">MDN-style page contract</a><a href="#public-runtime-inventory">Public runtime inventory</a><a href="#normalized-ai">Normalized AI</a><a href="#authority-and-feature-detection">Authority and feature detection</a></nav></details><aside class="callout callout-info"><strong>Normalized AI comes first.</strong> Ordinary applications start with <a href="../ai/"><code>AI.js</code> or <code>globalThis.Arcane.ai</code></a>. Use Ollama APIs only when provider-native fields or an admitted provider-specific operation is intentional.</aside><p>This reference answers developer questions in this order:</p>
+      <article class="prose reference-prose" data-reference-source="docs/reference/README.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#reference-map">Reference map</a><a href="#version-scope">Version scope</a><a href="#published-031">Published 0.3.1</a><a href="#mdn-style-page-contract">MDN-style page contract</a><a href="#public-runtime-inventory">Public runtime inventory</a><a href="#normalized-ai">Normalized AI</a><a href="#authority-and-feature-detection">Authority and feature detection</a></nav></details><aside class="callout callout-info"><strong>Normalized AI comes first.</strong> Ordinary applications start with <a href="../ai/"><code>AI.js</code> or <code>globalThis.Arcane.ai</code></a>. Use Ollama APIs only when provider-native fields or an admitted provider-specific operation is intentional.</aside><p>This reference answers developer questions in this order:</p>
 <ol>
 <li><strong>What can the application or tool do?</strong></li>
 <li><strong>What should I import or call?</strong></li>
@@ -102,9 +102,9 @@ high-level page links to the relevant deep section instead of repeating it.</p>
 </tbody></table>
 </div>
 <h2 id="version-scope">Version scope</h2>
-<p>This site documents SDK <code>0.3.0</code>, runtime bundle <code>0.8.12</code>, and protocol <code>arcane/1</code>. Native availability still depends on the selected Core satisfying the current build plan&#39;s feature, capability, method, provider, and application-identity checks. A matching protocol label alone is not authority or compatibility.</p>
-<h2 id="published-030">Published 0.3.0</h2>
-<p>The verified published package is exactly <code>arcane-os@0.3.0</code> from source commit <code>72239d0221279b461f1be08b02a70105f4cf7364</code>. The npm <code>latest</code> dist-tag resolves to <code>0.3.0</code>; the separate <code>dev</code> dist-tag remains <code>0.1.0-dev.5</code>.</p>
+<p>This site documents SDK <code>0.3.1</code>, runtime bundle <code>0.8.12</code>, and protocol <code>arcane/1</code>. Native availability still depends on the selected Core satisfying the current build plan&#39;s feature, capability, method, provider, and application-identity checks. A matching protocol label alone is not authority or compatibility.</p>
+<h2 id="published-031">Published 0.3.1</h2>
+<p>The verified published package is exactly <code>arcane-os@0.3.1</code> from source commit <code>d118cee133f41773dab9c8841ab0fccfd776c0bc</code>. The npm <code>latest</code> dist-tag resolves to <code>0.3.1</code>; the separate <code>dev</code> dist-tag remains <code>0.1.0-dev.5</code>.</p>
 <div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
 <tr>
@@ -114,27 +114,27 @@ high-level page links to the relevant deep section instead of repeating it.</p>
 </thead>
 <tbody><tr>
 <td>npm integrity</td>
-<td><code>sha512-dh7QfM1ur48hOyMez1XWjym/LJcOAYy+Xl3KcvVQ6ewwX5N7ER82PQx6LE+zSb5sHVtz4TOU2AuARsrFNSwuVw==</code></td>
+<td><code>sha512-g9C0cXK6Xim4Mu8D7zLKn3XErIo8UZEjIaGUA1fwnU6nVbB8XXgLD6/AjaVln+na6ihIHLzsHGgyTeic4yNggg==</code></td>
 </tr>
 <tr>
 <td>npm shasum</td>
-<td><code>94075dad9c3974b0e069ecfe09f8d612d8a30ea7</code></td>
+<td><code>b02c2d9bbd69c74ec69bed94174eeb09a523f093</code></td>
 </tr>
 <tr>
 <td>Immutable release tarball</td>
-<td><code>arcane-os-0.3.0.tgz</code>; 7,230,292 bytes; SHA-256 <code>4afdb8113d8408b03917b73ce45e25bf4d302577fc6f199165d4931dda8ca081</code></td>
+<td><code>arcane-os-0.3.1.tgz</code>; 7,238,316 bytes; SHA-256 <code>ac09c64f9d326f86dd560c7b4387c6956ef24553611cfd22f0ba68810daaff4f</code></td>
 </tr>
 <tr>
 <td>GitHub release</td>
-<td><a href="https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.3.0" target="_blank" rel="noreferrer"><code>0.3.0</code></a> (tag and title are both exactly <code>0.3.0</code>)</td>
+<td><a href="https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.3.1" target="_blank" rel="noreferrer"><code>0.3.1</code></a> (tag and title are both exactly <code>0.3.1</code>)</td>
 </tr>
 <tr>
 <td>Hosted source/artifact gate</td>
-<td><a href="https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33130699235" target="_blank" rel="noreferrer">Check run 33130699235</a></td>
+<td><a href="https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33140411052" target="_blank" rel="noreferrer">Check run 33140411052</a></td>
 </tr>
 <tr>
 <td>Trusted publication</td>
-<td><a href="https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33131083176" target="_blank" rel="noreferrer">Run 33131083176</a></td>
+<td><a href="https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33140501395" target="_blank" rel="noreferrer">Run 33140501395</a></td>
 </tr>
 </tbody></table>
 </div>
@@ -260,9 +260,9 @@ the nested capability snapshot through <code>Arcane.platform.status()</code>.</p
 infer authorization from a transport name, or treat an Ollama model inventory
 as package admission. Each method rechecks native policy at invocation time.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#reference-map">Reference map</a><a href="#version-scope">Version scope</a><a href="#published-030">Published 0.3.0</a><a href="#mdn-style-page-contract">MDN-style page contract</a><a href="#public-runtime-inventory">Public runtime inventory</a><a href="#normalized-ai">Normalized AI</a><a href="#authority-and-feature-detection">Authority and feature detection</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#reference-map">Reference map</a><a href="#version-scope">Version scope</a><a href="#published-031">Published 0.3.1</a><a href="#mdn-style-page-contract">MDN-style page contract</a><a href="#public-runtime-inventory">Public runtime inventory</a><a href="#normalized-ai">Normalized AI</a><a href="#authority-and-feature-detection">Authority and feature detection</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.3.0, runtime bundle 0.8.12, and protocol arcane/1; the latest verified published package is 0.3.0.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.3.1, runtime bundle 0.8.12, and protocol arcane/1; the latest verified published package is 0.3.1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>

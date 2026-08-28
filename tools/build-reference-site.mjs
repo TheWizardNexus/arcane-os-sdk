@@ -24,7 +24,7 @@ const referenceSourceRoot=path.join(repositoryRoot,'docs','reference');
 const referenceOutputRoot=path.join(repositoryRoot,'site','reference');
 const canonicalRoot='https://thewizardnexus.github.io/arcane-os-sdk/';
 const publishedVersions=Object.freeze({
-    sdk:'0.3.0',
+    sdk:'0.3.1',
     runtime:'0.8.12',
     protocol:'arcane/1'
 });
@@ -52,18 +52,18 @@ const expectedRuntimeContractSummary=Object.freeze({
     publicMemberCount:579
 });
 const publishedReleaseMarkdown=[
-    '## Published 0.3.0',
+    '## Published 0.3.1',
     '',
-    'The verified published package is exactly `arcane-os@0.3.0` from source commit `72239d0221279b461f1be08b02a70105f4cf7364`. The npm `latest` dist-tag resolves to `0.3.0`; the separate `dev` dist-tag remains `0.1.0-dev.5`.',
+    'The verified published package is exactly `arcane-os@0.3.1` from source commit `d118cee133f41773dab9c8841ab0fccfd776c0bc`. The npm `latest` dist-tag resolves to `0.3.1`; the separate `dev` dist-tag remains `0.1.0-dev.5`.',
     '',
     '| Evidence | Exact value |',
     '| --- | --- |',
-    '| npm integrity | `sha512-dh7QfM1ur48hOyMez1XWjym/LJcOAYy+Xl3KcvVQ6ewwX5N7ER82PQx6LE+zSb5sHVtz4TOU2AuARsrFNSwuVw==` |',
-    '| npm shasum | `94075dad9c3974b0e069ecfe09f8d612d8a30ea7` |',
-    '| Immutable release tarball | `arcane-os-0.3.0.tgz`; 7,230,292 bytes; SHA-256 `4afdb8113d8408b03917b73ce45e25bf4d302577fc6f199165d4931dda8ca081` |',
-    '| GitHub release | [`0.3.0`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.3.0) (tag and title are both exactly `0.3.0`) |',
-    '| Hosted source/artifact gate | [Check run 33130699235](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33130699235) |',
-    '| Trusted publication | [Run 33131083176](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33131083176) |',
+    '| npm integrity | `sha512-g9C0cXK6Xim4Mu8D7zLKn3XErIo8UZEjIaGUA1fwnU6nVbB8XXgLD6/AjaVln+na6ihIHLzsHGgyTeic4yNggg==` |',
+    '| npm shasum | `b02c2d9bbd69c74ec69bed94174eeb09a523f093` |',
+    '| Immutable release tarball | `arcane-os-0.3.1.tgz`; 7,238,316 bytes; SHA-256 `ac09c64f9d326f86dd560c7b4387c6956ef24553611cfd22f0ba68810daaff4f` |',
+    '| GitHub release | [`0.3.1`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.3.1) (tag and title are both exactly `0.3.1`) |',
+    '| Hosted source/artifact gate | [Check run 33140411052](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33140411052) |',
+    '| Trusted publication | [Run 33140501395](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33140501395) |',
     '',
     'The npm SLSA provenance binds the published package to that exact source commit and `.github/workflows/publish-dev.yml`. Hashes prove byte identity or consistency; provenance establishes the recorded source/workflow relationship. Neither claim alone proves browser hardware support, native admission, or a particular application\'s provider/model policy.'
 ].join('\n');
@@ -1033,7 +1033,7 @@ function publicReferenceMarkdown(markdown,source){
     if(source==='docs/reference/README.md'){
         output=output.replace(
             /\n## Version scope and provenance[\s\S]*?\n## MDN-style page contract/u,
-            '\n## Version scope\n\nThis site documents SDK `0.3.0`, runtime bundle `0.8.12`, and protocol `arcane/1`. Native availability still depends on the selected Core satisfying the current build plan\'s feature, capability, method, provider, and application-identity checks. A matching protocol label alone is not authority or compatibility.\n\n'
+            '\n## Version scope\n\nThis site documents SDK `0.3.1`, runtime bundle `0.8.12`, and protocol `arcane/1`. Native availability still depends on the selected Core satisfying the current build plan\'s feature, capability, method, provider, and application-identity checks. A matching protocol label alone is not authority or compatibility.\n\n'
                 +publishedReleaseMarkdown
                 +'\n\n## MDN-style page contract'
         );
@@ -1202,7 +1202,7 @@ function renderPage({
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p>${tableOfContentsHtml(tableOfContents)}</aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="${escapeHtml(siteHome)}" aria-label="Arcane OS SDK documentation home"><img src="${escapeHtml(icon)}" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK ${publishedVersions.sdk}, runtime bundle ${publishedVersions.runtime}, and protocol ${publishedVersions.protocol}; the latest verified published package is 0.3.0.</p><nav aria-label="Footer navigation"><a href="${escapeHtml(architecture)}">Architecture</a><a href="${escapeHtml(compatibility)}">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="${escapeHtml(siteHome)}" aria-label="Arcane OS SDK documentation home"><img src="${escapeHtml(icon)}" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK ${publishedVersions.sdk}, runtime bundle ${publishedVersions.runtime}, and protocol ${publishedVersions.protocol}; the latest verified published package is 0.3.1.</p><nav aria-label="Footer navigation"><a href="${escapeHtml(architecture)}">Architecture</a><a href="${escapeHtml(compatibility)}">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>
 `;
