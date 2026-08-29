@@ -11,7 +11,7 @@ The Arcane SDK owns the shared behavior:
 - Chat renders AI messages on the left and user messages on the right.
 - The nested SDK Speech component owns Talk, Stop, voice selection, mute state, and speech status.
 - `AI`, the browser-WASM provider, and DBOPFS own model loading and model persistence.
-- `PersistentAIChatSession` owns local conversation persistence.
+- Chat creates and binds the SDK's `PersistentAIChatSession`, which owns local conversation persistence.
 - `DBOPFSDocumentLibrary` owns the profile-specific local document corpus and lexical retrieval.
 - `PreferenceStore` owns model and profile selection persistence.
 
@@ -37,11 +37,13 @@ From the canonical SDK repository root:
 
     node .\examples\wasm-ai-demo\server.mjs
 
+Use this repository-root command rather than a generic Live Server extension. A server rooted at the example directory cannot expose the SDK checkout's live source routes.
+
 Then open:
 
     http://localhost:4173/examples/wasm-ai-demo/
 
-The example server uses only Node's built-in modules and serves the current checkout's direct `/src`, `/browser-runtime`, and `/runtime` paths. It prints the exact URL at startup. HTTP is the default; when local certificate files are present in `examples/wasm-ai-demo/tls/`, the URL uses HTTPS instead. To reuse an existing local certificate directory without copying it into Git, set `ARCANE_WASM_TLS_ROOT` before starting the server.
+The example server uses only Node's built-in modules and serves the current checkout's direct `/src`, `/browser-runtime`, and `/runtime` paths. Open the exact URL it prints at startup. HTTP is the default; when local certificate files are present in `examples/wasm-ai-demo/tls/`, the printed URL uses HTTPS instead. To reuse an existing local certificate directory without copying it into Git, set `ARCANE_WASM_TLS_ROOT` before starting the server.
 
 For example, a local launch can point at preserved prototype assets without making them source authority:
 

@@ -5,7 +5,6 @@ import DBOPFS from "arcane/DBOPFS";
 import PreferenceStore from "arcane/PreferenceStore";
 import waitForComponent from "arcane/WaitForComponent";
 import { subscribeAIRuntimeState } from "arcane/AIRuntimeState";
-import { createPersistentAIChatSession } from "#arcane/persistent-ai-chat-session";
 import {
   adaptV1LlmProvider,
   createBrowserModelSource,
@@ -155,7 +154,10 @@ let ragStats = null;
 let systemPrompt = "";
 let stopRuntimeSubscription = null;
 let teardownStarted = false;
+let toolSettlementAttempts = 0;
+let toolSettlementCallId = "";
 let toolSettlementPending = false;
+let toolSettlementWaiting = false;
 
 function setPageStatus(state, text) {
   statusElement.dataset.state = state;
@@ -344,7 +346,7 @@ function synchronizeRuntime(snapshot) {
   if (llm.state === "ready") {
     setPageStatus("ready", `${selectedProfile.label} ready`);
     queueMicrotask(function settleRestoredToolAfterRuntimeUpdate() {
-      void settleDisplayedToolCall();
+      retryDisplayedToolCallAfterStateChange();
     });
   } else if (llm.state === "loading") {
     setPageStatus("loading", `Starting ${selectedModel.shortLabel}…`);
@@ -509,20 +511,21 @@ async function initializeApplication() {
   }
 
   stopRuntimeSubscription = subscribeAIRuntimeState(synchronizeRuntime);
-  const session = await createPersistentAIChatSession({
+  await chat.bindSession({
     ai,
-    chatFileName: `wasm-ai-demo-${selectedProfile.id}-${selectedModel.id}.jsonl`,
-    contextBuilder: buildRequestContext,
-    loadExisting: true,
-    memory: false,
-    request: {
-      localOnly: true,
-      tools: toolsForProfile(selectedProfile.id),
-      toolChoice: "auto",
+    sessionOptions: {
+      chatFileName: `wasm-ai-demo-${selectedProfile.id}-${selectedModel.id}.jsonl`,
+      contextBuilder: buildRequestContext,
+      loadExisting: true,
+      memory: false,
+      request: {
+        localOnly: true,
+        tools: toolsForProfile(selectedProfile.id),
+        toolChoice: "auto",
+      },
+      systemPrompt,
     },
-    systemPrompt,
   });
-  await chat.bindSession({ session });
   ragImportButton.disabled = !ragReady;
   setPageStatus("ready", "SDK ready · start the model in chat");
 }
@@ -544,8 +547,27 @@ chat.addEventListener("chat-file-uploaded", function importChatKnowledgeFile(eve
 });
 async function settleDisplayedToolCall() {
   const pendingTool = chat.pendingTool;
-  if (!pendingTool || chat.aiAvailability?.llm !== true || toolSettlementPending) return false;
+  if (!pendingTool) {
+    toolSettlementAttempts = 0;
+    toolSettlementCallId = "";
+    toolSettlementWaiting = false;
+    return false;
+  }
+  if (toolSettlementCallId !== pendingTool.id) {
+    toolSettlementAttempts = 0;
+    toolSettlementCallId = pendingTool.id;
+    toolSettlementWaiting = true;
+  }
+  if (
+    chat.aiAvailability?.llm !== true
+    || toolSettlementPending
+    || !toolSettlementWaiting
+    || toolSettlementAttempts >= 2
+  ) return false;
   toolSettlementPending = true;
+  toolSettlementWaiting = false;
+  toolSettlementAttempts += 1;
+  let retryAfterSettlement = false;
   try {
     const accepted = await chat.submitToolResult({
       disposition: "not-executed",
@@ -554,21 +576,43 @@ async function settleDisplayedToolCall() {
       toolCallId: pendingTool.id,
     });
     if (!accepted) {
-      throw new Error("Arcane SDK Chat did not accept the not-executed tool disposition.");
+      if (toolSettlementAttempts < 2) {
+        console.error("Arcane SDK Chat did not accept the not-executed tool disposition; it will retry once after Chat becomes available.");
+        toolSettlementWaiting = true;
+      } else {
+        console.error("Arcane SDK Chat did not accept the not-executed tool disposition after one retry.");
+      }
+      if (chat.aiAvailability?.llm === true && toolSettlementWaiting) {
+        retryAfterSettlement = true;
+      }
+      return false;
     }
+    toolSettlementAttempts = 0;
+    toolSettlementCallId = "";
+    toolSettlementWaiting = false;
     return true;
   } catch (error) {
     console.error("The displayed SDK tool call could not be settled as not executed.", error);
     return false;
   } finally {
     toolSettlementPending = false;
+    if (retryAfterSettlement) {
+      queueMicrotask(function retryToolSettlementAfterRejectedSubmission() {
+        void settleDisplayedToolCall();
+      });
+    }
   }
 }
-chat.addEventListener("chat-session-bound", function settleRestoredToolCall() {
+
+function retryDisplayedToolCallAfterStateChange() {
   void settleDisplayedToolCall();
+}
+
+chat.addEventListener("chat-session-bound", function settleRestoredToolCall() {
+  retryDisplayedToolCallAfterStateChange();
 });
 chat.addEventListener("chat-session-message", function settleNewToolCall() {
-  void settleDisplayedToolCall();
+  retryDisplayedToolCallAfterStateChange();
 });
 window.addEventListener("pagehide", function disposeDemoOnPageHide() {
   void disposeApplication();

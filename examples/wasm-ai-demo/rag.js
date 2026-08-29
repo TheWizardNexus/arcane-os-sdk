@@ -12,18 +12,6 @@ function normalizeProfileId(profileId) {
   return normalized;
 }
 
-function assertDbopfs(dbopfs) {
-  if (!dbopfs || typeof dbopfs !== "object") {
-    throw new TypeError("An Arcane DBOPFS instance is required.");
-  }
-  for (const methodName of ["delete", "get", "getAllKeys", "set"]) {
-    if (typeof dbopfs[methodName] !== "function") {
-      throw new TypeError(`The Arcane DBOPFS instance is missing ${methodName}().`);
-    }
-  }
-  return dbopfs;
-}
-
 function reportStatus(onStatus, message) {
   if (typeof onStatus === "function") onStatus(message);
 }
@@ -106,7 +94,7 @@ async function readCorpus(library, signal) {
   }
 }
 
-async function prepareLibrary({ dbopfs, bundleUrl, onStatus, profileId, signal }) {
+async function prepareLibrary({ dbopfs, bundleUrl, initialLibrary, onStatus, profileId, signal }) {
   let version = "1";
   let bossDocuments = [];
   if (profileId === "boss") {
@@ -118,7 +106,9 @@ async function prepareLibrary({ dbopfs, bundleUrl, onStatus, profileId, signal }
     ));
   }
 
-  const library = createLibrary(dbopfs, profileId, version);
+  const library = profileId === "boss"
+    ? createLibrary(dbopfs, profileId, version)
+    : initialLibrary;
   const existing = await readCorpus(library, signal);
   const userDocuments = existing.matches.filter((document) => document.kind === "user-import");
   const hasBossDocuments = existing.matches.some((document) => document.kind === "boss-library");
@@ -152,7 +142,8 @@ async function prepareLibrary({ dbopfs, bundleUrl, onStatus, profileId, signal }
 
 async function libraryFor(profileId, { dbopfs, bundleUrl, onStatus, signal } = {}) {
   const profile = normalizeProfileId(profileId);
-  const db = assertDbopfs(dbopfs ?? globalThis.dbopfs);
+  const db = dbopfs ?? globalThis.dbopfs;
+  const initialLibrary = createLibrary(db, profile, "1");
   if (db.readyPromise) await db.readyPromise;
   const entries = entryMap(db);
   let entry = entries.get(profile);
@@ -162,6 +153,7 @@ async function libraryFor(profileId, { dbopfs, bundleUrl, onStatus, signal } = {
       ready: prepareLibrary({
         dbopfs: db,
         bundleUrl: bundleUrl || DEFAULT_BOSS_BUNDLE_URL,
+        initialLibrary,
         onStatus,
         profileId: profile,
         signal,
