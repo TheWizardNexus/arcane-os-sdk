@@ -72,20 +72,20 @@ const PROFILES = {
   general: {
     id: "general",
     label: "General",
+    sourceUrl: null,
     minimumContextTokens: 0,
-    instruction: "",
   },
-  focused: {
-    id: "focused",
-    label: "Focused",
-    minimumContextTokens: 0,
-    instruction: "Prioritize the user's immediate goal. Give a direct answer first, retain complete relevant content, and separate facts from open questions.",
+  precrisis: {
+    id: "precrisis",
+    label: "PreCrisis",
+    sourceUrl: "./profiles/PreCrisis.Modelfile",
+    minimumContextTokens: 8_192,
   },
-  tools: {
-    id: "tools",
-    label: "Tool visibility",
-    minimumContextTokens: 0,
-    instruction: "Use a declared function tool when the request clearly calls for one. The browser example displays structural tool calls but does not execute them, so never claim that a requested tool ran or succeeded. Supply a nonempty message argument that honestly explains the proposed handoff to the user.",
+  boss: {
+    id: "boss",
+    label: "BOSS",
+    sourceUrl: "./profiles/BOSS.Modelfile",
+    minimumContextTokens: 8_192,
   },
 };
 
@@ -166,11 +166,43 @@ function generalSystemPrompt() {
   return `You are ${selectedModel.label}, a ${selectedModel.parameterWords} parameter model running locally in this browser. Be concise, helpful, and direct. Accurately identify yourself as ${selectedModel.label}; do not claim to be a hosted service.`;
 }
 
+function extractSystemPrompt(modelfile, profile) {
+  const match = String(modelfile).match(/(?:^|\r?\n)SYSTEM\s+"""\s*\r?\n([\s\S]*?)\r?\n"""/);
+  if (!match?.[1]?.trim()) {
+    throw new Error(`${profile.label} Modelfile has no SYSTEM block.`);
+  }
+  return match[1].trim();
+}
+
+function browserProfileNote(profile) {
+  if (profile.id === "precrisis") {
+    return [
+      "## Browser example capabilities",
+      `This PreCrisis profile is running on ${selectedModel.label} through the live Arcane SDK source.`,
+      "Return structural assessment calls through the declared tools when the profile requires them. Every tool call must include a nonempty message argument for the user. SDK Chat displays and persists each call, then records it as not executed because this example has no application action handler. Never claim that a displayed call ran or succeeded. This example is not a diagnosis or an emergency service.",
+    ].join("\n\n");
+  }
+  if (profile.id === "boss") {
+    return [
+      "## Browser example capabilities",
+      `This BOSS profile is running on ${selectedModel.label} through the live Arcane SDK source.`,
+      "BOSS library retrieval is completed automatically before generation. Results arrive as local document context; use their complete content, titles, and source links when present. Every structural tool call must include a nonempty message argument for the user. SDK Chat displays and persists the call, then records it as not executed because this example has no application action handler. Never claim that a displayed call ran or succeeded.",
+    ].join("\n\n");
+  }
+  return "";
+}
+
 async function loadProfile() {
-  systemPrompt = [
-    generalSystemPrompt(),
-    selectedProfile.instruction,
-  ].filter(Boolean).join("\n\n");
+  if (!selectedProfile.sourceUrl) {
+    systemPrompt = generalSystemPrompt();
+    return systemPrompt;
+  }
+  const response = await fetch(selectedProfile.sourceUrl, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Unable to load ${selectedProfile.label}: HTTP ${response.status}.`);
+  }
+  const profilePrompt = extractSystemPrompt(await response.text(), selectedProfile);
+  systemPrompt = `${profilePrompt}\n\n${browserProfileNote(selectedProfile)}`;
   return systemPrompt;
 }
 
@@ -191,8 +223,13 @@ function updateRagStatus(stats = ragStats) {
     ragStatus.textContent = "Opening the Arcane document library…";
     return;
   }
+  const bossCount = integerStat(stats, ["bossCount", "bossDocuments", "boss"]);
   const userCount = integerStat(stats, ["userCount", "userDocuments", "imported"]);
-  ragStatus.textContent = `${userCount} locally added ${userCount === 1 ? "document" : "documents"}`;
+  if (selectedProfile.id === "boss") {
+    ragStatus.textContent = `${bossCount} BOSS library ${bossCount === 1 ? "record" : "records"} · ${userCount} locally added ${userCount === 1 ? "document" : "documents"}`;
+  } else {
+    ragStatus.textContent = `${userCount} locally added ${userCount === 1 ? "document" : "documents"}`;
+  }
 }
 
 async function loadRag() {
@@ -201,6 +238,7 @@ async function loadRag() {
   try {
     ragStats = await initializeRag({
       dbopfs: globalThis.dbopfs,
+      bundleUrl: "./rag/boss-library.json",
       profileId: selectedProfile.id,
       onStatus(text) {
         if (text) ragStatus.textContent = text;

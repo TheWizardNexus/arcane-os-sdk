@@ -15,7 +15,7 @@ The Arcane SDK owns the shared behavior:
 - `DBOPFSDocumentLibrary` owns the profile-specific local document corpus and lexical retrieval.
 - `PreferenceStore` owns model and profile selection persistence.
 
-The example owns only its branded outer shell, neutral model/profile catalog, example prompts, local-document controls, and example tool declarations. SDK Chat displays structural tool calls; the example records them through Chat's public tool-result method with the explicit `not-executed` disposition so the persisted conversation can continue without pretending an action ran. Arcane OS product prompts and generated product corpora remain with their owning applications and are not copied into this SDK example.
+The example owns its branded outer shell, model/profile catalog, General, PreCrisis, and BOSS prompt policy, maintained BOSS demo catalog, local-document controls, and profile-specific tool declarations. SDK Chat displays structural tool calls; the example records them through Chat's public tool-result method with the explicit `not-executed` disposition so the persisted conversation can continue without pretending an action ran. Every declared tool requires a nonempty user-facing `message`, matching the browser-WASM provider contract.
 
 Chat uses `PersistentAIChatSession`'s SDK-owned streaming seam, which composes live AI deltas with cancellation and one durable persisted turn. SDK Chat also owns the structural tool-call records and their visible disposition.
 
@@ -27,7 +27,9 @@ The app gives the SDK browser-speech owner the existing Whisper tiny.en FP32 and
 
 ## Local retrieval
 
-The Local knowledge control accepts user-selected text documents and stores them through the SDK's `DBOPFSDocumentLibrary`. Retrieval remains isolated by the selected neutral example profile, and every matching document is supplied in full to the current request without copying a product-owned corpus into the SDK repository.
+BOSS seeds the example's maintained document catalog through the SDK's `DBOPFSDocumentLibrary`. The Local knowledge control accepts user-selected text documents and merges them into the selected profile's SDK-owned document corpus. Retrieval remains isolated by profile, and every matching document is supplied in full to the current request.
+
+General uses the selected model's local-browser identity prompt. PreCrisis loads `profiles/PreCrisis.Modelfile`; BOSS loads `profiles/BOSS.Modelfile` and the maintained `rag/boss-library.json` catalog. Those are consumer-owned inputs to the SDK rather than alternate Chat, persistence, speech, or model implementations.
 
 ## Run from this checkout
 
@@ -47,4 +49,4 @@ For example, a local launch can point at preserved prototype assets without maki
     $env:ARCANE_WASM_TLS_ROOT = "C:\path\to\existing\tls"
     node .\examples\wasm-ai-demo\server.mjs
 
-Model weights, browser profiles, caches, generated evidence, runtime reproductions, and TLS private keys remain outside the maintained example.
+Model weights, browser profiles, caches, generated evidence, runtime reproductions, and TLS private keys remain outside the maintained example. The preserved standalone prototype is not edited or used as runtime authority.

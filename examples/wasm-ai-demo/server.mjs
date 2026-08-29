@@ -44,6 +44,8 @@ const publicFiles = new Map([
 
 const publicDirectories = new Map([
   [`${examplePath.slice(1)}/models`, modelDirectory],
+  [`${examplePath.slice(1)}/profiles`, path.join(root, "profiles")],
+  [`${examplePath.slice(1)}/rag`, path.join(root, "rag")],
   ["src", path.join(sdkRoot, "src")],
   ["browser-runtime", path.join(sdkRoot, "browser-runtime")],
   ["runtime/arcane", path.join(sdkRoot, "runtime", "arcane")],
