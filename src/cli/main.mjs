@@ -47,6 +47,7 @@ const REPORTABLE_COMMANDS=new Set([
     'native-doctor','native-prepare','new','package','repo','run','targets','test',
     'update-check','upgrade','verify','verify-bundle','version'
 ]);
+const MAX_NODE_TIMER_DELAY_MS=2_147_483_647;
 
 export const HELP_TEXT=`Arcane OS application SDK ${SDK_VERSION}
 
@@ -76,7 +77,7 @@ Usage:
   ${CLI_NAME} mail key status <profile>
   ${CLI_NAME} mail key delete <profile>
   ${CLI_NAME} mail send --profile <profile> --from <address> --report-key <id> --report-stdin [--request-timeout <ms>]
-  ${CLI_NAME} mail serve --profile <profile> --from <address> --app <id> --origin <origin> --allow-to <addresses> [--app-key-stdin] [--host 127.0.0.1] [--port 8025] [--request-timeout <ms>]
+  ${CLI_NAME} mail serve --profile <profile> --from <address> --app <id> --origin <origin> [--allow-to <addresses>] [--app-key-stdin] [--host 127.0.0.1] [--port 8025] [--request-timeout <ms>]
 
 Development:
   --sdk-runtime-source <sdk-root>  Dev-only live SDK checkout; omitted preserves the workspace runtime mode.
@@ -174,16 +175,17 @@ function readPort(value,defaultValue){
     return port;
 }
 
-function readRequestTimeout(value,defaultValue){
-    if(value===undefined){
-        return defaultValue;
-    }
+function readRequestTimeout(value){
+    if(value===undefined)return undefined;
     if(!/^\d+$/u.test(value)){
         usage(`Invalid request timeout: ${value}.`);
     }
     const timeout=Number(value);
-    if(!Number.isSafeInteger(timeout)||timeout<1_000||timeout>600_000){
-        usage('Mail request timeout must be an integer between 1000 and 600000 milliseconds.');
+    if(!Number.isSafeInteger(timeout)||timeout<1||timeout>MAX_NODE_TIMER_DELAY_MS){
+        usage(
+            `Mail request timeout must be an integer from 1 through ${MAX_NODE_TIMER_DELAY_MS} `
+            +'milliseconds, the Node timer range.'
+        );
     }
     return timeout;
 }
@@ -649,8 +651,7 @@ function operationOptions(command,parsed,cwd){
                 profile:values.profile,
                 from:values.from,
                 app:values.app,
-                origin:values.origin,
-                'allow-to':values['allow-to'],
+                origin:values.origin
             })){
                 if(!value)usage(`mail serve requires --${name} <value>.`);
             }
@@ -664,7 +665,7 @@ function operationOptions(command,parsed,cwd){
                 appKeyStdin:flags.has('app-key-stdin'),
                 host:values.host??'127.0.0.1',
                 port:readPort(values.port,8025),
-                requestTimeout:readRequestTimeout(values['request-timeout'],30_000),
+                requestTimeout:readRequestTimeout(values['request-timeout']),
             };
         }
         if(area==='send'){
@@ -693,7 +694,7 @@ function operationOptions(command,parsed,cwd){
                 from:values.from,
                 reportKey:values['report-key'],
                 reportStdin:true,
-                requestTimeout:readRequestTimeout(values['request-timeout'],30_000),
+                requestTimeout:readRequestTimeout(values['request-timeout']),
             };
         }
         usage('mail requires key set|status|delete <profile>, send, or serve.');

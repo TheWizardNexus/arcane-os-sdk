@@ -16,24 +16,25 @@ and exits nonzero on failure. Machine output is defined by
 | `arcane new <id>` | Creates one external app workspace. |
 | `arcane init [id]` | Initializes one app in an external or integrated workspace without rewriting unrelated files. |
 | `arcane doctor` | Reads and reports Node/tooling, SDK runtime, workspace, optional Arcane source recognition, and supported managed ArcaneOllama readiness. |
-| `arcane import-map` | Authenticates and refreshes one app's managed browser import map and matching HTML entry. |
+| `arcane import-map` | Refreshes one app's managed browser import map and every directly navigable descriptor-selected HTML/HTM document. |
+| `arcane upgrade` | Runs the external application's ordinary `npm upgrade` command. |
 | `arcane dev` | Starts one owned browser development server for one selected app. |
 | `arcane test` | Runs one app test boundary or one explicit integrated shared test file. |
 | `arcane check` | Validates one app boundary or the canonical integrated shared check. |
 | `arcane package` | Creates one browser release, or plans it with `--dry-run`. |
-| `arcane verify` | Authenticates one existing browser release. |
+| `arcane verify` | Validates one explicitly selected existing browser release. |
 | `arcane bundle` | Creates one deterministic external-app release archive. |
 | `arcane verify-bundle` | Verifies one deterministic external-app release archive without extraction. |
 | `arcane native-doctor` | Diagnoses one explicit native provider and host. |
-| `arcane native-prepare` | Runs one standalone provider toolchain-integrity preparation diagnostic. |
-| `arcane build` | Packages, plans, builds, and retained-verifies one target artifact. |
-| `arcane run` | Verifies and serves an existing browser release, or packages, plans, builds, verifies, and launches one paired native artifact. |
+| `arcane native-prepare` | Runs one standalone provider toolchain preparation diagnostic. |
+| `arcane build` | Packages, plans, and builds one target artifact. |
+| `arcane run` | Serves an existing browser release, or packages, plans, builds, and launches one paired native artifact. |
 | `arcane update-check` | Performs one explicit, read-only npm dist-tag query for the installed SDK version. |
 | `arcane targets` | Lists target ids, declared status, formats, architectures, signing profiles, methods, and pairing reason. |
 | `arcane repo status\|pull\|push` | Runs one selected repository operation for the current app workspace. |
 | `arcane mail key set\|status\|delete` | Manages one server-only Resend API-key profile in Windows Credential Manager. |
-| `arcane mail send` | Performs one explicit, idempotency-keyed Resend attempt from a bounded JSON report on redirected stdin. |
-| `arcane mail serve` | Starts one authenticated numeric-loopback Arcane-to-Resend gateway with exact app, Origin, and recipient admission. |
+| `arcane mail send` | Performs one explicit, idempotency-keyed Resend attempt from a complete JSON report on redirected stdin. |
+| `arcane mail serve` | Starts one credential-protected numeric-loopback Arcane-to-Resend gateway for the selected app, Origin, and recipients. |
 
 ## Parser-wide options
 
@@ -57,9 +58,9 @@ meaning and cardinality rules:
 | `--profile` | credential profile id | `mail send`, `mail serve` |
 | `--from` | verified sender | `mail send`, `mail serve` |
 | `--origin` | exact browser origin | `mail serve` |
-| `--allow-to` | one to 50 comma-separated addresses | `mail serve` |
-| `--report-key` | 8–128 safe characters | `mail send`; caller-owned stable Resend idempotency key |
-| `--request-timeout` | integer 1000–600000 ms | `mail send`, `mail serve` |
+| `--allow-to` | optional comma-separated addresses | `mail serve` |
+| `--report-key` | nonempty safe-character string | `mail send`; caller-owned stable Resend idempotency key |
+| `--request-timeout` | optional integer from 1 through 2147483647 milliseconds | `mail send`, `mail serve` |
 | `--output` | `human`, `json`, `ndjson` | Every invocation; the final occurrence wins. |
 | `--git` | flag | `new` |
 | `--skip-tests` | flag | `check --scope app` |
@@ -179,11 +180,19 @@ npm exec -- arcane doctor --workspace . --arcane-root "../Arcane OS"
 
 ### Overview
 
-Authenticates one selected application's physical browser runtime, generates
-its standard browser import map, and commits the map artifact and configured
-managed HTML entry as one bounded refresh. Packaging uses the same operation
-with the complete included `.html`/`.htm` document inventory so every packaged
-browser page receives byte-identical managed import-map JSON.
+Refreshes one selected application's physical browser runtime map, generates
+its standard browser import map, discovers every directly navigable
+`.html`/`.htm` document admitted by the selected descriptor's existing
+include/exclude rules, and commits the map artifact plus those managed documents
+as one transactional refresh. A current directly navigable document declares exactly
+one `<meta name="arcane-app-id" content="<selected-id>">`; the patch-compatible
+legacy path also admits an unmarked secondary document with an active `<base>`.
+Wrong or duplicate explicit app identity fails. The renderer then requires one
+path-correct base for every selected document. Included HTML files with neither
+the identity marker nor an active base are component fragments: they remain
+package files and are not rewritten with a document-level import map.
+Packaging and development use the same discovery owner, so directly navigable
+source pages and packaged pages receive the same complete managed import-map JSON.
 
 ```text
 arcane import-map [--workspace <directory>] [--app <id>]
@@ -196,12 +205,14 @@ identical executable alias.
 
 The generated artifact is
 `apps/<id>/modules/arcane.importmap.json`. Its exact JSON is also installed in
-the app entry as `<script type="importmap" data-arcane-import-map>` before
-module loading. In SDK `0.3.1`, the complete physical-v1 runtime derives its
-entries from the installed runtime and browser-runtime inventories and
-intentionally has no package-root mapping. The command receipt remains
-authoritative for the exact map written to the selected application; no fixed
-entry count is a release contract.
+the configured entry and every other admitted browser document as `<script
+type="importmap" data-arcane-import-map>` before module loading. The complete
+physical-v1 runtime derives its entries from the installed runtime and
+browser-runtime inventories. It intentionally has no package-root mapping;
+portable runtime subpaths such as `arcane-os/preference-store` and
+`arcane-os/speech-playback` instead map directly to their canonical projected
+modules. The result reports the complete map written to the selected
+application; no fixed entry count is a release contract.
 
 ### Result and safety
 
@@ -218,37 +229,27 @@ Success returns the normal selected-workspace wrapper:
         artifactRelativePath,
         entryPath,
         documentPaths,
-        documentCount:1,
+        documentCount,
         imports,
-        entryCount:Object.keys(imports).length,
         excludedModules:['modules/CaseEvidenceIndexer.js'],
-        files:[
-            {role:'artifact',path,bytes,sha256},
-            {role:'entry',path,bytes,sha256}
-        ],
-        cleanupWarnings,
         committed:true
     }
 }
 ```
 
-For the direct CLI command, `documentPaths` contains the configured entry and
-`documentCount` is one. The `files` array always places the artifact first, the
-configured entry second, and any additional packaging documents afterward as
-`{role:'document',path,bytes,sha256}` in deterministic order. Every record binds
-the committed byte length and SHA-256. A post-commit observer failure preserves
-delivery as a successful receipt with `eventDelivery.status === 'degraded'` and
-`ARCANE_EVENT_DELIVERY_FAILED`; it does not roll back valid application bytes.
-Packaging refuses a committed refresh that reports cleanup warnings.
+For the direct CLI command, `documentPaths` contains the configured entry first
+and every other descriptor-selected HTML/HTM document afterward in
+deterministic order. The generated artifact and selected documents are written
+together. A post-commit observer failure preserves delivery with
+`eventDelivery.status === 'degraded'` and `ARCANE_EVENT_DELIVERY_FAILED`; it
+does not roll back complete application content.
 
-An authenticated external package also publishes
-`/ARCANE_RUNTIME_PROJECTION.json`. The immutable JSON is
-`{schemaVersion:1,kind:'arcane-app-runtime-projection',sdkVersion,
-pathPrefix:'arcane/',fileCount,totalBytes,contentSha256,
-files:[{path,bytes,sha256}]}` and is bound by the packaged release inventory.
-The development server exposes the same public route from its authenticated
-workspace projection. The private `/ARCANE_APP_RELEASE.json` authority is not
-served to application code. Invalid or forged projection data fails
+An external package also publishes `/ARCANE_RUNTIME_PROJECTION.json`. The JSON
+is `{schemaVersion:1,kind:'arcane-app-runtime-projection',sdkVersion,
+pathPrefix:'arcane/',files:[{path}]}` and lists the complete packaged runtime.
+The development server exposes the same public route from its workspace
+projection. The private `/ARCANE_APP_RELEASE.json` record is not served to
+application code. Malformed projection data fails
 `ARCANE_RUNTIME_PROJECTION_INVALID`.
 
 The canonical integrated-legacy workspace has a deliberate compatibility
@@ -256,10 +257,12 @@ result instead of an artifact: `importMap.skipped` is `true`,
 `importMap.compatibility` is `'integrated-legacy'`, and the reason states that
 the physical two-route browser runtime is retained.
 
-`new` and `init` generate the map during scaffolding. `dev` refreshes it once
-before binding; non-dry-run `package` and browser `build` refresh it before
-collection. Paired native packaging refreshes each packaged app. `test`,
-`check`, `verify`, `bundle`, and browser `run` do not regenerate it. There is no
+`new` and `init` generate the map during scaffolding. `dev` refreshes all
+selected documents once before binding; non-dry-run `package` refreshes them
+once, then collects the complete release. Packaging does not run tests or
+checks automatically. Browser `build` and paired native packaging reuse the
+package flow. Explicit `test` and `check` operations read the existing map without regenerating it;
+`verify`, `bundle`, and browser `run` do not regenerate it. There is no
 watcher, polling, scheduled refresh, download, or self-update behavior.
 
 There is no supported `--dry-run` for `import-map`: do not pass that parser-wide
@@ -275,7 +278,29 @@ cancellation failures retain their normal SDK codes.
 npm exec -- arcane import-map --workspace . --app hello-world --output json
 ```
 
-Deep details: [authenticated browser delivery and receipts](protocols.md#browser-runtime-delivery).
+Deep details: [browser runtime delivery](protocols.md#browser-runtime-delivery).
+
+## `arcane upgrade`
+
+### Overview
+
+Runs the selected external application's normal `npm upgrade` command in its
+workspace root.
+
+```text
+arcane upgrade [--workspace <directory>] [--app <id>]
+```
+
+The SDK delegates dependency selection, registry access, lockfile updates, and
+installed package changes directly to npm. It does not add a custom Arcane lock,
+runtime-projection authentication, or import-map reconciliation workflow.
+Integrated workspaces reject this command.
+
+### Example
+
+```bash
+npm exec -- arcane upgrade --workspace . --app hello-world
+```
 
 ## `arcane dev`
 
@@ -321,6 +346,14 @@ integrated-only and admits one exact repository-relative `.test.mjs` through
 Arcane's fixed provider. It cannot run an arbitrary command, glob every test,
 or cross into another app.
 
+External and modern integrated app scope reads the existing managed import map
+and selected HTML documents before starting isolated test files. The
+Node loader honors only exact managed entries, including `arcane/*`,
+`#arcane/*`, reached `arcane-os/*`, and URL-like dependency compatibility keys.
+An unmapped reserved Arcane name is rejected before import. The compact map locator is
+removed from the isolated child's environment before app test code imports.
+Integrated-legacy scope retains its existing no-map compatibility path.
+
 ### Example
 
 ```bash
@@ -358,18 +391,21 @@ npm exec -- arcane check --app hello-world
 
 ### Overview
 
-Creates and authenticates one browser release beneath `dist/<id>/`, preserving
-the prior output until the replacement is verified.
+Creates one complete browser release beneath `dist/<id>/`, preserving the prior
+output until the replacement is complete. It refreshes the selected document
+map once, then assembles `dist`. Packaging does not run tests or checks
+automatically.
 
 ```text
 arcane package [--app <id>] [--dry-run]
 ```
 
-### Result and receipts
+### Result
 
-The result includes the release root, manifest, positive inventory, hashes,
-byte counts, policy identity, and a process-authenticated release receipt.
-`--dry-run` plans the selected package without replacing output.
+The result includes the release root, manifest, and complete selected inventory
+without byte counts, hashes, digests, provenance receipts, or test evidence.
+`--dry-run` plans the package without refreshing source, running tests, or
+replacing output.
 
 ### Example
 
@@ -381,8 +417,8 @@ npm exec -- arcane package --app hello-world
 
 ### Overview
 
-Authenticates one existing browser release against the app descriptor, package
-policy, exact inventory, file identities, byte lengths, and hashes.
+Explicitly validates one selected browser release against the app descriptor,
+package policy, complete inventory, and malformed-artifact rules.
 
 ```text
 arcane verify [--app <id>]
@@ -404,7 +440,7 @@ npm exec -- arcane verify --app hello-world
 
 ### Overview
 
-Seals one already packaged and authenticated external app into the deterministic
+Bundles one already packaged external app into the documented
 `.arcane-app.tar.gz` contract.
 
 ```text
@@ -415,8 +451,8 @@ arcane bundle [--app <id>] [--artifact <file>.arcane-app.tar.gz] [--overwrite]
 
 The default output is `dist/<id>-<version>.arcane-app.tar.gz`. An existing path
 is refused unless `--overwrite` is explicit. Even then, the prior artifact is
-retained until the promoted bytes pass final exact-length, hash, link, and
-filesystem-identity checks.
+retained until the replacement is complete. A conflicting or uncertain path is
+preserved rather than overwritten.
 
 ### Example
 
@@ -428,7 +464,7 @@ npm exec -- arcane bundle --app hello-world
 
 ### Overview
 
-Parses and authenticates one release bundle without extracting it.
+Parses one selected release bundle without extracting it.
 
 ```text
 arcane verify-bundle <file.arcane-app.tar.gz>
@@ -436,10 +472,10 @@ arcane verify-bundle <file.arcane-app.tar.gz>
 
 ### Validation
 
-The verifier enforces the canonical gzip member, USTAR metadata and order,
-portable paths, expansion limits, canonical descriptor, release policy,
-inventory, bytes, and hashes. Internal consistency is not installation
-authority.
+The verifier rejects genuinely malformed archives, unsafe or colliding paths,
+unsupported archive members, trailing data, and inconsistent descriptor or
+inventory structure. It does not impose byte counts, byte limits, hashes,
+digests, provenance, or admission policy.
 
 ### Example
 
@@ -476,9 +512,9 @@ npm exec -- arcane native-doctor \
 
 ### Overview
 
-Runs the provider's standalone toolchain-integrity preparation diagnostic for
-one target. It is not a prerequisite command to repeat immediately before
-`build`; `build` prepares and retains its own process-owned receipt.
+Runs the provider's standalone toolchain preparation diagnostic for one target.
+It is not a prerequisite command to repeat immediately before `build`; `build`
+prepares its own selected toolchain state.
 
 ```text
 arcane native-prepare --target <native-target> --arcane-root <directory>
@@ -496,8 +532,7 @@ npm exec -- arcane native-prepare \
 
 ### Overview
 
-Packages one app, prepares one provider, creates one immutable plan, builds one
-target, and retained-verifies one result.
+Packages one app, prepares one provider, creates one plan, and builds one target.
 
 ```text
 arcane build --target <target> [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>] [--dry-run]
@@ -506,9 +541,9 @@ arcane build --target <target> [--arcane-root <directory>] [--output-root <direc
 ### Cardinality and outputs
 
 The command selects one workspace, app, target, architecture, format, signing
-profile, and output root. Current providers emit a verified portable directory,
+profile, and output root. Current providers emit a portable directory,
 Windows x64 EXE bundle, Linux x64/ARM64 DEB, or development-signed Android APK.
-The output remains target-specific inside the common plan/receipt contract.
+The output remains target-specific inside the common plan contract.
 `--dry-run` is implemented for the browser build path. Native builds reject it
 rather than returning a fictional native artifact plan.
 
@@ -525,11 +560,10 @@ npm exec -- arcane build \
 
 ### Overview
 
-For `--target browser`, verifies the existing current `dist/<app>` release
-and starts its packaged server; it does not package or rebuild that release.
-For a paired native target, performs package, prepare, plan, build, retained
-verification, launch, readiness, and owned cancellation in one process so
-process-local receipts remain authoritative.
+For `--target browser`, starts the existing current `dist/<app>` release; it
+does not package, rebuild, test, check, or verify that release automatically.
+For a paired native target, it performs package, prepare, plan, build, launch,
+readiness, and owned cancellation in one process.
 
 ```text
 arcane run [--target <target>] [--app <id>] [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>]
@@ -538,9 +572,9 @@ arcane run [--target <target>] [--app <id>] [--arcane-root <directory>] [--outpu
 ### Availability
 
 Browser run is **Node control plane / browser data plane** and requires an
-existing verified release (run `arcane package` first). Windows, Linux, and
+existing packaged release (run `arcane package` first). Windows, Linux, and
 Android providers expose supported paired native run paths. Portable output is
-a verified directory and intentionally cannot run. Android run requires one
+a directory and intentionally cannot run. Android run requires one
 connected physical/native ARM64 device for the current target.
 
 ### Example
@@ -569,12 +603,10 @@ configuration, or self-updates. Arcane applications do not run it automatically.
 
 ### Request boundary
 
-The command makes one bounded, credential-free HTTPS `GET` to the approved
-`registry.npmjs.org` origin for the `arcane-os` dist-tag document. It rejects
-redirects and changed request identity, omits credentials and referrer data,
-disables cache use, accepts only JSON, limits the response to 32 KiB, and uses a
-2.5-second timeout. The CLI does not expose registry, package, or timeout
-overrides.
+The command makes one ordinary HTTPS `GET` to the default
+`registry.npmjs.org` origin for the `arcane-os` dist-tag document and accepts
+JSON. The CLI does not expose registry or package overrides; callers of the
+public function may select another HTTP or HTTPS npm registry URL.
 
 An installed prerelease version selects the npm `dev` tag. A stable installed
 version selects `latest`.
@@ -605,8 +637,8 @@ status. Reporting availability does not authorize or perform installation.
 
 The normal CLI envelope emits `operation.accepted`, then
 `update.check.started`. Success emits `update.check.completed` followed by the
-terminal `operation.completed` result. HTTP failure, timeout, changed origin,
-oversized/non-JSON/invalid UTF-8 content, malformed dist tags, or invalid semantic
+terminal `operation.completed` result. HTTP failure, timeout,
+non-JSON/invalid UTF-8 content, malformed dist tags, or invalid semantic
 versions emit `update.check.failed` and terminate as `operation.failed` with
 `ARCANE_UPDATE_CHECK_FAILED` and exit status `1`.
 
@@ -679,7 +711,8 @@ rejects a TTY before reading. The key is sent to the Windows Credential Manager
 helper over child-process stdin, never argv, and no plaintext fallback is
 created. Status reports only whether the profile exists. Delete returns the
 selected profile with `exists:false`; it intentionally does not distinguish a
-new deletion from an already-absent profile. Non-Windows hosts fail closed.
+new deletion from an already-absent profile. Non-Windows hosts report the
+credential operation as unavailable.
 
 Machine output for `key set` requires `--secret-stdin`. Raw CLI arguments are
 not included in acceptance events, and usage errors do not echo unknown option
@@ -695,8 +728,8 @@ arcane mail send --profile <profile> --from <verified-sender> --report-key <id> 
 ```
 
 `--report-stdin` is mandatory and rejects a terminal before attaching input
-listeners. It accepts one UTF-8 JSON object up to 52 MiB using the existing
-gateway report shape:
+listeners. It reads one complete UTF-8 JSON object using the gateway report
+shape:
 
 ```json
 {
@@ -707,23 +740,24 @@ gateway report shape:
 }
 ```
 
-The exact closed report keys are `type`, `to`, `subject`, and at least one of
-`text` or `html`. Direct CLI sending requires one to 50 explicit unique
-recipients, including for `error` reports. The Resend credential comes only
-from the selected Windows Credential Manager profile; neither it nor report
-content is accepted through argv, environment variables, or result fields.
+The required fields are `type`, `to`, `subject`, and at least one of `text` or
+`html`; additional JSON-compatible provider fields are preserved. Direct CLI
+sending requires at least one explicit recipient, including for `error`
+reports. The Resend credential comes only from the selected Windows Credential
+Manager profile; neither it nor report content is accepted through argv or
+environment variables.
 
-The caller owns `--report-key`. It must contain 8–128 ASCII letters, digits,
+The caller owns `--report-key`. It must contain one or more ASCII letters, digits,
 periods, underscores, colons, or hyphens. Reuse the same key only with the same
-byte-equivalent logical report when deliberately reconciling or retrying an
+logical report when deliberately reconciling or retrying an
 ambiguous attempt. The CLI never retries automatically.
 
 Exit zero means Resend returned a successful response with a valid provider
-acceptance id. The privacy-safe result contains only provider, status,
-classification, request id, provider id, provider HTTP status, and recipient
-count. It proves provider API acceptance, not inbox delivery. Permanent,
-retryable, and ambiguous outcomes exit nonzero with only normalized code,
-status, retry, uncertainty, and count metadata. Cancellation before the
+acceptance id. The result preserves the complete report, provider request,
+provider response, and available outcome detail without exposing the Resend API
+key. It proves provider API acceptance, not inbox delivery. Permanent,
+retryable, and ambiguous outcomes exit nonzero with that same complete
+available request and outcome detail. Cancellation before the
 provider attempt exits 130 without sending; cancellation, timeout, or transport
 loss after the attempt begins is ambiguous because Resend may have accepted it.
 
@@ -732,7 +766,7 @@ loss after the attempt begins is ambiguous because Resend may have accepted it.
 `mail serve` starts one owned Node HTTP gateway:
 
 ```text
-arcane mail serve --profile <profile> --from <verified-sender> --app <id> --origin <exact-origin> --allow-to <addresses> [--app-key-stdin] [--host 127.0.0.1] [--port 8025] [--request-timeout <ms>]
+arcane mail serve --profile <profile> --from <verified-sender> --app <id> --origin <exact-origin> [--allow-to <addresses>] [--app-key-stdin] [--host 127.0.0.1] [--port 8025] [--request-timeout <ms>]
 ```
 
 The selected credential profile supplies only the server-side Resend API key.
@@ -742,16 +776,19 @@ argv value or part of the server result. The browser must use the same value as
 `arcane.config.mail.appKey`.
 
 The CLI admits only numeric loopback host values accepted by the gateway. The
-gateway also binds the exact app id, Origin, sender, and recipient allowlist,
-and it requires the separate app key by default. `--allow-to` accepts one to 50
-comma-separated unique recipients. `--request-timeout` is the one provider
-attempt timeout in milliseconds and defaults to `30000`.
+gateway also binds the exact app id, Origin, and sender, and it requires the
+separate app key by default. `--allow-to` optionally supplies a comma-separated
+recipient allowlist with no fixed recipient-count ceiling. `--request-timeout`
+adds a caller-selected provider-attempt timeout from 1 through 2147483647
+milliseconds, the Node timer range. When it is omitted, the SDK adds no
+provider timeout.
 
-After binding, `server.ready` reports only sanitized lifecycle fields such as
+After binding, `server.ready` reports lifecycle fields such as
 protocol, app id, loopback address, port, URL, and caller-authentication mode.
 The command owns the server until its lifecycle ends or `SIGINT`/`SIGTERM`
-cancels it. Neither Resend nor local app credentials, sender/recipient policy,
-or message content appear in the result or observer events.
+cancels it. Resend and local app credentials never appear in results or events;
+per-request observer events preserve the complete delivery, report, provider
+outcome, and failure detail available to the gateway.
 
 See [Mail gateway and durable outbox](mail.md) for request, retry,
 idempotency, DBOPFS, and provider-acceptance semantics.

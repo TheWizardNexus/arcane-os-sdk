@@ -171,7 +171,9 @@ test('mail gateway rejects malformed credential and endpoint configuration befor
         {allowUnauthenticatedCaller:true},
         {appId:'Invalid App'},
         {from:'sender@example.test\r\nBcc: attacker@example.test'},
-        {errorRecipients:['outside@example.test']}
+        {errorRecipients:['outside@example.test']},
+        {bodyTimeoutMs:2_147_483_648},
+        {providerTimeoutMs:2_147_483_648}
     ];
     for(const overrides of invalidOptions){
         assert.throws(

@@ -19,6 +19,7 @@ const PREFLIGHT_HEADERS=new Set([
 ]);
 const PERMANENT_RATE_CODES=new Set(['daily_quota_exceeded','monthly_quota_exceeded']);
 const RETRYABLE_PROVIDER_STATUSES=new Set([408,425,429,500,502,503,504]);
+const MAX_NODE_TIMER_DELAY_MS=2_147_483_647;
 
 class MailGatewayFault extends Error {
     constructor(code,{details=null,retryable=false,retryAfterMs=0,statusCode=400,uncertain=false}={}){
@@ -61,9 +62,15 @@ function positiveInteger(value,fallback,{label,allowZero=false}={}){
     return resolved;
 }
 
-function optionalPositiveInteger(value,label){
+function optionalTimerDelay(value,label){
     if(value===undefined||value===null) return null;
-    return positiveInteger(value,null,{label});
+    if(!Number.isSafeInteger(value)||value<1||value>MAX_NODE_TIMER_DELAY_MS){
+        throw configurationError(
+            `${label} must be an integer from 1 through ${MAX_NODE_TIMER_DELAY_MS} `
+            +'milliseconds, the Node timer range.'
+        );
+    }
+    return value;
 }
 
 function normalizeRetryAfter(value){
@@ -248,7 +255,7 @@ function normalizeConfiguration(options={}){
         apiKey:validateApiKey(options.apiKey),
         appKeyDigest:callerAuthentication.appKeyDigest,
         appId:validateAppId(options.appId),
-        bodyTimeoutMs:optionalPositiveInteger(options.bodyTimeoutMs,'bodyTimeoutMs'),
+        bodyTimeoutMs:optionalTimerDelay(options.bodyTimeoutMs,'bodyTimeoutMs'),
         errorRecipients,
         fetchImpl,
         from:validateFrom(options.from),
@@ -256,7 +263,7 @@ function normalizeConfiguration(options={}){
         callerAuthentication:callerAuthentication.callerAuthentication,
         onEvent:options.onEvent,
         port:portNumber(options.port,8025),
-        providerTimeoutMs:optionalPositiveInteger(options.providerTimeoutMs,'providerTimeoutMs'),
+        providerTimeoutMs:optionalTimerDelay(options.providerTimeoutMs,'providerTimeoutMs'),
         requestIdFactory:options.requestIdFactory??randomUUID,
         retryableDelayMs:positiveInteger(
             options.retryableDelayMs,
@@ -968,7 +975,7 @@ function normalizeDirectSendOptions(options){
         errorRecipients:[],
         fetchImpl,
         from:validateFrom(options.from),
-        providerTimeoutMs:optionalPositiveInteger(options.providerTimeoutMs,'providerTimeoutMs'),
+        providerTimeoutMs:optionalTimerDelay(options.providerTimeoutMs,'providerTimeoutMs'),
         requestIdFactory:options.requestIdFactory??randomUUID,
         retryableDelayMs:positiveInteger(
             options.retryableDelayMs,

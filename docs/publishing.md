@@ -16,49 +16,38 @@ dependency and invoke its local CLI with `npm exec -- arcane`. A separate
 global installer, standalone SDK executable, NuGet package, Homebrew formula,
 or OS package is not part of this release surface.
 
-`Check` validates only package-publication authority once: package metadata,
-the executable and `.gitattributes` boundary, both authenticated runtime
-receipts, and the focused npm identity/channel/provenance contract. One
-unprivileged producer then packs one `.tgz` under pinned Node and npm versions.
-The producer writes a canonical manifest containing the source SHA,
-clean-checkout flag, package inventory, byte length, SHA-256, npm SHA-1 shasum,
-and SHA-512 integrity. One Ubuntu x64 consumer at the declared Node `22.23.2`
-floor downloads that Actions artifact by immutable artifact id, verifies the
-receipt, installs the tarball into a disposable project, exercises
-`npm exec --offline -- arcane`, and runs one small capability contract through
-the installed package's `arcane-test.mjs`. It never repacks. A final readiness
-job verifies the same artifact's identity, integrity, shasum, license inventory,
-and content boundary once. Golden snapshots, broad integration/regression and
-platform matrices, browser/process simulations, Pages, Examples, and
-presentation work are normal or post-registry checks rather than npm
-publication gates.
+Publication checks run only after the user explicitly selects an npm release.
+That selected-release workflow validates package metadata, the executable and
+`.gitattributes` boundary, the complete package inventory, version/channel
+agreement, and required license notices. One unprivileged producer packs one
+`.tgz` under the selected Node and npm versions and uploads it as one Actions
+artifact with a recorded run id, artifact id, version, and source commit. It
+does not impose byte counts, hashes, digests, provenance receipts, or unrelated
+test suites as ordinary development gates. Broader integration, regression,
+platform, browser, presentation, and documentation work remains separately
+user selected.
 
 `publish-dev.yml` can run only when manually dispatched from `main` in
-`TheWizardNexus/arcane-os-sdk`. Dispatch requires an authorized npm content
-classification. `unresolved` fails closed. `standard` permits the workflow's
-direct trusted-publishing path only when the package has no conflicting
-dual-use declaration. `dual-use` fails closed until the package includes npm's
-persistent `contentPolicy.class=dual-use` metadata and root `DISCLOSURE`, and
-the workflow is deliberately changed to `npm stage publish` plus human 2FA
-promotion. Direct trusted publishing is not permitted for that class.
-
-For the standard path, the workflow authenticates a successful `Check` push
-run for that exact `main` SHA, downloads its immutable package artifact,
-reverifies the manifest and bytes, derives `dev` or `latest` from the strict
-version, and publishes the downloaded `.tgz`. It
-never invokes `npm pack` or `npm publish .` under publication authority. A
+`TheWizardNexus/arcane-os-sdk`. Dispatch supplies the exact successful Check
+run id, artifact id, and numeric version. The workflow downloads that exact Check
+artifact, derives `dev` or `latest` from its version, and publishes the selected
+`.tgz`. It may check out current source only for the publication controller; it
+never repacks current source and never invokes `npm pack` or `npm publish .`
+under publication authority. A
 repository-wide concurrency group prevents simultaneous publication jobs;
 GitHub may replace an older pending dispatch, and each surviving dispatch is
-safe to rerun. Preflight rejects byte mismatches, tag rollback, malformed
-registry state, or any dist-tag other than `dev` and `latest`; an
-already-published matching version is an idempotent success. The historical
-first-version state where both tags identify `0.1.0-dev.5` is accepted only
-with its recorded integrity and shasum and only while no stable version exists.
-Post-publication verification preserves the other channel, checks integrity
-and shasum, and validates trusted-publisher provenance. It tolerates npm's
-publish-time scanning for up to 15 minutes. If
+safe to rerun. Preflight rejects tag rollback, malformed registry state, or any
+dist-tag other than `dev` and `latest`; an already-published matching version
+is an idempotent success. Post-publication status preserves the other channel
+and reports npm's response. It tolerates npm's publish-time scanning. If
 scanning or manual review remains pending, the workflow reports that state and
-a rerun safely resumes verification without republishing immutable bytes.
+a rerun safely resumes without republishing the version.
+
+The public `0.3.2` release is fixed to package-source commit
+`445bd2d982f12e6ef8dd2b615c70512000cc5224`, selected Check run
+`33264677687`, and publication/registry run `33264829711`. Its numeric Git tag
+and GitHub release title are both `0.3.2`. Later documentation or example
+commits do not replace that package authority.
 
 The unscoped package installs both `arcane` and `arcane-os`. The short command
 is the documented default; `arcane-os` is the collision-safe fallback. npm
@@ -68,42 +57,18 @@ When `npm view arcane-os@dev version` reports the package unavailable, run
 `npm run pack:local` in this SDK checkout for local development, scaffold with
 `node ./bin/arcane.mjs new ...`, and install the resulting `.tgz` into the app
 with `npm install --save-dev --save-exact <path>`. Keep the tarball at the path
-recorded by `package-lock.json`; subsequent `npm ci` verifies its recorded npm
-integrity. Arcane separately authenticates the installed package's exact name
-and version against the root dependency declaration and verifies the locked
-runtime. A local directory `file:` install is intentionally unsupported because
+recorded by `package-lock.json`; subsequent `npm ci` uses that declared package.
+Arcane reads the installed package's name and version against the root
+dependency declaration. A local directory `file:` install is intentionally unsupported because
 it may be linked.
 
-The first-version bootstrap established these permanent audit boundaries:
-
-1. Push the intended clean `main` commit and require the npm-critical Check
-   workflow—package authority, one producer, one installed Linux capability
-   smoke, and one identity/legal verifier—to pass.
-2. Review the uploaded tarball inventory, manifest, checksum, and license
-   notices. Ensure the Arcane OS monorepo package is private so it cannot publish
-   the same npm name accidentally.
-3. Make and record the npm content-policy decision before packing the bootstrap
-   bytes. A `standard` decision permits direct OIDC after bootstrap. A
-   `dual-use` decision requires `contentPolicy.class=dual-use`, a root
-   `DISCLOSURE` in the tarball, and staged publication with human 2FA promotion;
-   npm treats that declaration as persistent across versions.
-4. Because npm requires a package to exist before trusted or staged publishing
-   can be configured, an authorized npm maintainer must download that exact
-   green Actions artifact and publish its `.tgz` once under `dev` through an
-   interactive session with 2FA. That method is permitted for either content
-   class; the dual-use metadata and disclosure must already be inside the exact
-   tarball. Do not rebuild or repack it for this bootstrap. After the package
-   exists, standard releases may publish directly through OIDC, while dual-use
-   releases must use `npm stage publish` and human 2FA promotion.
-5. Verify the registry's `dist.integrity` and shasum. npm's required bootstrap
-   state has both `dev` and `latest` at the immutable `0.1.0-dev.5` bytes
-   until the first stable publish moves only `latest`. The sole trusted
-   publisher is the exact `publish-dev.yml` workflow and `npm` environment.
-6. Later standard development versions may use the workflow's direct OIDC
-   authority. A dual-use version must be staged and promoted with human 2FA.
-   Any missing policy decision, package bootstrap, environment, publisher
-   binding, or exact-SHA artifact is a publication blocker rather than a reason
-   to fall back to a token or repack.
+The npm package already has its trusted-publishing relationship. Each later
+release therefore follows the same direct selected-artifact path: push the
+intended `main` source, manually run Check for that exact revision, review the
+resulting package inventory and legal notices, then manually dispatch
+publication with that Check run and artifact. Confirm the selected version and
+dist-tag after publication. Never rebuild or repack the artifact under
+publication authority, and never substitute a different source revision.
 
 Generated app CI uses `npm ci --ignore-scripts`, so its lock must exist and its
 dependency source must be reachable by the runner. A sibling local tarball is a
@@ -112,92 +77,50 @@ exact registry release (or deliberately vendor the tarball) before remote CI.
 
 ## Reusable application release workflow
 
-External app repositories can call `.github/workflows/release-app.yml` by an
-immutable SDK repository revision. The reusable workflow checks out the exact
-caller SHA, installs only the caller's committed dependency lock, requires the
-exact public `arcane-os` authority encoded by that immutable workflow revision,
-and checks, packages, bundles, independently verifies, and uploads one explicitly
-selected app. Every third-party action reference is pinned to a full commit SHA.
+The checked-in reusable workflow is not an ordinary supported release path
+until its implementation matches the governing contract below.
+
+External app repositories can call `.github/workflows/release-app.yml` from a
+selected SDK repository revision. The reusable workflow checks out the selected
+caller commit, installs only the caller's committed dependency lock, packages,
+bundles, and uploads one explicitly selected app. Any tests, checks, or artifact
+verification run only because that release output was explicitly selected.
 The workflow never publishes npm, creates a GitHub Release, loops across apps,
-or changes Arcane admission state.
+or changes Arcane runtime policy.
 
-The build job holds only `contents: read`; its caller-owned checks, package
-scripts, and adapters never receive `id-token: write` or `attestations: write`.
-It uploads the exact bundle together with canonical metadata. A fresh
-caller-code-free job downloads that upload by immutable artifact id, checks out
-the called workflow's exact SDK revision, directly imports its verifier under
-supported Node 24, binds the receipt app id to the requested app, and exposes
-the independently reverified artifact, descriptor, and release identities as
-the reusable workflow outputs. This post-upload boundary prevents a background
-caller process from making the published outputs describe pre-upload bytes.
-
-GitHub artifact attestation is an explicit `attest: true` input and is false by
-default because availability for private repositories depends on the caller's
-GitHub plan. A caller that requests an unsupported attestation fails instead of
-silently producing weaker provenance. GitHub does not let a called workflow
-raise the caller job's permission ceiling. An attesting caller must therefore
-grant these permissions on the reusable-workflow job itself (prefer this
-job-scoped grant over workflow-wide authority):
-
-```yaml
-jobs:
-  release-app:
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
-    uses: TheWizardNexus/arcane-os-sdk/.github/workflows/release-app.yml@<FULL_40_CHARACTER_COMMIT_SHA>
-    with:
-      app-id: example-app
-      attest: true
-```
-
-Without that caller grant, `attest: true` fails even when the repository plan
-supports artifact attestations. When requested, a fresh privileged job
-depends on the successful post-upload verifier, downloads the same immutable
-artifact id with the pinned `actions/download-artifact` revision, checks out only
-`job.workflow_repository` at `job.workflow_sha`, selects supported Node 24 via
-the pinned `actions/setup-node` revision, and directly imports the
-dependency-free verifier from those trusted SDK source bytes. It rechecks the
-app id, bundle structure, digest, byte length, complete
-canonical metadata, and every post-upload workflow output. No package manager,
-dependency resolution, caller checkout, or caller-owned code runs while that job
-holds OIDC and attestation permissions. Whether attested or not, the upload is a
-build output.
-Arcane must verify an approved provenance or independent signature and an
-Arcane-owned authorization-lock entry before installation; the archive's
-internal checksums alone do not grant authority.
+The one build job holds only `contents: read`. It uses the caller's normal
+locked installation, runs one selected `arcane package`, creates one selected
+`arcane bundle`, and uploads that complete bundle. It creates no hashes, byte
+identities, receipts, provenance records, or attestation sidecars and does not
+run a second admission job.
 
 Stable versioning, the npm `latest` tag, and an official GitHub release remain a
 separate explicit release decision. Current `main` development does not
 silently convert a `-dev` package into an official release. A stable release
-must publish the same source-validated and platform-smoked `.tgz` under
-`latest`; only after registry
-integrity matches may GitHub attach that `.tgz`, manifest, and checksum. Its Git
+must publish the exact selected Check artifact under `latest`; GitHub may then
+attach that same package. Its Git
 tag and GitHub release title must both be the same bare numeric
 `MAJOR.MINOR.PATCH`. Prerelease versions do not get a misleading numeric
 GitHub release, and no release creates a Git branch for an npm dist-tag.
 
 ## Documentation publication
 
-GitHub Pages publishes the static `site/` tree from the newest successful
-`main` push `Check`. A completed Check triggers the Pages job, which resolves
-the newest successful receipt at deployment time so out-of-order completion
-cannot roll the site backward. It checks out that authenticated SHA without
-persistent credentials, validates the static tree, and uploads only `site/`.
-It does not rerun the SDK test suite or execute repository build code.
+Documentation publication occurs only when the user explicitly selects it. The
+Pages job checks out that selected `main` revision without persistent
+credentials and uploads only the static `site/` tree. It does not automatically
+run the SDK test suite, checks, generators, or repository build code.
 
 The deployment job holds only the read, Pages, and OIDC permissions required by
-that single checked artifact. The `github-pages` environment remains the final
+that selected artifact. The `github-pages` environment remains the final
 deployment authority. Documentation channels are post-registry presentation
 work and do not change the canonical source branch.
 
 ## Work-amplification record
 
-The release graph is one checked `main` SHA and one npm release candidate. One
-package-authority job runs the narrow source policy and publication contract;
-one producer creates the tarball; one Ubuntu consumer executes those exact
-installed bytes; and one readiness job verifies identity and legal inventory.
-OIDC publication reuses that successful exact-SHA artifact without rebuilding.
+The release graph is one selected `main` revision and one npm release candidate.
+One producer creates the tarball. Publication names that producer's exact Check
+run, artifact, and version and does not rebuild from a later checkout. The
+release workflow checks only the publication contract and required legal
+inventory for that selected output.
 Platform matrices, full product regressions, Pages, and broader presentation
-work remain outside registry publication and run separately when warranted.
+work remain separate user-selected operations.

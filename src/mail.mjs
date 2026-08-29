@@ -40,13 +40,16 @@ function dependency(options,name,fallback){
 }
 
 function recipientList(value,label){
+    if(value===undefined||value===null||value===''||(Array.isArray(value)&&value.length===0)){
+        return [];
+    }
     const entries=Array.isArray(value)
         ? value
         : typeof value==='string'
             ? value.split(',')
             : null;
-    if(!entries||entries.length===0||entries.length>50){
-        usage(`${label} must contain one to 50 comma-separated email addresses.`);
+    if(!entries||entries.length===0){
+        usage(`${label} must contain at least one email address when supplied.`);
     }
     const result=entries.map(function normalizeMailRecipient(entry){
         if(typeof entry!=='string'||!entry.trim()){
@@ -111,21 +114,24 @@ async function deleteCredential(options){
     return remove(credentialOptions(options));
 }
 
-function safeSendFailure(result){
-    return {
-        provider:'resend',
-        status:result.status,
-        classification:result.classification,
-        requestId:result.requestId,
-        providerStatus:result.providerStatus,
-        recipientCount:result.recipientCount,
-        retryable:result.retryable===true,
-        uncertain:result.uncertain===true,
-        ...(typeof result.code==='string'?{code:result.code}:{}),
-        ...(Number.isSafeInteger(result.retryAfterMs)&&result.retryAfterMs>0
-            ?{retryAfterMs:result.retryAfterMs}
-            :{})
-    };
+function withoutMailCredentials(value,seen=new WeakMap()){
+    if(!value||typeof value!=='object')return value;
+    if(seen.has(value))return seen.get(value);
+    const copy=Array.isArray(value)?[]:{};
+    seen.set(value,copy);
+    for(const [key,entry] of Object.entries(value)){
+        if(key==='apiKey'||key==='appKey')continue;
+        copy[key]=withoutMailCredentials(entry,seen);
+    }
+    return copy;
+}
+
+function completeSendFailure(result){
+    if(!result||typeof result!=='object'||Array.isArray(result)){
+        return {provider:'resend',result:withoutMailCredentials(result)};
+    }
+    // Complete provider detail remains visible; only credential fields are omitted.
+    return withoutMailCredentials(result);
 }
 
 async function sendMail(options){
@@ -164,9 +170,9 @@ async function sendMail(options){
             signal:options.signal
         });
         if(result?.classification==='accepted'&&result.status==='accepted'){
-            return result;
+            return withoutMailCredentials(result);
         }
-        const details=safeSendFailure(result||{});
+        const details=completeSendFailure(result);
         throw new ArcaneError(
             ERROR_CODES.operationFailed,
             `Resend did not authoritatively accept the mail request (${details.classification||'unknown'}).`,

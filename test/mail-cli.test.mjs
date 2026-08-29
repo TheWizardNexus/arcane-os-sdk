@@ -219,10 +219,8 @@ test('mail serve admits exact loopback gateway options and reports its lifecycle
         '--from','sender@example.com',
         '--app','mail-test',
         '--origin','http://127.0.0.1:8000',
-        '--allow-to','first@example.com,second@example.com',
         '--app-key-stdin',
         '--port','8123',
-        '--request-timeout','45000',
         '--output','ndjson'
     ],{
         stdin:Readable.from([`${appKey}\n`]),
@@ -251,10 +249,10 @@ test('mail serve admits exact loopback gateway options and reports its lifecycle
     assert.equal(invocation.options.profile,'arcane-dev');
     assert.equal(invocation.options.appId,'mail-test');
     assert.equal(invocation.options.origin,'http://127.0.0.1:8000');
-    assert.equal(invocation.options.allowTo,'first@example.com,second@example.com');
+    assert.equal(invocation.options.allowTo,undefined);
     assert.equal(invocation.options.appKeyStdin,true);
     assert.equal(invocation.options.port,8123);
-    assert.equal(invocation.options.requestTimeout,45_000);
+    assert.equal(invocation.options.requestTimeout,undefined);
     const events=parseNdjson(stdout.read());
     assert.equal(events.some(function isReady(event){return event.type==='server.ready';}),true);
     assert.equal(
@@ -266,12 +264,12 @@ test('mail serve admits exact loopback gateway options and reports its lifecycle
     assert.equal(events.at(-1).data.result.callerAuthentication,'app-key');
 });
 
-test('mail serve fails before execution when a required boundary is missing',async function invalidMailServe(){
+test('mail serve fails before execution when the required origin is missing',async function invalidMailServe(){
     const stdout=memoryStream();
     let executed=false;
     const exitCode=await runCli([
         'mail','serve','--profile','arcane-dev','--from','sender@example.com',
-        '--app','mail-test','--origin','http://127.0.0.1:8000','--output','ndjson'
+        '--app','mail-test','--output','ndjson'
     ],{
         stdout:stdout.stream,
         stderr:memoryStream().stream,
@@ -279,7 +277,29 @@ test('mail serve fails before execution when a required boundary is missing',asy
     });
     assert.equal(exitCode,1);
     assert.equal(executed,false);
-    assert.match(parseNdjson(stdout.read()).at(-1).data.error.message,/--allow-to/u);
+    assert.match(parseNdjson(stdout.read()).at(-1).data.error.message,/--origin/u);
+});
+
+test('mail rejects a request timeout outside the Node timer range before execution',async function invalidMailTimeout(){
+    const stdout=memoryStream();
+    let executed=false;
+    const exitCode=await runCli([
+        'mail','send',
+        '--profile','arcane-dev',
+        '--from','sender@example.com',
+        '--report-key','synthetic-cli-report-key-timeout',
+        '--report-stdin',
+        '--request-timeout','2147483648',
+        '--output','ndjson'
+    ],{
+        stdin:Readable.from(['{}']),
+        stdout:stdout.stream,
+        stderr:memoryStream().stream,
+        execute:async function unexpectedMailExecution(){executed=true;}
+    });
+    assert.equal(exitCode,1);
+    assert.equal(executed,false);
+    assert.match(parseNdjson(stdout.read()).at(-1).data.error.message,/Node timer range/u);
 });
 
 test('mail command controller keeps credential values inside the selected operation',async function mailControllerCredentials(){
@@ -343,10 +363,31 @@ test('mail command controller binds a credential profile to one loopback server 
     assert.equal(JSON.stringify(result).includes(secret),false);
 });
 
-test('mail send reads one bounded report from stdin and returns only acceptance metadata',async function mailSend(){
+test('mail command controller treats an explicit empty recipient list as unrestricted',async function unrestrictedMailControllerServe(){
+    let observed;
+    await executeMailCommand({
+        action:'serve',
+        profile:'arcane-dev',
+        appId:'mail-test',
+        from:'sender@example.com',
+        origin:'http://127.0.0.1:8000',
+        allowTo:[],
+        errorTo:[],
+        readCredential:async function readSyntheticCredential(){return 're_synthetic';},
+        readAppKey:async function readSyntheticAppKey(){return 'synthetic-app-key';},
+        startServer:async function startSyntheticMailServer(options){
+            observed=options;
+            return {target:'mail'};
+        }
+    });
+    assert.deepEqual(observed.recipientAllowlist,[]);
+    assert.deepEqual(observed.errorRecipients,[]);
+});
+
+test('mail send reads one complete report from stdin and returns complete acceptance detail',async function mailSend(){
     const report={
         subject:'Synthetic CLI acceptance',
-        text:'synthetic message body that must stay out of output',
+        text:'complete synthetic message body',
         to:['recipient@example.com'],
         type:'report'
     };
@@ -359,7 +400,6 @@ test('mail send reads one bounded report from stdin and returns only acceptance 
         '--from','sender@example.com',
         '--report-key','synthetic-cli-report-key-0001',
         '--report-stdin',
-        '--request-timeout','45000',
         '--output','ndjson'
     ],{
         stdin:Readable.from([JSON.stringify(report)]),
@@ -375,7 +415,10 @@ test('mail send reads one bounded report from stdin and returns only acceptance 
                 requestId:'synthetic-request-0001',
                 providerId:'synthetic-provider-0001',
                 providerStatus:200,
-                recipientCount:1
+                recipientCount:1,
+                report,
+                providerRequest:{...report,from:'sender@example.com'},
+                providerResponse:{id:'synthetic-provider-0001'}
             };
         }
     });
@@ -387,9 +430,9 @@ test('mail send reads one bounded report from stdin and returns only acceptance 
     assert.equal(invocation.options.from,'sender@example.com');
     assert.equal(invocation.options.reportKey,'synthetic-cli-report-key-0001');
     assert.equal(invocation.options.reportStdin,true);
-    assert.equal(invocation.options.requestTimeout,45_000);
-    assert.equal(stdout.read().includes(report.text),false);
-    assert.equal(stdout.read().includes(report.to[0]),false);
+    assert.equal(invocation.options.requestTimeout,undefined);
+    assert.equal(stdout.read().includes(report.text),true);
+    assert.equal(stdout.read().includes(report.to[0]),true);
     const events=parseNdjson(stdout.read());
     assert.equal(events[0].type,'operation.accepted');
     assert.equal(events.at(-1).data.result.status,'accepted');
@@ -450,7 +493,7 @@ test('mail send rejects malformed report input before credential access',async f
     assert.equal(credentialReads,0);
 });
 
-test('mail send controller performs one credential-backed attempt without exposing private input',async function mailSendController(){
+test('mail send controller performs one credential-backed attempt with complete noncredential detail',async function mailSendController(){
     const secret='re_test_send_controller_only_00000000000001';
     const report={
         subject:'Synthetic controller acceptance',
@@ -471,15 +514,21 @@ test('mail send controller performs one credential-backed attempt without exposi
         sendMail:async function sendSyntheticMail(options){
             sends+=1;
             observed=options;
-            return Object.freeze({
+            return {
                 provider:'resend',
                 status:'accepted',
                 classification:'accepted',
                 requestId:'synthetic-request-0004',
                 providerId:'synthetic-provider-0004',
                 providerStatus:200,
-                recipientCount:1
-            });
+                recipientCount:1,
+                report,
+                providerRequest:{...report,from:'sender@example.com'},
+                providerResponse:{
+                    id:'synthetic-provider-0004',
+                    credentials:{apiKey:secret,appKey:'synthetic-app-key'}
+                }
+            };
         }
     });
 
@@ -489,12 +538,13 @@ test('mail send controller performs one credential-backed attempt without exposi
     assert.equal(observed.reportKey,'synthetic-cli-report-key-0004');
     assert.deepEqual(observed.report,report);
     assert.equal(JSON.stringify(result).includes(secret),false);
-    assert.equal(JSON.stringify(result).includes(report.text),false);
-    assert.equal(JSON.stringify(result).includes(report.to[0]),false);
+    assert.equal(JSON.stringify(result).includes('synthetic-app-key'),false);
+    assert.equal(JSON.stringify(result).includes(report.text),true);
+    assert.equal(JSON.stringify(result).includes(report.to[0]),true);
     assert.equal(result.status,'accepted');
 });
 
-test('mail send controller surfaces only privacy-safe ambiguous metadata',async function ambiguousMailSend(){
+test('mail send controller preserves complete ambiguous outcome detail without credentials',async function ambiguousMailSend(){
     const privateBody='private synthetic ambiguous body';
     const secret='re_test_ambiguous_controller_only_0000000001';
     await assert.rejects(
@@ -513,8 +563,8 @@ test('mail send controller surfaces only privacy-safe ambiguous metadata',async 
                 };
             },
             readCredential:async function readAmbiguousCredential(){return secret;},
-            sendMail:async function returnAmbiguousResult(){
-                return Object.freeze({
+            sendMail:async function returnAmbiguousResult(options){
+                return {
                     provider:'resend',
                     status:'delivery_uncertain',
                     classification:'ambiguous',
@@ -524,18 +574,26 @@ test('mail send controller surfaces only privacy-safe ambiguous metadata',async 
                     retryAfterMs:1000,
                     retryable:true,
                     uncertain:true,
-                    code:'resend_transport_uncertain'
-                });
+                    code:'resend_transport_uncertain',
+                    report:options.report,
+                    providerRequest:{...options.report,from:options.from},
+                    providerResponse:{
+                        message:'complete synthetic provider response',
+                        credentials:{apiKey:secret,appKey:'synthetic-app-key'}
+                    }
+                };
             }
         }),
-        function isPrivacySafeAmbiguousError(error){
+        function isCompleteAmbiguousError(error){
             const serialized=JSON.stringify({message:error.message,details:error.details});
             return error.code==='ARCANE_OPERATION_FAILED'
                 &&error.details?.classification==='ambiguous'
                 &&error.details?.uncertain===true
                 &&!serialized.includes(secret)
-                &&!serialized.includes(privateBody)
-                &&!serialized.includes('recipient@example.com');
+                &&!serialized.includes('synthetic-app-key')
+                &&serialized.includes(privateBody)
+                &&serialized.includes('recipient@example.com')
+                &&serialized.includes('complete synthetic provider response');
         }
     );
 });
