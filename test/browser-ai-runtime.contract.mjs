@@ -604,7 +604,10 @@ async function run(){
             const call={
                 id:'boss-contract-call',
                 type:'function',
-                function:{name:'search_boss_library',arguments:'{"query":"local"}'}
+                function:{
+                    name:'search_boss_library',
+                    arguments:'{"query":"local","message":"Searching the local boss library."}'
+                }
             };
             return scriptedHandle([{
                 id:request.id,
@@ -632,7 +635,14 @@ async function run(){
         function:{
             name:'search_boss_library',
             description:'Visible structural test tool',
-            parameters:{type:'object',properties:{query:{type:'string'}},required:['query']}
+            parameters:{
+                type:'object',
+                properties:{
+                    query:{type:'string'},
+                    message:{type:'string',minLength:1}
+                },
+                required:['query','message']
+            }
         }
     };
     const fetched=await compatibilityAi.fetchRequest({
@@ -672,12 +682,33 @@ async function run(){
         executeTools:true,
         onRequest:(request,id)=>compatibility.requests.push({id,tools:request.tools.length}),
         onChunk:(text,id,isThinking)=>compatibility.chunks.push({text,id,isThinking}),
-        onToolCall:name=>compatibility.tools.push(name),
+        onToolCall:call=>compatibility.tools.push(call),
         onComplete:(result,id,isThinking)=>compatibility.completions.push({result,id,isThinking})
     });
     await Promise.resolve();
-    equal(toolResult.search_boss_library,'{"query":"local"}','Structural tool arguments drifted');
-    equal(compatibility.tools[0],'search_boss_library','Structural tool visibility drifted');
+    const expectedStructuralToolCall=[{
+        id:'boss-contract-call',
+        type:'function',
+        function:{
+            name:'search_boss_library',
+            arguments:'{"query":"local","message":"Searching the local boss library."}'
+        }
+    }];
+    equal(
+        JSON.stringify(toolResult),
+        JSON.stringify(expectedStructuralToolCall),
+        'Structural tool envelope or user-facing message drifted'
+    );
+    equal(
+        JSON.stringify(compatibility.tools),
+        JSON.stringify(expectedStructuralToolCall),
+        'Structural tool visibility drifted'
+    );
+    equal(
+        JSON.stringify(compatibility.completions[0].result),
+        JSON.stringify(expectedStructuralToolCall),
+        'Structural tool completion envelope drifted'
+    );
     equal(compatibility.completions[0].id,'M-boss-stream-request','streamRequest display ID drifted');
     equal(compatibility.executions,0,'The SDK executed an application-owned tool');
     await compatibilityAi.dispose();

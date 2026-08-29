@@ -25,7 +25,7 @@ export const CONVERSATION_TIMEBOX_REASONS=Object.freeze({
     started:'conversation-timebox-started'
 });
 
-const CONVERSATION_TIMEBOX_OPENING_INSTRUCTION=`Before any other intake question, ask exactly one timing question: "Do you have a limited amount of time to talk right now?" Ask no other question in that opening reply, and wait for the answer before continuing the app's normal intake. The elapsed conversation timer is already visible. A time limit applies only to this conversation. Never infer, round, or invent a duration. The conversation_timebox tool is available on every turn. When the user explicitly sets a duration, call it with action "set" and convert the exact stated duration to whole milliseconds. When the user explicitly adds time, call it with action "adjust" and convert the exact added duration to whole milliseconds. When the user explicitly says there is no limit, asks to remove it, or chooses to continue after a due check without setting another duration, call it with action "clear". A duration is always sent as duration_milliseconds; for example, 75 seconds is 75000 and 10 minutes is 600000. If the duration is vague or ranged, ask one focused question and do not call the tool yet. The timebox tool must be the sole tool call for its response. Adapt the pace and prioritize the most important next action within an active limit without skipping safety. A message that the agreed time check is due is a check-in, not a request to end: ask whether the user wants to end now or continue, and do not assume their choice.`;
+const CONVERSATION_TIMEBOX_OPENING_INSTRUCTION=`Before any other intake question, ask exactly one timing question: "Do you have a limited amount of time to talk right now?" Ask no other question in that opening reply, and wait for the answer before continuing the app's normal intake. The elapsed conversation timer is already visible. A time limit applies only to this conversation. Never infer, round, or invent a duration. The conversation_timebox tool is available on every turn. When the user explicitly sets a duration, call it with action "set" and convert the exact stated duration to whole milliseconds. When the user explicitly adds time, call it with action "adjust" and convert the exact added duration to whole milliseconds. When the user explicitly says there is no limit, asks to remove it, or chooses to continue after a due check without setting another duration, call it with action "clear". Every call must include a nonempty message containing the brief plain-language progress or next-step text shown to the user; do not claim the time check changed before the tool result confirms it. A duration is always sent as duration_milliseconds; for example, 75 seconds is 75000 and 10 minutes is 600000. If the duration is vague or ranged, ask one focused question and do not call the tool yet. The timebox tool must be the sole tool call for its response. Adapt the pace and prioritize the most important next action within an active limit without skipping safety. A message that the agreed time check is due is a check-in, not a request to end: ask whether the user wants to end now or continue, and do not assume their choice.`;
 
 const CONVERSATION_TIMEBOX_LIMIT_MESSAGE='The agreed conversation time check is due. Please ask whether I want to end now or continue, and do not assume my choice or set another limit unless I explicitly state one.';
 
@@ -43,13 +43,18 @@ const conversationTimeboxTool=Object.freeze({
                     enum:Object.freeze(['set','adjust','clear']),
                     description:'Set a new deadline, add time to the active deadline, or clear the deadline.'
                 }),
+                message:{
+                    type:'string',
+                    minLength:1,
+                    description:'Brief plain-language progress or next-step text shown to the user for this tool call. Do not claim the time check changed before the tool result confirms it.'
+                },
                 duration_milliseconds:Object.freeze({
                     type:'integer',
                     minimum:0,
                     description:'The exact positive whole-millisecond duration. Required for "set" and "adjust"; ignored for "clear". Examples: 75 seconds = 75000; 10 minutes = 600000.'
                 })
             }),
-            required:Object.freeze(['action'])
+            required:Object.freeze(['action','message'])
         })
     })
 });
@@ -84,7 +89,7 @@ function parseToolArguments(value){
 
 function normalizeConversationTimeboxCommand(value){
     const input=parseToolArguments(value);
-    const allowed=new Set(['action','duration_milliseconds']);
+    const allowed=new Set(['action','duration_milliseconds','message']);
     const unsupported=Object.keys(input).find(function findUnsupportedTimeboxField(key){
         return !allowed.has(key);
     });
@@ -95,15 +100,19 @@ function normalizeConversationTimeboxCommand(value){
     if(!['set','adjust','clear'].includes(input.action)){
         throw new TypeError('Conversation timebox action must be "set", "adjust", or "clear".');
     }
+    if(typeof input.message!=='string'||!input.message.trim()){
+        throw new TypeError('Conversation timebox message must contain user-facing text.');
+    }
     if(input.action==='clear'){
-        return Object.freeze({action:'clear'});
+        return Object.freeze({action:'clear',message:input.message});
     }
     if(!Number.isSafeInteger(input.duration_milliseconds)||input.duration_milliseconds<=0){
         throw new TypeError('duration_milliseconds must be an explicit positive whole number.');
     }
     return Object.freeze({
         action:input.action,
-        durationMilliseconds:input.duration_milliseconds
+        durationMilliseconds:input.duration_milliseconds,
+        message:input.message
     });
 }
 
@@ -406,18 +415,21 @@ class ConversationTimebox{
 
     applyCommand(value){
         const command=normalizeConversationTimeboxCommand(value);
+        let state;
         if(command.action==='clear'){
-            return this.clearLimit({source:'tool'});
+            state=this.clearLimit({source:'tool'});
+        }else{
+            state=command.action==='adjust'
+                ?this.adjustLimitMilliseconds(
+                    command.durationMilliseconds,
+                    {source:'tool'}
+                )
+                :this.setLimitMilliseconds(
+                    command.durationMilliseconds,
+                    {source:'tool'}
+                );
         }
-        return command.action==='adjust'
-            ?this.adjustLimitMilliseconds(
-                command.durationMilliseconds,
-                {source:'tool'}
-            )
-            :this.setLimitMilliseconds(
-                command.durationMilliseconds,
-                {source:'tool'}
-            );
+        return {...state,message:command.message};
     }
 
     subscribe(listener,options={}){

@@ -1,18 +1,15 @@
 import {
     CONVERSATION_ACTION_ITEM_BASES,
-    MAX_CONVERSATION_ACTION_ITEM_CHARACTERS,
-    MAX_CONVERSATION_REMEMBERED_ACTIONS,
     normalizeRememberedConversationActions
 } from './ConversationActionItems.js?v=2';
 
 const DEFAULT_TOOL_NAME='prepare_conversation_closing_report';
-const TOOL_NAME_PATTERN=/^[a-z][a-z0-9_]{0,63}$/;
-const MAX_ARGUMENT_CHARACTERS=16*1024;
-const MAX_FINAL_MESSAGE_CHARACTERS=5000;
-const REPORT_FIELDS=Object.freeze(new Set([
+const TOOL_NAME_PATTERN=/^[a-z][a-z0-9_]*$/;
+const REPORT_FIELDS=new Set([
+    'message',
     'final_message',
     'remembered_actions'
-]));
+]);
 
 function invalid(message){
     const error=new TypeError(message);
@@ -29,7 +26,7 @@ function isPlainRecord(value){
     return prototype===Object.prototype||prototype===null;
 }
 
-function boundedText(value,label,maximum,{required=false}={}){
+function normalizedText(value,label,{required=false}={}){
     if(value===undefined||value===null||value===''){
         if(required){
             throw invalid(`${label} is required.`);
@@ -40,45 +37,26 @@ function boundedText(value,label,maximum,{required=false}={}){
         throw invalid(`${label} must be a string.`);
     }
 
-    const normalized=value.replace(/[\u0000-\u001f\u007f]+/g,' ').replace(/\s+/g,' ').trim();
-
-    if(!normalized&&required){
+    if(!value.trim()&&required){
         throw invalid(`${label} is required.`);
     }
-    if(normalized.length>maximum){
-        throw invalid(`${label} exceeds ${maximum} characters.`);
-    }
-
-    return normalized;
+    return value;
 }
 
-function boundedFinalMessage(value){
+function normalizedFinalMessage(value){
     if(typeof value!=='string'){
         throw invalid('final_message must be a string.');
     }
 
-    const normalized=value
-        .replace(/\r\n?/g,'\n')
-        .replace(/[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f]+/g,' ')
-        .trim();
-
-    if(!normalized){
+    if(!value.trim()){
         throw invalid('final_message is required.');
     }
-    if(normalized.length>MAX_FINAL_MESSAGE_CHARACTERS){
-        throw invalid(
-            `final_message exceeds ${MAX_FINAL_MESSAGE_CHARACTERS} characters.`
-        );
-    }
-
-    return normalized;
+    return value;
 }
 
 function parseArguments(value){
     if(typeof value==='string'){
-        if(!value||value.length>MAX_ARGUMENT_CHARACTERS){
-            throw invalid('The closing-report arguments exceed the allowed size.');
-        }
+        if(!value)throw invalid('The closing-report arguments are required.');
 
         try{
             value=JSON.parse(value);
@@ -100,16 +78,8 @@ function escapeRawHTML(value){
         .replaceAll('>','&gt;');
 }
 
-function deepFreeze(value){
-    if(!value||typeof value!=='object'||Object.isFrozen(value)){
-        return value;
-    }
-
-    for(const child of Object.values(value)){
-        deepFreeze(child);
-    }
-
-    return Object.freeze(value);
+function completeValue(value){
+    return value;
 }
 
 /**
@@ -119,33 +89,36 @@ function deepFreeze(value){
  */
 export function createConversationClosingReportTool({
     name=DEFAULT_TOOL_NAME,
-    description='Prepare a bounded closing report when the user clearly ends a conversation.'
+    description='Prepare a complete closing report when the user clearly ends a conversation.'
 }={}){
     if(typeof name!=='string'||!TOOL_NAME_PATTERN.test(name)){
         throw invalid('The closing-report tool name is invalid.');
     }
-    if(typeof description!=='string'||!description.trim()||description.length>1000){
+    if(typeof description!=='string'||!description.trim()){
         throw invalid('The closing-report tool description is invalid.');
     }
 
-    return deepFreeze({
+    return completeValue({
         type:'function',
         function:{
             name,
-            description:description.trim(),
+            description,
             parameters:{
                 type:'object',
                 additionalProperties:false,
                 properties:{
+                    message:{
+                        type:'string',
+                        minLength:1,
+                        description:'Brief plain-language progress text shown to the user while the application accepts and renders the closing report. Do not put the complete closeout here or claim that later actions were saved.'
+                    },
                     final_message:{
                         type:'string',
                         minLength:1,
-                        maxLength:MAX_FINAL_MESSAGE_CHARACTERS,
                         description:'The complete final response shown to the user to close the conversation. When useful and grounded in the conversation, include a concise summary of what was accomplished, concrete progress or takeaways, and optional next steps or homework. Omit any of those elements when they would be inappropriate, unsafe, unwanted, or unsupported. Present next steps as choices, never obligations. If remembered_actions are included, mention them only as agreed follow-ups and never claim they were saved. End with a calm, warm closing that does not pressure the user or create new obligations.'
                     },
                     remembered_actions:{
                         type:'array',
-                        maxItems:MAX_CONVERSATION_REMEMBERED_ACTIONS,
                         items:{
                             type:'object',
                             additionalProperties:false,
@@ -153,7 +126,6 @@ export function createConversationClosingReportTool({
                                 text:{
                                     type:'string',
                                     minLength:1,
-                                    maxLength:MAX_CONVERSATION_ACTION_ITEM_CHARACTERS,
                                     description:'The follow-up the user explicitly agreed to carry into a later conversation.'
                                 },
                                 basis:{
@@ -167,7 +139,7 @@ export function createConversationClosingReportTool({
                         description:'Optional machine-readable follow-ups for local Profile persistence. Include only commitments or optional homework the user explicitly agreed to carry into a later conversation. Do not include ordinary suggestions from final_message.'
                     }
                 },
-                required:['final_message']
+                required:['message','final_message']
             }
         }
     });
@@ -189,14 +161,13 @@ export function conversationClosingReportInstruction({
         throw invalid('The closing-report tool name is invalid.');
     }
 
-    const trigger=boundedText(
+    const trigger=normalizedText(
         completionTrigger,
         'The conversation completion trigger',
-        1000,
         {required:true}
     );
 
-    return `## Conversation closeout\nWhen ${trigger}, call \`${toolName}\` as the sole tool call and do not also answer in prose. Do not call it after a routine answer, while requested work remains open, or merely because a response is long. Use only facts established in the conversation. Never diagnose, score, judge, or infer personal traits. Put the complete user-facing closeout in final_message. Populate remembered_actions only for a commitment or optional homework the user explicitly agreed to carry into a later conversation; never turn an ordinary suggestion into a saved obligation or claim it was saved. The application separately requests consent before saving a remembered action, displays final_message in the conversation, and reports the save result. The tool does not send anything elsewhere or perform any suggested action.`;
+    return `## Conversation closeout\nWhen ${trigger}, call \`${toolName}\` as the sole tool call and do not also answer in prose. Do not call it after a routine answer, while requested work remains open, or merely because a response is long. Use only facts established in the conversation. Never diagnose, score, judge, or infer personal traits. Include a brief nonempty message for the user-facing progress shown while the application accepts and renders the call; do not put the complete closeout there or claim later actions were saved. Put the complete user-facing closeout in final_message. Populate remembered_actions only for a commitment or optional homework the user explicitly agreed to carry into a later conversation; never turn an ordinary suggestion into a saved obligation or claim it was saved. The application separately requests consent before saving a remembered action, displays final_message in the conversation, and reports the save result. The tool does not send anything elsewhere or perform any suggested action.`;
 }
 
 export function normalizeConversationClosingReport(value){
@@ -207,8 +178,9 @@ export function normalizeConversationClosingReport(value){
         throw invalid(`Unexpected closing-report field: ${unexpectedField}.`);
     }
 
-    return Object.freeze({
-        finalMessage:boundedFinalMessage(source.final_message),
+    return completeValue({
+        message:normalizedText(source.message,'message',{required:true}),
+        finalMessage:normalizedFinalMessage(source.final_message),
         rememberedActions:normalizeRememberedConversationActions(
             source.remembered_actions||[]
         )
@@ -227,17 +199,17 @@ export function classifyConversationClosingReportCalls(calls={}, {
         throw invalid('The closing-report tool name is invalid.');
     }
     if(!isPlainRecord(calls)){
-        return Object.freeze({present:false,accepted:false,report:null,error:invalid('Tool calls must be an object.')});
+        return {present:false,accepted:false,report:null,error:invalid('Tool calls must be an object.')};
     }
 
     const names=Object.keys(calls);
     const present=Object.hasOwn(calls,toolName);
 
     if(!present){
-        return Object.freeze({present:false,accepted:false,report:null,error:null});
+        return {present:false,accepted:false,report:null,error:null};
     }
     if(names.length!==1){
-        return Object.freeze({
+        return completeValue({
             present:true,
             accepted:false,
             report:null,
@@ -246,20 +218,21 @@ export function classifyConversationClosingReportCalls(calls={}, {
     }
 
     try{
-        return Object.freeze({
+        return completeValue({
             present:true,
             accepted:true,
             report:normalizeConversationClosingReport(calls[toolName]),
             error:null
         });
     }catch(error){
-        return Object.freeze({present:true,accepted:false,report:null,error});
+        return {present:true,accepted:false,report:null,error};
     }
 }
 
 export function formatConversationClosingReport(value){
     const normalizedInput=isPlainRecord(value)&&value.finalMessage!==undefined
         ?{
+            message:value.message,
             final_message:value.finalMessage,
             remembered_actions:value.rememberedActions,
         }

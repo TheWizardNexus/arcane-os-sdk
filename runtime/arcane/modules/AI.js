@@ -13,30 +13,32 @@ import {
 } from './AIProviderRuntime.js';
 import {normalizeOllamaModelIdentifier} from './OllamaModelIdentifier.js';
 
+const completeValue=(value)=>value;
+
 let credentials='include';
 const LEGACY_TTS_RESPONSE_FORMAT='opus';
 credentials='omit';
 
 const LEGACY_AI_SERVICES=new Set(['OPENAI','OLLAMA','LOCAL_SPEACH']);
 export const AI_READY_EVENT='ai-ready';
-export const AI_INITIALIZATION_ERROR_CODES=Object.freeze({
+export const AI_INITIALIZATION_ERROR_CODES=completeValue({
     userReadyRegistrationCollision:
         'ARCANE_AI_USER_READY_REGISTRATION_COLLISION'
 });
-export const AI_INITIALIZATION_REASONS=Object.freeze({
+export const AI_INITIALIZATION_REASONS=completeValue({
     initialized:'ai-initialized',
     userReadyRegistrationCollision:'ai-user-ready-registration-collision'
 });
 export const AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL=
     'arcane-ai-browser-speech-configuration/1';
-export const AI_BROWSER_SPEECH_EVENT_TYPES=Object.freeze({
+export const AI_BROWSER_SPEECH_EVENT_TYPES=completeValue({
     configurationCancelled:'ai-browser-speech-configuration-cancelled',
     configurationError:'ai-browser-speech-configuration-error',
     configurationStarted:'ai-browser-speech-configuration-started',
     configured:'ai-browser-speech-configured',
     disposed:'ai-browser-speech-disposed'
 });
-export const AI_BROWSER_SPEECH_ERROR_CODES=Object.freeze({
+export const AI_BROWSER_SPEECH_ERROR_CODES=completeValue({
     artifactStoreConstructionRejected:
         'ARCANE_AI_BROWSER_SPEECH_ARTIFACT_STORE_CONSTRUCTION_REJECTED',
     asyncTransitionRequired:
@@ -64,7 +66,7 @@ export const AI_BROWSER_SPEECH_ERROR_CODES=Object.freeze({
     routeViewUpdateRejected:
         'ARCANE_AI_BROWSER_SPEECH_ROUTE_VIEW_UPDATE_REJECTED'
 });
-export const AI_BROWSER_SPEECH_REASONS=Object.freeze({
+export const AI_BROWSER_SPEECH_REASONS=completeValue({
     artifactStoreConstructionRejected:'speech-artifact-store-construction-rejected',
     asyncTransitionRequired:'speech-configuration-async-transition-required',
     configurationAdded:'speech-configuration-added',
@@ -121,6 +123,282 @@ function legacyAIProviderError(message,code,cause){
         :new Error(message,{cause});
     error.code=code;
     return error;
+}
+
+function aiStructuralError(code,message,cause){
+    const error=cause===undefined
+        ?new TypeError(message)
+        :new TypeError(message,{cause});
+    error.code=code;
+    return error;
+}
+
+function isPlainAIRecord(value){
+    if(!value||typeof value!=='object'||Array.isArray(value)){
+        return false;
+    }
+    const prototype=Object.getPrototypeOf(value);
+    return prototype===Object.prototype||prototype===null;
+}
+
+function requireAIToolMessageSchemas(value,label='AI tools'){
+    if(!Array.isArray(value)){
+        throw aiStructuralError(
+            'AI_CHAT_INVALID_TOOL_CALL',
+            `${label} must be an array.`
+        );
+    }
+    for(let index=0;index<value.length;index+=1){
+        const tool=value[index];
+        const parameters=tool?.function?.parameters;
+        const messageSchema=parameters?.properties?.message;
+        if(
+            !isPlainAIRecord(tool)
+            ||tool.type!=='function'
+            ||!isPlainAIRecord(tool.function)
+            ||!isPlainAIRecord(parameters)
+            ||parameters.type!=='object'
+            ||!isPlainAIRecord(parameters.properties)
+            ||!isPlainAIRecord(messageSchema)
+            ||messageSchema.type!=='string'
+            ||!Number.isInteger(messageSchema.minLength)
+            ||messageSchema.minLength<1
+            ||!Array.isArray(parameters.required)
+            ||!parameters.required.includes('message')
+        ){
+            throw aiStructuralError(
+                'AI_CHAT_TOOL_MESSAGE_REQUIRED',
+                `${label}[${index}] must require a nonempty string parameters.properties.message.`
+            );
+        }
+    }
+}
+
+function normalizeAIStructuralToolCall(call,label='Structural tool call'){
+    if(
+        !isPlainAIRecord(call)
+        ||typeof call.id!=='string'
+        ||!call.id.trim()
+        ||call.type!=='function'
+        ||!isPlainAIRecord(call.function)
+        ||typeof call.function.name!=='string'
+        ||!call.function.name.trim()
+        ||typeof call.function.arguments!=='string'
+    ){
+        throw aiStructuralError(
+            'AI_CHAT_INVALID_TOOL_CALL',
+            `${label} is not a complete structural function call.`
+        );
+    }
+    let argumentsRecord;
+    try{
+        argumentsRecord=JSON.parse(call.function.arguments);
+    }catch(cause){
+        throw aiStructuralError(
+            'AI_CHAT_INVALID_TOOL_CALL',
+            `${label} arguments must encode a JSON object.`,
+            cause
+        );
+    }
+    if(!isPlainAIRecord(argumentsRecord)){
+        throw aiStructuralError(
+            'AI_CHAT_INVALID_TOOL_CALL',
+            `${label} arguments must encode a JSON object.`
+        );
+    }
+    if(typeof argumentsRecord.message!=='string'||!argumentsRecord.message.trim()){
+        throw aiStructuralError(
+            'AI_CHAT_TOOL_MESSAGE_REQUIRED',
+            `${label} arguments must include a nonempty user-facing message.`
+        );
+    }
+    return {
+        id:call.id,
+        type:'function',
+        function:{
+            name:call.function.name,
+            arguments:call.function.arguments
+        }
+    };
+}
+
+function validateAIRequestMessages(messages=[]){
+    if(!Array.isArray(messages)){
+        throw new TypeError('AI messages must be an array.');
+    }
+    let pendingToolCallId=null;
+    for(let messageIndex=0;messageIndex<messages.length;messageIndex+=1){
+        const message=messages[messageIndex];
+        const calls=message?.tool_calls;
+        let openedToolCall=false;
+        if(calls!==undefined){
+            if(message?.role!=='assistant'||!Array.isArray(calls)){
+                throw aiStructuralError(
+                    'AI_CHAT_INVALID_TOOL_CALL',
+                    `AI messages[${messageIndex}].tool_calls is invalid.`
+                );
+            }
+            if(calls.length>1||(pendingToolCallId!==null&&calls.length)){
+                throw aiStructuralError(
+                    'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED',
+                    'The Arcane chat session accepts one structural tool call at a time.'
+                );
+            }
+            if(calls.length){
+                pendingToolCallId=normalizeAIStructuralToolCall(
+                    calls[0],
+                    `AI messages[${messageIndex}].tool_calls[0]`
+                ).id;
+                openedToolCall=true;
+            }
+        }
+        if(message?.role==='tool'){
+            if(typeof message.content!=='string'||!message.content.trim()){
+                throw aiStructuralError(
+                    'AI_CHAT_INVALID_TOOL_MESSAGE',
+                    `AI messages[${messageIndex}] must contain a nonblank user-facing tool result.`
+                );
+            }
+            if(
+                pendingToolCallId===null
+                ||typeof message.tool_call_id!=='string'
+                ||message.tool_call_id!==pendingToolCallId
+            ){
+                throw aiStructuralError(
+                    'AI_CHAT_INVALID_TOOL_MESSAGE',
+                    `AI messages[${messageIndex}] does not settle the pending structural tool call.`
+                );
+            }
+            pendingToolCallId=null;
+        }else if(pendingToolCallId!==null&&!openedToolCall){
+            throw aiStructuralError(
+                'AI_CHAT_TOOL_RESULT_REQUIRED',
+                `AI messages[${messageIndex}] precedes the pending structural tool result.`
+            );
+        }
+    }
+    if(pendingToolCallId!==null){
+        throw aiStructuralError(
+            'AI_CHAT_TOOL_RESULT_REQUIRED',
+            'The pending structural tool call must be settled before requesting another response.'
+        );
+    }
+}
+
+function validateAIStructuralRequest(messages,tools,parallelToolCalls){
+    validateAIRequestMessages(messages);
+    requireAIToolMessageSchemas(tools);
+    if(parallelToolCalls===true){
+        throw aiStructuralError(
+            'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED',
+            'The Arcane chat session accepts one structural tool call at a time.'
+        );
+    }
+}
+
+function normalizeAICompletionToolCalls(completion){
+    const calls=[];
+    const hasMessage=Boolean(
+        completion
+        &&typeof completion==='object'
+        &&Object.hasOwn(completion,'message')
+    );
+    const hasChoices=Boolean(
+        completion
+        &&typeof completion==='object'
+        &&Object.hasOwn(completion,'choices')
+    );
+    if(hasMessage&&hasChoices){
+        throw aiStructuralError(
+            'AI_CHAT_INVALID_RESPONSE',
+            'The AI completion must not mix message and choices envelopes.'
+        );
+    }
+    if(hasChoices&&!Array.isArray(completion.choices)){
+        throw aiStructuralError(
+            'AI_CHAT_INVALID_RESPONSE',
+            'The AI completion choices envelope must be an array.'
+        );
+    }
+    const messages=hasChoices
+        ?completion.choices.map(choice=>choice?.message)
+        :hasMessage
+            ?[completion.message]
+            :[];
+    for(let messageIndex=0;messageIndex<messages.length;messageIndex+=1){
+        const toolCalls=messages[messageIndex]?.tool_calls;
+        if(toolCalls!==undefined&&!Array.isArray(toolCalls)){
+            throw aiStructuralError(
+                'AI_CHAT_INVALID_TOOL_CALL',
+                `AI response message ${messageIndex+1} contains invalid structural tool calls.`
+            );
+        }
+        if(calls.length+(toolCalls?.length??0)>1){
+            throw aiStructuralError(
+                'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED',
+                'The Arcane chat session accepts one structural tool call at a time.'
+            );
+        }
+        if(messageIndex>0&&toolCalls?.length){
+            throw aiStructuralError(
+                'AI_CHAT_INVALID_RESPONSE',
+                'The AI completion placed a structural tool call outside the selected choice.'
+            );
+        }
+        for(let callIndex=0;callIndex<(toolCalls??[]).length;callIndex+=1){
+            calls.push(normalizeAIStructuralToolCall(
+                toolCalls[callIndex],
+                `AI response structural tool call ${messageIndex+1}.${callIndex+1}`
+            ));
+        }
+    }
+    return calls;
+}
+
+function sameAIStructuralToolCall(left,right){
+    return left?.id===right?.id
+        &&left?.type===right?.type
+        &&left?.function?.name===right?.function?.name
+        &&left?.function?.arguments===right?.function?.arguments;
+}
+
+function assertAIStreamToolCallCorrelation(
+    streamedCalls,
+    terminalCalls,
+    label='AI stream'
+){
+    if(!streamedCalls.length){
+        return;
+    }
+    if(
+        streamedCalls.length!==terminalCalls.length
+        ||streamedCalls.some(
+            (call,index)=>!sameAIStructuralToolCall(call,terminalCalls[index])
+        )
+    ){
+        throw aiStructuralError(
+            'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
+            `${label} changed or omitted its terminal structural tool call.`
+        );
+    }
+}
+
+function normalizeAIStreamToolCallObservation(completion,label){
+    try{
+        return normalizeAICompletionToolCalls(completion);
+    }catch(cause){
+        if(
+            cause?.code==='AI_CHAT_INVALID_TOOL_CALL'
+            ||cause?.code==='AI_CHAT_TOOL_MESSAGE_REQUIRED'
+        ){
+            throw aiStructuralError(
+                'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
+                `${label} did not retain a complete structural tool call.`,
+                cause
+            );
+        }
+        throw cause;
+    }
 }
 
 function createLegacyAIStreamBridge(execute,sourceSignal){
@@ -254,12 +532,13 @@ function createLegacyAIStreamBridge(execute,sourceSignal){
             return this;
         }
     };
-    return Object.freeze(handle);
+    return completeValue(handle);
 }
 
 function normalizeAIStartupOptions(options){
     if(options===undefined){
-        return Object.freeze({
+        return completeValue({
+            startLanguageModel:true,
             startMuted:true,
             startTranscription:false,
             signal:null
@@ -275,7 +554,8 @@ function normalizeAIStartupOptions(options){
     const descriptors=Object.getOwnPropertyDescriptors(options);
     for(const key of Reflect.ownKeys(descriptors)){
         if(typeof key==='symbol'||(
-            key!=='startMuted'
+            key!=='startLanguageModel'
+            &&key!=='startMuted'
             &&key!=='startTranscription'
             &&key!=='signal'
         )){
@@ -285,6 +565,9 @@ function normalizeAIStartupOptions(options){
             throw new TypeError(`AI startup options.${key} must be a data property.`);
         }
     }
+    const startLanguageModel=Object.hasOwn(descriptors,'startLanguageModel')
+        ?descriptors.startLanguageModel.value
+        :true;
     const startMuted=Object.hasOwn(descriptors,'startMuted')
         ?descriptors.startMuted.value
         :true;
@@ -294,6 +577,9 @@ function normalizeAIStartupOptions(options){
     const signal=Object.hasOwn(descriptors,'signal')
         ?descriptors.signal.value
         :null;
+    if(typeof startLanguageModel!=='boolean'){
+        throw new TypeError('AI startup startLanguageModel must be a boolean.');
+    }
     if(typeof startMuted!=='boolean'){
         throw new TypeError('AI startup startMuted must be a boolean.');
     }
@@ -308,7 +594,12 @@ function normalizeAIStartupOptions(options){
     )){
         throw new TypeError('AI startup signal must be an AbortSignal.');
     }
-    return Object.freeze({startMuted,startTranscription,signal});
+    return completeValue({
+        startLanguageModel,
+        startMuted,
+        startTranscription,
+        signal
+    });
 }
 
 function aiBrowserSpeechError(code,reason,message,cause,{committed=false,name='Error'}={}){
@@ -330,16 +621,15 @@ function isAbortSignal(value){
         &&typeof value.removeEventListener==='function';
 }
 
-function frozenClosedRecord(value,keys,required,label){
+function closedRecord(value,keys,required,label){
     if(!value
         ||typeof value!=='object'
         ||Array.isArray(value)
-        ||![Object.prototype,null].includes(Object.getPrototypeOf(value))
-        ||!Object.isFrozen(value)){
+        ||![Object.prototype,null].includes(Object.getPrototypeOf(value))){
         throw aiBrowserSpeechError(
             AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
             AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
-            `${label} must be a frozen plain data record.`
+            `${label} must be a plain data record.`
         );
     }
     const descriptors=Object.getOwnPropertyDescriptors(value);
@@ -369,12 +659,11 @@ function frozenClosedRecord(value,keys,required,label){
 function browserSpeechIdentifier(value,label){
     if(typeof value!=='string'
         ||value.trim()!==value
-        ||value.length<1
-        ||value.length>128){
+        ||value.length<1){
         throw aiBrowserSpeechError(
             AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
             AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
-            `${label} must be a trimmed 1-128 character string.`
+            `${label} must be a nonempty trimmed string.`
         );
     }
     return value;
@@ -382,7 +671,7 @@ function browserSpeechIdentifier(value,label){
 
 function normalizeBrowserSpeechRole(value,role){
     const label=`AI browser speech ${role}`;
-    const descriptors=frozenClosedRecord(
+    const descriptors=closedRecord(
         value,
         ['providerId','graph','model','runtime','security','offline'],
         ['providerId','offline'],
@@ -396,6 +685,7 @@ function normalizeBrowserSpeechRole(value,role){
     const hasModel=Object.hasOwn(descriptors,'model');
     const hasRuntime=Object.hasOwn(descriptors,'runtime');
     const hasSecurity=Object.hasOwn(descriptors,'security');
+    let secure=false;
     if(hasGraph&&(hasModel||hasRuntime)){
         throw aiBrowserSpeechError(
             AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
@@ -412,31 +702,11 @@ function normalizeBrowserSpeechRole(value,role){
     }
     if(hasGraph){
         const graph=descriptors.graph.value;
-        if(!graph||typeof graph!=='object'||!Object.isFrozen(graph)){
+        if(!graph||typeof graph!=='object'){
             throw aiBrowserSpeechError(
                 AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
                 AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
-                `${label}.graph must be an SDK-created frozen artifact graph.`
-            );
-        }
-        if(!hasSecurity){
-            throw aiBrowserSpeechError(
-                AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
-                AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
-                `${label}.security with secure:true is required for an artifact graph.`
-            );
-        }
-        const security=frozenClosedRecord(
-            descriptors.security.value,
-            ['secure','checks'],
-            ['secure'],
-            `${label}.security`
-        );
-        if(security.secure.value!==true){
-            throw aiBrowserSpeechError(
-                AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
-                AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
-                `${label}.security.secure must be true for an artifact graph.`
+                `${label}.graph must be an SDK-created artifact graph.`
             );
         }
     }else{
@@ -451,6 +721,12 @@ function normalizeBrowserSpeechRole(value,role){
             }
         }
     }
+    if(hasSecurity){
+        // Security is an intent-only seam. Stale or future fields do not run
+        // checks in ordinary mode, and secure mode requires user review before
+        // an implementation may be enabled.
+        secure=descriptors.security.value?.secure===true;
+    }
     if(typeof descriptors.offline.value!=='boolean'){
         throw aiBrowserSpeechError(
             AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
@@ -458,24 +734,24 @@ function normalizeBrowserSpeechRole(value,role){
             `${label}.offline must be a boolean.`
         );
     }
-    return Object.freeze({
+    return completeValue({
         providerId,
         ...(hasGraph
             ?{
                 graph:descriptors.graph.value,
-                security:descriptors.security.value
+                ...(secure?{security:{secure:true}}:{})
             }
             :{
                 model:descriptors.model.value,
                 runtime:descriptors.runtime.value,
-                ...(hasSecurity?{security:descriptors.security.value}:{})
+                ...(secure?{security:{secure:true}}:{})
             }),
         offline:descriptors.offline.value
     });
 }
 
 function normalizeBrowserSpeechConfiguration(value){
-    const descriptors=frozenClosedRecord(
+    const descriptors=closedRecord(
         value,
         ['protocol','id','dbopfs','tableName','stt','tts'],
         ['protocol','id','dbopfs'],
@@ -514,12 +790,12 @@ function normalizeBrowserSpeechConfiguration(value){
             'AI browser speech configuration must provide stt, tts, or both.'
         );
     }
-    return Object.freeze({
+    return completeValue({
         configuration:value,
         id,
         dbopfs,
         ...(tableName?{tableName}:{}),
-        roles:Object.freeze(roles),
+        roles:completeValue(roles),
         ...Object.fromEntries(roles.map(role=>[
             role,
             normalizeBrowserSpeechRole(descriptors[role].value,role)
@@ -528,7 +804,7 @@ function normalizeBrowserSpeechConfiguration(value){
 }
 
 function normalizeBrowserSpeechOperationOptions(value,label){
-    if(value===undefined)return Object.freeze({signal:null});
+    if(value===undefined)return completeValue({signal:null});
     if(!value
         ||typeof value!=='object'
         ||Array.isArray(value)
@@ -557,7 +833,7 @@ function normalizeBrowserSpeechOperationOptions(value,label){
             `${label} signal must be an AbortSignal.`
         );
     }
-    return Object.freeze({signal});
+    return completeValue({signal});
 }
 
 class AI {
@@ -676,7 +952,7 @@ class AI {
             this,
             {
                 source:'ai',
-                eventTypes:Object.freeze(
+                eventTypes:completeValue(
                     [
                         AI_READY_EVENT,
                         ...Object.values(AI_BROWSER_SPEECH_EVENT_TYPES)
@@ -712,7 +988,7 @@ class AI {
     #events=null;
     #browserSpeechConfigurationRecord=null;
     #browserSpeechController=null;
-    #browserSpeechControllerRoles=Object.freeze([]);
+    #browserSpeechControllerRoles=completeValue([]);
     #browserSpeechGeneration=0;
     #browserSpeechModulePromise=null;
     #browserSpeechOperationSequence=0;
@@ -725,7 +1001,7 @@ class AI {
     #legacySpeechReadiness=Promise.resolve(null);
     #speechControlGeneration=0;
     #stopOllamaReady=null;
-    #preferenceTuple=Object.freeze([
+    #preferenceTuple=completeValue([
         'OPENAI',
         'OPENAI',
         'OPENAI',
@@ -743,10 +1019,10 @@ class AI {
         const reason=AI_INITIALIZATION_REASONS.initialized;
         const {occurrence}=this.#events.dispatch(
             AI_READY_EVENT,
-            Object.freeze({db:this,operationId,reason}),
+            completeValue({db:this,operationId,reason}),
             {
                 operationId,
-                publicDetail:Object.freeze({
+                publicDetail:completeValue({
                     ready:true,
                     reason
                 })
@@ -837,14 +1113,14 @@ class AI {
             ||selection.modelId!==this.model
             ||selection.localOnly!==localOnly
             ||this.llmService!==providerId){
-            return Object.freeze({
+            return completeValue({
                 available:false,
                 code:'ARCANE_AI_MODEL_AUTHORITY_REQUIRED',
                 message:'The selected legacy LLM route does not match the active AI configuration.'
             });
         }
         if(!this.#legacyLLMCapability(providerId)){
-            return Object.freeze({
+            return completeValue({
                 available:false,
                 code:providerId==='OLLAMA'
                     ?'AI_NATIVE_LOCAL_REQUIRED'
@@ -854,13 +1130,12 @@ class AI {
                     :'AI provider is not configured.'
             });
         }
-        return Object.freeze({
+        return completeValue({
             available:true,
-            authority:Object.freeze({
+            authority:completeValue({
                 protocol:AI_MODEL_AUTHORITY_PROTOCOL,
                 providerId,
                 modelId:selection.modelId,
-                admitted:true
             })
         });
     }
@@ -877,7 +1152,7 @@ class AI {
                 &&!runtime.#legacyLLMCapability(providerId)){
                 state='unloaded';
             }
-            return Object.freeze({
+            return completeValue({
                 state,
                 loaded:state==='ready',
                 busy
@@ -902,17 +1177,17 @@ class AI {
             busy=false;
         }
 
-        return Object.freeze({
+        return completeValue({
             protocol:AI_PROVIDER_PROTOCOL,
             role:'llm',
             id:providerId,
             localOnly,
             catalog:function catalogLegacyLLMProvider(){
                 if(runtime.llmService!==providerId||!runtime.model){
-                    return Object.freeze([]);
+                    return completeValue([]);
                 }
-                return Object.freeze([
-                    Object.freeze({id:runtime.model})
+                return completeValue([
+                    completeValue({id:runtime.model})
                 ]);
             },
             inspect:function inspectLegacyLLMProvider(selection,{signal}={}){
@@ -964,7 +1239,7 @@ class AI {
                     unit:'items',
                     heartbeat:false
                 });
-                return Object.freeze({
+                return completeValue({
                     authority:inspection.authority,
                     status:statusLegacyLLMProvider()
                 });
@@ -1087,14 +1362,14 @@ class AI {
             ||selection.modelId!==this.#legacySpeechModel(role)
             ||selection.localOnly!==localOnly
             ||this.#legacySpeechService(role)!==providerId){
-            return Object.freeze({
+            return completeValue({
                 available:false,
                 code:'ARCANE_AI_MODEL_AUTHORITY_REQUIRED',
                 message:`The selected legacy ${role.toUpperCase()} route does not match the active AI configuration.`
             });
         }
         if(!this.#legacySpeechCapability(role,providerId)){
-            return Object.freeze({
+            return completeValue({
                 available:false,
                 code:providerId==='LOCAL_SPEACH'
                     ?'AI_NATIVE_LOCAL_REQUIRED'
@@ -1104,13 +1379,12 @@ class AI {
                     :'AI provider is not configured.'
             });
         }
-        return Object.freeze({
+        return completeValue({
             available:true,
-            authority:Object.freeze({
+            authority:completeValue({
                 protocol:AI_MODEL_AUTHORITY_PROTOCOL,
                 providerId,
                 modelId:selection.modelId,
-                admitted:true
             })
         });
     }
@@ -1128,7 +1402,7 @@ class AI {
                 &&!runtime.#legacySpeechCapability(role,providerId)){
                 state='unloaded';
             }
-            return Object.freeze({
+            return completeValue({
                 state,
                 loaded:state==='ready',
                 busy
@@ -1154,7 +1428,7 @@ class AI {
             busy=false;
         }
 
-        return Object.freeze({
+        return completeValue({
             protocol:AI_PROVIDER_PROTOCOL,
             role,
             id:providerId,
@@ -1162,14 +1436,14 @@ class AI {
             catalog:function catalogLegacySpeechProvider(){
                 const model=runtime.#legacySpeechModel(role);
                 if(runtime.#legacySpeechService(role)!==providerId||!model){
-                    return Object.freeze([]);
+                    return completeValue([]);
                 }
                 const defaultVoice=runtime.#legacySpeechDefaultVoice(
                     role,
                     providerId
                 );
-                return Object.freeze([
-                    Object.freeze({
+                return completeValue([
+                    completeValue({
                         id:model,
                         ...(defaultVoice?{defaultVoice}:{})
                     })
@@ -1224,7 +1498,7 @@ class AI {
                     unit:'items',
                     heartbeat:false
                 });
-                return Object.freeze({
+                return completeValue({
                     authority:inspection.authority,
                     status:statusLegacySpeechProvider()
                 });
@@ -1305,7 +1579,7 @@ class AI {
         const unregister=this.#providerRuntime.register(provider);
         this.#legacyLLMProviders.set(
             providerId,
-            Object.freeze({provider,unregister})
+            completeValue({provider,unregister})
         );
         return true;
     }
@@ -1322,7 +1596,7 @@ class AI {
         const unregister=this.#providerRuntime.register(provider);
         this.#legacySpeechProviders.set(
             this.#legacySpeechProviderKey(role,providerId),
-            Object.freeze({role,providerId,provider,unregister})
+            completeValue({role,providerId,provider,unregister})
         );
         return true;
     }
@@ -1569,7 +1843,7 @@ class AI {
             }
             return value;
         });
-        return Object.freeze(next);
+        return completeValue(next);
     }
 
     #assertValidProviderTuple(tuple){
@@ -1616,7 +1890,7 @@ class AI {
         this.modelTTS=this.#ttsModels[modelTTS]||modelTTS;
         this.modelSTT=this.#sttModels[modelSTT]||modelSTT;
         this.reasoningEffort='';
-        this.#preferenceTuple=Object.freeze(tuple.slice());
+        this.#preferenceTuple=completeValue(tuple.slice());
     }
 
     #applySpeechPreferenceTuple(tuple){
@@ -1624,14 +1898,14 @@ class AI {
         this.ttsService=tuple[2];
         this.modelTTS=this.#ttsModels[tuple[4]]||tuple[4];
         this.modelSTT=this.#sttModels[tuple[5]]||tuple[5];
-        this.#preferenceTuple=Object.freeze(tuple.slice());
+        this.#preferenceTuple=completeValue(tuple.slice());
     }
 
     #tupleFromProviderRoutes(selections){
         const llm=selections.llm.default;
         const stt=selections.stt.default;
         const tts=selections.tts.default;
-        return Object.freeze([
+        return completeValue([
             llm?.providerId||'',
             stt?.providerId||'',
             tts?.providerId||'',
@@ -1645,7 +1919,7 @@ class AI {
         const current=this.#preferenceTuple;
         const stt=selections.stt.default;
         const tts=selections.tts.default;
-        return Object.freeze([
+        return completeValue([
             current[0],
             stt?.providerId||'',
             tts?.providerId||'',
@@ -1966,14 +2240,12 @@ class AI {
     }
 
     #browserSpeechOperationId(action){
-        if(this.#browserSpeechOperationSequence===Number.MAX_SAFE_INTEGER){
-            throw aiBrowserSpeechError(
-                AI_BROWSER_SPEECH_ERROR_CODES.operationSequenceExhausted,
-                AI_BROWSER_SPEECH_REASONS.operationSequenceExhausted,
-                'The browser speech operation sequence is exhausted.'
-            );
-        }
-        this.#browserSpeechOperationSequence+=1;
+        this.#browserSpeechOperationSequence=
+            typeof this.#browserSpeechOperationSequence==='bigint'
+                ? this.#browserSpeechOperationSequence+1n
+                : this.#browserSpeechOperationSequence===Number.MAX_SAFE_INTEGER
+                    ? BigInt(this.#browserSpeechOperationSequence)+1n
+                    : this.#browserSpeechOperationSequence+1;
         return `${this.#events.instanceId}:${action}:${this.#browserSpeechOperationSequence.toString(36)}`;
     }
 
@@ -2104,9 +2376,9 @@ class AI {
             expectedProviders[role]=record.provider;
             legacyRecords.push(record);
         }
-        return Object.freeze({
-            expectedProviders:Object.freeze(expectedProviders),
-            legacyRecords:Object.freeze(legacyRecords)
+        return completeValue({
+            expectedProviders:completeValue(expectedProviders),
+            legacyRecords:completeValue(legacyRecords)
         });
     }
 
@@ -2175,7 +2447,7 @@ class AI {
     }
 
     #publishBrowserSpeechEvent(type,normalized,operationId,reason,{descriptor=null,error=null}={}){
-        const compatibilityDetail=Object.freeze({
+        const compatibilityDetail=completeValue({
             configuration:normalized.configuration,
             configurationId:normalized.id,
             ...(descriptor?{descriptor}:{}),
@@ -2187,7 +2459,7 @@ class AI {
             compatibilityDetail,
             {
                 operationId,
-                publicDetail:Object.freeze({
+                publicDetail:completeValue({
                     configurationId:normalized.id,
                     ...(descriptor?{descriptor}:{}),
                     ...(typeof error?.code==='string'?{code:error.code}:{}),
@@ -2199,12 +2471,12 @@ class AI {
 
     #browserSpeechRoutes(normalized,providers,previousRecord){
         function roleRoutes(provider,catalog){
-            const selection=Object.freeze({
+            const selection=completeValue({
                 providerId:provider.id,
                 modelId:catalog.id,
                 localOnly:true
             });
-            return Object.freeze({default:selection,localOnly:selection});
+            return completeValue({default:selection,localOnly:selection});
         }
         const currentRoutes=this.#currentSpeechRoutes();
         const routes={};
@@ -2228,15 +2500,15 @@ class AI {
             catalogs[role]=catalog[0];
             routes[role]=roleRoutes(providers[role],catalog[0]);
         }
-        return Object.freeze({
-            routes:Object.freeze(routes),
-            catalogs:Object.freeze(catalogs)
+        return completeValue({
+            routes:completeValue(routes),
+            catalogs:completeValue(catalogs)
         });
     }
 
     #browserSpeechDescriptor(normalized,catalogs,previousRecord){
         function roleDescriptor(role,configured,catalog){
-            return Object.freeze({
+            return completeValue({
                 role,
                 providerId:configured.providerId,
                 modelId:catalog.id,
@@ -2253,7 +2525,7 @@ class AI {
                 ?roleDescriptor(role,normalized[role],catalogs[role])
                 :previousRecord?.descriptor[role]??null;
         }
-        return Object.freeze({
+        return completeValue({
             protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
             configurationId:normalized.id,
             ...roles
@@ -2275,7 +2547,7 @@ class AI {
             role=>!normalized.roles.includes(role)
         );
         if(carriedRoles.length===0)return normalized.configuration;
-        return Object.freeze({
+        return completeValue({
             protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
             id:normalized.id,
             dbopfs:normalized.dbopfs,
@@ -2294,12 +2566,12 @@ class AI {
     }
 
     #currentSpeechRoutes(){
-        return Object.freeze({
-            stt:Object.freeze({
+        return completeValue({
+            stt:completeValue({
                 default:this.#providerRuntime.selection('stt'),
                 localOnly:this.#providerRuntime.selection('stt',{localOnly:true})
             }),
-            tts:Object.freeze({
+            tts:completeValue({
                 default:this.#providerRuntime.selection('tts'),
                 localOnly:this.#providerRuntime.selection('tts',{localOnly:true})
             })
@@ -2307,9 +2579,9 @@ class AI {
     }
 
     #emptySpeechRoutes(){
-        return Object.freeze({
-            stt:Object.freeze({default:null,localOnly:null}),
-            tts:Object.freeze({default:null,localOnly:null})
+        return completeValue({
+            stt:completeValue({default:null,localOnly:null}),
+            tts:completeValue({default:null,localOnly:null})
         });
     }
 
@@ -2354,7 +2626,7 @@ class AI {
         previousRecord
     ){
         const configurationByRole={};
-        const managedRoles=Object.freeze(['stt','tts'].filter(role=>
+        const managedRoles=completeValue(['stt','tts'].filter(role=>
             normalized.roles.includes(role)
             ||previousRecord?.managedRoles.includes(role)
         ));
@@ -2365,7 +2637,7 @@ class AI {
         }
         return {
             configuration,
-            configurationByRole:Object.freeze(configurationByRole),
+            configurationByRole:completeValue(configurationByRole),
             dbopfs:normalized.dbopfs,
             tableName:normalized.tableName,
             descriptor,
@@ -2379,15 +2651,13 @@ class AI {
         };
     }
 
-    #freezeBrowserSpeechRecord(record){
-        record.unregisters=Object.freeze({...record.unregisters});
-        Object.seal(record.registrationState);
-        Object.seal(record.retirementState);
-        return Object.freeze(record);
+    #finalizeBrowserSpeechRecord(record){
+        record.unregisters=completeValue({...record.unregisters});
+        return completeValue(record);
     }
 
     #browserSpeechRecordFromReplacement(record,replacement){
-        return this.#freezeBrowserSpeechRecord({
+        return this.#finalizeBrowserSpeechRecord({
             configuration:record.configuration,
             configurationByRole:record.configurationByRole,
             dbopfs:record.dbopfs,
@@ -2609,22 +2879,16 @@ class AI {
                 candidateProviders[role]=factory({
                     id:configured.providerId,
                     ...(configured.graph
-                        ?{
-                            graph:configured.graph,
-                            security:configured.security
-                        }
+                        ?{graph:configured.graph}
                         :{
                             model:configured.model,
-                            runtime:configured.runtime,
-                            ...(Object.hasOwn(configured,'security')
-                                ?{security:configured.security}
-                                :{})
+                            runtime:configured.runtime
                         }),
                     store,
                     offline:configured.offline
                 });
             }
-            providers=Object.freeze({...candidateProviders});
+            providers=completeValue({...candidateProviders});
             prepared=this.#browserSpeechRoutes(
                 normalized,
                 providers,
@@ -2646,7 +2910,7 @@ class AI {
                     const provider=candidateProviders[role];
                     const changed=normalized.roles.includes(role);
                     const selection=changed&&provider
-                        ?Object.freeze({
+                        ?completeValue({
                             providerId:provider.id,
                             modelId:normalized[role].graph?.model.id
                                 ??normalized[role].model.id,
@@ -2654,7 +2918,7 @@ class AI {
                         })
                         :null;
                     partialRoutes[role]=changed
-                        ?Object.freeze({default:selection,localOnly:selection})
+                        ?completeValue({default:selection,localOnly:selection})
                         :previousRecord?.managedRoles.includes(role)
                             ?previousRecord.routes[role]
                             :currentRoutes[role];
@@ -2663,8 +2927,8 @@ class AI {
                     normalized,
                     configuration,
                     null,
-                    Object.freeze({...candidateProviders}),
-                    Object.freeze(partialRoutes),
+                    completeValue({...candidateProviders}),
+                    completeValue(partialRoutes),
                     previousRecord
                 );
                 return this.#throwAfterBrowserSpeechCandidateCleanup(
@@ -2728,9 +2992,9 @@ class AI {
                         expectedProvider:replacementBoundary.expectedProviders[role]
                     }
                 );
-                replacement=Object.freeze({
+                replacement=completeValue({
                     routes:prepared.routes,
-                    unregisters:Object.freeze({
+                    unregisters:completeValue({
                         stt:role==='stt'
                             ?roleReplacement.unregister
                             :previousRecord?.unregisters.stt??null,
@@ -2804,9 +3068,9 @@ class AI {
                             expectedProvider:record.providers[role]
                         }
                     );
-                    rollback=Object.freeze({
+                    rollback=completeValue({
                         routes:previousRecord.routes,
-                        unregisters:Object.freeze({
+                        unregisters:completeValue({
                             stt:role==='stt'
                                 ?roleRollback.unregister
                                 :previousRecord.unregisters.stt,
@@ -2978,7 +3242,7 @@ class AI {
                     operation.signal?.removeEventListener('abort',forwardAbort);
                     if(runtime.#browserSpeechController===controller){
                         runtime.#browserSpeechController=null;
-                        runtime.#browserSpeechControllerRoles=Object.freeze([]);
+                        runtime.#browserSpeechControllerRoles=completeValue([]);
                     }
                 }
             }
@@ -3028,7 +3292,7 @@ class AI {
         if(invalidatesSpeech)this.#invalidateSpeechControl();
         const controller=new AbortController();
         this.#browserSpeechController=controller;
-        this.#browserSpeechControllerRoles=Object.freeze([]);
+        this.#browserSpeechControllerRoles=completeValue([]);
         const forwardAbort=function cancelBrowserSpeechDisposal(){
             if(!controller.signal.aborted)controller.abort(operation.signal.reason);
         };
@@ -3079,7 +3343,7 @@ class AI {
                         }else{
                             const role=activeRecord.managedRoles[0];
                             const currentRoutes=runtime.#currentSpeechRoutes();
-                            const emptyRoleRoutes=Object.freeze({
+                            const emptyRoleRoutes=completeValue({
                                 default:null,
                                 localOnly:null
                             });
@@ -3091,8 +3355,8 @@ class AI {
                                     expectedProvider:activeRecord.providers[role]
                                 }
                             );
-                            removed=Object.freeze({
-                                routes:Object.freeze({
+                            removed=completeValue({
+                                routes:completeValue({
                                     stt:role==='stt'
                                         ?emptyRoleRoutes
                                         :currentRoutes.stt,
@@ -3182,7 +3446,7 @@ class AI {
                     operation.signal?.removeEventListener('abort',forwardAbort);
                     if(runtime.#browserSpeechController===controller){
                         runtime.#browserSpeechController=null;
-                        runtime.#browserSpeechControllerRoles=Object.freeze([]);
+                        runtime.#browserSpeechControllerRoles=completeValue([]);
                     }
                 }
             }
@@ -3262,7 +3526,7 @@ class AI {
                 const errorText=await response.text();
 
                 if(errorText&&!errorText.trim().startsWith('<')){
-                    detail=errorText.trim().slice(0,500);
+                    detail=errorText;
                 }
             }
         }catch{
@@ -3471,8 +3735,8 @@ class AI {
     #arrayBufferToBase64(arrayBuffer){
         const bytes=new Uint8Array(arrayBuffer);
 
-        if(!bytes.length||bytes.length>6*1024*1024){
-            throw new RangeError('Microphone audio must be between 1 byte and 6 MiB.');
+        if(!bytes.length){
+            throw new RangeError('Microphone audio must not be empty.');
         }
 
         const chunks=[];
@@ -3485,7 +3749,7 @@ class AI {
     }
 
     #base64ToBytes(value){
-        if(typeof value!=='string'||!value||value.length>8*1024*1024){
+        if(typeof value!=='string'||!value){
             throw new TypeError('Arcane returned invalid local speech audio.');
         }
 
@@ -3532,8 +3796,13 @@ class AI {
                     if(typeof argumentValue==='string'){
                         try{
                             argumentValue=JSON.parse(argumentValue);
-                        }catch{
-                            argumentValue={};
+                        }catch(cause){
+                            const error=new TypeError(
+                                'Ollama tool call arguments must contain valid JSON.'
+                            );
+                            error.code='AI_TOOL_ARGUMENTS_INVALID';
+                            error.cause=cause;
+                            throw error;
                         }
                     }
                     if(
@@ -3541,7 +3810,11 @@ class AI {
                         ||typeof argumentValue!=='object'
                         ||Array.isArray(argumentValue)
                     ){
-                        argumentValue={};
+                        const error=new TypeError(
+                            'Ollama tool call arguments must contain a JSON object.'
+                        );
+                        error.code='AI_TOOL_ARGUMENTS_INVALID';
+                        throw error;
                     }
                     if(callId&&name){
                         toolNamesByCallId.set(callId,name);
@@ -3577,7 +3850,7 @@ class AI {
         });
         const requiredName=toolChoice?.function?.name;
         const instruction=requiredName
-            ?`Call the ${requiredName} function now with concise values for every required field. Do not answer in prose.`
+            ?`Call the ${requiredName} function now with complete values for every required field. Do not answer in prose.`
             :toolChoice==='none'
                 ?'Do not call a function in this request. Follow the response instructions and answer in the requested format.'
                 :'';
@@ -3645,16 +3918,15 @@ class AI {
         return null;
     }
 
-    async #reportRequest(requestHandler,request,id){
+    async #reportRequest(requestHandler,request,id,metadata){
         if(typeof requestHandler!=='function'){
             throw new TypeError('AI onRequest callback must be a function.');
         }
-        await requestHandler(request,id);
+        await requestHandler(request,id,metadata);
     }
 
     #providerStreamEmissions(chunk,seeThinking){
         const chunks=[];
-        const toolNames=[];
         const choices=Array.isArray(chunk?.choices)?chunk.choices:[];
         for(const choice of choices){
             const delta=choice?.delta||{};
@@ -3663,12 +3935,6 @@ class AI {
             }
             if(typeof delta.content==='string'){
                 chunks.push({text:delta.content,thinking:false});
-            }
-            for(const call of Array.isArray(delta.tool_calls)?delta.tool_calls:[]){
-                const name=call?.function?.name;
-                if(typeof name==='string'&&name){
-                    toolNames.push(name);
-                }
             }
         }
         if(!choices.length){
@@ -3683,19 +3949,8 @@ class AI {
             if(text){
                 chunks.push({text,thinking:false});
             }
-            const calls=Array.isArray(chunk?.toolCalls)
-                ?chunk.toolCalls
-                :Array.isArray(chunk?.tool_calls)
-                    ?chunk.tool_calls
-                    :[];
-            for(const call of calls){
-                const name=call?.function?.name||call?.name;
-                if(typeof name==='string'&&name){
-                    toolNames.push(name);
-                }
-            }
         }
-        return {chunks,toolNames};
+        return {chunks};
     }
 
     #providerCompletionOutput(completion){
@@ -3729,7 +3984,7 @@ class AI {
             payload.structuredOutput??false,
             payload.tools??[],
             payload.toolChoice??'auto',
-            payload.parallelToolCalls??true,
+            payload.parallelToolCalls??false,
             payload.id??Date.now(),
             function ignoreLegacyLLMProviderRequest(){},
             signal
@@ -3748,26 +4003,21 @@ class AI {
             );
         }
 
-        function emitLegacyLLMStreamTool(name){
-            if(typeof name==='string'&&name){
-                bridge.emit({toolCalls:[{name}]});
-            }
-        }
-
         return this.#streamLegacyMessage(
             payload.messages??[],
             emitLegacyLLMStreamText,
             function ignoreLegacyLLMProviderCompletion(){},
             payload.tools??[],
             payload.toolChoice??'auto',
-            emitLegacyLLMStreamTool,
-            payload.parallelToolCalls??true,
+            function retainLegacyLLMStreamToolUntilCompletion(){},
+            payload.parallelToolCalls??false,
             payload.id??Date.now(),
             payload.seeThinking??false,
             bridge.signal,
             function ignoreLegacyLLMProviderRequest(){},
             payload.structuredOutput??false,
-            false
+            false,
+            true
         );
     }
 
@@ -3789,27 +4039,78 @@ class AI {
         }
     }
 
+    #openAICompatibleOllamaToolCalls(value,id=Date.now()){
+        if(value===undefined){
+            return [];
+        }
+        if(!Array.isArray(value)){
+            throw aiStructuralError(
+                'AI_CHAT_INVALID_TOOL_CALL',
+                'The native Ollama response contains invalid structural tool calls.'
+            );
+        }
+        return value.map(function adaptNativeOllamaToolCall(call,index){
+            if(!call||typeof call!=='object'||Array.isArray(call)){
+                throw aiStructuralError(
+                    'AI_CHAT_INVALID_TOOL_CALL',
+                    `The native Ollama structural tool call ${index+1} is invalid.`
+                );
+            }
+            const nativeFunction=call.function;
+            if(
+                !nativeFunction
+                ||typeof nativeFunction!=='object'
+                ||Array.isArray(nativeFunction)
+            ){
+                throw aiStructuralError(
+                    'AI_CHAT_INVALID_TOOL_CALL',
+                    `The native Ollama structural tool call ${index+1} is invalid.`
+                );
+            }
+            let encodedArguments=nativeFunction.arguments;
+            if(
+                encodedArguments
+                &&typeof encodedArguments==='object'
+                &&!Array.isArray(encodedArguments)
+            ){
+                try{
+                    encodedArguments=JSON.stringify(encodedArguments);
+                }catch(cause){
+                    throw aiStructuralError(
+                        'AI_CHAT_INVALID_TOOL_CALL',
+                        `The native Ollama structural tool call ${index+1} arguments cannot be encoded.`,
+                        cause
+                    );
+                }
+            }
+            return {
+                id:call.id===undefined
+                    ?`ollama-${id}-tool-${index+1}`
+                    :call.id,
+                type:call.type===undefined?'function':call.type,
+                function:{
+                    name:nativeFunction.name,
+                    arguments:encodedArguments
+                }
+            };
+        });
+    }
+
     #openAICompatibleOllamaResponse(response={},id=Date.now()){
         const message=response?.message||{};
-        const toolCalls=Array.isArray(message.tool_calls)
-            ?message.tool_calls.map(
-                function normalizeOllamaToolCall(call,index){
-                    return {
-                        id:call?.id||`call-${id}-${index}`,
-                        type:'function',
-                        function:{
-                            name:call?.function?.name||'',
-                            arguments:typeof call?.function?.arguments==='string'
-                                ?call.function.arguments
-                                :JSON.stringify(call?.function?.arguments||{})
-                        }
-                    };
-                }
-            )
-            :[];
+        const responseId=typeof response?.id==='string'&&response.id
+            ?response.id
+            :`ollama-${id}`;
+        const adaptedToolCalls=this.#openAICompatibleOllamaToolCalls(
+            message.tool_calls,
+            id
+        );
+        const toolCalls=normalizeAICompletionToolCalls({
+            message:{tool_calls:adaptedToolCalls}
+        });
 
         return {
-            id:response?.id||`ollama-${id}`,
+            id:responseId,
             object:'chat.completion',
             created:Math.floor(Date.now()/1000),
             model:response?.model||this.model,
@@ -3841,15 +4142,27 @@ class AI {
         localOnly=false,
         onChunk=function ignoreStreamChunk(){},
         onComplete=function finishIgnoredStream(){},
+        onResponse=function ignoreStreamResponse(){},
         tools=[],
         toolChoice='auto',
         onToolCall=function ignoreEarlyFunction(){},
         onRequest=function ignoreStreamRequest(){},
-        parallelToolCalls=true,
+        parallelToolCalls=false,
         id=Date.now(),
         seeThinking=false,
-        signal=null
+        signal=null,
+        maxOutputTokens,
+        maxTokens,
+        temperature,
+        topK,
+        topP,
+        repeatPenalty,
+        minP,
+        seed,
+        stop,
+        templateOptions
     }={}){
+        validateAIStructuralRequest(messages,tools,parallelToolCalls);
         if(localOnly!==true&&localOnly!==false){
             throw new TypeError('AI localOnly must be a boolean.');
         }
@@ -3868,10 +4181,20 @@ class AI {
                 toolChoice,
                 parallelToolCalls,
                 id,
-                seeThinking
+                seeThinking,
+                ...(maxOutputTokens!==undefined
+                    ?{maxTokens:maxOutputTokens}
+                    :maxTokens!==undefined?{maxTokens}:{}),
+                ...(temperature!==undefined?{temperature}:{}),
+                ...(topK!==undefined?{topK}:{}),
+                ...(topP!==undefined?{topP}:{}),
+                ...(repeatPenalty!==undefined?{repeatPenalty}:{}),
+                ...(minP!==undefined?{minP}:{}),
+                ...(seed!==undefined?{seed}:{}),
+                ...(stop!==undefined?{stop}:{}),
+                ...(templateOptions!==undefined?{templateOptions}:{})
             };
             const displayId=`M-${id}`;
-            const announcedTools=new Set();
             let handle=null;
             try{
                 if(signal?.aborted){
@@ -3908,40 +4231,22 @@ class AI {
                             throw normalizeAIRequestAbort();
                         }
                     }
-                    for(const name of emissions.toolNames){
-                        if(signal?.aborted){
-                            throw normalizeAIRequestAbort();
-                        }
-                        if(!announcedTools.has(name)){
-                            announcedTools.add(name);
-                            await onToolCall(name);
-                            if(signal?.aborted){
-                                throw normalizeAIRequestAbort();
-                            }
-                        }
-                    }
                 }
                 const completion=await handle.result;
                 if(signal?.aborted){
                     throw normalizeAIRequestAbort();
                 }
-                for(const choice of Array.isArray(completion?.choices)
-                    ?completion.choices
-                    :[]){
-                    for(const call of Array.isArray(choice?.message?.tool_calls)
-                        ?choice.message.tool_calls
-                        :[]){
-                        const name=call?.function?.name;
-                        if(typeof name==='string'&&name&&!announcedTools.has(name)){
-                            if(signal?.aborted){
-                                throw normalizeAIRequestAbort();
-                            }
-                            announcedTools.add(name);
-                            await onToolCall(name);
-                            if(signal?.aborted){
-                                throw normalizeAIRequestAbort();
-                            }
-                        }
+                const structuralToolCalls=normalizeAICompletionToolCalls(
+                    completion
+                );
+                await onResponse(completion,id,false);
+                for(const call of structuralToolCalls){
+                    if(signal?.aborted){
+                        throw normalizeAIRequestAbort();
+                    }
+                    await onToolCall(call,displayId);
+                    if(signal?.aborted){
+                        throw normalizeAIRequestAbort();
                     }
                 }
                 const result=this.#providerCompletionOutput(completion);
@@ -3964,20 +4269,52 @@ class AI {
             }
         }
 
-        return this.streamMessage(
-            messages,
-            onChunk,
-            onComplete,
-            tools,
-            toolChoice,
-            onToolCall,
-            parallelToolCalls,
-            id,
-            seeThinking,
-            signal,
-            onRequest,
-            structuredOutput
-        );
+        try{
+            const completion=await this.#streamLegacyMessage(
+                messages,
+                onChunk,
+                function retainLegacyCompletionUntilResponse(){},
+                tools,
+                toolChoice,
+                function retainLegacyToolCallUntilResponse(){},
+                parallelToolCalls,
+                id,
+                seeThinking,
+                signal,
+                onRequest,
+                structuredOutput,
+                false,
+                true
+            );
+            const structuralToolCalls=normalizeAICompletionToolCalls(
+                completion
+            );
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort();
+            }
+            await onResponse(completion,id,false);
+            for(const call of structuralToolCalls){
+                if(signal?.aborted){
+                    throw normalizeAIRequestAbort();
+                }
+                await onToolCall(call,`M-${id}`);
+            }
+            const result=this.#providerCompletionOutput(completion);
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort();
+            }
+            await onComplete(result,`M-${id}`,false);
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort();
+            }
+            this.finishTTS();
+            return result;
+        }catch(error){
+            this.stopAudio();
+            throw isAIRequestAbort(error,signal)
+                ?normalizeAIRequestAbort(error)
+                :error;
+        }
     }
 
     async streamMessage(
@@ -3987,12 +4324,13 @@ class AI {
         tools=[],
         tool_choice='auto',
         earlyFunctionTrigger=function ignoreEarlyFunction(){},
-        parallel_tool_calls=true,
+        parallel_tool_calls=false,
         id=Date.now(),
         seeThinking=false,
         signal=null,
         requestHandler=function ignoreStreamRequest(){},
-        structuredOutput=false
+        structuredOutput=false,
+        returnCompletion=false
     ){
         if(this.#shouldUseProviderRuntime('llm',this.llmService,false)){
             return this.streamRequest({
@@ -4024,7 +4362,9 @@ class AI {
             seeThinking,
             signal,
             requestHandler,
-            structuredOutput
+            structuredOutput,
+            true,
+            returnCompletion
         );
     }
 
@@ -4035,17 +4375,19 @@ class AI {
         tools=[],
         tool_choice='auto',
         earlyFunctionTrigger=function ignoreEarlyFunction(){},
-        parallel_tool_calls=true,
+        parallel_tool_calls=false,
         id=Date.now(),
         seeThinking=false,
         signal=null,
         requestHandler=function ignoreStreamRequest(){},
         structuredOutput=false,
-        finishSpeech=true
+        finishSpeech=true,
+        returnCompletion=false
     ){
         let speechTurnCompleted=false;
 
         try{
+            validateAIStructuralRequest(messages,tools,parallel_tool_calls);
             this.#assertServiceConfigured(this.llmService);
             if(signal&&(
                 typeof signal.aborted!=='boolean'
@@ -4085,7 +4427,7 @@ class AI {
         let isThinking=true;
         let isWaiting=true;
 
-        streamHandler('Thinking...',`M-${id}`,isThinking);
+        await streamHandler('Thinking...',`M-${id}`,isThinking);
 
         const nativeOllama=this.#nativeOllama();
 
@@ -4098,8 +4440,7 @@ class AI {
 
         if(nativeOllama){
             let nativeContent='';
-            const nativeToolCalls={};
-            const triggeredTools=new Set();
+            const nativeStreamedToolCallFrames=[];
             const ollamaTools=this.#ollamaTools(tools,tool_choice);
             const ollamaMessages=this.#ollamaMessages(messages,tool_choice);
             const ollamaRequest={
@@ -4111,46 +4452,19 @@ class AI {
                 ...(ollamaTools.length?{tools:ollamaTools}:{})
             };
 
-            function reportEarlyFunctionFailure(error){
-                console.error('Early tool trigger failed.');
-            }
-
             function receiveNativeToolCalls(message={}){
                 const calls=Array.isArray(message.tool_calls)?message.tool_calls:[];
 
                 if(calls.length){
                     isThinking=false;
-                }
-
-                for(const call of calls){
-                    const name=call?.function?.name;
-
-                    if(!name){
-                        continue;
-                    }
-
-                    nativeToolCalls[name]=typeof call.function.arguments==='string'
-                        ?call.function.arguments
-                        :JSON.stringify(call.function.arguments||{});
-
-                    if(!triggeredTools.has(name)){
-                        triggeredTools.add(name);
-                        Promise.resolve(earlyFunctionTrigger(name)).catch(
-                            reportEarlyFunctionFailure
-                        );
-                    }
+                    nativeStreamedToolCallFrames.push(calls.slice());
                 }
             }
 
-            await this.#reportRequest(requestHandler,ollamaRequest,id,{
-                operation:'stream',
-                transport:'native',
-                destination:'Arcane.ollama.chat'
-            });
-            const nativeResponse=await nativeOllama.chat(
-                ollamaRequest,
-                {
-                    onChunk:function receiveNativeOllamaChunk(chunk){
+            let nativeChunkPipeline=Promise.resolve();
+            function queueNativeOllamaChunk(chunk){
+                nativeChunkPipeline=nativeChunkPipeline.then(
+                    async function processNativeOllamaChunk(){
                         if(signal?.aborted){
                             return;
                         }
@@ -4161,43 +4475,105 @@ class AI {
                         const content=String(message.content||'');
 
                         if(thinking){
-                            streamHandler(thinking,`M-${id}`,true);
+                            await streamHandler(thinking,`M-${id}`,true);
                         }
 
                         if(content){
                             isThinking=false;
                             nativeContent+=content;
-                            streamHandler(content,`M-${id}`,false);
+                            await streamHandler(content,`M-${id}`,false);
                         }
 
                         receiveNativeToolCalls(message);
-                    },
-                    signal
-                }
-            );
+                    }
+                );
+                return nativeChunkPipeline;
+            }
+
+            await this.#reportRequest(requestHandler,ollamaRequest,id,{
+                operation:'stream',
+                transport:'native',
+                destination:'Arcane.ollama.chat'
+            });
+            let nativeResponse;
+            let nativeRequestFailure=null;
+            try{
+                nativeResponse=await nativeOllama.chat(
+                    ollamaRequest,
+                    {onChunk:queueNativeOllamaChunk,signal}
+                );
+            }catch(error){
+                nativeRequestFailure=error;
+            }
+            try{
+                await nativeChunkPipeline;
+            }catch(error){
+                nativeRequestFailure??=error;
+            }
+            if(nativeRequestFailure){
+                throw nativeRequestFailure;
+            }
             if(signal?.aborted){
                 throw normalizeAIRequestAbort();
             }
-            receiveNativeToolCalls(nativeResponse?.message);
+            const nativeCompletion=this.#openAICompatibleOllamaResponse(
+                {
+                    ...nativeResponse,
+                    message:{
+                        ...(nativeResponse?.message??{}),
+                        content:typeof nativeResponse?.message?.content==='string'
+                            &&nativeResponse.message.content
+                            ?nativeResponse.message.content
+                            :nativeContent
+                    }
+                },
+                id
+            );
+            const structuralToolCalls=normalizeAICompletionToolCalls(
+                nativeCompletion
+            );
+            for(let frameIndex=0;
+                frameIndex<nativeStreamedToolCallFrames.length;
+                frameIndex+=1
+            ){
+                const streamedToolCalls=normalizeAIStreamToolCallObservation(
+                    {
+                        message:{
+                            tool_calls:this.#openAICompatibleOllamaToolCalls(
+                                nativeStreamedToolCallFrames[frameIndex],
+                                id
+                            )
+                        }
+                    },
+                    `The native Ollama stream frame ${frameIndex+1}`
+                );
+                assertAIStreamToolCallCorrelation(
+                    streamedToolCalls,
+                    structuralToolCalls,
+                    'The native Ollama stream'
+                );
+            }
             this.#assertRequiredOllamaToolCall(
-                Object.keys(nativeToolCalls).map(function createToolCallName(name){
-                    return {function:{name}};
-                }),
+                structuralToolCalls,
                 tool_choice
             );
+            for(const call of structuralToolCalls){
+                if(signal?.aborted){
+                    throw normalizeAIRequestAbort();
+                }
+                await earlyFunctionTrigger(call,`M-${id}`);
+            }
 
-            const nativeResult=Object.keys(nativeToolCalls).length
-                ?nativeToolCalls
-                :nativeContent;
-            if(Object.keys(nativeToolCalls).length&&!nativeContent){
-                streamHandler('',`M-${id}`,false);
+            const nativeResult=this.#providerCompletionOutput(nativeCompletion);
+            if(structuralToolCalls.length&&!nativeContent){
+                await streamHandler('',`M-${id}`,false);
             }
             if(finishSpeech){
                 this.finishTTS();
             }
             await streamComplete(nativeResult,`M-${id}`,isThinking);
             speechTurnCompleted=true;
-            return nativeResult;
+            return returnCompletion?nativeCompletion:nativeResult;
         }
 
         await this.#reportRequest(requestHandler,request,id,{
@@ -4238,8 +4614,13 @@ class AI {
 
         let chunkString='';
         let chunkCache='';
-        const streamedToolCalls=new Map();
-        const triggeredTools=new Set();
+        const streamedToolCallsByChoice=new Map();
+        let streamCreated=null;
+        let streamFinishReason=null;
+        let streamId=null;
+        let streamModel=null;
+        let streamObject=null;
+        let streamUsage=null;
         const decoder = new TextDecoder('utf-8');
         //alert(1)
         const reader=response.body?.getReader?.();
@@ -4248,41 +4629,63 @@ class AI {
             throw new TypeError('Streaming response body is not readable');
         }
 
-        function receiveStreamedToolCalls(toolCalls=[]){
+        function receiveStreamedToolCalls(toolCalls=[],choicePosition=0){
+            const streamedToolCalls=streamedToolCallsByChoice.get(choicePosition)
+                ||new Map();
             for(let position=0;position<toolCalls.length;position++){
                 const toolCall=toolCalls[position]||{};
                 const toolFunction=toolCall.function||{};
-                const key=Number.isInteger(toolCall.index)
-                    ?`index:${toolCall.index}`
-                    :toolCall.id
-                        ?`id:${toolCall.id}`
-                        :`position:${position}`;
+                const key=`position:${Number.isInteger(toolCall.index)
+                    ?toolCall.index
+                    :position}`;
                 const record=streamedToolCalls.get(key)||{
                     arguments:'',
+                    id:'',
+                    invalidArguments:false,
+                    invalidIdentity:false,
+                    invalidName:false,
                     name:'',
-                    order:streamedToolCalls.size
+                    order:streamedToolCalls.size,
+                    type:''
                 };
 
-                if(toolFunction.name){
-                    record.name=toolFunction.name;
-                    if(!triggeredTools.has(record.name)){
-                        triggeredTools.add(record.name);
-                        Promise.resolve(
-                            earlyFunctionTrigger(record.name)
-                        ).catch(
-                            ()=>console.error('Early tool trigger failed.')
-                        );
+                if(toolCall.id!==undefined){
+                    if(typeof toolCall.id!=='string'||!toolCall.id){
+                        record.invalidIdentity=true;
+                    }else if(record.id&&record.id!==toolCall.id){
+                        record.invalidIdentity=true;
+                    }else{
+                        record.id=toolCall.id;
+                    }
+                }
+
+                if(toolCall.type!==undefined){
+                    if(typeof toolCall.type!=='string'||!toolCall.type){
+                        record.invalidIdentity=true;
+                    }else if(record.type&&record.type!==toolCall.type){
+                        record.invalidIdentity=true;
+                    }else{
+                        record.type=toolCall.type;
+                    }
+                }
+
+                if(toolFunction.name!==undefined){
+                    if(typeof toolFunction.name!=='string'){
+                        record.invalidName=true;
+                    }else{
+                        record.name+=toolFunction.name;
                     }
                 }
 
                 if(typeof toolFunction.arguments==='string'){
                     record.arguments+=toolFunction.arguments;
-                }else if(toolFunction.arguments&&typeof toolFunction.arguments==='object'){
-                    record.arguments+=JSON.stringify(toolFunction.arguments);
+                }else if(toolFunction.arguments!==undefined){
+                    record.invalidArguments=true;
                 }
 
                 streamedToolCalls.set(key,record);
             }
+            streamedToolCallsByChoice.set(choicePosition,streamedToolCalls);
         }
 
         try{
@@ -4303,64 +4706,88 @@ class AI {
                 //alert(3)
                 //console.log(lines);
 
-                lines.forEach(
-                    function parsingAIGeneratedStream(delta,i){
-                        chunkCache+=delta;
+                for(const eventData of lines){
+                    chunkCache+=eventData;
 
-                        if (chunkCache.trim() === '[DONE]') {
-                            chunkCache = '';
-                            return;
+                    if(chunkCache.trim()==='[DONE]'){
+                        chunkCache='';
+                        continue;
+                    }
+
+                    let streamedResponse;
+                    try{
+                        streamedResponse=JSON.parse(chunkCache)||{};
+                    }catch{
+                        continue;
+                    }
+                    chunkCache='';
+                    if(streamedResponse.id!==undefined){
+                        streamId=streamedResponse.id;
+                    }
+                    if(streamedResponse.object!==undefined){
+                        streamObject=streamedResponse.object;
+                    }
+                    if(streamedResponse.created!==undefined){
+                        streamCreated=streamedResponse.created;
+                    }
+                    if(streamedResponse.model!==undefined){
+                        streamModel=streamedResponse.model;
+                    }
+                    if(streamedResponse.usage!==undefined){
+                        streamUsage=streamedResponse.usage;
+                    }
+
+                    const choices=Array.isArray(streamedResponse.choices)
+                        ?streamedResponse.choices
+                        :[];
+                    for(let choicePosition=0;
+                        choicePosition<choices.length;
+                        choicePosition+=1
+                    ){
+                        const choice=choices[choicePosition]||{};
+                        const choiceDelta=choice.delta||{};
+                        const toolCalls=choiceDelta.tool_calls;
+                        if(toolCalls!==undefined&&!Array.isArray(toolCalls)){
+                            throw aiStructuralError(
+                                'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
+                                `AI stream choice ${choicePosition+1} contains invalid structural tool-call data.`
+                            );
+                        }
+                        if(toolCalls?.length){
+                            receiveStreamedToolCalls(
+                                toolCalls,
+                                choicePosition
+                            );
+                        }
+                        if(choicePosition!==0){
+                            continue;
+                        }
+                        if(choice.finish_reason!==undefined){
+                            streamFinishReason=choice.finish_reason;
                         }
 
-                        try{
-                            const resp=JSON.parse(chunkCache)||{};
-                            //console.log(JSON.stringify(resp));
-                            //console.log(resp)
-                            const choice = resp.choices?.[0] || {};
-                            const delta = choice.delta || {};
-                            const content = delta.content || '';
-                            const tool_calls=delta.tool_calls || [];
-                            let value = content;
-
-                            let reasoning = '';
-
-                            if(seeThinking){
-                                reasoning=delta.reasoning || '';
-                            }
-
-                            if (reasoning) {
-                                isThinking = true;
-                                value = reasoning;
-                            }
-
-                            if (!reasoning && isThinking) {
-                                //remove thinking chunks
-                                chunkString='';
-                            }
-
-                            if (!reasoning) {
-                                isThinking = false;
-                            }
-
-                            chunkCache='';
-
-                            if(value==='' && !tool_calls.length){
-                                return;
-                            }
-
-                            if(value){
-                                streamHandler(value,`M-${id}`, isThinking);
-                                chunkString+=value;
-                            }
-
-                            if(tool_calls.length){
-                                receiveStreamedToolCalls(tool_calls);
-                            }
-                        } catch(err) {
-                            console.warn('AI stream callback failed.');
+                        const content=choiceDelta.content||'';
+                        let value=content;
+                        let reasoning='';
+                        if(seeThinking){
+                            reasoning=choiceDelta.reasoning||'';
+                        }
+                        if(reasoning){
+                            isThinking=true;
+                            value=reasoning;
+                        }
+                        if(!reasoning&&isThinking){
+                            chunkString='';
+                        }
+                        if(!reasoning){
+                            isThinking=false;
+                        }
+                        if(value){
+                            await streamHandler(value,`M-${id}`,isThinking);
+                            chunkString+=value;
                         }
                     }
-                );
+                }
             }
         }catch(error){
             if(isAIRequestAbort(error,signal)){
@@ -4371,30 +4798,108 @@ class AI {
             reader.releaseLock();
         }
 
-        const tool_funcs={};
-        const orderedToolCalls=[...streamedToolCalls.values()].sort(
-            function sortStreamedToolCalls(a,b){
-                return a.order-b.order;
+        const structuralToolCallsByChoice=new Map();
+        const orderedStreamChoices=[...streamedToolCallsByChoice.entries()].sort(
+            function sortStreamChoices(a,b){
+                return a[0]-b[0];
             }
         );
-
-        for(const toolCall of orderedToolCalls){
-            if(!toolCall.name){
-                throw new Error('AI stream returned a tool call without a name.');
-            }
-
-            if(Object.hasOwn(tool_funcs,toolCall.name)){
-                throw new Error(`AI stream returned duplicate tool ${toolCall.name}.`);
-            }
-
-            tool_funcs[toolCall.name]=toolCall.arguments;
+        for(const [choicePosition,toolCallRecords] of orderedStreamChoices){
+            const orderedToolCalls=[...toolCallRecords.values()].sort(
+                function sortStreamedToolCalls(a,b){
+                    return a.order-b.order;
+                }
+            );
+            const rawToolCalls=orderedToolCalls.map(
+                function completeStreamedToolCall(toolCall,index){
+                    if(
+                        toolCall.invalidArguments
+                        ||toolCall.invalidIdentity
+                        ||toolCall.invalidName
+                    ){
+                        throw aiStructuralError(
+                            'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
+                            `AI stream choice ${choicePosition+1} structural tool call ${index+1} changed an exact field.`
+                        );
+                    }
+                    return {
+                        id:toolCall.id,
+                        type:toolCall.type,
+                        function:{
+                            name:toolCall.name,
+                            arguments:toolCall.arguments
+                        }
+                    };
+                }
+            );
+            structuralToolCallsByChoice.set(
+                choicePosition,
+                normalizeAIStreamToolCallObservation(
+                    {message:{tool_calls:rawToolCalls}},
+                    `AI stream choice ${choicePosition+1}`
+                )
+            );
         }
-
-        const streamResult=Object.keys(tool_funcs).length
-            ?tool_funcs
-            :chunkString;
-        if(Object.keys(tool_funcs).length&&!chunkString){
-            streamHandler('',`M-${id}`,false);
+        const structuralToolCalls=structuralToolCallsByChoice.get(0)||[];
+        const completionChoices=[
+            {
+                index:0,
+                message:{
+                    role:'assistant',
+                    content:chunkString,
+                    ...(structuralToolCalls.length
+                        ?{tool_calls:structuralToolCalls}
+                        :{})
+                },
+                finish_reason:typeof streamFinishReason==='string'
+                    &&streamFinishReason
+                    ?streamFinishReason
+                    :structuralToolCalls.length?'tool_calls':'stop'
+            }
+        ];
+        for(const [choicePosition,toolCalls] of structuralToolCallsByChoice){
+            if(choicePosition===0){
+                continue;
+            }
+            completionChoices.push({
+                index:choicePosition,
+                message:{
+                    role:'assistant',
+                    content:'',
+                    ...(toolCalls.length?{tool_calls:toolCalls}:{})
+                },
+                finish_reason:toolCalls.length?'tool_calls':'stop'
+            });
+        }
+        const completion={
+            id:typeof streamId==='string'&&streamId?streamId:`legacy-${id}`,
+            object:typeof streamObject==='string'&&streamObject
+                ?streamObject
+                :'chat.completion',
+            created:Number.isSafeInteger(streamCreated)
+                ?streamCreated
+                :Math.floor(Date.now()/1000),
+            model:typeof streamModel==='string'&&streamModel
+                ?streamModel
+                :this.model,
+            choices:completionChoices,
+            ...(isPlainAIRecord(streamUsage)?{usage:streamUsage}:{})
+        };
+        const terminalToolCalls=normalizeAICompletionToolCalls(completion);
+        assertAIStreamToolCallCorrelation(
+            structuralToolCalls,
+            terminalToolCalls,
+            'The legacy HTTP stream'
+        );
+        for(const call of terminalToolCalls){
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort();
+            }
+            await earlyFunctionTrigger(call,`M-${id}`);
+        }
+        const streamResult=this.#providerCompletionOutput(completion);
+        if(structuralToolCalls.length&&!chunkString){
+            await streamHandler('',`M-${id}`,false);
         }
         if(finishSpeech){
             this.finishTTS();
@@ -4403,7 +4908,7 @@ class AI {
 
         //sync
         speechTurnCompleted=true;
-        return streamResult;
+        return returnCompletion?completion:streamResult;
         }catch(error){
             if(isAIRequestAbort(error,signal)){
                 throw normalizeAIRequestAbort(error);
@@ -4422,12 +4927,23 @@ class AI {
         localOnly=false,
         tools=[],
         toolChoice='auto',
-        parallelToolCalls=true,
+        parallelToolCalls=false,
         id=Date.now(),
         signal=null,
         onRequest=function ignoreFetchRequest(){},
-        onResponse=function ignoreFetchResponse(){}
+        onResponse=function ignoreFetchResponse(){},
+        maxOutputTokens,
+        maxTokens,
+        temperature,
+        topK,
+        topP,
+        repeatPenalty,
+        minP,
+        seed,
+        stop,
+        templateOptions
     }={}){
+        validateAIStructuralRequest(messages,tools,parallelToolCalls);
         if(localOnly!==true&&localOnly!==false){
             throw new TypeError('AI localOnly must be a boolean.');
         }
@@ -4448,7 +4964,18 @@ class AI {
                 tools,
                 toolChoice,
                 parallelToolCalls,
-                id
+                id,
+                ...(maxOutputTokens!==undefined
+                    ?{maxTokens:maxOutputTokens}
+                    :maxTokens!==undefined?{maxTokens}:{}),
+                ...(temperature!==undefined?{temperature}:{}),
+                ...(topK!==undefined?{topK}:{}),
+                ...(topP!==undefined?{topP}:{}),
+                ...(repeatPenalty!==undefined?{repeatPenalty}:{}),
+                ...(minP!==undefined?{minP}:{}),
+                ...(seed!==undefined?{seed}:{}),
+                ...(stop!==undefined?{stop}:{}),
+                ...(templateOptions!==undefined?{templateOptions}:{})
             };
             await this.#reportRequest(onRequest,request,id);
             if(signal?.aborted){
@@ -4466,6 +4993,7 @@ class AI {
             if(signal?.aborted){
                 throw normalizeAIRequestAbort();
             }
+            normalizeAICompletionToolCalls(response);
             await onResponse(response,id,false);
             if(signal?.aborted){
                 throw normalizeAIRequestAbort();
@@ -4492,7 +5020,7 @@ class AI {
         structuredOutput=false,
         tools=[],
         tool_choice='auto',
-        parallel_tool_calls=true,
+        parallel_tool_calls=false,
         id=Date.now(),
         requestHandler=function ignoreFetchRequest(){},
         signal=null,
@@ -4531,11 +5059,12 @@ class AI {
         structuredOutput=false,
         tools=[],
         tool_choice='auto',
-        parallel_tool_calls=true,
+        parallel_tool_calls=false,
         id=Date.now(),
         requestHandler=function ignoreFetchRequest(){},
         signal=null,
     ){
+        validateAIStructuralRequest(messages,tools,parallel_tool_calls);
         this.#assertServiceConfigured(this.llmService);
         if(signal&&(
             typeof signal.aborted!=='boolean'
@@ -4610,15 +5139,13 @@ class AI {
             if(signal?.aborted){
                 throw normalizeAIRequestAbort();
             }
-            this.#assertRequiredOllamaToolCall(
-                Array.isArray(nativeResponse?.message?.tool_calls)
-                    ?nativeResponse.message.tool_calls
-                    :[],
-                tool_choice
-            );
             const responseJSON=this.#openAICompatibleOllamaResponse(
                 nativeResponse,
                 id
+            );
+            this.#assertRequiredOllamaToolCall(
+                normalizeAICompletionToolCalls(responseJSON),
+                tool_choice
             );
 
             if(signal?.aborted){
@@ -4689,6 +5216,7 @@ class AI {
 
         //console.log(responseJSON);
         //async
+        normalizeAICompletionToolCalls(responseJSON);
         await responseHandler(responseJSON,id,false);
         //sync
         return responseJSON;
@@ -4739,20 +5267,15 @@ class AI {
 
     #extractSpeechSegments(end=false){
         const segments=[];
-        const maximumLength=220;
         let remainder=this.audioMessageChunks;
 
-        while(remainder.trim()){
+        while(remainder.length>0){
             const terminator=this.#findSpeechTerminator(remainder,end);
             let boundary=terminator
                 ?terminator.index+terminator[0].length
                 :-1;
 
-            if(boundary<0&&remainder.length>=maximumLength){
-                const candidate=remainder.slice(0,maximumLength+1);
-                const whitespace=candidate.lastIndexOf(' ');
-                boundary=whitespace>=80?whitespace+1:maximumLength;
-            }else if(boundary<0&&end){
+            if(boundary<0&&end){
                 boundary=remainder.length;
             }
 
@@ -4760,8 +5283,8 @@ class AI {
                 break;
             }
 
-            const segment=remainder.slice(0,boundary).trim();
-            remainder=remainder.slice(boundary).trimStart();
+            const segment=remainder.slice(0,boundary);
+            remainder=remainder.slice(boundary);
 
             if(segment){
                 segments.push(segment);
@@ -5635,7 +6158,7 @@ function installAIUserReadyRegistration(){
             delete globalThis[AI_USER_READY_REGISTRATION_KEY];
         }
     }
-    registration=Object.freeze({
+    registration=completeValue({
         protocol:AI_USER_READY_REGISTRATION_PROTOCOL,
         dispose:disposeAIUserReadyRegistration
     });

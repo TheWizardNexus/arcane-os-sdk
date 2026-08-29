@@ -31,10 +31,10 @@ for the installed-inventory-derived physical-runtime contract in SDK `0.3.1`.
 | `arcane-os/integrated-provider` | Fixed integrated shared-development provider. |
 | `arcane-os/packager` | Low-level browser app packager. |
 | `arcane-os/release-bundle` | Deterministic external release bundles. |
-| `arcane-os/event-manager` | Central synchronous events, bounded time-travel history, playback, and optional DOM instrumentation. |
-| `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, configurable DBOPFS model checks, streaming, cancellation, and structural tool-call results. |
-| `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS provider mechanisms, authenticated DBOPFS artifacts, Workers, and cancellation; no model or adapter bytes. |
-| `arcane-os/mail` | Portable Mail runtime, durable outbox, bounded transport, and provider-neutral acceptance contracts. |
+| `arcane-os/event-manager` | Central synchronous events, complete time-travel history, playback, and optional DOM instrumentation. |
+| `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, complete DBOPFS model storage, streaming, cancellation, and structural tool-call results; `secure:true` is a dormant hardening intent only. |
+| `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS provider mechanisms, ordinary upstream assets, materialized/native routing, Workers, and cancellation; `secure:true` is a dormant hardening intent only. |
+| `arcane-os/mail` | Portable Mail runtime, durable outbox, complete transport responses, and provider-neutral acceptance contracts. |
 
 JSON schemas, the runtime manifest, and `package.json` are data-only export subpaths. In Node ESM, import JSON with `with {type: 'json'}`, or resolve and read it explicitly.
 
@@ -42,7 +42,11 @@ JSON schemas, the runtime manifest, and `package.json` are data-only export subp
 
 High-level operations accept one options object. Common fields are `workspaceRoot`, `appId`, `target`, `signal`, and `onEvent`; only fields meaningful to that operation are consumed. Long work acknowledges first, owns its child tasks, keeps event delivery ordered and backpressured, emits progress or heartbeats, observes cancellation where safe, and rejects with `ArcaneError` on failure.
 
-One invocation selects one workspace, app, operation, target, architecture, format, signing profile, and output root. No API silently loops over all apps or targets. Receipt-returning APIs issue same-process authority: receipts cannot be serialized, reconstructed, or treated as cross-process authorization.
+One invocation selects one workspace, app, operation, target, architecture,
+format, signing profile, and output root. No API silently loops over all apps or
+targets. APIs that retain legacy receipt names are explicit selected-release
+verification helpers; ordinary development and application paths do not invoke
+them as content or execution gates.
 
 Protocol mechanics are intentionally kept in the [deep protocol guide](protocols.md). The compact availability and normalization sentence beneath each member is the normal application-facing view.
 
@@ -71,7 +75,6 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `APP_CONFIG_NAME` | constant | `arcane-os/packager` | Packaging and release bundles | Node |
 | `APP_DESCRIPTOR_NAME` | constant | `arcane-os` | Runtime and app descriptors | Node |
 | `APP_DESCRIPTOR_SCHEMA_VERSION` | constant | `arcane-os` | Runtime and app descriptors | Node |
-| `appDescriptorSha256()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `ARCANE_INTEGRATED_PROVIDER_RELATIVE_PATH` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `ARCANE_MACHINE_BUNDLE_VERSION` | constant | `arcane-os` | Identity and protocol constants | Node |
 | `ARCANE_NATIVE_PROVIDER_PATHS` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
@@ -105,12 +108,12 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `createApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `createArcaneAI()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser; compatible LLM provider or controller required |
 | `createAppReleaseBundle()` | function | `arcane-os` | Packaging and release bundles | Node |
-| `createBrowserKokoroProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with DBOPFS, Web Locks, Workers, object URLs, and caller-admitted Kokoro runtime/model artifacts |
+| `createBrowserKokoroProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with Workers, object URLs, and caller-selected Kokoro runtime/model artifacts; DBOPFS/Web Locks apply to explicit secure graph mode |
 | `createBrowserModelSource()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser Fetch with a readable response body |
 | `createBrowserSpeechArtifactGraph()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser metadata; construction starts no fetch, cache, Worker, provider, or event operation |
 | `createBrowserSpeechAuthority()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser descriptor construction; use requires the selected storage and provider Web APIs |
-| `createBrowserWasmLlmProvider()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser secure context with WebAssembly, OPFS/DBOPFS, WebGPU, and admitted full-offload evidence; no CPU fallback |
-| `createBrowserWhisperProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with DBOPFS, Web Locks, Workers, object URLs, and caller-admitted Whisper runtime/model artifacts |
+| `createBrowserWasmLlmProvider()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser context with WebAssembly, OPFS/DBOPFS, and WebGPU; no CPU fallback |
+| `createBrowserWhisperProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with Workers, object URLs, and caller-selected Whisper runtime/model artifacts; DBOPFS/Web Locks apply to explicit secure graph mode |
 | `createCanonicalUstarHeader()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `createDbopfsModelStore()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser with a ready DBOPFS instance and OPFS |
 | `createDbopfsSpeechArtifactStore()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with ready DBOPFS, Web Locks, Fetch, File/Blob, and object URLs |
@@ -159,6 +162,11 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `planApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `prepareNativeTarget()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `prepareSharedPayloadSnapshot()` | function | `arcane-os` | Packaging and release bundles | Node |
+| `PreferenceStore default export` | class | `arcane-os/preference-store` | Portable runtime modules | Node with injected adapters, or browser/native WebView storage |
+| `PREFERENCE_STORE_ERROR_CODES` | constant | `arcane-os/preference-store` | Portable runtime modules | Node and browser |
+| `PREFERENCE_STORE_EVENT_TYPES` | constant | `arcane-os/preference-store` | Portable runtime modules | Node and browser |
+| `Preference` | class | `arcane-os/preference-store` | Portable runtime modules | Node and browser |
+| `preferenceSchema()` | function | `arcane-os/preference-store` | Portable runtime modules | Node and browser |
 | `projectNativeDescriptor()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `projectPackageManifest()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `readVerifiedAppReleaseFile()` | function | `arcane-os` | Packaging and release bundles | Node |
@@ -185,12 +193,19 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `SDK_ROOT` | constant | `arcane-os` | Identity and protocol constants | Node |
 | `SDK_VERSION` | constant | `arcane-os` | Identity and protocol constants | Node |
 | `selectApp()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node |
+| `SpeechPlayback default export` | class | `arcane-os/speech-playback` | Portable runtime modules | Node with injected media adapters, or browser/native WebView media |
+| `SPEECH_PLAYBACK_STATE_EVENT` | constant | `arcane-os/speech-playback` | Portable runtime modules | Node and browser |
+| `SPEECH_VOICE_ALIASES` | constant | `arcane-os/speech-playback` | Portable runtime modules | Node and browser |
+| `SPEECH_VOICE_OPTIONS` | constant | `arcane-os/speech-playback` | Portable runtime modules | Node and browser |
+| `SpeechPlayback` | class | `arcane-os/speech-playback` | Portable runtime modules | Node with injected media adapters, or browser/native WebView media |
+| `splitSpeechText()` | function | `arcane-os/speech-playback` | Portable runtime modules | Node and browser |
 | `startDevServer()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node control plane; browser data plane |
 | `TARGET_ADAPTER_PROTOCOL` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `TARGET_IDS` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `test()` | function | `arcane-os` | Events, processes, and testing | Node |
 | `testApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `throwIfAborted()` | function | `arcane-os` | Errors | Node |
+| `upgradeApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `validateAppBundlePath()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `validateAppConfig()` | function | `arcane-os/packager` | Packaging and release bundles | Node |
 | `validateAppDescriptor()` | function | `arcane-os` | Runtime and app descriptors | Node |
@@ -232,7 +247,6 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `PLAYBACK_FAILED_EVENT` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `PLAYBACK_RECORD_EVENT` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `PLAYBACK_STARTED_EVENT` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
-| `TIME_TRAVEL_OVERFLOW_EVENT` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `TIME_TRAVEL_SEEK_EVENT` | constant | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `arcaneEvents` | singleton | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler; DOM capture requires a compatible DOM |
 | `createArcaneEventSource()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
@@ -249,7 +263,6 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `MAIL_OUTBOX_PROTOCOL` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
 | `MAIL_OUTBOX_STATES` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
 | `MAIL_OUTBOX_TABLE` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
-| `MAX_MAIL_RESPONSE_BYTES` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
 | `Mail` | class | `arcane-os/mail` | Portable Mail | Node with injected host adapters, or browser/native WebView with durable storage and Web Locks |
 | `MailOutbox` | class | `arcane-os/mail` | Portable Mail | Node or browser with injected DBOPFS-compatible storage and a Web Locks-compatible lock manager |
 | `MailTransportError` | class | `arcane-os/mail` | Portable Mail | Node and browser |
@@ -278,7 +291,7 @@ Import it from `arcane-os` or `arcane-os/release-bundle`. Treat arrays and recor
 
 ### Availability and normalization
 
-**Node.** Exact immutable SDK value. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Exact immutable SDK value. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -304,7 +317,7 @@ Import it from `arcane-os` or `arcane-os/release-bundle`. Treat arrays and recor
 
 ### Availability and normalization
 
-**Node.** Exact immutable SDK value. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Exact immutable SDK value. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -330,7 +343,7 @@ Import it from `arcane-os` or `arcane-os/release-bundle`. Treat arrays and recor
 
 ### Availability and normalization
 
-**Node.** Exact immutable SDK value. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Exact immutable SDK value. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -356,7 +369,7 @@ Import it from `arcane-os` or `arcane-os/release-bundle`. Treat arrays and recor
 
 ### Availability and normalization
 
-**Node.** Exact immutable SDK value. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Exact immutable SDK value. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -382,7 +395,7 @@ Import it from `arcane-os` or `arcane-os/release-bundle`. Treat arrays and recor
 
 ### Availability and normalization
 
-**Node.** Exact immutable SDK value. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Exact immutable SDK value. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -408,7 +421,7 @@ Import it from `arcane-os` or `arcane-os/release-bundle`. Treat arrays and recor
 
 ### Availability and normalization
 
-**Node.** Exact immutable SDK value. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Exact immutable SDK value. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -434,7 +447,7 @@ Import it from `arcane-os` or `arcane-os/release-bundle`. Treat arrays and recor
 
 ### Availability and normalization
 
-**Node.** Exact immutable SDK value. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Exact immutable SDK value. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -460,7 +473,7 @@ Import it from `arcane-os` or `arcane-os/release-bundle`. Treat arrays and recor
 
 ### Availability and normalization
 
-**Node.** Exact immutable SDK value. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Exact immutable SDK value. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -486,7 +499,7 @@ Import it from `arcane-os/release-bundle`. Treat arrays and records as immutable
 
 ### Availability and normalization
 
-**Node.** Exact immutable SDK value. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Exact immutable SDK value. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -512,7 +525,7 @@ Import it from `arcane-os/packager`. Treat arrays and records as immutable publi
 
 ### Availability and normalization
 
-**Node.** Exact immutable SDK value. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Exact immutable SDK value. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -526,7 +539,7 @@ console.log(APP_CONFIG_NAME);
 
 ### Overview
 
-Authenticates that a same-process app release receipt also carries authored descriptor authority for external delivery.
+Explicitly verifies that the selected app release state carries its authored descriptor for external delivery.
 
 ### Signature and result
 
@@ -534,11 +547,11 @@ Authenticates that a same-process app release receipt also carries authored desc
 async authenticateAppReleaseAuthority(receipt, { releaseRoot, expectedPackageConfig, expectedDescriptor, signal }={})
 ```
 
-Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -554,7 +567,7 @@ async function useauthenticateAppReleaseAuthority(...arguments_) {
 
 ### Overview
 
-Authenticates a same-process verified application release receipt against its exact current filesystem state.
+Explicitly verifies a selected application release against its complete current filesystem state.
 
 ### Signature and result
 
@@ -562,11 +575,11 @@ Authenticates a same-process verified application release receipt against its ex
 async authenticateAppReleaseReceipt(receipt, options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -590,11 +603,11 @@ Authenticates the same-process immutable shared-payload snapshot consumed by app
 async authenticateSharedPayloadSnapshot(receipt, options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -641,7 +654,7 @@ the documented backup file for manual recovery.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -666,7 +679,7 @@ async function previewNextPrerelease(workspaceRoot) {
 
 ### Overview
 
-Writes one deterministic USTAR+gzip external application bundle from an authenticated authored release receipt.
+Writes one deterministic USTAR+gzip external application bundle from the selected authored release state.
 
 ### Signature and result
 
@@ -674,11 +687,11 @@ Writes one deterministic USTAR+gzip external application bundle from an authenti
 async createAppReleaseBundle({ receipt, releaseRoot, outputPath, overwrite=false, signal, onEvent }={})
 ```
 
-Import it from `arcane-os` or `arcane-os/release-bundle`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/release-bundle`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -702,11 +715,11 @@ Builds the exact 512-byte canonical USTAR header for one validated bundle entry.
 createCanonicalUstarHeader(entryPath, size)
 ```
 
-Import it from `arcane-os` or `arcane-os/release-bundle`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/release-bundle`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -730,11 +743,11 @@ Root-entry alias for the packager-specific application discovery function.
 async discoverPackagerApps({workspaceRoot:requestedWorkspaceRoot})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -758,11 +771,11 @@ Returns a validated semantic version incremented by the requested bump and optio
 incrementSemver(value, bump, preid)
 ```
 
-Import it from `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -776,28 +789,34 @@ console.log(incrementSemver('1.2.3', 'minor'));
 
 ### Overview
 
-Loads and validates one packager app configuration, shared mappings, descriptor, and release inputs.
+Loads one validated packager app plan, including the shared directly navigable
+descriptor-selected browser document inventory.
 
 ### Signature and result
 
 ```text
-async inspectApp({workspaceRoot, appId})
+async inspectApp({workspaceRoot, appId, signal}={})
 ```
 
-Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/packager`. The result includes the
+configured `entry`, `include`, and `exclude` values plus `browserDocuments`, the
+entry-first ordered `.html`/`.htm` paths selected by the same package traversal
+used by import-map refresh and packaging. Current pages declare exactly one
+matching `meta[name="arcane-app-id"]`; unmarked pages with an active `base`
+remain selected for patch compatibility. Included HTML with neither signal is
+retained as a package fragment rather than rewritten as a document.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
 ```javascript
 import {inspectApp} from 'arcane-os';
 
-async function useinspectApp(...arguments_) {
-    return inspectApp(...arguments_);
-}
+const plan=await inspectApp({workspaceRoot:process.cwd(),appId:'hello-world'});
+console.log(plan.browserDocuments);
 ```
 
 ## normalizeRelativePath()
@@ -812,11 +831,11 @@ Normalizes one portable repository-relative path and rejects traversal, aliases,
 normalizeRelativePath(value, label='path')
 ```
 
-Import it from `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -830,7 +849,9 @@ console.log(normalizeRelativePath('apps/example/index.html'));
 
 ### Overview
 
-Builds and authenticates one browser application release through the low-level packager API.
+Builds one complete browser application release through the low-level packager
+API. It does not run tests or checks automatically; verification occurs only
+when explicitly requested or when required for this selected release output.
 
 ### Signature and result
 
@@ -838,11 +859,13 @@ Builds and authenticates one browser application release through the low-level p
 async packageApp(options)
 ```
 
-Import it from `arcane-os` or `arcane-os/packager`. For a non-dry-run external
-package, the result includes `importMapReceipt`. That frozen receipt binds the
-artifact, configured entry, every additional included `.html`/`.htm` document,
-and their exact committed bytes/hashes. Each admitted document receives the
-same deterministic map. The package root also contains the public
+Import it from `arcane-os` or `arcane-os/packager`. Packaging refreshes the
+managed map once and preserves the complete selected source and browser
+document inventory without clipping, tailing, elision, byte limits, hashes, or
+ordinary admission receipts. It rejects malformed configuration, descriptors,
+and the malformed selected release archive while preserving the previously
+selected output on failure. Each selected browser document receives the same
+deterministic map. The package root also contains the public
 `ARCANE_RUNTIME_PROJECTION.json` inventory:
 
 ```javascript
@@ -851,21 +874,17 @@ same deterministic map. The package root also contains the public
   kind: 'arcane-app-runtime-projection',
   sdkVersion: '0.3.1',
   pathPrefix: 'arcane/',
-  fileCount,
-  totalBytes,
-  contentSha256,
-  files: [{path, bytes, sha256}]
+  files: [{path}]
 }
 ```
 
-That projection is authenticated by the private application release inventory
-and the admitted runtime authorities. It is not a replacement for either
-receipt. Incomplete, changed, forged, or internally inconsistent projection
-data rejects with `ARCANE_RUNTIME_PROJECTION_INVALID`.
+The projection is an inventory, not an ordinary execution gate. Malformed or
+internally inconsistent selected projection data rejects with
+`ARCANE_RUNTIME_PROJECTION_INVALID`.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -877,8 +896,7 @@ const packaged = await packageApp({
     appId: 'hello-world'
 });
 
-console.log(packaged.importMapReceipt.documentPaths);
-console.log(packaged.importMapReceipt.documentCount);
+console.log(packaged.importMap.documentPaths);
 ```
 
 ## PACKAGER_VERSION
@@ -897,7 +915,7 @@ Import it from `arcane-os/packager`. Treat arrays and records as immutable publi
 
 ### Availability and normalization
 
-**Node.** Exact immutable SDK value. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Exact immutable SDK value. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -919,11 +937,11 @@ Discovers packager application configurations and release boundaries beneath one
 async discoverApps({workspaceRoot:requestedWorkspaceRoot})
 ```
 
-Import it from `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -947,11 +965,11 @@ Parses one strict three-part semantic version with optional prerelease metadata.
 parseSemver(value)
 ```
 
-Import it from `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -973,11 +991,11 @@ Verifies and snapshots the shared runtime/dependency payload once for reuse by o
 async prepareSharedPayloadSnapshot({ workspaceRoot:requestedWorkspaceRoot, sharedPayloadIds, signal, onEvent }={})
 ```
 
-Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -993,7 +1011,7 @@ async function useprepareSharedPayloadSnapshot(...arguments_) {
 
 ### Overview
 
-Reads one bounded file through an authenticated app-release receipt and rechecks its identity and digest.
+Reads one complete file during explicit selected app-release verification.
 
 ### Signature and result
 
@@ -1001,11 +1019,11 @@ Reads one bounded file through an authenticated app-release receipt and rechecks
 async readVerifiedAppReleaseFile(receipt, { releaseRoot, relativePath, signal }={})
 ```
 
-Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -1033,7 +1051,7 @@ Import it from `arcane-os/packager`. Treat arrays and records as immutable publi
 
 ### Availability and normalization
 
-**Node.** Exact immutable SDK value. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Exact immutable SDK value. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -1059,7 +1077,7 @@ Import it from `arcane-os/packager`. Treat arrays and records as immutable publi
 
 ### Availability and normalization
 
-**Node.** Exact immutable SDK value. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Exact immutable SDK value. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -1073,7 +1091,7 @@ console.log(ROOT_CONFIG_NAME);
 
 ### Overview
 
-Validates and normalizes one portable path admitted inside an external app bundle.
+Validates and normalizes one portable path selected inside an external app bundle.
 
 ### Signature and result
 
@@ -1081,11 +1099,11 @@ Validates and normalizes one portable path admitted inside an external app bundl
 validateAppBundlePath(value, label='bundle path')
 ```
 
-Import it from `arcane-os` or `arcane-os/release-bundle`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/release-bundle`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -1107,11 +1125,11 @@ Validates one schema-1 packager app configuration and its relationship to the ro
 validateAppConfig(value, appId, rootConfig, configPath=`apps/${appId}/${APP_CONFIG_NAME}`)
 ```
 
-Import it from `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -1135,11 +1153,11 @@ Validates one root packager mapping and its fixed shared-route boundaries.
 validateRootConfig(value, configPath=ROOT_CONFIG_NAME)
 ```
 
-Import it from `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -1163,11 +1181,11 @@ Authenticates one existing browser app release through the low-level packager AP
 async verifyApp({workspaceRoot, appId, signal, onEvent})
 ```
 
-Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -1191,11 +1209,11 @@ Parses and authenticates one deterministic app bundle without extraction.
 async verifyAppReleaseBundle({bundlePath, signal, onEvent}={})
 ```
 
-Import it from `arcane-os` or `arcane-os/release-bundle`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/release-bundle`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node.** Normalized SDK validation and receipt; canonical archive/release bytes preserved. Deep protocol: [SDK packager, receipt, or deterministic bundle contract](protocols.md).
+**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
 
 ### Example
 
@@ -1262,39 +1280,11 @@ import {APP_DESCRIPTOR_SCHEMA_VERSION} from 'arcane-os';
 console.log(APP_DESCRIPTOR_SCHEMA_VERSION);
 ```
 
-## appDescriptorSha256()
-
-### Overview
-
-Returns the SHA-256 digest of the canonical validated schema-2 application descriptor.
-
-### Signature and result
-
-```text
-appDescriptorSha256(descriptor)
-```
-
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
-
-### Availability and normalization
-
-**Node.** SDK-normalized inputs, errors, events, and documented result. Deep protocol: [Node ESM](protocols.md).
-
-### Example
-
-```javascript
-import {appDescriptorSha256} from 'arcane-os';
-
-async function useappDescriptorSha256(...arguments_) {
-    return appDescriptorSha256(...arguments_);
-}
-```
-
 ## authenticateRuntimeReceipt()
 
 ### Overview
 
-Authenticates a same-process runtime receipt against the exact runtime root and current file identities.
+Explicitly verifies a selected runtime release against its complete current runtime root.
 
 ### Signature and result
 
@@ -1302,7 +1292,7 @@ Authenticates a same-process runtime receipt against the exact runtime root and 
 async authenticateRuntimeReceipt(receipt, { runtimeRoot=path.join(sdkRoot, 'runtime'), signal }={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -1330,7 +1320,7 @@ Returns the absolute installed SDK package root.
 getSdkRoot()
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -1348,7 +1338,7 @@ console.log(getSdkRoot());
 
 ### Overview
 
-Loads an authored schema-2 descriptor or a bounded legacy projection with explicit provenance.
+Loads an authored schema-2 descriptor or a complete legacy projection with its source label.
 
 ### Signature and result
 
@@ -1356,7 +1346,7 @@ Loads an authored schema-2 descriptor or a bounded legacy projection with explic
 async loadAppDescriptor({workspaceRoot, appRoot, appId, packageManifest})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -1384,7 +1374,7 @@ Reads and structurally validates the synchronized runtime release manifest.
 async loadRuntimeRelease({runtimeRoot=path.join(sdkRoot, 'runtime')}={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -1404,7 +1394,8 @@ async function useloadRuntimeRelease(...arguments_) {
 
 ### Overview
 
-Verifies the workspace's exact installed SDK runtime and browser runtime, then creates, reuses, or transactionally refreshes their dynamic projection.
+Materializes the complete installed SDK runtime and browser-runtime content.
+It uses no byte identities, hashes, digests, receipts, or lock reconciliation.
 
 ### Signature and result
 
@@ -1412,13 +1403,24 @@ Verifies the workspace's exact installed SDK runtime and browser runtime, then c
 async materializeInstalledSdkRuntime({workspaceRoot,sdkPackageSource,workspaceOperationLease,signal,onEvent}={})
 ```
 
-Import it through the exact dependency key declared by the workspace: normally `arcane-os`, or the alias name such as `arcane-sdk` when the declaration is `npm:arcane-os@<version>`. It resolves that declaration under the shared workspace-operation lock, verifies both physical runtime receipts, and creates or refreshes the complete projection by staged whole-tree replacement. The frozen result includes `status` (`created`, `reused`, or `refreshed`), `generation`, `receiptPath`, `persistentReceipt`, `cleanupWarnings`, the installed-package authority, and all three process-local verification receipts.
+Import it through the exact dependency key declared by the workspace: normally
+`arcane-os`, or the alias name such as `arcane-sdk` when the declaration is
+`npm:arcane-os@<version>`. It resolves that declaration under the shared
+workspace-operation lock and replaces the complete projection by staged
+whole-tree replacement. The mutable result includes the installed-package
+location and materialized workspace runtime paths. It never creates or
+reconciles `arcane.lock.json`, writes runtime identity metadata, installs
+dependencies, or merges application source.
 
-The canonical `.arcane/installed-sdk-runtime.json` receipt binds the physical package and exact destination inventory. A later process reauthenticates that receipt against the current installed package, freshly issued source receipts, and all destination bytes before returning `reused`; the JSON file alone grants no authority. Refresh prunes bytes absent from the new inventory and restores the prior tree and receipt on commit or post-commit verification failure. `signal` and `onEvent` remain caller-owned before commit. Once the bounded commit starts, it completes verification or rollback without observing cancellation or invoking callbacks.
+Replacement removes files absent from the selected runtime content and restores
+the prior tree if commit fails. `signal` and
+`onEvent` remain caller-owned before commit. Once the atomic replacement starts,
+it completes replacement or rollback without observing cancellation or invoking
+callbacks.
 
 ### Availability and normalization
 
-**Node.** Canonical workspace and installed-package identity, verified runtime receipts, a persistent reauthenticatable generation receipt, and a frozen materialization result. Deep protocol: [Installed SDK runtime materialization](protocols.md#installed-sdk-runtime-materialization).
+**Node.** Complete installed runtime content and a mutable materialization result. Deep protocol: [Installed SDK runtime materialization](protocols.md#installed-sdk-runtime-materialization).
 
 ### Example
 
@@ -1428,6 +1430,271 @@ import {materializeInstalledSdkRuntime} from 'arcane-os';
 // 'arcane-sdk' instead.
 
 const result=await materializeInstalledSdkRuntime({workspaceRoot});
+```
+
+## PreferenceStore default export
+
+### Overview
+
+Default binding for the canonical PreferenceStore runtime class. The static
+specifier `arcane-os/preference-store` works in Node package consumers and is
+mapped to the same runtime module in managed browsers; legacy browser code may
+continue using `arcane/PreferenceStore`.
+
+### Signature and result
+
+```text
+default class PreferenceStore extends EventTarget
+```
+
+### Availability and normalization
+
+**Node with injected adapters, or browser/native WebView storage.** The package
+subpath and managed browser key both resolve directly to the canonical runtime
+module. Deep protocol: [Browser runtime delivery](protocols.md#browser-runtime-delivery).
+
+### Example
+
+```javascript
+import PreferenceStore from 'arcane-os/preference-store';
+const store=new PreferenceStore({schema,adapter});
+```
+
+## PREFERENCE_STORE_ERROR_CODES
+
+### Overview
+
+Frozen stable error-code vocabulary emitted by PreferenceStore.
+
+### Signature and result
+
+```text
+const PREFERENCE_STORE_ERROR_CODES
+```
+
+### Availability and normalization
+
+**Node and browser.** Exact immutable values from the canonical runtime module.
+
+### Example
+
+```javascript
+import {PREFERENCE_STORE_ERROR_CODES} from 'arcane-os/preference-store';
+console.log(PREFERENCE_STORE_ERROR_CODES.disposed);
+```
+
+## PREFERENCE_STORE_EVENT_TYPES
+
+### Overview
+
+Frozen semantic event names published by PreferenceStore.
+
+### Signature and result
+
+```text
+const PREFERENCE_STORE_EVENT_TYPES
+```
+
+### Availability and normalization
+
+**Node and browser.** Exact load, change, and reset names from the canonical runtime.
+
+### Example
+
+```javascript
+import {PREFERENCE_STORE_EVENT_TYPES} from 'arcane-os/preference-store';
+console.log(PREFERENCE_STORE_EVENT_TYPES.change);
+```
+
+## Preference
+
+### Overview
+
+Canonical Preference entity re-exported with the store namespace.
+
+### Signature and result
+
+```text
+new Preference(data={})
+```
+
+### Availability and normalization
+
+**Node and browser.** Entity validation and serialization remain owned by the
+canonical runtime entity.
+
+### Example
+
+```javascript
+import {Preference} from 'arcane-os/preference-store';
+const record=new Preference({key:'theme',value:'system'});
+```
+
+## preferenceSchema()
+
+### Overview
+
+Builds the canonical Preference strong-type schema for a supplied definition set.
+
+### Signature and result
+
+```text
+preferenceSchema(definitions=[])
+```
+
+### Availability and normalization
+
+**Node and browser.** Returns the canonical runtime schema for the supplied definitions.
+
+### Example
+
+```javascript
+import {preferenceSchema} from 'arcane-os/preference-store';
+const schema=preferenceSchema([]);
+```
+
+## SpeechPlayback default export
+
+### Overview
+
+Default binding for the canonical SpeechPlayback runtime class. The static
+specifier `arcane-os/speech-playback` works in Node package consumers and maps
+to the same runtime module in managed browsers; `arcane/SpeechPlayback` remains
+the legacy browser-compatible name.
+
+### Signature and result
+
+```text
+default class SpeechPlayback
+```
+
+### Availability and normalization
+
+**Node with injected media adapters, or browser/native WebView media.** The
+package subpath and managed browser key both resolve directly to the canonical
+runtime module; provider and media availability remain host-owned.
+
+### Example
+
+```javascript
+import SpeechPlayback from 'arcane-os/speech-playback';
+const playback=new SpeechPlayback({audio,speech});
+```
+
+## SPEECH_PLAYBACK_STATE_EVENT
+
+### Overview
+
+Canonical semantic event name for SpeechPlayback state transitions.
+
+### Signature and result
+
+```text
+const SPEECH_PLAYBACK_STATE_EVENT
+```
+
+### Availability and normalization
+
+**Node and browser.** Exact immutable `speech-playback-state` name.
+
+### Example
+
+```javascript
+import {SPEECH_PLAYBACK_STATE_EVENT} from 'arcane-os/speech-playback';
+console.log(SPEECH_PLAYBACK_STATE_EVENT);
+```
+
+## SPEECH_VOICE_ALIASES
+
+### Overview
+
+Read-only compatibility aliases for canonical speech voice identifiers.
+
+### Signature and result
+
+```text
+const SPEECH_VOICE_ALIASES
+```
+
+### Availability and normalization
+
+**Node and browser.** Provides read-only membership without mutable Set authority.
+
+### Example
+
+```javascript
+import {SPEECH_VOICE_ALIASES} from 'arcane-os/speech-playback';
+console.log(SPEECH_VOICE_ALIASES.has('default'));
+```
+
+## SPEECH_VOICE_OPTIONS
+
+### Overview
+
+Frozen provider-neutral voice option records exposed to shared UI.
+
+### Signature and result
+
+```text
+const SPEECH_VOICE_OPTIONS
+```
+
+### Availability and normalization
+
+**Node and browser.** Frozen ordered value/label records from the canonical runtime.
+
+### Example
+
+```javascript
+import {SPEECH_VOICE_OPTIONS} from 'arcane-os/speech-playback';
+console.log(SPEECH_VOICE_OPTIONS[0]);
+```
+
+## SpeechPlayback
+
+### Overview
+
+Named binding for the same canonical class exposed as the speech-playback default. `prepare()` preserves each nonblank part's exact input string without trimming, splitting, or freezing that content.
+
+### Signature and result
+
+```text
+new SpeechPlayback(options={})
+```
+
+### Availability and normalization
+
+**Node with injected media adapters, or browser/native WebView media.** Binding
+identity equals the default export; provider and media availability remain host-owned.
+
+### Example
+
+```javascript
+import SpeechPlayback,{SpeechPlayback as NamedSpeechPlayback} from 'arcane-os/speech-playback';
+console.log(SpeechPlayback===NamedSpeechPlayback);
+```
+
+## splitSpeechText()
+
+### Overview
+
+Returns the caller's exact nonblank speech text as one segment.
+
+### Signature and result
+
+```text
+splitSpeechText(value='')
+```
+
+### Availability and normalization
+
+**Node and browser.** Uses trimming only to detect blank input. A nonblank value is returned with its exact whitespace and content intact in one mutable array; it is not trimmed, split, or frozen. Blank or whitespace-only input returns an empty array.
+
+### Example
+
+```javascript
+import {splitSpeechText} from 'arcane-os/speech-playback';
+console.log(splitSpeechText('Hello world.'));
 ```
 
 ## projectNativeDescriptor()
@@ -1442,7 +1709,7 @@ Projects the canonical app descriptor into the native registry shape consumed by
 projectNativeDescriptor(descriptor, {source}={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -1470,7 +1737,7 @@ Projects a schema-2 descriptor into the compatible schema-1 application package 
 projectPackageManifest(descriptor)
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -1490,7 +1757,7 @@ async function useprojectPackageManifest(...arguments_) {
 
 ### Overview
 
-Reads one bounded runtime file through an authenticated runtime receipt and rechecks its identity and digest.
+Reads one complete runtime file during explicit selected runtime-release verification.
 
 ### Signature and result
 
@@ -1498,7 +1765,7 @@ Reads one bounded runtime file through an authenticated runtime receipt and rech
 async readVerifiedRuntimeFile(receipt, { runtimeRoot=path.join(sdkRoot, 'runtime'), relativePath, signal }={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -1526,7 +1793,7 @@ Strictly validates and freezes one schema-2 app descriptor, including runtime-on
 validateAppDescriptor(value, {appId}={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -1546,7 +1813,7 @@ async function usevalidateAppDescriptor(...arguments_) {
 
 ### Overview
 
-Verifies every synchronized runtime file and returns a deeply frozen same-process receipt.
+Explicitly verifies the complete synchronized runtime selected for release and returns a frozen result.
 
 ### Signature and result
 
@@ -1554,7 +1821,7 @@ Verifies every synchronized runtime file and returns a deeply frozen same-proces
 async verifyRuntime({ runtimeRoot=path.join(sdkRoot, 'runtime'), signal, onEvent }={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -1663,11 +1930,11 @@ Requires an integrated workspace and selected native toolchain root to resolve t
 assertIntegratedNativeToolchain({workspaceMode, workspaceRoot, toolchainRoot, target}={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -1691,11 +1958,11 @@ Portable-target compatibility wrapper for the integrated native checkout asserti
 assertIntegratedPortableToolchain(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -1711,7 +1978,7 @@ async function useassertIntegratedPortableToolchain(...arguments_) {
 
 ### Overview
 
-Checks a prepared native toolchain receipt against the selected application's declared Core requirements.
+Checks prepared native toolchain state against the selected application's declared Core requirements.
 
 ### Signature and result
 
@@ -1719,11 +1986,11 @@ Checks a prepared native toolchain receipt against the selected application's de
 assertNativeApplicationToolchainCompatibility({prepared, toolchainReceipt}={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -1739,7 +2006,7 @@ async function useassertNativeApplicationToolchainCompatibility(...arguments_) {
 
 ### Overview
 
-Validates that a toolchain receipt provides the required Core version, protocol, features, capabilities, and methods.
+Validates that a prepared toolchain provides the required Core version, protocol, features, capabilities, and methods.
 
 ### Signature and result
 
@@ -1747,11 +2014,11 @@ Validates that a toolchain receipt provides the required Core version, protocol,
 assertNativeToolchainCompatibility({ appDescriptor, toolchainReceipt, minimumCoreVersion }={})
 ```
 
-Import it from `arcane-os` or `arcane-os/native`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/native`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -1767,7 +2034,7 @@ async function useassertNativeToolchainCompatibility(...arguments_) {
 
 ### Overview
 
-Portable-target compatibility wrapper for native application/toolchain admission.
+Portable-target compatibility wrapper for native application and toolchain selection.
 
 ### Signature and result
 
@@ -1775,11 +2042,11 @@ Portable-target compatibility wrapper for native application/toolchain admission
 assertPortableToolchainCompatibility(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -1795,7 +2062,7 @@ async function useassertPortableToolchainCompatibility(...arguments_) {
 
 ### Overview
 
-Authenticates an immutable same-process native build plan and its bound receipts before execution.
+Validates a selected native build plan and its prepared inputs before execution.
 
 ### Signature and result
 
@@ -1803,11 +2070,11 @@ Authenticates an immutable same-process native build plan and its bound receipts
 async authenticateNativeBuildPlan(plan, { expectedNativeBuilder, expectedTarget, signal, onEvent }={})
 ```
 
-Import it from `arcane-os` or `arcane-os/native`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/native`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -1831,11 +2098,11 @@ Invokes one target adapter build with explicit app, target, and artifact inputs.
 async buildTarget(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/targets`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/targets`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -1859,11 +2126,11 @@ Creates one immutable, authenticated, single-attempt native plan binding app, de
 async createNativeBuildPlan({ nativeBuilder, toolchainRoot, toolchainReceipt, appReleaseRoot, appReleaseReceipt, appDescriptor, dependencyReleases=[], providerGeneration, minimumCoreVersion, protectedRoots=[], outputRoot, targetRequest, signal, onEvent }={})
 ```
 
-Import it from `arcane-os` or `arcane-os/native`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/native`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -1887,11 +2154,11 @@ Adapts one validated native builder to the common target-adapter contract.
 createNativeTargetAdapter({targetId, nativeBuilder}={})
 ```
 
-Import it from `arcane-os` or `arcane-os/targets`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/targets`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -1915,11 +2182,11 @@ Loads and diagnoses one explicit native provider and target without building an 
 async doctorNativeTarget(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -1943,11 +2210,11 @@ Consumes one authenticated single-attempt native plan through its bound builder 
 async executeNativeBuildPlan(plan, { expectedNativeBuilder, expectedTarget, signal, onEvent }={})
 ```
 
-Import it from `arcane-os` or `arcane-os/native`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/native`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -1971,11 +2238,11 @@ Returns the registered adapter for one exact target id or fails for an unknown t
 getTargetAdapter(targetId)
 ```
 
-Import it from `arcane-os` or `arcane-os/targets`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/targets`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -2025,11 +2292,11 @@ Returns the frozen target descriptors without running an operation lifecycle.
 listTargets()
 ```
 
-Import it from `arcane-os` or `arcane-os/targets`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/targets`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -2051,11 +2318,11 @@ Loads and authenticates the fixed Arcane-owned integrated development provider g
 loadArcaneIntegratedProvider({ arcaneRoot, signal, onEvent, run=runProcess }={})
 ```
 
-Import it from `arcane-os` or `arcane-os/integrated-provider`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/integrated-provider`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -2080,11 +2347,11 @@ checkout and authenticates that provider generation for the current SDK process.
 loadArcaneNativeProvider({ arcaneRoot, target, inspect=lstat, canonicalize=realpath, readModule=readFile, importModule=specifier=>import(specifier), generationCache=providerGenerationCache, signal, onEvent }={})
 ```
 
-Import it from `arcane-os` or `arcane-os/native-provider`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/native-provider`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -2108,11 +2375,11 @@ Compatibility wrapper that loads the portable native provider.
 loadArcanePortableProvider(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/native-provider`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/native-provider`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -2180,7 +2447,7 @@ console.log(NATIVE_BUILDER_PROTOCOL);
 
 ### Overview
 
-Runs one provider toolchain preparation and returns its authenticated process-owned receipt.
+Runs one provider toolchain preparation and returns its process-owned result.
 
 ### Signature and result
 
@@ -2188,11 +2455,11 @@ Runs one provider toolchain preparation and returns its authenticated process-ow
 async prepareNativeTarget(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -2216,11 +2483,11 @@ Resolves and validates one native output root, including integrated-checkout non
 resolveNativeBuildOutputRoot({target, workspaceMode, workspaceRoot, outputRoot}={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -2244,11 +2511,11 @@ Portable-target compatibility wrapper for native output-root resolution.
 resolvePortableBuildOutputRoot(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -2272,11 +2539,11 @@ Invokes one target adapter run method and fails honestly when the artifact kind 
 async runTarget(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/targets`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/targets`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -2352,11 +2619,11 @@ Validates a native builder's protocol and required describe/doctor/prepare/build
 validateNativeBuilder(provider)
 ```
 
-Import it from `arcane-os` or `arcane-os/native`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/native`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -2372,7 +2639,7 @@ async function usevalidateNativeBuilder(...arguments_) {
 
 ### Overview
 
-Authenticates one target artifact through the exact prepared provider/toolchain receipt.
+Explicitly verifies one selected target artifact through the prepared provider and toolchain state.
 
 ### Signature and result
 
@@ -2380,11 +2647,11 @@ Authenticates one target artifact through the exact prepared provider/toolchain 
 async verifyNativeArtifact(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -2408,11 +2675,11 @@ Invokes one target adapter's artifact verification boundary.
 async verifyTarget(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/targets`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/targets`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Normalized plan/admission/receipt; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
 
 ### Example
 
@@ -2728,7 +2995,7 @@ Normalized SDK error class carrying a stable code, human message, optional resol
 new ArcaneError(code, message, {details, cause, exitCode}={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -2754,7 +3021,7 @@ console.log(error.code, error.message);
 Frozen registry of stable SDK error-code strings.
 
 `ERROR_CODES.updateCheckFailed` is exactly
-`'ARCANE_UPDATE_CHECK_FAILED'`. It identifies a bounded update-check validation,
+`'ARCANE_UPDATE_CHECK_FAILED'`. It identifies an update-check validation,
 registry, timeout, HTTP, or response failure; caller cancellation remains the
 separate `ERROR_CODES.cancelled` value.
 
@@ -2797,7 +3064,7 @@ Projects an error into the JSON-safe normalized public error record.
 errorRecord(error)
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -2867,7 +3134,7 @@ Converts an unknown thrown value into an `ArcaneError` while preserving an exist
 normalizeError(error, fallbackCode=ERROR_CODES.operationFailed)
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -2893,7 +3160,7 @@ Throws the signal reason or a normalized cancellation error when an AbortSignal 
 throwIfAborted(signal)
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -2923,7 +3190,7 @@ Performs a read-only Microsoft NT assessment of the managed ArcaneOllama service
 async assessArcaneOllama({ signal, onEvent, platform=process.platform, run=runProcess, fileExists=exists }={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -2951,7 +3218,7 @@ Scaffolds one new external repository-shaped workspace and one selected applicat
 async createWorkspace({ targetPath, appId, displayName, target='browser', initializeGit=false, signal, onEvent })
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -2979,7 +3246,7 @@ Runs the read-only SDK/runtime/workspace and optional local-AI diagnostic operat
 async doctorApplication(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3007,7 +3274,7 @@ Initializes missing Arcane files for one app in an existing external or integrat
 async initializeApplication(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3035,7 +3302,7 @@ Adds one application scaffold to an existing workspace without overwriting incom
 async initWorkspace({ workspaceRoot=process.cwd(), appId, displayName, target='browser', signal, onEvent })
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3063,7 +3330,7 @@ Classifies one canonical workspace as external or integrated and reports its fix
 async inspectWorkspaceProfile(workspaceRoot=process.cwd())
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3091,7 +3358,7 @@ Runs one fast-forward-only pull after proving the selected repository worktree i
 async repositoryPull({ workspaceRoot=process.cwd(), signal, onEvent, run=runProcess }={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3175,7 +3442,7 @@ Reads one repository's branch and short worktree status through an owned child p
 async repositoryStatus({ workspaceRoot=process.cwd(), signal, onEvent, run=runProcess }={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3203,7 +3470,7 @@ Resolves one workspace profile and selected app into canonical SDK paths.
 async resolveWorkspace({workspaceRoot=process.cwd(), appId}={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3231,7 +3498,7 @@ Discovers application ids in one external or integrated workspace without select
 async discoverApps(workspaceRoot=process.cwd())
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3259,7 +3526,7 @@ Runs the underlying read-only doctor checks and returns their normalized report.
 async runDoctor({ workspaceRoot, appId, arcaneRoot, requireLocalAI=false, signal, onEvent, platform=process.platform, run=runProcess }={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3287,7 +3554,7 @@ Selects and runs one repository action by name.
 async runRepositoryAction(action, options={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3315,7 +3582,7 @@ Selects one exact app id, or requires an unambiguous single discovered applicati
 async selectApp(workspaceRoot=process.cwd(), appId)
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3335,7 +3602,7 @@ async function useselectApp(...arguments_) {
 
 ### Overview
 
-Starts one bounded browser development server with exact runtime/app route mappings and an unguessable session capability.
+Starts one owned browser development server with exact runtime/app route mappings and an unguessable session capability.
 
 ### Signature, modes, and result
 
@@ -3345,10 +3612,10 @@ async startDevServer(options={})
 
 Import it from `arcane-os`. Source mode accepts
 `{workspaceRoot=process.cwd(), appId, mode='source', host='127.0.0.1', port=0,
-runtimeReceipt, signal, onEvent}` and serves one validated workspace application
-plus its verified SDK or integrated runtime. Packaged mode uses
-`{mode:'packaged', releaseRoot, releaseReceipt, host, port, signal, onEvent}` and
-serves only files admitted by that same-process release receipt. `host` must be
+signal, onEvent}` and serves one validated workspace application plus its
+complete SDK or integrated runtime. Packaged mode uses
+`{mode:'packaged', releaseRoot, host, port, signal, onEvent}` and serves the
+complete selected release files. `host` must be
 numeric loopback `127.0.0.1` or `::1`; port `0` asks the operating system for an
 available port.
 
@@ -3367,7 +3634,7 @@ requests and event delivery drain. Call `await result.close()` in a `finally`
 block, or abort `signal`; `close()` is idempotent and returns the
 same settlement represented by both `closed` and `lifecycle`. A listener error
 or event-callback failure closes the server and rejects its lifecycle. Invalid
-mode/host/port, workspace or receipt authentication failure, an occupied port,
+mode/host/port, malformed workspace or release content, an occupied port,
 or an already-aborted signal rejects startup.
 
 ### Availability and normalization
@@ -3417,7 +3684,7 @@ async validateWorkspace({
 }={})
 ```
 
-Import it from `arcane-os`. It resolves to a frozen validation receipt with
+Import it from `arcane-os`. It resolves to a frozen validation result with
 `valid`, `workspaceMode`, `workspaceRoot`, `appId`, `appRoot`, the selected
 configuration/application, lock data, and completed checks. For an external
 workspace it additionally returns the exact installed package authority:
@@ -3441,7 +3708,7 @@ workspace it additionally returns the exact installed package authority:
 The dependency can be named `arcane-os` or be one exact npm alias for
 `npm:arcane-os@0.3.1`. The selected installation must still be one direct,
 physical, non-link package directory whose manifest identifies exactly as
-`arcane-os@0.3.1`; duplicate canonical/alias declarations fail closed.
+`arcane-os@0.3.1`; duplicate canonical/alias declarations reject.
 `allowMissingManagedImportMap` is an internal packaging/development seam. An
 ordinary caller should leave it `false`.
 
@@ -3478,7 +3745,7 @@ Builds and retained-verifies one explicitly selected native target through one p
 async buildApplication(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3506,7 +3773,7 @@ Creates one deterministic external application bundle from one authenticated pac
 async bundleApplication(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3534,7 +3801,7 @@ Runs the selected application or integrated shared validation boundary.
 async checkApplication(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3562,7 +3829,7 @@ Creates one new external application workspace through the shared headless toolc
 async createApplication(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3585,8 +3852,11 @@ async function usecreateApplication(...arguments_) {
 Returns a frozen convenience object that applies shared defaults to every headless application operation.
 
 The object includes `importMap(options)`, which merges defaults with explicit
-call options and performs one selected app's authenticated map refresh. The
-equivalent generic route is `execute('import-map', options)`. It also includes
+call options and refreshes every directly navigable descriptor-selected browser
+document for one selected app. The equivalent generic route is
+`execute('import-map', options)`.
+It also includes `upgrade(options)`, which performs the explicit installed-SDK
+consumer upgrade described by `upgradeApplication()`, and
 `updateCheck(options)`, which invokes `checkSdkUpdate()` once. Constructing the
 toolchain does not check, poll, schedule, download, install, regenerate, or
 mutate anything.
@@ -3597,7 +3867,7 @@ mutate anything.
 createToolchain(defaults={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3616,7 +3886,7 @@ const toolchain = createToolchain({
     }
 });
 
-// Only this explicit call refreshes the managed map and configured HTML entry.
+// Only this explicit call refreshes the managed map and selected HTML documents.
 const result = await toolchain.importMap();
 console.log(result.importMap.entryCount); // derived from installed inventories
 console.log(result.importMap.documentPaths, result.importMap.documentCount);
@@ -3634,7 +3904,7 @@ Returns the normalized target catalog through the headless operation lifecycle.
 async describeTargets(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3662,7 +3932,7 @@ Starts one owned browser development server for the selected application.
 async developApplication(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3684,15 +3954,23 @@ async function usedevelopApplication(...arguments_) {
 
 Dispatches one named headless SDK operation with normalized acceptance, events, cancellation, and failure.
 
-The exact command `'import-map'` dispatches one app-scoped authenticated refresh
-and returns `{workspaceRoot, workspaceMode, appId, importMap}`. A normal
-`importMap` value binds the generated imports and the committed map/HTML file
-hashes through `documentPaths`, `documentCount`, and the ordered `files`
-records. The direct operation supplies the configured entry only; packaging
-owns discovery of additional included browser documents. The canonical
-integrated-legacy layout returns its documented skip
-record instead. This route mutates the two managed application files and has no
+The exact command `'import-map'` dispatches one app-scoped refresh
+across every `.html`/`.htm` file selected by the descriptor's existing
+include/exclude rules and returns `{workspaceRoot, workspaceMode, appId,
+importMap}`. A normal `importMap` value reports the generated imports and
+complete ordered `documentPaths` without byte counts, hashes, digests, or
+ordinary admission receipts. The canonical integrated-legacy layout returns its documented skip
+record instead. This route mutates the map artifact and selected managed HTML
+documents as one atomic refresh and has no
 supported dry-run.
+
+The exact command `'upgrade'` dispatches `upgradeApplication(options)`. It is
+external-workspace-only and composes three complete stages under one
+workspace-operation lease: exact lock reconciliation, runtime
+materialization, and the same multi-document import-map refresh. It performs no
+dependency installation, `package.json` merge, test, packaging, `dist`, or
+network operation. The stages are not presented as one filesystem-atomic
+transaction.
 
 The exact command `'update-check'` dispatches one `checkSdkUpdate(options)`
 call. Dispatch never installs a recurring task, polls application state, or
@@ -3706,7 +3984,7 @@ causes another command to check for updates implicitly. There is no exported
 async executeOperation(command, options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3729,10 +4007,16 @@ console.log(result.importMap.documentPaths, result.importMap.documentCount);
 
 ### Overview
 
-Runs the high-level package operation for one selected application. It
-authenticates the installed SDK/runtime authorities, injects one deterministic
-managed import map into every included `.html`/`.htm` browser document, and
-returns the low-level package result with its `importMapReceipt`. External
+Runs the high-level package operation for one selected application. It reads
+the installed SDK/runtime selection, injects one deterministic
+managed import map into every directly navigable included `.html`/`.htm`
+browser document while preserving component fragments as package files, and
+then packages the complete selected content without automatically running tests
+or checks. Verification occurs only when explicitly requested or when required
+for the selected release output. A failure leaves the previously accepted
+distribution untouched. Success returns the low-level package result and
+complete import-map document inventory without byte counts, hashes, digests, or
+ordinary receipts. External
 packages publish `ARCANE_RUNTIME_PROJECTION.json`; private
 `ARCANE_APP_RELEASE.json` remains an internal verification authority rather
 than an application route.
@@ -3743,7 +4027,7 @@ than an application route.
 async packageApplication(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3759,7 +4043,7 @@ const result = await packageApplication({
     appId: 'hello-world'
 });
 
-console.log(result.release.importMapReceipt.documentCount);
+console.log(result.release.importMap.documentPaths);
 ```
 
 ## planApplication()
@@ -3774,7 +4058,7 @@ Creates one authenticated native build plan without executing the provider build
 async planApplication(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3802,7 +4086,7 @@ Dispatches one selected repository status, pull, or push operation through the h
 async repositoryApplication(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3822,7 +4106,7 @@ async function userepositoryApplication(...arguments_) {
 
 ### Overview
 
-Runs a browser app or performs the retained native build/verify/launch lifecycle for one target.
+Runs a browser app or performs the selected native build/launch lifecycle for one target. It does not run tests or checks automatically; selected release-output verification remains explicit to that release operation.
 
 ### Signature and result
 
@@ -3830,7 +4114,7 @@ Runs a browser app or performs the retained native build/verify/launch lifecycle
 async runApplication(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3851,6 +4135,15 @@ async function userunApplication(...arguments_) {
 ### Overview
 
 Runs the selected application's exact test boundary or one integrated shared test.
+For external and modern integrated apps, app-scope testing authenticates the
+existing managed import-map artifact against the selected runtime and each
+selected HTML document before launching isolated files. The child loader maps
+only exact entries such as `arcane/SpeechPlayback`, preserves
+`arcane-os/testing`, resolves supported URL-like compatibility keys, and rejects
+an unmapped `arcane/*` or `#arcane/*` specifier. The compact map
+locator is removed from the child environment before application test code is
+imported. Integrated-legacy testing retains its existing no-map compatibility
+path.
 
 ### Signature and result
 
@@ -3858,7 +4151,7 @@ Runs the selected application's exact test boundary or one integrated shared tes
 async testApplication(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3874,6 +4167,42 @@ async function usetestApplication(...arguments_) {
 }
 ```
 
+## upgradeApplication()
+
+### Overview
+
+Runs the selected external installed-SDK application's ordinary `npm upgrade`
+command without adding a separate lock, runtime, import-map, authentication, or
+reconciliation workflow. npm retains authority for dependency selection and
+network behavior.
+
+### Signature and result
+
+```text
+async upgradeApplication(options={})
+```
+
+The mutable `arcane-application-upgrade` result includes `workspaceRoot`,
+`workspaceMode`, `appId`, and the normal process result (`command`, `args`,
+`cwd`, `code`, `stdout`, and `stderr`).
+
+### Availability and normalization
+
+**Node; external installed-SDK workspaces only.** SDK-normalized inputs,
+errors, events, and documented process results.
+
+### Example
+
+```javascript
+import {upgradeApplication} from 'arcane-os';
+
+const upgraded=await upgradeApplication({
+    workspaceRoot:process.cwd(),
+    appId:'hello-world'
+});
+console.log(upgraded.command,upgraded.args,upgraded.code);
+```
+
 ## verifyApplication()
 
 ### Overview
@@ -3886,7 +4215,7 @@ Runs the high-level verification operation for one selected browser release.
 async verifyApplication(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -3914,7 +4243,7 @@ Runs the high-level external bundle verification operation.
 async verifyBundleApplication(options={})
 ```
 
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -4001,7 +4330,7 @@ Default-export alias of the public `test` registration function.
 default(name, optionsOrCallback, maybeCallback)
 ```
 
-Import it from `arcane-os/testing`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os/testing`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -4055,7 +4384,7 @@ Returns the number of tests registered in the current isolated test realm.
 registeredTestCount()
 ```
 
-Import it from `arcane-os` or `arcane-os/testing`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/testing`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -4073,7 +4402,7 @@ console.log(registeredTestCount());
 
 ### Overview
 
-Runs one shell-free child command with bounded output tails, ordered stream events, heartbeats, and process-tree cancellation.
+Runs one shell-free child command with complete stdout and stderr, ordered stream events, heartbeats, and process-tree cancellation.
 
 ### Signature, parameters, and result
 
@@ -4101,7 +4430,7 @@ The promise resolves to
 `{command, args, cwd, code, signal, stdout, stderr}`. Here `signal` is the
 child's terminating signal name or `null`, not the input `AbortSignal`. `args`
 is copied, `cwd` defaults to the current process directory, and each captured
-text stream keeps a bounded recent tail using a 4 MiB threshold. A missing executable rejects with
+text stream preserves its complete content. A missing executable rejects with
 `ARCANE_PREREQUISITE_MISSING`; invalid arguments, a disallowed nonzero exit,
 and spawn/runtime failures use the normalized SDK error boundary, with the
 nonzero result retained in error details.
@@ -4203,7 +4532,7 @@ Registers one public test, optional timeout, callback, nested cases, and FIFO cl
 test(name, optionsOrCallback, maybeCallback)
 ```
 
-Import it from `arcane-os` or `arcane-os/testing`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and receipt lifetime.
+Import it from `arcane-os` or `arcane-os/testing`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
 ### Availability and normalization
 
@@ -4223,7 +4552,8 @@ test('adds two values', () => {
 
 This is an on-demand Node.js control-plane and CLI maintainer surface. It never
 runs from renderer application code automatically. One call can make one
-bounded, credential-free HTTPS GET to an approved npm registry; there is no
+ordinary HTTP or HTTPS GET to the selected npm registry and reads the complete
+response subject only to unavoidable HTTP framing; there is no
 polling, recurrence, interval, background agent, download, install, dependency
 mutation, runtime replacement, or self-update. The only timer is the timeout
 owned and cleared by that one request.
@@ -4232,7 +4562,7 @@ owned and cleared by that one request.
 
 ### Overview
 
-Approved default npm registry root for an explicit SDK update check.
+Default npm registry root for an explicit SDK update check.
 
 ### Value
 
@@ -4245,7 +4575,7 @@ The request builder appends the fixed
 
 ### Availability and normalization
 
-**Node; on-demand CLI or maintainer check only.** Exact immutable HTTPS origin
+**Node; on-demand CLI or maintainer check only.** Exact default HTTPS origin
 string. Importing it performs no request and starts no timer.
 
 ### Example
@@ -4271,9 +4601,8 @@ const SDK_UPDATE_TIMEOUT_MS = 2500
 
 ### Availability and normalization
 
-**Node; on-demand CLI or maintainer check only.** Exact immutable millisecond
-integer. Accepted per-call timeouts are safe integers from 100 through 10,000
-milliseconds.
+**Node; on-demand CLI or maintainer check only.** Exact default millisecond
+integer. Accepted per-call timeouts are positive safe integers.
 
 ### Example
 
@@ -4287,7 +4616,7 @@ console.log(`Update-check timeout: ${SDK_UPDATE_TIMEOUT_MS} ms`);
 
 ### Overview
 
-Performs exactly one bounded registry read and reports whether the npm dist-tag
+Performs exactly one complete registry read and reports whether the npm dist-tag
 selected for the installed SDK is newer. It only checks metadata; it does not
 download, install, mutate, or schedule anything.
 
@@ -4298,7 +4627,6 @@ async checkForSdkUpdate({
     packageName=SDK_NAME,
     currentVersion=SDK_VERSION,
     registry=SDK_UPDATE_REGISTRY,
-    allowedRegistryHosts,
     timeoutMs=SDK_UPDATE_TIMEOUT_MS,
     fetchImpl=globalThis.fetch,
     signal,
@@ -4309,21 +4637,20 @@ async checkForSdkUpdate({
 
 `packageName` must be exactly `arcane-os`. `currentVersion` must be strict
 semantic version text: prereleases select npm `dev`, while stable versions
-select `latest`. `registry` must pass `validateUpdateRegistry()`; the default
-hostname allowlist contains only `registry.npmjs.org`. `allowedRegistryHosts`,
-`fetchImpl`, and `clock` are explicit test or controlled-host injection points,
-not discovery mechanisms. `timeoutMs` is 100-10,000. `signal` provides caller
+select `latest`. `registry` must pass `validateUpdateRegistry()`; ordinary HTTP
+and HTTPS npm registries, including caller-selected local or corporate paths,
+remain functional. `fetchImpl` and `clock` are explicit injection points.
+`timeoutMs` is a positive safe integer. `signal` provides caller
 cancellation, and each supplied `onEvent` callback is awaited.
 
-The request is one `GET` with `credentials:'omit'`, `redirect:'error'`,
-`cache:'no-store'`, and `referrerPolicy:'no-referrer'`. The response must retain
-the exact endpoint identity, return HTTP 200 and JSON media type, contain at
-most 32 KiB of valid UTF-8, and decode to 1-64 safe dist-tags whose values are
-strict semantic versions no longer than 128 characters.
+The request is one ordinary `GET` accepting JSON and follows the selected
+runtime's normal registry behavior. The response must return HTTP 200 and JSON
+media type, be valid UTF-8, and decode to a nonempty dist-tag object whose
+string values are strict semantic versions.
 
 ### Result, events, and errors
 
-The promise resolves to a frozen object:
+The promise resolves to a mutable object:
 
 ```text
 {
@@ -4341,7 +4668,7 @@ The promise resolves to a frozen object:
 After initial validation it emits awaited `update.check.started`. Success emits
 `update.check.completed`; a non-cancellation request or response failure emits
 `update.check.failed` with the normalized failure code.
-Registry, timeout, HTTP, redirect, content, JSON, dist-tag, version, or clock
+Registry, timeout, HTTP, content, JSON, dist-tag, version, or clock
 failures reject with `ARCANE_UPDATE_CHECK_FAILED`. Caller cancellation rejects
 with `ARCANE_CANCELLED`; it is distinct from the per-request timeout. Event
 callbacks are awaited, and a callback rejection can reject or replace the
@@ -4351,7 +4678,7 @@ in `finally`.
 ### Availability and normalization
 
 **Node; on-demand CLI or maintainer check only.** Registry data is reduced to
-one frozen status result. No provider payload becomes installation authority,
+one mutable status result. No provider payload becomes installation authority,
 and applications never invoke this function automatically.
 
 ### Example
@@ -4474,31 +4801,26 @@ console.log(updateTagForVersion('1.0.0'));       // latest
 
 ### Overview
 
-Synchronously validates one credential-free HTTPS registry root against an
-explicit hostname allowlist.
+Synchronously validates one ordinary HTTP or HTTPS registry URL.
 
 ### Signature and result
 
 ```text
-validateUpdateRegistry(value, {
-    allowedHosts=new Set(['registry.npmjs.org'])
-}={})
+validateUpdateRegistry(value)
 ```
 
-The URL must use HTTPS, have no username, password, query, or fragment, use the
-root path `/`, and use no explicit port other than 443. The lowercase hostname
-must be admitted by the supplied Set-like `allowedHosts`. It returns the
-normalized `URL` object. Validation performs no DNS lookup or request and does
-not claim trust in registry content.
+The URL must use HTTP or HTTPS. Caller-selected credentials, ports, paths,
+queries, and normal redirects remain under the selected registry and Fetch
+runtime. The function returns the normalized `URL` object and performs no DNS
+lookup or request.
 
-Invalid syntax, credentials, scheme, path, port, or hostname throws
-synchronously with `ARCANE_UPDATE_CHECK_FAILED`; the error can contain the
-parsed origin as diagnostic detail.
+Invalid syntax or an unsupported scheme throws synchronously with
+`ARCANE_UPDATE_CHECK_FAILED`.
 
 ### Availability and normalization
 
-**Node; on-demand CLI or maintainer check only.** Exact origin validation; no
-fallback, redirect acceptance, host discovery, polling, or mutation.
+**Node; on-demand CLI or maintainer check only.** URL normalization only; no
+request, polling, or mutation.
 
 ### Example
 
@@ -4569,7 +4891,7 @@ console.log(DEFAULT_DOM_EVENT_TYPES.includes('click'));
 
 ### Overview
 
-The event name used for bounded diagnostics of captured clicks, keys, pointer actions, form activity, and the other configured DOM interactions. Its payload describes the target and path without retaining DOM nodes.
+The event name used for complete diagnostics of captured clicks, keys, pointer actions, form activity, and the other configured DOM interactions. Its payload describes the target and path without retaining DOM nodes; private targets and credential-named fields remain protected.
 
 ### Value and use
 
@@ -4577,7 +4899,7 @@ The event name used for bounded diagnostics of captured clicks, keys, pointer ac
 const DOM_INTERACTION_EVENT = 'arcane.dom.interaction'
 ```
 
-Listen on the EventManager to update a debugger in real time. Recording snapshots the diagnostic into `arcane-event-stack/1`; privacy defaults omit input values and redact sensitive event detail. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
+Listen on the EventManager to update a debugger in real time. DOM instrumentation defaults `captureEventDetails`, `captureInputValues`, and `captureNodeMarkup` to `true`, preserving complete non-private interaction details and values. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
 
 ### Availability and normalization
 
@@ -4605,11 +4927,11 @@ The event name used for normalized attribute, character-data, and child-list mut
 const DOM_MUTATION_EVENT = 'arcane.dom.mutation'
 ```
 
-Mutation capture uses `MutationObserver` and is enabled by default when DOM instrumentation starts. Markup is omitted by default; sensitive attributes, private elements, and URLs remain redacted. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
+Mutation capture uses `MutationObserver` and is enabled by default when DOM instrumentation starts. Complete non-private markup, text, selectors, and URLs are preserved by default; private elements and credential-like attribute-mutation values remain redacted. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
 
 ### Availability and normalization
 
-**Browser DOM or a DOM-compatible test host; constant imports in Node.** The payload is a bounded diagnostic projection and cannot reconstruct or authorize changes to the DOM.
+**Browser DOM or a DOM-compatible test host; constant imports in Node.** The payload is a complete credential-protected diagnostic projection and cannot reconstruct or authorize changes to the DOM.
 
 ### Example
 
@@ -4661,7 +4983,7 @@ The lifecycle event emitted after normal shutdown of active DOM observation. It 
 const DOM_OBSERVATION_STOPPED_EVENT = 'arcane.dom.observation.stopped'
 ```
 
-Calling `stop()` when already inactive is idempotent and emits nothing. Retention overflow stops DOM observation with lifecycle emission suppressed so the terminal overflow marker remains the last stack record. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
+Calling `stop()` when already inactive is idempotent and emits nothing. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
 
 ### Availability and normalization
 
@@ -4681,7 +5003,7 @@ arcaneEvents.on(DOM_OBSERVATION_STOPPED_EVENT, ({root}) => {
 
 ### Overview
 
-A synchronous pub/sub manager with opt-in bounded time-travel recording, strict event-stack import/export, cursor review, playback, and optional DOM instrumentation. Create an instance for an isolated subsystem or use `arcaneEvents` for the package singleton.
+A synchronous pub/sub manager with opt-in complete time-travel recording, strict event-stack import/export, cursor review, playback, and optional DOM instrumentation. Create an instance for an isolated subsystem or use `arcaneEvents` for the package singleton.
 
 ### Syntax and result
 
@@ -4690,18 +5012,15 @@ new EventManager({
     timeTravel=false,
     dom=null,
     captureStacks=false,
-    redactSensitive=true,
-    maxEvents=10_000,
-    maxSnapshotDepth=50,
-    maxSnapshotEntries=1_000,
-    maxSnapshotStringLength=10_000,
+    secure=false,
+    redactSensitive=secure,
     clock=()=>new Date(),
     now,
     sessionId
 }={})
 ```
 
-Listeners receive the original live arguments synchronously. When recording is enabled, the manager separately stores deeply frozen bounded snapshots, parent/causation structure, timing, status, and a redacted error snapshot. See the [central events guide](event-manager.md) for every getter, method, default, failure, and recovery path. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
+Listeners receive the original live arguments synchronously. When recording is enabled, the manager separately stores complete deeply frozen snapshots, parent/causation structure, timing, status, and error detail. Ordinary `secure:false, redactSensitive:false` preserves complete URLs, public details, and captured stack text while credential-named fields remain `[REDACTED]`; `captureStacks` defaults to `false`. Optional URL redaction requires `secure:true, redactSensitive:true`. Legacy maximum options remain accepted for compatibility but do not cap, clip, tail, truncate, or elide content. See the [central events guide](event-manager.md) for every getter, method, default, failure, and recovery path. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
 
 ### Availability and normalization
 
@@ -4712,7 +5031,7 @@ Listeners receive the original live arguments synchronously. When recording is e
 ```javascript
 import {EventManager} from 'arcane-os/event-manager';
 
-const events = new EventManager({timeTravel:true, maxEvents:100});
+const events = new EventManager({timeTravel:true});
 events.on('cart.updated', cart => console.log(cart.total));
 events.emit('cart.updated', {total:42});
 console.log(events.history.at(-1).status);
@@ -4722,7 +5041,7 @@ console.log(events.history.at(-1).status);
 
 ### Overview
 
-The playback lifecycle event emitted when an AbortSignal aborts an active review. Its frozen summary reports the source session, number delivered, current cursor, `completed:false`, and a bounded error snapshot.
+The playback lifecycle event emitted when an AbortSignal aborts an active review. Its frozen summary reports the source session, number delivered, current cursor, `completed:false`, and complete credential-protected error detail.
 
 ### Value and use
 
@@ -4786,11 +5105,11 @@ The playback lifecycle event emitted when parsing, timing, event delivery, or th
 const PLAYBACK_FAILED_EVENT = 'arcane.time-travel.playback.failed'
 ```
 
-The diagnostic error in the lifecycle payload is a bounded snapshot and may not preserve object identity. Records delivered before failure are not undone. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
+The diagnostic error in the lifecycle payload is complete credential-protected detail and may not preserve object identity. Ordinary mode preserves URLs and captured stack text; explicit secure redaction may replace URLs. Records delivered before failure are not undone. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
 
 ### Availability and normalization
 
-**Node and browser/bundler.** The failure summary is normalized and redacted; the thrown error remains the local failure value.
+**Node and browser/bundler.** The failure summary is normalized with credential-named fields protected; the thrown error remains the local failure value.
 
 ### Example
 
@@ -4856,32 +5175,6 @@ import {PLAYBACK_STARTED_EVENT, arcaneEvents} from 'arcane-os/event-manager';
 arcaneEvents.on(PLAYBACK_STARTED_EVENT, run => {
     console.log(run.mode, run.count);
 });
-```
-
-## TIME_TRAVEL_OVERFLOW_EVENT
-
-### Overview
-
-The exact type of the terminal record appended when history already contains `maxEvents` records and another string event arrives. The marker preserves explicit truncation evidence instead of silently dropping or rotating history.
-
-### Value and use
-
-```text
-const TIME_TRAVEL_OVERFLOW_EVENT = 'arcane.time-travel.overflow'
-```
-
-Overflow leaves at most `maxEvents + 1` records, disables time travel, and stops DOM observation without a stop lifecycle record. The marker is not dispatched on the live event bus. Call `clearHistory()` before enabling time travel again. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
-
-### Availability and normalization
-
-**Node and browser/bundler.** The marker has fixed event-manager source/category and normalized retention evidence.
-
-### Example
-
-```javascript
-import {TIME_TRAVEL_OVERFLOW_EVENT} from 'arcane-os/event-manager';
-
-const overflowed = stack.events.at(-1)?.type === TIME_TRAVEL_OVERFLOW_EVENT;
 ```
 
 ## TIME_TRAVEL_SEEK_EVENT
@@ -4966,7 +5259,7 @@ constructed.
 cancelable=false}={})` synchronously returns the frozen
 `{occurrence,accepted}` publication. The occurrence contains immutable
 `protocol`, `occurrenceId`, `type`, `source`, `instanceId`, `operationId`,
-privacy-admitted deeply frozen `detail`, `cancelable`, live
+complete credential-protected deeply frozen `detail`, `cancelable`, live
 `defaultPrevented`, and `preventDefault()`. Canonical listeners run before the
 source's EventTarget-compatible listeners. Cancellation is synchronous and only
 sets acceptance; the publisher decides whether to begin or continue domain work.
@@ -5393,17 +5686,15 @@ createDOMInstrumentation({
     root=document,
     eventTypes=DEFAULT_DOM_EVENT_TYPES,
     MutationObserver,
-    captureEventDetails=false,
-    captureInputValues=false,
-    captureNodeMarkup=false,
+    captureEventDetails=true,
+    captureInputValues=true,
+    captureNodeMarkup=true,
     captureMutations=true,
-    maxValueLength=10_000,
-    maxSerializedNodeLength=100_000,
     observeOpenShadowRoots=true
 }={})
 ```
 
-The factory validates configuration but does not start automatically. Sensitive fields, private elements, sensitive attributes, and URLs are redacted; enabling ordinary input or markup capture does not override private-element redaction. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
+The factory validates configuration but does not start automatically. Its three content-capture flags default to `true`, so complete non-private values, markup, selectors, URLs, and object details are retained. Private elements and credential-like attribute-mutation values remain redacted; later EventManager snapshots also protect credential-named object fields. Callers may explicitly disable an individual capture flag to omit that content. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
 
 ### Availability and normalization
 
@@ -5509,15 +5800,10 @@ Parses a JSON string or object and strictly validates an `arcane-event-stack/1` 
 ### Syntax and result
 
 ```text
-parseEventStack(source, {
-    maxEvents=10_000,
-    maxSnapshotDepth=50,
-    maxSnapshotEntries=1_000,
-    maxSnapshotStringLength=10_000
-}={})
+parseEventStack(source)
 ```
 
-Validation rejects unknown keys, accessors, sparse arrays, unsafe or oversized values, invalid timestamps/statuses/nesting, inconsistent sessions/protocols, non-increasing sequences, and malformed overflow history. A valid terminal overflow document may contain `maxEvents + 1` records. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
+Validation rejects unknown keys, accessors, sparse arrays, unsafe values, invalid timestamps/statuses/nesting, inconsistent sessions/protocols, and non-increasing sequences. It preserves the complete valid event history. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
 
 ### Availability and normalization
 
@@ -5536,7 +5822,7 @@ console.log(stack.sessionId, stack.events.length);
 
 ### Overview
 
-Deep-frozen authority for the browser-only runtime behind
+Mutable metadata for the browser-only runtime behind
 `arcane-os/ai/browser-wasm`. It records protocol
 `arcane-ai-browser-wasm/2`, `@wllama/wllama` `3.6.0`, the embedded llama.cpp
 revision, the exact packaged JavaScript and WebAssembly assets, retained MIT
@@ -5555,7 +5841,7 @@ inspecting it does not initialize Wllama, request storage, or download a model.
 
 ### Availability and normalization
 
-**Browser metadata.** This is an immutable component receipt, not a provider,
+**Browser metadata.** This is component metadata, not a provider,
 model, browser-permission grant, or proof that WebAssembly, OPFS, a secure
 context, or WebGPU is available.
 
@@ -5575,7 +5861,7 @@ Complete lifecycle, model authority, cache, cancellation, and tool behavior:
 
 ### Overview
 
-Creates the application-facing LLM facade around a compatible provider or
+Creates the application-facing AI API module around a compatible provider or
 controller. The default `on-demand` policy loads before first use; `manual`
 requires an explicit successful `load()` before requests. When both `llm` and
 `provider` are supplied, `llm` takes precedence.
@@ -5586,35 +5872,49 @@ requires an explicit successful `load()` before requests. When both `llm` and
 createArcaneAI({ llm=null, provider=null, loadPolicy='on-demand', security }={})
 ```
 
-At least one `llm` or `provider` is required. The frozen facade contains
+At least one `llm` or `provider` is required. The mutable API object contains
 `llm`, `runtime`, `createChatSession`, `status`, `load`, `unload`, `probe`,
 `fetchRequest`, `streamRequest`, and `dispose`. `status()` returns
 `{llm: status}`; lifecycle methods return the flat LLM status.
 `fetchRequest()` returns the completion. `streamRequest()` consumes streaming
-and returns text or a tool-name-to-JSON-argument-string record. Use
-`ai.llm.stream()` for the async iterator.
+and returns complete terminal text and structural tool-call records. Use
+`ai.llm.stream()` for the async iterator; its ordinary chunks contain only
+content/reasoning data, while structural fragments remain internal until the
+complete terminal result validates.
 
-When `llm` is an existing `ModelController`, it retains the security and load
-policy chosen when that controller was created. `createArcaneAI()` does not
+When `llm` is an existing `ModelController`, it retains the optional hardening
+and load policy chosen when that controller was created. `createArcaneAI()` does not
 reapply its `loadPolicy` argument in that case, and supplying `security` with an
 existing controller throws `TypeError`. Provider input creates a new controller
 and applies the supplied `loadPolicy` and app-level `security` normally.
 
 `createChatSession(options)` asynchronously imports the private managed
 `#arcane/persistent-ai-chat-session` specifier, resolves a
-`Promise<PersistentAIChatSession>`, and binds its `chat` function to this exact
+`Promise<PersistentAIChatSession>`, and binds its AI API to this exact
 controller. Applications continue to use this public controller method rather
 than importing that private specifier. `options` must be a plain object and cannot contain
-`chat`. The resulting session preserves coherent live bounded context while
+`chat`. The resulting session preserves coherent complete live context while
 letting each user/assistant/tool turn choose matching durable ChatEntity/DBOPFS
 persistence; `persist:false` does not write that turn to durable history or
 memory. There is no storage or provider fallback.
 
-App and load-operation security use
-`{security:{secure?:boolean, checks?:{byteLength?:boolean, sha256?:boolean}}}`.
-The SDK/app default is `secure:false`. Each omitted field inherits and an
-operation field overrides the corresponding app field. The provider/model
-binding scope, documented below, sits between those scopes.
+The session's `stream()` uses this controller's streaming transport when
+available and otherwise completes the same atomic turn through its configured
+non-stream request; lack of optional streaming is not a protocol error.
+Per-turn `request` options merge over the session defaults while messages and
+the caller signal remain session-owned. A visibility-only consumer can submit a
+matching tool disposition with `request:{toolChoice:'none'}` so the continuation
+cannot open another tool loop, without calling Wllama directly. A streamed
+structural call is published only after its exact ID, type, name, and argument
+string match the terminal response; omission or divergence rejects with
+`AI_CHAT_STREAM_TOOL_CALL_MISMATCH` before persistence or commit.
+
+Optional hardening uses `{security:{secure?:boolean}}` and defaults to
+`secure:false`. Ordinary operation is complete and functional without byte
+counts, limits, hashes, digests, integrity records, or admission metadata.
+`secure:true` records hardening intent only. Historical checking remains
+disabled and cannot run until a separate user review authorizes its exact
+implementation and scope.
 
 ### Availability and normalization
 
@@ -5632,14 +5932,13 @@ other than `statechange` or `progress` are compatibility no-ops.
 one idempotent removal closure whose `.dispose` property is that same closure.
 The controller exposes no public `dispatchEvent()` and
 therefore does not let consumers forge lifecycle occurrences. Compatibility
-listeners receive the frozen full status as `event.detail` with the controller
+listeners receive the mutable full status snapshot as `event.detail` with the controller
 as `this`, `target`, and `currentTarget`. Canonical `statechange` and `progress`
 occurrences use source `ai-model-controller`; every load or unload owns one
 non-null operation ID shared by its state and progress occurrences. Public
-progress retains the exact admitted `modelId`, `phase`, `loaded`, `total`,
-`percent`, and nested file-progress field names rather
-than relabeling byte counts. Accessor-bearing provider status and malformed
-progress fail at admission with `ARCANE_AI_PROVIDER_STATUS_INVALID` and
+progress retains the exact selected `modelId`, `phase`, state, and nested
+file-progress field names without byte totals. Accessor-bearing provider status
+and malformed progress reject with `ARCANE_AI_PROVIDER_STATUS_INVALID` and
 `ARCANE_AI_PROVIDER_PROGRESS_INVALID`. After disposal, lifecycle operations fail with
 `ARCANE_AI_DISPOSED`.
 
@@ -5667,12 +5966,10 @@ async function openLocalReviewAfterUserChoice() {
 
 Validates a caller-owned ordered model-file descriptor and creates the
 cancellable HTTPS source accepted by the browser-WASM store/provider. The
-canonical descriptor is
-`{id,files:[{name?,url|immutableUrl,bytes?,sha256?},...]}`. The nonempty file
-array has unique normalized names and URLs. `bytes`, when present, is an
-expected positive safe-integer byte length, not inline data. The legacy
-one-file `{id,url|immutableUrl,name?,bytes?,sha256?}` shape remains accepted
-and normalizes to one ordered member.
+canonical descriptor is `{id,files:[{name?,url},...]}`. The nonempty file array
+has unique normalized names and URLs. The one-file `{id,url,name?}` shape also
+normalizes to one ordered member. Ordinary sources have no byte count, byte
+limit, hash, digest, or byte-identity metadata.
 
 ### Signature and result
 
@@ -5680,27 +5977,26 @@ and normalizes to one ordered member.
 createBrowserModelSource(descriptor, { fetchImpl=null }={})
 ```
 
-Every URL must be absolute HTTPS with no credentials or fragment and no
-revision-floating `main`, `master`, or `latest` path. A supplied SHA-256 value
-is exactly 64 hexadecimal characters. The frozen source exposes `kind`, the
-canonical descriptor fields, `descriptor`, and `open(memberIndex,{signal})`.
+Every URL must be absolute HTTPS with no credentials or fragment. Use a
+caller-selected version-pinned URL when reproducibility matters. The mutable
+source exposes `kind`, the canonical descriptor fields, `descriptor`, and
+`open(memberIndex,{signal})`.
 For a one-file source, `open({signal})` remains accepted. The result is
-`{body,requestedUrl,finalUrl,reportedBytes,cancel}`. `reportedBytes` is the
-nullable valid nonnegative `Content-Length` observation; it is not an
-unconditional admission check. Every direct `open()` performs the configured
-fetch and does not admit bytes to the cache.
+`{body,requestedUrl,finalUrl,cancel}`. Every direct `open()` performs the
+configured fetch and preserves the complete response body subject only to
+unavoidable HTTP framing.
 
-`immutableUrl` is an alias for `url`; both must match when supplied together.
-Legacy `licenseSpdx` and `sourceRevision` properties are not canonical
-descriptor fields, runtime admission checks, or proof of license rights.
+Legacy `immutableUrl` remains an input alias for `url`; both must match when
+supplied together. Legacy `licenseSpdx` and `sourceRevision` properties are not
+ordinary runtime gates or proof of license rights.
 
 ### Availability and normalization
 
 **Browser Fetch with CORS and a readable response body.** Downloads omit
 credentials/referrer, disable HTTP caching, follow redirects, require a final
-HTTPS URL, and honor `AbortSignal`. The DBOPFS store always counts and records
-actual bytes; it compares expected length or hashes bytes only when the
-corresponding effective check is enabled.
+HTTPS URL, and honor `AbortSignal`. The DBOPFS store preserves complete model
+content without counting, limiting, hashing, digesting, or byte-identifying it
+in the ordinary path.
 
 ### Example
 
@@ -5709,14 +6005,10 @@ const source = createBrowserModelSource({
     id:'reviewed-model',
     files:[{
         name:'model-q4-00001-of-00002.gguf',
-        url:'https://models.example/revisions/4f7c/model-q4-00001-of-00002.gguf',
-        bytes:123456789,
-        sha256:'0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+        url:'https://models.example/releases/4f7c/model-q4-00001-of-00002.gguf'
     },{
         name:'model-q4-00002-of-00002.gguf',
-        url:'https://models.example/revisions/4f7c/model-q4-00002-of-00002.gguf',
-        bytes:98765432,
-        sha256:'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789'
+        url:'https://models.example/releases/4f7c/model-q4-00002-of-00002.gguf'
     }]
 });
 ```
@@ -5738,42 +6030,45 @@ createBrowserWasmLlmProvider({ source, sources, store, loadDefaults={}, security
 
 `sources` is a nonempty array of unique SDK-created sources. Optional legacy
 `source` names the default and must be one member of `sources`; when `sources`
-is omitted, `source` supplies the one-model catalog. The frozen provider
+is omitted, `source` supplies the one-model catalog. The mutable provider
 exposes `protocol`, `id`, default `model`, `catalog`, `capabilities`, `status`,
 `load`, `unload`, `chat`, `stream`, `streamChat`, `use`, `probe`, and `dispose`.
 Direct `load()` selects a catalog model and returns `{model,status}`; the
-facade `ai.load()` returns the flat controller status. Load settings include
+public AI API module's `ai.load()` returns the flat controller status. Load settings include
 offline mode, `AbortSignal`, progress, threads, and context/batch/micro-batch
 tokens. The runtime always forces `gpuLayers:99999`; callers cannot request CPU
 or partial offload.
 
 Chat supports OpenAI-like message/generation fields, tools, tool choice,
 parallel tool-call preference, and JSON/JSON-Schema structured output.
-`stream()` returns a frozen async iterator with `result` and `cancel(reason)`.
-Returned tool calls are validated structural data with JSON-string arguments;
-the SDK never invokes a handler or executes a tool.
+`stream()` returns a mutable async iterator with `result` and `cancel(reason)`.
+Direct chat and stream ingress validate complete history, require nonblank
+matching tool results, and validate every terminal choice. Ordinary stream
+iteration omits structural deltas; the exact validated terminal calls remain
+on `result`.
+Every function declaration requires
+`parameters.properties.message:{type:'string',minLength:1}` and includes
+`message` in `required`. Returned calls preserve exact IDs, names, and
+JSON-string arguments containing that nonempty user-facing message. The SDK
+never invokes a handler or executes a tool; a matching executed, declined,
+cancelled, or not-executed `role:'tool'` result is required before another user
+turn.
 
-Provider `security` is the provider/model-binding scope. Security fields resolve
-independently by precedence: load operation, provider/model binding, app SDK
-configuration, then SDK default `secure:false`. Omitted fields inherit. After
-resolution, `secure:true` enables both byte-length and SHA-256 checks by default;
-`secure:false` disables both by default. An explicit per-check boolean overrides
-the resolved secure default. Enabled checks require their corresponding
-descriptor fields and fail closed; disabled checks permit those fields to be
-absent. Changing effective checks for an already loaded or in-flight model
-requires unload and reload.
+Provider `security` defaults to `{secure:false}`. That ordinary mode remains
+fully functional and never requires byte counts, hashes, digests, integrity
+records, freezes, or admission metadata. `secure:true` records intent but does
+not activate the historical checking implementation; that code remains
+disabled pending separate user review.
 
 ### Availability and normalization
 
-**Browser secure context with WebAssembly, OPFS/DBOPFS, WebGPU, and admitted
-full-offload/buffer/queue/fence evidence.** A load succeeds only after Wllama
-confirms the model is loaded and the full GPU execution evidence settles. There
-is no CPU fallback. Cross-origin isolation and coarse hardware fields remain
-observations rather than hard gates. Status discloses effective `security`,
-per-check `integrity`, catalog compatibility, storage evidence, and lifecycle
-state; unchecked bytes are never labeled SHA-256 verified. Adapter selection
+**Browser context with WebAssembly, OPFS/DBOPFS, and WebGPU.** A load succeeds
+after Wllama confirms the complete model is loaded. There is no CPU fallback.
+Cross-origin isolation and coarse hardware fields remain observations rather
+than hard gates. Ordinary status reports complete catalog compatibility and
+lifecycle state without integrity or byte evidence. Adapter selection
 is instrumented as `arcane.ai.browser-wasm.webgpu.adapter.selected`.
-Cancellation normalizes to `ARCANE_AI_REQUEST_ABORTED`; load/admission failures
+Cancellation normalizes to `ARCANE_AI_REQUEST_ABORTED`; load or availability failures
 surface stable `ARCANE_AI_*` codes such as `ARCANE_AI_WEBGPU_REQUIRED`,
 `ARCANE_AI_MODEL_FULL_OFFLOAD_UNPROVEN`, and
 `ARCANE_AI_MODEL_GPU_MEMORY_INSUFFICIENT`. Concurrent runtime inference can fail
@@ -5787,7 +6082,6 @@ misrepresenting those observations as a successful load.
 const provider = createBrowserWasmLlmProvider({
     sources:[source],
     store,
-    security:{secure:true},
     loadDefaults:{threads:1, contextTokens:4096}
 });
 console.log(provider.status().state); // unloaded
@@ -5797,11 +6091,10 @@ console.log(provider.status().state); // unloaded
 
 ### Overview
 
-Adapts an existing DBOPFS instance into a multi-model, ordered multi-file cache
-without renaming its public methods. The adapter commits every model file
-before the `arcane.ai.browser-wasm.model.v4` completion manifest and always
-records observed downloaded or cached byte lengths. A partial file set is not
-a cache hit.
+Adapts an existing DBOPFS instance into a complete multi-model, ordered
+multi-file cache without renaming its public methods. The adapter commits every
+selected model file before the completion manifest. A partial file set is not a
+cache hit.
 
 ### Signature and result
 
@@ -5809,38 +6102,29 @@ a cache hit.
 createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models', estimateStorage=null }={})
 ```
 
-The frozen result contains `kind`, `tableName`, the original `adapter`, and
-`ready`, `openVerified`, `install`, `ensure`, and `remove`. `ensure()` returns
-`files`, the one-file compatibility `file` or `null`, the manifest,
-`observedBytes`, integrity detail, storage evidence, and
-`cache:'cached'|'installed'`. Optional `estimateStorage()` supplies bounded
-quota evidence when the browser estimator is unavailable or the application
-owns a more precise view. `openVerified()` is a compatibility helper that
-forces both checks on. Ordinary install/reuse compares expected length only
-when effective `checks.byteLength` is true and hashes only when effective
-`checks.sha256` is true. `offline:true` never downloads and rejects a miss with
+The mutable result contains `kind`, `tableName`, the original `adapter`, and
+`ready`, `install`, `ensure`, and `remove`. `ensure()` returns `files`, the
+one-file compatibility `file` or `null`, the manifest, and
+`cache:'cached'|'installed'`. It preserves the complete model content without
+byte counts, limits, hashes, digests, or ordinary verification receipts.
+`offline:true` never downloads and rejects a miss with
 `ARCANE_AI_MODEL_OFFLINE_MISS`. Version-2/3 compatibility is internal; every
-new successful completion is recorded as version 4 without fabricating an
-integrity result.
+new successful completion is recorded as version 4.
 
 ### Availability and normalization
 
-**Browser with a ready DBOPFS instance and OPFS.** The cache reports only checks
-actually performed. Disabled byte-length checks do not compare descriptor
-`bytes`, disabled SHA-256 checks do not hash or reread solely for a digest, and
-overall integrity is `verified` when every enabled check succeeds or
-`unchecked` when neither check is enabled. Cache metadata is not a transferable
-capability or license proof. Provider unload/dispose keeps all cached files;
+**Browser with a ready DBOPFS instance and OPFS.** Cache metadata is not a
+transferable capability or license proof. Provider unload/dispose keeps all cached files;
 `store.remove(source)` explicitly deletes that source's files and manifest.
 
 ### Example
 
 ```javascript
 const store = createDbopfsModelStore({dbopfs});
-async function verifyCachedModelAfterUserChoice() {
+async function openCachedModel() {
     await store.ready();
-    const cached = await store.openVerified(source);
-    console.log(cached ? 'verified cache' : 'cache miss');
+    const cached = await store.ensure(source,{offline:true});
+    console.log(cached ? 'cached' : 'cache miss');
 }
 ```
 
@@ -5848,10 +6132,10 @@ async function verifyCachedModelAfterUserChoice() {
 
 ### Overview
 
-Projects one compatible admitted v1 browser-WASM provider into the provider-neutral
+Projects one compatible v1 browser-WASM provider into the provider-neutral
 LLM role consumed by the managed `arcane/AIProviderRuntime` projection. The
 runtime checks the v1 protocol, required identity/methods, and local-only
-capability; it does not establish SDK provenance for an arbitrary compatible
+capability; it does not establish ownership for an arbitrary compatible
 object. The adapter does not
 change the wrapped provider, download a model, create a fallback, or execute a
 tool.
@@ -5862,13 +6146,19 @@ tool.
 adaptV1LlmProvider(provider)
 ```
 
-The frozen result is
+The mutable result is
 `{protocol:'arcane-ai-provider/2',role:'llm',id,localOnly:true,catalog,inspect,
 status,load,request,unload,dispose}`. `inspect()` returns an
 `arcane-ai-model-authority/1` record only for an exact catalog selection.
 `request()` accepts only the `chat` and `stream` operations, preserves
-structural tool calls, and never invokes application handlers. Re-adapting the
-same provider returns the same adapter object.
+structural tool calls, and never invokes application handlers. Both operations
+validate declaration/history ingress and terminal structural messages. The
+stream wrapper exposes only content/reasoning chunks, validates its complete
+terminal result, and starts observed provider cancellation immediately when the
+consumer returns early without making iterator return wait for provider cleanup.
+The terminal result retains provider settlement; any later cancellation or
+iterator-return failure is reported completely to the developer console.
+Re-adapting the same provider returns the same adapter object.
 
 ### Availability and normalization
 
@@ -5893,7 +6183,7 @@ releaseProvider();
 
 `arcane-os/ai/browser-speech` exports exactly the seven package members below.
 It ships provider, authority, artifact-store, and Worker mechanisms but no
-Whisper/Kokoro model weights, adapter runtime bytes, voices, download URLs,
+Whisper/Kokoro model weights, adapter runtime artifacts, voices, download URLs,
 default catalog, CDN loader, native bridge, or cloud fallback. The providers
 implement `arcane-ai-provider/2`; the managed `arcane/AIProviderRuntime` and
 `arcane/AIRuntimeState` projection modules can normalize their independent
@@ -5938,9 +6228,9 @@ console.log(BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL);
 
 ### Overview
 
-Stable protocol identifier for an SDK-created authenticated browser speech
-artifact store. It identifies the store contract, not a model authority,
-capability grant, or complete-cache receipt.
+Stable protocol identifier for the optional SDK-created browser speech artifact
+store. It identifies the store contract, not a model authority or capability
+grant.
 
 ### Value and import
 
@@ -5984,13 +6274,17 @@ The SDK selects none of those values.
 createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', identitySha256, providerId=null, role, model, runtime, files, edges, transforms }={})
 ```
 
+This graph API is optional hardening and is used only after explicit
+`secure:true` selection. Ordinary `secure:false` speech does not require a
+graph, digest, per-file byte/SHA metadata, graph status, or preparation receipt.
+
 `role` is exactly `stt` or `tts`; its model and runtime adapter fields must
 match that role. Every non-entry file must be reachable through the declared
 runtime, model, voice, or edge graph. Files are normalized into one unique
 path/source inventory with exact media types, positive byte lengths, lowercase
 SHA-256 values, immutable revisions, and explicitly admitted runtime routes.
 Unknown graph kinds, roles, adapters, paths, identities, files, edges,
-transforms, runtime routes, or voice policy fail closed with a concrete
+transforms, runtime routes, or voice policy reject the selected secure graph with a concrete
 `artifact-graph-*` reason.
 
 The result is one frozen
@@ -6006,8 +6300,8 @@ equal that computed value.
 
 **Browser metadata; the ESM subpath is importable in Node.** Construction is
 synchronous and starts no fetch, cache, Worker, provider, or event operation.
-The graph is authority only because it was created and retained by this SDK
-realm; a structurally similar object is not admitted. Preparing and executing
+The graph is valid only because it was created and retained by this SDK realm;
+a structurally similar object is rejected in explicit secure mode. Preparing and executing
 the graph requires the selected DBOPFS, Web Locks, Fetch, object URL, and Worker
 capabilities.
 
@@ -6027,8 +6321,8 @@ console.log(graph.identitySha256, graph.artifactGraphStatus);
 ### Overview
 
 Validates and freezes one caller-owned Whisper STT or Kokoro TTS model/runtime
-closure. The application owns every model, runtime, revision, URL, hash, voice,
-license, and business-policy choice; the SDK supplies no artifact selection.
+selection. The application owns every model, runtime, revision, URL, voice, and
+business-policy choice; the SDK supplies no artifact selection.
 
 ### Signature and result
 
@@ -6040,31 +6334,27 @@ createBrowserSpeechAuthority({ providerId, role, model, runtime, security }={})
 `{id,repository,revision,files}` and, for TTS, `defaultVoice`. `runtime`
 supplies `{adapter,version,revision,entry,files}`; the adapter is exactly
 `transformers-whisper` for STT or `kokoro-js` for TTS. File records use unique
-relative `path` and immutable HTTPS or same-origin `url` identities plus
-optional `bytes`, `sha256`, and `mediaType`. The runtime entry names one
-self-contained JavaScript module in the declared runtime closure.
+relative `path`, caller-selected version-pinned HTTPS or same-origin `url`, and
+optional `mediaType`. Ordinary records contain no byte counts, byte limits,
+hashes, digests, or byte identities. The runtime entry names one JavaScript
+module in the selected runtime.
 
 The result is a frozen `arcane-ai-model-authority/1` record containing the
-provider/model/role identity, admitted local authority, normalized runtime and
-model file declarations, optional default voice, and normalized security policy.
-Construction binds declared identities; `store.prepare()` validates the actual
-downloaded or cached self-contained runtime graph before execution.
+provider/model/role identity, normalized runtime and model file declarations,
+optional default voice, and `{secure:false}` by default. Construction validates
+the descriptor structure without adding an ordinary content gate.
 
-Security is the closed record
-`{secure?:boolean,checks?:{byteLength?:boolean,sha256?:boolean}}`. A provider
-resolves each field from SDK default `secure:false`, then `appSecurity`, provider
-`security`, and finally `load({security})`. Omitted checks default to the
-effective `secure` value, while explicit per-check booleans override it. Every
-enabled check requires matching `bytes` or `sha256` evidence on every runtime
-and model artifact and fails closed when evidence is absent or mismatched.
-Disabled checks are disclosed and are never reported as verification.
+Security defaults to `{secure:false}` and ordinary loading remains fully
+functional. Optional graph hardening activates only after explicit user
+authorization and an explicit `secure:true` selection; it is separate from this
+ordinary upstream descriptor and never turns byte/hash metadata into a default
+requirement.
 
 ### Availability and normalization
 
-**Browser descriptor construction; actual use requires the chosen artifact
-store and provider Web APIs.** Mutable `main`, `master`, and `latest` paths,
-credentials, fragments, duplicate identities, mismatched adapters, and runtime
-graphs outside the declared closure fail closed. This function grants no
+**Browser descriptor construction; actual use requires the selected provider
+Web APIs.** Credentials, fragments, duplicate identities, mismatched adapters,
+and malformed runtime descriptors reject. This function grants no
 publisher authenticity or license rights.
 
 ### Example
@@ -6102,11 +6392,10 @@ const authority = createBrowserSpeechAuthority({
 
 ### Overview
 
-Adapts an existing DBOPFS instance into an authority-scoped speech
-runtime/model store. It serializes each exact authority with an exclusive Web
-Lock, removes partial state after failure, and commits the
-`arcane.ai.browser-speech.assets.v1` completion manifest only after every
-declared file succeeds.
+Adapts an existing DBOPFS instance into a complete caller-selected speech
+runtime/model store. It serializes each selected model with an exclusive Web
+Lock, removes malformed partial state after failure, and commits the
+completion manifest only after every declared file succeeds.
 
 ### Signature and result
 
@@ -6115,10 +6404,10 @@ createDbopfsSpeechArtifactStore({ dbopfs, tableName='arcane_ai_browser_speech', 
 ```
 
 The frozen result is `{protocol,tableName,prepare,remove}`.
-`prepare(authority,{signal,onProgress,offline=false,security})` admits a
-compatible complete cache or downloads every declared file with omitted
-credentials, enforces only enabled byte-length/SHA-256 checks, validates the
-closed runtime graph, materializes object URLs, and returns
+`prepare(authority,{signal,onProgress,offline=false,security})` uses a complete
+compatible cache or downloads every declared file with omitted credentials,
+preserves complete content without byte/hash/digest gates in ordinary mode,
+materializes object URLs, and returns
 `{cache,runtime,model,release}`. Call `release()` when the Worker no longer
 needs those URLs. `offline:true` never fetches and rejects a miss with
 `ARCANE_AI_ARTIFACT_OFFLINE_MISS`. `remove(authority)` deletes that exact
@@ -6128,9 +6417,9 @@ authority's files and manifest.
 
 **Browser with a ready DBOPFS instance, OPFS, Web Locks, Fetch or an injected
 fetch function, File/Blob, and object URLs.** An unavailable authority lock
-fails as `ARCANE_AI_STORAGE_BUSY`; download, integrity, cache, graph, and
-storage failures remain observable `ARCANE_AI_*` errors. Completion metadata
-is cache-consistency evidence, not transferable authority or publisher proof.
+fails as `ARCANE_AI_STORAGE_BUSY`; download, malformed cache, graph, and storage
+failures remain observable `ARCANE_AI_*` errors. Completion metadata is not
+transferable authority or publisher proof.
 
 ### Example
 
@@ -6141,7 +6430,7 @@ import {
 
 const speechStore = createDbopfsSpeechArtifactStore({dbopfs});
 async function inspectCachedSpeechAfterUserChoice() {
-    // This strict offline call assumes this exact authority was admitted earlier.
+    // Offline mode uses the complete previously selected cache.
     const prepared = await speechStore.prepare(authority, {offline:true});
     try {
         console.log(prepared.cache, prepared.runtime.entry);
@@ -6195,8 +6484,9 @@ and accessors are rejected before Worker use.
 
 ### Availability and normalization
 
-**Browser with DBOPFS, Web Locks, Workers, object URLs, and a caller-admitted
-self-contained `transformers-whisper` runtime/model closure.** The subpath is
+**Browser with Workers, object URLs, and a caller-selected
+`transformers-whisper` runtime/model. Explicit secure graph mode additionally
+requires DBOPFS and Web Locks.** The subpath is
 importable in Node, but no Node storage, Worker, audio-decoder, or speech
 execution adapter is published. No Core speech call, model/runtime download
 authority, or automatic provider fallback is added. Provider objects are not event targets; register them with
@@ -6259,11 +6549,11 @@ re-freeze the cloned record.
 
 The shared AI request form is
 `{model,input,responseFormat,voice?,speed?}`. It requires the exact model,
-admits only `responseFormat:'wav'`, maps `input` to provider-native text, and
+accepts only `responseFormat:'wav'`, maps the complete `input` to provider-native text, and
 returns frozen `{audio:Uint8Array,contentType:'audio/wav'}` containing 24 kHz
 mono 16-bit PCM. Unsupported formats fail
 `ARCANE_AI_UNSUPPORTED_RESPONSE_FORMAT`; malformed adapter audio fails
-`ARCANE_AI_INVALID_PROVIDER_RESULT`. Unknown fields and accessors fail closed.
+`ARCANE_AI_INVALID_PROVIDER_RESULT`. Unknown fields and accessors reject as malformed.
 
 Lifecycle/status, coalesced load, busy-request, unload, Worker-failure, and
 disposal behavior matches the Whisper provider. Cancellation after Worker use
@@ -6276,8 +6566,9 @@ provider stays ready. Stable failures include
 
 ### Availability and normalization
 
-**Browser with DBOPFS, Web Locks, Workers, object URLs, and a caller-admitted
-self-contained `kokoro-js` runtime/model/voice closure.** The subpath is
+**Browser with Workers, object URLs, and a caller-selected
+`kokoro-js` runtime/model/voice selection. Explicit secure graph mode
+additionally requires DBOPFS and Web Locks.** The subpath is
 importable in Node, but no Node storage, Worker, or speech execution adapter is
 published. No Core speech call, model/runtime/voice authority, or automatic provider fallback is
 added. Provider objects are not event targets; managed `AIProviderRuntime` and
@@ -6355,7 +6646,7 @@ const MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES
 
 ### Availability and normalization
 
-Node and browser metadata. Acceptance means admitted provider or Core
+Node and browser metadata. Acceptance means provider or Core
 acceptance, not independent inbox delivery.
 
 ### Example
@@ -6453,28 +6744,6 @@ Node and browser metadata. The immutable value is `mail_outbox`.
 import {MAIL_OUTBOX_TABLE} from 'arcane-os/mail';
 ```
 
-## MAX_MAIL_RESPONSE_BYTES
-
-### Overview
-
-Maximum response-body bytes admitted by the Mail HTTP transport.
-
-### Value and import
-
-```text
-const MAX_MAIL_RESPONSE_BYTES
-```
-
-### Availability and normalization
-
-Node and browser metadata. The immutable bound is 65536 bytes.
-
-### Example
-
-```js
-import {MAX_MAIL_RESPONSE_BYTES} from 'arcane-os/mail';
-```
-
 ## Mail
 
 ### Overview
@@ -6539,8 +6808,8 @@ new MailTransportError(message, options={})
 
 ### Availability and normalization
 
-Node and browser. It exposes code, retryable, retryAfterMs, statusCode, and
-uncertain without unbounded remote detail.
+Node and browser. It exposes code, retryable, retryAfterMs, statusCode,
+uncertain, and the complete remote detail subject only to HTTP framing.
 
 ### Example
 
@@ -6648,7 +6917,7 @@ const config = resolveMailConfig();
 
 ### Overview
 
-Sends one immutable Mail report with an idempotency key through bounded HTTP.
+Sends one complete Mail report with an idempotency key through HTTP.
 
 ### Signature and result
 
@@ -6659,8 +6928,8 @@ sendMailReport({ appKey, appName, endpoint, fetchImpl=globalThis.fetch, report, 
 ### Availability and normalization
 
 Node and browser with Fetch and AbortController, or an explicit fetch
-implementation. The response is bounded and normalized as acceptance or a
-`MailTransportError`.
+implementation. The complete response is preserved subject only to unavoidable
+HTTP framing and normalized as acceptance or a `MailTransportError`.
 
 ### Example
 

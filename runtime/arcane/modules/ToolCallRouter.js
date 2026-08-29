@@ -1,18 +1,31 @@
 function parseArguments(value,name=''){
-    if(value&&typeof value==='object'){
-        return value;
+    let parsed=value;
+    if(typeof parsed==='string'){
+        try{
+            parsed=JSON.parse(parsed);
+        }catch(error){
+            console.warn(error);
+            throw new Error(`Tool ${name} returned invalid JSON arguments.`);
+        }
     }
-
-    if(typeof value!=='string'){
-        throw new Error(`Tool ${name} did not provide valid arguments.`);
+    const prototype=parsed&&typeof parsed==='object'
+        ?Object.getPrototypeOf(parsed)
+        :undefined;
+    if(
+        !parsed
+        ||typeof parsed!=='object'
+        ||Array.isArray(parsed)
+        ||(prototype!==Object.prototype&&prototype!==null)
+        ||typeof parsed.message!=='string'
+        ||!parsed.message.trim()
+    ){
+        const error=new Error(
+            `Tool ${name} must provide a nonempty user-facing message in its arguments.`
+        );
+        error.code='AI_TOOL_MESSAGE_REQUIRED';
+        throw error;
     }
-
-    try{
-        return JSON.parse(value);
-    }catch(error){
-        console.warn(error);
-        throw new Error(`Tool ${name} returned invalid JSON arguments.`);
-    }
+    return parsed;
 }
 
 function getResponseCalls(response={}){

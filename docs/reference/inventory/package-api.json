@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 200,
+  "memberCount": 211,
   "members": [
     {
       "id": "root:APP_BUNDLE_DESCRIPTOR_NAME",
@@ -22,7 +22,7 @@
       "group": "Packaging and release bundles",
       "summary": "Canonical descriptor filename stored in an external application release bundle.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Exact immutable SDK value"
     },
     {
@@ -39,7 +39,7 @@
       "group": "Packaging and release bundles",
       "summary": "Required filename extension for deterministic external application release bundles.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Exact immutable SDK value"
     },
     {
@@ -56,7 +56,7 @@
       "group": "Packaging and release bundles",
       "summary": "Canonical archive encoding used by external application release bundles.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Exact immutable SDK value"
     },
     {
@@ -73,7 +73,7 @@
       "group": "Packaging and release bundles",
       "summary": "Stable manifest kind identifying an Arcane application release bundle.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Exact immutable SDK value"
     },
     {
@@ -90,7 +90,7 @@
       "group": "Packaging and release bundles",
       "summary": "Frozen compressed-size, expanded-size, entry-count, and path limits enforced by bundle creation and verification.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Exact immutable SDK value"
     },
     {
@@ -107,7 +107,7 @@
       "group": "Packaging and release bundles",
       "summary": "Canonical bundle-envelope manifest filename.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Exact immutable SDK value"
     },
     {
@@ -124,7 +124,7 @@
       "group": "Packaging and release bundles",
       "summary": "Canonical path of the packaged release manifest inside a bundle payload.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Exact immutable SDK value"
     },
     {
@@ -141,7 +141,7 @@
       "group": "Packaging and release bundles",
       "summary": "Current immutable bundle-envelope schema version.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Exact immutable SDK value"
     },
     {
@@ -157,7 +157,7 @@
       "group": "Packaging and release bundles",
       "summary": "Exact SDK generations accepted by this bundle verifier.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Exact immutable SDK value"
     },
     {
@@ -173,7 +173,7 @@
       "group": "Packaging and release bundles",
       "summary": "Canonical schema-1 application package configuration filename used by the packager.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Exact immutable SDK value"
     },
     {
@@ -207,22 +207,6 @@
       "availability": "Node",
       "protocol": "Node ESM",
       "normalization": "Exact immutable SDK value"
-    },
-    {
-      "id": "root:appDescriptorSha256",
-      "name": "appDescriptorSha256",
-      "displayName": "appDescriptorSha256()",
-      "kind": "function",
-      "signature": "appDescriptorSha256(descriptor)",
-      "entrypoints": [
-        "arcane-os"
-      ],
-      "primaryImport": "arcane-os",
-      "group": "Runtime and app descriptors",
-      "summary": "Returns the SHA-256 digest of the canonical validated schema-2 application descriptor.",
-      "availability": "Node",
-      "protocol": "Node ESM",
-      "normalization": "SDK-normalized inputs, errors, events, and documented result"
     },
     {
       "id": "root:ARCANE_INTEGRATED_PROVIDER_RELATIVE_PATH",
@@ -370,7 +354,7 @@
       "summary": "Requires an integrated workspace and selected native toolchain root to resolve to the same canonical Arcane checkout.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:assertIntegratedPortableToolchain",
@@ -387,7 +371,7 @@
       "summary": "Portable-target compatibility wrapper for the integrated native checkout assertion.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:assertNativeApplicationToolchainCompatibility",
@@ -401,10 +385,10 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Targets, native plans, and providers",
-      "summary": "Checks a prepared native toolchain receipt against the selected application's declared Core requirements.",
+      "summary": "Checks prepared native toolchain state against the selected application's declared Core requirements.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:assertNativeToolchainCompatibility",
@@ -418,10 +402,10 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Targets, native plans, and providers",
-      "summary": "Validates that a toolchain receipt provides the required Core version, protocol, features, capabilities, and methods.",
+      "summary": "Validates that a prepared toolchain provides the required Core version, protocol, features, capabilities, and methods.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:assertPortableToolchainCompatibility",
@@ -435,10 +419,10 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Targets, native plans, and providers",
-      "summary": "Portable-target compatibility wrapper for native application/toolchain admission.",
+      "summary": "Portable-target compatibility wrapper for native application and toolchain selection.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:assessArcaneOllama",
@@ -468,10 +452,10 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Packaging and release bundles",
-      "summary": "Authenticates that a same-process app release receipt also carries authored descriptor authority for external delivery.",
+      "summary": "Explicitly verifies that the selected app release state carries its authored descriptor for external delivery.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:authenticateAppReleaseReceipt",
@@ -485,10 +469,10 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Packaging and release bundles",
-      "summary": "Authenticates a same-process verified application release receipt against its exact current filesystem state.",
+      "summary": "Explicitly verifies a selected application release against its complete current filesystem state.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:authenticateNativeBuildPlan",
@@ -502,10 +486,10 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Targets, native plans, and providers",
-      "summary": "Authenticates an immutable same-process native build plan and its bound receipts before execution.",
+      "summary": "Validates a selected native build plan and its prepared inputs before execution.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:authenticateRuntimeReceipt",
@@ -518,7 +502,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Runtime and app descriptors",
-      "summary": "Authenticates a same-process runtime receipt against the exact runtime root and current file identities.",
+      "summary": "Explicitly verifies a selected runtime release against its complete current runtime root.",
       "availability": "Node",
       "protocol": "Node ESM",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"
@@ -537,8 +521,8 @@
       "group": "Packaging and release bundles",
       "summary": "Authenticates the same-process immutable shared-payload snapshot consumed by app packaging.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:buildApplication",
@@ -552,7 +536,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Headless toolchain operations",
-      "summary": "Builds and retained-verifies one explicitly selected native target through one paired provider.",
+      "summary": "Packages the selected app and builds one explicitly selected target; tests or checks run only when explicitly requested or required for the selected release output.",
       "availability": "Node; selected operation may produce browser or native output",
       "protocol": "Shared headless operation API + arcane-cli-events/1",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"
@@ -572,7 +556,7 @@
       "summary": "Invokes one target adapter build with explicit app, target, and artifact inputs.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:bumpVersion",
@@ -587,8 +571,8 @@
       "group": "Packaging and release bundles",
       "summary": "Updates one selected app version with a validated semantic-version bump through the packager boundary.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:bundleApplication",
@@ -685,10 +669,10 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Packaging and release bundles",
-      "summary": "Writes one deterministic USTAR+gzip external application bundle from an authenticated authored release receipt.",
+      "summary": "Writes one deterministic USTAR+gzip external application bundle from the selected authored release state.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:createCanonicalUstarHeader",
@@ -704,8 +688,8 @@
       "group": "Packaging and release bundles",
       "summary": "Builds the exact 512-byte canonical USTAR header for one validated bundle entry.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:createNativeBuildPlan",
@@ -722,7 +706,7 @@
       "summary": "Creates one immutable, authenticated, single-attempt native plan binding app, dependencies, toolchain, request, and output roots.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:createNativeTargetAdapter",
@@ -739,7 +723,7 @@
       "summary": "Adapts one validated native builder to the common target-adapter contract.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:createReporter",
@@ -871,8 +855,8 @@
       "group": "Packaging and release bundles",
       "summary": "Root-entry alias for the packager-specific application discovery function.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:doctorApplication",
@@ -906,7 +890,7 @@
       "summary": "Loads and diagnoses one explicit native provider and target without building an application.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:ERROR_CODES",
@@ -955,7 +939,7 @@
       "summary": "Consumes one authenticated single-attempt native plan through its bound builder and event/cancellation lifecycle.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:executeOperation",
@@ -1021,7 +1005,7 @@
       "summary": "Returns the registered adapter for one exact target id or fails for an unknown target.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:incrementSemver",
@@ -1036,8 +1020,8 @@
       "group": "Packaging and release bundles",
       "summary": "Returns a validated semantic version incremented by the requested bump and optional prerelease id.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:initializeApplication",
@@ -1077,17 +1061,17 @@
       "name": "inspectApp",
       "displayName": "inspectApp()",
       "kind": "function",
-      "signature": "async inspectApp({workspaceRoot, appId})",
+      "signature": "async inspectApp({workspaceRoot, appId, signal}={})",
       "entrypoints": [
         "arcane-os",
         "arcane-os/packager"
       ],
       "primaryImport": "arcane-os",
       "group": "Packaging and release bundles",
-      "summary": "Loads and validates one packager app configuration, shared mappings, descriptor, and release inputs.",
+      "summary": "Loads one validated packager app plan, including the shared descriptor-admitted browser document inventory.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:inspectWorkspaceProfile",
@@ -1137,7 +1121,7 @@
       "summary": "Returns the frozen target descriptors without running an operation lifecycle.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:loadAppDescriptor",
@@ -1150,7 +1134,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Runtime and app descriptors",
-      "summary": "Loads an authored schema-2 descriptor or a bounded legacy projection with explicit provenance.",
+      "summary": "Loads an authored schema-2 descriptor or a complete legacy projection with its source label.",
       "availability": "Node",
       "protocol": "Node ESM",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"
@@ -1170,7 +1154,7 @@
       "summary": "Loads and authenticates the fixed Arcane-owned integrated development provider generation.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:loadArcaneNativeProvider",
@@ -1187,7 +1171,7 @@
       "summary": "Loads the fixed provider for one target from an explicitly selected Arcane OS checkout and authenticates that provider generation for the current SDK process.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:loadArcanePortableProvider",
@@ -1204,7 +1188,7 @@
       "summary": "Compatibility wrapper that loads the portable native provider.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:loadRuntimeRelease",
@@ -1227,16 +1211,16 @@
       "name": "materializeInstalledSdkRuntime",
       "displayName": "materializeInstalledSdkRuntime()",
       "kind": "function",
-      "signature": "async materializeInstalledSdkRuntime({workspaceRoot,sdkPackageSource,signal,onEvent}={})",
+      "signature": "async materializeInstalledSdkRuntime({workspaceRoot,sdkPackageSource,workspaceOperationLease,signal,onEvent}={})",
       "entrypoints": [
         "arcane-os"
       ],
       "primaryImport": "arcane-os",
       "group": "Runtime and app descriptors",
-      "summary": "Verifies the workspace's exact installed SDK runtime and browser runtime, then materializes their dynamic inventories.",
+      "summary": "Materializes the complete installed SDK runtime and browser runtime without lock reconciliation or identity metadata.",
       "availability": "Node",
       "protocol": "Installed SDK runtime materialization",
-      "normalization": "Canonical workspace and installed-package identity, verified runtime receipts, and a frozen materialization result"
+      "normalization": "Complete installed runtime content and a mutable materialization result"
     },
     {
       "id": "root:NATIVE_BUILD_PLAN_PROTOCOL",
@@ -1301,8 +1285,8 @@
       "group": "Packaging and release bundles",
       "summary": "Normalizes one portable repository-relative path and rejects traversal, aliases, links, and unsafe names.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:OUTPUT_MODES",
@@ -1332,10 +1316,10 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Packaging and release bundles",
-      "summary": "Builds and authenticates one browser application release through the low-level packager API.",
+      "summary": "Builds one selected browser application release through the low-level packager API; it never runs tests or checks automatically.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:packageApplication",
@@ -1367,7 +1351,7 @@
       "group": "Packaging and release bundles",
       "summary": "Builder identity written into schema-1 application release manifests.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Exact immutable SDK value"
     },
     {
@@ -1383,8 +1367,8 @@
       "group": "Packaging and release bundles",
       "summary": "Discovers packager application configurations and release boundaries beneath one workspace root.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:parseSemver",
@@ -1399,8 +1383,8 @@
       "group": "Packaging and release bundles",
       "summary": "Parses one strict three-part semantic version with optional prerelease metadata.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:planApplication",
@@ -1431,10 +1415,10 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Targets, native plans, and providers",
-      "summary": "Runs one provider toolchain preparation and returns its authenticated process-owned receipt.",
+      "summary": "Runs one provider toolchain preparation and returns its process-owned result.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:prepareSharedPayloadSnapshot",
@@ -1450,8 +1434,8 @@
       "group": "Packaging and release bundles",
       "summary": "Verifies and snapshots the shared runtime/dependency payload once for reuse by one packaging generation.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:projectNativeDescriptor",
@@ -1497,10 +1481,164 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Packaging and release bundles",
-      "summary": "Reads one bounded file through an authenticated app-release receipt and rechecks its identity and digest.",
+      "summary": "Reads one complete file during explicit selected app-release verification.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
+    },
+    {
+      "id": "preference-store:default",
+      "name": "default",
+      "displayName": "PreferenceStore default export",
+      "kind": "class",
+      "signature": "default class PreferenceStore extends EventTarget",
+      "entrypoints": ["arcane-os/preference-store"],
+      "primaryImport": "arcane-os/preference-store",
+      "group": "Portable runtime modules",
+      "summary": "Default binding for the canonical PreferenceStore runtime class in Node and managed browsers.",
+      "availability": "Node with injected adapters, or browser/native WebView storage",
+      "protocol": "Node ESM / authenticated managed browser import map",
+      "normalization": "Binding identity and namespace come directly from the canonical runtime module"
+    },
+    {
+      "id": "preference-store:PREFERENCE_STORE_ERROR_CODES",
+      "name": "PREFERENCE_STORE_ERROR_CODES",
+      "displayName": "PREFERENCE_STORE_ERROR_CODES",
+      "kind": "constant",
+      "signature": "const PREFERENCE_STORE_ERROR_CODES",
+      "entrypoints": ["arcane-os/preference-store"],
+      "primaryImport": "arcane-os/preference-store",
+      "group": "Portable runtime modules",
+      "summary": "Frozen stable error-code vocabulary emitted by PreferenceStore.",
+      "availability": "Node and browser",
+      "protocol": "PreferenceStore runtime contract",
+      "normalization": "Exact immutable code names from the canonical runtime module"
+    },
+    {
+      "id": "preference-store:PREFERENCE_STORE_EVENT_TYPES",
+      "name": "PREFERENCE_STORE_EVENT_TYPES",
+      "displayName": "PREFERENCE_STORE_EVENT_TYPES",
+      "kind": "constant",
+      "signature": "const PREFERENCE_STORE_EVENT_TYPES",
+      "entrypoints": ["arcane-os/preference-store"],
+      "primaryImport": "arcane-os/preference-store",
+      "group": "Portable runtime modules",
+      "summary": "Frozen semantic event names published by PreferenceStore.",
+      "availability": "Node and browser",
+      "protocol": "PreferenceStore runtime contract",
+      "normalization": "Exact load, change, and reset event names"
+    },
+    {
+      "id": "preference-store:Preference",
+      "name": "Preference",
+      "displayName": "Preference",
+      "kind": "class",
+      "signature": "new Preference(data={})",
+      "entrypoints": ["arcane-os/preference-store"],
+      "primaryImport": "arcane-os/preference-store",
+      "group": "Portable runtime modules",
+      "summary": "Canonical Preference entity re-exported with the store namespace.",
+      "availability": "Node and browser",
+      "protocol": "Preference entity schema",
+      "normalization": "Canonical entity validation and serialization"
+    },
+    {
+      "id": "preference-store:preferenceSchema",
+      "name": "preferenceSchema",
+      "displayName": "preferenceSchema()",
+      "kind": "function",
+      "signature": "preferenceSchema(definitions=[])",
+      "entrypoints": ["arcane-os/preference-store"],
+      "primaryImport": "arcane-os/preference-store",
+      "group": "Portable runtime modules",
+      "summary": "Builds the canonical Preference strong-type schema for an admitted definition set.",
+      "availability": "Node and browser",
+      "protocol": "Preference entity schema",
+      "normalization": "Returns the canonical runtime schema for the supplied definitions"
+    },
+    {
+      "id": "speech-playback:default",
+      "name": "default",
+      "displayName": "SpeechPlayback default export",
+      "kind": "class",
+      "signature": "default class SpeechPlayback",
+      "entrypoints": ["arcane-os/speech-playback"],
+      "primaryImport": "arcane-os/speech-playback",
+      "group": "Portable runtime modules",
+      "summary": "Default binding for the canonical SpeechPlayback runtime class in Node and managed browsers.",
+      "availability": "Node with injected media adapters, or browser/native WebView media",
+      "protocol": "SpeechPlayback runtime contract",
+      "normalization": "Binding identity and namespace come directly from the canonical runtime module"
+    },
+    {
+      "id": "speech-playback:SPEECH_PLAYBACK_STATE_EVENT",
+      "name": "SPEECH_PLAYBACK_STATE_EVENT",
+      "displayName": "SPEECH_PLAYBACK_STATE_EVENT",
+      "kind": "constant",
+      "signature": "const SPEECH_PLAYBACK_STATE_EVENT",
+      "entrypoints": ["arcane-os/speech-playback"],
+      "primaryImport": "arcane-os/speech-playback",
+      "group": "Portable runtime modules",
+      "summary": "Canonical semantic event name for SpeechPlayback state transitions.",
+      "availability": "Node and browser",
+      "protocol": "SpeechPlayback runtime contract",
+      "normalization": "Exact immutable speech-playback-state event name"
+    },
+    {
+      "id": "speech-playback:SPEECH_VOICE_ALIASES",
+      "name": "SPEECH_VOICE_ALIASES",
+      "displayName": "SPEECH_VOICE_ALIASES",
+      "kind": "constant",
+      "signature": "const SPEECH_VOICE_ALIASES",
+      "entrypoints": ["arcane-os/speech-playback"],
+      "primaryImport": "arcane-os/speech-playback",
+      "group": "Portable runtime modules",
+      "summary": "Read-only compatibility aliases for canonical speech voice identifiers.",
+      "availability": "Node and browser",
+      "protocol": "SpeechPlayback runtime contract",
+      "normalization": "Read-only alias membership without mutable Set authority"
+    },
+    {
+      "id": "speech-playback:SPEECH_VOICE_OPTIONS",
+      "name": "SPEECH_VOICE_OPTIONS",
+      "displayName": "SPEECH_VOICE_OPTIONS",
+      "kind": "constant",
+      "signature": "const SPEECH_VOICE_OPTIONS",
+      "entrypoints": ["arcane-os/speech-playback"],
+      "primaryImport": "arcane-os/speech-playback",
+      "group": "Portable runtime modules",
+      "summary": "Frozen provider-neutral voice option records exposed to shared UI.",
+      "availability": "Node and browser",
+      "protocol": "SpeechPlayback runtime contract",
+      "normalization": "Frozen ordered value and label records"
+    },
+    {
+      "id": "speech-playback:SpeechPlayback",
+      "name": "SpeechPlayback",
+      "displayName": "SpeechPlayback",
+      "kind": "class",
+      "signature": "new SpeechPlayback(options={})",
+      "entrypoints": ["arcane-os/speech-playback"],
+      "primaryImport": "arcane-os/speech-playback",
+      "group": "Portable runtime modules",
+      "summary": "Named binding for the same canonical class exposed as the subpath default.",
+      "availability": "Node with injected media adapters, or browser/native WebView media",
+      "protocol": "SpeechPlayback runtime contract",
+      "normalization": "Binding identity equals the default export; prepare preserves each nonblank part input exactly without trimming, splitting, or freezing it; provider and media availability remain host-owned"
+    },
+    {
+      "id": "speech-playback:splitSpeechText",
+      "name": "splitSpeechText",
+      "displayName": "splitSpeechText()",
+      "kind": "function",
+      "signature": "splitSpeechText(value='')",
+      "entrypoints": ["arcane-os/speech-playback"],
+      "primaryImport": "arcane-os/speech-playback",
+      "group": "Portable runtime modules",
+      "summary": "Returns the caller's exact nonblank speech text as one segment.",
+      "availability": "Node and browser",
+      "protocol": "SpeechPlayback runtime contract",
+      "normalization": "Uses trimming only to detect blank input; nonblank text is returned unchanged in one mutable array without trimming, splitting, or freezing"
     },
     {
       "id": "root:readVerifiedRuntimeFile",
@@ -1513,7 +1651,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Runtime and app descriptors",
-      "summary": "Reads one bounded runtime file through an authenticated runtime receipt and rechecks its identity and digest.",
+      "summary": "Reads one complete runtime file during explicit selected runtime-release verification.",
       "availability": "Node",
       "protocol": "Node ESM",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"
@@ -1548,7 +1686,7 @@
       "group": "Packaging and release bundles",
       "summary": "Canonical packaged application release manifest filename.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Exact immutable SDK value"
     },
     {
@@ -1631,7 +1769,7 @@
       "summary": "Resolves and validates one native output root, including integrated-checkout non-overlap.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:resolvePortableBuildOutputRoot",
@@ -1648,7 +1786,7 @@
       "summary": "Portable-target compatibility wrapper for native output-root resolution.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:resolveWorkspace",
@@ -1679,7 +1817,7 @@
       "group": "Packaging and release bundles",
       "summary": "Canonical root packager configuration filename.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
+      "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Exact immutable SDK value"
     },
     {
@@ -1742,7 +1880,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Events, processes, and testing",
-      "summary": "Runs one shell-free child command with bounded output tails, ordered stream events, heartbeats, and process-tree cancellation.",
+      "summary": "Runs one shell-free child command with complete stdout and stderr, ordered stream events, heartbeats, and process-tree cancellation.",
       "availability": "Node",
       "protocol": "Node ESM / owned process or test lifecycle",
       "normalization": "SDK event/error/report normalization"
@@ -1795,7 +1933,7 @@
       "summary": "Invokes one target adapter run method and fails honestly when the artifact kind is not runnable.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:RUNTIME_ROOT",
@@ -1888,7 +2026,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Workspace, doctor, repository, and server",
-      "summary": "Starts one bounded browser development server with exact runtime/app route mappings and an unguessable session capability.",
+      "summary": "Starts one owned browser development server with exact runtime/app route mappings and an unguessable session capability.",
       "availability": "Node control plane; browser data plane",
       "protocol": "Node ESM",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"
@@ -1989,8 +2127,8 @@
       "group": "Packaging and release bundles",
       "summary": "Validates and normalizes one portable path admitted inside an external app bundle.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:validateAppConfig",
@@ -2005,8 +2143,8 @@
       "group": "Packaging and release bundles",
       "summary": "Validates one schema-1 packager app configuration and its relationship to the root config.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:validateAppDescriptor",
@@ -2039,7 +2177,7 @@
       "summary": "Validates a native builder's protocol and required describe/doctor/prepare/build/verify/run methods.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:validateRootConfig",
@@ -2054,8 +2192,8 @@
       "group": "Packaging and release bundles",
       "summary": "Validates one root packager mapping and its fixed shared-route boundaries.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:validateWorkspace",
@@ -2071,7 +2209,24 @@
       "summary": "Runs canonical workspace, runtime, descriptor, selected-app, and exact installed-SDK validation with progress events.",
       "availability": "Node",
       "protocol": "Node ESM",
-      "normalization": "Returns a frozen workspace receipt and, for external workspaces, the exact canonical or npm-alias-bound SDK installation authority"
+      "normalization": "Returns a frozen workspace record and, for external workspaces, the exact canonical or npm-alias-bound SDK installation authority"
+    },
+    {
+      "id": "root:upgradeApplication",
+      "name": "upgradeApplication",
+      "displayName": "upgradeApplication()",
+      "kind": "function",
+      "signature": "async upgradeApplication(options={})",
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/toolchain"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Headless toolchain operations",
+      "summary": "Runs an external application's ordinary npm upgrade command without a separate SDK lock, runtime, import-map, authentication, or reconciliation workflow.",
+      "availability": "Node; selected operation may produce browser or native output",
+      "protocol": "Shared headless operation API + arcane-cli-events/1",
+      "normalization": "Returns a mutable application-upgrade record with the selected workspace fields and normal npm process result"
     },
     {
       "id": "root:verifyApp",
@@ -2087,8 +2242,8 @@
       "group": "Packaging and release bundles",
       "summary": "Authenticates one existing browser app release through the low-level packager API.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:verifyApplication",
@@ -2121,8 +2276,8 @@
       "group": "Packaging and release bundles",
       "summary": "Parses and authenticates one deterministic app bundle without extraction.",
       "availability": "Node",
-      "protocol": "SDK packager, receipt, or deterministic bundle contract",
-      "normalization": "Normalized SDK validation and receipt; canonical archive/release bytes preserved"
+      "protocol": "SDK packager and deterministic bundle contract",
+      "normalization": "Normalized SDK validation with complete canonical archive and release content"
     },
     {
       "id": "root:verifyBundleApplication",
@@ -2153,10 +2308,10 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Targets, native plans, and providers",
-      "summary": "Authenticates one target artifact through the exact prepared provider/toolchain receipt.",
+      "summary": "Explicitly verifies one selected target artifact through the prepared provider and toolchain state.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:verifyRuntime",
@@ -2169,7 +2324,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Runtime and app descriptors",
-      "summary": "Verifies every synchronized runtime file and returns a deeply frozen same-process receipt.",
+      "summary": "Explicitly verifies the complete synchronized runtime selected for release and returns a frozen result.",
       "availability": "Node",
       "protocol": "Node ESM",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"
@@ -2189,7 +2344,7 @@
       "summary": "Invokes one target adapter's artifact verification boundary.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized plan/admission/receipt; target-specific artifact detail preserved"
+      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
       "id": "root:ARCANE_EVENT_AUTHORITY_BRAND",
@@ -2240,7 +2395,7 @@
       "summary": "Identifies compatible canonical Arcane event authorities.",
       "availability": "Node and browser/bundler",
       "protocol": "arcane-event-authority/1",
-      "normalization": "Exact authority protocol discriminator; incompatible globals fail closed"
+      "normalization": "Exact authority protocol discriminator; incompatible or malformed globals reject"
     },
     {
       "id": "root:ARCANE_EVENT_ERROR_CODES",
@@ -2291,7 +2446,7 @@
       "summary": "Identifies immutable canonical event occurrences.",
       "availability": "Node and browser/bundler",
       "protocol": "arcane-event-occurrence/1",
-      "normalization": "Exact occurrence protocol discriminator; public detail is privacy-admitted and deeply frozen"
+      "normalization": "Exact occurrence protocol discriminator; complete public detail is deeply frozen while credential-named fields remain redacted"
     },
     {
       "id": "root:ARCANE_EVENT_SOURCE_DISPOSED_EVENT",
@@ -2390,10 +2545,10 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Event type emitted for a redacted, bounded DOM interaction diagnostic.",
+      "summary": "Event type emitted for a complete DOM interaction diagnostic with private and credential-named content protected.",
       "availability": "Browser DOM or a DOM-compatible test host; constant imports in Node",
       "protocol": "In-process event-pubsub; optional arcane-event-stack/1 recording",
-      "normalization": "Normalized target, path, flags, and bounded details; sensitive content redacted"
+      "normalization": "Complete non-private values, selectors, URLs, and object details are retained by default; private targets remain redacted and EventManager snapshots protect credential-named fields"
     },
     {
       "id": "root:DOM_MUTATION_EVENT",
@@ -2407,10 +2562,10 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Event type emitted for a redacted, bounded DOM mutation diagnostic.",
+      "summary": "Event type emitted for a complete DOM mutation diagnostic with private and credential-named content protected.",
       "availability": "Browser DOM or a DOM-compatible test host; constant imports in Node",
       "protocol": "MutationObserver projected through in-process events and optional arcane-event-stack/1 recording",
-      "normalization": "Normalized attribute, character-data, or child-list diagnostic; sensitive content redacted"
+      "normalization": "Complete non-private markup, text, selectors, and URLs are retained by default; private targets and credential-like attribute-mutation values are redacted"
     },
     {
       "id": "root:DOM_OBSERVATION_STARTED_EVENT",
@@ -2444,7 +2599,7 @@
       "summary": "Lifecycle event emitted when active DOM instrumentation stops normally.",
       "availability": "Browser DOM or a DOM-compatible test host; constant imports in Node",
       "protocol": "In-process event-pubsub; optional arcane-event-stack/1 recording",
-      "normalization": "Normalized root diagnostic; overflow shutdown intentionally suppresses this lifecycle record"
+      "normalization": "Normalized root diagnostic; stopping an already inactive controller is idempotent and emits nothing"
     },
     {
       "id": "root:EventManager",
@@ -2458,10 +2613,10 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Runs synchronous pub/sub with optional bounded, immutable time-travel history and DOM instrumentation.",
+      "summary": "Runs synchronous pub/sub with optional complete, immutable time-travel history and DOM instrumentation.",
       "availability": "Node and browser/bundler; DOM capture requires a browser DOM or compatible host",
       "protocol": "Synchronous event-pubsub plus optional arcane-event-stack/1 export/import",
-      "normalization": "Live listener arguments retain identity; recorded payloads and metadata are bounded, redacted, deeply frozen snapshots"
+      "normalization": "Live listener arguments retain identity; ordinary secure:false recording preserves complete URLs, public details, and captured stacks in deeply frozen snapshots while credential-named fields remain redacted"
     },
     {
       "id": "root:PLAYBACK_CANCELLED_EVENT",
@@ -2478,7 +2633,7 @@
       "summary": "Lifecycle event emitted when an AbortSignal cancels event-stack playback.",
       "availability": "Node and browser/bundler",
       "protocol": "In-process playback lifecycle over an arcane-event-stack/1 source",
-      "normalization": "Frozen summary with session, delivered count, cursor, completion flag, and redacted error snapshot"
+      "normalization": "Frozen summary with session, delivered count, cursor, completion flag, and a complete credential-protected error snapshot"
     },
     {
       "id": "root:PLAYBACK_COMPLETED_EVENT",
@@ -2512,7 +2667,7 @@
       "summary": "Lifecycle event emitted when event-stack playback fails for a reason other than signal cancellation.",
       "availability": "Node and browser/bundler",
       "protocol": "In-process playback lifecycle over an arcane-event-stack/1 source",
-      "normalization": "Frozen summary with session, delivered count, cursor, completion flag, and redacted error snapshot"
+      "normalization": "Frozen summary with session, delivered count, cursor, completion flag, and a complete credential-protected error snapshot"
     },
     {
       "id": "root:PLAYBACK_RECORD_EVENT",
@@ -2549,23 +2704,6 @@
       "normalization": "Normalized session, range, count, speed, and mode summary"
     },
     {
-      "id": "root:TIME_TRAVEL_OVERFLOW_EVENT",
-      "name": "TIME_TRAVEL_OVERFLOW_EVENT",
-      "displayName": "TIME_TRAVEL_OVERFLOW_EVENT",
-      "kind": "constant",
-      "signature": "const TIME_TRAVEL_OVERFLOW_EVENT",
-      "entrypoints": [
-        "arcane-os",
-        "arcane-os/event-manager"
-      ],
-      "primaryImport": "arcane-os/event-manager",
-      "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Terminal marker appended when bounded history reaches maxEvents and recording shuts down.",
-      "availability": "Node and browser/bundler",
-      "protocol": "Terminal arcane-event-stack/1 record type; the overflow marker is not dispatched on the live bus",
-      "normalization": "Fixed event-manager source/category with exact retention evidence; history may contain maxEvents plus this marker"
-    },
-    {
       "id": "root:TIME_TRAVEL_SEEK_EVENT",
       "name": "TIME_TRAVEL_SEEK_EVENT",
       "displayName": "TIME_TRAVEL_SEEK_EVENT",
@@ -2597,7 +2735,7 @@
       "summary": "Package-scoped EventManager singleton for applications that want one shared event bus.",
       "availability": "Node and browser/bundler; DOM capture requires a compatible DOM",
       "protocol": "Synchronous event-pubsub plus opt-in arcane-event-stack/1 recording",
-      "normalization": "Same module singleton through root and focused subpath; time travel starts disabled"
+      "normalization": "Same module singleton through root and focused subpath; time travel starts disabled and ordinary recording defaults to secure:false"
     },
     {
       "id": "root:createArcaneEventSource",
@@ -2631,7 +2769,7 @@
       "summary": "Creates a start/stop controller that projects DOM interactions and mutations into an EventManager.",
       "availability": "Browser DOM or a DOM-compatible test host",
       "protocol": "Capture-phase DOM events and MutationObserver projected to in-process EventManager events",
-      "normalization": "Produces bounded diagnostic descriptors, redacts sensitive values and URLs, and never reconstructs DOM state"
+      "normalization": "Defaults detail, input-value, and node-markup capture to true; preserves complete non-private values, markup, selectors, URLs, and object details while redacting private targets and credential-like attribute-mutation values"
     },
     {
       "id": "root:createEventManager",
@@ -2648,7 +2786,7 @@
       "summary": "Constructs and returns an independent EventManager instance.",
       "availability": "Node and browser/bundler; DOM capture requires a compatible DOM",
       "protocol": "Synchronous event-pubsub plus optional arcane-event-stack/1",
-      "normalization": "Equivalent constructor behavior without sharing the arcaneEvents singleton"
+      "normalization": "Equivalent constructor behavior without sharing the arcaneEvents singleton; secure:false and redactSensitive:false are the ordinary defaults"
     },
     {
       "id": "root:describeDOMTarget",
@@ -2716,7 +2854,7 @@
       "summary": "Strictly parses and validates an event-stack object or JSON string into a canonical frozen document.",
       "availability": "Node and browser/bundler",
       "protocol": "arcane-event-stack/1",
-      "normalization": "Rejects extra keys, invalid bounds, malformed nesting, unsafe values, and nonterminal overflow; returns a deeply frozen canonical document"
+      "normalization": "Rejects extra keys, malformed nesting, unsafe values, invalid timing or session structure, and non-increasing sequences; returns a deeply frozen canonical document"
     },
     {
       "id": "root:projectArcaneDOMEvent",
@@ -2748,8 +2886,8 @@
       "group": "Explicit SDK update checks",
       "summary": "Approved default npm registry origin for the on-demand SDK update check.",
       "availability": "Node; on-demand CLI or maintainer check only",
-      "protocol": "Credential-free HTTPS GET to an approved npm registry dist-tag endpoint",
-      "normalization": "Exact immutable HTTPS origin string"
+      "protocol": "Ordinary HTTP or HTTPS GET to the selected npm registry dist-tag endpoint",
+      "normalization": "Exact default HTTPS registry string"
     },
     {
       "id": "root:SDK_UPDATE_TIMEOUT_MS",
@@ -2764,24 +2902,24 @@
       "group": "Explicit SDK update checks",
       "summary": "Default per-request timeout for one explicit SDK registry check.",
       "availability": "Node; on-demand CLI or maintainer check only",
-      "protocol": "Credential-free HTTPS GET to an approved npm registry dist-tag endpoint",
-      "normalization": "Exact immutable millisecond integer"
+      "protocol": "Ordinary HTTP or HTTPS GET to the selected npm registry dist-tag endpoint",
+      "normalization": "Exact default millisecond integer"
     },
     {
       "id": "root:checkForSdkUpdate",
       "name": "checkForSdkUpdate",
       "displayName": "checkForSdkUpdate()",
       "kind": "function",
-      "signature": "async checkForSdkUpdate({ packageName=SDK_NAME, currentVersion=SDK_VERSION, registry=SDK_UPDATE_REGISTRY, allowedRegistryHosts, timeoutMs=SDK_UPDATE_TIMEOUT_MS, fetchImpl=globalThis.fetch, signal, onEvent, clock=()=>new Date() }={})",
+      "signature": "async checkForSdkUpdate({ packageName=SDK_NAME, currentVersion=SDK_VERSION, registry=SDK_UPDATE_REGISTRY, timeoutMs=SDK_UPDATE_TIMEOUT_MS, fetchImpl=globalThis.fetch, signal, onEvent, clock=()=>new Date() }={})",
       "entrypoints": [
         "arcane-os"
       ],
       "primaryImport": "arcane-os",
       "group": "Explicit SDK update checks",
-      "summary": "Performs one bounded credential-free registry read and reports whether the selected npm dist-tag is newer than the installed SDK.",
+      "summary": "Performs one ordinary registry read and reports whether the selected npm dist-tag is newer than the installed SDK.",
       "availability": "Node; on-demand CLI or maintainer check only",
-      "protocol": "Credential-free HTTPS GET to an approved npm registry dist-tag endpoint",
-      "normalization": "Frozen current, ahead, or update-available result; bounded registry data and normalized update-check failures"
+      "protocol": "Ordinary HTTP or HTTPS GET to the selected npm registry dist-tag endpoint",
+      "normalization": "Mutable current, ahead, or update-available result with complete registry data and normalized update-check failures"
     },
     {
       "id": "root:checkSdkUpdate",
@@ -2797,7 +2935,7 @@
       "group": "Explicit SDK update checks",
       "summary": "Toolchain and CLI wrapper for exactly one checkForSdkUpdate invocation.",
       "availability": "Node; on-demand CLI or maintainer check only",
-      "protocol": "Credential-free HTTPS GET to an approved npm registry dist-tag endpoint",
+      "protocol": "Ordinary HTTP or HTTPS GET to the selected npm registry dist-tag endpoint",
       "normalization": "Preserves the direct check result, events, cancellation, and errors without scheduling another check"
     },
     {
@@ -2837,16 +2975,16 @@
       "name": "validateUpdateRegistry",
       "displayName": "validateUpdateRegistry()",
       "kind": "function",
-      "signature": "validateUpdateRegistry(value, { allowedHosts=new Set(['registry.npmjs.org']) }={})",
+      "signature": "validateUpdateRegistry(value)",
       "entrypoints": [
         "arcane-os"
       ],
       "primaryImport": "arcane-os",
       "group": "Explicit SDK update checks",
-      "summary": "Validates one credential-free HTTPS registry root against an explicit hostname allowlist.",
+      "summary": "Validates one ordinary HTTP or HTTPS registry URL.",
       "availability": "Node; on-demand CLI or maintainer check only",
-      "protocol": "Approved credential-free HTTPS registry origin",
-      "normalization": "Returns a normalized URL object only for an exact allowed root origin"
+      "protocol": "Ordinary HTTP or HTTPS registry URL",
+      "normalization": "Returns the normalized URL object without a host, credential, port, path, query, fragment, or redirect policy"
     },
     {
       "id": "browser-wasm:BROWSER_WASM_RUNTIME_AUTHORITY",
@@ -2859,10 +2997,10 @@
       ],
       "primaryImport": "arcane-os/ai/browser-wasm",
       "group": "Browser-WASM local AI",
-      "summary": "Deep-frozen authority for the packaged Wllama and llama.cpp runtime, authenticated JS and WASM assets, licensing, and disabled compatibility-network policy.",
+      "summary": "Mutable metadata for the packaged Wllama and llama.cpp runtime, upstream JS and WASM assets, licensing, and disabled compatibility-network policy.",
       "availability": "Browser metadata; import and inspection require neither DBOPFS nor a loaded model",
       "protocol": "arcane-ai-browser-wasm/2 over the provider-neutral arcane-ai-adapter/1 boundary",
-      "normalization": "Exact immutable runtime and component identity; it contains no model weights or model catalog"
+      "normalization": "Complete mutable runtime/component metadata; it contains no model weights or model catalog"
     },
     {
       "id": "browser-wasm:adaptV1LlmProvider",
@@ -2878,7 +3016,7 @@
       "summary": "Adapts one compatible browser LLM provider to the provider-neutral LLM role contract.",
       "availability": "Browser; the wrapped provider retains its own WebGPU, storage, model, and lifecycle requirements",
       "protocol": "arcane-ai-provider/2 adapted from the browser LLM adapter surface",
-      "normalization": "Projects catalog, inspection, status, lifecycle, chat, stream, cancellation, and disposal without adding a provider or fallback"
+      "normalization": "Projects catalog, inspection, status, lifecycle, declaration/history-validated chat and stream, content/reasoning-only ordinary iterator chunks, validated terminal structural calls, prompt observed early-return cancellation, and disposal without adding a provider or fallback"
     },
     {
       "id": "browser-wasm:createArcaneAI",
@@ -2891,10 +3029,10 @@
       ],
       "primaryImport": "arcane-os/ai/browser-wasm",
       "group": "Browser-WASM local AI",
-      "summary": "Creates the provider-neutral browser AI facade and LLM lifecycle controller around one compatible provider or controller.",
+      "summary": "Creates the provider-neutral browser AI API module and LLM lifecycle controller around one compatible provider or controller.",
       "availability": "Browser; the selected provider observes its own WebAssembly, storage, and model readiness",
       "protocol": "arcane-ai-adapter/1",
-      "normalization": "Normalizes lazy or manual load, fieldwise app/provider/load security inheritance from SDK secure:false, lifecycle status, cancellation, streaming completion, and structural tool-call visibility without executing tools; an existing ModelController retains its preconfigured security/load policy and rejects a new security option"
+      "normalization": "Normalizes lazy or manual load, mutable complete lifecycle status, cancellation, nonstructural ordinary stream iteration, validated terminal completion, required structural arguments.message, exact matching nonblank tool-result sequencing, and dormant secure intent without executing tools; an existing ModelController retains its preconfigured load policy and rejects a new security option"
     },
     {
       "id": "browser-wasm:createBrowserModelSource",
@@ -2909,8 +3047,8 @@
       "group": "Browser-WASM local AI",
       "summary": "Validates a caller-supplied ordered multi-file model descriptor (or the legacy one-file shape) and creates cancellable no-credentials HTTPS member downloads.",
       "availability": "Browser with Fetch and a readable response body; each direct member open performs its configured HTTPS fetch",
-      "protocol": "Caller-supplied immutable HTTPS model-file URLs with optional expected byte lengths and SHA-256 values",
-      "normalization": "Canonical frozen ordered descriptor and per-member download handle; expected fields are required and enforced only for their effective enabled checks, and model license is not runtime admission"
+      "protocol": "Caller-supplied version-pinned HTTPS model-file URLs",
+      "normalization": "Canonical mutable ordered descriptor and complete per-member download handle; ordinary mode requires no byte count, hash, digest, freeze, or admission metadata"
     },
     {
       "id": "browser-wasm:createBrowserWasmLlmProvider",
@@ -2923,10 +3061,10 @@
       ],
       "primaryImport": "arcane-os/ai/browser-wasm",
       "group": "Browser-WASM local AI",
-      "summary": "Creates the packaged Wllama browser provider with effective-check disclosure, honest integrity status, serialized inference, streaming, abort, unload, and probe operations.",
-      "availability": "Browser secure context with WebAssembly, OPFS/DBOPFS, WebGPU, and admitted full-offload/buffer/queue/fence evidence; no CPU fallback",
+      "summary": "Creates the packaged Wllama browser provider with complete serialized inference, streaming, abort, unload, and probe operations.",
+      "availability": "Browser context with WebAssembly, OPFS/DBOPFS, and WebGPU; no CPU fallback",
       "protocol": "arcane-ai-adapter/1 with OpenAI-like chat completion and streaming envelopes",
-      "normalization": "Frozen lifecycle/status/security/integrity records and structured tool-call data; security fields inherit by scope and the SDK never invokes application tools"
+      "normalization": "Mutable complete lifecycle/status records, declaration/history validation, nonblank tool-result sequencing, nonstructural ordinary iterator chunks, all-choice terminal validation, and exact structured tool-call data with required user-facing message; secure:true is dormant intent only and the SDK never invokes application tools"
     },
     {
       "id": "browser-wasm:createDbopfsModelStore",
@@ -2939,10 +3077,10 @@
       ],
       "primaryImport": "arcane-os/ai/browser-wasm",
       "group": "Browser-WASM local AI",
-      "summary": "Adapts an existing DBOPFS instance into a model cache that records observed bytes, commits metadata last, and hashes only when SHA-256 checking is enabled.",
+      "summary": "Adapts an existing DBOPFS instance into a complete model cache and commits its metadata after the selected content.",
       "availability": "Browser with a ready DBOPFS instance and OPFS support",
       "protocol": "arcane.ai.browser-wasm.model.v4 completion manifests over existing DBOPFS method semantics",
-      "normalization": "Returns cached or installed receipts with observed byte count and per-check outcomes; disabled expected-length and SHA-256 checks do not compare or hash, while enabled checks fail closed"
+      "normalization": "Returns complete cached or installed model records; ordinary mode has no byte count, hash, digest, or admission gate"
     },
     {
       "id": "browser-speech:BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL",
@@ -2955,10 +3093,10 @@
       ],
       "primaryImport": "arcane-os/ai/browser-speech",
       "group": "Browser speech providers",
-      "summary": "Stable protocol identifier for a complete caller-owned authenticated browser speech artifact graph.",
+      "summary": "Stable compatibility protocol identifier for a complete caller-owned browser speech materialization graph.",
       "availability": "Browser metadata; graph construction is side-effect free and provider use requires the selected browser storage and Worker capabilities",
       "protocol": "arcane-ai-browser-speech-artifact-graph/1",
-      "normalization": "Exact immutable protocol value for one closed runtime, model, and voice dependency graph; it selects no artifacts or policy"
+      "normalization": "Exact compatibility protocol string; the graph file inventory routes known materialized files and does not select artifacts or enforce edge policy"
     },
     {
       "id": "browser-speech:BROWSER_SPEECH_ARTIFACT_PROTOCOL",
@@ -2971,10 +3109,10 @@
       ],
       "primaryImport": "arcane-os/ai/browser-speech",
       "group": "Browser speech providers",
-      "summary": "Stable protocol identifier for authenticated browser speech artifact stores.",
-      "availability": "Browser metadata; model/runtime admission and use require DBOPFS, Web Locks, Workers, and caller-supplied immutable artifacts",
+      "summary": "Stable protocol identifier for browser speech artifact stores.",
+      "availability": "Browser metadata; model/runtime use requires DBOPFS, Web Locks, Workers, and caller-selected artifacts",
       "protocol": "arcane-ai-browser-speech-artifacts/1 over arcane-ai-provider/2",
-      "normalization": "Exact immutable protocol value; it grants no model authority and names no model download"
+      "normalization": "Exact compatibility protocol string; it grants no model authority and names no model download"
     },
     {
       "id": "browser-speech:createBrowserKokoroProvider",
@@ -2988,25 +3126,25 @@
       "primaryImport": "arcane-os/ai/browser-speech",
       "group": "Browser speech providers",
       "summary": "Creates a local-only Kokoro text-to-speech provider for the provider-neutral AI runtime.",
-      "availability": "Browser with DBOPFS, Web Locks, Workers, object URLs, and a caller-admitted self-contained kokoro-js runtime/model closure",
+      "availability": "Browser with DBOPFS, Web Locks, Workers, object URLs, and caller-selected kokoro-js runtime/model content",
       "protocol": "arcane-ai-provider/2 tts/synthesize",
-      "normalization": "Independent load, status, request, unload, cancellation, and disposal; provider-native requests return 24000 Hz Float32Array PCM, while shared AI.js requests admit only wav and return frozen Uint8Array audio/wav data; never selects a cloud fallback"
+      "normalization": "Independent load, status, request, unload, cancellation, and disposal; provider-native requests return 24000 Hz Float32Array PCM, while shared AI.js requests use wav and return complete Uint8Array audio/wav data; never selects a cloud fallback"
     },
     {
       "id": "browser-speech:createBrowserSpeechArtifactGraph",
       "name": "createBrowserSpeechArtifactGraph",
       "displayName": "createBrowserSpeechArtifactGraph()",
       "kind": "function",
-      "signature": "createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', identitySha256, providerId=null, role, model, runtime, files, edges, transforms }={})",
+      "signature": "createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', security, providerId=null, role, model, runtime, files, edges, transforms }={})",
       "entrypoints": [
         "arcane-os/ai/browser-speech"
       ],
       "primaryImport": "arcane-os/ai/browser-speech",
       "group": "Browser speech providers",
-      "summary": "Validates, canonicalizes, identifies, and freezes one complete caller-owned browser speech artifact graph.",
+      "summary": "Normalizes one complete caller-owned browser speech materialization graph without computing byte identities.",
       "availability": "Browser metadata; construction starts no fetch, cache, Worker, provider, or event operation",
       "protocol": "arcane-ai-browser-speech-artifact-graph/1",
-      "normalization": "Returns one closed graph with lexically normalized inventories, a canonical SHA-256 identity, declared runtime edges, explicit STT/TTS model policy, and no SDK-selected artifacts"
+      "normalization": "Returns one mutable graph with normalized file/model/runtime facts; edge, transform, negative-route, and security metadata are compatibility-only and do not gate ordinary routing"
     },
     {
       "id": "browser-speech:createBrowserSpeechAuthority",
@@ -3019,10 +3157,10 @@
       ],
       "primaryImport": "arcane-os/ai/browser-speech",
       "group": "Browser speech providers",
-      "summary": "Validates and freezes one caller-owned Whisper or Kokoro model/runtime authority.",
+      "summary": "Validates and preserves one mutable caller-owned Whisper or Kokoro model/runtime authority.",
       "availability": "Browser descriptor construction; using the authority requires the selected storage and provider Web APIs",
       "protocol": "arcane-ai-model-authority/1",
-      "normalization": "Requires immutable URL identity, exact adapter role, unique paths/URLs, and caller-supplied revision with optional byte-length and SHA-256 checks"
+      "normalization": "Requires an exact adapter role, unique paths/URLs, and caller-supplied revision; ordinary mode has no byte count, hash, digest, or admission metadata"
     },
     {
       "id": "browser-speech:createBrowserWhisperProvider",
@@ -3036,7 +3174,7 @@
       "primaryImport": "arcane-os/ai/browser-speech",
       "group": "Browser speech providers",
       "summary": "Creates a local-only Whisper speech-to-text provider for the provider-neutral AI runtime.",
-      "availability": "Browser with DBOPFS, Web Locks, Workers, object URLs, and a caller-admitted self-contained transformers-whisper runtime/model closure",
+      "availability": "Browser with DBOPFS, Web Locks, Workers, object URLs, and caller-selected transformers-whisper runtime/model content",
       "protocol": "arcane-ai-provider/2 stt/transcribe",
       "normalization": "Independent load, status, request, unload, cancellation, and disposal; accepts provider-native Float32Array audio at exactly 16000 Hz or decodes the shared AI.js Blob/File payload to authoritative 16000 Hz mono PCM; never selects a cloud fallback"
     },
@@ -3051,10 +3189,10 @@
       ],
       "primaryImport": "arcane-os/ai/browser-speech",
       "group": "Browser speech providers",
-      "summary": "Adapts an existing DBOPFS instance into an authenticated, authority-scoped speech runtime/model artifact store.",
+      "summary": "Adapts an existing DBOPFS instance into a caller-scoped speech runtime/model artifact store and ordinary module router.",
       "availability": "Browser with a ready DBOPFS instance, Web Locks, Fetch or an explicit fetch implementation, File/Blob, and object URLs",
       "protocol": "arcane.ai.browser-speech.assets.v1 completion manifests under arcane-ai-browser-speech-artifacts/1",
-      "normalization": "Serializes each authority, commits its completion manifest last, deletes partial state on failure, and supports strict offline cache admission"
+      "normalization": "Serializes complete caller-selected content, routes known materialized imports/fetches/Workers/cache reads, falls back to native browser behavior for unmapped operations, and keeps secure intent dormant"
     },
     {
       "id": "mail:DEFAULT_MAIL_REQUEST_TIMEOUT_MS",
@@ -3141,20 +3279,6 @@
       "normalization": "Exact immutable value mail_outbox"
     },
     {
-      "id": "mail:MAX_MAIL_RESPONSE_BYTES",
-      "name": "MAX_MAIL_RESPONSE_BYTES",
-      "displayName": "MAX_MAIL_RESPONSE_BYTES",
-      "kind": "constant",
-      "signature": "const MAX_MAIL_RESPONSE_BYTES",
-      "entrypoints": ["arcane-os/mail"],
-      "primaryImport": "arcane-os/mail",
-      "group": "Portable Mail",
-      "summary": "Maximum response-body bytes admitted by the Mail HTTP transport.",
-      "availability": "Node and browser metadata",
-      "protocol": "Arcane Mail HTTP transport",
-      "normalization": "Exact immutable value of 65536 bytes"
-    },
-    {
       "id": "mail:Mail",
       "name": "Mail",
       "displayName": "Mail",
@@ -3165,8 +3289,8 @@
       "group": "Portable Mail",
       "summary": "Owns the application Mail singleton, durable lifecycle, report normalization, and explicit transport selection.",
       "availability": "Node with injected host adapters, or browser/native WebView with durable storage and Web Locks",
-      "protocol": "arcane-mail-outbox/1 with native Arcane.mail or bounded HTTP delivery",
-      "normalization": "Validates bounded reports, persists before delivery, and returns frozen provider-neutral send results"
+      "protocol": "arcane-mail-outbox/1 with native Arcane.mail or complete HTTP delivery",
+      "normalization": "Validates complete reports, persists before delivery, and returns frozen provider-neutral send results"
     },
     {
       "id": "mail:MailOutbox",
@@ -3177,10 +3301,10 @@
       "entrypoints": ["arcane-os/mail"],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
-      "summary": "Persists bounded reports before delivery and owns FIFO draining, retry classification, and explicit invalid-record maintenance.",
+      "summary": "Persists complete reports before delivery and owns FIFO draining, retry classification, and explicit invalid-record maintenance.",
       "availability": "Node or browser with injected DBOPFS-compatible storage and a Web Locks-compatible lock manager",
       "protocol": "arcane-mail-outbox/1",
-      "normalization": "Returns deeply frozen records and bounded summaries; ambiguous attempts remain same-key retries or require reconciliation"
+      "normalization": "Returns deeply frozen complete records and summaries; ambiguous attempts remain same-key retries or require reconciliation"
     },
     {
       "id": "mail:MailTransportError",
@@ -3194,7 +3318,7 @@
       "summary": "Normalized Mail transport failure with stable retry, uncertainty, status, and delay metadata.",
       "availability": "Node and browser",
       "protocol": "Arcane Mail HTTP transport",
-      "normalization": "Exposes code, retryable, retryAfterMs, statusCode, and uncertain without unbounded remote detail"
+      "normalization": "Exposes code, retryable, retryAfterMs, statusCode, uncertain, and complete remote detail"
     },
     {
       "id": "mail:createMailOutbox",
@@ -3221,7 +3345,7 @@
       "group": "Portable Mail",
       "summary": "Default package binding for the same Mail class exposed by the named export.",
       "availability": "Node with injected host adapters, or browser/native WebView with durable storage and Web Locks",
-      "protocol": "arcane-mail-outbox/1 with native Arcane.mail or bounded HTTP delivery",
+      "protocol": "arcane-mail-outbox/1 with native Arcane.mail or complete HTTP delivery",
       "normalization": "Binding identity is exactly equal to the named Mail export"
     },
     {
@@ -3261,10 +3385,10 @@
       "entrypoints": ["arcane-os/mail"],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
-      "summary": "Sends one immutable Mail report with an idempotency key through a bounded HTTP request.",
+      "summary": "Sends one complete Mail report with an idempotency key through HTTP.",
       "availability": "Node and browser with Fetch and AbortController, or an explicit fetch implementation",
       "protocol": "Arcane Mail HTTP transport",
-      "normalization": "Validates request identity and body equality, bounds response bytes, and returns normalized acceptance or throws MailTransportError"
+      "normalization": "Validates request identity and complete body equality, preserves the complete response subject only to HTTP framing, and returns normalized acceptance or throws MailTransportError"
     },
     {
       "id": "mail:serializeMailReport",

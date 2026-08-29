@@ -4,6 +4,8 @@
         display: block;
         height: 100%;
         min-width: 0;
+        min-inline-size:0;
+        max-inline-size:100%;
         min-height: 0;
         --arcane-chat-gap: var(--arcane-space-3, .75rem);
         --arcane-chat-radius: var(--arcane-radius-large, 1rem);
@@ -15,6 +17,9 @@
         justify-content: flex-end;
         box-sizing: border-box;
         width: min(100%, 72rem);
+        min-width:0;
+        min-inline-size:0;
+        max-inline-size:100%;
         height: 100%;
         min-height: 0;
         margin-inline: auto;
@@ -145,13 +150,18 @@
 
     .chat_output {
         flex:1 1 auto;
+        display:flow-root;
         box-sizing: border-box;
         width: 100%;
         min-height:0;
+        min-inline-size:0;
+        max-inline-size:100%;
         margin: 0;
         padding: clamp(1rem, 2vw, 1.5rem);
         list-style: none;
-        overflow: visible;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
         scrollbar-gutter: stable;
         border: 1px solid var(--arcane-border, var(--border-color));
         border-radius: var(--arcane-chat-radius);
@@ -162,12 +172,16 @@
     .chat_output > li {
         box-sizing: border-box;
         width: auto;
+        min-width: 0;
+        min-inline-size:0;
+        max-inline-size:min(92%,48rem);
         max-width: min(92%, 48rem);
         margin: 0 0 .85rem;
         padding: .85rem 1rem;
         clear: both;
         border: 1px solid var(--arcane-border, var(--border-color));
         border-radius: calc(var(--arcane-chat-radius) - .1rem);
+        overflow-x: hidden;
         overflow-wrap: anywhere;
     }
 
@@ -185,6 +199,93 @@
         border-color: var(--arcane-action, var(--primary-color));
         border-start-end-radius: var(--arcane-radius-small, .3rem);
         text-align: right;
+    }
+
+    .message_header{
+        display:block;
+        margin:0 0 .65rem;
+    }
+
+    .message_timestamp{
+        display:block;
+        margin-top:.65rem;
+        color:currentColor;
+        font-size:.72rem;
+        line-height:1.2;
+        opacity:.7;
+        text-align:right;
+    }
+
+    .message_tool_calls{
+        display:grid;
+        box-sizing:border-box;
+        width:100%;
+        min-width:0;
+        min-inline-size:0;
+        max-inline-size:100%;
+        max-width:100%;
+        gap:.55rem;
+        margin-top:.75rem;
+    }
+
+    .message_tool_call{
+        box-sizing:border-box;
+        width:100%;
+        min-width:0;
+        min-inline-size:0;
+        max-inline-size:100%;
+        max-width:100%;
+        padding:.65rem;
+        border:1px solid currentColor;
+        border-radius:var(--arcane-radius-small,.3rem);
+        overflow-x:hidden;
+        overflow-wrap:anywhere;
+    }
+
+    .message_tool_message{
+        margin:.45rem 0 0;
+        white-space:pre-wrap;
+        overflow-wrap:anywhere;
+    }
+
+    .message_tool_details{
+        box-sizing:border-box;
+        width:100%;
+        min-width:0;
+        min-inline-size:0;
+        max-inline-size:100%;
+        max-width:100%;
+        margin-top:.55rem;
+        overflow-x:hidden;
+    }
+
+    .message_tool_details summary{
+        cursor:pointer;
+        overflow-wrap:anywhere;
+    }
+
+    .message_tool_call pre{
+        box-sizing:border-box;
+        width:100%;
+        min-width:0;
+        min-inline-size:0;
+        max-inline-size:100%;
+        max-width:100%;
+        margin:.45rem 0 0;
+        white-space:pre-wrap;
+        word-break:break-word;
+        overflow-x:auto;
+        overflow-wrap:anywhere;
+    }
+
+    .message_tool_call code{
+        display:block;
+        box-sizing:border-box;
+        min-inline-size:0;
+        max-inline-size:100%;
+        white-space:inherit;
+        word-break:inherit;
+        overflow-wrap:anywhere;
     }
 
     .chat_output li ul,
@@ -244,6 +345,7 @@
     }
 
     .ai_activation_copy {
+        flex:1 1 auto;
         min-width:0;
     }
 
@@ -256,6 +358,18 @@
     .ai_activation_copy span {
         margin-block-start:.22rem;
         font-size:.9rem;
+    }
+
+    .ai_activation_progress{
+        display:block;
+        width:100%;
+        height:.6rem;
+        margin-block-start:.7rem;
+        accent-color:var(--arcane-action,var(--primary-color));
+    }
+
+    .ai_activation_progress[hidden]{
+        display:none;
     }
 
     .ai_activation button {
@@ -519,6 +633,12 @@
         <span class="ai_activation_copy">
             <strong id="ai_activation_title">Language model not active</strong>
             <span id="ai_activation_status">Start the selected language model to enable chat.</span>
+            <progress
+                id="ai_activation_progress"
+                class="ai_activation_progress"
+                aria-label="Language model activation progress"
+                hidden
+            ></progress>
         </span>
         <button type="button" id="ai_activation_button">Start language model</button>
     </section>
@@ -768,6 +888,7 @@
     const aiActivationPanel=shadowRoot.querySelector('#ai_activation');
     const aiActivationTitle=shadowRoot.querySelector('#ai_activation_title');
     const aiActivationStatus=shadowRoot.querySelector('#ai_activation_status');
+    const aiActivationProgress=shadowRoot.querySelector('#ai_activation_progress');
     const aiActivationButton=shadowRoot.querySelector('#ai_activation_button');
     const [
         {default:MD},
@@ -805,8 +926,11 @@
     let boundChatAI=null;
     let sessionBindingPending=false;
     let sessionMessagePending=false;
+    let activeSessionMessageToken=null;
     let sessionBindingGeneration=0;
     let sessionMessageSequence=0;
+    let pendingStructuralToolCall=null;
+    let pendingStructuralToolMessage='';
     const activeSubmissionOwnerships=new Set();
     const conversationTimeboxRetryDelays=[0,500,1_500];
     const chatReasons={
@@ -915,10 +1039,35 @@
 
     function visibleErrorMessage(error,fallback){
         try{
-            if(typeof error?.message==='string'&&error.message){
-                return error.message;
+            // Only errors deliberately classified by their owner may provide UI copy.
+            // Provider and protocol diagnostics remain complete in console/events.
+            if(error?.userSafe===true){
+                const message=typeof error.userMessage==='string'
+                    ?error.userMessage
+                    :error.message;
+                if(typeof message==='string'&&message.trim()){
+                    return message;
+                }
             }
         }catch{}
+        return fallback;
+    }
+
+    function visibleProgressText(value,fallback,field){
+        if(typeof value==='string'){
+            return value||fallback;
+        }
+        if(value&&typeof value==='object'){
+            console.error(`Arcane chat progress ${field} is not text.`,value);
+            return visibleErrorMessage(value,fallback);
+        }
+        if(value!==undefined&&value!==null&&value!==''){
+            const error=new TypeError(
+                `Arcane chat progress ${field} must be text.`,
+                {cause:value}
+            );
+            console.error(`Arcane chat progress ${field} is not text.`,error);
+        }
         return fallback;
     }
 
@@ -939,25 +1088,239 @@
             &&typeof session.send==='function';
     }
 
-    function appendTranscriptMessage(role,content,name){
+    function scrollTranscriptToBottom(){
+        chatOutput.scrollTop=chatOutput.scrollHeight;
+        return true;
+    }
+
+    function transcriptTime(timestamp){
+        const time=chatOutput.ownerDocument.createElement('time');
+        time.className='message_timestamp';
+        const value=timestamp instanceof Date
+            ?timestamp
+            :new Date(timestamp);
+        if(timestamp!==undefined&&timestamp!==null&&Number.isFinite(value.getTime())){
+            time.dateTime=value.toISOString();
+            time.textContent=value.toLocaleTimeString([],{
+                hour:'2-digit',
+                minute:'2-digit',
+                hourCycle:'h23'
+            });
+            time.title=value.toLocaleString();
+        }else{
+            time.textContent='Time unavailable';
+            time.setAttribute('aria-label','Message time unavailable');
+        }
+        return time;
+    }
+
+    function normalizeVisibleToolCalls(value){
+        if(value===undefined) return [];
+        if(!Array.isArray(value)){
+            const failure=new TypeError('Chat session tool calls must be an array.');
+            failure.code='AI_CHAT_INVALID_TOOL_CALL';
+            throw failure;
+        }
+        return value.map((call,index)=>{
+            if(
+                !call
+                ||typeof call!=='object'
+                ||Array.isArray(call)
+                ||call.type!=='function'
+                ||!call.function
+                ||typeof call.function!=='object'
+                ||Array.isArray(call.function)
+                ||typeof call.id!=='string'
+                ||!call.id.trim()
+                ||typeof call.function.name!=='string'
+                ||!call.function.name.trim()
+                ||typeof call.function.arguments!=='string'
+            ){
+                const failure=new TypeError(`Chat session tool call ${index+1} is invalid.`);
+                failure.code='AI_CHAT_INVALID_TOOL_CALL';
+                throw failure;
+            }
+            structuralToolMessage(call);
+            return call;
+        });
+    }
+
+    function structuralToolMessage(call){
+        let argumentsRecord;
+        try{
+            argumentsRecord=JSON.parse(call.function.arguments);
+        }catch(error){
+            const failure=new TypeError(
+                'Structural tool call arguments must encode a JSON object.',
+                {cause:error}
+            );
+            failure.code='AI_CHAT_INVALID_TOOL_CALL';
+            throw failure;
+        }
+        if(!isPlainRecord(argumentsRecord)){
+            const failure=new TypeError(
+                'Structural tool call arguments must encode a JSON object.'
+            );
+            failure.code='AI_CHAT_INVALID_TOOL_CALL';
+            throw failure;
+        }
+        if(typeof argumentsRecord.message!=='string'||!argumentsRecord.message.trim()){
+            const failure=new TypeError(
+                'Structural tool call arguments must include a nonempty user-facing message.'
+            );
+            failure.code='AI_CHAT_TOOL_MESSAGE_REQUIRED';
+            throw failure;
+        }
+        return argumentsRecord.message;
+    }
+
+    function setPendingStructuralToolCall(call=null){
+        if(call===null){
+            pendingStructuralToolCall=null;
+            pendingStructuralToolMessage='';
+            return null;
+        }
+        pendingStructuralToolMessage=structuralToolMessage(call);
+        pendingStructuralToolCall={
+            id:call.id,
+            type:'function',
+            function:{
+                name:call.function.name,
+                arguments:call.function.arguments
+            }
+        };
+        return pendingStructuralToolCall;
+    }
+
+    function sameStructuralToolCall(left,right){
+        return Boolean(left&&right)
+            &&left.id===right.id
+            &&left.type===right.type
+            &&left.function?.name===right.function?.name
+            &&left.function?.arguments===right.function?.arguments;
+    }
+
+    function pendingStructuralToolSummary(){
+        return pendingStructuralToolCall
+            ?{
+                id:pendingStructuralToolCall.id,
+                name:pendingStructuralToolCall.function.name,
+                message:pendingStructuralToolMessage
+            }
+            :null;
+    }
+
+    function appendVisibleToolCall(item,call){
+        const toolCalls=item.querySelector('.message_tool_calls')
+            ??item.ownerDocument.createElement('section');
+        if(!toolCalls.classList.contains('message_tool_calls')){
+            toolCalls.className='message_tool_calls';
+            toolCalls.setAttribute('aria-label','Tool calls');
+            item.insertBefore(toolCalls,item.querySelector('.message_timestamp'));
+        }
+        const existing=[...toolCalls.children].find(
+            candidate=>candidate.dataset.toolCallId===call.id
+        );
+        if(existing) return existing;
+        const entry=item.ownerDocument.createElement('article');
+        entry.className='message_tool_call';
+        entry.dataset.toolCallId=call.id;
+        const heading=item.ownerDocument.createElement('strong');
+        heading.textContent=`Tool: ${call.function.name}`;
+        const userMessage=item.ownerDocument.createElement('p');
+        userMessage.className='message_tool_message';
+        userMessage.textContent=structuralToolMessage(call);
+        const details=item.ownerDocument.createElement('details');
+        details.className='message_tool_details';
+        const summary=item.ownerDocument.createElement('summary');
+        summary.textContent='Tool call details';
+        const argumentsBlock=item.ownerDocument.createElement('pre');
+        const code=item.ownerDocument.createElement('code');
+        code.textContent=call.function.arguments;
+        argumentsBlock.append(code);
+        details.append(summary,argumentsBlock);
+        entry.append(heading,userMessage,details);
+        toolCalls.append(entry);
+        scrollTranscriptToBottom();
+        return entry;
+    }
+
+    function setTranscriptMessageContent(item,content,timestamp){
+        if(typeof content!=='string'){
+            throw new TypeError('Chat session message content must be a string.');
+        }
+        item.querySelector('.thinking')?.remove();
+        const markdown=item.querySelector('.markdown');
+        markdown.raw=content;
+        markdown.innerHTML=new MD(content).rendered;
+        if(timestamp!==undefined){
+            item.querySelector('.message_timestamp')?.replaceWith(
+                transcriptTime(timestamp)
+            );
+        }
+        scrollTranscriptToBottom();
+        return item;
+    }
+
+    function setTranscriptMessageTimestamp(item,timestamp){
+        const current=item?.querySelector?.('.message_timestamp');
+        if(!current||timestamp===undefined||timestamp===null){
+            return false;
+        }
+        current.replaceWith(transcriptTime(timestamp));
+        scrollTranscriptToBottom();
+        return true;
+    }
+
+    function latestCommittedTranscriptTurn(transcript,requestMessage){
+        if(!Array.isArray(transcript)) return null;
+        const requestRole=requestMessage?.role??'user';
+        const requestContent=requestMessage?.content;
+        for(let index=transcript.length-1;index>0;index--){
+            const response=transcript[index];
+            const request=transcript[index-1];
+            if(
+                response?.role==='assistant'
+                &&request?.role===requestRole
+                &&request.content===requestContent
+                &&(
+                    requestRole!=='tool'
+                    ||request.tool_call_id===requestMessage.tool_call_id
+                )
+            ){
+                return {request,response};
+            }
+        }
+        return null;
+    }
+
+    function createTranscriptMessage(role,content,name,{timestamp,toolCalls}={}){
         if(typeof content!=='string'){
             throw new TypeError('Chat session message content must be a string.');
         }
         const item=chatOutput.ownerDocument.createElement('li');
         item.className=role==='user'?'user':'ai';
+        item.dataset.role=role;
+        const header=chatOutput.ownerDocument.createElement('header');
+        header.className='message_header';
         const heading=chatOutput.ownerDocument.createElement('strong');
-        heading.textContent=`${name} ${getMilTime()}:`;
+        heading.textContent=name;
+        header.append(heading);
         const markdown=chatOutput.ownerDocument.createElement('div');
         markdown.className='markdown';
         markdown.raw=content;
         markdown.innerHTML=new MD(content).rendered;
-        item.append(
-            heading,
-            chatOutput.ownerDocument.createElement('br'),
-            chatOutput.ownerDocument.createElement('br'),
-            markdown
-        );
+        item.append(header,markdown,transcriptTime(timestamp));
+        for(const call of normalizeVisibleToolCalls(toolCalls)){
+            appendVisibleToolCall(item,call);
+        }
+        return item;
+    }
+
+    function appendTranscriptMessage(role,content,name,{timestamp=Date.now(),toolCalls}={}){
+        const item=createTranscriptMessage(role,content,name,{timestamp,toolCalls});
         chatOutput.append(item);
+        scrollTranscriptToBottom();
         return item;
     }
 
@@ -967,11 +1330,18 @@
         }
         const fragment=chatOutput.ownerDocument.createDocumentFragment();
         const rendered=[];
+        let restoredPendingToolCall=null;
         for(const message of history){
             if(!message||typeof message!=='object'||Array.isArray(message)){
                 throw new TypeError('Chat session history contains an invalid message.');
             }
             if(message.role==='system'){
+                if(restoredPendingToolCall){
+                    throw chatError(
+                        'Saved chat contains a system record before its pending structural tool result.',
+                        'AI_CHAT_INCOHERENT_PERSISTENCE'
+                    );
+                }
                 continue;
             }
             if(!['assistant','tool','user'].includes(message.role)){
@@ -980,30 +1350,63 @@
             if(typeof message.content!=='string'){
                 throw new TypeError('Chat session history message content must be a string.');
             }
-            const item=chatOutput.ownerDocument.createElement('li');
-            item.className=message.role==='user'?'user':'ai';
+            if(message.role==='tool'&&!message.content.trim()){
+                throw chatError(
+                    'Saved chat contains a blank structural tool result.',
+                    'AI_CHAT_INVALID_TOOL_MESSAGE'
+                );
+            }
+            const calls=normalizeVisibleToolCalls(message.tool_calls);
+            if(calls.length>1){
+                throw chatError(
+                    'Saved chat contains parallel structural tool calls.',
+                    'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED'
+                );
+            }
+            if(message.role!=='assistant'&&calls.length){
+                throw chatError(
+                    'Only assistant records may contain structural tool calls.',
+                    'AI_CHAT_INVALID_TOOL_CALL'
+                );
+            }
+            if(message.role==='tool'){
+                if(
+                    !restoredPendingToolCall
+                    ||typeof message.tool_call_id!=='string'
+                    ||message.tool_call_id!==restoredPendingToolCall.id
+                ){
+                    throw chatError(
+                        'Saved chat contains a tool result that does not match its pending structural tool call.',
+                        'AI_CHAT_INVALID_TOOL_MESSAGE'
+                    );
+                }
+                restoredPendingToolCall=null;
+            }else{
+                if(restoredPendingToolCall){
+                    throw chatError(
+                        'Saved chat continues before its pending structural tool result.',
+                        'AI_CHAT_TOOL_RESULT_REQUIRED'
+                    );
+                }
+                if(calls.length){
+                    restoredPendingToolCall=calls[0];
+                }
+            }
             const name=message.role==='user'
                 ?host.name
                 :message.role==='tool'
                 ?'Tool'
                 :host.aiName;
-            const heading=chatOutput.ownerDocument.createElement('strong');
-            heading.textContent=`${name}:`;
-            const markdown=chatOutput.ownerDocument.createElement('div');
-            markdown.className='markdown';
-            markdown.raw=message.content;
-            markdown.innerHTML=new MD(message.content).rendered;
-            item.append(
-                heading,
-                chatOutput.ownerDocument.createElement('br'),
-                chatOutput.ownerDocument.createElement('br'),
-                markdown
-            );
+            const item=createTranscriptMessage(message.role,message.content,name,{
+                timestamp:message.timestamp,
+                toolCalls:calls,
+            });
             fragment.append(item);
             rendered.push(item);
         }
+        setPendingStructuralToolCall(restoredPendingToolCall);
         chatOutput.replaceChildren(fragment);
-        chatOutput.scrollTop=chatOutput.scrollHeight;
+        scrollTranscriptToBottom();
         return rendered;
     }
 
@@ -1055,7 +1458,9 @@
                 ai
             });
             await session.ready();
-            const history=await session.history();
+            const history=typeof session.transcript==='function'
+                ?await session.transcript()
+                :await session.history();
             if(destroyed||generation!==sessionBindingGeneration){
                 throw chatError(
                     'The chat component was destroyed before session binding completed.',
@@ -1066,8 +1471,19 @@
             boundChatSession=session;
             boundChatAI=ai??session.ai??null;
             host.session=session;
-            setSessionStatus('ready','Chat ready.');
-            const detail={chat:host,session,ai:boundChatAI,history};
+            setSessionStatus(
+                pendingStructuralToolMessage?'tool':'ready',
+                pendingStructuralToolMessage||'Chat ready.'
+            );
+            applyAIAvailability(host.aiAvailability);
+            sessionBindingPending=false;
+            const detail={
+                chat:host,
+                session,
+                ai:boundChatAI,
+                history,
+                pendingTool:pendingStructuralToolSummary()
+            };
             dispatchChatEvent(
                 'chat-session-bound',
                 detail,
@@ -1084,7 +1500,11 @@
             return session;
         }catch(error){
             if(!destroyed&&generation===sessionBindingGeneration){
-                const message=visibleErrorMessage(error,'The chat session could not be opened.');
+                const internalProtocolFailure=internalStructuralToolFailure(error);
+                console.error('Arcane saved chat could not be opened.',error);
+                const message=internalProtocolFailure
+                    ?'This saved chat could not be opened.'
+                    :visibleErrorMessage(error,'The chat session could not be opened.');
                 setSessionStatus('error',message);
                 dispatchChatEvent(
                     'chat-session-error',
@@ -1218,6 +1638,7 @@
         panel:aiActivationPanel,
         title:aiActivationTitle,
         status:aiActivationStatus,
+        progress:aiActivationProgress,
         button:aiActivationButton
     });
 
@@ -1229,9 +1650,16 @@
     host.bindConversationTimebox=bindConversationTimebox;
     host.bindSession=bindSession;
     host.submitMessage=submitMessage;
+    host.submitToolResult=submitToolResult;
+    Object.defineProperty(host,'pendingTool',{
+        configurable:true,
+        enumerable:true,
+        get:pendingStructuralToolSummary
+    });
     host.destroy=destroy;
     host.session=null;
     host.sessionStatus={state:'idle',message:'Chat session is not connected.'};
+    host.modelName=typeof host.modelName==='string'?host.modelName:'';
     host.aiAvailability={llm:false,stt:false,tts:false};
     host.conversationComplete=false;
     applyAIAvailability(host.aiAvailability);
@@ -1256,11 +1684,14 @@
         chatArea.dataset.conversationComplete=String(complete);
         textArea.disabled=complete;
         uploadBtn.disabled=complete;
-        send.disabled=complete||!host.aiAvailability.llm||sessionMessagePending;
+        send.disabled=complete
+            ||!host.aiAvailability.llm
+            ||sessionMessagePending
+            ||Boolean(pendingStructuralToolMessage);
         if(complete){
             textArea.blur?.();
             chatOutput.focus?.({preventScroll:true});
-            chatOutput.scrollTop=chatOutput.scrollHeight;
+            scrollTranscriptToBottom();
         }
         return complete;
     }
@@ -1356,19 +1787,21 @@
         const warningLabel=normalizedFailed>0
             ?` · ${normalizedFailed} warning${normalizedFailed===1?'':'s'}`
             :'';
+        const visibleLabel=visibleProgressText(label,'Working','label');
+        const visibleStatus=visibleProgressText(status,'Streaming','status');
         const progressStatus=isIndeterminate
-            ?`${String(status||'Streaming')}${warningLabel}`
+            ?`${visibleStatus}${warningLabel}`
             :`${normalizedCurrent} of ${normalizedTotal}${warningLabel}`;
         const percent=normalizedTotal>0
             ?normalizedCurrent/normalizedTotal*100
             :0;
 
-        labelElement.textContent=String(label||'Working');
+        labelElement.textContent=visibleLabel;
         countElement.textContent=progressStatus;
         progress.classList.toggle('indeterminate',isIndeterminate);
         fill.style.width=isIndeterminate?'32%':`${percent}%`;
         progress.setAttribute('role','progressbar');
-        progress.setAttribute('aria-label',String(label||'Working'));
+        progress.setAttribute('aria-label',visibleLabel);
         if(isIndeterminate){
             progress.removeAttribute('aria-valuemin');
             progress.removeAttribute('aria-valuemax');
@@ -1380,9 +1813,9 @@
         }
         progress.setAttribute(
             'aria-valuetext',
-            `${String(label||'Working')} ${progressStatus}`
+            `${visibleLabel} ${progressStatus}`
         );
-        chatOutput.scrollTop=chatOutput.scrollHeight;
+        scrollTranscriptToBottom();
         return true;
     }
 
@@ -1415,8 +1848,13 @@
 
     function applyAIAvailability(availability){
         host.aiAvailability={...availability};
-        send.disabled=host.conversationComplete||!availability.llm||sessionMessagePending;
-        send.title=availability.llm
+        send.disabled=host.conversationComplete
+            ||!availability.llm
+            ||sessionMessagePending
+            ||Boolean(pendingStructuralToolMessage);
+        send.title=pendingStructuralToolMessage
+            ?pendingStructuralToolMessage
+            :availability.llm
             ?'Send message'
             :'The selected language model service is unavailable.';
         send.setAttribute('aria-label',send.title);
@@ -1427,6 +1865,7 @@
         panel,
         title,
         status,
+        progress,
         button,
         publish=dispatchChatEvent,
         createOperationId=nextChatOperationId,
@@ -1440,13 +1879,6 @@
         let requestGeneration=0;
         let destroyed=false;
 
-        function visibleError(error,fallback){
-            const message=typeof error?.message==='string'
-                ?error.message
-                :'';
-            return message||fallback;
-        }
-
         function cancellation(error){
             return error?.name==='AbortError'
                 ||['ARCANE_AI_REQUEST_ABORTED','AI_CHAT_ABORTED'].includes(error?.code);
@@ -1459,15 +1891,76 @@
                 &&role.modelId.length>0;
         }
 
-        function progressMessage(){
-            if(!role?.progress){
-                return 'The selected language model is loading.';
+        function modelDisplayName(){
+            const configured=typeof host.modelName==='string'
+                ?host.modelName.trim()
+                :'';
+            return configured||role?.modelId||'the selected language model';
+        }
+
+    function byteProgressUnit(value){
+        const unit=String(value??'')
+            .trim()
+            .toLowerCase()
+            .replace(/[\s_-]+/g,'');
+        return unit.includes('byte')
+            ||unit.includes('octet')
+            ||/^(?:[kmgtpe]?i?b)(?:(?:\/|per)?(?:s|sec|second))?$/u.test(unit);
+        }
+
+        function determinateProgress(){
+            const total=Number(role?.progress?.total);
+            const completed=Number(role?.progress?.completed);
+            const unit=typeof role?.progress?.unit==='string'&&role.progress.unit
+                ?role.progress.unit
+                :'items';
+            if(
+                byteProgressUnit(unit)
+                ||!Number.isFinite(total)
+                ||total<=0
+                ||!Number.isFinite(completed)
+            ){
+                return null;
             }
-            const progress=role.progress;
-            const amount=progress.total===null
-                ?`${progress.completed} ${progress.unit}`
-                :`${progress.completed} of ${progress.total} ${progress.unit}`;
-            return `${progress.phase}, ${amount}${progress.heartbeat?', active heartbeat':''}.`;
+            return {
+                completed:Math.max(0,completed),
+                total,
+                unit
+            };
+        }
+
+        function progressMessage(){
+            const measured=determinateProgress();
+            const phase=typeof role?.progress?.phase==='string'&&role.progress.phase
+                ?role.progress.phase
+                :'loading';
+            const parts=[
+                `Loading ${modelDisplayName()} through the Arcane SDK`,
+                phase
+            ];
+            if(measured){
+                parts.push(`${measured.completed} of ${measured.total} ${measured.unit}`);
+            }
+            parts.push('The first activation can take several minutes; keep this tab open');
+            return parts.join(' · ');
+        }
+
+        function renderProgress(){
+            const visible=requestPending||role?.state==='loading';
+            progress.hidden=!visible;
+            if(!visible){
+                progress.removeAttribute('value');
+                progress.removeAttribute('max');
+                return;
+            }
+            const measured=determinateProgress();
+            if(!measured){
+                progress.removeAttribute('value');
+                progress.removeAttribute('max');
+                return;
+            }
+            progress.max=measured.total;
+            progress.value=Math.min(measured.completed,measured.total);
         }
 
         function render(){
@@ -1481,6 +1974,7 @@
                 'aria-busy',
                 String(requestPending||['loading','unloading'].includes(role?.state))
             );
+            renderProgress();
             if(!visible){
                 return;
             }
@@ -1492,9 +1986,9 @@
                 return;
             }
             if(role.state==='loading'){
-                title.textContent='Starting language model';
+                title.textContent=`Loading ${modelDisplayName()}`;
                 status.textContent=progressMessage();
-                button.textContent='Cancel loading';
+                button.textContent='Cancel activation';
                 button.disabled=false;
                 return;
             }
@@ -1507,7 +2001,7 @@
             }
             if(role.state==='error'||requestError){
                 title.textContent='Language model activation failed';
-                status.textContent=requestError||visibleError(
+                status.textContent=requestError||visibleErrorMessage(
                     role.error,
                     'The selected language model could not start.'
                 );
@@ -1577,11 +2071,12 @@
                     &&['unloaded','unloading'].includes(role?.state)){
                     return false;
                 }
-                const message=visibleError(
+                const message=visibleErrorMessage(
                     error,
                     `The language model ${action} request failed.`
                 );
                 requestError=message;
+                console.error('Arcane language model activation request failed.',error);
                 publish(
                     'chat-ai-activation-error',
                     {request,error,message},
@@ -1614,6 +2109,13 @@
         function synchronize(nextRole){
             if(destroyed){
                 return;
+            }
+            if(
+                nextRole?.state==='error'
+                &&nextRole.error
+                &&nextRole.error!==role?.error
+            ){
+                console.error('Arcane language model runtime failed.',nextRole.error);
             }
             if(role?.state!==nextRole.state
                 ||role?.providerId!==nextRole.providerId
@@ -1694,6 +2196,7 @@
         try{
             controller.start();
         }catch(error){
+            console.error('Arcane conversation timebox could not start.',error);
             conversationTimeboxStatus.textContent='The elapsed timer could not start.';
             conversationTimeboxPanel.dataset.error='true';
             conversationTimeboxUnsubscribe?.();
@@ -1886,7 +2389,7 @@
                         }
                     }
                 );
-                console.error('The conversation timebox message could not be sent.');
+                console.error('The conversation timebox message could not be sent.',error);
                 return false;
             }
         );
@@ -1936,6 +2439,19 @@
     );
 
     async function streamMessage(text='', id='', isThinking){
+        if(typeof text!=='string'){
+            if(text instanceof Error){
+                console.error('Arcane chat stream delivered an Error as content.',text);
+                throw text;
+            }
+            const error=new TypeError(
+                'Arcane chat stream content must be text.',
+                {cause:text}
+            );
+            error.code='ARCANE_CHAT_STREAM_CONTENT_INVALID';
+            console.error('Arcane chat stream delivered invalid content.',error);
+            throw error;
+        }
         if(!id){
             console.warn('Streaming messages require ids, none specified.')
             return false;
@@ -1965,7 +2481,10 @@
         if(isThinking && !thinkingHTML){
             thinkingHTML=message.ownerDocument.createElement('span');
             thinkingHTML.className='thinking';
-            message.append(thinkingHTML);
+            message.insertBefore(
+                thinkingHTML,
+                message.querySelector('.message_timestamp')
+            );
         }
 
         if(isThinking){
@@ -1976,7 +2495,7 @@
             thinkingHTML.append(
                 message.ownerDocument.createTextNode(String(text))
             );
-            chatOutput.scrollTop = chatOutput.scrollHeight;
+            scrollTranscriptToBottom();
             return true;
         }
 
@@ -2009,7 +2528,7 @@
 
         target.innerHTML=new MD(target.raw).rendered;
         
-        chatOutput.scrollTop = chatOutput.scrollHeight;
+        scrollTranscriptToBottom();
     }
 
     textArea.addEventListener(
@@ -2156,13 +2675,6 @@
         {signal:aiRuntimeStateAbortController.signal}
     );
 
-    function getMilTime() {
-        const now = new Date();
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        return `${hours}:${minutes}`;
-    }
-
     async function resizeTextArea(e={}) {
         if(e.key && e.key == 'Enter' && !e.shiftKey && !send.disabled){
             e.preventDefault();
@@ -2187,11 +2699,54 @@
         const text=visibleErrorMessage(error,'The AI request failed.');
         markdown.raw=text;
         markdown.innerHTML=new MD(text).rendered;
-        chatOutput.scrollTop=chatOutput.scrollHeight;
+        scrollTranscriptToBottom();
         return true;
     }
 
-    async function sendMessageThroughBoundSession(text,context){
+    function internalStructuralToolFailure(error){
+        return [
+            'ARCANE_AI_TOOL_CALL_INVALID',
+            'ARCANE_AI_PARALLEL_TOOLS_UNSUPPORTED',
+            'ARCANE_AI_TOOL_MESSAGE_REQUIRED',
+            'AI_CHAT_INVALID_TOOL_CALL',
+            'AI_CHAT_INVALID_TOOL_MESSAGE',
+            'AI_CHAT_INCOHERENT_PERSISTENCE',
+            'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED',
+            'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
+            'AI_CHAT_TOOL_MESSAGE_REQUIRED',
+            'AI_CHAT_TOOL_RESULT_NOT_PENDING',
+            'AI_CHAT_TOOL_RESULT_REQUIRED',
+            'AI_CHAT_TRANSACTION_SETTLED'
+        ].includes(error?.code);
+    }
+
+    function restoreRejectedStructuralDraft(messageId,operationId,text){
+        const response=[...chatOutput.children].find(
+            candidate=>candidate.id===`message-${messageId}`
+        )||null;
+        const request=[...chatOutput.children].find(
+            candidate=>candidate.dataset.operationId===operationId
+        )||null;
+        response?.remove();
+        request?.remove();
+        const existing=textArea.value;
+        if(existing!==text){
+            textArea.value=existing
+                ?`${text}\n${existing}`
+                :text;
+        }
+        textArea.style.height='auto';
+        textArea.style.height=`${textArea.scrollHeight}px`;
+        scrollTranscriptToBottom();
+        return Boolean(response||request);
+    }
+
+    async function sendMessageThroughBoundSession(
+        text,
+        context,
+        sessionRequestMessage={content:text,role:'user'},
+        perTurnRequest=null
+    ){
         const session=boundChatSession;
         const bindingGeneration=sessionBindingGeneration;
         if(!session){
@@ -2208,10 +2763,15 @@
         }
 
         const request={
-            message:{content:text},
-            signal:context.signal
+            message:sessionRequestMessage,
+            signal:context.signal,
+            ...(perTurnRequest===null?{}:{request:perTurnRequest})
         };
+        const previousPendingToolCall=pendingStructuralToolCall;
+        let streamedStructuralToolCall=null;
         const messageId=`session-${++sessionMessageSequence}`;
+        const sessionMessageToken=Symbol(messageId);
+        activeSessionMessageToken=sessionMessageToken;
         sessionMessagePending=true;
         applyAIAvailability(host.aiAvailability);
         setSessionStatus('sending','AI is responding…');
@@ -2226,10 +2786,52 @@
                     status:'Working'
                 }
             );
-            const result=await session.send(request);
+            const result=typeof session.stream==='function'
+                ?await session.stream(
+                    request,
+                    {
+                        onChunk:async function renderSessionStreamChunk(chunk,requestId,isThinking){
+                            if(
+                                destroyed
+                                ||bindingGeneration!==sessionBindingGeneration
+                                ||session!==boundChatSession
+                            ) return false;
+                            return streamMessage(chunk,messageId,isThinking);
+                        },
+                        onToolCall:async function renderSessionToolCall(call){
+                            if(
+                                destroyed
+                                ||bindingGeneration!==sessionBindingGeneration
+                                ||session!==boundChatSession
+                            ) return false;
+                            const message=[...chatOutput.children].find(
+                                candidate=>candidate.id===`message-${messageId}`
+                            )||null;
+                            if(!message) return false;
+                            const normalized=normalizeVisibleToolCalls([call])[0];
+                            if(
+                                streamedStructuralToolCall
+                                &&!sameStructuralToolCall(streamedStructuralToolCall,normalized)
+                            ){
+                                throw chatError(
+                                    'The streamed structural tool call changed before completion.',
+                                    'AI_CHAT_STREAM_TOOL_CALL_MISMATCH'
+                                );
+                            }
+                            if(streamedStructuralToolCall){
+                                return true;
+                            }
+                            streamedStructuralToolCall=normalized;
+                            setPendingStructuralToolCall(normalized);
+                            appendVisibleToolCall(message,normalized);
+                            setSessionStatus('tool',pendingStructuralToolMessage);
+                            return true;
+                        }
+                    }
+                )
+                :await session.send(request);
             if(
                 destroyed
-                ||context.signal.aborted
                 ||bindingGeneration!==sessionBindingGeneration
                 ||session!==boundChatSession
             ){
@@ -2241,8 +2843,62 @@
             if(!result.message||typeof result.message.content!=='string'){
                 throw new TypeError('The chat session result must contain assistant message content.');
             }
-            await streamMessage(result.message.content,messageId,false);
-            setSessionStatus('ready','Chat ready.');
+            const committedTurn=typeof session.transcript==='function'
+                ?latestCommittedTranscriptTurn(
+                    await session.transcript(),
+                    sessionRequestMessage
+                )
+                :null;
+            const message=[...chatOutput.children].find(
+                candidate=>candidate.id===`message-${messageId}`
+            )||null;
+            if(!message){
+                throw new Error('The active chat response card is unavailable.');
+            }
+            setTranscriptMessageContent(
+                message,
+                result.message.content,
+                committedTurn?.response?.timestamp??result.message.timestamp
+            );
+            const requestMessage=[...chatOutput.children].find(
+                candidate=>candidate.dataset.operationId===context.operationId
+            )||null;
+            setTranscriptMessageTimestamp(
+                requestMessage,
+                committedTurn?.request?.timestamp
+            );
+            const terminalToolCalls=normalizeVisibleToolCalls(result.message.tool_calls);
+            if(terminalToolCalls.length>1){
+                throw chatError(
+                    'The chat session returned parallel structural tool calls.',
+                    'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED'
+                );
+            }
+            if(
+                streamedStructuralToolCall
+                &&(
+                    terminalToolCalls.length!==1
+                    ||!sameStructuralToolCall(
+                        streamedStructuralToolCall,
+                        terminalToolCalls[0]
+                    )
+                )
+            ){
+                throw chatError(
+                    'The terminal structural tool call does not match the streamed call.',
+                    'AI_CHAT_STREAM_TOOL_CALL_MISMATCH'
+                );
+            }
+            if(!streamedStructuralToolCall&&terminalToolCalls.length){
+                appendVisibleToolCall(message,terminalToolCalls[0]);
+            }
+            setPendingStructuralToolCall(
+                terminalToolCalls.length?terminalToolCalls.at(-1):null
+            );
+            setSessionStatus(
+                pendingStructuralToolMessage?'tool':'ready',
+                pendingStructuralToolMessage||'Chat ready.'
+            );
             const detail={
                 session,
                 request,
@@ -2250,6 +2906,11 @@
                 message:result.message,
                 context
             };
+            if(activeSessionMessageToken===sessionMessageToken){
+                activeSessionMessageToken=null;
+                sessionMessagePending=false;
+                applyAIAvailability(host.aiAvailability);
+            }
             dispatchChatEvent(
                 'chat-session-message',
                 detail,
@@ -2266,6 +2927,39 @@
             return result;
         }catch(error){
             if(!destroyed&&bindingGeneration===sessionBindingGeneration){
+                setPendingStructuralToolCall(previousPendingToolCall);
+            }
+            if(
+                !destroyed
+                &&bindingGeneration===sessionBindingGeneration
+                &&internalStructuralToolFailure(error)
+            ){
+                if(sessionRequestMessage.role==='tool'){
+                    const response=[...chatOutput.children].find(
+                        candidate=>candidate.id===`message-${messageId}`
+                    )||null;
+                    const requestMessage=[...chatOutput.children].find(
+                        candidate=>candidate.dataset.operationId===context.operationId
+                    )||null;
+                    response?.remove();
+                    requestMessage?.remove();
+                    scrollTranscriptToBottom();
+                }else{
+                    restoreRejectedStructuralDraft(messageId,context.operationId,text);
+                }
+                console.error('Arcane structural tool protocol failure.',error);
+                setSessionStatus(
+                    pendingStructuralToolCall?'tool':'ready',
+                    pendingStructuralToolMessage||'Chat ready.'
+                );
+            }else if(!destroyed&&bindingGeneration===sessionBindingGeneration){
+                console.error('Arcane chat request failed.',error);
+                if(sessionRequestMessage.role==='tool'){
+                    const requestMessage=[...chatOutput.children].find(
+                        candidate=>candidate.dataset.operationId===context.operationId
+                    )||null;
+                    requestMessage?.remove();
+                }
                 renderSessionMessageFailure(messageId,error);
                 setSessionStatus(
                     'error',
@@ -2294,10 +2988,117 @@
             }
             throw error;
         }finally{
-            sessionMessagePending=false;
-            if(!destroyed){
+            if(activeSessionMessageToken===sessionMessageToken){
+                activeSessionMessageToken=null;
+                sessionMessagePending=false;
+            }
+            if(!destroyed&&activeSessionMessageToken===null){
                 applyAIAvailability(host.aiAvailability);
             }
+        }
+    }
+
+    async function submitToolResult(options={},context={}){
+        if(destroyed||host.conversationComplete){
+            return false;
+        }
+        if(!isPlainRecord(options)||!isPlainRecord(context)){
+            throw new TypeError('Tool-result options and context must be plain objects.');
+        }
+        const unsupportedOption=Object.keys(options).find(
+            key=>!['disposition','message','persist','request','toolCallId'].includes(key)
+        );
+        if(unsupportedOption){
+            throw new TypeError(`Unsupported tool-result option: ${unsupportedOption}.`);
+        }
+        const unsupportedContext=Object.keys(context).find(
+            key=>!['operationId','signal'].includes(key)
+        );
+        if(unsupportedContext){
+            throw new TypeError(`Unsupported tool-result context: ${unsupportedContext}.`);
+        }
+        if(!boundChatSession||sessionBindingPending||sessionMessagePending){
+            return false;
+        }
+        if(!host.aiAvailability.llm){
+            return false;
+        }
+        if(!pendingStructuralToolCall){
+            const error=new TypeError('There is no pending structural tool call to settle.');
+            error.code='AI_CHAT_TOOL_RESULT_NOT_PENDING';
+            throw error;
+        }
+        const disposition=options.disposition;
+        const dispositions=new Map([
+            ['executed','Executed'],
+            ['declined','Declined'],
+            ['cancelled','Cancelled'],
+            ['not-executed','Not executed']
+        ]);
+        if(!dispositions.has(disposition)){
+            throw new TypeError(
+                'Tool-result disposition must be executed, declined, cancelled, or not-executed.'
+            );
+        }
+        if(typeof options.message!=='string'||!options.message.trim()){
+            throw new TypeError('Tool-result message must contain user-facing text.');
+        }
+        const perTurnRequest=options.request??null;
+        if(perTurnRequest!==null&&!isPlainRecord(perTurnRequest)){
+            throw new TypeError('Tool-result request options must be a plain object.');
+        }
+        const managedRequestField=perTurnRequest&&Object.keys(perTurnRequest).find(
+            key=>['messages','onChunk','onResponse','onToolCall','signal','stream'].includes(key)
+        );
+        if(managedRequestField){
+            throw new TypeError(
+                `Tool-result request.${managedRequestField} is managed by the chat session.`
+            );
+        }
+        const toolCallId=options.toolCallId??pendingStructuralToolCall.id;
+        if(typeof toolCallId!=='string'||toolCallId!==pendingStructuralToolCall.id){
+            const error=new TypeError('Tool-result ID does not match the pending structural tool call.');
+            error.code='AI_CHAT_INVALID_TOOL_MESSAGE';
+            throw error;
+        }
+        const persist=options.persist??true;
+        if(typeof persist!=='boolean'){
+            throw new TypeError('Tool-result persist must be boolean.');
+        }
+
+        const text=`${dispositions.get(disposition)} — ${options.message}`;
+        const operationId=typeof context.operationId==='string'&&context.operationId
+            ?context.operationId
+            :nextChatOperationId('tool-result');
+        const ownership=createChatSubmissionOwnership(context.signal??null);
+        const eventContext={
+            source:'tool',
+            synthetic:true,
+            operationId,
+            signal:ownership.signal
+        };
+        if(ownership.signal.aborted){
+            ownership.release();
+            return false;
+        }
+        try{
+            const visibleMessage=appendTranscriptMessage('tool',text,'Tool');
+            visibleMessage.dataset.operationId=operationId;
+            const result=sendMessageThroughBoundSession(
+                text,
+                eventContext,
+                {
+                    content:text,
+                    persist,
+                    role:'tool',
+                    tool_call_id:toolCallId
+                },
+                perTurnRequest
+            );
+            return observeHostSubmission(result,eventContext,ownership);
+        }catch(error){
+            ownership.release();
+            throw error;
         }
     }
 
@@ -2311,6 +3112,9 @@
             },
             function reportHostSubmissionFailure(error){
                 if(destroyed||context.signal.aborted){
+                    return false;
+                }
+                if(internalStructuralToolFailure(error)){
                     return false;
                 }
                 dispatchChatEvent(
@@ -2330,7 +3134,7 @@
                         }
                     }
                 );
-                console.error('The chat message could not be submitted.');
+                console.error('The chat message could not be submitted.',error);
                 return false;
             }
         ).finally(
@@ -2357,7 +3161,7 @@
         if(!host.aiAvailability.llm){
             return false;
         }
-        if(sessionBindingPending||sessionMessagePending){
+        if(sessionBindingPending||sessionMessagePending||pendingStructuralToolMessage){
             return false;
         }
         const submissionContext={
@@ -2432,9 +3236,10 @@
             // console.log(forceText,text,1);
             if(!eventContext.synthetic&&!eventContext.reuseVisibleMessage){
                 hostSubmissionGeneration++;
-                appendTranscriptMessage('user',text,host.name);
+                const visibleMessage=appendTranscriptMessage('user',text,host.name);
+                visibleMessage.dataset.operationId=operationId;
             }
-            chatOutput.scrollTop = chatOutput.scrollHeight;
+            scrollTranscriptToBottom();
 
             if(host.aiAvailability.tts&&speech.muted===false){
                 const aiRuntime=boundChatAI??globalThis.ai;
@@ -2466,7 +3271,7 @@
         if(id){
             message.id=`message-${id}`;
         }
-        chatOutput.scrollTop = chatOutput.scrollHeight;
+        scrollTranscriptToBottom();
         return message;
     }
 
@@ -2483,9 +3288,7 @@
             }
         }
 
-        const message=typeof error?.message==='string'&&error.message
-            ?error.message
-            :'Speech synthesis failed.';
+        const message=visibleErrorMessage(error,'Speech synthesis failed.');
         dispatchChatEvent(
             'chat-speech-synthesis-error',
             {error,message},
@@ -2502,7 +3305,7 @@
                 }
             }
         );
-        console.error('Speech synthesis failed.');
+        console.error('Speech synthesis failed.',error);
         return false;
     }
 
@@ -2529,6 +3332,8 @@
         initialSpeechMuteListenerInstalled=false;
         sessionBindingPending=false;
         sessionMessagePending=false;
+        activeSessionMessageToken=null;
+        setPendingStructuralToolCall();
         boundChatSession=null;
         boundChatAI=null;
         host.session=null;

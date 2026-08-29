@@ -3,17 +3,17 @@ export const referenceModuleContractsA=Object.freeze([
         name:'AI.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Browser import listens for user-entity-loaded and arcane-ollama-ready, installs window.ai once the user is ready, emits ai-ready, and may perform provider configuration/transition, HTTP/native AI, microphone, and audio-playback side effects.',
-        paramsResults:'AI(llmService, sttService, ttsService, model, modelTTS, modelSTT) selects providers and models. configureProviders(config) updates routes without unloading them. transitionAI(llmService, sttService, ttsService, model, modelTTS, modelSTT) and transitionProviders(selections) stop queued audio, unload all three current roles, and then configure replacements; the first returns aggregate runtime status and the second returns admitted routes. startProviders({startMuted=true,startTranscription=false,signal=null}={}) declines the startup STT load unless explicitly requested without forcing an independently active STT role to unload, and setSpeechMuted(muted) owns TTS lifecycle. fetchSTT(audioFile,responseHandler=(text=\'\')=>{},signal=null) preserves its compatibility callback and propagates the supplied cancellation signal. Selected legacy OPENAI LLM/STT/TTS, OLLAMA LLM, and admitted Core LOCAL_SPEACH STT/TTS routes expose truthful capability-only provider/2 readiness without probing or downloading. TTS uses the exact selected model catalog defaultVoice; a saved OpenAI voice is not forwarded to another route. fetchRequest(options) preserves provider-native JSON, streamRequest(options) reports chunks, completion, and tool calls through callbacks, and browser speech normalizes shared Blob/File STT and WAV TTS requests at the provider boundary.',
+        paramsResults:'AI(llmService, sttService, ttsService, model, modelTTS, modelSTT) selects providers and models. configureProviders(config) updates routes without unloading them. transitionAI(llmService, sttService, ttsService, model, modelTTS, modelSTT) and transitionProviders(selections) stop queued audio, unload all three current roles, and then configure replacements; the first returns aggregate runtime status and the second returns the configured routes. startProviders({startMuted=true,startTranscription=false,signal=null}={}) declines the startup STT load unless explicitly requested without forcing an independently active STT role to unload, and setSpeechMuted(muted) owns TTS lifecycle. fetchSTT(audioFile,responseHandler=(text=\'\')=>{},signal=null) preserves its compatibility callback and propagates the supplied cancellation signal. Selected legacy OPENAI LLM/STT/TTS, OLLAMA LLM, and Core LOCAL_SPEACH STT/TTS routes expose truthful capability-only provider/2 readiness without probing or downloading. TTS uses the exact selected model catalog defaultVoice; a saved OpenAI voice is not forwarded to another route. fetchRequest(options) preserves provider-native JSON. streamRequest(options) awaits onResponse with the complete terminal response, emits each complete validated structural call exactly once through onToolCall, then awaits onComplete; onRequest receives supplied transport metadata and ordinary chunks never expose partial structural deltas. Native Ollama calls are adapted before validation without inventing arguments.message. Browser speech normalizes shared Blob/File STT and WAV TTS requests at the provider boundary.',
         events:Object.freeze(['consumes user-entity-loaded','consumes arcane-ollama-ready','emits ai-ready']),
         errors:Object.freeze(['AI_NATIVE_LOCAL_REQUIRED','AI_PROVIDER_NOT_CONFIGURED','AI_MODEL_INVALID','AI_LOCAL_MODEL_REQUIRED','AI_STRUCTURED_OUTPUT_INVALID','AI_REQUIRED_TOOL_UNAVAILABLE','AI_REQUIRED_TOOL_CALL_MISSING','AI_SERVICE_UNREACHABLE','AI_REQUEST_FAILED','AI_REQUEST_ABORTED','AI_ANDROID_NATIVE_SPEECH_UNAVAILABLE','ARCANE_AI_MODEL_AUTHORITY_REQUIRED','ARCANE_AI_PROVIDER_DISPOSED','ARCANE_AI_PROVIDER_RUNTIME_INVALID','ARCANE_AI_PROVIDER_UNAVAILABLE','ARCANE_AI_REQUEST_ABORTED','ARCANE_AI_ROLE_BUSY','ARCANE_AI_ROLE_NOT_READY','ARCANE_AI_INVALID_REQUEST','ARCANE_AI_AUDIO_DECODE_UNAVAILABLE','ARCANE_AI_AUDIO_DECODE_FAILED','ARCANE_AI_INVALID_PROVIDER_RESULT','ARCANE_AI_UNSUPPORTED_RESPONSE_FORMAT']),
-        capabilitiesCore:'Normalizes explicitly selected provider/2 LLM, STT, and TTS routes alongside configured OpenAI HTTPS and admitted Arcane.ollama.chat or Arcane.speech paths. Each route keeps its real browser, native/Core, or cloud admission and never silently falls back.',
+        capabilitiesCore:'Normalizes explicitly selected provider/2 LLM, STT, and TTS routes alongside configured OpenAI HTTPS, Arcane.ollama.chat, and Arcane.speech paths. Each route keeps its real browser, native/Core, or cloud availability and never silently falls back.',
         example:`async function requestAnswerAfterUserChoice(){
     const ai=window.ai?.ready
         ?window.ai
         :await new Promise(resolve=>addEventListener('ai-ready',event=>resolve(event.detail.db),{once:true}));
     if(!ai.configured) throw new Error('Configure an AI provider first.');
     const response=await ai.fetchRequest({
-        messages:[{role:'user',content:'Answer in one sentence.'}]
+        messages:[{role:'user',content:'Return the complete answer.'}]
     });
     console.log(response.choices?.[0]?.message?.content);
 }`
@@ -49,8 +49,8 @@ console.log(AI_PREFERENCE_SLOT_KEYS,aiPreferenceTuplesEqual(tuple,tuple));`
     Object.freeze({
         name:'AIProviderRuntime.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'The exported singleton owns registered providers and independent llm, stt, and tts lifecycle slots. Configuration, start, load, unload, request, cancellation, disposal, and mute operations publish normalized role state; importing alone performs no model download or provider selection. A newer valid request that reaches admission for an occupied role supersedes the older request, waits for its settlement or confirmed stream cleanup, and alone may proceed.',
-        paramsResults:'AIProviderRuntime is singleton-only. getAIProviderRuntime() returns aiProviderRuntime. Register a provider/2 object with required protocol, role, id, localOnly, catalog, inspect, status, load, request, unload, and dispose members; additional provider keys are accepted. Configuration is a closed {llm,stt,tts} record of {default,localOnly} routes. start({startMuted=true,startTranscription=false,signal=null}={}) waits for prior speech/unload work, declines a startup STT load unless explicitly requested, applies initial mute state, and returns the startAIRuntime control {barrier,settled,cancel}. chat/stream/transcribe/synthesize accept data-only payloads plus {localOnly=false,signal=null}; per role, the latest valid request supersedes earlier request ownership.',
+        lifecycleSideEffects:'The exported singleton owns registered providers and independent llm, stt, and tts lifecycle slots. Configuration, start, load, unload, request, cancellation, disposal, and mute operations publish complete mutable role state; importing alone performs no model download or provider selection. Requests for an occupied role enter its FIFO lane and settle in arrival order unless their own cancellation signal aborts them.',
+        paramsResults:'AIProviderRuntime is singleton-only. getAIProviderRuntime() returns aiProviderRuntime. Register a provider/2 object with required protocol, role, id, localOnly, catalog, inspect, status, load, request, unload, and dispose members; additional provider keys are accepted. Configuration is a closed {llm,stt,tts} record of {default,localOnly} routes. start({startMuted=true,startTranscription=false,signal=null}={}) waits for prior speech/unload work, declines a startup STT load unless explicitly requested, applies initial mute state, and returns the mutable startAIRuntime control {barrier,settled,cancel}. chat/stream/transcribe/synthesize accept complete payloads plus {localOnly=false,signal=null}; per-role requests are queued without superseding or discarding earlier content. Direct LLM ingress validates tool declarations, exact pending-call history, and nonblank tool-result content. Structured terminals use exactly one message or choices envelope; ordinary iteration exposes only content/reasoning data and the separate result retains the complete validated terminal response.',
         events:Object.freeze(['publishes arcane-ai-runtime-state through AIRuntimeState','consumes arcane-ai-runtime-intent through AIRuntimeState']),
         errors:Object.freeze([
             'ARCANE_AI_RUNTIME_SINGLETON_REQUIRED',
@@ -88,7 +88,7 @@ console.log(AI_PREFERENCE_SLOT_KEYS,aiPreferenceTuplesEqual(tuple,tuple));`
             'ARCANE_AI_STREAM_CLEANUP_INCOMPLETE',
             'ARCANE_AI_TTS_MUTED'
         ]),
-        capabilitiesCore:'Provider-neutral in-process lifecycle. Browser, native, and cloud providers retain separate availability and authority; localOnly routing fails closed and never creates a fallback.',
+        capabilitiesCore:'Provider-neutral in-process lifecycle. Browser, native, and cloud providers retain separate availability and authority; localOnly selects a matching route and never creates a fallback.',
         example:`import {getAIProviderRuntime} from '/arcane/modules/AIProviderRuntime.js';
 
 const runtime=getAIProviderRuntime();
@@ -97,12 +97,12 @@ console.log(runtime.protocol,runtime.status());`
     Object.freeze({
         name:'AIResponseLength.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Pure prompt transformation with no provider or storage side effects.',
-        paramsResults:'normalizeAIResponseLength(value) accepts low, medium, or high and defaults to medium. applyAIResponseLength(systemPrompt, value) appends the shared instruction once and returns a string.',
+        lifecycleSideEffects:'Pure inert compatibility normalization with no prompt, provider, or storage side effects.',
+        paramsResults:'normalizeAIResponseLength(value) accepts legacy low, medium, or high selectors and defaults to medium; every option is labeled Complete. aiResponseLengthInstruction() returns an empty string. applyAIResponseLength(systemPrompt,value) returns the complete systemPrompt unchanged.',
         events:Object.freeze([]),
         errors:Object.freeze(['TypeError when systemPrompt is not a string']),
-        capabilitiesCore:'Provider-neutral policy applied before chat; it does not alter Core or provider limits.',
-        example:`const prompt=applyAIResponseLength('You are a careful assistant.','low');
+        capabilitiesCore:'Provider-neutral compatibility surface; it does not alter prompts, Core, or provider behavior.',
+        example:`const prompt=applyAIResponseLength('Return the complete answer.','low');
 console.log(normalizeAIResponseLength('LOW'),prompt);`
     }),
     Object.freeze({
@@ -123,7 +123,7 @@ console.log(audit.ok,audit.links);`
         name:'AIRuntimeState.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Import creates one EventTarget-backed sticky state owner. Publishing replaces one or all complete role records with a monotonic revision; subscriptions attach listeners until their returned release function or AbortSignal removes them. startAIRuntime requests startup intents and exposes separate text-chat and all-requested-role settlement promises.',
-        paramsResults:'getAIRuntimeState() returns frozen {protocol,revision,roles:{llm,stt,tts}}. subscribeAIRuntimeState(listener,{signal,emitCurrent=true}) returns an unsubscribe function. requestAIRuntimeIntent({role,action,reason}) accepts load/unload/dispose and startup/user/teardown. startAIRuntime({startMuted=true,startTranscription=false,signal=null}) returns frozen {barrier,settled,cancel}; barrier settles for LLM only, while settled covers every requested role. STT startup is opt-in so selection and observation alone never request its load.',
+        paramsResults:'getAIRuntimeState() returns mutable {protocol,revision,roles:{llm,stt,tts}} with complete role records. subscribeAIRuntimeState(listener,{signal,emitCurrent=true}) returns an unsubscribe function. requestAIRuntimeIntent({role,action,reason}) accepts load/unload/dispose and startup/user/teardown. startAIRuntime({startMuted=true,startTranscription=false,signal=null}) returns mutable {barrier,settled,cancel}; barrier settles for LLM only, while settled covers every requested role. STT startup is opt-in so selection and observation alone never request its load.',
         events:Object.freeze(['arcane-ai-runtime-state','arcane-ai-runtime-intent','arcane-ai-runtime-startup-settled']),
         errors:Object.freeze(['TypeError message prefix ARCANE_AI_RUNTIME_STATE_INVALID','ARCANE_AI_REQUEST_ABORTED']),
         capabilitiesCore:'Cross-host state normalization only. Events describe current intent/state; they do not grant a capability, select a provider, or prove native/browser readiness.',
@@ -210,12 +210,13 @@ console.log(await bridge.request('/health'));`
     Object.freeze({
         name:'ArcaneNavigationPolicy.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'The returned guard loads policy, computes a frozen decision, and awaits optional onDecision; it never navigates.',
-        paramsResults:'createArcaneNavigationGuard({loadPolicy, onDecision, networkMatcher}) returns async guard(value, context). Valid HTTP(S) destinations yield frozen allow or block decisions, and policy or matcher failures fail closed as blocked policy-unavailable decisions.',
+        lifecycleSideEffects:'The returned guard computes a complete mutable decision and awaits optional onDecision; it loads policy only when secure:true explicitly enables hardening, and it never navigates.',
+        paramsResults:'createArcaneNavigationGuard({secure=false, loadPolicy, onDecision, networkMatcher}) returns async guard(value, context). The ordinary path permits valid HTTP(S) navigation with a warning. With secure:true, domain/CIDR matches block and policy or matcher failures fail closed as policy-unavailable decisions.',
         events:Object.freeze([]),
         errors:Object.freeze(['TypeError for a non-HTTP(S) or unparseable destination before policy evaluation']),
-        capabilitiesCore:'Cross-host normalized navigation decision using the shared deny policy; callers or Core own the actual navigation.',
+        capabilitiesCore:'Cross-host navigation decision with optional shared deny-policy hardening; callers or Core own the actual navigation.',
         example:`const guard=createArcaneNavigationGuard({
+    secure:true,
     loadPolicy:async()=>emptyArcaneNetworkPolicy()
 });
 console.log(await guard('https://example.com/docs',{intent:'external'}));`
@@ -253,8 +254,8 @@ console.log(value);`
     Object.freeze({
         name:'BrowserTestSuite.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Runs a fixed parent-supplied test list sequentially, creates per-test abort and timer boundaries, and emits suite and test lifecycle events without evaluating source text or persisting results.',
-        paramsResults:'BrowserTestSuite({tests, maxTests, timeoutMs, now}).list() returns descriptors. run({context, signal}) returns a frozen {status, totals, durationMs, results} summary and supplies assert, skip, signal, and context to each callback.',
+        lifecycleSideEffects:'Runs the complete parent-supplied test list sequentially, creates a per-test AbortController boundary, and emits suite and test lifecycle events without evaluating source text, starting timers, or persisting results.',
+        paramsResults:'BrowserTestSuite({tests, now, ...legacyMetadata}).list() returns complete mutable descriptors. Legacy maxTests and timeout-shaped options are accepted as inert metadata without limiting or timing the supplied list. run({context, signal}) returns a complete mutable {status, totals, durationMs, results} summary and supplies assert, skip, signal, and context to each callback.',
         events:Object.freeze(['browser-test-suite-start','browser-test-start','browser-test-result','browser-test-suite-complete']),
         errors:Object.freeze(['BROWSER_TEST_BUSY','BROWSER_TEST_ABORTED','BROWSER_TEST_TIMEOUT','BROWSER_TEST_SKIP','BROWSER_TEST_ASSERTION','BROWSER_TEST_INVALID_OPTIONS','BROWSER_TEST_INVALID_LIMIT','BROWSER_TEST_INVALID_DESCRIPTOR','BROWSER_TEST_INVALID_CLOCK','BROWSER_TEST_INVALID_RESULT','BROWSER_TEST_LIMIT','BROWSER_TEST_CASE_COLLISION']),
         capabilitiesCore:'First-party browser behavioral-test runner with no Core dependency and no arbitrary-code text interface.',
@@ -273,9 +274,9 @@ console.log(await suite.run());`
         name:'CalculatorEngine.js',
         classification:'public-first-party',
         lifecycleSideEffects:'evaluateExpression is pure; calculate additionally dispatches one result or error event.',
-        paramsResults:'evaluateExpression(input) parses 1–512 characters with arithmetic, powers, parentheses, pi, e, and common functions. calculate(expression) returns a Calculation entity.',
+        paramsResults:'evaluateExpression(input) parses any nonblank arithmetic expression with powers, parentheses, pi, e, and common functions. calculate(expression) returns a Calculation entity.',
         events:Object.freeze(['calculator-result','calculator-error']),
-        errors:Object.freeze(['TypeError for empty or oversized input','SyntaxError for invalid grammar','RangeError for division by zero or non-finite output']),
+        errors:Object.freeze(['TypeError for empty input','SyntaxError for invalid grammar','RangeError for division by zero or non-finite output']),
         capabilitiesCore:'Cross-host deterministic computation without eval and with no Core dependency.',
         example:`const engine=new CalculatorEngine();
 console.log(engine.calculate('sqrt(81) + 2^3').result);`
@@ -391,7 +392,7 @@ console.log(registry.has('demo'),registry.list());`
     Object.freeze({
         name:'ComponentContracts.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'All exported contracts are pure normalization and formatting functions plus frozen label and format constants.',
+        lifecycleSideEffects:'All exported contracts are pure normalization and formatting functions plus mutable label and format constants.',
         paramsResults:'Normalizers cover chart options and rows, dashboard definitions, options, and visibility, Markdown formats and options, and voice options. applyMarkdownFormat and appendTranscription return deterministic editor text and selection results.',
         events:Object.freeze([]),
         errors:Object.freeze(['TypeError or RangeError for invalid records, values, callbacks, limits, or chart bounds']),
@@ -404,16 +405,15 @@ console.log(rows);`
     Object.freeze({
         name:'ConfiguredAIChatSession.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Keeps bounded history only in memory. prepare makes one injected or default chat call and returns a single-settlement commit/rollback transaction; send prepares and commits the user and assistant pair atomically only after a valid response.',
-        paramsResults:'ConfiguredAIChatSession(options) admits exactly chat, contextBuilder, initialMessages, maxContextCharacters, maxMessageCharacters, maxMessages, request, responseLength, and systemPrompt; initialMessages accepts bounded user/assistant/tool messages with coherent single structural tool-call sequencing and no system role. It exposes history, clear, prepare(input,{signal}), and send(input,{signal}); send accepts user or tool input. The optional contextBuilder receives frozen {input,history,signal}; its result is transient untrusted context. The injected chat(request) callback may return either the prior normalized provider result, preserving its explicit done boolean, or exactly one non-stream OpenAI-compatible choice, which normalizes to done:true. Any tool_calls array must contain exactly one valid structural call. prepare returns frozen {response,commit,rollback}; send returns the frozen {provider,model,message:{role,content,tool_calls?},done,doneReason,promptEvalCount,evalCount} response after atomic commit.',
+        lifecycleSideEffects:'Keeps complete history only in memory. prepare makes one injected or default chat call and returns a mutable single-settlement commit/rollback transaction; send prepares and commits the user and assistant pair atomically only after a valid response.',
+        paramsResults:'ConfiguredAIChatSession(options) accepts chat, contextBuilder, initialMessages, request, and systemPrompt. Legacy responseLength and maximum options are accepted as inert compatibility metadata and do not limit content. initialMessages accepts complete user/assistant/tool messages and at most one structural function call per assistant turn. Every declared function tool must require parameters.properties.message as a string with minLength of at least one, and every returned function.arguments string must encode an object with a nonempty user-facing message; exact call IDs, names, and serialized arguments are preserved. It exposes history, clear, prepare(input,{request?,signal?}), and send(input,{request?,signal?}); constructor request defaults merge first, per-turn request options merge second, then the session owns signal and messages. send accepts user or matching tool input. The optional contextBuilder receives mutable {input,history,signal}, and its complete result is included only in the current request. The injected chat(request) callback may return either the prior normalized provider result, preserving its explicit done boolean and complete providerResponse, or a non-stream OpenAI-compatible envelope whose first choice supplies the assistant message and normalizes to done:true. prepare returns mutable {response,commit,rollback}; send returns the mutable {provider,model,message:{role,content,tool_calls?},providerResponse,done,doneReason,promptEvalCount,evalCount} response after atomic commit.',
         events:Object.freeze([]),
-        errors:Object.freeze(['AI_CHAT_UNAVAILABLE','AI_CHAT_BUSY','AI_CHAT_CONTEXT_LIMIT','AI_CHAT_INVALID_RESPONSE','AI_CHAT_ABORTED','AI_CHAT_INVALID_TOOL_MESSAGE','AI_CHAT_TOOL_RESULT_REQUIRED','AI_CHAT_TRANSACTION_SETTLED','validation TypeError or RangeError','provider rejection preserved']),
+        errors:Object.freeze(['AI_CHAT_UNAVAILABLE','AI_CHAT_BUSY','AI_CHAT_INVALID_RESPONSE','AI_CHAT_ABORTED','AI_CHAT_INVALID_TOOL_CALL','AI_CHAT_INVALID_TOOL_MESSAGE','AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED','AI_CHAT_TOOL_MESSAGE_REQUIRED','AI_CHAT_TOOL_RESULT_REQUIRED','AI_CHAT_TRANSACTION_SETTLED','validation TypeError or RangeError','provider rejection preserved']),
         capabilitiesCore:'Defaults to Arcane.ai.chat but is cross-host with injected chat; it performs no provider selection, persistence, streaming, tools, or rendering.',
         example:`import ConfiguredAIChatSession from '/arcane/modules/ConfiguredAIChatSession.js';
 
 const session=new ConfiguredAIChatSession({
-    systemPrompt:'Be concise.',
-    responseLength:'low',
+    systemPrompt:'Return the complete answer.',
     chat:async request=>({
         provider:'demo',
         model:'echo',
@@ -428,7 +428,7 @@ console.log(await session.send('Hello'));`
     Object.freeze({
         name:'ConversationActionItems.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Pure bounded normalization and lifecycle transforms with no persistence, reminders, delivery, or timers.',
+        lifecycleSideEffects:'Pure complete-content normalization and lifecycle transforms with no persistence, reminders, delivery, or timers.',
         paramsResults:'Helpers create, normalize, remember, update, remove, select, and mark open or completed items with an explicit basis, IDs, revisions, timestamps, and presentation cooldown. Formatting returns inert check-in or prompt text.',
         events:Object.freeze([]),
         errors:Object.freeze(['CONVERSATION_ACTION_ITEM_INVALID']),
@@ -443,11 +443,12 @@ console.log(item,outstandingConversationActionItems([item]));`
         name:'ConversationClosingReport.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure tool-schema, instruction, classification, normalization, and escaped-text formatting; it performs no inference, persistence, rendering, action, navigation, or delivery.',
-        paramsResults:'createConversationClosingReportTool(options) returns a frozen function-tool schema. normalizeConversationClosingReport(value) accepts an object or JSON with final_message and optional remembered_actions; the classifier accepts only a sole named call; the formatter HTML-escapes final text.',
+        paramsResults:'createConversationClosingReportTool(options) returns a mutable function-tool schema requiring nonempty string message and final_message fields; remembered_actions remains optional. normalizeConversationClosingReport(value) accepts an object or JSON and returns mutable {message,finalMessage,rememberedActions}; the classifier accepts only a sole named call. message is the brief user-facing progress text for accepting and rendering the call, while final_message remains the complete closeout and the formatter HTML-escapes only that final text.',
         events:Object.freeze([]),
         errors:Object.freeze(['CONVERSATION_CLOSING_REPORT_INVALID']),
         capabilitiesCore:'Provider-neutral terminal tool contract; the app and provider own calling and any consented local persistence.',
         example:`const report=normalizeConversationClosingReport({
+    message:'Preparing the conversation closeout.',
     final_message:'All requested work is complete.',
     remembered_actions:[]
 });
@@ -457,7 +458,7 @@ console.log(formatConversationClosingReport(report));`
         name:'ConversationTimebox.js',
         classification:'public-first-party',
         lifecycleSideEffects:'ConversationTimebox starts and cancels a periodic tick, holds in-memory deadline state, and notifies subscribed callbacks; dispose cancels the timer and clears listeners.',
-        paramsResults:'The class starts, sets, adjusts, clears, applies, snapshots, subscribes, and disposes limits. Exported helpers normalize sole-tool commands, control messages, elapsed display, submission keys and barriers, and delivery proof.',
+        paramsResults:'The class starts, sets, adjusts, clears, applies, snapshots, subscribes, and disposes limits. conversationTimeboxTool requires action and a nonempty string message in every function argument object; set and adjust also require duration_milliseconds. normalizeConversationTimeboxCommand preserves message, and applyCommand plus a fulfilled consumeConversationTimeboxCall result return the changed state with that user-facing message. Exported helpers also cover sole-tool commands, control messages, elapsed display, submission keys, barriers, and delivery proof.',
         events:Object.freeze(['subscriber snapshot','subscriber change','subscriber tick','subscriber due']),
         errors:Object.freeze(['TypeError or RangeError for invalid options, clock, commands, durations, or dates','CONVERSATION_TIMEBOX_MUST_BE_SOLE_CALL','requireConversationTimeboxDelivery throws on false']),
         capabilitiesCore:'Cross-host conversation control contract using clocks and callbacks; it supplies a provider tool schema but does not call Core.',
@@ -469,7 +470,11 @@ const box=new ConversationTimebox({
     tickMs:1000
 });
 box.start();
-console.log(box.setLimitMilliseconds(60_000));
+console.log(box.applyCommand({
+    action:'set',
+    duration_milliseconds:60_000,
+    message:'Setting the requested one-minute time check.'
+}));
 box.dispose();`
     }),
     Object.freeze({
@@ -523,8 +528,8 @@ console.log(await window.dbopfs.get('notes','welcome',true));`
     Object.freeze({
         name:'DBOPFSDocumentLibrary.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Construction only validates options and binds an existing DBOPFS-compatible adapter. bootstrap is the sole corpus writer: it performs bounded reads, writes a new generation, commits the completion manifest last, and then removes stale generation files. search and buildContext read only the completed generation. evaluate reads caller-owned sources without persisting their bodies.',
-        paramsResults:'new DBOPFSDocumentLibrary({concurrency=4,db=globalThis.dbopfs,maxCorpusCharacters=16777216,maxDocumentCharacters=1048576,maxSearchCharacters,schema}); bootstrap({files,onProgress?,read?,readFailurePolicy?,signal?}) resolves a frozen manifest and optionally partial readCoverage; search(query,{kinds?,limit=10,signal?,tags?}) resolves {failures,matches,total}; evaluate(query,{sources,read,maxCharacters,maxCorpusCharacters,maxScoringCharacters,maxDocumentCharacters?,kinds?,tags?,readFailurePolicy?,onProgress?,signal?}) requires sources, read, and the three named budgets, persists no caller-owned body, and resolves frozen {authority:\'sources\',characters,coverage,documents,failures,limits,query,scoringTruncated,text,truncated}. Evaluation defaults to rejecting read failures; readFailurePolicy:\'preserve-readable\' instead returns partial failures and coverage for successfully read sources. buildContext() resolves bounded persisted context; createContextBuilder() returns a ConfiguredAIChatSession-compatible async builder.',
+        lifecycleSideEffects:'Construction only validates options and binds an existing DBOPFS-compatible adapter. bootstrap is the sole corpus writer: it reads complete selected sources with caller-configured concurrency, writes a new generation, commits the completion manifest last, and then removes stale generation files. search and buildContext read only the completed generation. evaluate reads complete caller-owned sources without persisting their bodies.',
+        paramsResults:'new DBOPFSDocumentLibrary({concurrency=4,db=globalThis.dbopfs,schema}); legacy maximum options are accepted without limiting content. bootstrap({files,onProgress?,read?,readFailurePolicy?,signal?}) resolves a mutable manifest and optional partial readCoverage; search(query,{kinds?,signal?,tags?}) resolves complete {failures,matches,total}; evaluate(query,{sources,read,kinds?,tags?,readFailurePolicy?,onProgress?,signal?}) persists no caller-owned body and resolves mutable {authority:\'sources\',characters,coverage,documents,failures,query,text}. The default preserve-readable policy reports source failures while retaining every readable source; readFailurePolicy:\'reject\' opts into whole-operation rejection. buildContext() resolves complete persisted context; createContextBuilder() returns a ConfiguredAIChatSession-compatible async builder.',
         events:Object.freeze(['optional bootstrap onProgress phases: reading, writing, cleanup, complete','optional evaluate onProgress phases: preparing, reading, read-complete, ranking, assembling, complete']),
         errors:Object.freeze(['DBOPFS_DOCUMENT_INVALID','DBOPFS_DOCUMENT_INVALID_LIMIT','DBOPFS_DOCUMENT_STORAGE_UNAVAILABLE','DBOPFS_DOCUMENT_BUSY','DBOPFS_DOCUMENT_NOT_BOOTSTRAPPED','DBOPFS_DOCUMENT_INCOMPLETE','DBOPFS_DOCUMENT_CASE_COLLISION','DBOPFS_DOCUMENT_BOOTSTRAP_FAILED','DBOPFS_DOCUMENT_READ_FAILED','DBOPFS_DOCUMENT_LIMIT','DBOPFS_DOCUMENT_ABORTED','preserved read failures without a usable source code use failures[].code DBOPFS_DOCUMENT_ERROR']),
         capabilitiesCore:'Portable app-owned storage/search mechanism. It preserves existing DBOPFS method names and semantics and needs no Core RPC; the host-specific boundary is the injected storage adapter.',
@@ -570,7 +575,7 @@ console.log(await result);`
         name:'DevelopmentWorkspace.js',
         classification:'public-first-party',
         lifecycleSideEffects:'The client itself performs no discovery; inspect, context, setup, and installNode delegate only to an injected or Arcane.development provider.',
-        paramsResults:'DevelopmentWorkspace(api) reports available and nodeInstallerAvailable. inspect(root), context(root, query), setup(root, taskId), and installNode() validate bounded inputs and preserve provider results.',
+        paramsResults:'DevelopmentWorkspace(api) reports available and nodeInstallerAvailable. inspect(root), context(root, query), setup(root, taskId), and installNode() preserve complete provider results.',
         events:Object.freeze([]),
         errors:Object.freeze(['TypeError for an invalid root, query, or task id','unavailable capability Error','provider errors preserved']),
         capabilitiesCore:'Native development-capability wrapper; the provider owns filesystem authorization, canonical paths, filtering, the setup allowlist, and fixed Node installer, with no arbitrary-command API.',
@@ -597,8 +602,8 @@ console.log(await picker.select({title:'Choose a workspace'}));`
     Object.freeze({
         name:'DocumentLexicalSearch.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Construction creates frozen in-memory indexes. Tokenization, scoring, rank, search, and excerpt helpers are deterministic and perform no storage, network, provider, DOM, or global mutation.',
-        paramsResults:'new DocumentLexicalSearch(records,{maxResults=20}); rank(query,{kinds,tags}) returns every frozen scored match, and search(query,{kinds,limit,tags}) returns a bounded frozen subset. documentContextExcerpt(value,query,maximum,{relevant=false}) returns bounded text, line range, and truncation metadata. Public helpers expose normalized text/tokens, index construction, and metadata/body scoring.',
+        lifecycleSideEffects:'Construction creates mutable in-memory indexes. Tokenization, scoring, rank, search, and excerpt helpers are deterministic and perform no storage, network, provider, DOM, or global mutation.',
+        paramsResults:'new DocumentLexicalSearch(records); rank(query,{kinds,tags}) and search(query,{kinds,limit?,tags}) return every mutable scored match; the legacy limit option is accepted without reducing results. documentContextExcerpt(value) returns the complete text and full line range. Public helpers expose normalized text/tokens, index construction, and metadata/body scoring.',
         events:Object.freeze([]),
         errors:Object.freeze(['DOCUMENT_SEARCH_INVALID','DOCUMENT_SEARCH_INVALID_QUERY']),
         capabilitiesCore:'Dependency-free cross-host search with no Core or provider authority. Applications decide which records enter the index and whether results become chat context.',

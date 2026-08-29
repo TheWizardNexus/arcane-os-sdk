@@ -13,21 +13,68 @@ function plainRecord(value){
         &&Object.getPrototypeOf(value)===Object.prototype;
 }
 
+function coded(error,code){
+    error.code=code;
+    return error;
+}
+
 function copyToolCalls(value){
     if(value===undefined) return null;
     if(!Array.isArray(value)||value.length!==1){
-        throw new TypeError('assistantMessage.tool_calls must contain exactly one structural tool call.');
+        const error=new TypeError(
+            'assistantMessage.tool_calls must contain exactly one structural tool call.'
+        );
+        error.code=Array.isArray(value)&&value.length>1
+            ?'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED'
+            :'AI_CHAT_INVALID_TOOL_CALL';
+        throw error;
     }
     const ids=new Set();
     return value.map((call,index)=>{
         if(!plainRecord(call)||!plainRecord(call.function)||call.type!=='function'){
-            throw new TypeError(`assistantMessage.tool_calls[${index}] is invalid.`);
+            const error=new TypeError(`assistantMessage.tool_calls[${index}] is invalid.`);
+            error.code='AI_CHAT_INVALID_TOOL_CALL';
+            throw error;
         }
-        const id=String(call.id??'').trim();
-        const name=String(call.function.name??'').trim();
+        const id=call.id;
+        const name=call.function.name;
         const argumentValue=call.function.arguments;
-        if(!id||id.length>128||ids.has(id)||!name||name.length>128||typeof argumentValue!=='string'){
-            throw new TypeError(`assistantMessage.tool_calls[${index}] is invalid.`);
+        if(
+            typeof id!=='string'
+            ||!id.trim()
+            ||ids.has(id)
+            ||typeof name!=='string'
+            ||!name.trim()
+            ||typeof argumentValue!=='string'
+        ){
+            const error=new TypeError(`assistantMessage.tool_calls[${index}] is invalid.`);
+            error.code='AI_CHAT_INVALID_TOOL_CALL';
+            throw error;
+        }
+        let argumentRecord;
+        try{
+            argumentRecord=JSON.parse(argumentValue);
+        }catch(cause){
+            const error=new TypeError(
+                `assistantMessage.tool_calls[${index}].function.arguments must encode a JSON object.`,
+                {cause}
+            );
+            error.code='AI_CHAT_INVALID_TOOL_CALL';
+            throw error;
+        }
+        if(!plainRecord(argumentRecord)){
+            const error=new TypeError(
+                `assistantMessage.tool_calls[${index}].function.arguments must encode a JSON object.`
+            );
+            error.code='AI_CHAT_INVALID_TOOL_CALL';
+            throw error;
+        }
+        if(typeof argumentRecord.message!=='string'||!argumentRecord.message.trim()){
+            const error=new TypeError(
+                `assistantMessage.tool_calls[${index}].function.arguments.message must contain user-facing text.`
+            );
+            error.code='AI_CHAT_TOOL_MESSAGE_REQUIRED';
+            throw error;
         }
         ids.add(id);
         return {
@@ -43,8 +90,19 @@ function turnMessage(value,label){
         throw new TypeError(`${label} must be a user or tool message.`);
     }
     if(value.role==='tool'){
-        const toolCallId=String(value.tool_call_id??'').trim();
-        if(!toolCallId||toolCallId.length>128) throw new TypeError(`${label}.tool_call_id is invalid.`);
+        const toolCallId=value.tool_call_id;
+        if(typeof toolCallId!=='string'||!toolCallId.trim()){
+            throw coded(
+                new TypeError(`${label}.tool_call_id is invalid.`),
+                'AI_CHAT_INVALID_TOOL_MESSAGE'
+            );
+        }
+        if(!value.content.trim()){
+            throw coded(
+                new TypeError(`${label}.content must contain a user-facing tool result.`),
+                'AI_CHAT_INVALID_TOOL_MESSAGE'
+            );
+        }
         return {content:value.content,role:'tool',tool_call_id:toolCallId};
     }
     return {content:value.content,role:'user'};
@@ -53,20 +111,67 @@ function turnMessage(value,label){
 function pendingToolCallId(messages){
     let pending=null;
     for(const [index,message] of messages.entries()){
-        if(message.role==='user'&&pending){
-            throw new TypeError(`Chat message ${index+1} starts a user turn before the pending tool result.`);
+        if(!plainRecord(message)||!['assistant','system','tool','user'].includes(message.role)){
+            throw coded(
+                new TypeError(`Chat message ${index+1} is not a supported persisted record.`),
+                'AI_CHAT_INCOHERENT_PERSISTENCE'
+            );
         }
-        if(message.role==='assistant'&&message.tool_calls){
-            const calls=copyToolCalls(message.tool_calls);
+        if(message.role!=='assistant'&&message.tool_calls!==undefined){
+            throw coded(
+                new TypeError(`Chat message ${index+1} places structural tool calls on a non-assistant record.`),
+                'AI_CHAT_INCOHERENT_PERSISTENCE'
+            );
+        }
+        if(message.role!=='tool'&&message.tool_call_id!==undefined){
+            throw coded(
+                new TypeError(`Chat message ${index+1} places a tool-call ID on a non-tool record.`),
+                'AI_CHAT_INCOHERENT_PERSISTENCE'
+            );
+        }
+        if(message.role==='system'&&pending){
+            throw coded(
+                new TypeError(`Chat message ${index+1} precedes the pending tool result.`),
+                'AI_CHAT_INCOHERENT_PERSISTENCE'
+            );
+        }
+        if(message.role==='user'&&pending){
+            throw coded(
+                new TypeError(`Chat message ${index+1} starts a user turn before the pending tool result.`),
+                'AI_CHAT_INCOHERENT_PERSISTENCE'
+            );
+        }
+        if(message.role==='assistant'){
             if(pending){
-                throw new TypeError(`Chat message ${index+1} overlaps a pending tool call.`);
+                throw coded(
+                    new TypeError(`Chat message ${index+1} precedes the pending tool result.`),
+                    'AI_CHAT_INCOHERENT_PERSISTENCE'
+                );
             }
-            pending=calls[0].id;
+            if(message.tool_calls){
+                const calls=copyToolCalls(message.tool_calls);
+                pending=calls[0].id;
+            }
         }
         if(message.role==='tool'){
-            const toolCallId=String(message.tool_call_id??'').trim();
+            const toolCallId=message.tool_call_id;
+            if(typeof toolCallId!=='string'||!toolCallId.trim()){
+                throw coded(
+                    new TypeError(`Chat message ${index+1} has an invalid tool_call_id.`),
+                    'AI_CHAT_INCOHERENT_PERSISTENCE'
+                );
+            }
+            if(typeof message.content!=='string'||!message.content.trim()){
+                throw coded(
+                    new TypeError(`Chat message ${index+1} has a blank tool result.`),
+                    'AI_CHAT_INCOHERENT_PERSISTENCE'
+                );
+            }
             if(!pending||pending!==toolCallId){
-                throw new TypeError(`Chat message ${index+1} does not match the pending tool call.`);
+                throw coded(
+                    new TypeError(`Chat message ${index+1} does not match the pending tool call.`),
+                    'AI_CHAT_INCOHERENT_PERSISTENCE'
+                );
             }
             pending=null;
         }
@@ -91,6 +196,8 @@ function pendingToolCallId(messages){
  * Internal marker for session-only messages omitted from durable chat and memory.
  * @property {Array<Object>} [tool_calls]
  * Assistant tool calls retained in the saved conversation log.
+ * @property {string} [reasoning_content]
+ * Optional complete provider reasoning retained with an assistant record.
  * @property {string} [tool_call_id]
  * Matching tool-call identifier for a tool result.
  */
@@ -225,21 +332,47 @@ class ChatEntity{
      * @returns {ChatMessage[]}
      */
     get messages(){
-        return Object.freeze(this.#messages.map(function publicChatMessage(message){
+        return this.#messages.map(function publicChatMessage(message){
             const copy={...message};
             if(copy.tool_calls){
-                copy.tool_calls=Object.freeze(copyToolCalls(copy.tool_calls).map(call=>Object.freeze({
-                    function:Object.freeze({...call.function}),
+                copy.tool_calls=copyToolCalls(copy.tool_calls).map(call=>({
+                    function:{...call.function},
                     id:call.id,
                     type:call.type,
-                })));
+                }));
             }
             delete copy.memory_excluded;
             delete copy.persistence_excluded;
             delete copy.ui_hidden;
             delete copy.timestamp;
-            return Object.freeze(copy);
-        }));
+            return copy;
+        });
+    }
+
+    /**
+     * Returns the UI-visible conversation records with their persisted timestamps.
+     * Model-facing callers should continue to use `messages`, which intentionally
+     * omits display metadata.
+     *
+     * @returns {ChatMessage[]}
+     */
+    get transcript(){
+        return this.#messages
+            .filter(message=>message.ui_hidden!==true)
+            .map(function publicTranscriptMessage(message){
+                const copy={...message};
+                if(copy.tool_calls){
+                    copy.tool_calls=copyToolCalls(copy.tool_calls).map(call=>({
+                        function:{...call.function},
+                        id:call.id,
+                        type:call.type,
+                    }));
+                }
+                delete copy.memory_excluded;
+                delete copy.persistence_excluded;
+                delete copy.ui_hidden;
+                return copy;
+            });
     }
 
     /**
@@ -300,7 +433,10 @@ class ChatEntity{
             throw new Error('persist must be boolean');
         }
         if(pendingToolCallId(this.#messages)){
-            throw new TypeError('The pending structural tool result must be supplied before a new user turn.');
+            throw coded(
+                new TypeError('The pending structural tool result must be supplied before a new user turn.'),
+                'AI_CHAT_TOOL_RESULT_REQUIRED'
+            );
         }
 
         const message={
@@ -341,6 +477,12 @@ class ChatEntity{
         if(!is.boolean(persist)){
             throw new Error('persist must be boolean');
         }
+        if(pendingToolCallId(this.#messages)){
+            throw coded(
+                new TypeError('The pending structural tool result must be supplied before another assistant turn.'),
+                'AI_CHAT_TOOL_RESULT_REQUIRED'
+            );
+        }
 
         const message={
             role:'assistant',
@@ -366,16 +508,24 @@ class ChatEntity{
      * The host application decides whether anything is rendered in the chat UI.
      */
     addToolExchange({id='',name='',arguments:argumentValue='',result='',persist=true}={}){
-        const toolCallId=String(id).trim();
-        const toolName=String(name).trim();
-        if(!toolCallId||!toolName){
+        const toolCallId=id;
+        const toolName=name;
+        if(
+            typeof toolCallId!=='string'
+            ||!toolCallId.trim()
+            ||typeof toolName!=='string'
+            ||!toolName.trim()
+        ){
             throw new TypeError('Tool exchanges require an id and name.');
         }
         if(!is.boolean(persist)){
             throw new TypeError('persist must be boolean.');
         }
         if(pendingToolCallId(this.#messages)){
-            throw new TypeError('The pending structural tool result must be supplied before another tool exchange.');
+            throw coded(
+                new TypeError('The pending structural tool result must be supplied before another tool exchange.'),
+                'AI_CHAT_TOOL_RESULT_REQUIRED'
+            );
         }
 
         const serializedArguments=typeof argumentValue==='string'
@@ -387,6 +537,14 @@ class ChatEntity{
         if(typeof serializedArguments!=='string'||typeof serializedResult!=='string'){
             throw new TypeError('Tool exchange arguments and results must be JSON-compatible.');
         }
+        const toolCall=copyToolCalls([{
+            id:toolCallId,
+            type:'function',
+            function:{
+                name:toolName,
+                arguments:serializedArguments
+            }
+        }])[0];
 
         const timestamp=Date.now();
         return this.#appendMessages([
@@ -394,14 +552,7 @@ class ChatEntity{
                 role:'assistant',
                 content:'',
                 tool_calls:[
-                    {
-                        id:toolCallId,
-                        type:'function',
-                        function:{
-                            name:toolName,
-                            arguments:serializedArguments
-                        }
-                    }
+                    toolCall
                 ],
                 timestamp,
                 memory_excluded:true
@@ -440,19 +591,41 @@ class ChatEntity{
             throw new TypeError('memoryRequest must be a function.');
         }
         if(messagePersist!==responsePersist){
-            throw new TypeError('messagePersist and responsePersist must match for one coherent durable turn.');
+            throw coded(
+                new TypeError('messagePersist and responsePersist must match for one coherent durable turn.'),
+                'AI_CHAT_INCOHERENT_PERSISTENCE'
+            );
         }
         const pendingTool=pendingToolCallId(this.#messages);
         if(request.role==='user'&&pendingTool){
-            throw new TypeError('The pending structural tool result must be supplied before a new user turn.');
+            throw coded(
+                new TypeError('The pending structural tool result must be supplied before a new user turn.'),
+                'AI_CHAT_TOOL_RESULT_REQUIRED'
+            );
         }
         if(request.role==='tool'&&pendingTool!==request.tool_call_id){
-            throw new TypeError('requestMessage does not match the pending structural tool call.');
+            throw coded(
+                new TypeError('requestMessage does not match the pending structural tool call.'),
+                'AI_CHAT_INVALID_TOOL_MESSAGE'
+            );
         }
         const toolCalls=copyToolCalls(assistantMessage.tool_calls);
         const assistantContent=assistantMessage.content??'';
-        if(!is.union(assistantContent,'string','number')||(!String(assistantContent)&&!toolCalls)){
-            throw new TypeError('assistantMessage must contain text or structural tool calls.');
+        const assistantReasoning=assistantMessage.reasoning_content;
+        if(assistantReasoning!==undefined&&typeof assistantReasoning!=='string'){
+            throw new TypeError('assistantMessage.reasoning_content must be a string when provided.');
+        }
+        if(
+            !is.union(assistantContent,'string','number')
+            ||(
+                !String(assistantContent)
+                &&!toolCalls
+                &&!(typeof assistantReasoning==='string'&&assistantReasoning.length)
+            )
+        ){
+            throw new TypeError(
+                'assistantMessage must contain text, reasoning, or structural tool calls.'
+            );
         }
         const timestamp=Date.now();
         const requestRecord={...request,timestamp};
@@ -460,6 +633,7 @@ class ChatEntity{
             content:assistantContent,
             role:'assistant',
             timestamp,
+            ...(assistantReasoning!==undefined?{reasoning_content:assistantReasoning}:{}),
             ...(toolCalls?{tool_calls:toolCalls}:{})
         };
         if(request.role==='tool') requestRecord.memory_excluded=true;
@@ -502,13 +676,15 @@ class ChatEntity{
             return this.messages;
         }
 
-        this.#messages=Array.isArray(content)
+        const loadedMessages=Array.isArray(content)
             ?content
             :String(content)
                 .split('\n')
                 .map(row=>row.trim())
                 .filter(Boolean)
                 .map(row=>JSON.parse(row));
+        pendingToolCallId(loadedMessages);
+        this.#messages=loadedMessages;
         this.#persistedMessageCount=this.#durableMessages().length;
         this.#saved=true;
 
@@ -735,13 +911,19 @@ ${JSON.stringify(transcript)}`
             try{
                 const messageIndex=this.#messages.indexOf(records[0]);
                 if(messageIndex<0){
-                    return false;
+                    throw coded(
+                        new Error('The chat persistence transaction is already settled.'),
+                        'AI_CHAT_TRANSACTION_SETTLED'
+                    );
                 }
                 const recordsAreContiguous=records.every(
                     (record,index)=>this.#messages[messageIndex+index]===record
                 );
                 if(!recordsAreContiguous){
-                    throw new Error('Chat records changed before persistence completed.');
+                    throw coded(
+                        new Error('Chat records changed before persistence completed.'),
+                        'AI_CHAT_INCOHERENT_PERSISTENCE'
+                    );
                 }
                 const durableSnapshot=this.#durableMessages();
                 const durableIndex=durableSnapshot.indexOf(durableRecords[0]);
@@ -749,7 +931,10 @@ ${JSON.stringify(transcript)}`
                     (record,index)=>durableSnapshot[durableIndex+index]===record
                 );
                 if(durableIndex<0||!durableRecordsAreContiguous){
-                    throw new Error('Durable chat records changed before persistence completed.');
+                    throw coded(
+                        new Error('Durable chat records changed before persistence completed.'),
+                        'AI_CHAT_INCOHERENT_PERSISTENCE'
+                    );
                 }
                 const lastDurableIndex=durableIndex+durableRecords.length-1;
                 if(this.#persistedMessageCount===durableIndex){

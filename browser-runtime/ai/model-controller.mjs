@@ -2,107 +2,38 @@ import { createArcaneEventSource } from "arcane-os/event-manager";
 
 export const ARCANE_AI_ADAPTER_PROTOCOL = "arcane-ai-adapter/1";
 
-const SECURITY_KEYS = Object.freeze(["secure", "checks"]);
-const SECURITY_CHECK_KEYS = Object.freeze(["byteLength", "sha256"]);
-const EMPTY_SECURITY_CHECKS = Object.freeze({});
-const EMPTY_MODEL_SECURITY = Object.freeze({ checks: EMPTY_SECURITY_CHECKS });
-const MODEL_CONTROLLER_EVENT_TYPES = Object.freeze(["statechange", "progress"]);
+const MODEL_CONTROLLER_EVENT_TYPES = ["statechange", "progress"];
 const MODEL_CONTROLLER_EVENT_TYPE_SET = new Set(MODEL_CONTROLLER_EVENT_TYPES);
 
-function closedSecurityRecord(value, keys, label) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new TypeError(`${label} must be a plain object when provided.`);
-  }
-  const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) {
-    throw new TypeError(`${label} must be a plain object when provided.`);
-  }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  for (const key of Reflect.ownKeys(descriptors)) {
-    if (typeof key !== "string" || !keys.includes(key)) {
-      throw new TypeError(`${label} contains an unknown ${String(key)} field.`);
-    }
-    if (descriptors[key].get || descriptors[key].set) {
-      throw new TypeError(`${label}.${key} must be a data property.`);
-    }
-  }
-  return descriptors;
-}
-
 export function normalizeModelSecurity(value, label = "security") {
-  if (value === undefined) return EMPTY_MODEL_SECURITY;
-  const descriptors = closedSecurityRecord(value, SECURITY_KEYS, label);
-  const normalized = {};
-  if (descriptors.secure?.value !== undefined) {
-    if (typeof descriptors.secure.value !== "boolean") {
-      throw new TypeError(`${label}.secure must be a boolean when provided.`);
-    }
-    normalized.secure = descriptors.secure.value;
-  }
-
-  let checks = EMPTY_SECURITY_CHECKS;
-  if (descriptors.checks?.value !== undefined) {
-    const checkDescriptors = closedSecurityRecord(
-      descriptors.checks.value,
-      SECURITY_CHECK_KEYS,
-      `${label}.checks`,
-    );
-    const normalizedChecks = {};
-    for (const check of SECURITY_CHECK_KEYS) {
-      if (checkDescriptors[check]?.value === undefined) continue;
-      if (typeof checkDescriptors[check].value !== "boolean") {
-        throw new TypeError(`${label}.checks.${check} must be a boolean when provided.`);
-      }
-      normalizedChecks[check] = checkDescriptors[check].value;
-    }
-    checks = Object.freeze(normalizedChecks);
-  }
-  normalized.checks = checks;
-  return Object.freeze(normalized);
+  void label;
+  return value?.secure === true ? { secure: true } : undefined;
 }
 
 export function resolveModelSecurity({ app, binding, load } = {}) {
-  const scopes = [
-    normalizeModelSecurity(app, "app security"),
-    normalizeModelSecurity(binding, "provider security"),
-    normalizeModelSecurity(load, "load security"),
-  ];
+  const scopes = [app, binding, load];
   let secure = false;
-  let byteLength;
-  let sha256;
   for (const scope of scopes) {
-    if (Object.hasOwn(scope, "secure")) secure = scope.secure;
-    if (Object.hasOwn(scope.checks, "byteLength")) byteLength = scope.checks.byteLength;
-    if (Object.hasOwn(scope.checks, "sha256")) sha256 = scope.checks.sha256;
+    if (scope?.secure === true) secure = true;
+    else if (scope?.secure === false) secure = false;
   }
-  return Object.freeze({
-    secure,
-    checks: Object.freeze({
-      byteLength: byteLength ?? secure,
-      sha256: sha256 ?? secure,
-    }),
-  });
+  if (!secure) return undefined;
+  // Secure mode currently carries activation intent only. Security checks remain
+  // disabled and must be reviewed with the user before any implementation runs.
+  return { secure: true };
 }
 
 export function sameModelSecurity(left, right) {
-  return left?.secure === right?.secure
-    && left?.checks?.byteLength === right?.checks?.byteLength
-    && left?.checks?.sha256 === right?.checks?.sha256;
+  return (left?.secure === true) === (right?.secure === true);
 }
 
-function hasModelSecurityOverrides(value) {
-  return Object.hasOwn(value, "secure")
-    || Object.hasOwn(value.checks, "byteLength")
-    || Object.hasOwn(value.checks, "sha256");
-}
-
-const ERROR_CODES = Object.freeze({
+const ERROR_CODES = {
   load: "ARCANE_AI_LOAD_FAILED",
   unload: "ARCANE_AI_UNLOAD_FAILED",
   request: "ARCANE_AI_REQUEST_FAILED",
   dispose: "ARCANE_AI_DISPOSE_FAILED",
   probe: "ARCANE_AI_PROBE_FAILED",
-});
+};
 
 function abortLike(error, signal) {
   return signal?.aborted === true
@@ -174,10 +105,10 @@ function copyError(error) {
       throw invalidStatus(copyErrorFailure);
     }
   }
-  return Object.freeze({
+  return {
     code: String(code ?? "ARCANE_AI_REQUEST_FAILED"),
     message: String(message ?? "The Arcane AI operation failed."),
-  });
+  };
 }
 
 function isModelControllerListener(value) {
@@ -208,9 +139,6 @@ function copyProviderStatus(value) {
   }
 }
 
-const MAX_PROGRESS_DEPTH = 8;
-const MAX_PROGRESS_ENTRIES = 256;
-
 function invalidProgress(cause) {
   return new ArcaneAIError(
     "ARCANE_AI_PROVIDER_PROGRESS_INVALID",
@@ -219,9 +147,9 @@ function invalidProgress(cause) {
   );
 }
 
-function copyProgressValue(value, state, depth = 0) {
+function copyProgressValue(value, state) {
   if (value === null || typeof value !== "object") return value;
-  if (depth > MAX_PROGRESS_DEPTH || state.seen.has(value)) {
+  if (state.seen.has(value)) {
     throw invalidProgress();
   }
   const prototype = Object.getPrototypeOf(value);
@@ -233,20 +161,19 @@ function copyProgressValue(value, state, depth = 0) {
   try {
     for (const key of Reflect.ownKeys(value)) {
       if (Array.isArray(value) && key === "length") continue;
-      state.entries += 1;
-      if (state.entries > MAX_PROGRESS_ENTRIES || typeof key !== "string") {
+      if (typeof key !== "string") {
         throw invalidProgress();
       }
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
       if (!descriptor || !("value" in descriptor)) throw invalidProgress();
       Object.defineProperty(copy, key, {
-        value: copyProgressValue(descriptor.value, state, depth + 1),
+        value: copyProgressValue(descriptor.value, state),
         enumerable: descriptor.enumerable,
-        configurable: false,
-        writable: false,
+        configurable: true,
+        writable: true,
       });
     }
-    return Object.freeze(copy);
+    return copy;
   } finally {
     state.seen.delete(value);
   }
@@ -258,7 +185,7 @@ function copyProgress(progress) {
     throw invalidProgress();
   }
   try {
-    return copyProgressValue(progress, { seen: new WeakSet(), entries: 0 });
+    return copyProgressValue(progress, { seen: new WeakSet() });
   } catch (error) {
     if (error instanceof ArcaneAIError) throw error;
     throw invalidProgress(error);
@@ -266,31 +193,7 @@ function copyProgress(progress) {
 }
 
 function publicProgress(progress) {
-  if (!progress || typeof progress !== "object") return null;
-  const file = progress.file && typeof progress.file === "object"
-    ? Object.freeze({
-      ...(Number.isSafeInteger(progress.file.index) ? { index: progress.file.index } : {}),
-      ...(Number.isSafeInteger(progress.file.count) ? { count: progress.file.count } : {}),
-      ...(typeof progress.file.name === "string" ? { name: progress.file.name } : {}),
-      ...(Number.isSafeInteger(progress.file.loaded) ? { loaded: progress.file.loaded } : {}),
-      ...(progress.file.total === null || Number.isSafeInteger(progress.file.total)
-        ? { total: progress.file.total }
-        : {}),
-    })
-    : null;
-  return Object.freeze({
-    ...(typeof progress.modelId === "string" ? { modelId: progress.modelId } : {}),
-    ...(typeof progress.phase === "string" ? { phase: progress.phase } : {}),
-    ...(Number.isSafeInteger(progress.loaded) ? { loaded: progress.loaded } : {}),
-    ...(progress.total === null || Number.isSafeInteger(progress.total)
-      ? { total: progress.total }
-      : {}),
-    ...(progress.percent === null
-      || (typeof progress.percent === "number" && Number.isFinite(progress.percent))
-      ? { percent: progress.percent }
-      : {}),
-    ...(file ? { file } : {}),
-  });
+  return progress && typeof progress === "object" ? copyProgress(progress) : null;
 }
 
 function localRequirement(options, provider) {
@@ -311,10 +214,10 @@ function linkedAbortSignal(externalSignal) {
   const forward = () => controller.abort(externalSignal.reason);
   if (externalSignal?.aborted) forward();
   else externalSignal?.addEventListener?.("abort", forward, { once: true });
-  return Object.freeze({
+  return {
     controller,
     release: () => externalSignal?.removeEventListener?.("abort", forward),
-  });
+  };
 }
 
 function fireAndForget(callback, ...args) {
@@ -338,21 +241,464 @@ function displayRequestId(value) {
   return `M-${String(value)}`;
 }
 
+function completeTextValue(value, seen, location) {
+  if (value === null) return null;
+  if (value === undefined) return { $type: "undefined" };
+  if (typeof value === "bigint") return { $type: "bigint", value: value.toString() };
+  if (typeof value === "number" && !Number.isFinite(value)) {
+    return { $type: "number", value: String(value) };
+  }
+  if (typeof value === "symbol") return { $type: "symbol", value: String(value) };
+  if (typeof value === "function") {
+    return { $type: "function", value: Function.prototype.toString.call(value) };
+  }
+  if (typeof value !== "object") return value;
+  if (seen.has(value)) return { $ref: seen.get(value) };
+  seen.set(value, location);
+  if (value instanceof Date) return { $type: "date", value: value.toISOString() };
+  if (value instanceof RegExp) return { $type: "regexp", value: String(value) };
+  if (value instanceof Map) {
+    return {
+      $type: "map",
+      entries: [...value.entries()].map(([key, entry], index) => [
+        completeTextValue(key, seen, `${location}.entries[${index}].key`),
+        completeTextValue(entry, seen, `${location}.entries[${index}].value`),
+      ]),
+    };
+  }
+  if (value instanceof Set) {
+    return {
+      $type: "set",
+      values: [...value].map((entry, index) => completeTextValue(
+        entry,
+        seen,
+        `${location}.values[${index}]`,
+      )),
+    };
+  }
+  if (ArrayBuffer.isView(value)) {
+    return {
+      $type: value.constructor?.name ?? "ArrayBufferView",
+      values: Array.from(
+        value instanceof DataView
+          ? new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+          : value,
+        (entry, index) => completeTextValue(entry, seen, `${location}.values[${index}]`),
+      ),
+    };
+  }
+  if (value instanceof ArrayBuffer) {
+    return { $type: "ArrayBuffer", values: Array.from(new Uint8Array(value)) };
+  }
+  const copy = Array.isArray(value) ? [] : {};
+  for (const key of Reflect.ownKeys(value)) {
+    if (Array.isArray(value) && key === "length") continue;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const renderedKey = typeof key === "symbol" ? `[${String(key)}]` : key;
+    copy[renderedKey] = descriptor && "value" in descriptor
+      ? completeTextValue(descriptor.value, seen, `${location}.${renderedKey}`)
+      : {
+        $type: "accessor",
+        get: Boolean(descriptor?.get),
+        set: Boolean(descriptor?.set),
+      };
+  }
+  return copy;
+}
+
+export function completeValueText(value) {
+  if (typeof value === "string") return value;
+  return JSON.stringify(completeTextValue(value, new WeakMap(), "$"), null, 2);
+}
+
 function textFromCompletion(completion) {
-  const content = completion?.choices?.[0]?.message?.content;
-  return typeof content === "string" ? content : "";
+  if (!Array.isArray(completion?.choices)) return completeValueText(completion);
+  return completion.choices.map((choice) => {
+    const content = choice?.message?.content;
+    return content === undefined ? completeValueText(choice) : completeValueText(content);
+  }).join("\n");
+}
+
+function structuralToolCall(call,location){
+  if(
+    !call
+    ||typeof call!=="object"
+    ||Array.isArray(call)
+    ||call.type!=="function"
+    ||typeof call.id!=="string"
+    ||!call.id.trim()
+    ||!call.function
+    ||typeof call.function!=="object"
+    ||Array.isArray(call.function)
+    ||typeof call.function.name!=="string"
+    ||!call.function.name.trim()
+    ||typeof call.function.arguments!=="string"
+  ){
+    throw new ArcaneAIError(
+      "ARCANE_AI_TOOL_CALL_INVALID",
+      `${location} is not a complete structural function call.`,
+      {operation:"request"},
+    );
+  }
+  let argumentsRecord;
+  try{
+    argumentsRecord=JSON.parse(call.function.arguments);
+  }catch(error){
+    throw new ArcaneAIError(
+      "ARCANE_AI_TOOL_CALL_INVALID",
+      `${location} arguments must encode a JSON object.`,
+      {cause:error,operation:"request"},
+    );
+  }
+  if(
+    !argumentsRecord
+    ||typeof argumentsRecord!=="object"
+    ||Array.isArray(argumentsRecord)
+  ){
+    throw new ArcaneAIError(
+      "ARCANE_AI_TOOL_CALL_INVALID",
+      `${location} arguments must encode a JSON object.`,
+      {operation:"request"},
+    );
+  }
+  if(typeof argumentsRecord.message!=="string"||!argumentsRecord.message.trim()){
+    throw new ArcaneAIError(
+      "ARCANE_AI_TOOL_MESSAGE_REQUIRED",
+      `${location} arguments must include a nonempty user-facing message.`,
+      {operation:"request"},
+    );
+  }
+  return {
+    id:call.id,
+    type:"function",
+    function:{
+      name:call.function.name,
+      arguments:call.function.arguments,
+    },
+  };
+}
+
+function plainStructuralRecord(value){
+  if(!value||typeof value!=="object"||Array.isArray(value)) return false;
+  const prototype=Object.getPrototypeOf(value);
+  return prototype===Object.prototype||prototype===null;
+}
+
+function requireToolMessageSchemas(value,location){
+  if(value===undefined) return;
+  if(!Array.isArray(value)){
+    throw new ArcaneAIError(
+      "ARCANE_AI_TOOL_CALL_INVALID",
+      `${location} must be an array.`,
+      {operation:"request"},
+    );
+  }
+  for(const [index,tool] of value.entries()){
+    const parameters=tool?.function?.parameters;
+    const messageSchema=parameters?.properties?.message;
+    if(
+      !plainStructuralRecord(tool)
+      ||tool.type!=="function"
+      ||!plainStructuralRecord(tool.function)
+      ||!plainStructuralRecord(parameters)
+      ||parameters.type!=="object"
+      ||!plainStructuralRecord(parameters.properties)
+      ||!plainStructuralRecord(messageSchema)
+      ||messageSchema.type!=="string"
+      ||!Number.isInteger(messageSchema.minLength)
+      ||messageSchema.minLength<1
+      ||!Array.isArray(parameters.required)
+      ||!parameters.required.includes("message")
+    ){
+      throw new ArcaneAIError(
+        "ARCANE_AI_TOOL_MESSAGE_REQUIRED",
+        `${location}[${String(index)}] must require a nonempty string parameters.properties.message.`,
+        {operation:"request"},
+      );
+    }
+  }
+}
+
+function structuralCallsFromMessage(message,location){
+  if(!plainStructuralRecord(message)){
+    throw new ArcaneAIError(
+      "ARCANE_AI_TOOL_CALL_INVALID",
+      `${location} must be a plain message object.`,
+      {operation:"request"},
+    );
+  }
+  if(
+    Object.hasOwn(message,"toolCalls")
+    ||Object.hasOwn(message,"tool_call")
+    ||Object.hasOwn(message,"toolCall")
+    ||Object.hasOwn(message,"function_call")
+    ||Object.hasOwn(message,"functionCall")
+  ){
+    throw new ArcaneAIError(
+      "ARCANE_AI_TOOL_CALL_INVALID",
+      `${location} contains a noncanonical structural tool-call field.`,
+      {operation:"request"},
+    );
+  }
+  if(!Object.hasOwn(message,"tool_calls"))return [];
+  const descriptor=Object.getOwnPropertyDescriptor(message,"tool_calls");
+  if(
+    !descriptor
+    ||!Object.hasOwn(descriptor,"value")
+    ||!Array.isArray(descriptor.value)
+  ){
+    throw new ArcaneAIError(
+      "ARCANE_AI_TOOL_CALL_INVALID",
+      `${location}.tool_calls must be an array data property.`,
+      {operation:"request"},
+    );
+  }
+  return descriptor.value;
+}
+
+function structuralRequest(value){
+  if(!plainStructuralRecord(value)){
+    throw new TypeError("AI request options must be a plain object.");
+  }
+  if(value.messages!==undefined&&!Array.isArray(value.messages)){
+    throw new TypeError("AI request messages must be an array.");
+  }
+  requireToolMessageSchemas(value.tools,"AI request tools");
+  if(value.parallelToolCalls===true||value.parallel_tool_calls===true){
+    throw new ArcaneAIError(
+      "ARCANE_AI_PARALLEL_TOOLS_UNSUPPORTED",
+      "The Arcane chat session accepts one structural tool call at a time.",
+      {operation:"request"},
+    );
+  }
+
+  let pendingToolCallId=null;
+  for(const [messageIndex,message] of (value.messages??[]).entries()){
+    const calls=structuralCallsFromMessage(
+      message,
+      `AI request messages[${String(messageIndex)}]`,
+    );
+    let openedToolCall=false;
+    if(Object.hasOwn(message,"tool_calls")){
+      if(message?.role!=="assistant"||!Array.isArray(calls)){
+        throw new ArcaneAIError(
+          "ARCANE_AI_TOOL_CALL_INVALID",
+          `AI request messages[${String(messageIndex)}].tool_calls is invalid.`,
+          {operation:"request"},
+        );
+      }
+      if(calls.length>1||pendingToolCallId!==null&&calls.length){
+        throw new ArcaneAIError(
+          "ARCANE_AI_PARALLEL_TOOLS_UNSUPPORTED",
+          "The Arcane chat session accepts one structural tool call at a time.",
+          {operation:"request"},
+        );
+      }
+      if(calls.length){
+        pendingToolCallId=structuralToolCall(
+          calls[0],
+          `AI request messages[${String(messageIndex)}].tool_calls[0]`,
+        ).id;
+        openedToolCall=true;
+      }
+    }
+    if(message?.role==="tool"){
+      if(
+        typeof message.content!=="string"
+        ||!message.content.trim()
+      ){
+        throw new ArcaneAIError(
+          "ARCANE_AI_INVALID_TOOL_MESSAGE",
+          `AI request messages[${String(messageIndex)}] must contain a nonblank user-facing tool result.`,
+          {operation:"request"},
+        );
+      }
+      if(
+        pendingToolCallId===null
+        ||typeof message.tool_call_id!=="string"
+        ||message.tool_call_id!==pendingToolCallId
+      ){
+        throw new ArcaneAIError(
+          "ARCANE_AI_INVALID_TOOL_MESSAGE",
+          `AI request messages[${String(messageIndex)}] does not settle the pending structural tool call.`,
+          {operation:"request"},
+        );
+      }
+      pendingToolCallId=null;
+    }else if(pendingToolCallId!==null&&!openedToolCall){
+      throw new ArcaneAIError(
+        "ARCANE_AI_TOOL_RESULT_REQUIRED",
+        `AI request messages[${String(messageIndex)}] precedes the pending structural tool result.`,
+        {operation:"request"},
+      );
+    }
+  }
+  if(pendingToolCallId!==null){
+    throw new ArcaneAIError(
+      "ARCANE_AI_TOOL_RESULT_REQUIRED",
+      "The pending structural tool call must be settled before requesting another response.",
+      {operation:"request"},
+    );
+  }
+
+  return {
+    ...value,
+    ...(value.tools?.length
+      &&value.parallelToolCalls===undefined
+      &&value.parallel_tool_calls===undefined
+      ?{parallelToolCalls:false}
+      :{}),
+  };
 }
 
 function toolRecordFromCompletion(completion) {
-  const result = {};
-  let count = 0;
-  for (const choice of completion?.choices ?? []) {
-    for (const call of choice?.message?.tool_calls ?? []) {
-      result[call.function.name] = call.function.arguments;
-      count += 1;
+  if(typeof completion==="string")return null;
+  if(!plainStructuralRecord(completion)){
+    throw new ArcaneAIError(
+      "ARCANE_AI_INVALID_PROVIDER_RESULT",
+      "The model returned neither text nor a structured completion.",
+      {operation:"request"},
+    );
+  }
+  const hasMessage=Object.hasOwn(completion,"message");
+  const hasChoices=Object.hasOwn(completion,"choices");
+  if(hasMessage===hasChoices){
+    throw new ArcaneAIError(
+      "ARCANE_AI_INVALID_PROVIDER_RESULT",
+      "The model completion must contain exactly one message or choices envelope.",
+      {operation:"request"},
+    );
+  }
+  const result = [];
+  const messages=[];
+  if(hasMessage){
+    const descriptor=Object.getOwnPropertyDescriptor(completion,"message");
+    if(
+      !descriptor
+      ||!Object.hasOwn(descriptor,"value")
+      ||!plainStructuralRecord(descriptor.value)
+      ||descriptor.value.role!=="assistant"
+    ){
+      throw new ArcaneAIError(
+        "ARCANE_AI_INVALID_PROVIDER_RESULT",
+        "The model completion message must be an assistant message data property.",
+        {operation:"request"},
+      );
+    }
+    messages.push(descriptor.value);
+  }else{
+    const descriptor=Object.getOwnPropertyDescriptor(completion,"choices");
+    if(
+      !descriptor
+      ||!Object.hasOwn(descriptor,"value")
+      ||!Array.isArray(descriptor.value)
+      ||!descriptor.value.length
+    ){
+      throw new ArcaneAIError(
+        "ARCANE_AI_INVALID_PROVIDER_RESULT",
+        "The model completion choices envelope must be a nonempty array data property.",
+        {operation:"request"},
+      );
+    }
+    const indexes=new Set();
+    for(const [choiceIndex,choice] of descriptor.value.entries()){
+      const messageDescriptor=plainStructuralRecord(choice)
+        ?Object.getOwnPropertyDescriptor(choice,"message")
+        :null;
+      if(
+        !plainStructuralRecord(choice)
+        ||!Number.isSafeInteger(choice.index)
+        ||choice.index<0
+        ||indexes.has(choice.index)
+        ||!messageDescriptor
+        ||!Object.hasOwn(messageDescriptor,"value")
+        ||!plainStructuralRecord(messageDescriptor.value)
+        ||messageDescriptor.value.role!=="assistant"
+      ){
+        throw new ArcaneAIError(
+          "ARCANE_AI_INVALID_PROVIDER_RESULT",
+          `The model completion choice ${String(choiceIndex)} is invalid.`,
+          {operation:"request"},
+        );
+      }
+      indexes.add(choice.index);
+      messages.push(messageDescriptor.value);
     }
   }
-  return count ? result : null;
+  for (let messageIndex=0;messageIndex<messages.length;messageIndex+=1) {
+    const calls=structuralCallsFromMessage(
+      messages[messageIndex],
+      `Structural tool call message ${String(messageIndex+1)}`,
+    );
+    if(messageIndex>0&&calls?.length){
+      throw new ArcaneAIError(
+        "ARCANE_AI_INVALID_PROVIDER_RESULT",
+        "The model placed a structural tool call outside the selected first choice.",
+        {operation:"request"},
+      );
+    }
+    for (const [callIndex,call] of (calls ?? []).entries()) {
+      result.push(structuralToolCall(
+        call,
+        `Structural tool call ${String(messageIndex+1)}.${String(callIndex+1)}`,
+      ));
+    }
+  }
+  if(result.length>1){
+    throw new ArcaneAIError(
+      "ARCANE_AI_PARALLEL_TOOLS_UNSUPPORTED",
+      "The Arcane chat session accepts one structural tool call at a time.",
+      {operation:"request"},
+    );
+  }
+  return result.length ? result : null;
+}
+
+function isPublicStreamContentKey(key){
+  return key==="content"
+    ||key==="text"
+    ||key==="thinking"
+    ||key==="reasoning"
+    ||key==="reasoning_content";
+}
+
+function projectPublicStreamContent(value,seen=new WeakSet()){
+  if(!value||typeof value!=="object"||seen.has(value))return null;
+  seen.add(value);
+  if(Array.isArray(value)){
+    const result=[];
+    for(const item of value){
+      const projected=projectPublicStreamContent(item,seen);
+      if(projected!==null)result.push(projected);
+    }
+    seen.delete(value);
+    return result.length?result:null;
+  }
+  if(!plainStructuralRecord(value)){
+    seen.delete(value);
+    return null;
+  }
+  const result={};
+  for(const [key,descriptor] of Object.entries(Object.getOwnPropertyDescriptors(value))){
+    if(!Object.hasOwn(descriptor,"value"))continue;
+    if(
+      isPublicStreamContentKey(key)
+      &&descriptor.value!==null
+      &&descriptor.value!==undefined
+    ){
+      result[key]=descriptor.value;
+      continue;
+    }
+    const projected=projectPublicStreamContent(descriptor.value,seen);
+    if(projected!==null)result[key]=projected;
+  }
+  seen.delete(value);
+  return Object.keys(result).length?result:null;
+}
+
+function projectPublicStreamChunk(value){
+  if(typeof value==="string")return value;
+  return projectPublicStreamContent(value);
 }
 
 export class ModelController {
@@ -401,18 +747,18 @@ export class ModelController {
 
   status() {
     const providerStatus = copyProviderStatus(
-      providerMethod(this.#provider, "status")?.(
-        Object.freeze({ security: this.#security }),
-      ),
+      providerMethod(this.#provider, "status")?.({}),
     );
+    delete providerStatus.security;
     const progress = copyProgress(providerStatus.progress ?? this.#progress);
-    return Object.freeze({
+    return {
       ...providerStatus,
       kind: "llm",
       state: providerStatus.state ?? this.#fallbackState,
       progress,
       error: copyError(providerStatus.error ?? this.#error),
-    });
+      ...(this.#security ? { security: { secure: true } } : {}),
+    };
   }
 
   addEventListener(type, listener, options) {
@@ -449,11 +795,11 @@ export class ModelController {
     const progress = type === "progress" ? publicProgress(status.progress) : null;
     this.#events.dispatch(type, status, {
       operationId,
-      publicDetail: Object.freeze({
+      publicDetail: {
         ...(typeof status.state === "string" ? { state: status.state } : {}),
         ...(progress ? { progress } : {}),
         ...(typeof status.error?.code === "string" ? { code: status.error.code } : {}),
-      }),
+      },
     });
   }
 
@@ -476,24 +822,28 @@ export class ModelController {
     const load = providerMethod(this.#provider, "load");
     if (!load) throw new ArcaneAIError("ARCANE_AI_UNAVAILABLE", "The LLM provider cannot load a model.");
     const signal = options.signal ?? null;
-    const explicitOperationSecurity = options.security !== undefined;
-    const securityMustResolve = explicitOperationSecurity
-      || (
-        state === "ready"
-        && !this.#readyPolicyResolved
-        && hasModelSecurityOverrides(this.#security)
-      );
-    if (state === "ready" && !securityMustResolve) return this.status();
+    this.#security = resolveModelSecurity({
+      app: this.#security,
+      load: options.security,
+    });
+    const loadOptions = { ...options };
+    delete loadOptions.security;
+    // `secure: true` is an activation-intent seam only. Existing security
+    // implementations remain disabled until they are reviewed with the user.
+    const explicitLoadConfiguration=Object.keys(options).some(
+      key=>!['signal','security'].includes(key)
+    );
+    const loadMustResolve = explicitLoadConfiguration;
+    if (state === "ready" && !loadMustResolve) return this.status();
     if (this.#loadPromise) {
-      if (!explicitOperationSecurity) return this.#loadPromise;
+      if (!loadMustResolve) return this.#loadPromise;
       try {
-        await load(options, Object.freeze({
+        await load(loadOptions, {
           protocol: ARCANE_AI_ADAPTER_PROTOCOL,
           kind: "llm",
           operation: "load",
           signal,
-          security: this.#security,
-        }));
+        });
         return this.status();
       } catch (error) {
         throw normalizeArcaneAIError(error, { operation: "load", signal });
@@ -527,14 +877,13 @@ export class ModelController {
     }
     async function executeModelLoad() {
       try {
-        await load(options, Object.freeze({
+        await load(loadOptions, {
           protocol: ARCANE_AI_ADAPTER_PROTOCOL,
           kind: "llm",
           operation: "load",
           signal,
-          security: controller.#security,
           reportProgress: reportModelLoadProgress,
-        }));
+        });
         if (
           operationGeneration !== controller.#operationGeneration
           || controller.#disposing
@@ -604,12 +953,12 @@ export class ModelController {
     const inFlightLoad = this.#loadPromise;
     const operationGeneration = ++this.#operationGeneration;
     const operationId = `${this.#events.instanceId}:unload:${operationGeneration.toString(36)}`;
-    const context = Object.freeze({
+    const context = {
       protocol: ARCANE_AI_ADAPTER_PROTOCOL,
       kind: "llm",
       operation: "unload",
       signal,
-    });
+    };
     let resolveOperation;
     let rejectOperation;
     const operation = new Promise(function createModelUnloadOperation(resolve, reject) {
@@ -658,6 +1007,7 @@ export class ModelController {
 
   async chat(request = {}) {
     this.#assertOperational();
+    request=structuralRequest(request);
     const signal = request.signal ?? null;
     localRequirement(request, this.#provider);
     if (abortLike(null, signal)) {
@@ -667,12 +1017,14 @@ export class ModelController {
     const chat = providerMethod(this.#provider, "chat") ?? providerMethod(this.#provider, "use");
     if (!chat) throw new ArcaneAIError("ARCANE_AI_UNAVAILABLE", "The LLM provider cannot chat.");
     try {
-      return await chat(request, Object.freeze({
+      const response=await chat(request, {
         protocol: ARCANE_AI_ADAPTER_PROTOCOL,
         kind: "llm",
         operation: "chat",
         signal,
-      }));
+      });
+      toolRecordFromCompletion(response);
+      return response;
     } catch (error) {
       throw normalizeArcaneAIError(error, { operation: "request", signal });
     }
@@ -680,11 +1032,13 @@ export class ModelController {
 
   stream(request = {}) {
     this.#assertOperational();
+    request=structuralRequest(request);
     localRequirement(request, this.#provider);
     const controller = this;
     const externalSignal = request.signal ?? null;
     const linked = linkedAbortSignal(externalSignal);
     let opened = null;
+    let openedIterator = null;
     let openError = null;
     let cancelPromise = null;
 
@@ -701,20 +1055,56 @@ export class ModelController {
       if (!stream) throw new ArcaneAIError("ARCANE_AI_UNAVAILABLE", "The LLM provider cannot stream.");
       const value = await stream(
         { ...request, signal: linked.controller.signal },
-        Object.freeze({
+        {
           protocol: ARCANE_AI_ADAPTER_PROTOCOL,
           kind: "llm",
           operation: "stream",
           signal: linked.controller.signal,
-        }),
+        },
       );
-      if (!value || typeof value[Symbol.asyncIterator] !== "function") {
+      if (
+        !value
+        ||typeof value[Symbol.asyncIterator]!=="function"
+        ||typeof value.cancel!=="function"
+        ||!value.result
+        ||typeof value.result.then!=="function"
+      ) {
+        if(typeof value?.cancel==="function"){
+          Promise.resolve().then(()=>value.cancel(
+            "The provider returned an invalid stream handle.",
+          )).catch(function reportInvalidModelStreamCleanupFailure(error){
+            console.error("Arcane invalid model stream cleanup failed.",error);
+          });
+        }
         throw new ArcaneAIError(
           "ARCANE_AI_INVALID_PROVIDER_RESULT",
-          "The LLM provider did not return an async stream handle.",
+          "The LLM provider did not return an async stream handle with result and cancel().",
+        );
+      }
+      let iterator;
+      try{
+        iterator=value[Symbol.asyncIterator]();
+      }catch(error){
+        Promise.resolve().then(()=>value.cancel(error)).catch(
+          function reportRejectedModelIteratorCleanupFailure(cleanupError){
+            console.error("Arcane rejected model stream iterator cleanup failed.",cleanupError);
+          },
+        );
+        throw error;
+      }
+      if(!iterator||typeof iterator.next!=="function"){
+        Promise.resolve().then(()=>value.cancel(
+          "The provider returned an invalid stream iterator.",
+        )).catch(function reportInvalidModelIteratorCleanupFailure(error){
+          console.error("Arcane invalid model stream iterator cleanup failed.",error);
+        });
+        throw new ArcaneAIError(
+          "ARCANE_AI_INVALID_PROVIDER_RESULT",
+          "The LLM provider stream iterator has no next() method.",
         );
       }
       opened = value;
+      openedIterator=iterator;
       return value;
     })().catch((error) => {
       openError = normalizeArcaneAIError(error, {
@@ -725,7 +1115,10 @@ export class ModelController {
     });
     openPromise.catch(() => undefined);
 
-    const result = openPromise.then((value) => value.result).then((value) => value).finally(() => {
+    const result = openPromise.then((value) => value.result).then((value) => {
+      toolRecordFromCompletion(value);
+      return value;
+    }).finally(() => {
       linked.release();
       controller.#activeStreams.delete(handle);
     });
@@ -739,8 +1132,8 @@ export class ModelController {
           try {
             const value = opened ?? await openPromise;
             await value.cancel?.(reason);
-          } catch {
-            // result exposes the normalized terminal error.
+          } catch (error) {
+            console.error("Arcane model provider cancellation failed.",error);
           }
           try {
             await result;
@@ -753,11 +1146,23 @@ export class ModelController {
       },
       async next(value) {
         if (openError) throw openError;
-        const streamHandle = opened ?? await openPromise;
-        return streamHandle.next(value);
+        if(!opened)await openPromise;
+        const streamIterator=openedIterator;
+        let nextValue=value;
+        while(true){
+          const next=await streamIterator.next(nextValue);
+          nextValue=undefined;
+          if(next.done)return {value:undefined,done:true};
+          const projected=projectPublicStreamChunk(next.value);
+          if(projected!==null)return {value:projected,done:false};
+        }
       },
       async return(value) {
-        await this.cancel("The stream consumer stopped before completion.");
+        Promise.resolve().then(()=>this.cancel(
+          "The stream consumer stopped before completion.",
+        )).catch(function reportModelStreamReturnCancellationFailure(error){
+          console.error("Arcane model stream early-return cancellation failed.",error);
+        });
         return { value, done: true };
       },
       async throw(error) {
@@ -768,7 +1173,6 @@ export class ModelController {
         return this;
       },
     };
-    Object.freeze(handle);
     this.#activeStreams.add(handle);
     return handle;
   }
@@ -777,13 +1181,14 @@ export class ModelController {
     this.#assertOperational();
     localRequirement(options, this.#provider);
     const id = requestIdentity(options.id);
-    const request = { ...options, id };
+    const request = structuralRequest({ ...options, id });
     // localOnly admission is complete before app callbacks observe a request.
     fireAndForget(options.onRequest, request, id);
     const response = await this.chat(request);
     if (options.signal?.aborted) {
       throw normalizeArcaneAIError(null, { operation: "request", signal: options.signal });
     }
+    toolRecordFromCompletion(response);
     if (typeof options.onResponse === "function") {
       await options.onResponse(response, id, false);
     }
@@ -794,11 +1199,10 @@ export class ModelController {
     this.#assertOperational();
     localRequirement(options, this.#provider);
     const id = requestIdentity(options.id);
-    const request = { ...options, id };
+    const request = structuralRequest({ ...options, id });
     const displayId = displayRequestId(id);
     fireAndForget(options.onRequest, request, id);
     const handle = this.stream(request);
-    const announcedTools = new Set();
 
     try {
       for await (const chunk of handle) {
@@ -806,17 +1210,10 @@ export class ModelController {
         for (const choice of chunk?.choices ?? []) {
           const delta = choice?.delta ?? {};
           if (typeof delta.reasoning_content === "string" && options.seeThinking === true) {
-            options.onChunk?.(delta.reasoning_content, displayId, true);
+            await options.onChunk?.(delta.reasoning_content, displayId, true);
           }
           if (typeof delta.content === "string") {
-            options.onChunk?.(delta.content, displayId, false);
-          }
-          for (const tool of delta.tool_calls ?? []) {
-            const name = tool?.function?.name;
-            if (typeof name === "string" && name && !announcedTools.has(name)) {
-              announcedTools.add(name);
-              fireAndForget(options.onToolCall, name);
-            }
+            await options.onChunk?.(delta.content, displayId, false);
           }
         }
       }
@@ -825,6 +1222,12 @@ export class ModelController {
         throw normalizeArcaneAIError(null, { operation: "request", signal: options.signal });
       }
       const tools = toolRecordFromCompletion(completion);
+      if (typeof options.onResponse === "function") {
+        await options.onResponse(completion, id, false);
+      }
+      for (const call of tools ?? []) {
+        await options.onToolCall?.(call, displayId);
+      }
       const output = tools ?? textFromCompletion(completion);
       if (typeof options.onComplete === "function") {
         await options.onComplete(output, displayId, false);

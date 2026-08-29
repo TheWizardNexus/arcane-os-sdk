@@ -47,8 +47,9 @@ const {createArcaneAI}=await import(
     '../browser-runtime/ai/browser-wasm.mjs?persistent-session-contract'
 );
 
-test('persistent chat binds the current SDK AI request boundary without shortening content',async()=>{
+test('persistent chat binds the SDK AI boundary and falls back from optional streaming',async()=>{
     const requests=[];
+    const streamActivity=[];
     const controller=new AbortController();
     const input='Complete caller message '.repeat(24);
     const response='Complete assistant response '.repeat(24);
@@ -66,18 +67,26 @@ test('persistent chat binds the current SDK AI request boundary without shorteni
         maxMessageCharacters:1,
         maxMessages:1,
         memory:false,
-        request:{localOnly:true},
+        request:{localOnly:true,toolChoice:'auto'},
         systemPrompt:'Complete system prompt '.repeat(12),
     });
 
-    const result=await session.send({
-        message:{content:input},
-        signal:controller.signal,
-    });
+    const result=await session.stream(
+        {
+            message:{content:input},
+            request:{toolChoice:'none'},
+            signal:controller.signal,
+        },
+        {
+            onChunk(...details){streamActivity.push(['chunk',...details]);},
+            onToolCall(...details){streamActivity.push(['tool',...details]);},
+        },
+    );
 
     assert.equal(session.ai,ai);
     assert.equal(requests.length,1);
     assert.equal(requests[0].localOnly,true);
+    assert.equal(requests[0].toolChoice,'none');
     assert.equal(requests[0].signal,controller.signal);
     assert.ok(requests[0].messages.some(message=>message.content===input));
     assert.ok(requests[0].messages.some(message=>message.content===context));
@@ -85,6 +94,7 @@ test('persistent chat binds the current SDK AI request boundary without shorteni
     assert.equal(Object.isFrozen(requests[0]),false);
     assert.equal(Object.isFrozen(requests[0].messages.at(-1)),false);
     assert.equal(Object.isFrozen(result.message),false);
+    assert.deepEqual(streamActivity,[]);
 
     await assert.rejects(
         PersistentAIChatSession.create({
@@ -93,6 +103,75 @@ test('persistent chat binds the current SDK AI request boundary without shorteni
         }),
         error=>error?.code==='AI_CHAT_AMBIGUOUS_PROVIDER',
     );
+});
+
+test('persistent streaming preserves an exact structural call through terminal settlement',async()=>{
+    const structuralCall={
+        id:'stream-lookup-1',
+        type:'function',
+        function:{
+            name:'lookup',
+            arguments:'{"id":"alpha","message":"Looking up Alpha in the local library."}'
+        },
+    };
+    let streamCount=0;
+    const ai={
+        async fetchRequest(){throw new Error('The streaming transport was not selected.');},
+        async streamRequest(request){
+            streamCount++;
+            request.onToolCall(structuredClone(structuralCall),'M-stream-lookup');
+            const terminalCall=streamCount===1
+                ?structuredClone(structuralCall)
+                :{
+                    ...structuredClone(structuralCall),
+                    function:{
+                        ...structuralCall.function,
+                        arguments:'{"id":"alpha","message":"Changed terminal text."}'
+                    },
+                };
+            await request.onResponse({
+                message:{role:'assistant',content:'',tool_calls:[terminalCall]},
+            });
+            return [structuredClone(structuralCall)];
+        },
+    };
+    const visibleCalls=[];
+    const session=await PersistentAIChatSession.create({ai,memory:false});
+    const result=await session.stream(
+        {
+            message:{content:'Find Alpha.',persist:false},
+            response:{persist:false},
+        },
+        {
+            onToolCall(call,displayId){
+                visibleCalls.push({call,displayId});
+            },
+        },
+    );
+    assert.deepEqual(visibleCalls,[{
+        call:structuralCall,
+        displayId:'M-stream-lookup',
+    }]);
+    assert.deepEqual(result.message.tool_calls,[structuralCall]);
+    assert.equal(
+        JSON.parse(result.message.tool_calls[0].function.arguments).message,
+        'Looking up Alpha in the local library.'
+    );
+
+    const mismatchedVisibleCalls=[];
+    const mismatched=await PersistentAIChatSession.create({ai,memory:false});
+    await assert.rejects(
+        mismatched.stream(
+            {
+                message:{content:'Find Alpha again.',persist:false},
+                response:{persist:false},
+            },
+            {onToolCall:call=>mismatchedVisibleCalls.push(call)},
+        ),
+        error=>error?.code==='AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
+    );
+    assert.deepEqual(mismatchedVisibleCalls,[]);
+    assert.deepEqual(await mismatched.history(),[]);
 });
 
 test('persistent chat retains transient turns in recurring context without writing them',async()=>{
@@ -162,8 +241,8 @@ test('response persistence inherits message persistence and rejects incoherent m
                 role:'assistant',
                 content:'',
                 tool_calls:[
-                    {id:'one',type:'function',function:{name:'lookup',arguments:'{}'}},
-                    {id:'two',type:'function',function:{name:'lookup',arguments:'{}'}},
+                    {id:'one',type:'function',function:{name:'lookup',arguments:'{"message":"Looking up the first record."}'}},
+                    {id:'two',type:'function',function:{name:'lookup',arguments:'{"message":"Looking up the second record."}'}},
                 ],
             },
             requestMessage:{role:'user',content:'invoke tools'},
@@ -278,7 +357,10 @@ test('automatic memory waits for a structural tool result and final response',as
                     tool_calls:[{
                         id:'memory-tool-1',
                         type:'function',
-                        function:{name:'lookup',arguments:'{}'},
+                        function:{
+                            name:'lookup',
+                            arguments:'{"message":"Looking up the requested memory context."}'
+                        },
                     }],
                 }};
             }
@@ -313,7 +395,10 @@ test('persistent chat rolls back recurring context on durable failure and retain
                     tool_calls:[{
                         id:'lookup-1',
                         type:'function',
-                        function:{name:'lookup',arguments:'{"id":"alpha"}'},
+                        function:{
+                            name:'lookup',
+                            arguments:'{"id":"alpha","message":"Looking up Alpha."}'
+                        },
                     }],
                 }};
             }
@@ -327,7 +412,10 @@ test('persistent chat rolls back recurring context on durable failure and retain
     assert.deepEqual(publicToolCall,{
         id:'lookup-1',
         type:'function',
-        function:{name:'lookup',arguments:'{"id":"alpha"}'},
+        function:{
+            name:'lookup',
+            arguments:'{"id":"alpha","message":"Looking up Alpha."}'
+        },
     });
     await assert.rejects(
         session.send({message:{content:'skip the pending tool'}}),
@@ -364,7 +452,10 @@ test('persistent chat rolls back recurring context on durable failure and retain
     assert.deepEqual(requests[1].messages.at(-2).tool_calls[0],{
         id:'lookup-1',
         type:'function',
-        function:{name:'lookup',arguments:'{"id":"alpha"}'},
+        function:{
+            name:'lookup',
+            arguments:'{"id":"alpha","message":"Looking up Alpha."}'
+        },
     });
     assert.equal(requests[1].messages.at(-1).role,'tool');
 
@@ -380,4 +471,78 @@ test('persistent chat rolls back recurring context on durable failure and retain
     await assert.rejects(session.send({message:{content:'must roll back'}}));
     await session.send({message:{content:'after failure',persist:false}});
     assert.ok(!requests.at(-1).messages.some(message=>message.content==='must roll back'));
+});
+
+test('legacy persisted structural calls fail without inventing user-facing text',async()=>{
+    const chatFileName='legacy-missing-tool-message.jsonl';
+    const legacyContent=[
+        {role:'user',content:'Find Alpha.',timestamp:1},
+        {
+            role:'assistant',
+            content:'',
+            timestamp:2,
+            tool_calls:[{
+                id:'legacy-lookup-1',
+                type:'function',
+                function:{name:'lookup',arguments:'{"id":"alpha"}'},
+            }],
+        },
+    ].map(message=>JSON.stringify(message)).join('\n')+'\n';
+    await db.set('chats',chatFileName,legacyContent);
+
+    await assert.rejects(
+        PersistentAIChatSession.create({
+            chat:async()=>({message:{role:'assistant',content:'must not run'}}),
+            chatFileName,
+            loadExisting:true,
+            memory:false,
+        }),
+        error=>{
+            assert.equal(error?.code,'AI_CHAT_TOOL_MESSAGE_REQUIRED');
+            assert.equal(
+                error?.message,
+                'assistantMessage.tool_calls[0].function.arguments.message must contain user-facing text.'
+            );
+            return true;
+        },
+    );
+    assert.equal(db.raw('chats',chatFileName),legacyContent);
+});
+
+test('persisted tool results require nonblank user-facing content',async()=>{
+    const chatFileName='legacy-blank-tool-result.jsonl';
+    const legacyContent=[
+        {role:'user',content:'Find Alpha.',timestamp:1},
+        {
+            role:'assistant',
+            content:'',
+            timestamp:2,
+            tool_calls:[{
+                id:'legacy-lookup-2',
+                type:'function',
+                function:{
+                    name:'lookup',
+                    arguments:'{"id":"alpha","message":"Looking up Alpha."}',
+                },
+            }],
+        },
+        {
+            role:'tool',
+            content:'   ',
+            timestamp:3,
+            tool_call_id:'legacy-lookup-2',
+        },
+    ].map(message=>JSON.stringify(message)).join('\n')+'\n';
+    await db.set('chats',chatFileName,legacyContent);
+
+    await assert.rejects(
+        PersistentAIChatSession.create({
+            chat:async()=>({message:{role:'assistant',content:'must not run'}}),
+            chatFileName,
+            loadExisting:true,
+            memory:false,
+        }),
+        error=>error?.code==='AI_CHAT_INCOHERENT_PERSISTENCE',
+    );
+    assert.equal(db.raw('chats',chatFileName),legacyContent);
 });

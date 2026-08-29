@@ -8,7 +8,7 @@ Apps import renderer ESM from `/arcane/modules/<file>`. Classic scripts, the OPF
 
 - **Cross-host** means in-process logic built from standard JavaScript/Web APIs.
 - **Browser / native WebView** means DOM, storage, media, or component behavior available in a browser renderer and in supported native WebViews.
-- **Native bridge** means the module requires an admitted `globalThis.Arcane` method.
+- **Native bridge** means the module requires an available `globalThis.Arcane` method.
 - **Hybrid** means one public helper deliberately selects a documented native or browser/provider path.
 - **Cloud** means the module can call an explicitly configured remote provider; it never implies automatic local-to-cloud fallback.
 - **Node**, **worker**, and **vendor** identify specialized runtimes.
@@ -43,21 +43,21 @@ own asynchronous work, cancellation, and backpressure.
 | [`AI.js`](#aijs) | esm | Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structured output, streaming, and queued audio playback. | Browser + native bridge + cloud | High-level chat/speech behavior is normalized; provider diagnostics and media errors remain mixed. |
 | [`AIPreferenceRuntime.js`](#aipreferenceruntimejs) | esm | Applies and reads non-persistent per-user AI preference overrides. | Cross-host | Normalized six-slot preference state. |
 | [`AIPreferenceTuple.js`](#aipreferencetuplejs) | esm | Normalizes and compares the six provider/model preference slots. | Cross-host | Fully normalized frozen tuple. |
-| [`AIProviderRuntime.js`](#aiproviderruntimejs) | esm | Owns provider-neutral selection, lifecycle, routing, startup, requests, streaming, cancellation, and independent LLM/STT/TTS state. | Cross-host runtime; provider-specific availability | Normalized required provider members plus closed route/status contracts, with fail-closed local-only selection and no implicit fallback. |
-| [`AIResponseLength.js`](#airesponselengthjs) | esm | Normalizes concise/short/medium/long response preferences and applies the matching system instruction. | Cross-host | Fully normalized string/instruction contract. |
+| [`AIProviderRuntime.js`](#aiproviderruntimejs) | esm | Owns provider-neutral selection, lifecycle, routing, startup, requests, streaming, cancellation, and independent LLM/STT/TTS state. | Cross-host runtime; provider-specific availability | Normalized required provider members plus route/status contracts, with explicit local-only selection and no implicit fallback. |
+| [`AIResponseLength.js`](#airesponselengthjs) | esm | Retains legacy response-preference selectors as inert compatibility metadata while preserving complete prompts. | Cross-host | Legacy selector normalization; prompt content remains unchanged. |
 | [`AIResponseURLPolicy.js`](#airesponseurlpolicyjs) | esm | Extracts and audits links from AI Markdown, rendered HTML, CSS, srcset, bare URLs, and email text. | Cross-host | Normalized frozen allowlist audit. |
-| [`AIRuntimeState.js`](#airuntimestatejs) | esm | Publishes sticky immutable role snapshots, lifecycle intents, and startup-settlement barriers. | Cross-host state contract | Closed monotonic state records; events report state but grant no authority. |
+| [`AIRuntimeState.js`](#airuntimestatejs) | esm | Publishes sticky mutable role snapshots, lifecycle intents, and startup-settlement barriers. | Cross-host state contract | Closed monotonic state records; events report state but grant no authority. |
 | [`AnsiText.js`](#ansitextjs) | esm | Parses terminal ANSI sequences into display spans or strips them to plain text. | Cross-host | Normalized text/span output. |
 | [`ApiModelDatabase.js`](#apimodeldatabasejs) | esm | Fetches an injectable HTTP JSON model with parser, cache, redacted public endpoint records, and request lifecycle events. | Browser / native WebView / server with fetch | Request records are normalized; fetch/provider failures remain mixed. |
 | [`AppDataScope.js`](#appdatascopejs) | esm | Reconciles declared and native application identity and scopes OPFS/localStorage ownership fail-closed. | Browser / native WebView hybrid | Strict normalized identifiers and coded mismatch failures. |
 | [`AppearancePreferences.js`](#appearancepreferencesjs) | esm | Defines, stores, and applies color scheme, density, reduced motion, and large-text preferences. | Browser / native WebView hybrid | Normalized values; storage/host failures remain mixed. |
 | [`ArcaneCommunicationBridge.js`](#arcanecommunicationbridgejs) | esm | Maps provider HTTP threads/messages/connect/disconnect endpoints to normalized communication entities. | Browser / native WebView / server with fetch | Entity results are normalized; provider/transport failures remain mixed. |
-| [`ArcaneNavigationPolicy.js`](#arcanenavigationpolicyjs) | esm | Creates a fail-closed HTTP(S) navigation guard with domain and CIDR policy decisions. | Cross-host | Normalized frozen allow/block decision. |
+| [`ArcaneNavigationPolicy.js`](#arcanenavigationpolicyjs) | esm | Creates an HTTP(S) navigation guard with explicit secure-mode domain and CIDR policy decisions. | Cross-host | Complete mutable decisions; ordinary mode warns and continues, while explicitly selected `secure: true` fails closed. |
 | [`ArcaneNetworkPolicy.js`](#arcanenetworkpolicyjs) | esm | Validates the Arcane domain/network deny policy and matches domain, IPv4/IPv6 CIDR, protocol, and port rules. | Cross-host | Strict coded normalization. |
 | [`AsyncBoundary.js`](#asyncboundaryjs) | esm | Runs one asynchronous operation with timeout, abort, result validation, and stable boundary errors. | Cross-host | Fully normalized timeout/abort errors. |
-| [`BrowserTestSuite.js`](#browsertestsuitejs) | esm | Runs a fixed sequential browser test list with cooperative abort, per-test timeout, and lifecycle events. | Browser / standard Web APIs | Normalized result and skip/assertion errors. |
-| [`CalculatorEngine.js`](#calculatorenginejs) | esm | Evaluates bounded arithmetic, powers, constants, and common functions without `eval`. | Cross-host | Normalized `Calculation` result and parser errors. |
-| [`CaseEvidenceIndexer.js`](#caseevidenceindexerjs) | esm | Pairs and indexes structured evidence records with rendered-page provenance and SHA-256 identity. | Node only | Normalized naming/page helpers; filesystem errors preserved. |
+| [`BrowserTestSuite.js`](#browsertestsuitejs) | esm | Runs a complete sequential browser test list with explicit cancellation and full-detail lifecycle events. | Browser / standard Web APIs | Mutable results and skip/assertion errors normalized without suite-created caps or timers. |
+| [`CalculatorEngine.js`](#calculatorenginejs) | esm | Evaluates arithmetic, powers, constants, and common functions without `eval`. | Cross-host | Normalized `Calculation` result and parser errors. |
+| [`CaseEvidenceIndexer.js`](#caseevidenceindexerjs) | esm | Pairs and indexes structured evidence records with rendered-page references. | Node only | Normalized naming/page helpers; filesystem errors preserved. |
 | [`ChartLibrary.js`](#chartlibraryjs) | esm | Loads the bundled uPlot classic script once and returns its global constructor. | Browser / native WebView | Load state/errors normalized; uPlot result is vendor-native. |
 | [`ChatRecords.js`](#chatrecordsjs) | esm | Detects whether a chat record contains a meaningful user entry. | Cross-host | Boolean normalized result. |
 | [`CommunicationAppController.js`](#communicationappcontrollerjs) | esm | Binds shared inbox, conversation, settings, theme, and provider workflows into one UI controller. | Browser / native WebView hybrid | Controller state normalized; provider/DOM failures mixed. |
@@ -65,53 +65,53 @@ own asynchronous work, cancellation, and backpressure.
 | [`CommunicationPreferences.js`](#communicationpreferencesjs) | esm | Stores app-scoped, non-secret communication provider preferences. | Browser / native WebView hybrid | Normalized preference record; storage failures mixed. |
 | [`CommunicationProviderRegistry.js`](#communicationproviderregistryjs) | esm | Registers and queries validated provider definitions, channels, and required methods. | Cross-host | Strict normalized registry. |
 | [`ComponentContracts.js`](#componentcontractsjs) | esm | Owns normalized configuration/value contracts and shared explicit STT activation behavior for chart, dashboard, Markdown, and voice components. | Cross-host | Fully normalized labels, rows, definitions, visibility, formats, editor and voice options, plus capability-neutral STT activation intent and presentation state. |
-| [`ConfiguredAIChatSession.js`](#configuredaichatsessionjs) | esm | Owns bounded in-memory AI turns, context construction, response-length instruction, and atomic history commit. | Native bridge by default; cross-host with injected chat | Normalized session/result; provider rejection preserved. |
-| [`ConversationActionItems.js`](#conversationactionitemsjs) | esm | Normalizes, creates, updates, remembers, selects, and formats bounded conversation action items. | Cross-host | Fully normalized status/base/presentation contract. |
+| [`ConfiguredAIChatSession.js`](#configuredaichatsessionjs) | esm | Owns complete in-memory AI turns, context construction, provider-response preservation, and atomic history commit. | Native bridge by default; cross-host with injected chat | Normalized session/result; provider rejection preserved. |
+| [`ConversationActionItems.js`](#conversationactionitemsjs) | esm | Normalizes, creates, updates, remembers, selects, and formats complete conversation action items. | Cross-host | Fully normalized status/base/presentation contract. |
 | [`ConversationClosingReport.js`](#conversationclosingreportjs) | esm | Defines the closing-report tool, instruction, result normalizer, call classifier, and formatter. | Cross-host | Fully normalized report contract. |
 | [`ConversationTimebox.js`](#conversationtimeboxjs) | esm | Owns conversation limits, control messages, submission barriers, elapsed formatting, and delivery proof. | Cross-host | Fully normalized state/command/delivery errors. |
-| [`CoreLocalModelCatalog.js`](#corelocalmodelcatalogjs) | esm | Projects Core local-AI status into UI-safe admitted model and speech availability catalogs. | Cross-host | Fully normalized descriptors and stable admission labels. |
+| [`CoreLocalModelCatalog.js`](#corelocalmodelcatalogjs) | esm | Projects Core local-AI status into UI-safe model and speech availability catalogs. | Cross-host | Fully normalized descriptors and stable availability labels. |
 | [`DataMaintenance.js`](#datamaintenancejs) | esm | Deletes empty chats and associated/empty memory records inside the current app data scope. | Browser / native WebView | Normalized counts; destructive storage failures preserved. |
 | [`DBLS.js`](#dblsjs) | esm | Provides app-scoped localStorage tables, batch reads/writes, filtering, deletion, and counts. | Browser / native WebView | Scoped keys and values normalized; storage failures mixed. |
 | [`DBOPFS.js`](#dbopfsjs) | esm | Provides app-scoped OPFS tables, worker I/O, backup/restore, compression, and CRUD/batch APIs. | Browser / native WebView | App scope normalized; DOM/storage errors preserved. |
-| [`DBOPFSDocumentLibrary.js`](#dbopfsdocumentlibraryjs) | esm | Bootstraps and searches an app-defined DBOPFS corpus and builds explicitly untrusted chat context. | Browser or compatible DBOPFS host | Existing DBOPFS semantics; manifest-last generations and bounded search only after the app calls it or wires its context builder. |
+| [`DBOPFSDocumentLibrary.js`](#dbopfsdocumentlibraryjs) | esm | Bootstraps and searches an app-defined DBOPFS corpus and builds complete chat context. | Browser or compatible DBOPFS host | Existing DBOPFS semantics; generation completion and complete search only after the app calls it or wires its context builder. |
 | [`DBOPFSWorker.js`](#dbopfsworkerjs) | worker | Serializes OPFS sync-handle read/write requests from a MessagePort. | Dedicated worker | Responses normalize to `{success,fileData?}` or `{error:{name,message}}`. |
-| [`DevelopmentWorkspace.js`](#developmentworkspacejs) | esm | Provides bounded workspace inspection, context, setup task, and Node installer clients without arbitrary command execution. | Native bridge | Inputs normalized; provider result/error preserved. |
+| [`DevelopmentWorkspace.js`](#developmentworkspacejs) | esm | Provides complete workspace inspection, context, setup task, and Node installer clients without arbitrary command execution. | Native bridge | Inputs normalized; complete provider result/error preserved. |
 | [`DirectoryPicker.js`](#directorypickerjs) | esm | Wraps the provider-owned native directory chooser and normalizes selected/cancelled/error results. | Native bridge | Strict normalized selection and coded errors. |
-| [`DocumentLexicalSearch.js`](#documentlexicalsearchjs) | esm | Provides dependency-free deterministic metadata/body ranking and bounded excerpts. | Cross-host | Frozen stable results with no storage, provider, or network side effects. |
+| [`DocumentLexicalSearch.js`](#documentlexicalsearchjs) | esm | Provides dependency-free deterministic metadata/body ranking and complete excerpts. | Cross-host | Mutable complete results with no storage, provider, or network side effects. |
 | [`DocumentNavigation.js`](#documentnavigationjs) | esm | Binds document navigation, filtering, history, current-item reveal, and load initialization. | Browser / native WebView | Normalized filter/navigation state; DOM effects preserved. |
-| [`Errors.js`](#errorsjs) | esm | Normalizes global errors/rejections, fingerprints and deduplicates incidents, persists a ledger, and performs bounded delivery. | Browser / native WebView hybrid | Incident records normalized; storage/mail failures isolated. |
-| [`GifEncoder.js`](#gifencoderjs) | esm | Encodes indexed frames into a bounded animated GIF using palette mapping and LZW. | Cross-host | Normalized byte output and bounds. |
+| [`Errors.js`](#errorsjs) | esm | Normalizes global errors/rejections, fingerprints and deduplicates incidents, persists a complete ledger, and performs complete delivery. | Browser / native WebView hybrid | Incident records normalized; storage/mail failures isolated. |
+| [`GifEncoder.js`](#gifencoderjs) | esm | Encodes indexed frames into a complete animated GIF using palette mapping and LZW. | Cross-host | Normalized complete binary output. |
 | [`HTMLImport.js`](#htmlimportjs) | esm | Defines the same-origin `<html-import>` loader with open shadow root, inline script execution, and readiness/error events. | Browser / native WebView | Public error detail normalized; fetch/DOM failure preserved. |
 | [`InMemoryCommunicationProvider.js`](#inmemorycommunicationproviderjs) | esm | Implements deterministic in-memory thread/message/send behavior for demos and tests. | Cross-host | Normalized communication entities. |
-| [`IsolatedModelQuestionRunner.js`](#isolatedmodelquestionrunnerjs) | esm | Inspects one exact model and runs one isolated question with proof validation. | Native bridge or injected provider | Strict normalized proof/coded errors. |
-| [`LocalAIReadiness.js`](#localaireadinessjs) | esm | Derives selected AI requirements and returns a frozen readiness/recovery report across browser, desktop, and Android modes. | Browser/native hybrid | Fully normalized report and stable error codes; browsers never probe Ollama. |
+| [`IsolatedModelQuestionRunner.js`](#isolatedmodelquestionrunnerjs) | esm | Inspects one selected model and runs one isolated question while preserving the complete answer. | Native bridge or injected provider | Normalized model/result and coded errors. |
+| [`LocalAIReadiness.js`](#localaireadinessjs) | esm | Derives selected AI requirements and returns a complete readiness/recovery report across browser, desktop, and Android modes. | Browser/native hybrid | Fully normalized report and stable error codes; browsers never probe Ollama. |
 | [`LocalAIReadinessController.js`](#localaireadinesscontrollerjs) | esm | Coordinates local-AI status component checks, ensured recovery, availability projection, and teardown. | Browser/native hybrid | Normalized controller state and change events. |
-| [`Mail.js`](#mailjs) | esm | Builds bounded reports and prefers the native mail capability with an explicit HTTP transport fallback. | Browser/native hybrid + cloud | Mail inputs/results normalized; transport failures mixed. |
-| [`MailOutbox.mjs`](#mailoutboxmjs) | esm | Persists bounded mail reports before delivery and normalizes idempotent enqueue, retry, reconciliation, and invalid-record maintenance. | Browser/native WebView or compatible injected host | Frozen records, bounded work, cancellation, and lifecycle states normalized; storage, lock, and delivery failures coded. |
-| [`MailTransport.mjs`](#mailtransportmjs) | esm | Sends one bounded mail report to a normalized HTTP(S) endpoint with timeout and response-size limits. | Browser/server with fetch + cloud | Normalized endpoint/timeout/size errors; remote detail bounded. |
+| [`Mail.js`](#mailjs) | esm | Builds complete reports and prefers the native mail capability with an explicit HTTP transport fallback. | Browser/native hybrid + cloud | Mail inputs/results normalized; transport failures mixed. |
+| [`MailOutbox.mjs`](#mailoutboxmjs) | esm | Persists complete mail reports before delivery and normalizes idempotent enqueue, retry, reconciliation, and invalid-record maintenance. | Browser/native WebView or compatible injected host | Complete records, full work, cancellation, and lifecycle states normalized; storage, lock, and delivery failures coded. |
+| [`MailTransport.mjs`](#mailtransportmjs) | esm | Sends one complete mail report to a normalized HTTP(S) endpoint. | Browser/server with fetch + cloud | Normalized endpoint and transport errors; remote detail preserved. |
 | [`Marked.min.js`](#markedminjs) | esm | Vendored Marked 18.0.5 Markdown lexer, parser, renderer, extension, and walk-token API. | Cross-host vendor module | Vendor-native Marked contract. |
-| [`MD.js`](#mdjs) | esm | Renders Markdown with Marked and exposes a DOM-sanitized projection. | Browser / native WebView | Raw Marked behavior plus Arcane sanitization; parse errors vendor-native. |
+| [`MD.js`](#mdjs) | esm | Renders complete Markdown with Marked and exposes the complete rendered markup. | Browser / native WebView | Complete raw and rendered Marked values; parse errors vendor-native. |
 | [`MemoryRecords.js`](#memoryrecordsjs) | esm | Normalizes memory content and detects meaningful stored memory. | Cross-host | Fully normalized string/boolean results. |
 | [`MessageAdvisory.js`](#messageadvisoryjs) | esm | Normalizes message content advisories and contains per-message inspection failures. | Cross-host | Normalized advisory records; inspector failures converted to unavailable results. |
 | [`ModelDefinition.js`](#modeldefinitionjs) | esm | Parses the deterministic packaged Modelfile subset and extracts the SYSTEM prompt. | Cross-host | Strict normalized definition with coded syntax errors. |
 | [`Ollama.js`](#ollamajs) | esm | Provides the first-class Arcane Ollama client without direct access to localhost:11434. | Native bridge | Principal methods preserve provider-native envelopes; readiness/text/unload helpers normalize. |
 | [`OllamaModelIdentifier.js`](#ollamamodelidentifierjs) | esm | Validates and canonicalizes the syntax of Ollama model identifiers without granting model admission. | Cross-host | Fully normalized string/boolean result. |
-| [`OllamaSettings.js`](#ollamasettingsjs) | esm | Defines bounded runtime/service preference schemas and deterministic Arcane brain alias names. | Cross-host | Fully normalized settings/name contract. |
-| [`OpenMeteoWeatherProvider.js`](#openmeteoweatherproviderjs) | esm | Searches and loads Open-Meteo data into frozen Arcane weather entities. | Browser / native WebView / server with fetch + cloud | Provider data normalized to entities; transport errors mixed. |
-| [`PersistentAIChatSession.js`](#persistentaichatsessionjs) | esm | Adds explicit durable history/memory policy to bounded configured chat without changing DBOPFS or ChatEntity semantics. | Browser / native WebView with DBOPFS and configured chat | Live context commits atomically; persistence stays coherent across user/assistant/tool turns. |
-| [`PreferenceStore.js`](#preferencestorejs) | esm | Loads and updates schema-defined app preferences through native storage with a narrow browser fallback. | Browser/native hybrid | Values normalized before I/O; setAll uses one optional atomic adapter batch when advertised for one to 32 selected values, retains serial per-key compatibility above that Core limit, never retries a rejected dispatched batch serially, and only exact unsupported native capability changes future operations to the browser fallback. |
+| [`OllamaSettings.js`](#ollamasettingsjs) | esm | Defines complete runtime/service preference schemas and deterministic Arcane brain alias names. | Cross-host | Fully normalized settings/name contract. |
+| [`OpenMeteoWeatherProvider.js`](#openmeteoweatherproviderjs) | esm | Searches and loads Open-Meteo data into complete mutable Arcane weather entities. | Browser / native WebView / server with fetch + cloud | Provider data normalized to mutable entities; transport errors mixed. |
+| [`PersistentAIChatSession.js`](#persistentaichatsessionjs) | esm | Adds explicit durable history/memory policy to complete configured chat without changing DBOPFS or ChatEntity semantics. | Browser / native WebView with DBOPFS and configured chat | Live context commits atomically; persistence stays coherent across user/assistant/tool turns. |
+| [`PreferenceStore.js`](#preferencestorejs) | esm | Loads and updates schema-defined app preferences through native storage with a narrow browser fallback. | Browser/native hybrid | Complete ordinary values remain mutable; setAll uses one optional atomic adapter batch for every selected value when advertised, otherwise retains complete serial compatibility, and only exact unsupported native capability changes future operations to the browser fallback. |
 | [`QRCode.min.js`](#qrcodeminjs) | classic-script | Vendored QRCode generator for DOM, canvas, SVG, and image output. | Browser vendor script | Vendor-native. |
-| [`Questionnaire.js`](#questionnairejs) | esm | Evaluates whether a one-time questionnaire prompt is due without performing the prompt. | Cross-host | Normalized fail-closed boolean. |
+| [`Questionnaire.js`](#questionnairejs) | esm | Evaluates whether a one-time questionnaire prompt is due without performing the prompt. | Cross-host | Normalized conservative boolean. |
 | [`RecordLinkIndex.js`](#recordlinkindexjs) | esm | Parses record links and builds their normalized index. | Cross-host | Fully normalized. |
 | [`RecordPassageIndex.js`](#recordpassageindexjs) | esm | Indexes text lines, page markers, dates, rules, and excerpts for record review. | Cross-host | Fully normalized. |
 | [`RecordReviewStore.js`](#recordreviewstorejs) | esm | Stores normalized record-review decisions through native storage or app-scoped local fallback. | Browser/native hybrid | Normalized ids/reviews/snapshots; storage failures mixed. |
-| [`RevocableProjectionLedger.js`](#revocableprojectionledgerjs) | esm | Implements an append-only bounded in-memory projection/revocation ledger safe for hostile descriptor inputs. | Cross-host | Strict normalization with stable `ProjectionLedgerError`. |
-| [`RiskSignalAnalyzer.js`](#risksignalanalyzerjs) | esm | Matches configured risk signals and levels against bounded text. | Cross-host | Fully normalized. |
+| [`RevocableProjectionLedger.js`](#revocableprojectionledgerjs) | esm | Implements an append-only complete in-memory projection/revocation ledger safe for malformed descriptor inputs. | Cross-host | Strict normalization with stable `ProjectionLedgerError`. |
+| [`RiskSignalAnalyzer.js`](#risksignalanalyzerjs) | esm | Matches configured risk signals and levels against complete text. | Cross-host | Fully normalized. |
 | [`ScamRiskPolicy.js`](#scamriskpolicyjs) | esm | Combines deterministic scam signals with Arcane blocked-domain evidence and safety guidance. | Cross-host | Fully normalized. |
-| [`ScopedOPFSCache.js`](#scopedopfscachejs) | esm | Provides a narrow exact-key JSON cache inside one app-owned OPFS namespace. | Browser / native WebView | Keys/limits/corruption handling normalized; storage errors mixed. |
+| [`ScopedOPFSCache.js`](#scopedopfscachejs) | esm | Provides a narrow exact-key JSON cache inside one app-owned OPFS namespace. | Browser / native WebView | Filename-safe keys, complete JSON values, and malformed-cache cleanup normalized; storage errors mixed. |
 | [`ScreenCapture.js`](#screencapturejs) | esm | Captures a display surface as image, video, or GIF with explicit lifecycle events. | Browser / native WebView | State/events normalized; permission and codec errors mixed. |
-| [`SpeechPlayback.js`](#speechplaybackjs) | esm | Segments bounded text, queues latest-request speech synthesis, and controls lookahead HTML audio playback. | Browser + native bridge | State/limits normalized; provider/media failures mixed. |
-| [`StaticDocumentCatalog.js`](#staticdocumentcatalogjs) | esm | Loads a positive static document inventory with byte/hash verification, cache, search, and bounded context. | Browser / native WebView / server with fetch | Strict catalog/content normalization; transport failures mixed. |
+| [`SpeechPlayback.js`](#speechplaybackjs) | esm | Preserves exact nonblank text as one speech segment, queues latest-request synthesis, and controls lookahead HTML audio playback. | Browser + native bridge | Exact input text and state normalized; provider/media failures mixed. |
+| [`StaticDocumentCatalog.js`](#staticdocumentcatalogjs) | esm | Loads a positive static document inventory with cache, search, and complete context. | Browser / native WebView / server with fetch | Mutable complete catalog/content normalization; malformed data and transport failures remain visible. |
 | [`SystemAppearance.js`](#systemappearancejs) | esm | Reads or applies native appearance, returning an explicit unsupported browser state when no bridge exists. | Browser/native hybrid | Absent bridge normalized; native result/error preserved. |
 | [`SystemPlatformPresentation.js`](#systemplatformpresentationjs) | classic-script | Maps kernel names to presentation labels/classes without granting platform authority. | Browser / native WebView classic script | Fully normalized presentation only. |
 | [`SystemToolRegistry.js`](#systemtoolregistryjs) | esm | Registers validated command builders and constructs command strings without executing them. | Cross-host | Fully normalized definitions/quoting. |
@@ -120,12 +120,12 @@ own asynchronous work, cancellation, and backpressure.
 | [`ThemeBootstrap.js`](#themebootstrapjs) | esm | Performs import-time Arcane theme loading and subscribes to native appearance changes. | Browser/native hybrid | Theme state normalized; storage/native errors mixed. |
 | [`ThemeManager.js`](#thememanagerjs) | esm | Loads, applies, previews, saves, resets, and synchronizes semantic Arcane themes. | Browser/native hybrid | Theme values/events normalized; storage/native failures mixed. |
 | [`TimeGuard.js`](#timeguardjs) | esm | Persists and evaluates clock rollback and grace-period state. | Browser / native WebView | Time decisions normalized; storage lifecycle mixed. |
-| [`ToolCallRouter.js`](#toolcallrouterjs) | esm | Parses OpenAI-style tool calls and dispatches complete or streamed calls to injected handlers. | Cross-host | Arguments/routing normalized; handler results returned or all-settled. |
+| [`ToolCallRouter.js`](#toolcallrouterjs) | esm | Parses OpenAI-style tool calls and dispatches complete or streamed calls to injected handlers. | Cross-host | Argument records validated; handler results returned or all-settled. |
 | [`uPlot.iife.min.js`](#uplotiifeminjs) | classic-script | Vendored uPlot chart constructor and rendering runtime. | Browser vendor script | Vendor-native. |
 | [`uPlot.LICENSE.txt`](#uplotlicensetxt) | license | License companion for the bundled uPlot vendor runtime. | Documentation asset | Not executable. |
 | [`uPlot.min.css`](#uplotmincss) | stylesheet | Bundled uPlot presentation stylesheet. | Browser stylesheet | Presentation only. |
 | [`WaitForComponent.js`](#waitforcomponentjs) | esm | Waits for a component property, method, or readiness event with optional error event and bounded timeout. | Cross-host EventTarget / browser component | Normalized coded readiness, error, and timeout results. |
-| [`YouTubeMedia.js`](#youtubemediajs) | esm | Validates YouTube video/playlist locators and constructs privacy-enhanced embed URLs. | Cross-host | Fully normalized. |
+| [`YouTubeMedia.js`](#youtubemediajs) | esm | Parses YouTube video/playlist locators and constructs ordinary embed URLs with opt-in privacy enhancement. | Cross-host | Fully normalized mutable locators. |
 
 ## AI.js
 
@@ -150,12 +150,12 @@ not reinterpret one provider's failure as permission to select another
 provider. `transitionAI()` and `transitionProviders()` are deliberate
 cross-role transitions: each stops queued audio, unloads the current LLM, STT,
 and TTS roles, then applies the replacement configuration. `transitionAI()`
-returns aggregate runtime status; `transitionProviders()` returns the admitted
+returns aggregate runtime status; `transitionProviders()` returns the configured
 three-role route configuration. Selected `OPENAI` LLM/STT/TTS, `OLLAMA` LLM,
-and admitted Core `LOCAL_SPEACH` STT/TTS legacy routes expose truthful
+and Core `LOCAL_SPEACH` STT/TTS legacy routes expose truthful
 capability-only readiness through internal provider/2 adapters without probing,
-downloading, or hiding a load. Cloud speech admission requires the selected
-route, its model, a credential, and `fetch`; Core speech admission requires the
+downloading, or hiding a load. Cloud speech availability requires the selected
+route, its model, a credential, and `fetch`; Core speech availability requires the
 exact selected `Arcane.speech.transcribe` or `synthesize` method. `fetchRequest()`
 keeps the selected provider's public response shape. Browser speech routes
 translate the existing AI.js STT `{audio:Blob|File,mimeType,model}` and TTS
@@ -173,9 +173,13 @@ only STT and TTS, then commits that same closed speech route record. Neither
 method loads a model, selects a fallback, or changes caller-owned model or voice
 policy.
 
-`startProviders({startMuted=true,startTranscription=false,signal=null}={})`
-starts text chat without requesting an STT load by default; it does not undo an
-already ready or independently loading LLM or STT role. Its default
+`startProviders({startLanguageModel=true,startMuted=true,startTranscription=false,signal=null}={})`
+starts provider-owned text chat without requesting an STT load by default.
+Callers selecting a browser-WASM LLM pass `startLanguageModel:false` so it
+remains selected and unloaded until the user uses the shared chat activation
+control or the application publishes an equivalent explicit user load intent.
+The default preserves startup behavior for existing Cloud/Core routes. Startup
+does not undo an already ready or independently loading LLM or STT role. Its default
 `startMuted:true` path cancels active TTS work and unloads TTS. Callers must opt
 into eager STT startup with `startTranscription:true` or publish the explicit
 user activation intent exposed by the shared speech component.
@@ -184,10 +188,10 @@ TTS route reaches ready; a failed load leaves the public state muted. In contras
 `setSpeechMuted(true)` cancels active TTS work and unloads that role.
 `fetchTTS({model,voice,input,responseFormat,speed},signal)` accepts the public
 provider-neutral synthesis shape, requires any explicit model to match the
-admitted route, and admits an omitted voice only from the selected model
+selected route, and fills an omitted voice only from the selected model
 catalog's `defaultVoice`. An omitted response format preserves the instance's
 existing `audioFormat` for a compatibility-only catalog. When the selected model
-declares `speech.responseFormats`, that setting is used only when admitted; if
+declares `speech.responseFormats`, that setting is used only when supported; if
 the setting is the legacy `opus` default and the model rejects it, the catalog's
 `speech.defaultResponseFormat` is used, while any other unsupported setting is
 rejected. It propagates the caller-owned signal and returns a playable `Blob`;
@@ -200,9 +204,40 @@ PCM normalization, and WAV construction to the selected shared provider;
 delivery suppression is guaranteed after abort, while underlying provider-stop
 claims remain limited to that provider's cancellation contract.
 
+Every function declaration accepted by the chat and streaming APIs must define
+`function.parameters.properties.message` as a string with `minLength:1` and
+include `message` in the declaration's `required` list. Every emitted structural
+call must preserve its exact nonempty `id`, function name, and JSON argument
+string; that JSON must encode an object with a nonempty user-facing `message`.
+The message is ordinary progress or next-step text. Complete argument envelopes
+remain available to an explicitly opened inspection surface or developer
+console, but are not substituted for conversational text. A visible call is
+still pending until a matching `role:'tool'` message records an executed,
+declined, cancelled, or not-executed result.
+That tool-result content must be a nonblank string and is preserved exactly.
+
+`streamRequest()` owns the complete terminal callback sequence. It awaits the
+explicit `onResponse` callback with the unprojected terminal provider response,
+then invokes `onToolCall` exactly once for each complete normalized structural
+call, then awaits `onComplete`. Ordinary `onChunk` delivery contains only text
+or reasoning text; partial structural deltas are retained internally until the
+terminal envelope validates. Request observers receive
+`onRequest(request,id,metadata)` and any transport metadata supplied by the
+selected route is forwarded unchanged. Every async native, HTTP, provider, and
+legacy callback is observed before the next callback or terminal settlement.
+
+Native Ollama responses are adapted before the shared structural validator:
+provider-native calls may omit `id` and `type` or provide object arguments, so
+the adapter assigns a deterministic request-local call ID when needed, sets
+`type:'function'`, and JSON-encodes complete object arguments. This adaptation
+never invents the required user-facing `arguments.message`. Every response
+choice is scanned; a structural call outside the selected result or a streamed
+call that changes or disappears at terminal settlement is rejected with
+`AI_CHAT_STREAM_TOOL_CALL_MISMATCH` before public tool-call delivery.
+
 #### Browser speech configuration
 
-The caller constructs a frozen authority record for one or both roles and
+The caller constructs a mutable authority record for one or both roles and
 retains ownership of it. This example configures both:
 
 ```javascript
@@ -210,24 +245,22 @@ import AI, {
   AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL
 } from '/arcane/modules/AI.js';
 
-const speechConfiguration = Object.freeze({
+const speechConfiguration = {
   protocol: AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
   id: 'app-speech-authority',
   dbopfs,
   tableName: 'browser-speech-artifacts', // optional
-  stt: Object.freeze({
+  stt: {
     providerId: 'app-whisper',
     graph: sttGraph,
-    security: Object.freeze({secure: true}),
     offline: false
-  }),
-  tts: Object.freeze({
+  },
+  tts: {
     providerId: 'app-kokoro',
     graph: ttsGraph,
-    security: Object.freeze({secure: true}),
     offline: false
-  })
-});
+  }
+};
 
 const ai = new AI(/* existing application AI preferences */);
 const descriptor = await ai.configureBrowserSpeech(
@@ -243,23 +276,24 @@ await ai.setSpeechMuted(false); // loads the selected TTS role, then unmutes
 await ai.disposeBrowserSpeech({signal});
 ```
 
-The record must be a frozen plain data record with exactly
+The record is a mutable plain data record with exactly
 `{protocol,id,dbopfs,tableName?,stt?,tts?}` and at least one role. Each supplied
-frozen role is exactly `{providerId,graph,security,offline}` or
+mutable role is exactly `{providerId,graph,security?,offline}` or
 `{providerId,model,runtime,security?,offline}`. The graph and direct authority
-forms are mutually exclusive; `providerId` and `id` are trimmed 1-128 character
-strings, `graph` is the role-matching frozen graph returned by the SDK browser
-speech artifact API, graph `security` must explicitly select `secure:true`, and
+forms are mutually exclusive; `providerId` and `id` are nonblank exact strings,
+`graph` is the role-matching graph returned by the SDK browser
+speech artifact API, `security` is optional and ordinary behavior defaults to
+`secure:false`, and
 `offline` is boolean. The direct form forwards its
 caller-selected model, runtime, and optional security descriptors to the shared
 provider. In warn-first mode it may use an empty `model.files` inventory and a
-version-pinned upstream `runtime.wasmPaths`; secure graph mode remains the
-closed, content-addressed path. The application chooses every artifact,
-immutable graph or direct model/runtime authority, provider ID, offline policy,
+version-pinned upstream `runtime.wasmPaths`. Optional hardening is activated only
+when the caller explicitly supplies `security:{secure:true}`. The application
+chooses every artifact, graph or direct model/runtime authority, provider ID, offline policy,
 sample rate, and TTS default voice. `configureBrowserSpeech()` imports the shared
 browser-speech module, creates one DBOPFS store, constructs and registers the
 supplied Whisper and/or Kokoro provider/2 instances, atomically replaces only
-the supplied STT/TTS routes, and returns a frozen descriptor. An initial or
+the supplied STT/TTS routes, and returns a mutable descriptor. An initial or
 later call may supply only `stt` or only `tts`; the omitted external Cloud/Core
 role remains unchanged and is not claimed as SDK browser-provider ownership.
 A partial replacement of an existing browser-managed record retains the same
@@ -267,7 +301,7 @@ A partial replacement of an existing browser-managed record retains the same
 route unchanged, and unregisters and disposes only the replaced provider after
 commit. Supplying both roles remains one atomic replacement. Applications do not register those
 providers, decode `Blob`/`File` data into PCM, construct WAV, select Worker URLs,
-or reproduce DBOPFS cache or artifact verification logic.
+or reproduce DBOPFS cache logic.
 
 The returned descriptor is exactly `{protocol,configurationId,stt,tts}`; an
 external, unmanaged role is `null`. A managed STT descriptor is
@@ -275,7 +309,7 @@ external, unmanaged role is `null`. A managed STT descriptor is
 `defaultVoice`. `artifactGraphId` is present only for the graph form.
 `browserSpeechConfiguration` returns the exact caller-owned record when no
 managed role is carried. After a partial replacement that carries another
-managed role, it returns a frozen merged record with the replacement call's
+managed role, it returns a mutable merged record with the replacement call's
 `id` and the carried role's unchanged authority. It is non-null only while the
 SDK still owns every represented browser provider and route;
 `browserSpeechDescriptor` returns that descriptor on the same condition.
@@ -300,7 +334,7 @@ transition method or await `disposeBrowserSpeech()`.
 Browser speech publishes these exact event values through the AI instance's
 canonical event source. Public consumers use
 `arcaneEvents.subscribe(type,handler,{signal})`; `handler(occurrence)` receives
-the frozen canonical occurrence and can correlate `source:'ai'`, `instanceId`,
+the mutable complete canonical occurrence and can correlate `source:'ai'`, `instanceId`,
 and `operationId`:
 
 | Constant member | Stable value |
@@ -311,7 +345,7 @@ and `operationId`:
 | `configurationError` | `ai-browser-speech-configuration-error` |
 | `disposed` | `ai-browser-speech-disposed` |
 
-Canonical public details are frozen and contain `configurationId`, optional
+Canonical public details are mutable and contain `configurationId`, optional
 `descriptor`, optional exact `code`, and `reason`. The private source-local
 compatibility view also carries the caller-owned configuration and optional
 error, but `AI` does not expose that source handle and the global occurrence
@@ -456,7 +490,7 @@ rejected at the provider boundary.
 
 Selection options admit `localOnly=false`; inspection admits
 `{localOnly=false,signal=null}`; startup admits
-`{startMuted=true,startTranscription=false,signal=null}` (including an omitted
+`{startLanguageModel=true,startMuted=true,startTranscription=false,signal=null}` (including an omitted
 `options` value); load admits `{signal=null,localOnly=false}`; unload, dispose,
 and dispose-all admit `{signal=null}`. Request requires the exact
 `{operation,payload,localOnly,signal}` options record; the four role-specific
@@ -470,17 +504,17 @@ records are the closed `{llm,stt,tts}`, `{stt,tts}`, or
 registered providers remain caller-owned. The high-level
 `AI.configureBrowserSpeech()` boundary is different: AI constructs, registers,
 atomically replaces, unregisters, and disposes those two SDK-owned providers.
-`status()` is the sticky frozen AIRuntimeState snapshot (or one role record),
-while `catalog()` synchronously returns frozen provider/model admissions and
+`status()` is the sticky mutable AIRuntimeState snapshot (or one role record),
+while `catalog()` synchronously returns mutable provider/model entries and
 never loads or downloads a model. `load()` forwards provider progress into the
 sticky role record; `unload()` and `dispose()` abort owned work, await exposed
 settlement, and verify provider status before publishing terminal state.
 
-`validateSpeechConfiguration(value)` returns one frozen two-role selection
+`validateSpeechConfiguration(value)` returns one mutable two-role selection
 record without committing it, where `value` is the closed `{stt,tts}` record.
 `configureSpeech(value)` accepts the same record, requires both speech roles to
 own no ready/load/unload/dispose or request work, commits only STT/TTS, restores
-muted speech admission, and returns the frozen selection record. The current LLM
+muted speech selection, and returns the mutable selection record. The current LLM
 routes, selection, readiness, operation generation, and sticky state remain
 unchanged. A malformed top-level, route, or selection record preserves the
 compatibility code
@@ -503,22 +537,36 @@ busy, or partially divergent selection rejects without changing either role.
 
 `start(options)` waits for prior speech-state and role unload work, applies the
 requested initial mute state, and returns the `startAIRuntime()` control handle
-`{barrier,settled,cancel}`. Startup does not request selected STT unless the
-caller explicitly opts in; it does not force an independently active STT role
-back to unloaded. The barrier and settled promises describe provider-startup
-readiness; cancellation remains cooperative through the supplied signal and
-returned control.
+`{barrier,settled,cancel}`. With `startLanguageModel:false`, startup does not
+request the selected LLM and its barrier may therefore resolve with `chatReady:false` and
+`roles.llm.requested:false` while the explicit activation UI remains available.
+Startup does not request selected STT unless the caller explicitly opts in; it
+does not force an independently active STT role back to unloaded. The barrier
+and settled promises describe only requested provider-startup work;
+cancellation remains cooperative through the supplied signal and returned
+control.
 
-Interactive requests are latest-request-wins per role. A newer valid request
-that reaches admission aborts the active request, waits for its provider promise
-to settle (or for bounded stream cleanup to be confirmed), and revalidates
-ready/loaded/not-busy state before it starts. Rapid intermediate requests are
-superseded, and their late results cannot restore or overwrite newer role state.
-Promise settlement proves only that the provider's exposed request promise
-completed; it does not by itself prove that underlying provider work stopped.
-Provider-specific positive cancellation acknowledgement remains
-provider-specific. Load and reconfiguration guards stay fail-closed while
-request ownership is active.
+Interactive requests enter an uncapped FIFO lane per role. A newer request does
+not abort or discard the active request; each request starts after earlier work
+settles. A caller `AbortSignal` cancels only its own queued or active request,
+while `cancel(role)` targets only the active request. Explicit unload and dispose
+reject queued work and cancel active ownership as part of lifecycle cleanup.
+Load and configuration remain unavailable while that role owns active or queued
+request work. Promise settlement proves only that the provider's exposed request
+promise completed; provider-specific cancellation acknowledgement remains the
+selected provider's boundary.
+
+Direct LLM `request()`, `chat()`, and `stream()` use the same message history,
+tool-declaration, emitted-call, all-choice, and single-call contracts as the
+high-level AI API module, including nonblank matching tool-result content. A
+complete text-only terminal string remains compatible; structured terminals
+must use exactly one message or choices envelope. An ordinary stream iterator exposes only nonstructural
+content/reasoning chunks; provider-native tool deltas remain internal until the
+complete terminal result validates. The handle's `result` retains the complete
+validated terminal provider response. Consumer `return()` starts observed
+cancellation immediately and returns promptly; provider cleanup and any failure
+remain observable through the terminal result or complete developer-console
+diagnostics rather than blocking iterator return.
 
 ### Availability and normalization
 
@@ -530,7 +578,7 @@ cloud adapters may be supplied externally only when they implement the same
 provider must prove a matching `arcane-ai-model-authority/1` inspection before load.
 `localOnly` routing fails closed; it never selects a cloud or non-local route as
 a fallback. A missing or mismatched explicit local-only route rejects load or
-request admission with `AI_LOCAL_MODEL_REQUIRED`. Role lifecycle and stream
+request selection with `AI_LOCAL_MODEL_REQUIRED`. Role lifecycle and stream
 cleanup are normalized, while the
 selected provider retains its own capability, permission, download, and model
 requirements. [Deep protocol details](protocols.md#portable-ai-provider-runtime).
@@ -548,17 +596,22 @@ console.log(runtime.protocol, runtime.status());
 
 ### Overview
 
-Normalizes concise/short/medium/long response preferences and applies the matching system instruction.
+Retains legacy low/medium/high response-preference selectors as inert
+compatibility metadata while preserving complete prompts unchanged.
 
 ### Public surface
 
-Response-length constants plus `normalizeAIResponseLength()`, `aiResponseLengthInstruction()`, and `applyAIResponseLength()`.
+Compatibility constants plus `normalizeAIResponseLength()`,
+`aiResponseLengthInstruction()`, and `applyAIResponseLength()`. Every option is
+labeled `Complete`, the instruction helper returns an empty string, and the
+application helper returns its complete `systemPrompt` unchanged.
 
 Exact exports: `AI_RESPONSE_LENGTH_DEFAULT`, `AI_RESPONSE_LENGTH_OPTIONS`, `aiResponseLengthInstruction`, `applyAIResponseLength`, `normalizeAIResponseLength`.
 
 ### Availability and normalization
 
-**Cross-host.** Fully normalized string/instruction contract. Transport: In-process only. [Deep protocol details](protocols.md).
+**Cross-host.** Legacy selector normalization with no prompt transformation.
+Transport: In-process only. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -596,7 +649,7 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Publishes one sticky immutable state tree for `llm`, `stt`, and `tts`, transient
+Publishes one sticky mutable state tree for `llm`, `stt`, and `tts`, transient
 load/unload/dispose intents, and a startup-settlement report. It makes lifecycle
 observable without exposing provider transports in application code.
 
@@ -612,16 +665,18 @@ Exact exports: `AI_RUNTIME_INTENT_EVENT`, `AI_RUNTIME_PROTOCOL`,
 Each role record is exactly `{role,state,providerId,modelId,localOnly,loaded,
 busy,operationId,progress,error}`.
 `subscribeAIRuntimeState(listener,{signal=null,emitCurrent=true})` installs its
-subscription and synchronously replays the current frozen snapshot by default;
+subscription and synchronously replays the current mutable snapshot by default;
 `subscribeAIRuntimeIntents(listener,{signal=null})` is future-only. Both return
 one idempotent unsubscribe/dispose closure. `aiRuntimeEvents` is a deprecated,
 state-free EventTarget compatibility view over the same canonical source; it is
 not a second authority and owns no listener registry.
-`startAIRuntime({startMuted=true,startTranscription=false,signal})` returns
-`{barrier,settled,cancel}`: `barrier` settles for text chat, while `settled`
-covers every requested role. Muted startup does not request TTS, and STT startup
-is opt-in so selection and state observation do not begin a transcription-model
-load.
+`startAIRuntime({startLanguageModel=true,startMuted=true,startTranscription=false,signal})` returns
+`{barrier,settled,cancel}`: `barrier` settles for requested text-chat startup,
+while `settled` covers every requested role. With `startLanguageModel:false`, a
+selected LLM remains unloaded for explicit user activation, so the barrier can settle honestly with
+`chatReady:false` and `roles.llm.requested:false`. Muted startup does not request
+TTS, and STT startup is opt-in so selection and state observation do not begin a
+transcription-model load.
 
 ### Availability and normalization
 
@@ -779,24 +834,27 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Creates a fail-closed HTTP(S) navigation guard with domain and CIDR policy decisions.
+Creates an HTTP(S) navigation guard whose optional domain and CIDR hardening runs only when the caller explicitly selects `secure: true`. The ordinary default returns a complete allow decision with a warning and does not load policy.
 
 ### Public surface
 
-`createArcaneNavigationGuard()`.
+`createArcaneNavigationGuard({ secure })`.
 
 Exact exports: `createArcaneNavigationGuard`.
 
 ### Availability and normalization
 
-**Cross-host.** Normalized frozen allow/block decision. Transport: Arcane network-policy document. [Deep protocol details](protocols.md).
+**Cross-host.** Complete mutable allow/block decision. Ordinary mode warns and
+continues; explicitly selected `secure: true` loads the Arcane network-policy
+document and fails closed when that selected policy cannot be evaluated. [Deep protocol details](protocols.md).
 
 ### Example
 
 ```javascript
-import * as module from '/arcane/modules/ArcaneNavigationPolicy.js';
+import {createArcaneNavigationGuard} from '/arcane/modules/ArcaneNavigationPolicy.js';
 
-console.log(Object.keys(module));
+const guard=createArcaneNavigationGuard();
+console.log(await guard('https://example.com/docs',{intent:'external'}));
 ```
 
 ## ArcaneNetworkPolicy.js
@@ -851,11 +909,14 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Runs a fixed sequential browser test list with cooperative abort, per-test timeout, and lifecycle events.
+Runs a complete sequential browser test list with explicit cancellation and full-detail lifecycle events.
 
 ### Public surface
 
-default `BrowserTestSuite`; `list()`, `run()`; emits suite/test start/result/complete events.
+default `BrowserTestSuite`; `list()`, `run()`, `dispose()`/`destroy()`; emits
+complete suite/test start/result/complete events. Legacy `maxTests` and timeout
+fields are accepted as inert compatibility metadata and never limit execution or
+create a timer. Caller `AbortSignal` or disposal is the only suite-owned stop.
 
 Exact exports: `BROWSER_TEST_SUITE_ERROR_CODES`,
 `BROWSER_TEST_SUITE_EVENT_TYPES`, `BROWSER_TEST_SUITE_REASONS`,
@@ -863,7 +924,9 @@ Exact exports: `BROWSER_TEST_SUITE_ERROR_CODES`,
 
 ### Availability and normalization
 
-**Browser / standard Web APIs.** Normalized result and skip/assertion errors. Transport: EventTarget and timers. [Deep protocol details](protocols.md).
+**Browser / standard Web APIs.** Mutable full-detail results and events with
+normalized malformed-result and skip/assertion errors. Transport: EventTarget
+and explicit AbortSignal cancellation. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -877,7 +940,7 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Evaluates bounded arithmetic, powers, constants, and common functions without `eval`.
+Evaluates complete arithmetic expressions, powers, constants, and common functions without `eval`.
 
 ### Public surface
 
@@ -888,7 +951,7 @@ Evaluates bounded arithmetic, powers, constants, and common functions without `e
 `on(type,listener,options): unsubscribe`,
 `dispatchEvent(event): boolean`, and idempotent
 `dispose(): boolean` / `destroy(): boolean`. `evaluateExpression(input): number`
-remains the parser-only helper. `CALCULATOR_ENGINE_ERROR_CODES` is one frozen
+remains the parser-only helper. `CALCULATOR_ENGINE_ERROR_CODES` is one mutable
 record containing the stable `disposed`, `input`, `syntax`, `domain`, and
 `evaluation` codes.
 
@@ -898,10 +961,10 @@ Exact exports: `CALCULATOR_ENGINE_ERROR_CODES`, `default`,
 ### Availability and normalization
 
 **Cross-host.** Each engine owns one `calculator-engine` source on the realm's
-branded `globalThis.arcaneEvents`. `calculator-result` publishes frozen public
+branded `globalThis.arcaneEvents`. `calculator-result` publishes mutable public
 detail `{result}`; the legacy instance listener receives the same `Calculation`
-object returned by `calculate()`. `calculator-error` publishes frozen public
-detail `{code}`; the legacy listener receives frozen
+object returned by `calculate()`. `calculator-error` publishes mutable public
+detail `{code,error,expression}`; the legacy listener receives mutable
 `{expression,error}` while `calculate()` rethrows that same `Error`. Both
 occurrences carry one source-instance `operationId`. Listener callbacks are
 synchronous observations; their failures are reported by the central event
@@ -932,7 +995,8 @@ Pairs and indexes structured evidence records with rendered-page provenance and 
 
 ### Public surface
 
-Eight exported indexing, page, naming, stem, and digest helpers.
+Eight exported indexing, page, naming, and stem helpers. Legacy digest helpers
+remain host-internal compatibility only and are not an ordinary content gate.
 
 Exact exports: `indexPairedRecord`, `nearestPageMarker`, `parseStructuredRecordName`, `renderedPageBlocks`, `resolveEvidenceSourcePage`, `safeName`, `sha256`, `stem`.
 
@@ -1107,7 +1171,7 @@ behavior for chart, dashboard, Markdown, and voice components.
 Constant sets plus normalization, formatting, and explicit STT activation
 helpers. `createSTTActivationController({host,button,onChange,EventClass=CustomEvent})`
 consumes only normalized
-[`AIRuntimeState`](#airuntimestatejs) `stt` role records. Its frozen controller
+[`AIRuntimeState`](#airuntimestatejs) `stt` role records. Its mutable controller
 exposes `action`, `error`, `label`, `pending`, `selected`, `status`, `title`, and
 `visible` getters plus `request(action)`, `synchronize(role)`, and `destroy()`.
 `host` supplies `dispatchEvent(event)` and `requestSTTActivation(intent)`;
@@ -1117,9 +1181,9 @@ callers use the default `CustomEvent`; non-DOM callers must inject a compatible
 `EventClass` constructor.
 
 `request('load'|'unload')` emits the cancelable
-`speech-stt-activation-request` event with frozen `{intent,state}` before it
+`speech-stt-activation-request` event with mutable `{intent,state}` before it
 invokes `host.requestSTTActivation(intent)`. Callback failure emits
-`speech-stt-activation-error` with frozen `{request,error,message}`. Syncing
+`speech-stt-activation-error` with mutable `{request,error,message}`. Syncing
 sticky state only changes the controller's observation and presentation; it
 never emits a lifecycle intent, chooses a provider, or starts a download.
 `destroy()` removes its button listener and suppresses late callback effects.
@@ -1154,46 +1218,68 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Owns bounded in-memory AI turns, context construction, response-length instruction, and atomic history commit.
+Owns complete in-memory AI turns, context construction, provider-response
+preservation, and atomic history commit.
 
 ### Public surface
 
-default `ConfiguredAIChatSession`; `history()`, `clear()`, `prepare()`, `send()`.
+Default `ConfiguredAIChatSession`; named
+`normalizeStructuralToolCall(call,label)`; instance methods `history()`,
+`clear()`, `prepare()`, and `send()`.
 
-`new ConfiguredAIChatSession(options={})` admits exactly `chat`,
-`contextBuilder`, `initialMessages`, `maxContextCharacters`,
-`maxMessageCharacters`, `maxMessages`, `request`, `responseLength`, and
-`systemPrompt`. `initialMessages` is an array of closed `user`, `assistant`, or
-`tool` messages under the same message/context bounds. It excludes `system`,
-allows exactly one structural assistant tool call, and requires a matching tool
-result before another user turn or tool-call sequence; `systemPrompt` owns the
-separate system message.
+`new ConfiguredAIChatSession(options={})` uses `chat`, `contextBuilder`,
+`initialMessages`, `request`, and `systemPrompt`. Compatibility keys
+`responseLength`, `maxContextCharacters`, `maxMessageCharacters`, and
+`maxMessages` are accepted as inert metadata and do not alter or limit content.
+`initialMessages` is an array of complete `user`, `assistant`, or
+`tool` messages. It excludes `system`, preserves optional assistant
+`reasoning_content`, accepts structural assistant tool-call
+arrays, and requires the tracked pending tool result before another user turn
+or tool-call sequence; `systemPrompt` owns the separate system message.
 
-`prepare(input,{signal})` performs the complete bounded request but does not
-commit history immediately. It returns frozen `{response,commit,rollback}`;
-exactly one terminal settlement is permitted. `send()` is the convenience path
-that prepares and then commits the turn.
+Each assistant structural tool call is one complete function call with an exact
+nonempty string `id`, `type:'function'`, a nonempty `function.name`, and
+`function.arguments` as a JSON string encoding an object containing a nonempty
+user-facing `message`. At most one structural call is accepted per assistant
+message. Validation does not trim or reserialize an accepted ID, name, or
+argument string. A pending call is settled only by a request with `role:'tool'`,
+nonempty content, and a `tool_call_id` exactly matching that call's ID. A user
+turn, mismatched tool result, or overlapping structural call is rejected until
+settlement.
 
-An optional async `contextBuilder({input,history,signal})` receives a frozen
-request snapshot and the same cancellation signal. Its returned context is
-framed as untrusted data for only the current request and is never committed to
+`prepare(input,{request,signal})` performs the complete request but does not
+commit history immediately. It returns mutable `{response,commit,rollback}`;
+exactly one terminal settlement is permitted. Plain-object per-turn `request`
+options merge over constructor defaults, while session-owned `messages` and
+`signal` are applied last. `messages`, `signal`, `stream`, `onChunk`,
+`onToolCall`, and `onResponse` cannot be supplied through either request layer.
+`send()` is the convenience path that prepares and then commits the turn.
+
+An optional async `contextBuilder({input,history,signal})` receives a mutable,
+complete request snapshot and the same cancellation signal. Its complete
+returned context applies only to the current request and is never committed to
 history.
 
-An injected `chat(request)` may return the prior normalized session result or
-exactly one non-stream OpenAI-compatible choice. The prior form preserves its
-explicit `done` boolean; OpenAI-compatible choice normalization sets
-`done:true`. Both return frozen
-`{provider,model,message:{role:'assistant',content,tool_calls?},done,
-doneReason,promptEvalCount,evalCount}`. Tool calls remain structural data and
-are never executed. When `tool_calls` is present it must contain exactly one
-valid structural call. A malformed response fails `AI_CHAT_INVALID_RESPONSE`;
-caller cancellation is `AbortError` with code `AI_CHAT_ABORTED`. A new user
+An injected `chat(request)` may return the prior normalized session result or a
+non-stream OpenAI-compatible response whose first choice supplies the assistant
+message. The prior form preserves its explicit `done` boolean;
+OpenAI-compatible choice normalization sets `done:true`. Both return mutable
+`{provider,model,message:{role:'assistant',content,tool_calls?},providerResponse,
+done,doneReason,promptEvalCount,evalCount}` and preserve the complete provider
+response in `providerResponse`. Tool calls remain structural data and are never
+executed. General malformed responses fail `AI_CHAT_INVALID_RESPONSE`;
+malformed structural envelopes or argument JSON fail
+`AI_CHAT_INVALID_TOOL_CALL`, a missing or blank argument `message` fails
+`AI_CHAT_TOOL_MESSAGE_REQUIRED`, and more than one structural call fails
+`AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED`. Caller cancellation is `AbortError` with
+code `AI_CHAT_ABORTED`. A new user
 turn cannot bypass a pending structural tool call
 (`AI_CHAT_TOOL_RESULT_REQUIRED`), a mismatched tool result fails
 `AI_CHAT_INVALID_TOOL_MESSAGE`, and a second terminal settlement of one
-prepared transaction fails `AI_CHAT_TRANSACTION_SETTLED`.
+prepared transaction fails `AI_CHAT_TRANSACTION_SETTLED`. Incoherent initial or
+persisted sequencing fails `AI_CHAT_INCOHERENT_PERSISTENCE`.
 
-Exact exports: `default`.
+Exact exports: `normalizeStructuralToolCall`, `default`.
 
 ### Availability and normalization
 
@@ -1221,13 +1307,13 @@ console.log(await session.send('Hello'));
 
 ### Overview
 
-Normalizes, creates, updates, remembers, selects, and formats bounded conversation action items.
+Normalizes, creates, updates, remembers, selects, and formats complete conversation action items.
 
 ### Public surface
 
 Action-item constants and lifecycle/formatting helpers.
 
-Exact exports: `CONVERSATION_ACTION_ITEM_BASES`, `CONVERSATION_ACTION_ITEM_PRESENTATION_COOLDOWN_MS`, `CONVERSATION_ACTION_ITEM_STATUSES`, `MAX_CONVERSATION_ACTION_ITEMS`, `MAX_CONVERSATION_ACTION_ITEM_CHARACTERS`, `MAX_CONVERSATION_REMEMBERED_ACTIONS`, `conversationActionItemsInstruction`, `createConversationActionItem`, `formatConversationActionItemCheckIn`, `markConversationActionItemsPresented`, `normalizeConversationActionItem`, `normalizeConversationActionItems`, `normalizeRememberedConversationActions`, `outstandingConversationActionItems`, `rememberConversationActionItems`, `removeConversationActionItem`, `selectConversationActionItemsForPresentation`, `updateConversationActionItem`.
+Exact exports: `CONVERSATION_ACTION_ITEM_BASES`, `CONVERSATION_ACTION_ITEM_PRESENTATION_COOLDOWN_MS`, `CONVERSATION_ACTION_ITEM_STATUSES`, `conversationActionItemsInstruction`, `createConversationActionItem`, `formatConversationActionItemCheckIn`, `markConversationActionItemsPresented`, `normalizeConversationActionItem`, `normalizeConversationActionItems`, `normalizeRememberedConversationActions`, `outstandingConversationActionItems`, `rememberConversationActionItems`, `removeConversationActionItem`, `selectConversationActionItemsForPresentation`, `updateConversationActionItem`.
 
 ### Availability and normalization
 
@@ -1250,6 +1336,14 @@ Defines the closing-report tool, instruction, result normalizer, call classifier
 ### Public surface
 
 Six constants/helpers for closing reports.
+
+The generated sole-call schema requires both `message` and `final_message`.
+`message` is brief user-facing progress shown while the application accepts and
+renders the call. `final_message` remains the complete terminal closeout and is
+never replaced by or duplicated into `message`; `remembered_actions` remains
+optional. `normalizeConversationClosingReport()` returns
+`{message,finalMessage,rememberedActions}`, while
+`formatConversationClosingReport()` escapes and renders only `finalMessage`.
 
 Exact exports: `CONVERSATION_CLOSING_REPORT_TOOL_NAME`, `classifyConversationClosingReportCalls`, `conversationClosingReportInstruction`, `createConversationClosingReportTool`, `formatConversationClosingReport`, `normalizeConversationClosingReport`.
 
@@ -1285,6 +1379,15 @@ Exact exports: `CONVERSATION_TIMEBOX_ERROR_CODES`,
 `formatConversationElapsed`, `normalizeConversationTimeboxCommand`, and
 `requireConversationTimeboxDelivery`.
 
+`conversationTimeboxTool` is a sole-call function schema with
+`additionalProperties:false`. Every call requires `action` and a nonempty
+user-facing `message`; `set` and `adjust` also require an explicit positive
+`duration_milliseconds`, while `clear` ignores duration.
+`normalizeConversationTimeboxCommand()` preserves the exact message, and
+`ConversationTimebox.applyCommand()` returns the resulting state snapshot plus
+that message after applying the command. `consumeConversationTimeboxCall()`
+retains this producer result inside its fulfilled result record.
+
 ### Availability and normalization
 
 **Cross-host.** Fully normalized state/command/delivery errors. Transport: Clock/timers and callbacks. [Deep protocol details](protocols.md).
@@ -1311,7 +1414,7 @@ Exact exports: `USER_MANAGED_LOOPBACK_PROVIDER_MODE`, `getCoreLocalModelCatalog`
 
 ### Availability and normalization
 
-**Cross-host.** Fully normalized descriptors and stable admission labels. Transport: In-process projection of Core status. [Deep protocol details](protocols.md).
+**Cross-host.** Fully normalized descriptors and stable availability labels. Transport: In-process projection of Core status. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -1398,31 +1501,25 @@ console.log(Object.keys(module));
 ### Overview
 
 Stores one application-defined document corpus through an existing DBOPFS-style
-adapter, searches only a completed generation, and builds bounded context that
-is explicitly labeled untrusted. Construction performs no read, write, fetch,
-or search; applications call `bootstrap()` deliberately.
+adapter, searches only a completed generation, and builds complete context.
+Construction performs no read, write, fetch, or search; applications call
+`bootstrap()` deliberately.
 
 ### Public surface
 
 Exact exports: `DBOPFSDocumentLibrary`, `createDBOPFSDocumentLibrary`,
 `default`, and `normalizeDBOPFSDocumentSchema`.
 
-`new DBOPFSDocumentLibrary({concurrency,db,maxCorpusCharacters,
-maxDocumentCharacters,maxSearchCharacters,schema})` exposes `schema`,
+`new DBOPFSDocumentLibrary({concurrency,db,schema})` exposes `schema`,
 `bootstrap({files,onProgress,read,readFailurePolicy,signal})`,
-`search(query,{kinds,limit,signal,tags})`,
-`evaluate(query,{sources,read,maxCharacters,maxCorpusCharacters,
-maxScoringCharacters,maxDocumentCharacters?,kinds?,tags?,readFailurePolicy?,
-onProgress?,signal?})`,
-`buildContext(query,{limit,maxCharacters,maxDocumentCharacters,signal})`, and
-`createContextBuilder({limit,maxCharacters,maxDocumentCharacters})`.
+`search(query,{kinds,limit,signal,tags})` (legacy `limit` is inert),
+`evaluate(query,{sources,read,kinds?,tags?,readFailurePolicy?,onProgress?,signal?})`,
+`buildContext(query,{signal})`, and `createContextBuilder()`.
 
-`evaluate()` requires `sources`, `read`, `maxCharacters`,
-`maxCorpusCharacters`, and `maxScoringCharacters`. It filters source metadata
-before calling
-`read(source,{maxCharacters,maxCorpusCharacters,ordinal,signal})`, never accepts a
-source body as implicit authority, and never persists a caller-owned body.
-`maxDocumentCharacters` defaults to the smaller instance/output bound.
+Legacy maximum-character options remain accepted for compatibility but do not
+cap, truncate, clip, tail, or elide content. `evaluate()` requires `sources`
+and `read`, filters source metadata before calling
+`read(source,{ordinal,signal})`, and never persists a caller-owned body.
 
 ### Availability and normalization
 
@@ -1430,26 +1527,24 @@ source body as implicit authority, and never persists a caller-owned body.
 keeps the existing `get`, `set`, `getAllKeys`, and `delete` method names; Node
 can use the same class only through an explicitly imported runtime module and a
 compatible storage adapter; SDK `0.3.1` publishes no Node package subpath or
-Node storage implementation for it. Bootstrap uses a bounded concurrent
+Node storage implementation for it. Bootstrap uses a concurrent
 generation, commits its manifest last, cleans partial data on failure, and
 rejects case-colliding IDs. Search
-returns `{failures,matches,total}` so one corrupt record does not become a false
-complete result. `bootstrap()` defaults to rejecting read failure; the explicit
-`readFailurePolicy:'preserve-readable'` mode returns partial-success
-`readCoverage`. `evaluate()` also defaults to rejecting a source-read failure;
-its explicit `preserve-readable` mode instead ranks the readable records and
-returns partial `failures` plus `coverage` in the evaluation result (not
-bootstrap's `readCoverage`). It reads a caller-owned source list without
-persisting its bodies and returns frozen `{authority:'sources',characters,
-coverage,documents,failures,limits,query,scoringTruncated,text,truncated}`.
+returns `{failures,matches,total}` so one malformed record remains visible
+without hiding readable results. `bootstrap()` and `evaluate()` default to
+`readFailurePolicy:'preserve-readable'`; explicit `reject` stops on a read
+failure. Preserve-readable mode returns the readable records plus the complete
+failure and coverage details (`readCoverage` for bootstrap, `coverage` for
+evaluation). Evaluation reads a caller-owned source list without persisting its
+bodies and returns complete documents and text.
 Read failure remains `DBOPFS_DOCUMENT_READ_FAILED`; invalid public input uses
-`DBOPFS_DOCUMENT_INVALID`, invalid integer budgets use
+`DBOPFS_DOCUMENT_INVALID`, invalid concurrency uses
 `DBOPFS_DOCUMENT_INVALID_LIMIT`, and a preserved read failure without a usable
 source code is reported as `failures[].code:'DBOPFS_DOCUMENT_ERROR'`.
 Cancellation is `AbortError` with code `DBOPFS_DOCUMENT_ABORTED`. Construction
 does not search.
 When an application explicitly supplies the library's context builder, each
-prepared chat send performs that bounded retrieval.
+prepared chat send performs that complete retrieval.
 
 ### Example
 
@@ -1473,11 +1568,7 @@ async function replaceHelpCorpusAfterUserChoice() {
 
   const preview = await documents.evaluate('portable', {
     sources: [{id:'draft', path:'draft.md', title:'Draft'}],
-    read: async source => source.id === 'draft' ? 'Portable app notes.' : '',
-    maxCharacters: 2048,
-    maxCorpusCharacters: 4096,
-    maxDocumentCharacters: 512,
-    maxScoringCharacters: 512
+    read: async source => source.id === 'draft' ? 'Portable app notes.' : ''
   });
   console.log(preview.coverage, preview.text);
 }
@@ -1509,7 +1600,7 @@ const worker = new Worker('/arcane/modules/DBOPFSWorker.js', {type: 'module'});
 
 ### Overview
 
-Provides bounded workspace inspection, context, setup task, and Node installer clients without arbitrary command execution.
+Provides complete workspace inspection, context, setup task, and Node installer clients without arbitrary command execution.
 
 ### Public surface
 
@@ -1557,7 +1648,7 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Provides deterministic, dependency-free metadata/body ranking and bounded
+Provides deterministic, dependency-free metadata/body ranking and complete
 context excerpts for caller-owned document records.
 
 ### Public surface
@@ -1567,16 +1658,16 @@ Exact exports: `DOCUMENT_SEARCH_FIELD_ORDER`, `DocumentLexicalSearch`,
 `documentSearchTokens`, `normalizedDocumentSearchText`, `scoreDocumentBody`,
 and `scoreDocumentLexicalIndex`.
 
-`new DocumentLexicalSearch(records,{maxResults=20})` exposes
-`rank(query,{kinds,tags})` and `search(query,{kinds,limit,tags})`.
+`new DocumentLexicalSearch(records)` exposes
+`rank(query,{kinds,tags})` and `search(query,{kinds,limit,tags})`; the legacy
+`limit` field is accepted without limiting the result set.
 
 ### Availability and normalization
 
 **Cross-host.** Indexing and search are in-process only. Text, tags, kinds,
-scores, field ordering, truncation, and tie-breaking are normalized into frozen
-records. This module performs no storage, network, model, Core, or DOM action.
-The caller decides whether a result is merely displayed or explicitly injected
-as untrusted AI context.
+scores, field ordering, complete excerpts, and tie-breaking are normalized into
+mutable records. This module performs no storage, network, model, Core, or DOM
+action. The caller decides how a result is used.
 
 ### Example
 
@@ -1622,7 +1713,7 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Normalizes global errors/rejections, fingerprints and deduplicates incidents, persists a ledger, and performs bounded delivery.
+Normalizes global errors/rejections, fingerprints and deduplicates incidents, persists a complete ledger, and performs complete delivery.
 
 ### Public surface
 
@@ -1648,7 +1739,7 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Encodes indexed frames into a bounded animated GIF using palette mapping and LZW.
+Encodes indexed frames into a complete animated GIF using palette mapping and LZW.
 
 ### Public surface
 
@@ -1658,7 +1749,7 @@ Exact exports: `default`, `indexPixels`, `lzw`.
 
 ### Availability and normalization
 
-**Cross-host.** Normalized byte output and bounds. Transport: In-process only. [Deep protocol details](protocols.md).
+**Cross-host.** Normalized complete binary output. Transport: In-process only. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -1720,17 +1811,23 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Inspects one exact model and runs one isolated question with proof validation.
+Inspects one selected model and runs one isolated question while preserving the
+complete answer.
 
 ### Public surface
 
 default/named runner, `countSentences()`, `inspectModel()`, `runQuestion()`.
+`inspectModel(model,expectedModel,contextTokens)` accepts any positive safe
+integer context-token value and forwards the complete selected request.
+`runQuestion()` returns the provider's full result plus informative
+`sentenceCount`; it has no `maxSentences` input or `sentenceLimitExceeded`
+output.
 
 Exact exports: `IsolatedModelQuestionRunner`, `countSentences`, `default`.
 
 ### Availability and normalization
 
-**Native bridge or injected provider.** Strict normalized proof/coded errors. Transport: localAI isolated-model methods. [Deep protocol details](protocols.md).
+**Native bridge or injected provider.** Normalized model/result and coded errors. Transport: localAI isolated-model methods. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -1744,7 +1841,7 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Derives selected AI requirements and returns a frozen readiness/recovery report across browser, desktop, and Android modes.
+Derives selected AI requirements and returns a complete readiness/recovery report across browser, desktop, and Android modes.
 
 ### Public surface
 
@@ -1754,7 +1851,7 @@ Exact exports: `LOCAL_AI_BROWSER_ENDPOINTS`, `checkLocalAIReadiness`, `deriveLoc
 
 ### Availability and normalization
 
-**Browser/native hybrid.** Fully normalized report and stable error codes; browsers never probe Ollama. Transport: Arcane.localAI, Arcane.speech, bounded browser speech health. [Deep protocol details](protocols.md).
+**Browser/native hybrid.** Fully normalized report and stable error codes; browsers never probe Ollama. Transport: Arcane.localAI, Arcane.speech, complete browser speech health. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -1803,7 +1900,7 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Builds bounded reports and prefers the native mail capability with an explicit HTTP transport fallback.
+Builds complete reports and prefers the native mail capability with an explicit HTTP transport fallback. Report text, HTML, and serialized content are preserved exactly and delivered complete.
 
 ### Public surface
 
@@ -1827,7 +1924,7 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Persists each bounded provider-neutral mail report before delivery and owns its
+Persists each complete provider-neutral mail report before delivery and owns its
 idempotent enqueue, FIFO drain, retry-window, terminal-state, reconciliation,
 and explicit invalid-record maintenance lifecycle. It selects no mail provider,
 recipient, retention policy, retry timer, or transport fallback.
@@ -1848,10 +1945,6 @@ new MailOutbox({
   lockManager=undefined,
   onlineTarget=typeof globalThis.addEventListener==='function'?globalThis:null,
   onRecordCommitted=null,
-  maxAttemptsPerDrain=16,
-  maxInvalidRecords=128,
-  maxRecords=512,
-  maxReportBytes=786432,
   quarantineTable='mail_outbox_quarantine',
   table=MAIL_OUTBOX_TABLE
 }={})
@@ -1861,7 +1954,7 @@ new MailOutbox({
 quarantine additionally requires `delete()`. `lockManager` must expose the Web
 Locks-compatible `request()` contract. The injected
 `deliver({report,reportKey,serializedReport,signal})` callback receives the
-frozen parsed report, its stable idempotency key, the exact stored JSON string,
+complete parsed report, its stable idempotency key, the exact stored JSON string,
 and the caller-owned signal. Omitted `lockManager` resolves first from storage
 and then from `navigator.locks`. A delivery result must identify a valid
 `requestId` and one of `accepted`, `delivery_uncertain`,
@@ -1872,12 +1965,12 @@ accepted results additionally require a provider ID or the admitted
 Read-only getters are `started`, `invalidRecords`, and `lastBackgroundError`.
 Methods are `get(key)`, `list()`, `audit()`, `deleteInvalid(fileName)`,
 `repairInvalid(fileName,replacement)`,
-`quarantineInvalid({limit=64}={})`,
+`quarantineInvalid()`,
 `enqueue({report,reportKey}={}, {attempt=true,signal=null}={})`,
 `drain({reason='manual',signal=null}={})`, `start({signal=null}={})`, and
 `stop()`. `createMailOutbox(options)` returns `new MailOutbox(options)`.
 
-Every returned durable record is deeply frozen and contains exactly
+Every returned durable record contains exactly
 `{protocol,reportKey,serializedReport,state,createdAt,updatedAt,firstAttemptAt,
 lastAttemptAt,nextAttemptAt,attempts,result,failure}`. Protocol is
 `arcane-mail-outbox/1`; the default table is `mail_outbox`; the idempotency
@@ -1886,8 +1979,9 @@ window is 86,400,000 milliseconds. States are exactly `queued`, `sending`,
 means provider or admitted Core acceptance, not inbox delivery.
 
 `enqueue()` serializes same-instance persistence and binds one report key to one
-exact serialized body. `drain()` runs or joins one bounded instance drain under
-an exclusive shared lock and attempts at most 16 records by default. Startup,
+complete serialized body. It preserves the complete queued content without
+truncation, clipping, tailing, or elision.
+`drain()` runs or joins one instance drain under an exclusive shared lock. Startup,
 an owned `online` listener, or an explicit call may trigger work; there is no
 polling or retry timer. Abort before the delivery call prevents that call, and a
 caller joining an existing drain may stop waiting without cancelling the shared
@@ -1898,7 +1992,7 @@ becomes `reconciliation_required` when automatic retry would risk a duplicate.
 `stop()` aborts only the owned online drain, removes its listener, preserves
 durable records, and returns the instance.
 
-`audit()` reports valid records plus bounded invalid-file metadata. Repair,
+`audit()` reports valid records plus complete invalid-file metadata. Repair,
 deletion, and quarantine are explicit, revalidate the selected file under the
 table lock, and never infer destructive authority from a storage read failure.
 `onRecordCommitted(record)` is an observational callback after each durable
@@ -1909,7 +2003,7 @@ write; callback failure cannot change the committed operation result.
 **Browser/native WebView or compatible injected host.** The default application
 integration uses DBOPFS-compatible durable storage and `navigator.locks`; an
 alternate adapter owns its own durability claim and must provide equivalent
-storage and shared-lock semantics. Frozen records, bounds, state transitions,
+storage and shared-lock semantics. Complete records, state transitions,
 retry/reconciliation classification, invalid-record maintenance, and
 AbortSignal admission/join cancellation are normalized. Storage, lock,
 online-check, and injected-delivery failures remain visible through concrete
@@ -1936,20 +2030,20 @@ outbox.stop();
 
 ### Overview
 
-Sends one bounded mail report to a normalized HTTP(S) endpoint with timeout and response-size limits.
+Sends one complete mail report to a normalized HTTP(S) endpoint.
 
 ### Public surface
 
-Timeout/size constants, `MailTransportError`, `normalizeMailEndpoint()`,
+Compatibility timeout constant, `MailTransportError`, `normalizeMailEndpoint()`,
 `serializeMailReport()`, and `sendMailReport()`.
 
-Exact exports: `DEFAULT_MAIL_REQUEST_TIMEOUT_MS`, `MAX_MAIL_RESPONSE_BYTES`,
+Exact exports: `DEFAULT_MAIL_REQUEST_TIMEOUT_MS`,
 `MailTransportError`, `normalizeMailEndpoint`, `serializeMailReport`,
 `sendMailReport`.
 
 ### Availability and normalization
 
-**Browser/server with fetch + cloud.** Normalized endpoint/timeout/size errors; remote detail bounded. Transport: HTTP(S) fetch + AbortController. [Deep protocol details](protocols.md).
+**Browser/server with fetch + cloud.** Normalized endpoint/transport errors; complete remote detail is preserved subject only to unavoidable HTTP framing. Transport: HTTP(S) fetch + AbortController. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -1987,7 +2081,8 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Renders Markdown with Marked and exposes a DOM-sanitized projection.
+Renders complete Markdown with Marked and exposes the same complete rendered
+markup through `rendered` and `safeRendered`.
 
 ### Public surface
 
@@ -1997,7 +2092,8 @@ Exact exports: `default`.
 
 ### Availability and normalization
 
-**Browser / native WebView.** Raw Marked behavior plus Arcane sanitization; parse errors vendor-native. Transport: Marked + DOM template sanitization. [Deep protocol details](protocols.md).
+**Browser / native WebView.** Raw Marked behavior is preserved; parse errors are
+vendor-native. Transport: Marked. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -2132,7 +2228,7 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Defines bounded runtime/service preference schemas and deterministic Arcane brain alias names.
+Defines complete runtime/service preference schemas and deterministic Arcane brain alias names.
 
 ### Public surface
 
@@ -2156,7 +2252,7 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Searches and loads Open-Meteo data into frozen Arcane weather entities.
+Searches and loads Open-Meteo data into mutable Arcane weather entities.
 
 ### Public surface
 
@@ -2191,18 +2287,51 @@ semantics; it does not define a new storage protocol.
 Exact exports: `PersistentAIChatSession`, `createPersistentAIChatSession`, and
 `default`.
 
-Constructor and factory options are `{chat,chatEntity,chatFileName,
-contextBuilder,loadExisting,maxContextCharacters,maxMessageCharacters,
-maxMessages,memory,request,responseLength,systemPrompt}`. Public members are
-static `create()`, getters `chatEntity` and `fileName`, and `ready()`,
-`history()`, `settleMemory()`, and `send(input)`.
+Constructor and factory options are `{ai,chat,chatEntity,chatFileName,
+contextBuilder,loadExisting,memory,request,responseLength,systemPrompt}`. Legacy
+maximum-character/message options are accepted for compatibility but do not
+cap, truncate, clip, tail, or elide content. Public members are
+static `create()`, getters `ai`, `chatEntity`, and `fileName`, and `ready()`,
+`history()`, `transcript()`, `settleMemory()`, `send(input)`, and
+`stream(input,handlers)`.
 `ready()` waits for initialization and resolves the same session instance.
 
 `send()` accepts `{message:{content,role:'user'|'tool',tool_call_id?,persist},
-response:{persist},signal?}`. Message and response persistence must match.
-`persist:false` still commits the coherent turn to live bounded model context,
+request?,response:{persist},signal?}`. Message and response persistence must
+match. Plain-object `request` supplies per-turn generation options such as
+`toolChoice:'none'`; it cannot replace session-owned `messages`, `signal`, or
+streaming/lifecycle callback state.
+`persist:false` still commits the coherent turn to complete live model context,
 but not to durable ChatEntity history or memory. A structural tool result must
 use the persistence choice captured by its matching assistant tool call.
+
+`history()` returns provider-safe configured model context, including the
+system prompt, complete optional assistant reasoning, and every committed live
+turn. `transcript()` returns copies of
+the current non-hidden ChatEntity records with their display timestamps. A
+`persist:false` turn remains in both live history and transcript for the active
+session while remaining excluded from DBOPFS durability and memory extraction.
+
+`stream()` accepts the same input as `send()` and optional
+`{onChunk,onToolCall}` handlers. When `ai.streamRequest()` is available, it
+forwards live text deltas, buffers a normalized structural call until its exact
+ID, type, name, and argument string match the terminal response and the complete
+response passes configured-session validation, and only then publishes that
+call and uses the same atomic ChatEntity append/configured session commit as
+`send()`. Omission or divergence rejects with
+`AI_CHAT_STREAM_TOOL_CALL_MISMATCH` before persistence or commit. When streaming
+is unavailable, `stream()` uses the
+configured non-stream chat request and still returns, validates, persists, and
+renders the complete terminal response and tool calls; optional streaming is
+not a session failure. The same caller signal and transaction rollback govern
+both paths.
+
+When an assistant response opens a structural call, the response persistence
+choice is retained under the exact call ID. The matching `role:'tool'`
+settlement must use that same choice. Persisted legacy calls without the
+required nonempty argument `message` are never assigned invented text; loading
+reports the coded structural-message failure while leaving the stored record
+unchanged for application-owned recovery.
 
 ### Availability and normalization
 
@@ -2212,7 +2341,9 @@ inject the browser-WASM controller, another provider-neutral adapter, or a
 cloud chat function. There is no automatic provider or storage fallback.
 Context builders are request-only, and document context remains explicitly
 untrusted. Errors include `AI_CHAT_BUSY`, `AI_CHAT_TOOL_RESULT_REQUIRED`,
-`AI_CHAT_INVALID_TOOL_MESSAGE`, and `AI_CHAT_INCOHERENT_PERSISTENCE`.
+`AI_CHAT_INVALID_TOOL_MESSAGE`, `AI_CHAT_TOOL_MESSAGE_REQUIRED`, and
+`AI_CHAT_INCOHERENT_PERSISTENCE`, plus
+`AI_CHAT_STREAM_TOOL_CALL_MISMATCH` for a streamed/terminal envelope mismatch.
 
 ### Example
 
@@ -2247,13 +2378,13 @@ default `PreferenceStore`, re-exported `Preference`/schema; load/set/setAll/rese
 
 Adapters provide `get(key, context)`, `set(key, value, context)`, and
 `delete(key, context)`. An adapter may also provide
-`setMany(entries, context)`, where `entries` is one frozen plain object keyed by
+`setMany(entries, context)`, where `entries` is one mutable plain object keyed by
 the store's namespaced storage keys. `setAll(values, {signal})` normalizes every
-selected schema value before storage work. For one to 32 selected values it calls
-an advertised `setMany()` once and publishes the existing per-key change events
+selected schema value before storage work. For every selected value it calls an
+advertised `setMany()` once and publishes the existing per-key change events
 only after that batch succeeds. A dispatched batch rejection propagates without
-a serial retry, in-memory state change, or change event. Larger batches and
-adapters without `setMany()` retain ordered serial storage compatibility inside
+a serial retry, in-memory state change, or change event. Adapters without
+`setMany()` retain ordered complete serial storage compatibility inside
 one queued operation, including state and events for each successful write before
 a later write fails.
 
@@ -2263,7 +2394,8 @@ Exact exports: `PREFERENCE_STORE_ERROR_CODES`,
 
 ### Availability and normalization
 
-**Browser/native hybrid.** Values are normalized before I/O. Non-Android
+**Browser/native hybrid.** Complete ordinary values and returned snapshots remain
+mutable after schema normalization. Non-Android
 `Arcane.preferences.setMany()` supplies the optional atomic batch. Only exact
 unsupported native capability changes future operations to app-scoped
 localStorage; an in-flight advertised batch is never downgraded after rejection.
@@ -2315,7 +2447,7 @@ Exact exports: `DEFAULT_QUESTIONNAIRE_NOTIFICATION_TIME_MS`, `Questionnaire`.
 
 ### Availability and normalization
 
-**Cross-host.** Normalized fail-closed boolean. Transport: In-process clock only. [Deep protocol details](protocols.md).
+**Cross-host.** Normalized conservative boolean. Transport: In-process clock only. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -2403,13 +2535,14 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Implements an append-only bounded in-memory projection/revocation ledger safe for hostile descriptor inputs.
+Implements an append-only in-memory projection/revocation ledger for normalized descriptor inputs.
 
 ### Public surface
 
-Ledger classes, limits/status/reason constants, clone/fingerprint/port helpers, append/query/list APIs.
+Ledger classes, status/reason constants, clone/fingerprint/port helpers, append/query/list APIs.
 
-Exact exports: `DEFAULT_PROJECTION_LEDGER_CAPACITY`, `DEFAULT_PROJECTION_LEDGER_STORED_CHARACTERS`, `DEFAULT_PROJECTION_LEDGER_STORED_NODES`, `DEFAULT_PROJECTION_LEDGER_STORED_UTF8_BYTES`, `MAX_PROJECTION_LEDGER_CAPACITY`, `MAX_PROJECTION_LEDGER_STORED_CHARACTERS`, `MAX_PROJECTION_LEDGER_STORED_NODES`, `MAX_PROJECTION_LEDGER_STORED_UTF8_BYTES`, `PROJECTION_LEDGER_LIMITS`, `PROJECTION_LEDGER_REASON_CODES`, `PROJECTION_LEDGER_SCHEMA_VERSION`, `PROJECTION_LEDGER_STATUSES`, `ProjectionLedgerError`, `RevocableProjectionLedger`, `cloneProjectionLedgerValue`, `createProjectionLedgerFingerprint`, `createRevocableProjectionLedgerPortAdapter`, `default`.
+Exact exports follow the current runtime module inventory. Legacy limit constants,
+when retained for compatibility, do not cap or truncate stored content.
 
 ### Availability and normalization
 
@@ -2427,7 +2560,7 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Matches configured risk signals and levels against bounded text.
+Matches configured risk signals and levels against complete text.
 
 ### Public surface
 
@@ -2485,7 +2618,9 @@ Exact exports: `default`.
 
 ### Availability and normalization
 
-**Browser / native WebView.** Keys/limits/corruption handling normalized; storage errors mixed. Transport: OPFS + AppDataScope. [Deep protocol details](protocols.md).
+**Browser / native WebView.** Exact-key options and malformed-JSON handling are
+normalized; complete JSON values are preserved and storage errors remain
+visible. Transport: OPFS + AppDataScope. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -2525,17 +2660,16 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Segments bounded text, queues latest-request speech synthesis, and controls lookahead HTML audio playback.
+Preserves exact nonblank text as one segment, queues latest-request speech
+synthesis, and controls lookahead HTML audio playback.
 
 ### Public surface
 
-`SpeechPlayback` class/default, voice/limit compatibility constants,
+`SpeechPlayback` class/default, voice compatibility constants,
 `SPEECH_PLAYBACK_STATE_EVENT`, `splitSpeechText()`, and playback lifecycle APIs.
 
-Exact exports: `MAX_SPEECH_CHARACTERS`, `MAX_SPEECH_CHUNKS`,
-`MAX_SPEECH_INPUT`, `PREFERRED_STREAM_SEGMENT`, `SPEECH_PLAYBACK_STATE_EVENT`,
-`SPEECH_VOICE_ALIASES`, `SPEECH_VOICE_OPTIONS`, `SpeechPlayback`, `default`,
-and `splitSpeechText`.
+Exact exports: `SPEECH_PLAYBACK_STATE_EVENT`, `SPEECH_VOICE_ALIASES`,
+`SPEECH_VOICE_OPTIONS`, `SpeechPlayback`, `default`, and `splitSpeechText`.
 
 ```text
 new SpeechPlayback({
@@ -2557,21 +2691,27 @@ new SpeechPlayback({
 `synthesize(payload, {signal})`. `prepare({key,parts,model,voice,responseFormat,
 speed,autoplay=true})` uses only caller-supplied model, voice, and response-format
 values; those three omitted values remain omitted so the selected AI/model
-catalog may admit its documented defaults. Speed defaults to `1`, is normalized
+catalog may provide its documented defaults. Speed defaults to `1`, is normalized
 as a positive number, and is always sent. The legacy voice constants remain
 exported for compatibility but are not selected by the class. There is no
 hard-coded model, response format, voice, or cloud/browser fallback.
+`splitSpeechText(value)` uses trimming only to detect blank input, then returns
+the caller's exact string in one mutable array without trimming, splitting, or
+freezing it. `prepare()` likewise preserves each nonblank part's exact `input`
+string while normalizing its other playback fields into a new mutable record.
+The class applies no part-count, character-count, pause, or input upper cap.
 
 Every preparation owns an operation ID and one AbortController for each active
 synthesis segment or playback delay. Replacement,
 `stop()`, `cancel()`, and `destroy()` abort their owned signals, suppress stale
 settlement, release Blob URLs, and publish synchronous
 `speech-playback-state` occurrences through `globalThis.arcaneEvents` before
-calling the compatibility `onState(frozenDetail)` callback. The detail contains
+calling the compatibility `onState(detail)` callback. Both receive mutable
+public state detail. The detail contains
 `state`, `message`, `key`, `index`, `total`, `producing`, `buffered`, `hasAudio`,
-`operationId`, `code`, and `reason`; the canonical public occurrence omits
-provider response/error bodies. `destroy()` also removes every audio listener
-and disposes its per-instance canonical source handle; repeated destroy returns
+`operationId`, `code`, and `reason`; provider rejection remains preserved to the
+`prepare()` caller. `destroy()` also removes every audio listener and disposes
+its per-instance canonical source handle; repeated destroy returns
 `false`. Signal abortion proves delivery suppression; whether provider work
 actually stops remains the selected provider's cancellation boundary.
 
@@ -2593,8 +2733,8 @@ Exact lifecycle reasons are `playback-replaced`, `playback-stopped`,
 
 ### Availability and normalization
 
-**Browser + admitted AI/native bridge.** State, cancellation, lifecycle, and
-playable Blob normalization are shared. Provider/model/runtime/voice admission
+**Browser + compatible AI/native bridge.** State, cancellation, lifecycle, and
+playable Blob normalization are shared. Provider/model/runtime/voice selection
 remains caller- and catalog-owned. Transport: `AI.fetchTTS`, compatible
 `Arcane.speech.synthesize`, Blob URLs, audio element, and the singleton event
 authority. [Deep protocol details](protocols.md).
@@ -2629,7 +2769,7 @@ speakButton.addEventListener('click', async () => {
 
 ### Overview
 
-Loads a positive static document inventory with byte/hash verification, cache, search, and bounded context.
+Loads a positive static document inventory with cache, search, and complete context.
 
 ### Public surface
 
@@ -2639,7 +2779,9 @@ Exact exports: `CATALOG_SCHEMA_VERSION`, `default`, `normalizeStaticDocumentCata
 
 ### Availability and normalization
 
-**Browser / native WebView / server with fetch.** Strict catalog/content normalization; transport failures mixed. Transport: HTTP(S), crypto.subtle, optional cache. [Deep protocol details](protocols.md).
+**Browser / native WebView / server with fetch.** Catalog/content normalization
+preserves complete mutable documents; malformed catalog/content and transport
+failures remain visible. Transport: HTTP(S) and optional cache. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -2845,17 +2987,30 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Parses OpenAI-style tool calls and dispatches complete or streamed calls to injected handlers.
+Parses OpenAI-style complete responses or streamed name-keyed call records,
+validates each argument record, and dispatches it to an injected handler.
 
 ### Public surface
 
 `parseArguments()`, `handleResponse()`, `handleStreamedCalls()`.
 
+`parseArguments()` accepts JSON text or a plain argument object whose prototype
+is `Object.prototype` or `null`, requires a nonempty user-facing `message`, and
+returns the parsed object without cloning, freezing, or reserialization.
+Missing, blank, null, array, custom-prototype, or otherwise invalid argument
+records fail with `AI_TOOL_MESSAGE_REQUIRED`. Complete-response handlers run
+sequentially and return one result or an array; streamed handlers return
+`Promise.allSettled()` results. A routed call is not settled merely because it
+was displayed: the conversation owner must still append the exact matching
+executed, declined, cancelled, or not-executed `role:'tool'` result before the
+next user turn.
+
 Exact exports: `handleResponse`, `handleStreamedCalls`, `parseArguments`.
 
 ### Availability and normalization
 
-**Cross-host.** Arguments/routing normalized; handler results returned or all-settled. Transport: Injected handlers. [Deep protocol details](protocols.md).
+**Cross-host.** Argument records validated; handler results returned or
+all-settled. Transport: Injected handlers. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -2956,7 +3111,8 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Validates YouTube video/playlist locators and constructs privacy-enhanced embed URLs.
+Parses YouTube video/playlist locators and constructs ordinary embed URLs by
+default, with privacy enhancement only when the caller selects it.
 
 ### Public surface
 
@@ -2966,7 +3122,10 @@ Exact exports: `parseYouTubeMedia`, `youtubeEmbedUrl`.
 
 ### Availability and normalization
 
-**Cross-host.** Fully normalized. Transport: URL construction only. [Deep protocol details](protocols.md).
+**Cross-host.** Bare video IDs and supported URLs normalize to mutable locators;
+`youtubeEmbedUrl(locator,{privacyEnhanced:false})` is the default and
+`privacyEnhanced:true` explicitly selects the privacy-enhanced host. Transport:
+URL construction only. [Deep protocol details](protocols.md).
 
 ### Example
 

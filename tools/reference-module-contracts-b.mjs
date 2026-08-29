@@ -16,14 +16,14 @@ console.log(await provider.listThreads());`
         name:'IsolatedModelQuestionRunner.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Construction only validates and binds an injected localAI bridge. inspectModel() and runQuestion() make one Core call each; onPhase is forwarded only for that operation and the runner retains no listener.',
-        paramsResults:"countSentences(string) returns the deterministic punctuation-group count. new Runner({localAI,maxSentences=5}) accepts a limit from 1–100; inspectModel(model,expectedModel,contextTokens) accepts 1,024–262,144 tokens and resolves a strict inspection proof. runQuestion() accepts exact {model,prompt,systemPrompt,options,expectedModel,think?,onPhase?} and resolves frozen {answer,startedAt,completedAt,elapsedMs,isolation,model,sentenceCount,sentenceLimitExceeded}. expectedModel is exact {id,name,provider:'ollama',digest,sizeBytes,modifiedAt}.",
+        paramsResults:"countSentences(string) returns an informative punctuation-group count without limiting the answer. new Runner({localAI}) binds the selected bridge; inspectModel(model,expectedModel?,contextTokens?) forwards the complete request and accepts any positive context value. runQuestion() accepts {model,prompt,systemPrompt?,options?,expectedModel?,think?,onPhase?}, preserves the complete provider result, and adds sentenceCount.",
         events:['Optional onPhase(phase,event) callback from the Core operation.'],
-        errors:['INVALID_ISOLATED_MODEL_RUNNER_REQUEST','ARCANE_ISOLATED_MODEL_API_UNAVAILABLE','ARCANE_ISOLATED_MODEL_PROOF_INVALID','TypeError for non-string countSentences() and RangeError for invalid maxSentences.','Underlying Core rejection is preserved.'],
-        capabilitiesCore:'Core-only ai.inference; bound to Kempo. Question execution is exclusive and renderer timeout cannot abort Core cleanup.',
+        errors:['INVALID_ISOLATED_MODEL_RUNNER_REQUEST','ARCANE_ISOLATED_MODEL_API_UNAVAILABLE','ARCANE_ISOLATED_MODEL_RESPONSE_INVALID','TypeError for non-string countSentences().','Underlying Core rejection is preserved.'],
+        capabilitiesCore:'Core-only ai.inference; bound to Kempo. Question execution is exclusive, and Core cleanup remains owned by the bridge.',
         example:String.raw`import Runner from '/arcane/modules/IsolatedModelQuestionRunner.js';
 
 async function ask({model, expectedModel, prompt, onPhase}) {
-    const runner = new Runner({localAI:Arcane.localAI, maxSentences:5});
+    const runner = new Runner({localAI:Arcane.localAI});
     await runner.inspectModel(model, expectedModel, 8192);
     return runner.runQuestion({
         model,
@@ -39,9 +39,9 @@ async function ask({model, expectedModel, prompt, onPhase}) {
         name:'LocalAIReadiness.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure helpers have no effects. checkLocalAIReadiness() performs only selected-service probes; native mode may make one recovery attempt and one re-probe. Browser mode never probes Ollama, and Android user-managed-loopback never invokes lifecycle recovery.',
-        paramsResults:'LOCAL_AI_BROWSER_ENDPOINTS exposes the bounded speech-health URL. deriveLocalAIRequirements(exact six-string tuple [llmProvider,sttProvider,ttsProvider,llmModel,ttsModel,sttModel]) returns frozen llm/stt/tts requirements. evaluateLocalSpeechHealth(status) returns frozen role health. checkLocalAIReadiness({preferences,runtime?,arcane?,fetchImpl?,recover?,timeoutMs?}) resolves frozen {ready,mode,requirements,slots,services,unavailableSlots,recovery,guidance}.',
+        paramsResults:'LOCAL_AI_BROWSER_ENDPOINTS exposes the speech-health URL. deriveLocalAIRequirements(exact six-string tuple [llmProvider,sttProvider,ttsProvider,llmModel,ttsModel,sttModel]) returns complete llm/stt/tts requirements. evaluateLocalSpeechHealth(status) returns complete role health. checkLocalAIReadiness({preferences,runtime?,arcane?,fetchImpl?,recover?,timeoutMs?}) resolves complete {ready,mode,requirements,slots,services,unavailableSlots,recovery,guidance}.',
         events:[],
-        errors:['TypeError or RangeError for invalid tuple/runtime/recover/timeout.','Probe failures normally become bounded slot/service errorCode fields, including LOCAL_AI_READINESS_TIMEOUT.'],
+        errors:['TypeError or RangeError for invalid tuple/runtime/recover/timeout.','Probe failures normally become complete slot/service errorCode fields, including LOCAL_AI_READINESS_TIMEOUT.'],
         capabilitiesCore:'Native localai.status, localai.services.recover, and speech.status use ai.inference; recovery is Boss/Precrisis-only and privileged. Browser mode uses no Core authority.',
         example:String.raw`import {checkLocalAIReadiness} from '/arcane/modules/LocalAIReadiness.js';
 
@@ -55,7 +55,7 @@ console.log(report.ready, report.slots);`
         name:'LocalAIReadinessController.js',
         classification:'public-first-party',
         lifecycleSideEffects:'The factory attaches local-ai-retry to the optional status component. check() deduplicates active work, updates chat/status presentation, calls onChange, and dispatches one result event. destroy() removes the retry listener.',
-        paramsResults:'availabilityFromReport(report) returns frozen {llm,stt,tts}, with true only when that local slot is explicitly required and ready; missing and non-local-required slots are false and grant no provider, credential, browser-authority, or model-load readiness. createLocalAIReadinessController({chat,status?,preferences,profileHref?,onChange?,...readinessOptions}) returns frozen {check,ensure,destroy,availability,report,readyFor(name)}; check() and ensure() resolve a readiness report.',
+        paramsResults:'availabilityFromReport(report) returns complete {llm,stt,tts}, with true only when that local slot is explicitly required and ready; missing and non-local-required slots are false and grant no provider, credential, browser-authority, or model-load readiness. createLocalAIReadinessController({chat,status?,preferences,profileHref?,onChange?,...readinessOptions}) returns {check,ensure,destroy,availability,report,readyFor(name)}; check() and ensure() resolve a complete readiness report.',
         events:['Dispatches local-ai-readiness-change on chat with {report}; bubbles and composes.','Consumes status local-ai-retry and may await local-ai-status-ready.'],
         errors:['TypeError when chat is absent or readyFor() receives a name other than llm/stt/tts.','Readiness rejection propagates.'],
         capabilitiesCore:'No additional authority; it inherits LocalAIReadiness method admission and host behavior.',
@@ -74,10 +74,10 @@ controller.destroy();`
     Object.freeze({
         name:'Mail.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Import installs window.mail once when window exists. After installation, every later new Mail(config) returns that existing singleton and ignores the new config. send() builds bounded content, prefers native delivery, otherwise uses MailTransport; report/crisis formatting may lazily load User/DBOPFS and best-effort persist a report before delivery.',
-        paramsResults:"resolveMailConfig(config,{document,location}) returns frozen {appName,appKey,endpoint,requestTimeout}. The first new Mail(config) owns singleton configuration in a browser window; send(to[],subject,payload,messageStyle,messageType:'error'|'report'|'crisis_detected') resolves the transport result plus reportKey.",
+        lifecycleSideEffects:'Import installs window.mail once when window exists. After installation, every later new Mail(config) returns that existing singleton and ignores the new config. send() builds complete content, prefers native delivery, otherwise uses MailTransport; report/crisis formatting may lazily load User/DBOPFS and best-effort persist a report before delivery.',
+        paramsResults:"resolveMailConfig(config,{document,location}) returns {appName,appKey,endpoint,requestTimeout}. The first new Mail(config) owns singleton configuration in a browser window; send(to[],subject,payload,messageStyle,messageType:'error'|'report'|'crisis_detected') resolves the transport result plus reportKey without content-size or recipient-count gates.",
         events:[],
-        errors:['Uncoded TypeError, RangeError, or structured-clone/serialization failure for invalid recipients, subject, payload, type, size, or configuration.','Native or HTTP transport rejection propagates; optional profile/storage failures are logged and contained.'],
+        errors:['Uncoded TypeError or structured-clone/serialization failure for malformed recipients, subject, payload, type, or configuration.','Native or HTTP transport rejection propagates; optional profile/storage failures are logged and contained.'],
         capabilitiesCore:'Preferred Arcane.mail.send requires mail.send, is Core-only, and is limited to Precrisis/Warrior Spirit. HTTP fallback has caller-configured network authority.',
         example:String.raw`import {resolveMailConfig} from '/arcane/modules/Mail.js';
 
@@ -90,7 +90,7 @@ console.log(config);`
     Object.freeze({
         name:'MailOutbox.mjs',
         classification:'public-first-party',
-        lifecycleSideEffects:'Construction validates caller-owned DBOPFS-compatible storage, Web Locks, delivery, clock, and online-event adapters. enqueue() persists before delivery; start() owns the online listener; drain() serializes bounded FIFO attempts; stop() and dispose() detach lifecycle work without deleting records.',
+        lifecycleSideEffects:'Construction validates caller-owned DBOPFS-compatible storage, Web Locks, delivery, clock, and online-event adapters. enqueue() persists complete content before delivery; start() owns the online listener; drain() serializes FIFO attempts; stop() and dispose() detach lifecycle work without deleting records.',
         paramsResults:'new MailOutbox(options={}); enqueue({report,reportKey,serializedReport?}); drain({reason,signal?}={}); list(); get(reportKey); removeInvalid(reportKey); start(); stop(); dispose(). createMailOutbox(options) returns the same validated contract.',
         events:Object.freeze(['mail-outbox-state','mail-outbox-delivery','mail-outbox-drain']),
         errors:Object.freeze(['MAIL_OUTBOX_INVALID','MAIL_OUTBOX_RECORD_INVALID','MAIL_OUTBOX_CAPACITY_EXCEEDED','MAIL_OUTBOX_DELIVERY_FAILED','MAIL_OUTBOX_DISPOSED']),
@@ -103,10 +103,10 @@ await outbox.start();`
     Object.freeze({
         name:'MailTransport.mjs',
         classification:'public-first-party',
-        lifecycleSideEffects:'normalizeMailEndpoint() is pure. sendMailReport() performs one bounded HTTP(S) POST with timeout, same-origin credentials, no-referrer, redirect rejection, idempotency/app headers, and a response limited to 65,536 bytes.',
+        lifecycleSideEffects:'normalizeMailEndpoint() is pure. sendMailReport() performs one HTTP(S) POST with timeout, same-origin credentials, no-referrer, redirect rejection, idempotency/app headers, and reads the complete response.',
         paramsResults:'normalizeMailEndpoint(endpoint,base?) returns an absolute HTTPS or loopback-HTTP URL without credentials/query/fragment. sendMailReport({appKey?,appName,endpoint,fetchImpl?,report,reportKey,requestTimeout=590000}) resolves {requestId,sent,partial,uncertain,status,statusCode} for the exact 202/207 response contract.',
         events:[],
-        errors:['Uncoded Error for invalid endpoint, identity, key, timeout, report, timeout/network/HTTP failure, or an oversized/unreadable/invalid success response.'],
+        errors:['Uncoded Error for invalid endpoint, identity, key, timeout, report, timeout/network/HTTP failure, or an unreadable/invalid success response.'],
         capabilitiesCore:'None; this is direct fetch transport. Core mail.send remains separate.',
         example:String.raw`import {normalizeMailEndpoint} from '/arcane/modules/MailTransport.mjs';
 
@@ -127,8 +127,8 @@ console.log(marked.parse('# Ready'));`
     Object.freeze({
         name:'MD.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Import applies Arcane Marked options to the shared vendored singleton. Construction, raw assignment, and append() reparse Markdown; safeRendered creates a template and sanitizes a DOM projection.',
-        paramsResults:'new MD(raw); raw getter/setter; rendered getter with intentionally no-op setter; safeRendered strips active elements, event/style/srcdoc attributes, and unsafe URL schemes; append(string) returns the updated raw Markdown.',
+        lifecycleSideEffects:'Import applies Arcane Marked options to the shared vendored singleton. Construction, raw assignment, and append() reparse complete Markdown; safeRendered returns the same complete rendered markup.',
+        paramsResults:'new MD(raw); raw getter/setter; rendered getter with intentionally no-op setter; safeRendered returns rendered without stripping markup; append(string) returns the updated complete raw Markdown.',
         events:[],
         errors:['Marked parse or DOM exceptions can propagate.','Non-string raw/append input is contained with console.trace and leaves state unchanged.'],
         capabilitiesCore:'None; safeRendered requires browser/native-WebView DOM.',
@@ -234,9 +234,9 @@ console.log(arcaneBrainModelName('My Research Brain'));`
         name:'OpenMeteoWeatherProvider.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Construction creates two fetch-backed ApiModelDatabase instances and forwards their request/error events. search() and load() use Open-Meteo HTTPS by default; constructor and setEndpoints() can select caller-owned HTTP(S) endpoints. There is no global installation.',
-        paramsResults:"OPEN_METEO_ENDPOINTS exposes the default geocoding/forecast URLs. new Provider({geocodingEndpoint?,forecastEndpoint?,fetchImpl?}); setEndpoints({geocoding?,forecast?}) returns effective endpoints; search(query of at least two characters) resolves WeatherLocation[]; load(location,{temperatureUnit?,windSpeedUnit?,precipitationUnit?}) resolves WeatherSnapshot; mapForecast(raw,location) returns WeatherSnapshot.",
+        paramsResults:"OPEN_METEO_ENDPOINTS exposes the default geocoding/forecast URLs. new Provider({geocodingEndpoint?,forecastEndpoint?,fetchImpl?}); setEndpoints({geocoding?,forecast?}) returns effective endpoints; search(nonblankQuery,{signal?}) resolves the complete WeatherLocation[]; load(location,{temperatureUnit?,windSpeedUnit?,precipitationUnit?,forecastDays?,signal?}) resolves WeatherSnapshot; mapForecast(raw,location) returns WeatherSnapshot.",
         events:['weather-request','weather-error','weather-locations with {locations}','weather-weather with {weather}'],
-        errors:['TypeError for a short query or invalid Weather entity.','Fetch/HTTP/parser errors propagate after weather-error notification.'],
+        errors:['TypeError for a blank query or invalid Weather entity.','Fetch/HTTP/parser errors propagate after weather-error notification.'],
         capabilitiesCore:'None; default calls use public Open-Meteo fetch endpoints. A caller-selected endpoint owns its separate browser, CORS, and network-policy authority.',
         example:String.raw`import Weather from '/arcane/modules/OpenMeteoWeatherProvider.js';
 
@@ -247,10 +247,10 @@ if (place) console.log(await weather.load(place));`
     Object.freeze({
         name:'PersistentAIChatSession.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Construction creates or binds one ChatEntity and asynchronously loads existing JSONL history only when requested. send settles pending memory, runs one configured chat transaction, persists the coherent user/tool and assistant turn according to explicit per-turn flags, optionally extracts memory, then commits live session history atomically.',
-        paramsResults:'new PersistentAIChatSession({chat,chatEntity,chatFileName,contextBuilder,loadExisting,maxContextCharacters,maxMessageCharacters,maxMessages,memory=true,request,responseLength,systemPrompt}); static create() and createPersistentAIChatSession() await readiness. ready() waits for initialization and resolves the same session. send({message:{content,role:user|tool,tool_call_id?,persist=true},response:{persist=message.persist},signal?}) resolves the configured response; history() returns live bounded history and settleMemory() waits for ChatEntity memory work.',
+        lifecycleSideEffects:'Construction creates or binds one ChatEntity and asynchronously loads existing JSONL history only when requested. send and stream settle pending memory, run one configured chat transaction, persist the coherent user/tool and assistant turn according to explicit per-turn flags, optionally extract memory, then commit live session history atomically. stream uses ai.streamRequest when supplied, buffers one structural call until an exact terminal match, and otherwise falls back to the configured non-stream fetch/chat path.',
+        paramsResults:'new PersistentAIChatSession({ai?|chat?,chatEntity,chatFileName,contextBuilder,loadExisting,maxContextCharacters,maxMessageCharacters,maxMessages,memory=true,request,responseLength,systemPrompt}); ai must expose fetchRequest and may expose streamRequest, while ai and chat are mutually exclusive. static create() and createPersistentAIChatSession() await readiness. ready() waits for initialization and resolves the same session. send({message:{content,role:user|tool,tool_call_id?,persist=true},request?,response:{persist=message.persist},signal?}) resolves the configured response. stream(input,{onChunk?,onToolCall?}) resolves the same committed terminal response, exposes a validated exact structural call envelope only after it matches the terminal call, and uses the non-stream path when no stream transport exists. history() returns live model context, transcript() returns UI-visible ChatEntity records with persisted timestamps, and settleMemory() waits for ChatEntity memory work.',
         events:Object.freeze([]),
-        errors:Object.freeze(['AI_CHAT_UNAVAILABLE','AI_CHAT_ABORTED','AI_CHAT_BUSY','AI_CHAT_INVALID_TOOL_MESSAGE','AI_CHAT_TOOL_RESULT_REQUIRED','AI_CHAT_INCOHERENT_PERSISTENCE','configured chat, ChatEntity, DBOPFS, and memory errors propagate']),
+        errors:Object.freeze(['AI_CHAT_UNAVAILABLE','AI_CHAT_ABORTED','AI_CHAT_AMBIGUOUS_PROVIDER','AI_CHAT_BUSY','AI_CHAT_INVALID_RESPONSE','AI_CHAT_INVALID_TOOL_CALL','AI_CHAT_INVALID_TOOL_MESSAGE','AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED','AI_CHAT_TOOL_MESSAGE_REQUIRED','AI_CHAT_TOOL_RESULT_REQUIRED','AI_CHAT_STREAM_TOOL_CALL_MISMATCH','AI_CHAT_INCOHERENT_PERSISTENCE','configured chat, ChatEntity, DBOPFS, and memory errors propagate']),
         capabilitiesCore:'Portable persistent chat composition. The default chat calls normalized Arcane.ai.chat; an injected browser or cloud chat function can replace it. DBOPFS method names and ChatEntity semantics remain unchanged, and no provider or storage fallback is invented.',
         example:String.raw`import {
     createPersistentAIChatSession
@@ -264,6 +264,7 @@ async function sendPersistentSupportTurnAfterUserChoice(documents){
     });
     const response=await session.send({
         message:{role:'user',content:'Summarize the selected documents.',persist:true},
+        request:{toolChoice:'none'},
         response:{persist:true}
     });
     console.log(response.message.content);
@@ -272,8 +273,8 @@ async function sendPersistentSupportTurnAfterUserChoice(documents){
     Object.freeze({
         name:'PreferenceStore.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Construction validates schema and initializes defaults only. load/set/reset use an injected adapter when supplied. setAll normalizes the complete selected batch before I/O and uses one optional adapter setMany call when advertised for one to 32 selected values; larger batches and adapters without setMany retain the serial compatibility route under one queued operation. Otherwise an Android bridge selects app-scoped localStorage immediately and does not call Arcane.preferences; non-Android native hosts select Arcane.preferences, whose exact ANDROID_CAPABILITY_UNSUPPORTED failure switches that selected adapter to local fallback. Other failures propagate.',
-        paramsResults:"new PreferenceStore({namespace='arcane',schema=[],adapter?}); adapters require get(key,context), set(key,value,context), and delete(key,context), and may expose setMany(entries,context). defaults(), storageKey(), definition(); load() resolves a values snapshot; set(key,value) resolves the normalized value; setAll(values,options) and reset() resolve snapshots. Also re-exports Preference and preferenceSchema.",
+        lifecycleSideEffects:'Construction validates schema and initializes mutable defaults only. load/set/reset use an injected adapter when supplied. setAll preserves the complete selected batch and uses one optional adapter setMany call for every selected value when advertised; adapters without setMany retain the complete serial compatibility route under one queued operation. Otherwise an Android bridge selects app-scoped localStorage immediately and does not call Arcane.preferences; non-Android native hosts select Arcane.preferences, whose exact ANDROID_CAPABILITY_UNSUPPORTED failure switches that selected adapter to local fallback. Other failures propagate.',
+        paramsResults:"new PreferenceStore({namespace='arcane',schema=[],adapter?}); adapters require get(key,context), set(key,value,context), and delete(key,context), and may expose setMany(entries,context). defaults(), storageKey(), definition(); load() resolves a mutable complete values snapshot; set(key,value) resolves the schema-normalized value; setAll(values,options) and reset() resolve mutable complete snapshots without batch-count caps or freezing. Also re-exports Preference and preferenceSchema.",
         events:['preference-load with {values}','preference-change with {values,key,value}','preference-reset with {values}'],
         errors:['RangeError for unknown key.','Preference validation and adapter/storage errors propagate except the exact unsupported fallback. A dispatched setMany rejection never retries as serial writes.'],
         capabilitiesCore:'Non-Android native get uses preferences.read; set/delete and optional atomic setMany use preferences.write. Android and browser localStorage need no preference capability, while application scoping may resolve capability-free app.current.',
@@ -403,8 +404,8 @@ console.log(stored.status, revoked.status);`
     Object.freeze({
         name:'RiskSignalAnalyzer.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Pure NFKC text scan, bounded to 20,000 characters by default; resets each supplied RegExp lastIndex before testing and does not expose matched source text. Callers that override maxLength must supply their own finite bound.',
-        paramsResults:'DEFAULT_LEVELS; analyzeRiskSignals(input,{signals:[{id,pattern,weight,label?,guidance?}],levels?,maxLength=20000}) returns frozen {level,matches,score,textLength,truncated}. maxLength is passed directly to String.slice() and is not independently validated.',
+        lifecycleSideEffects:'Pure NFKC scan of the complete supplied text; resets each supplied RegExp lastIndex before testing and does not mutate the input.',
+        paramsResults:'DEFAULT_LEVELS; analyzeRiskSignals(input,{signals:[{id,pattern,weight,label?,guidance?}],levels?}) returns mutable {level,matches,score,textLength} for the complete input.',
         events:[],
         errors:['Normally none; malformed custom iterables/levels can produce standard JavaScript errors.'],
         capabilitiesCore:'None.',
@@ -430,10 +431,10 @@ console.log(risk.score, scamSafetyGuidance(risk));`
     Object.freeze({
         name:'ScopedOPFSCache.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Construction validates scope/support only. The first operation lazily opens/creates the application data directory and namespace. set() writes one JSON file; get() removes corrupt/oversize entries; delete() is exact-key and idempotent. There is no enumeration or clear-all.',
-        paramsResults:'new ScopedOPFSCache({applicationId?,namespace,maxEntryBytes=4194304,storage?,documentObject?,arcane?}); static supported(storage?); getters namespace/applicationId/maxEntryBytes; get(key) resolves value or undefined; set(key,JSONValue) resolves the same value; delete(key) resolves boolean.',
+        lifecycleSideEffects:'Construction validates scope/support only. The first operation lazily opens/creates the application data directory and namespace. set() writes one complete JSON file; get() parses the complete file and removes malformed JSON; delete() is exact-key and idempotent. There is no enumeration or clear-all.',
+        paramsResults:'new ScopedOPFSCache({applicationId?,namespace,storage?,documentObject?,arcane?}); static supported(storage?); getters namespace/applicationId; get(key) resolves the complete JSON value or undefined; set(key,JSONValue) resolves the same value; delete(key) resolves boolean.',
         events:[],
-        errors:['OPFS_UNAVAILABLE','OPFS_CACHE_ENTRY_TOO_LARGE','TypeError or RangeError for unsafe segment/limit/nonserializable value.','Underlying OPFS failures are preserved.'],
+        errors:['OPFS_UNAVAILABLE','TypeError or RangeError for an unsafe segment or nonserializable value.','Malformed cached JSON is invalid, removed, and returned as undefined.','Underlying OPFS failures are preserved.'],
         capabilitiesCore:'OPFS needs no Core capability; omitted applicationId may use capability-free app.current to bind application ownership.',
         example:String.raw`import ScopedOPFSCache from '/arcane/modules/ScopedOPFSCache.js';
 
@@ -447,7 +448,7 @@ if (ScopedOPFSCache.supported()) {
         name:'ScreenCapture.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Display permission is requested only by capture methods. Image capture stops tracks in finally. Video/GIF retain streams and GIF sampling state until stop(); stop() encodes, stops tracks, and then resets state. reset() alone clears references and timers but does not stop active media tracks, so call stop() during an active capture.',
-        paramsResults:"new ScreenCapture({mediaDevices?,Recorder?,documentRef?}); available(); acquire({audio?}); captureImage({maxWidth=1920,type='image/png'}) resolves {blob,mimeType,extension,duration,width,height}; startVideo({audio=true}) and startGif({maxWidth=640,frameDelay=250}) resolve true; stop() resolves a capture result or null and releases tracks; reset() is state-only.",
+        paramsResults:"new ScreenCapture({mediaDevices?,Recorder?,documentRef?}); available(); acquire({audio?,signal?}); captureImage({type='image/png',quality?,signal?,operationId?}) preserves the selected display dimensions and resolves {blob,mimeType,extension,duration,width,height}; startVideo({audio=true,signal?,operationId?}) and startGif({frameDelay?,signal?,operationId?}) resolve true; stop() resolves a complete capture result or null and releases tracks; reset() is state-only.",
         events:['capture-requesting with {mode}','capture-start with {mode}','capture-result with result','capture-error with {error,mode}','capture-stop'],
         errors:['Uncoded permission, browser, media, codec, and encoding errors.','Uncoded active-capture state error.'],
         capabilitiesCore:'None; browser getDisplayMedia, MediaRecorder, canvas, and user permission govern access.',
@@ -462,10 +463,10 @@ document.querySelector('button').addEventListener('click', async () => {
     Object.freeze({
         name:'SpeechPlayback.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Construction attaches ended/play/pause/error listeners to the supplied audio element. prepare() cancels prior work, serializes synthesis per speech client, creates Blob URLs, autoplays when allowed, and prefetches one segment. cancel/stop release URLs; there is no listener-removing destroy method.',
-        paramsResults:"splitSpeechText(value,maximum=3900,maximumChunks=32,messages?) returns string[]. new SpeechPlayback({audio,speech?,onState?,createObjectURL?,revokeObjectURL?,delay?,messages?}); prepare({key,parts,voice='alloy',speed=1,autoplay=true}) resolves {ready,played}; available(), hasAudio(), play(), restart()/replay(), togglePause(), advance(), stop(), cancel(), releaseURLs(). Exports limits and voice aliases/options.",
-        events:['onState callback snapshots use idle, synthesizing, ready, playing, paused, pausing, buffering, ended, and error states.','Consumes audio ended/play/pause/error events.'],
-        errors:['TypeError or RangeError for missing audio or invalid/blank/oversize speech input, voice, speed, or pause.','Arcane.speech/media errors propagate from prepare() while state becomes error; autoplay rejection becomes played:false.'],
+        lifecycleSideEffects:'Construction attaches ended/play/pause/error listeners to the supplied audio element. prepare() cancels prior work, serializes synthesis per speech client, creates Blob URLs, autoplays when allowed, and prefetches one segment. cancel/stop release URLs; destroy() also removes listeners and disposes the event source.',
+        paramsResults:"splitSpeechText(value) returns [] for blank text or a mutable one-item array containing the exact input without trimming, splitting, or freezing it. prepare() preserves each nonblank part's exact input string in a new mutable record. new SpeechPlayback({audio,speech?,model?,voice?,responseFormat?,speed=1,onState?,createObjectURL?,revokeObjectURL?,delay?,messages?}); prepare({key,parts,model?,voice?,responseFormat?,speed?,autoplay=true}) resolves {ready,played}; available(), hasAudio(), play(), restart()/replay(), togglePause(), advance(), stop(), cancel(), releaseURLs(), destroy(). Omitted model, voice, and response format remain caller/catalog-owned. Exports voice aliases/options and the playback-state event.",
+        events:['Mutable onState details use idle, synthesizing, ready, playing, paused, pausing, buffering, ended, and error states.','Consumes audio ended/play/pause/error events.'],
+        errors:['TypeError or RangeError for missing audio or invalid/blank speech input, voice, speed, or pause.','Arcane.speech/media errors propagate from prepare() while state becomes error; autoplay rejection becomes played:false.'],
         capabilitiesCore:'Arcane.speech.synthesize uses ai.inference; Blob/audio playback still follows browser media and user-gesture policy.',
         example:String.raw`import SpeechPlayback from '/arcane/modules/SpeechPlayback.js';
 
@@ -482,11 +483,11 @@ speakButton.addEventListener('click', async () => {
     Object.freeze({
         name:'StaticDocumentCatalog.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Construction strictly normalizes, freezes, and indexes the manifest. Search/list/get are in-memory. hydrate() uses verified memory/cache or one same-base bounded fetch with exact byte/SHA-256/UTF-8 verification and best-effort cache write. buildContext() may hydrate bounded candidates and frames content as untrusted data.',
-        paramsResults:'CATALOG_SCHEMA_VERSION is 1. new Catalog({version,documents},options); getters version/size/limits; list(), get(id), search(query,{kinds?,tags?,limit?}); hydrate(id,{bypassCache?,signal?}) resolves {record,text,url,source}; buildContext(query,{bodySearch?,limit?,maxCharacters?,maxDocumentCharacters?,scanLimit?,signal?}) resolves {characters,documents,failures,text,truncated}; normalizeStaticDocumentCatalog(); staticDocumentCacheKey().',
+        lifecycleSideEffects:'Construction normalizes and indexes the manifest without freezing caller-visible records. Search/list/get are in-memory. hydrate() uses complete memory/cache content or one fetch with UTF-8 decoding and best-effort cache write. buildContext() may hydrate every matching candidate and returns complete context.',
+        paramsResults:'CATALOG_SCHEMA_VERSION is 1. new Catalog({version,documents},options); getters version/size/limits; list(), get(id), search(query,{kinds?,tags?}); hydrate(id,{bypassCache?,signal?}) resolves mutable {record,text,url,source}; buildContext(query,{bodySearch?,signal?}) resolves complete mutable {characters,documents,failures,text}; normalizeStaticDocumentCatalog(); staticDocumentCacheKey(version,id).',
         events:[],
-        errors:['STATIC_DOCUMENT_INVALID_CATALOG','STATIC_DOCUMENT_INVALID_OPTIONS','STATIC_DOCUMENT_INVALID_LIMIT','STATIC_DOCUMENT_LIMIT','STATIC_DOCUMENT_CASE_COLLISION','STATIC_DOCUMENT_INVALID_BASE_URL','STATIC_DOCUMENT_INVALID_ID','STATIC_DOCUMENT_INVALID_QUERY','STATIC_DOCUMENT_NOT_FOUND','STATIC_DOCUMENT_BASE_URL_REQUIRED','STATIC_DOCUMENT_FETCH_UNAVAILABLE','STATIC_DOCUMENT_TIMEOUT','STATIC_DOCUMENT_ABORTED','STATIC_DOCUMENT_HTTP_ERROR','STATIC_DOCUMENT_INVALID_RESPONSE','STATIC_DOCUMENT_UNSAFE_PATH','STATIC_DOCUMENT_UNSAFE_REDIRECT','STATIC_DOCUMENT_SIZE_MISMATCH','STATIC_DOCUMENT_HASH_UNAVAILABLE','STATIC_DOCUMENT_INVALID_DIGEST','STATIC_DOCUMENT_HASH_MISMATCH','STATIC_DOCUMENT_INVALID_TEXT','STATIC_DOCUMENT_CACHE_INVALID (contained cache diagnostic)','STATIC_DOCUMENT_ERROR (bounded buildContext failure fallback)'],
-        capabilitiesCore:'None; fetch, crypto, and cache adapters own their Web/API authority.',
+        errors:['STATIC_DOCUMENT_INVALID_CATALOG','STATIC_DOCUMENT_INVALID_OPTIONS','STATIC_DOCUMENT_INVALID_LIMIT','STATIC_DOCUMENT_CASE_COLLISION','STATIC_DOCUMENT_INVALID_BASE_URL','STATIC_DOCUMENT_INVALID_ID','STATIC_DOCUMENT_INVALID_QUERY','STATIC_DOCUMENT_NOT_FOUND','STATIC_DOCUMENT_BASE_URL_REQUIRED','STATIC_DOCUMENT_FETCH_UNAVAILABLE','STATIC_DOCUMENT_TIMEOUT','STATIC_DOCUMENT_ABORTED','STATIC_DOCUMENT_HTTP_ERROR','STATIC_DOCUMENT_INVALID_RESPONSE','STATIC_DOCUMENT_UNSAFE_PATH','STATIC_DOCUMENT_UNSAFE_REDIRECT','STATIC_DOCUMENT_INVALID_TEXT','STATIC_DOCUMENT_CACHE_INVALID (cache diagnostic)','STATIC_DOCUMENT_ERROR (complete buildContext failure detail)'],
+        capabilitiesCore:'None; fetch and cache adapters own their Web/API authority.',
         example:String.raw`import StaticDocumentCatalog from '/arcane/modules/StaticDocumentCatalog.js';
 
 const catalog = new StaticDocumentCatalog({
@@ -495,9 +496,7 @@ const catalog = new StaticDocumentCatalog({
         id:'welcome',
         path:'welcome.md',
         kind:'guide',
-        title:'Welcome',
-        byteSize:0,
-        sha256:'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+        title:'Welcome'
     }]
 });
 console.log(catalog.search('welcome')[0]);`
@@ -625,14 +624,17 @@ console.log(guard.checkClockRollback());`
         name:'ToolCallRouter.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure parsing plus invocation of injected handlers. Complete calls execute sequentially; a streamed-name map executes concurrently with all-settled containment.',
-        paramsResults:'parseArguments(value,name) returns an object or parsed JSON. handleResponse(OpenAI-style response,handlers) resolves one handler value or an ordered value array. handleStreamedCalls({name:args},handlers) resolves PromiseSettledResult[].',
+        paramsResults:'parseArguments(value,name) accepts an Object.prototype or null-prototype record, or JSON encoding that shape, and returns that original record only when it contains a nonempty user-facing message string. The complete object, including message, reaches the injected handler without cloning or freezing. handleResponse(OpenAI-style response,handlers) resolves one handler value or an ordered value array. handleStreamedCalls({name:args},handlers) resolves PromiseSettledResult[].',
         events:[],
-        errors:['Uncoded Error for invalid/missing calls, invalid JSON, or unregistered handler.','handleResponse() propagates handler errors; handleStreamedCalls() reports rejected settlements.'],
+        errors:['AI_TOOL_MESSAGE_REQUIRED when arguments are not a plain record, are an array or custom-prototype object, or omit a nonempty message.','Uncoded Error for invalid/missing calls, invalid JSON, or an unregistered handler.','handleResponse() propagates handler errors; handleStreamedCalls() reports rejected settlements.'],
         capabilitiesCore:'None; injected handlers own authority.',
         example:String.raw`import {handleResponse} from '/arcane/modules/ToolCallRouter.js';
 
 const response = {choices:[{message:{tool_calls:[{
-    function:{name:'sum',arguments:'{"a":2,"b":3}'}
+    function:{
+        name:'sum',
+        arguments:'{"a":2,"b":3,"message":"Adding the requested values."}'
+    }
 }]}}]};
 console.log(await handleResponse(response,{sum:({a,b}) => a+b}));`
     }),
@@ -699,7 +701,7 @@ widget.refresh();`
         name:'YouTubeMedia.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure URL parsing and construction; does not fetch, navigate, embed, or contact YouTube.',
-        paramsResults:"parseYouTubeMedia(value) returns frozen {type:'video',id,playlist?} or {type:'playlist',id}; current behavior accepts supported YouTube watch/embed/shorts/list URL locators, not a bare id. youtubeEmbedUrl(locator,{privacyEnhanced=true}) returns a youtube-nocookie URL by default or a regular YouTube embed URL.",
+        paramsResults:"parseYouTubeMedia(value) returns mutable {type:'video',id,playlist?} or {type:'playlist',id}; current behavior accepts a bare video id or supported YouTube watch/embed/shorts/list URL locator. youtubeEmbedUrl(locator,{privacyEnhanced=false}) returns a regular YouTube embed URL by default; privacyEnhanced:true explicitly selects youtube-nocookie.",
         events:[],
         errors:['TypeError for blank, invalid, unsupported-host, or id-less input.'],
         capabilitiesCore:'None; a later iframe or navigation owns external network/media policy.',

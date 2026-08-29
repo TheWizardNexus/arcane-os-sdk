@@ -30,12 +30,12 @@ That source publishes synchronously to the realm's branded
 `globalThis.arcaneEvents` authority. Component DOM events are one-way
 compatibility projections of the same canonical occurrence; they are never
 republished into the authority. Every projected detail has the canonical
-`occurrenceId`, `arcaneSource`, `instanceId`, and `operationId` fields and a
-frozen outer record. A compatibility payload's existing `source` field remains
+`occurrenceId`, `arcaneSource`, `instanceId`, and `operationId` fields in a
+mutable complete record. A compatibility payload's existing `source` field remains
 source-local and may differ from `arcaneSource`; the payload may additionally
 retain source-local browser or provider objects.
 
-When a component uses a cancelable event as an admission gate, cancellation on
+When a component uses a cancelable event before a requested operation, cancellation on
 either the canonical occurrence or its DOM projection makes the publication
 unaccepted, and the component does not continue the guarded operation. A
 cancelable compatibility notification emitted after committed work does not
@@ -62,7 +62,7 @@ appropriate.
 | [`assistant-panel.html`](#assistant-panelhtml) | Reusable assistant drawer, message area, composer, pending/streaming/empty/error state, and actions. | `open()`<br>`close()`<br>`toggle()`<br>`send()`<br>`clear()`<br>`setState()`<br>`focusComposer()`<br>`scrollToEnd()`<br>`destroy()` | `assistant-ready`<br>`assistant-opened`<br>`assistant-closed`<br>`assistant-send`<br>`assistant-clear` | DOM-normalized; caller/provider results remain external |
 | [`calculator.html`](#calculatorhtml) | Calculator keypad and result/error event surface backed by CalculatorEngine. | `calculate()`<br>`destroy()` | `calculator-ready`<br>`calculation-complete`<br>`calculation-error` | Normalized Calculation/error events |
 | [`chart.html`](#charthtml) | Accessible uPlot line, area, or point chart with normalized options and rows. | `configure()`<br>`populate()`<br>`setData()`<br>`addData()`<br>`update()`<br>`destroy()` | `chart-ready`<br>`chart-remove` | Options/rows normalized; uPlot rendering is vendor-native |
-| [`chat.html`](#chathtml) | Shared chat, visible selected-model activation request, file upload, streaming, speech, language, availability, and conversation-timebox surface. | `streamMessage()`<br>`setMessageProgress()`<br>`setAIAvailability()`<br>`setInitialSpeechMuted()`<br>`setConversationComplete()`<br>`bindConversationTimebox()`<br>`submitMessage()`<br>`sendMessage()`<br>`languageChanged()`<br>`requestAIActivation()`<br>`destroy()` | `chat-ready`<br>`chat-send-message`<br>`chat-send-error`<br>`chat-file-uploaded`<br>`chat-file-upload-error`<br>`chat-language-changed`<br>`chat-language-change-error`<br>`chat-ai-activation-request`<br>`chat-ai-activation-error`<br>`chat-speech-synthesis-error`<br>`conversation-timebox-error` | UI/runtime state and explicit user activation intent normalized; AI/storage/media behavior mixed |
+| [`chat.html`](#chathtml) | Shared chat, visible selected-model activation request, file upload, streaming, structural tool settlement, speech, language, availability, and conversation-timebox surface. | `streamMessage()`<br>`setMessageProgress()`<br>`setAIAvailability()`<br>`setInitialSpeechMuted()`<br>`setConversationComplete()`<br>`bindConversationTimebox()`<br>`bindSession()`<br>`submitMessage()`<br>`submitToolResult()`<br>`sendMessage()`<br>`languageChanged()`<br>`requestAIActivation()`<br>`destroy()` | `chat-ready`<br>`chat-session-bound`<br>`chat-session-message`<br>`chat-session-error`<br>`chat-send-message`<br>`chat-send-error`<br>`chat-file-uploaded`<br>`chat-file-upload-error`<br>`chat-language-changed`<br>`chat-language-change-error`<br>`chat-ai-activation-request`<br>`chat-ai-activation-error`<br>`chat-speech-synthesis-error`<br>`conversation-timebox-error` | UI/runtime state, explicit user activation intent, and honest structural-call settlement normalized; AI/storage/media behavior mixed |
 | [`conversation-view.html`](#conversation-viewhtml) | Provider-neutral conversation display, advisory actions, composer, busy state, and status. | `setConversation()`<br>`setBusy()`<br>`setStatus()`<br>`clearComposer()`<br>`destroy()` | `conversation-view-ready`<br>`communication-send`<br>`communication-advisory-action` | DOM-normalized |
 | [`dashboard-config.html`](#dashboard-confightml) | Selects which normalized chart definitions are visible on a dashboard. | `configure()`<br>`setDefinitions()`<br>`setVisibility()`<br>`getChartOptions()`<br>`getEffectiveVisibility()`<br>`open()`<br>`close()`<br>`destroy()` | `dashboard-config-ready`<br>`dashboard-config-opened`<br>`dashboard-config-closed`<br>`dashboard-config-change` | Fully normalized definitions and visibility |
 | [`data-maintenance.html`](#data-maintenancehtml) | Runs destructive cleanup of empty chats and memories inside the current app data scope. | `open()`<br>`destroy()` | `data-maintenance-ready`<br>`data-maintenance-complete` | Normalized counts; DBOPFS failures mixed |
@@ -75,9 +75,9 @@ appropriate.
 | [`header.html`](#headerhtml) | Legacy title bar with history, reload, online marker, presentation labels, and 988 link. | None | No component-specific event | Browser/platform-native behavior; no component-ready contract |
 | [`integration-settings.html`](#integration-settingshtml) | Edits non-secret communication service configuration and service actions. | `configure()`<br>`getValues()`<br>`setStatus()`<br>`destroy()` | `integration-settings-ready`<br>`integration-settings-save`<br>`integration-settings-close`<br>`integration-action` | Normalized non-secret values |
 | [`local-ai-status.html`](#local-ai-statushtml) | Presents local-AI standby, failure, recovery, guidance, retry, and dismissal states. | `configure()`<br>`begin()`<br>`present()`<br>`destroy()`<br>`hidden` | `local-ai-status-ready`<br>`local-ai-status-dismissed`<br>`local-ai-retry` | Fully normalized LocalAIReadiness report |
-| [`markdown-document.html`](#markdown-documenthtml) | Safely renders and navigates a Markdown document with focusable fragments. | `configure()`<br>`load()`<br>`render()`<br>`clear()`<br>`fail()`<br>`focus()`<br>`focusFragment()`<br>`destroy()` | `markdown-document-ready`<br>`markdown-document-state`<br>`markdown-document-loading`<br>`markdown-document-rendered`<br>`markdown-document-empty`<br>`markdown-document-error`<br>`markdown-document-navigate` | State/sanitized output normalized; Marked/DOM failures mixed |
+| [`markdown-document.html`](#markdown-documenthtml) | Renders and navigates a complete Markdown document with focusable fragments. | `configure()`<br>`load()`<br>`render()`<br>`clear()`<br>`fail()`<br>`focus()`<br>`focusFragment()`<br>`destroy()` | `markdown-document-ready`<br>`markdown-document-state`<br>`markdown-document-loading`<br>`markdown-document-rendered`<br>`markdown-document-empty`<br>`markdown-document-error`<br>`markdown-document-navigate` | Complete Markdown/state normalized; malformed input and Marked/DOM failures remain visible |
 | [`markdown-editor.html`](#markdown-editorhtml) | Configurable Markdown authoring, toolbar, preview, title, and save surface. | `configure()`<br>`focus()`<br>`clear()`<br>`saveEntry()`<br>`destroy()` | `markdown-editor-ready`<br>`markdown-editor-change`<br>`markdown-editor-saved` | Editor values normalized; injected save result mixed |
-| [`media-embed.html`](#media-embedhtml) | Loads a validated YouTube video or playlist embed and exposes external-platform action. | `configure()`<br>`load()`<br>`destroy()` | `media-embed-ready`<br>`media-load`<br>`media-error`<br>`media-open-platform` | URL/error normalized; iframe/platform behavior native |
+| [`media-embed.html`](#media-embedhtml) | Loads a parsed YouTube video or playlist embed with ordinary hosting by default, optional privacy enhancement, and an external-platform action. | `configure()`<br>`load()`<br>`destroy()` | `media-embed-ready`<br>`media-load`<br>`media-error`<br>`media-open-platform` | URL/error normalized; iframe/platform behavior native |
 | [`modal.html`](#modalhtml) | Generic modal with population, open/close, actions, and sequential task execution. | `populate()`<br>`open()`<br>`close()`<br>`runTasks()`<br>`destroy()` | `modal-ready`<br>`modal-opened`<br>`modal-closed`<br>`modal-action` | Modal state normalized; injected task results mixed |
 | [`output-panel.html`](#output-panelhtml) | Presents status, output, body, coverage, actions, pending, error, and cleared states. | `configure()`<br>`setOutput()`<br>`setBody()`<br>`setCoverage()`<br>`setActions()`<br>`setPending()`<br>`setStatus()`<br>`setError()`<br>`clear()`<br>`destroy()` | `output-panel-ready`<br>`output-panel-state`<br>`output-panel-change`<br>`output-panel-action`<br>`output-panel-error`<br>`output-panel-cleared` | DOM-normalized |
 | [`preferences-form.html`](#preferences-formhtml) | Builds a schema-driven preferences form with submit, reset, busy, and status behavior. | `configure()`<br>`getValues()`<br>`setValues()`<br>`setBusy()`<br>`setStatus()`<br>`destroy()` | `preferences-form-ready`<br>`preferences-change`<br>`preferences-submit`<br>`preferences-reset` | Normalized form values |
@@ -94,7 +94,7 @@ appropriate.
 | [`theme-editor.html`](#theme-editorhtml) | Edits, previews, saves, and resets semantic custom theme tokens. | `configure()`<br>`getTheme()`<br>`setTheme()`<br>`setBusy()`<br>`setStatus()`<br>`destroy()` | `theme-editor-ready`<br>`theme-preview`<br>`theme-save`<br>`theme-reset` | Fully normalized Theme values |
 | [`theme-switcher.html`](#theme-switcherhtml) | Selects and refreshes system, light, dark, or custom theme mode. | `setMode()`<br>`refresh()` | No component-specific event | Preference/native appearance behavior mixed; no component-ready contract |
 | [`unified-inbox.html`](#unified-inboxhtml) | Displays provider-neutral communication threads with active/loading state. | `configure()`<br>`setThreads()`<br>`setActive()`<br>`setLoading()`<br>`destroy()` | `unified-inbox-ready`<br>`inbox-refresh`<br>`thread-select` | DOM-normalized |
-| [`voice-transcription.html`](#voice-transcriptionhtml) | Records segmented microphone audio only after authoritative STT admission, exposes explicit selected-STT activation, transcribes with cancellation, persists, and completes a combined transcript. | `configure()`<br>`requestSTTActivation()`<br>`startRecording()`<br>`stopRecording()`<br>`save()`<br>`completeTranscription()/complete()`<br>`clear()`<br>`reset()`<br>`destroy()` | `voice-transcription-ready`<br>`voice-transcription-state`<br>`voice-transcription-segment`<br>`voice-transcription-change`<br>`voice-transcription-complete`<br>`speech-transcription-complete`<br>`speech-transcription-cancelled`<br>`speech-stt-activation-request`<br>`speech-stt-activation-error` | Sticky runtime STT readiness, explicit activation, request cancellation, and state/text are normalized; media/provider behavior remains external |
+| [`voice-transcription.html`](#voice-transcriptionhtml) | Records segmented microphone audio only after authoritative STT readiness, exposes explicit selected-STT activation, transcribes complete content with cancellation, persists, and completes a combined transcript. | `configure()`<br>`requestSTTActivation()`<br>`startRecording()`<br>`stopRecording()`<br>`save()`<br>`completeTranscription()/complete()`<br>`clear()`<br>`reset()`<br>`destroy()` | `voice-transcription-ready`<br>`voice-transcription-state`<br>`voice-transcription-segment`<br>`voice-transcription-change`<br>`voice-transcription-complete`<br>`speech-transcription-complete`<br>`speech-transcription-cancelled`<br>`speech-stt-activation-request`<br>`speech-stt-activation-error` | Sticky runtime STT readiness, explicit activation, request cancellation, and complete state/text are normalized; media/provider behavior remains external |
 | [`weather-widget.html`](#weather-widgethtml) | Displays normalized current and daily weather with refresh intent. | `setWeather()`<br>`clear()`<br>`destroy()` | `weather-widget-ready`<br>`weather-refresh` | Display normalized; provider supplied externally |
 | [`web-navigator.html`](#web-navigatorhtml) | Guards embedded/external navigation and surfaces allow/block/open intents. | `configure()`<br>`navigate()`<br>`currentUrl()`<br>`destroy()` | `web-navigator-ready`<br>`web-navigate`<br>`web-navigation-blocked`<br>`web-open-external` | Navigation intent/decision normalized; browser navigation result platform-native |
 
@@ -218,8 +218,10 @@ speech, language, availability, and conversation-timebox surface.
 
 Methods/properties: `streamMessage()`, `setMessageProgress()`,
 `setAIAvailability()`, `setInitialSpeechMuted()`,
-`setConversationComplete()`, `bindConversationTimebox()`, `submitMessage()`,
-`sendMessage()`, `languageChanged()`, `requestAIActivation()`, and `destroy()`.
+`setConversationComplete()`, `bindConversationTimebox()`, `bindSession()`,
+`submitMessage()`, `submitToolResult()`, `sendMessage()`, `languageChanged()`,
+`requestAIActivation()`, `session`, `sessionStatus`, `pendingTool`, `modelName`,
+and `destroy()`.
 
 `sendMessage(text)` and `languageChanged(text)` are host-overridable async
 extension callbacks. The component installs warning-only defaults when the host
@@ -229,7 +231,7 @@ does not supply them; applications may instead consume the corresponding
 `submitMessage(textOverride='',context={})` returns `Promise<boolean>`.
 `context` accepts `source`, `preserveDraft`, `synthetic`, an optional exact
 `operationId`, and an optional caller-owned `AbortSignal`. The component owns a
-derived signal for each submission, supplies it in the frozen compatibility
+derived signal for each submission, supplies it in the mutable complete compatibility
 `{message,context}` detail, and aborts it on canonical/DOM cancellation,
 component destruction, or caller cancellation. `chat-send-message` is
 cancelable and is the gate before `sendMessage(text,context)`; a canceled event
@@ -237,32 +239,107 @@ never reaches the host callback. Rejected host promises are observed as
 `chat-send-error`, and stale settlement after abort or destruction is
 suppressed.
 
+`bindSession({ai,session,sessionOptions})` accepts exactly one of a public AI API
+module or an existing compatible session, restores the UI transcript when
+available, and uses provider-safe history as its compatibility fallback. The
+transcript is a masked vertical scroll viewport; status and composer remain
+outside it. Initial restoration and every user, assistant, tool, streaming,
+progress, or failure mutation scrolls that viewport to its true bottom. Each
+restored or new message uses a separate semantic `<time>` element at the card's
+lower-right with an ISO `datetime`, full local title, and local 24-hour `HH:MM`
+text.
+
+Assistant structural calls render their nonempty `function.arguments.message`
+as ordinary visible progress. The exact call name and argument string are
+retained inside a collapsed `Tool call details` inspection surface. Displaying
+a call does not settle it or enable another user turn.
+`submitToolResult({toolCallId?,disposition,message,persist?,request?},{operationId?,signal?})`
+settles only the current exact pending call. `disposition` is `executed`,
+`declined`, `cancelled`, or `not-executed`; the exact matching ID is inferred
+when omitted, and an explicitly supplied different ID is rejected. The method
+persists and renders the human-readable disposition plus complete message as a
+matching `role:'tool'` request, then renders the assistant continuation. Live
+submission and restored history both require that tool-result content contain
+nonblank user-facing text; accepted text is preserved exactly rather than
+trimmed or rewritten.
+Optional plain-object `request` contains per-turn generation choices forwarded
+through the session; a visibility-only host can use
+`request:{toolChoice:'none'}` after a not-executed result so that continuation
+cannot open another tool loop. Session-owned messages, signal, and streaming
+state remain unavailable through that field. Its
+terminal `chat-session-message` event releases the completed request ownership
+before publication, so a listener may call `submitToolResult()` immediately
+without a timer or microtask workaround. Internal protocol diagnostics remain
+in the developer console; they are not inserted as assistant content, and a
+rejected user draft is restored without losing its text.
+
+Visible Chat failure copy is opt-in: only an Error deliberately marked
+`userSafe:true` may provide its nonblank `userMessage` or `message`. Every
+unknown provider, protocol, dispatch, persistence, or settlement failure keeps
+its complete Error object in the developer console and diagnostic event while
+the transcript and status use a generic user outcome. New diagnostic codes
+therefore cannot become conversational text merely because they are absent
+from a finite internal-error list.
+
+`streamMessage(text,id,isThinking)` accepts text content only. An Error supplied
+as a stream chunk is logged and rejected rather than stringified into the
+transcript; any other nontext chunk fails with
+`ARCANE_CHAT_STREAM_CONTENT_INVALID`. `setMessageProgress()` preserves explicit
+string labels/status, but routes Error objects through the same user-safe copy
+boundary and otherwise displays generic progress text while logging the exact
+diagnostic value.
+
+`pendingTool` is `null` or a mutable actionable summary containing only
+`{id,name,message}`; it never exposes raw arguments. On restored history,
+`bindSession()` clears its binding guard before publishing `chat-session-bound`
+with the same `pendingTool` summary. A listener can therefore call
+`submitToolResult()` immediately after reload without parsing transcript DOM or
+duplicating the session protocol. Restoration accepts one pending call and
+settles it only when the next tool record has the exact matching
+`tool_call_id` and nonblank content; an absent, blank, different, overlapping,
+or out-of-order record leaves the chat unavailable and reports the coded
+diagnostic to the developer console while the visible status says only that
+the saved chat could not be opened.
+
+For streaming sessions, a provisional structural card and the terminal result
+must describe the same exact ID, type, function name, and argument string. A
+changed or omitted terminal call fails with
+`AI_CHAT_STREAM_TOOL_CALL_MISMATCH`; the provisional card is removed and the
+prior pending-call state is restored instead of leaving a ghost card or a false
+settlement.
+
 `setAIAvailability()` remains an LLM compatibility input, but selected sticky
 `AIRuntimeState` LLM state wins over that boolean. STT and TTS readiness always
 comes from sticky runtime role state; the method never forwards compatibility
-speech booleans or synthesizes ready speech roles without an admitted, loaded
+speech booleans or synthesizes ready speech roles without a selected, loaded
 provider.
 
 When a selected LLM route is `unloaded` or in `error`, the component exposes a
 keyboard-operable Start/Try again control while Send stays disabled. During
-`loading`, the control becomes Cancel loading and reflects sticky progress.
-The default `requestAIActivation(intent)` forwards frozen
+`loading`, the control becomes Cancel loading and reflects sticky progress
+inside the same activation area. Progress is indeterminate until a real finite
+positive total exists; byte-based units never produce a numeric progress label.
+`modelName` supplies the application-owned display label without moving model
+policy into the component.
+The default `requestAIActivation(intent)` forwards mutable
 `{role:'llm',action:'load'|'unload',reason:'user'}` to
 `requestAIRuntimeIntent()`. A host may replace that callback.
 
 Before the callback, the component dispatches the bubbles/composed/cancelable
-`chat-ai-activation-request` event with frozen `{intent,state}` detail.
+`chat-ai-activation-request` event with mutable complete `{intent,state}` detail.
 `preventDefault()` suppresses the callback. A callback failure dispatches the
-bubbles/composed, noncancelable `chat-ai-activation-error` event with frozen
+bubbles/composed, noncancelable `chat-ai-activation-error` event with mutable complete
 `{request,error,message}`. A recognized canceled load whose current route is
 `unloaded` or `unloading` is not reported as an activation error.
 
 `destroy()` aborts the component's AI-runtime-state subscription, destroys the
 activation controller, removes its `pagehide` listener, calls the optional
 speech controller's `destroy()`, sets `ready` to `false`, and returns
-`undefined`. It does not initiate a provider load or unload.
+`true`; later calls return `false`. It does not initiate a provider load or
+unload.
 
-Events: `chat-ready`, `chat-send-message`, `chat-send-error`,
+Events: `chat-ready`, `chat-session-bound`, `chat-session-message`,
+`chat-session-error`, `chat-send-message`, `chat-send-error`,
 `chat-file-uploaded`, `chat-file-upload-error`, `chat-language-changed`,
 `chat-language-change-error`, `chat-ai-activation-request`,
 `chat-ai-activation-error`, `chat-speech-synthesis-error`, and
@@ -289,11 +366,10 @@ The stable chat boundary codes are:
 - `ARCANE_CHAT_SPEECH_SYNTHESIS_REQUEST_REJECTED`;
 - `ARCANE_CHAT_CONVERSATION_TIMEBOX_DELIVERY_REJECTED`.
 
-Error projections expose the boundary `code` and include `causeCode` only when
-the rejected dependency supplies a distinct code. File projections expose only
-size/type metadata canonically while retaining the live `File` locally.
-Language and LLM activation request projections are cancelable gates before
-their host callbacks. Every public detail is frozen by the canonical authority.
+Error projections preserve the complete error detail, with the boundary `code`
+and any distinct dependency `causeCode`. File projections preserve the complete
+live `File` and its authored metadata. Language and LLM activation requests are
+cancelable before their host callbacks. Every public detail remains mutable.
 
 Shared dependencies: [`MD.js`](runtime-modules.md#mdjs), [`File.js`](runtime-entities.md#filejs), [`ConversationTimebox.js`](runtime-modules.md#conversationtimeboxjs), [`AIRuntimeState.js`](runtime-modules.md#airuntimestatejs).
 
@@ -637,7 +713,7 @@ Shared dependencies: [`LocalAIReadiness.js`](runtime-modules.md#localaireadiness
 
 ### Overview
 
-Safely renders and navigates a Markdown document with focusable fragments.
+Renders and navigates a complete Markdown document with focusable fragments.
 
 ### Public surface
 
@@ -652,7 +728,10 @@ Shared dependencies: [`MD.js`](runtime-modules.md#mdjs).
 
 ### Availability and normalization
 
-**Browser and supported native WebViews.** State/sanitized output normalized; Marked/DOM failures mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app's capabilities. [Deep protocol details](protocols.md).
+**Browser and supported native WebViews.** Complete Markdown and state are
+normalized; malformed input and Marked/DOM failures remain visible. HTMLImport
++ DOM; injected Arcane/provider modules where listed. Native methods remain
+subject to the bound app's capabilities. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -694,7 +773,9 @@ Shared dependencies: [`MD.js`](runtime-modules.md#mdjs), [`ComponentContracts.js
 
 ### Overview
 
-Loads a validated YouTube video or playlist embed and exposes external-platform action.
+Loads a parsed YouTube video or playlist embed and exposes an external-platform
+action. Ordinary YouTube hosting is the default; `configure({privacyEnhanced:true})`
+explicitly selects the privacy-enhanced host.
 
 ### Public surface
 
@@ -963,15 +1044,22 @@ Canceling state while `unloading`, and Try again with the sticky error while
 `error`. Selected-unloaded, busy, and error states are shown as distinct facts;
 none is treated as ready.
 
-The default `requestSTTActivation(intent)` forwards the frozen
+The default `requestSTTActivation(intent)` forwards the mutable
 `{role:'stt',action:'load'|'unload',reason:'user'}` record to
 `requestAIRuntimeIntent()`. Before calling it, the component emits a bubbling,
-composed, cancelable `speech-stt-activation-request` event with frozen
+composed, cancelable `speech-stt-activation-request` event with mutable complete
 `{intent,state}` detail. `preventDefault()` suppresses the callback and intent.
-Callback failure emits `speech-stt-activation-error` with frozen
+Callback failure emits `speech-stt-activation-error` with mutable complete
 `{request,error,message}` detail. Cancel loading publishes an `unload` intent;
 only subsequent sticky `unloading` or `unloaded` state confirms lifecycle
 progress, and callback return never proves provider work stopped.
+
+Provider and runtime failures use generic visible speech status unless their
+Error owner explicitly marks nonblank copy with `userSafe:true`. Complete
+unknown diagnostics remain available through the developer console and error
+events; they do not become control labels or status text by default. The same
+boundary applies to STT activation, transcription, TTS lifecycle, synthesis,
+and playback failures.
 
 The component emits no activation request on import or state observation.
 Provider registration and selection remain inert, and default
@@ -993,6 +1081,9 @@ was canceled, not that an uncooperative provider stopped underlying work.
 
 User Unmute calls the shared `AI.setSpeechMuted(false)` lifecycle owner before
 or with publishing the TTS load intent, so the runtime can legally load TTS.
+Configured `initialMuted:false` records that same unmute intent even when the
+TTS route is still unselected or loading; the component remains publicly muted
+until the selected role reaches `ready`, then applies the preserved intent.
 Mute calls `AI.setSpeechMuted(true)`, stops playback, cancels active TTS work,
 and unloads the selected TTS role. Lifecycle failures remain visible through
 `speech-tts-lifecycle-error` and sticky role state.
@@ -1222,7 +1313,7 @@ Events: `unified-inbox-ready`, `inbox-refresh`, `thread-select`.
 
 ### Overview
 
-Records segmented microphone audio only after authoritative STT admission,
+Records segmented microphone audio only after authoritative STT readiness,
 exposes explicit selected-STT activation, transcribes with cancellation,
 persists, and completes a combined transcript.
 
@@ -1247,7 +1338,7 @@ Shared dependencies: [`MD.js`](runtime-modules.md#mdjs),
 
 **Browser and supported native WebViews.** The component subscribes
 synchronously to sticky `AIRuntimeState.roles.stt`; its recording Start button
-and public `startRecording()` both fail closed unless that role is exactly
+and public `startRecording()` both remain unavailable unless that role is exactly
 `ready` and not busy. A configured `transcribe(file,context)` callback remains
 request plumbing rather than readiness authority. Its context now includes the
 owned `signal` additively. The default route calls
@@ -1258,12 +1349,15 @@ For a selected `unloaded`, `loading`, `unloading`, or `error` role, the componen
 keeps recording Start disabled and presents the same keyboard-operable Start
 transcription/Try again or Cancel loading control as `speech.html`. Both use the
 shared `createSTTActivationController()` contract. User operation emits the
-cancelable `speech-stt-activation-request` event with frozen `{intent,state}`;
+cancelable `speech-stt-activation-request` event with mutable complete `{intent,state}`;
 `preventDefault()` suppresses the callback. The default
-`requestSTTActivation(intent)` publishes the frozen
+`requestSTTActivation(intent)` publishes the mutable
 `{role:'stt',action:'load'|'unload',reason:'user'}` intent. Callback failure emits
-`speech-stt-activation-error` with frozen `{request,error,message}`. Import and
+`speech-stt-activation-error` with mutable complete `{request,error,message}`. Import and
 state observation emit no activation request and never begin a model download.
+Unknown provider/runtime diagnostics remain complete in the developer console
+and error events, while controls use generic visible outcomes unless the Error
+owner explicitly marks nonblank copy with `userSafe:true`.
 
 If sticky readiness is lost during microphone acquisition, capture, or the STT
 request, the component invalidates the session, aborts the owned request signal,
@@ -1294,8 +1388,8 @@ activation listener, sets component `ready` to `false`, and returns `true`;
 repeated destruction is
 idempotent. Destruction is terminal: Start, activation, and Complete remain
 disabled and status remains unavailable. `voice-transcription-state` detail is
-the frozen `{message,state,stt}` record, where `state` remains the component
-workflow and `stt` is the authoritative immutable role record. Transcript
+the mutable complete `{message,state,stt}` record, where `state` remains the component
+workflow and `stt` is the authoritative mutable role record. Transcript
 completion stays available when STT is unavailable before destruction.
 State/text, explicit activation, and request cancellation are normalized;
 provider/model authority and media behavior remain external. HTMLImport + DOM;

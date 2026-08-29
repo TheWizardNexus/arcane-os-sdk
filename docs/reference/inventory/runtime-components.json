@@ -130,7 +130,7 @@
     {
       "file": "runtime/arcane/components/chat.html",
       "name": "chat.html",
-      "purpose": "Shared chat, visible selected-model activation request, file upload, streaming, speech, language, availability, and conversation-timebox surface.",
+      "purpose": "Shared chat, visible selected-model activation/progress, masked auto-scrolling transcript, structural tool inspection/settlement, speech, language, and conversation-timebox surface.",
       "methods": [
         "streamMessage()",
         "setMessageProgress()",
@@ -138,7 +138,9 @@
         "setInitialSpeechMuted()",
         "setConversationComplete()",
         "bindConversationTimebox()",
+        "bindSession()",
         "submitMessage()",
+        "submitToolResult()",
         "sendMessage()",
         "languageChanged()",
         "requestAIActivation()",
@@ -146,6 +148,9 @@
       ],
       "events": [
         "chat-ready",
+        "chat-session-bound",
+        "chat-session-message",
+        "chat-session-error",
         "chat-send-message",
         "chat-send-error",
         "chat-file-uploaded",
@@ -166,7 +171,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "UI/runtime state and explicit user activation intent/request normalized; destroy aborts state/activation observation, releases page/speech listeners, clears ready, returns undefined, and does not initiate provider lifecycle; the provider/runtime owner executes any load; AI/storage/media behavior mixed"
+      "normalization": "UI/runtime state, honest model progress, complete timestamped transcript, user-facing structural arguments.message, nonblank tool-result restoration, collapsed raw inspection, exact-ID replay validation, streamed/terminal envelope correlation, text-only stream rendering, generic visible failure outcomes with complete console diagnostics, matching executed/declined/cancelled/not-executed settlement with per-turn request options, pending-call reload recovery, and reentrant terminal-event ownership are normalized; destroy aborts observation and returns true once/false thereafter; AI/storage/media behavior remains mixed"
     },
     {
       "file": "runtime/arcane/components/conversation-view.html",

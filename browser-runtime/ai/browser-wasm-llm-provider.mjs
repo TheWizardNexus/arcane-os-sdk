@@ -4,17 +4,15 @@ import {
   normalizeModelSecurity,
   normalizeArcaneAIError,
   resolveModelSecurity,
-  sameModelSecurity,
 } from "./model-controller.mjs";
 import { createPackagedWllamaRuntime } from "./browser-wllama-runtime.mjs";
-import { createStreamingSha256 } from "./internal/sha256.mjs";
 import { arcaneEvents } from "../event-manager.mjs";
 
+const completeValue = (value) => value;
+
+// Compatibility export only. Ordinary model caching no longer creates or
+// requires completion manifests, receipts, or byte identities.
 const MODEL_MANIFEST_SCHEMA = "arcane.ai.browser-wasm.model.v4";
-const SINGLE_MODEL_MANIFEST_SCHEMA = "arcane.ai.browser-wasm.model.v3";
-const LEGACY_MODEL_MANIFEST_SCHEMA = "arcane.ai.browser-wasm.model.v2";
-const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
-const MUTABLE_PATH_PATTERN = /\/(?:resolve\/)?(?:main|master|latest)(?:\/|$)/iu;
 const BROWSER_MODEL_SOURCES = new WeakSet();
 const BROWSER_MODEL_SOURCE_METADATA = new WeakMap();
 const MODEL_DESCRIPTOR_METADATA = new WeakMap();
@@ -28,7 +26,6 @@ const CHROME_HIGH_PERFORMANCE_GPU_FLAG_URL =
   "chrome://flags/#force-high-performance-gpu";
 const INTEL_VENDOR_ID = 0x8086;
 const CAPABILITY_POLICY_PROTOCOL = "arcane-ai-browser-capability-policy/1";
-const WLLAMA_MAX_FILE_BYTES = 2_000_000_000;
 let highPerformanceGpuNoticeShown = false;
 
 function fail(code, message, cause) {
@@ -52,20 +49,13 @@ function normalizationSignal(error, signal) {
   return error?.code === "ARCANE_AI_WORKER_TERMINATION_UNCONFIRMED" ? null : signal;
 }
 
-function immutableHttpsUrl(value) {
+function modelSourceUrl(value) {
   let url;
   try {
     url = new URL(value);
   } catch {
     return null;
   }
-  if (
-    url.protocol !== "https:"
-    || url.username
-    || url.password
-    || url.hash
-    || MUTABLE_PATH_PATTERN.test(url.pathname)
-  ) return null;
   return url;
 }
 
@@ -135,28 +125,15 @@ function descriptorFile(value, { fallbackName = null } = {}) {
   ) {
     throw new TypeError("Browser model file url and legacy immutableUrl must match when both are provided.");
   }
-  const url = immutableHttpsUrl(value.url ?? value.immutableUrl);
+  const url = modelSourceUrl(value.url ?? value.immutableUrl);
   if (!url) {
-    throw new TypeError("Browser model file url must be immutable HTTPS without credentials or fragments.");
+    throw new TypeError("Browser model file url must be a valid absolute URL.");
   }
   const file = {
     name: descriptorFileName(value, url, fallbackName),
     url: url.href,
   };
-  if (value.bytes !== undefined) {
-    if (!Number.isSafeInteger(value.bytes) || value.bytes < 1) {
-      throw new TypeError("Browser model file bytes must be a positive safe integer when provided.");
-    }
-    file.bytes = value.bytes;
-  }
-  if (value.sha256 !== undefined) {
-    const sha256 = requiredText(value.sha256, "file sha256").toLowerCase();
-    if (!SHA256_PATTERN.test(sha256)) {
-      throw new TypeError("Browser model file sha256 must be exactly 64 hexadecimal characters when provided.");
-    }
-    file.sha256 = sha256;
-  }
-  return Object.freeze(file);
+  return completeValue(file);
 }
 
 function modelDescriptor(value) {
@@ -165,7 +142,7 @@ function modelDescriptor(value) {
   }
   const id = modelIdText(value.id);
   const hasFiles = value.files !== undefined;
-  const hasLegacyFile = ["url", "immutableUrl", "name", "bytes", "sha256"]
+  const hasLegacyFile = ["url", "immutableUrl", "name"]
     .some((field) => value[field] !== undefined);
   if (hasFiles && hasLegacyFile) {
     throw new TypeError("Browser model files[] is mutually exclusive with legacy one-file fields.");
@@ -195,18 +172,20 @@ function modelDescriptor(value) {
     names.add(nameKey);
     urls.add(file.url);
   }
-  files = Object.freeze(files);
+  files = completeValue(files);
+  const publicFiles = completeValue(files.map((file) => completeValue({
+    name: file.name,
+    url: file.url,
+  })));
   let descriptor;
   if (legacy) {
     const [file] = files;
     descriptor = { id, url: file.url };
-    if (file.bytes !== undefined) descriptor.bytes = file.bytes;
-    if (file.sha256 !== undefined) descriptor.sha256 = file.sha256;
   } else {
-    descriptor = { id, files };
+    descriptor = { id, files: publicFiles };
   }
-  descriptor = Object.freeze(descriptor);
-  MODEL_DESCRIPTOR_METADATA.set(descriptor, Object.freeze({ files, legacy }));
+  descriptor = completeValue(descriptor);
+  MODEL_DESCRIPTOR_METADATA.set(descriptor, completeValue({ files, legacy }));
   return descriptor;
 }
 
@@ -263,7 +242,7 @@ function emitWebgpuAdapterSelection(source, runtime) {
   const webgpu = evidence?.webgpu;
   if (webgpu?.observed !== true || !webgpu.adapter) return;
   try {
-    arcaneEvents.instrument(WEBGPU_ADAPTER_SELECTED_EVENT, Object.freeze({
+    arcaneEvents.instrument(WEBGPU_ADAPTER_SELECTED_EVENT, completeValue({
       protocol: WEBGPU_ADAPTER_SELECTION_PROTOCOL,
       providerId: "arcane-browser-wasm-wllama",
       modelId: source.id,
@@ -272,7 +251,7 @@ function emitWebgpuAdapterSelection(source, runtime) {
       offload: webgpu.offload ?? null,
       buffers: webgpu.buffers ?? null,
       queue: webgpu.queue ?? null,
-    }), Object.freeze({
+    }), completeValue({
       source: "sdk:ai/browser-wasm",
       category: "capability",
     }));
@@ -286,20 +265,10 @@ function sourceMetadata(source) {
     ?? MODEL_DESCRIPTOR_METADATA.get(publicDescriptor(source));
 }
 
-function manifestModelIdentity(source) {
-  return Object.freeze({
-    id: source.id,
-    files: Object.freeze(sourceMetadata(source).files.map((file) => Object.freeze({
-      name: file.name,
-      url: file.url,
-    }))),
-  });
-}
-
 /**
- * Creates a browser download authority for one caller-supplied immutable
- * model file set. Legacy one-file descriptors normalize to one ordered member.
- * Effective load security decides which expected-byte checks run.
+ * Creates a browser download authority for one caller-supplied model file set.
+ * Legacy one-file descriptors normalize to one ordered member.
+ * Security is an intent-only seam and does not change ordinary downloads.
  */
 export function createBrowserModelSource(descriptor, {
   fetchImpl = null,
@@ -331,10 +300,7 @@ export function createBrowserModelSource(descriptor, {
     try {
       response = await fetchFunction(member.url, {
         cache: "no-store",
-        credentials: "omit",
-        mode: "cors",
         redirect: "follow",
-        referrerPolicy: "no-referrer",
         signal,
       });
     } catch (error) {
@@ -354,22 +320,14 @@ export function createBrowserModelSource(descriptor, {
     } catch {
       finalUrl = null;
     }
-    if (finalUrl?.protocol !== "https:") {
-      await response.body?.cancel?.().catch(() => undefined);
-      throw fail("ARCANE_AI_MODEL_REDIRECT_BLOCKED", "The model response left HTTPS.");
-    }
+    finalUrl ??= new URL(member.url);
     if (!response.body || typeof response.body.getReader !== "function") {
       throw fail("ARCANE_AI_MODEL_SOURCE_INVALID", "The model response did not provide a byte stream.");
     }
-    const header = response.headers?.get?.("content-length");
-    const reported = header === null || header === undefined || header === ""
-      ? null
-      : Number(header);
-    return Object.freeze({
+    return completeValue({
       body: response.body,
       requestedUrl: member.url,
       finalUrl: finalUrl.href,
-      reportedBytes: Number.isSafeInteger(reported) && reported >= 0 ? reported : null,
       cancel: (reason) => response.body.cancel(reason),
     });
   }
@@ -386,7 +344,7 @@ export function createBrowserModelSource(descriptor, {
       immutableUrl: { value: metadata.files[0].url, enumerable: false },
     });
   }
-  const source = Object.freeze(sourceRecord);
+  const source = completeValue(sourceRecord);
   BROWSER_MODEL_SOURCES.add(source);
   BROWSER_MODEL_SOURCE_METADATA.set(source, metadata);
   return source;
@@ -452,213 +410,25 @@ function storageName(source, { legacy = false } = {}) {
   const safeId = legacy
     ? source.id.replace(/[^a-z0-9._-]+/giu, "_")
     : `id-${injectiveStorageId(source.id)}`;
-  const models = sourceMetadata(source).files.map((file) => Object.freeze({
+  const models = sourceMetadata(source).files.map((file) => completeValue({
     file,
     name: `${safeId}--${file.name}`,
   }));
-  return Object.freeze({
-    models: Object.freeze(models),
+  return completeValue({
+    models: completeValue(models),
     model: models[0].name,
     manifest: `${safeId}.complete.json`,
   });
 }
 
-function manifestFor(source, files) {
-  const observedBytes = files.reduce((total, file) => total + file.observedBytes, 0);
-  return Object.freeze({
-    schema: MODEL_MANIFEST_SCHEMA,
-    complete: true,
-    model: manifestModelIdentity(source),
-    files: Object.freeze(files.map((file) => Object.freeze({
-      name: file.name,
-      finalUrl: file.finalUrl,
-      observedBytes: file.observedBytes,
-    }))),
-    observedBytes,
-    completedAt: new Date().toISOString(),
-  });
-}
-
-function manifestByteLength(manifest) {
-  return new TextEncoder().encode(`${JSON.stringify(manifest)}\n`).byteLength;
-}
-
-function projectedManifestByteLength(source) {
-  return manifestByteLength(manifestFor(
-    source,
-    sourceMetadata(source).files.map((file) => ({
-      name: file.name,
-      finalUrl: file.url,
-      observedBytes: file.bytes,
-    })),
-  ));
-}
-
-function manifestKind(manifest, source) {
-  const model = manifest?.model;
-  const members = sourceMetadata(source).files;
-  if (
-    manifest?.schema === MODEL_MANIFEST_SCHEMA
-    && manifest?.complete === true
-    && model?.id === source.id
-    && Array.isArray(model?.files)
-    && model.files.length === members.length
-    && model.files.every((file, index) => (
-      file?.name === members[index].name
-      && file?.url === members[index].url
-    ))
-    && Array.isArray(manifest.files)
-    && manifest.files.length === members.length
-    && manifest.files.every((file, index) => (
-      file?.name === members[index].name
-      && Number.isSafeInteger(file?.observedBytes)
-      && file.observedBytes >= 0
-      && immutableHttpsUrl(file?.finalUrl)
-    ))
-    && Number.isSafeInteger(manifest.observedBytes)
-    && manifest.observedBytes >= 0
-    && manifest.files.reduce((total, file) => total + file.observedBytes, 0)
-      === manifest.observedBytes
-  ) return "set";
-  if (!sourceMetadata(source).legacy || members.length !== 1) return null;
-  const [member] = members;
-  if (
-    manifest?.schema === SINGLE_MODEL_MANIFEST_SCHEMA
-    && manifest?.complete === true
-    && model?.id === source.id
-    && model?.url === member.url
-    && Number.isSafeInteger(manifest.observedBytes)
-    && manifest.observedBytes >= 0
-  ) return "single";
-  if (
-    manifest?.schema === LEGACY_MODEL_MANIFEST_SCHEMA
-    && manifest?.complete === true
-    && model?.id === source.id
-    && model?.name === member.name
-    && model?.immutableUrl === member.url
-  ) return "legacy";
-  return null;
-}
-
-function progress(source, phase, loaded, total = null, memberIndex = 0, memberLoaded = loaded) {
-  const members = sourceMetadata(source).files;
-  const member = members[memberIndex] ?? members[0];
-  return Object.freeze({
-    modelId: source.id,
-    phase,
-    loaded,
-    total,
-    percent: Number.isSafeInteger(total) && total > 0 ? (loaded / total) * 100 : null,
-    file: Object.freeze({
-      index: memberIndex,
-      count: members.length,
-      name: member.name,
-      loaded: memberLoaded,
-      total: member.bytes ?? null,
-    }),
-  });
-}
-
 function securitySnapshot(security) {
-  return Object.freeze({
-    secure: security.secure,
-    checks: Object.freeze({
-      byteLength: security.checks.byteLength,
-      sha256: security.checks.sha256,
-    }),
-  });
-}
-
-function assertDescriptorChecks(source, security) {
-  const files = sourceMetadata(source).files;
-  if (security.checks.byteLength && files.some((file) => file.bytes === undefined)) {
-    throw fail(
-      "ARCANE_AI_MODEL_SOURCE_INVALID",
-      "Browser model bytes is required for every file when the byteLength check is enabled.",
-    );
-  }
-  if (security.checks.sha256 && files.some((file) => file.sha256 === undefined)) {
-    throw fail(
-      "ARCANE_AI_MODEL_SOURCE_INVALID",
-      "Browser model sha256 is required for every file when the sha256 check is enabled.",
-    );
-  }
-}
-
-function knownModelBytes(source) {
-  const files = sourceMetadata(source).files;
-  if (files.some((file) => file.bytes === undefined)) return null;
-  const total = files.reduce((sum, file) => sum + file.bytes, 0);
-  return Number.isSafeInteger(total) ? total : null;
-}
-
-function oversizedModelFile(source) {
-  return sourceMetadata(source).files.find(
-    (file) => file.bytes !== undefined && file.bytes > WLLAMA_MAX_FILE_BYTES,
-  ) ?? null;
-}
-
-function integritySnapshot(security, source, {
-  observedBytes = null,
-  byteLength = security.checks.byteLength ? "pending" : "unchecked",
-  sha256 = security.checks.sha256 ? "pending" : "unchecked",
-  actualSha256 = null,
-  files = null,
-} = {}) {
-  const enabledStates = [];
-  if (security.checks.byteLength) enabledStates.push(byteLength);
-  if (security.checks.sha256) enabledStates.push(sha256);
-  const state = enabledStates.length === 0
-    ? "unchecked"
-    : enabledStates.every((value) => value === "verified")
-      ? "verified"
-      : enabledStates.some((value) => value === "failed")
-        ? "failed"
-        : "pending";
-  const members = sourceMetadata(source).files;
-  const fileStates = members.map((member, index) => {
-    const evidence = files?.[index] ?? {};
-    return Object.freeze({
-      name: member.name,
-      observedBytes: evidence.observedBytes ?? null,
-      byteLength: Object.freeze({
-        enabled: security.checks.byteLength,
-        state: evidence.byteLength ?? byteLength,
-        expected: member.bytes ?? null,
-        observed: evidence.observedBytes ?? null,
-      }),
-      sha256: Object.freeze({
-        enabled: security.checks.sha256,
-        state: evidence.sha256 ?? sha256,
-        expected: member.sha256 ?? null,
-        actual: evidence.actualSha256 ?? (members.length === 1 ? actualSha256 : null),
-      }),
-    });
-  });
-  return Object.freeze({
-    state,
-    observedBytes,
-    byteLength: Object.freeze({
-      enabled: security.checks.byteLength,
-      state: byteLength,
-      expected: knownModelBytes(source),
-      observed: observedBytes,
-    }),
-    sha256: Object.freeze({
-      enabled: security.checks.sha256,
-      state: sha256,
-      expected: members.length === 1 ? members[0].sha256 ?? null : null,
-      actual: members.length === 1 ? actualSha256 : null,
-    }),
-    files: Object.freeze(fileStates),
-  });
+  return security?.secure === true ? { secure: true } : undefined;
 }
 
 /**
  * Adapts an existing Arcane DBOPFS singleton without rebinding or changing any
- * of its public methods. The completion manifest is committed only after the
- * model file has been written. SHA-256 is read and computed only when its
- * effective check is enabled.
+ * of its public methods. Ordinary cache reuse is based on the selected model's
+ * expected files being present; no receipt or byte identity is created.
  */
 export function createDbopfsModelStore({
   dbopfs,
@@ -709,35 +479,21 @@ export function createDbopfsModelStore({
     }
   }
 
-  async function write(name, body, { signal, onChunk } = {}) {
+  async function write(name, body, { signal } = {}) {
     const directory = await table();
     const handle = await directory.getFileHandle(name, { create: true });
     const writable = await handle.createWritable();
-    let written = 0;
     try {
       for await (const chunk of byteChunks(body, signal)) {
         await writable.write(chunk);
-        written += chunk.byteLength;
-        await onChunk?.(chunk, written);
       }
       throwIfAborted(signal, "install");
       await writable.close();
-      return written;
+      return undefined;
     } catch (error) {
       await writable.abort?.(error).catch(() => undefined);
       await directory.removeEntry(name).catch(() => undefined);
       throw error;
-    }
-  }
-
-  async function readManifest(name, { removeInvalid = true } = {}) {
-    const manifestFile = await file(name);
-    if (!manifestFile) return null;
-    try {
-      return JSON.parse(await manifestFile.text());
-    } catch {
-      if (removeInvalid) await removeEntry(name);
-      return null;
     }
   }
 
@@ -750,272 +506,56 @@ export function createDbopfsModelStore({
   async function remove(source) {
     let removed = await removeNames(storageName(source));
     if (sourceMetadata(source).legacy) {
-      const legacyNames = storageName(source, { legacy: true });
-      const legacyManifest = await readManifest(legacyNames.manifest, { removeInvalid: false });
-      if (manifestKind(legacyManifest, source)) {
-        removed = await removeNames(legacyNames) || removed;
-      }
+      removed = await removeNames(storageName(source, { legacy: true })) || removed;
     }
     return removed;
   }
 
-  async function writeManifest(name, manifest, signal) {
-    const encoded = new TextEncoder().encode(`${JSON.stringify(manifest)}\n`);
-    await write(name, encoded, { signal });
-  }
-
-  async function verifySha256(source, memberIndex, modelFile, {
-    signal,
-    onProgress,
-    phase,
-    completedBytes = 0,
-    totalBytes = null,
-  }) {
-    const digest = createStreamingSha256();
-    let hashed = 0;
-    for await (const chunk of byteChunks(modelFile, signal)) {
-      digest.update(chunk);
-      hashed += chunk.byteLength;
-      onProgress?.(progress(
-        source,
-        phase,
-        completedBytes + hashed,
-        totalBytes,
-        memberIndex,
-        hashed,
-      ));
-    }
-    return Object.freeze({ hashed, sha256: digest.digestHex() });
-  }
-
-  async function storagePolicy(source, { cached = null, security } = {}) {
-    if (cached) {
-      const payloadBytes = cached.observedBytes;
-      const manifestBytes = manifestByteLength(cached.manifest);
-      const requiredBytes = payloadBytes + manifestBytes;
-      return Object.freeze({
-        compatibility: "compatible",
-        code: "ARCANE_AI_MODEL_CACHE_COMPLETE",
-        requiredBytes,
-        payloadBytes,
-        manifestBytes,
-        quotaBytes: null,
-        usageBytes: null,
-        availableBytes: null,
-        measured: false,
-        admitted: true,
-      });
-    }
-    if (security?.checks?.byteLength !== true) {
-      return Object.freeze({
-        compatibility: "unknown",
-        code: "ARCANE_AI_MODEL_STORAGE_REQUIREMENT_UNBOUNDED",
-        requiredBytes: null,
-        payloadBytes: null,
-        manifestBytes: null,
-        quotaBytes: null,
-        usageBytes: null,
-        availableBytes: null,
-        measured: false,
-        admitted: false,
-      });
-    }
-    const payloadBytes = knownModelBytes(source);
-    const manifestBytes = payloadBytes === null ? null : projectedManifestByteLength(source);
-    const requiredBytes = payloadBytes === null || !Number.isSafeInteger(payloadBytes + manifestBytes)
-      ? null
-      : payloadBytes + manifestBytes;
-    if (requiredBytes === null) {
-      return Object.freeze({
-        compatibility: "unknown",
-        code: "ARCANE_AI_MODEL_STORAGE_REQUIREMENT_UNKNOWN",
-        requiredBytes: null,
-        payloadBytes,
-        manifestBytes,
-        quotaBytes: null,
-        usageBytes: null,
-        availableBytes: null,
-        measured: false,
-        admitted: false,
-      });
-    }
-    const estimator = estimateStorage
-      ?? globalThis.navigator?.storage?.estimate?.bind(globalThis.navigator.storage);
-    if (typeof estimator !== "function") {
-      return Object.freeze({
-        compatibility: "unknown",
-        code: "ARCANE_AI_STORAGE_ESTIMATE_UNAVAILABLE",
-        requiredBytes,
-        payloadBytes,
-        manifestBytes,
-        quotaBytes: null,
-        usageBytes: null,
-        availableBytes: null,
-        measured: false,
-        admitted: false,
-      });
-    }
-    let estimate;
-    try {
-      estimate = await estimator();
-    } catch {
-      return Object.freeze({
-        compatibility: "unknown",
-        code: "ARCANE_AI_STORAGE_ESTIMATE_FAILED",
-        requiredBytes,
-        payloadBytes,
-        manifestBytes,
-        quotaBytes: null,
-        usageBytes: null,
-        availableBytes: null,
-        measured: true,
-        admitted: false,
-      });
-    }
-    const quotaBytes = Number.isSafeInteger(estimate?.quota) && estimate.quota >= 0
-      ? estimate.quota
-      : null;
-    const usageBytes = Number.isSafeInteger(estimate?.usage) && estimate.usage >= 0
-      ? estimate.usage
-      : null;
-    const availableBytes = quotaBytes !== null && usageBytes !== null && quotaBytes >= usageBytes
-      ? quotaBytes - usageBytes
-      : null;
-    const incompatible = availableBytes !== null && requiredBytes > availableBytes;
-    return Object.freeze({
-      compatibility: incompatible ? "incompatible" : availableBytes === null ? "unknown" : "compatible",
-      code: incompatible
-        ? "ARCANE_AI_STORAGE_CAPACITY_INSUFFICIENT"
-        : availableBytes === null
-          ? "ARCANE_AI_STORAGE_ESTIMATE_INVALID"
-          : "ARCANE_AI_STORAGE_CAPACITY_AVAILABLE",
-      requiredBytes,
-      payloadBytes,
-      manifestBytes,
-      quotaBytes,
-      usageBytes,
-      availableBytes,
-      measured: true,
-      admitted: false,
+  async function storagePolicy({ cached = false } = {}) {
+    return completeValue({
+      compatibility: "compatible",
+      code: cached
+        ? "ARCANE_AI_MODEL_CACHE_AVAILABLE"
+        : "ARCANE_AI_MODEL_STORAGE_AVAILABLE",
+      measured: false,
     });
+  }
+
+  async function storedModelFiles(names, signal) {
+    const modelFiles = [];
+    for (const entry of names.models) {
+      throwIfAborted(signal, "install");
+      const modelFile = await file(entry.name);
+      if (!modelFile) return null;
+      modelFiles.push(modelFile);
+    }
+    return modelFiles;
   }
 
   async function openCached(source, {
     signal,
-    onProgress,
-    security = resolveModelSecurity(),
   } = {}) {
-    assertDescriptorChecks(source, security);
     let names = storageName(source);
-    let manifest = await readManifest(names.manifest);
-    let kind = manifestKind(manifest, source);
-    if (!kind && sourceMetadata(source).legacy) {
+    let modelFiles = await storedModelFiles(names, signal);
+    if (!modelFiles && sourceMetadata(source).legacy) {
+      await removeNames(names);
       const legacyNames = storageName(source, { legacy: true });
-      const legacyManifest = await readManifest(legacyNames.manifest, { removeInvalid: false });
-      const legacyKind = manifestKind(legacyManifest, source);
-      if (legacyKind) {
+      const legacyFiles = await storedModelFiles(legacyNames, signal);
+      if (legacyFiles) {
         names = legacyNames;
-        manifest = legacyManifest;
-        kind = legacyKind;
+        modelFiles = legacyFiles;
+      } else {
+        await removeNames(legacyNames);
       }
     }
-    if (!kind) {
-      // Model files without the exact ordered completion manifest are partial.
-      await remove(source);
+    if (!modelFiles) {
+      await removeNames(names);
       return null;
     }
-    const members = sourceMetadata(source).files;
-    const modelFiles = [];
-    const fileEvidence = [];
-    let observedBytes = 0;
     try {
-      for (let index = 0; index < names.models.length; index += 1) {
-        const member = members[index];
-        const modelFile = await file(names.models[index].name);
-        if (!modelFile) {
-          await removeNames(names);
-          return null;
-        }
-        if (modelFile.size > WLLAMA_MAX_FILE_BYTES) {
-          await removeNames(names);
-          throw fail(
-            "ARCANE_AI_MODEL_SHARD_TOO_LARGE",
-            `Cached model file ${member.name} exceeds Wllama's ${WLLAMA_MAX_FILE_BYTES}-byte boundary.`,
-          );
-        }
-        if (kind === "set" && manifest.files[index].observedBytes !== modelFile.size) {
-          await removeNames(names);
-          return null;
-        }
-        if (security.checks.byteLength && modelFile.size !== member.bytes) {
-          await removeNames(names);
-          return null;
-        }
-        modelFiles.push(modelFile);
-        fileEvidence.push({
-          observedBytes: modelFile.size,
-          byteLength: security.checks.byteLength ? "verified" : "unchecked",
-          sha256: security.checks.sha256 ? "pending" : "unchecked",
-          actualSha256: null,
-        });
-        observedBytes += modelFile.size;
-      }
-      if ((kind === "set" || kind === "single") && manifest.observedBytes !== observedBytes) {
-        await removeNames(names);
-        return null;
-      }
-      let completedBytes = 0;
-      for (let index = 0; index < modelFiles.length; index += 1) {
-        const modelFile = modelFiles[index];
-        if (security.checks.sha256) {
-          const verification = await verifySha256(source, index, modelFile, {
-            signal,
-            onProgress,
-            phase: "verify-cache",
-            completedBytes,
-            totalBytes: observedBytes,
-          });
-          fileEvidence[index].actualSha256 = verification.sha256;
-          if (
-            verification.hashed !== modelFile.size
-            || verification.sha256 !== members[index].sha256
-          ) {
-            await removeNames(names);
-            return null;
-          }
-          fileEvidence[index].sha256 = "verified";
-        } else {
-          onProgress?.(progress(
-            source,
-            "cache",
-            completedBytes + modelFile.size,
-            observedBytes,
-            index,
-            modelFile.size,
-          ));
-        }
-        completedBytes += modelFile.size;
-      }
-      let completion = manifest;
-      if (kind !== "set") {
-        completion = manifestFor(source, [{
-          name: members[0].name,
-          finalUrl: manifest.finalUrl ?? members[0].url,
-          observedBytes,
-        }]);
-      }
-      return Object.freeze({
-        files: Object.freeze(modelFiles),
+      return completeValue({
+        files: completeValue(modelFiles),
         file: modelFiles.length === 1 ? modelFiles[0] : null,
-        manifest: completion,
-        observedBytes,
-        integrity: integritySnapshot(security, source, {
-          observedBytes,
-          byteLength: security.checks.byteLength ? "verified" : "unchecked",
-          sha256: security.checks.sha256 ? "verified" : "unchecked",
-          actualSha256: fileEvidence[0]?.actualSha256 ?? null,
-          files: fileEvidence,
-        }),
       });
     } catch (error) {
       if (!signal?.aborted) await removeNames(names);
@@ -1023,121 +563,33 @@ export function createDbopfsModelStore({
     }
   }
 
-  async function openVerified(source, { signal, onProgress } = {}) {
-    const security = resolveModelSecurity({ load: { secure: true } });
-    return openCached(source, { signal, onProgress, security });
-  }
-
-  async function install(source, { signal, onProgress, security: configuredSecurity } = {}) {
-    const security = resolveModelSecurity({ load: configuredSecurity });
-    assertDescriptorChecks(source, security);
+  async function install(source, { signal } = {}) {
     const names = storageName(source);
     const members = sourceMetadata(source).files;
     await remove(source);
     const modelFiles = [];
-    const manifestFiles = [];
-    const fileEvidence = [];
-    const expectedTotal = knownModelBytes(source);
-    let observedBytes = 0;
     try {
       for (let index = 0; index < members.length; index += 1) {
         const member = members[index];
         const opened = await source.open(index, { signal });
         try {
-          if (opened.reportedBytes !== null && opened.reportedBytes > WLLAMA_MAX_FILE_BYTES) {
-            throw fail(
-              "ARCANE_AI_MODEL_SHARD_TOO_LARGE",
-              `Model file ${member.name} exceeds Wllama's ${WLLAMA_MAX_FILE_BYTES}-byte boundary.`,
-            );
-          }
-          if (
-            security.checks.byteLength
-            && opened.reportedBytes !== null
-            && opened.reportedBytes !== member.bytes
-          ) {
-            throw fail(
-              "ARCANE_AI_MODEL_SIZE_MISMATCH",
-              "A model response Content-Length did not match its expected byte length.",
-            );
-          }
-          const downloadDigest = security.checks.sha256 ? createStreamingSha256() : null;
-          const written = await write(names.models[index].name, opened.body, {
-            signal,
-            async onChunk(chunk, loaded) {
-              downloadDigest?.update(chunk);
-              if (loaded > WLLAMA_MAX_FILE_BYTES) {
-                throw fail(
-                  "ARCANE_AI_MODEL_SHARD_TOO_LARGE",
-                  `Model file ${member.name} exceeds Wllama's ${WLLAMA_MAX_FILE_BYTES}-byte boundary.`,
-                );
-              }
-              if (security.checks.byteLength && loaded > member.bytes) {
-                throw fail("ARCANE_AI_MODEL_SIZE_MISMATCH", "Downloaded model file exceeded its declared size.");
-              }
-              onProgress?.(progress(
-                source,
-                "download",
-                observedBytes + loaded,
-                expectedTotal,
-                index,
-                loaded,
-              ));
-            },
-          });
-          if (security.checks.byteLength && written !== member.bytes) {
-            throw fail(
-              "ARCANE_AI_MODEL_SIZE_MISMATCH",
-              "Downloaded model file bytes did not match the caller-supplied expected byte length.",
-            );
-          }
+          await write(names.models[index].name, opened.body, { signal });
           const modelFile = await file(names.models[index].name);
-          if (!modelFile || modelFile.size !== written) {
+          if (!modelFile) {
             throw fail(
               "ARCANE_AI_MODEL_CACHE_REJECTED",
-              "A stored model file did not preserve the observed downloaded byte count.",
+              "A stored model file could not be reopened.",
             );
           }
-          const evidence = {
-            observedBytes: written,
-            byteLength: security.checks.byteLength ? "verified" : "unchecked",
-            sha256: security.checks.sha256 ? "pending" : "unchecked",
-            actualSha256: null,
-          };
-          if (security.checks.sha256) {
-            evidence.actualSha256 = downloadDigest.digestHex();
-            if (evidence.actualSha256 !== member.sha256) {
-              throw fail(
-                "ARCANE_AI_MODEL_DIGEST_MISMATCH",
-                "Downloaded model file bytes did not match the caller-supplied SHA-256 value.",
-              );
-            }
-            evidence.sha256 = "verified";
-          }
           modelFiles.push(modelFile);
-          fileEvidence.push(evidence);
-          manifestFiles.push({ name: member.name, finalUrl: opened.finalUrl, observedBytes: written });
-          observedBytes += written;
         } catch (error) {
           await opened.cancel?.(error).catch(() => undefined);
           throw error;
         }
       }
-      // Completion is the final storage mutation. No member is admitted until
-      // this exact ordered set manifest exists.
-      const manifest = manifestFor(source, manifestFiles);
-      await writeManifest(names.manifest, manifest, signal);
-      return Object.freeze({
-        files: Object.freeze(modelFiles),
+      return completeValue({
+        files: completeValue(modelFiles),
         file: modelFiles.length === 1 ? modelFiles[0] : null,
-        manifest,
-        observedBytes,
-        integrity: integritySnapshot(security, source, {
-          observedBytes,
-          byteLength: security.checks.byteLength ? "verified" : "unchecked",
-          sha256: security.checks.sha256 ? "verified" : "unchecked",
-          actualSha256: fileEvidence[0]?.actualSha256 ?? null,
-          files: fileEvidence,
-        }),
       });
     } catch (error) {
       await remove(source).catch(() => undefined);
@@ -1147,42 +599,31 @@ export function createDbopfsModelStore({
 
   async function ensure(source, {
     signal,
-    onProgress,
     onCapabilityPolicy,
     offline = false,
-    security: configuredSecurity,
   } = {}) {
-    const security = resolveModelSecurity({ load: configuredSecurity });
-    assertDescriptorChecks(source, security);
-    const cached = await openCached(source, { signal, onProgress, security });
+    const cached = await openCached(source, { signal });
     if (cached) {
-      const storage = await storagePolicy(source, { cached, security });
+      const storage = await storagePolicy({ cached: true });
       onCapabilityPolicy?.(storage);
-      return Object.freeze({ ...cached, cache: "cached", storage });
+      return completeValue({ ...cached, cache: "cached", storage });
     }
     if (offline) {
-      throw fail("ARCANE_AI_MODEL_OFFLINE_MISS", "No admitted offline model cache is available.");
+      throw fail("ARCANE_AI_MODEL_OFFLINE_MISS", "No cached offline model is available.");
     }
-    const storage = await storagePolicy(source, { security });
+    const storage = await storagePolicy();
     onCapabilityPolicy?.(storage);
-    if (storage.compatibility === "incompatible") {
-      throw fail(
-        storage.code,
-        "Available browser storage is smaller than the model file set and completion manifest.",
-      );
-    }
-    const installed = await install(source, { signal, onProgress, security });
-    const admittedStorage = await storagePolicy(source, { cached: installed, security });
+    const installed = await install(source, { signal });
+    const admittedStorage = await storagePolicy({ cached: true });
     onCapabilityPolicy?.(admittedStorage);
-    return Object.freeze({ ...installed, cache: "installed", storage: admittedStorage });
+    return completeValue({ ...installed, cache: "installed", storage: admittedStorage });
   }
 
-  const store = Object.freeze({
+  const store = completeValue({
     kind: "arcane-dbopfs-model-store",
     tableName,
     adapter: dbopfs,
     ready: () => table().then(() => undefined),
-    openVerified,
     install,
     ensure,
     remove,
@@ -1196,7 +637,7 @@ function linkAbortSignal(externalSignal) {
   const forward = () => controller.abort(externalSignal.reason);
   if (externalSignal?.aborted) forward();
   else externalSignal?.addEventListener?.("abort", forward, { once: true });
-  return Object.freeze({
+  return completeValue({
     controller,
     release() {
       externalSignal?.removeEventListener?.("abort", forward);
@@ -1300,7 +741,7 @@ function createSerialRequestQueue(onDepth) {
     return ready;
   }
 
-  return Object.freeze({
+  return completeValue({
     schedule,
     openStream,
     idle: () => tail,
@@ -1312,19 +753,139 @@ function responseFormat(structuredOutput) {
     return undefined;
   }
   if (structuredOutput === true || structuredOutput === "json") {
-    return Object.freeze({ type: "json_object" });
+    return completeValue({ type: "json_object" });
   }
   if (typeof structuredOutput !== "object" || Array.isArray(structuredOutput)) {
     throw new TypeError("structuredOutput must be false, true, \"json\", or a JSON Schema object.");
   }
-  return Object.freeze({
+  return completeValue({
     type: "json_schema",
-    json_schema: Object.freeze({ name: "arcane_response", strict: true, schema: structuredOutput }),
+    json_schema: completeValue({ name: "arcane_response", strict: true, schema: structuredOutput }),
   });
 }
 
+function plainStructuralRecord(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function validateToolMessageSchemas(value) {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) throw new TypeError("tools must be an array.");
+  for (const [index, tool] of value.entries()) {
+    const parameters = tool?.function?.parameters;
+    const messageSchema = parameters?.properties?.message;
+    if (
+      !plainStructuralRecord(tool)
+      || tool.type !== "function"
+      || !plainStructuralRecord(tool.function)
+      || !plainStructuralRecord(parameters)
+      || parameters.type !== "object"
+      || !plainStructuralRecord(parameters.properties)
+      || !plainStructuralRecord(messageSchema)
+      || messageSchema.type !== "string"
+      || !Number.isInteger(messageSchema.minLength)
+      || messageSchema.minLength < 1
+      || !Array.isArray(parameters.required)
+      || !parameters.required.includes("message")
+    ) {
+      throw fail(
+        "ARCANE_AI_TOOL_MESSAGE_REQUIRED",
+        `tools[${String(index)}] must require a nonempty string parameters.properties.message.`,
+      );
+    }
+  }
+}
+
+function validateRequestMessages(messages) {
+  let pendingToolCallId = null;
+  for (const [messageIndex, message] of messages.entries()) {
+    if (!plainStructuralRecord(message)) {
+      throw new TypeError(`messages[${String(messageIndex)}] must be a plain object.`);
+    }
+    const hasToolCalls = Object.hasOwn(message, "tool_calls");
+    const calls = validateToolCalls(message, `messages[${String(messageIndex)}]`);
+    let openedToolCall = false;
+    if (hasToolCalls) {
+      if (message?.role !== "assistant") {
+        throw fail(
+          "ARCANE_AI_TOOL_CALL_INVALID",
+          `messages[${String(messageIndex)}].tool_calls is supported only for assistant messages.`,
+        );
+      }
+      if (pendingToolCallId !== null && calls.length) {
+        throw fail(
+          "ARCANE_AI_PARALLEL_TOOLS_UNSUPPORTED",
+          "The Arcane chat session accepts one structural tool call at a time.",
+        );
+      }
+      if (calls.length) {
+        pendingToolCallId = calls[0].id;
+        openedToolCall = true;
+      }
+    }
+    if (message?.role === "tool") {
+      if (typeof message.content !== "string" || !message.content.trim()) {
+        throw fail(
+          "ARCANE_AI_INVALID_TOOL_MESSAGE",
+          `messages[${String(messageIndex)}] must contain a nonblank user-facing tool result.`,
+        );
+      }
+      if (
+        pendingToolCallId === null
+        || typeof message.tool_call_id !== "string"
+        || message.tool_call_id !== pendingToolCallId
+      ) {
+        throw fail(
+          "ARCANE_AI_INVALID_TOOL_MESSAGE",
+          `messages[${String(messageIndex)}] does not settle the pending structural tool call.`,
+        );
+      }
+      pendingToolCallId = null;
+    } else {
+      if (Object.hasOwn(message, "tool_call_id")) {
+        throw fail(
+          "ARCANE_AI_INVALID_TOOL_MESSAGE",
+          `messages[${String(messageIndex)}].tool_call_id is valid only for a tool result.`,
+        );
+      }
+      if (pendingToolCallId !== null && !openedToolCall) {
+        throw fail(
+          "ARCANE_AI_TOOL_RESULT_REQUIRED",
+          `messages[${String(messageIndex)}] precedes the pending structural tool result.`,
+        );
+      }
+    }
+  }
+  if (pendingToolCallId !== null) {
+    throw fail(
+      "ARCANE_AI_TOOL_RESULT_REQUIRED",
+      "The pending structural tool call must be settled before requesting another response.",
+    );
+  }
+}
+
+function validateStructuralRequest(request) {
+  if (!plainStructuralRecord(request)) {
+    throw new TypeError("The browser-WASM LLM request must be a plain object.");
+  }
+  if (!Array.isArray(request.messages)) throw new TypeError("messages must be an array.");
+  validateRequestMessages(request.messages);
+  validateToolMessageSchemas(request.tools);
+  const parallelValues = [request.parallelToolCalls, request.parallel_tool_calls];
+  if (parallelValues.some(function enablesParallelBrowserWasmTools(value) {
+    return value !== undefined && value !== false;
+  })) {
+    throw fail(
+      "ARCANE_AI_PARALLEL_TOOLS_UNSUPPORTED",
+      "The Arcane chat session accepts one structural tool call at a time.",
+    );
+  }
+}
+
 function completionOptions(request, abortSignal, stream) {
-  if (!Array.isArray(request?.messages)) throw new TypeError("messages must be an array.");
+  validateStructuralRequest(request);
   const options = {
     messages: request.messages,
     stream,
@@ -1339,14 +900,23 @@ function completionOptions(request, abortSignal, stream) {
     ["minP", "min_p"],
     ["min_p", "min_p"],
     ["repeatPenalty", "penalty_repeat"],
+    ["repeat", "penalty_repeat"],
+    ["repeat_penalty", "penalty_repeat"],
     ["penalty_repeat", "penalty_repeat"],
     ["maxTokens", "max_tokens"],
+    ["maxOutputTokens", "max_tokens"],
     ["max_tokens", "max_tokens"],
     ["seed", "seed"],
     ["stop", "stop"],
   ];
   for (const [source, target] of copy) {
     if (request[source] !== undefined) options[target] = request[source];
+  }
+  if (request.templateOptions !== undefined) {
+    if (!request.templateOptions || typeof request.templateOptions !== "object" || Array.isArray(request.templateOptions)) {
+      throw new TypeError("templateOptions must be a plain object when provided.");
+    }
+    options.chat_template_kwargs = { ...request.templateOptions };
   }
   if (request.tools !== undefined) {
     if (!Array.isArray(request.tools)) throw new TypeError("tools must be an array.");
@@ -1356,51 +926,207 @@ function completionOptions(request, abortSignal, stream) {
   if (request.tool_choice !== undefined) options.tool_choice = request.tool_choice;
   if (request.parallelToolCalls !== undefined) options.parallel_tool_calls = request.parallelToolCalls;
   if (request.parallel_tool_calls !== undefined) options.parallel_tool_calls = request.parallel_tool_calls;
+  if (
+    request.tools?.length
+    && request.parallelToolCalls === undefined
+    && request.parallel_tool_calls === undefined
+  ) options.parallel_tool_calls = false;
   const format = responseFormat(request.structuredOutput);
   if (format) options.response_format = format;
   return options;
 }
 
-function validateToolCalls(message) {
-  if (message?.tool_calls === undefined) return;
-  if (!Array.isArray(message.tool_calls)) {
-    throw fail("ARCANE_AI_INVALID_PROVIDER_RESULT", "The model returned malformed tool calls.");
+function validateToolCalls(message, location = "The model response") {
+  if (!plainStructuralRecord(message)) {
+    throw fail("ARCANE_AI_INVALID_PROVIDER_RESULT", `${location} is not a plain assistant message.`);
+  }
+  if (
+    Object.hasOwn(message, "toolCalls")
+    || Object.hasOwn(message, "function_call")
+    || Object.hasOwn(message, "functionCall")
+  ) {
+    throw fail("ARCANE_AI_TOOL_CALL_INVALID", `${location} contains a noncanonical structural tool-call field.`);
+  }
+  if (!Object.hasOwn(message, "tool_calls")) return [];
+  const descriptor = Object.getOwnPropertyDescriptor(message, "tool_calls");
+  if (!descriptor || !Object.hasOwn(descriptor, "value") || !Array.isArray(descriptor.value)) {
+    throw fail("ARCANE_AI_TOOL_CALL_INVALID", `${location} contains malformed tool calls.`);
+  }
+  const calls = descriptor.value;
+  if (calls.length > 1) {
+    throw fail(
+      "ARCANE_AI_PARALLEL_TOOLS_UNSUPPORTED",
+      "The Arcane chat session accepts one structural tool call at a time.",
+    );
   }
   const ids = new Set();
-  for (const call of message.tool_calls) {
+  for (const call of calls) {
     if (
-      typeof call?.id !== "string"
-      || !call.id
+      !plainStructuralRecord(call)
+      || typeof call.id !== "string"
+      || !call.id.trim()
       || ids.has(call.id)
       || call.type !== "function"
-      || typeof call.function?.name !== "string"
-      || !call.function.name
-      || typeof call.function?.arguments !== "string"
+      || !plainStructuralRecord(call.function)
+      || typeof call.function.name !== "string"
+      || !call.function.name.trim()
+      || typeof call.function.arguments !== "string"
     ) {
-      throw fail("ARCANE_AI_INVALID_PROVIDER_RESULT", "The model returned malformed tool calls.");
+      throw fail("ARCANE_AI_TOOL_CALL_INVALID", `${location} contains malformed tool calls.`);
+    }
+    let argumentsRecord;
+    try {
+      argumentsRecord = JSON.parse(call.function.arguments);
+    } catch (error) {
+      throw fail(
+        "ARCANE_AI_TOOL_CALL_INVALID",
+        `${location} contains structural tool arguments that are not a JSON object.`,
+        error,
+      );
+    }
+    if (!plainStructuralRecord(argumentsRecord)) {
+      throw fail(
+        "ARCANE_AI_TOOL_CALL_INVALID",
+        `${location} contains structural tool arguments that are not a JSON object.`,
+      );
+    }
+    if (typeof argumentsRecord.message !== "string" || !argumentsRecord.message.trim()) {
+      throw fail(
+        "ARCANE_AI_TOOL_MESSAGE_REQUIRED",
+        `${location} structural tool arguments must include a nonempty user-facing message.`,
+      );
     }
     ids.add(call.id);
   }
+  return calls;
 }
 
 function validateCompletion(value, requestId) {
   if (
-    !value
-    || typeof value !== "object"
-    || !Array.isArray(value.choices)
-    || value.choices.length === 0
+    !plainStructuralRecord(value)
   ) {
     throw fail("ARCANE_AI_INVALID_PROVIDER_RESULT", "The model returned an invalid chat completion.");
   }
+  const hasMessage = Object.hasOwn(value, "message");
+  const hasChoices = Object.hasOwn(value, "choices");
+  if (hasMessage === hasChoices) {
+    throw fail(
+      "ARCANE_AI_INVALID_PROVIDER_RESULT",
+      "The model completion must contain exactly one message or choices envelope.",
+    );
+  }
+  if (hasMessage) {
+    const messageDescriptor = Object.getOwnPropertyDescriptor(value, "message");
+    if (
+      !messageDescriptor
+      || !Object.hasOwn(messageDescriptor, "value")
+      || !plainStructuralRecord(messageDescriptor.value)
+      || messageDescriptor.value.role !== "assistant"
+    ) {
+      throw fail("ARCANE_AI_INVALID_PROVIDER_RESULT", "The model returned an invalid assistant message.");
+    }
+    validateToolCalls(messageDescriptor.value);
+    return requestId === undefined ? value : completeValue({ ...value, id: requestId });
+  }
+  const choicesDescriptor = Object.getOwnPropertyDescriptor(value, "choices");
+  if (
+    !choicesDescriptor
+    || !Object.hasOwn(choicesDescriptor, "value")
+    || !Array.isArray(choicesDescriptor.value)
+    || choicesDescriptor.value.length === 0
+  ) {
+    throw fail("ARCANE_AI_INVALID_PROVIDER_RESULT", "The model returned an invalid chat completion.");
+  }
+  const choices = choicesDescriptor.value;
   const indexes = new Set();
-  for (const choice of value.choices) {
-    if (!Number.isSafeInteger(choice?.index) || choice.index < 0 || indexes.has(choice.index)) {
+  let toolCallCount = 0;
+  for (let choicePosition = 0; choicePosition < choices.length; choicePosition += 1) {
+    const choice = choices[choicePosition];
+    const messageDescriptor = plainStructuralRecord(choice)
+      ? Object.getOwnPropertyDescriptor(choice, "message")
+      : null;
+    if (
+      !plainStructuralRecord(choice)
+      || !Number.isSafeInteger(choice.index)
+      || choice.index < 0
+      || indexes.has(choice.index)
+      || !messageDescriptor
+      || !Object.hasOwn(messageDescriptor, "value")
+      || !plainStructuralRecord(messageDescriptor.value)
+      || messageDescriptor.value.role !== "assistant"
+    ) {
       throw fail("ARCANE_AI_INVALID_PROVIDER_RESULT", "The model returned an invalid choice index.");
     }
     indexes.add(choice.index);
-    validateToolCalls(choice.message);
+    const choiceToolCallCount = validateToolCalls(
+      messageDescriptor.value,
+      `The model response choice ${String(choicePosition)}`,
+    ).length;
+    if (choicePosition > 0 && choiceToolCallCount) {
+      throw fail(
+        "ARCANE_AI_INVALID_PROVIDER_RESULT",
+        "The model placed a structural tool call outside the selected first choice.",
+      );
+    }
+    toolCallCount += choiceToolCallCount;
+    if (toolCallCount > 1) {
+      throw fail(
+        "ARCANE_AI_PARALLEL_TOOLS_UNSUPPORTED",
+        "The Arcane chat session accepts one structural tool call at a time.",
+      );
+    }
   }
-  return requestId === undefined ? value : Object.freeze({ ...value, id: requestId });
+  return requestId === undefined ? value : completeValue({ ...value, id: requestId });
+}
+
+function isPublicStreamContentKey(key) {
+  return key === "content"
+    || key === "text"
+    || key === "thinking"
+    || key === "reasoning"
+    || key === "reasoning_content";
+}
+
+function projectPublicStreamContent(value, seen = new WeakSet()) {
+  if (!value || typeof value !== "object" || seen.has(value)) return null;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    const result = [];
+    for (const item of value) {
+      const projected = projectPublicStreamContent(item, seen);
+      if (projected !== null) result.push(projected);
+    }
+    seen.delete(value);
+    return result.length ? result : null;
+  }
+  if (!plainStructuralRecord(value)) {
+    seen.delete(value);
+    return null;
+  }
+  const result = {};
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key === "symbol") continue;
+    const descriptor = descriptors[key];
+    if (!Object.hasOwn(descriptor, "value")) continue;
+    if (
+      isPublicStreamContentKey(key)
+      && descriptor.value !== null
+      && descriptor.value !== undefined
+    ) {
+      result[key] = descriptor.value;
+      continue;
+    }
+    const projected = projectPublicStreamContent(descriptor.value, seen);
+    if (projected !== null) result[key] = projected;
+  }
+  seen.delete(value);
+  return Object.keys(result).length ? result : null;
+}
+
+function projectPublicStreamChunk(value) {
+  if (typeof value === "string") return value;
+  return projectPublicStreamContent(value);
 }
 
 function createCompletionAccumulator(modelId, requestId) {
@@ -1453,14 +1179,34 @@ function createCompletionAccumulator(modelId, requestId) {
         const tool = record.tools.get(fragment.index) ?? {
           index: fragment.index,
           id: "",
+          invalidArguments: false,
+          invalidIdentity: false,
           type: "",
           name: "",
           arguments: "",
         };
-        if (typeof fragment.id === "string" && !tool.id) tool.id = fragment.id;
-        if (typeof fragment.type === "string") tool.type = fragment.type;
-        if (typeof fragment.function?.name === "string") tool.name += fragment.function.name;
-        if (typeof fragment.function?.arguments === "string") tool.arguments += fragment.function.arguments;
+        if (fragment.id !== undefined) {
+          if (typeof fragment.id !== "string" || !fragment.id || tool.id && tool.id !== fragment.id) {
+            tool.invalidIdentity = true;
+          } else {
+            tool.id = fragment.id;
+          }
+        }
+        if (fragment.type !== undefined) {
+          if (typeof fragment.type !== "string" || !fragment.type || tool.type && tool.type !== fragment.type) {
+            tool.invalidIdentity = true;
+          } else {
+            tool.type = fragment.type;
+          }
+        }
+        if (fragment.function?.name !== undefined) {
+          if (typeof fragment.function.name !== "string") tool.invalidIdentity = true;
+          else tool.name += fragment.function.name;
+        }
+        if (fragment.function?.arguments !== undefined) {
+          if (typeof fragment.function.arguments !== "string") tool.invalidArguments = true;
+          else tool.arguments += fragment.function.arguments;
+        }
         record.tools.set(fragment.index, tool);
       }
     }
@@ -1479,11 +1225,19 @@ function createCompletionAccumulator(modelId, requestId) {
         if (record.tools.size) {
           message.tool_calls = [...record.tools.values()]
             .sort((a, b) => a.index - b.index)
-            .map((tool) => ({
-              id: tool.id,
-              type: tool.type,
-              function: { name: tool.name, arguments: tool.arguments },
-            }));
+            .map((tool) => {
+              if (tool.invalidArguments || tool.invalidIdentity) {
+                throw fail(
+                  "ARCANE_AI_TOOL_CALL_INVALID",
+                  "A streamed structural tool call changed or omitted an exact field.",
+                );
+              }
+              return {
+                id: tool.id,
+                type: tool.type,
+                function: { name: tool.name, arguments: tool.arguments },
+              };
+            });
         }
         return { index: record.index, message, finish_reason: record.finish_reason };
       }),
@@ -1491,7 +1245,7 @@ function createCompletionAccumulator(modelId, requestId) {
     return validateCompletion(completion, requestId);
   }
 
-  return Object.freeze({ push, result });
+  return completeValue({ push, result });
 }
 
 function callbackStreamHandle({ runtime, request, signal, onSettled }) {
@@ -1508,9 +1262,11 @@ function callbackStreamHandle({ runtime, request, signal, onSettled }) {
     if (ended || linked.controller.signal.aborted) return;
     const chunk = request.id === undefined ? value : { ...value, id: request.id };
     accumulator.push(chunk);
+    const publicChunk = projectPublicStreamChunk(chunk);
+    if (publicChunk === null) return;
     const waiter = waiters.shift();
-    if (waiter) waiter.resolve({ value: chunk, done: false });
-    else chunks.push(chunk);
+    if (waiter) waiter.resolve({ value: publicChunk, done: false });
+    else chunks.push(publicChunk);
   }
 
   function finish(error = null) {
@@ -1579,7 +1335,11 @@ function callbackStreamHandle({ runtime, request, signal, onSettled }) {
       return new Promise((resolve, reject) => waiters.push({ resolve, reject }));
     },
     async return(value) {
-      await this.cancel("The stream consumer stopped before completion.");
+      Promise.resolve().then(() => this.cancel(
+        "The stream consumer stopped before completion.",
+      )).catch(function reportBrowserWasmStreamReturnCancellationFailure(error) {
+        console.error("Arcane browser-WASM stream early-return cancellation failed.", error);
+      });
       return { value, done: true };
     },
     async throw(error) {
@@ -1590,15 +1350,125 @@ function callbackStreamHandle({ runtime, request, signal, onSettled }) {
       return this;
     },
   };
-  return Object.freeze(handle);
+  return completeValue(handle);
 }
 
-function positiveLoadInteger(value, field, fallback, maximum) {
+function validatedV1StreamHandle(opened, request) {
+  if (
+    !opened
+    || typeof opened !== "object"
+    || typeof opened[Symbol.asyncIterator] !== "function"
+    || typeof opened.cancel !== "function"
+    || !opened.result
+    || typeof opened.result.then !== "function"
+  ) {
+    if (typeof opened?.cancel === "function") {
+      Promise.resolve().then(function cancelInvalidV1StreamHandle() {
+        return opened.cancel("The v1 provider returned an invalid stream handle.");
+      }).catch(function reportInvalidV1StreamCleanupFailure(error) {
+        console.error("Arcane invalid v1 stream cleanup failed.", error);
+      });
+    }
+    throw fail(
+      "ARCANE_AI_INVALID_PROVIDER_RESULT",
+      "The browser-WASM adapter stream must expose an async iterator, result, and cancel().",
+    );
+  }
+  let iterator;
+  try {
+    iterator = opened[Symbol.asyncIterator]();
+  } catch (error) {
+    Promise.resolve().then(function cancelRejectedV1Iterator() {
+      return opened.cancel(error);
+    }).catch(function reportRejectedV1IteratorCleanupFailure(cleanupError) {
+      console.error("Arcane rejected v1 stream iterator cleanup failed.", cleanupError);
+    });
+    throw error;
+  }
+  if (!iterator || typeof iterator.next !== "function") {
+    Promise.resolve().then(function cancelInvalidV1Iterator() {
+      return opened.cancel("The v1 provider returned an invalid stream iterator.");
+    }).catch(function reportInvalidV1IteratorCleanupFailure(error) {
+      console.error("Arcane invalid v1 stream iterator cleanup failed.", error);
+    });
+    throw fail(
+      "ARCANE_AI_INVALID_PROVIDER_RESULT",
+      "The browser-WASM adapter stream iterator has no next() method.",
+    );
+  }
+  const result = Promise.resolve(opened.result).then(
+    function validateV1StreamTerminal(value) {
+      return validateCompletion(value, request.id);
+    },
+  );
+  result.catch(function retainV1StreamTerminalRejection() {});
+  const handle = {
+    result,
+    cancel: function cancelValidatedV1Stream(reason) {
+      return opened.cancel(reason);
+    },
+    async next(value) {
+      let nextValue = value;
+      while (true) {
+        const next = await iterator.next(nextValue);
+        nextValue = undefined;
+        if (next.done) return { value: undefined, done: true };
+        const projected = projectPublicStreamChunk(next.value);
+        if (projected !== null) return { value: projected, done: false };
+      }
+    },
+    async return(value) {
+      if (typeof iterator.return === "function") {
+        Promise.resolve().then(function returnUnderlyingV1Stream() {
+          return iterator.return(value);
+        }).catch(function reportUnderlyingV1StreamReturnFailure(error) {
+          console.error("Arcane v1 stream iterator return failed.", error);
+        });
+      }
+      Promise.resolve().then(function cancelReturnedV1Stream() {
+        return opened.cancel("The stream consumer stopped before completion.");
+      }).catch(function reportReturnedV1StreamCancellationFailure(error) {
+        console.error("Arcane v1 stream early-return cancellation failed.", error);
+      });
+      return { value, done: true };
+    },
+    async throw(error) {
+      await opened.cancel(error);
+      throw error;
+    },
+    [Symbol.asyncIterator]() {
+      return this;
+    },
+  };
+  return completeValue(handle);
+}
+
+function positiveLoadInteger(value, field, fallback) {
   const resolved = value === undefined ? fallback : value;
-  if (!Number.isSafeInteger(resolved) || resolved < 1 || resolved > maximum) {
-    throw new RangeError(`${field} must be a positive safe integer no greater than ${maximum}.`);
+  if (!Number.isSafeInteger(resolved) || resolved < 1) {
+    throw new RangeError(`${field} must be a positive safe integer.`);
   }
   return resolved;
+}
+
+function optionalLoadBoolean(value, field) {
+  if (value === undefined) return undefined;
+  if (typeof value !== "boolean") throw new TypeError(`${field} must be a boolean when provided.`);
+  return value;
+}
+
+function optionalLoadText(value, field) {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") throw new TypeError(`${field} must be a string when provided.`);
+  return value;
+}
+
+function optionalTemplateDefaults(value) {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new TypeError("templateDefaults must be a plain object when provided.");
+  }
+  return { ...value };
 }
 
 function measuredRuntimeCapabilities(runtimeCapabilities) {
@@ -1606,7 +1476,7 @@ function measuredRuntimeCapabilities(runtimeCapabilities) {
   const deviceMemory = Number.isFinite(measuredDeviceMemory) && measuredDeviceMemory > 0
     ? measuredDeviceMemory
     : null;
-  return Object.freeze({ ...runtimeCapabilities, deviceMemory });
+  return completeValue({ ...runtimeCapabilities, deviceMemory });
 }
 
 function capabilityLoadPlan(runtimeCapabilities, defaults, options = {}) {
@@ -1632,32 +1502,36 @@ function capabilityLoadPlan(runtimeCapabilities, defaults, options = {}) {
     configured.threads,
     "threads",
     Math.max(1, Math.min(4, hardwareConcurrency - 1 || 1)),
-    64,
   );
   const contextTokens = positiveLoadInteger(
     configured.contextTokens,
     "contextTokens",
     defaultContext,
-    1_048_576,
   );
   const batchTokens = positiveLoadInteger(
     configured.batchTokens,
     "batchTokens",
     Math.min(defaultBatch, contextTokens),
-    contextTokens,
   );
   const microBatchTokens = positiveLoadInteger(
     configured.microBatchTokens,
     "microBatchTokens",
     Math.min(defaultMicroBatch, batchTokens),
-    batchTokens,
   );
-  return Object.freeze({
+  const reasoning = optionalLoadBoolean(configured.reasoning, "reasoning");
+  const chatTemplate = optionalLoadText(configured.chatTemplate, "chatTemplate");
+  const jinja = optionalLoadBoolean(configured.jinja, "jinja");
+  const templateDefaults = optionalTemplateDefaults(configured.templateDefaults);
+  return completeValue({
     threads,
     contextTokens,
     batchTokens,
     microBatchTokens,
     gpuLayers: 99_999,
+    ...(reasoning!==undefined?{ reasoning }:{}),
+    ...(chatTemplate!==undefined?{ chatTemplate }:{}),
+    ...(jinja!==undefined?{ jinja }:{}),
+    ...(templateDefaults!==undefined?{ templateDefaults }:{}),
   });
 }
 
@@ -1666,23 +1540,27 @@ function sameLoadPlan(left, right) {
     && left?.contextTokens === right?.contextTokens
     && left?.batchTokens === right?.batchTokens
     && left?.microBatchTokens === right?.microBatchTokens
-    && left?.gpuLayers === right?.gpuLayers;
+    && left?.gpuLayers === right?.gpuLayers
+    && left?.reasoning === right?.reasoning
+    && left?.chatTemplate === right?.chatTemplate
+    && left?.jinja === right?.jinja
+    && JSON.stringify(left?.templateDefaults) === JSON.stringify(right?.templateDefaults);
 }
 
 function stableModelFailure(error) {
   const code = typeof error?.code === "string" ? error.code : "";
   const message = typeof error?.message === "string" ? error.message : "";
   if (code === "ARCANE_AI_MODEL_SHARD_TOO_LARGE") {
-    return Object.freeze({ code });
+    return completeValue({ code });
   }
   if (/(?:out of memory|allocation failed|failed to allocate|memory exhausted)/iu.test(message)) {
-    return Object.freeze({ code: "ARCANE_AI_MODEL_GPU_MEMORY_INSUFFICIENT" });
+    return completeValue({ code: "ARCANE_AI_MODEL_GPU_MEMORY_INSUFFICIENT" });
   }
   if (code === "ARCANE_AI_WEBGPU_EVIDENCE_INVALID") {
-    return Object.freeze({ code: "ARCANE_AI_MODEL_FULL_OFFLOAD_UNPROVEN" });
+    return completeValue({ code: "ARCANE_AI_MODEL_FULL_OFFLOAD_UNPROVEN" });
   }
   if (code === "ARCANE_AI_WEBGPU_REQUIRED" && /(?:offload|GPU|WebGPU)/iu.test(message)) {
-    return Object.freeze({ code: "ARCANE_AI_MODEL_WEBGPU_REQUIREMENT_FAILED" });
+    return completeValue({ code: "ARCANE_AI_MODEL_WEBGPU_REQUIREMENT_FAILED" });
   }
   return null;
 }
@@ -1697,10 +1575,10 @@ function capabilityPolicy(
   failure = null,
 ) {
   const reasons = [];
-  const add = (code, compatibility, details = {}) => reasons.push(Object.freeze({
+  const add = (code, compatibility, details = {}) => reasons.push(completeValue({
     code,
     compatibility,
-    details: Object.freeze(details),
+    details: completeValue(details),
   }));
   if (runtimeCapabilities.webAssembly !== true) {
     add("ARCANE_AI_WEBASSEMBLY_UNAVAILABLE", "incompatible");
@@ -1714,37 +1592,21 @@ function capabilityPolicy(
   if (runtimeCapabilities.webgpuApiPresent !== true) {
     add("ARCANE_AI_WEBGPU_API_UNAVAILABLE", "incompatible");
   }
-  const oversized = oversizedModelFile(source);
-  if (oversized) {
-    add("ARCANE_AI_MODEL_SHARD_TOO_LARGE", "incompatible", {
-      name: oversized.name,
-      bytes: oversized.bytes,
-      maximumBytes: WLLAMA_MAX_FILE_BYTES,
-    });
-  }
-  if (failure && failure.code !== "ARCANE_AI_MODEL_SHARD_TOO_LARGE") {
+  if (failure) {
     add(failure.code, "incompatible");
   }
   if (storage?.compatibility === "incompatible") {
-    add(storage.code, "incompatible", {
-      requiredBytes: storage.requiredBytes,
-      availableBytes: storage.availableBytes,
-    });
+    add(storage.code, "incompatible");
   } else if (!storage || storage.compatibility === "unknown") {
-    add(storage?.code ?? "ARCANE_AI_STORAGE_NOT_MEASURED", "unknown", {
-      requiredBytes: storage?.requiredBytes ?? knownModelBytes(source),
-      availableBytes: storage?.availableBytes ?? null,
-    });
+    add(storage?.code ?? "ARCANE_AI_STORAGE_NOT_MEASURED", "unknown");
   }
   const webgpu = runtimeEvidence?.webgpu;
   if (state === "ready" && webgpu?.observed === true) {
-    add("ARCANE_AI_WEBGPU_EXECUTION_OBSERVED", "compatible", {
-      requestedGpuLayers: loadPlan.gpuLayers,
-      offloadedLayers: webgpu.offload?.layers ?? null,
-      totalLayers: webgpu.offload?.totalLayers ?? null,
-      queueSubmissions: webgpu.queue?.submissions ?? null,
-      logicalBufferDescriptorBytes: webgpu.buffers?.descriptorBytes ?? null,
-    });
+    add(
+      "ARCANE_AI_WEBGPU_EXECUTION_OBSERVED",
+      "compatible",
+      {},
+    );
   } else if (runtimeCapabilities.webgpuApiPresent === true) {
     add("ARCANE_AI_WEBGPU_EXECUTION_UNOBSERVED", "unknown", {
       requestedGpuLayers: loadPlan.gpuLayers,
@@ -1755,18 +1617,14 @@ function capabilityPolicy(
     : reasons.some((reason) => reason.compatibility === "unknown")
       ? "unknown"
       : "compatible";
-  return Object.freeze({
+  return completeValue({
     protocol: CAPABILITY_POLICY_PROTOCOL,
     compatibility,
-    reasons: Object.freeze(reasons),
-    model: Object.freeze({
-      id: source.id,
-      fileCount: sourceMetadata(source).files.length,
-      declaredBytes: knownModelBytes(source),
-    }),
+    reasons: completeValue(reasons),
+    model: completeValue({ id: source.id }),
     load: loadPlan,
     storage: storage ?? null,
-    inputs: Object.freeze({
+    inputs: completeValue({
       hardwareConcurrency: runtimeCapabilities.hardwareConcurrency,
       deviceMemory: runtimeCapabilities.deviceMemory,
       deviceMemoryMeaning: "coarse-system-memory-gib",
@@ -1799,8 +1657,8 @@ function providerModelSources(source, sources) {
   if (source !== undefined && !list.includes(source)) {
     throw new TypeError("The legacy default source must be one member of sources.");
   }
-  return Object.freeze({
-    sources: Object.freeze(list.slice()),
+  return completeValue({
+    sources: completeValue(list.slice()),
     defaultSource: source ?? list[0],
   });
 }
@@ -1834,11 +1692,9 @@ export function createBrowserWasmLlmProvider({
     runtimeLoadDefaults,
   );
   let state = "unloaded";
-  let progressState = null;
   let errorState = null;
   let cacheState = "unknown";
   let activeSecurity = null;
-  let activeIntegrity = null;
   let queueDepth = 0;
   let disposed = false;
   let disposing = false;
@@ -1865,7 +1721,7 @@ export function createBrowserWasmLlmProvider({
 
   function capabilities() {
     const runtimeCapabilities = measuredRuntimeCapabilities(runtime.capabilities());
-    return Object.freeze({
+    return completeValue({
       localOnly: true,
       toolCalls: "structural-only",
       webAssembly: runtimeCapabilities.webAssembly,
@@ -1899,7 +1755,7 @@ export function createBrowserWasmLlmProvider({
 
   function catalog() {
     const runtimeCapabilities = measuredRuntimeCapabilities(runtime.capabilities());
-    return Object.freeze(modelSources.map((candidate) => {
+    return completeValue(modelSources.map((candidate) => {
       const selected = candidate === activeSource;
       const plan = selected
         ? activeLoadPlan
@@ -1913,7 +1769,7 @@ export function createBrowserWasmLlmProvider({
         selected ? state : "unloaded",
         modelFailures.get(candidate.id) ?? null,
       );
-      return Object.freeze({
+      return completeValue({
         ...publicDescriptor(candidate),
         compatibility: policy.compatibility,
         compatibilityDetails: policy,
@@ -1926,8 +1782,8 @@ export function createBrowserWasmLlmProvider({
       app: context?.security,
       binding: bindingSecurity,
     });
-    const integrity = activeIntegrity ?? integritySnapshot(effectiveSecurity, activeSource);
-    return Object.freeze({
+    const publicSecurity = securitySnapshot(effectiveSecurity);
+    return completeValue({
       protocol: ARCANE_AI_ADAPTER_PROTOCOL,
       provider: "arcane-browser-wasm-wllama",
       state,
@@ -1935,10 +1791,8 @@ export function createBrowserWasmLlmProvider({
       busy: activeCount > 0,
       queued: Math.max(0, queueDepth - activeCount),
       model: publicDescriptor(activeSource),
-      cache: Object.freeze({ state: cacheState, schema: MODEL_MANIFEST_SCHEMA }),
-      security: securitySnapshot(effectiveSecurity),
-      integrity,
-      progress: progressState,
+      cache: completeValue({ state: cacheState }),
+      ...(publicSecurity ? { security: publicSecurity } : {}),
       error: errorState,
       runtime: runtime.authority,
       runtimeEvidence: runtime.evidence(),
@@ -1955,21 +1809,14 @@ export function createBrowserWasmLlmProvider({
       || error?.code === "ARCANE_AI_WORKER_TERMINATION_UNCONFIRMED"
       ? "error"
       : "unloaded";
-    progressState = null;
     errorState = state === "error"
-      ? Object.freeze({
+      ? completeValue({
         code: typeof error?.code === "string" ? error.code : "ARCANE_AI_RUNTIME_FAILED",
         message: typeof error?.message === "string"
           ? error.message
           : "The browser-WASM runtime failed.",
       })
       : null;
-  }
-
-  function report(value, options, context) {
-    progressState = value;
-    options?.onProgress?.(value);
-    context?.reportProgress?.(value);
   }
 
   async function load(options = {}, context = {}) {
@@ -1988,22 +1835,11 @@ export function createBrowserWasmLlmProvider({
       binding: bindingSecurity,
       load: options.security,
     });
-    assertDescriptorChecks(requestedSource, effectiveSecurity);
     const requestedLoadPlan = capabilityLoadPlan(
       measuredRuntimeCapabilities(runtime.capabilities()),
       runtimeLoadDefaults,
       options,
     );
-    const oversized = oversizedModelFile(requestedSource);
-    if (oversized) {
-      modelFailures.set(requestedSource.id, Object.freeze({
-        code: "ARCANE_AI_MODEL_SHARD_TOO_LARGE",
-      }));
-      throw fail(
-        "ARCANE_AI_MODEL_SHARD_TOO_LARGE",
-        `Model file ${oversized.name} exceeds Wllama's ${WLLAMA_MAX_FILE_BYTES}-byte boundary.`,
-      );
-    }
     if (state === "ready") {
       if (activeSource !== requestedSource) {
         throw fail(
@@ -2017,14 +1853,8 @@ export function createBrowserWasmLlmProvider({
           "Unload the browser-WASM model before changing its context or batch load plan.",
         );
       }
-      if (sameModelSecurity(activeSecurity, effectiveSecurity)) {
-        activeSecurity = effectiveSecurity;
-        return Object.freeze({ model: publicDescriptor(activeSource), status: status() });
-      }
-      throw fail(
-        "ARCANE_AI_SECURITY_RELOAD_REQUIRED",
-        "Unload the browser-WASM model before changing its effective security checks.",
-      );
+      activeSecurity = effectiveSecurity;
+      return completeValue({ model: publicDescriptor(activeSource), status: status() });
     }
     if (loadPromise) {
       if (activeSource !== requestedSource) {
@@ -2039,14 +1869,8 @@ export function createBrowserWasmLlmProvider({
           "The in-flight browser-WASM load uses a different context or batch plan.",
         );
       }
-      if (sameModelSecurity(activeSecurity, effectiveSecurity)) {
-        activeSecurity = effectiveSecurity;
-        return loadPromise;
-      }
-      throw fail(
-        "ARCANE_AI_SECURITY_RELOAD_REQUIRED",
-        "The in-flight browser-WASM load uses different effective security checks.",
-      );
+      activeSecurity = effectiveSecurity;
+      return loadPromise;
     }
     const externalSignal = options.signal ?? context.signal ?? null;
     const linked = linkAbortSignal(externalSignal);
@@ -2056,9 +1880,7 @@ export function createBrowserWasmLlmProvider({
     activeSource = requestedSource;
     activeSecurity = effectiveSecurity;
     activeLoadPlan = requestedLoadPlan;
-    activeIntegrity = integritySnapshot(effectiveSecurity, activeSource);
     state = "loading";
-    progressState = null;
     errorState = null;
     loadPromise = (async () => {
       try {
@@ -2066,21 +1888,13 @@ export function createBrowserWasmLlmProvider({
         const admitted = await store.ensure(activeSource, {
           signal,
           offline: options.offline === true,
-          security: effectiveSecurity,
-          onProgress: (value) => report(value, options, context),
           onCapabilityPolicy: (value) => { storagePolicies.set(activeSource.id, value); },
         });
         cacheState = admitted.cache;
-        activeIntegrity = admitted.integrity;
         throwIfAborted(signal, "load");
         if (generation !== lifecycleGeneration || state !== "loading") {
           throw fail("ARCANE_AI_OPERATION_SUPERSEDED", "The model load was superseded by unload.");
         }
-        report(
-          progress(activeSource, "initialize", admitted.observedBytes, admitted.observedBytes),
-          options,
-          context,
-        );
         throwIfAborted(signal, "load");
         if (generation !== lifecycleGeneration || state !== "loading") {
           throw fail("ARCANE_AI_OPERATION_SUPERSEDED", "The model load was superseded by unload.");
@@ -2115,9 +1929,8 @@ export function createBrowserWasmLlmProvider({
           throw fail("ARCANE_AI_OPERATION_SUPERSEDED", "The model load was superseded by unload.");
         }
         state = "ready";
-        progressState = null;
         modelFailures.delete(activeSource.id);
-        return Object.freeze({ model: publicDescriptor(activeSource), status: status() });
+        return completeValue({ model: publicDescriptor(activeSource), status: status() });
       } catch (error) {
         let cleanupFailure = null;
         try {
@@ -2135,7 +1948,7 @@ export function createBrowserWasmLlmProvider({
         if (modelFailure) modelFailures.set(activeSource.id, modelFailure);
         if (generation === lifecycleGeneration && state === "loading") {
           state = "error";
-          errorState = Object.freeze({ code: normalized.code, message: normalized.message });
+          errorState = completeValue({ code: normalized.code, message: normalized.message });
         }
         throw normalized;
       } finally {
@@ -2205,7 +2018,7 @@ export function createBrowserWasmLlmProvider({
           if (error) reconcileRuntimeAfterRequestError(error);
         },
       });
-      activeAbort = Object.freeze({
+      activeAbort = completeValue({
         abort: (reason) => handle.cancel(reason),
       });
       return handle;
@@ -2239,10 +2052,8 @@ export function createBrowserWasmLlmProvider({
         throwIfAborted(signal, "unload");
         await runtime.exit();
         state = "unloaded";
-        progressState = null;
         errorState = null;
         activeSecurity = null;
-        activeIntegrity = null;
         return status();
       } catch (error) {
         const normalized = normalizeArcaneAIError(error, {
@@ -2251,7 +2062,7 @@ export function createBrowserWasmLlmProvider({
           signal: normalizationSignal(error, signal),
         });
         state = "error";
-        errorState = Object.freeze({ code: normalized.code, message: normalized.message });
+        errorState = completeValue({ code: normalized.code, message: normalized.message });
         throw normalized;
       } finally {
         unloadPromise = null;
@@ -2287,7 +2098,7 @@ export function createBrowserWasmLlmProvider({
     return runtime.probe(options);
   }
 
-  return Object.freeze({
+  return completeValue({
     protocol: ARCANE_AI_ADAPTER_PROTOCOL,
     id: "arcane-browser-wasm-wllama",
     model: publicDescriptor(defaultSource),
@@ -2324,22 +2135,6 @@ function assertV1LlmAdapterSelection(selection, providerId, modelIds, role) {
   }
 }
 
-function provider2ByteProgress(value) {
-  const phase = typeof value?.phase === "string" ? value.phase.trim() : "";
-  const completed = Number(value?.loaded);
-  const total = value?.total === null ? null : Number(value?.total);
-  if (
-    !phase
-    || !Number.isSafeInteger(completed)
-    || completed < 0
-    || (total !== null && (!Number.isSafeInteger(total) || total < 0))
-    || (total !== null && completed > total)
-  ) {
-    throw fail("ARCANE_AI_PROVIDER_PROGRESS_INVALID", "The browser-WASM provider returned invalid byte progress.");
-  }
-  return Object.freeze({ phase, completed, total, unit: "bytes", heartbeat: false });
-}
-
 /**
  * Projects the existing browser-WASM LLM provider into the provider-neutral
  * Arcane AI /2 lifecycle without changing the provider's public v1 contract.
@@ -2369,7 +2164,7 @@ export function adaptV1LlmProvider(provider) {
     throw new TypeError("The browser-WASM LLM provider must be explicitly local-only.");
   }
 
-  const fallbackCatalog = Object.freeze([model]);
+  const fallbackCatalog = completeValue([model]);
   const initialCatalog = typeof provider.catalog === "function"
     ? provider.catalog()
     : fallbackCatalog;
@@ -2393,11 +2188,10 @@ export function adaptV1LlmProvider(provider) {
 
   function authorityFor(selection) {
     const selectedModel = catalogModels.get(selection.modelId);
-    return Object.freeze({
+    return completeValue({
       protocol: AI_MODEL_AUTHORITY_PROTOCOL,
       providerId,
       modelId: selectedModel.id,
-      admitted: true,
       localOnly: true,
       model: selectedModel,
     });
@@ -2424,19 +2218,18 @@ export function adaptV1LlmProvider(provider) {
     ) {
       throw fail("ARCANE_AI_PROVIDER_STATUS_INVALID", "The browser-WASM provider returned an invalid status.");
     }
-    return Object.freeze({
+    return completeValue({
       state: disposed ? "disposed" : value.state,
       loaded: disposed ? false : value.loaded,
       busy: disposed ? false : value.busy,
       cache: value.cache,
-      security: value.security,
-      integrity: value.integrity,
+      ...(value.security?.secure===true?{security:{secure:true}}:{}),
       capabilityPolicy: value.capabilityPolicy,
       compatibility: value.capabilityPolicy?.compatibility ?? "unknown",
     });
   }
 
-  const adapted = Object.freeze({
+  const adapted = completeValue({
     protocol: AI_PROVIDER_PROTOCOL,
     role: "llm",
     id: providerId,
@@ -2448,7 +2241,7 @@ export function adaptV1LlmProvider(provider) {
       assertSelection(selection, role);
       throwIfAborted(signal, "inspect");
       if (disposed) {
-        return Object.freeze({
+        return completeValue({
           available: false,
           code: "ARCANE_AI_DISPOSED",
           message: "The browser-WASM provider is disposed.",
@@ -2463,13 +2256,13 @@ export function adaptV1LlmProvider(provider) {
       ];
       const missing = requirements.find(([available]) => !available)?.[1] ?? null;
       if (missing) {
-        return Object.freeze({
+        return completeValue({
           available: false,
           code: "ARCANE_AI_PROVIDER_UNAVAILABLE",
           message: `The browser-WASM provider requires ${missing}.`,
         });
       }
-      return Object.freeze({ available: true, authority: authorityFor(selection) });
+      return completeValue({ available: true, authority: authorityFor(selection) });
     },
     status,
     async load({
@@ -2478,6 +2271,7 @@ export function adaptV1LlmProvider(provider) {
       signal = null,
       progress = null,
       security,
+      ...loadOptions
     } = {}) {
       assertSelection(selection, role);
       throwIfAborted(signal, "load");
@@ -2485,10 +2279,10 @@ export function adaptV1LlmProvider(provider) {
         throw new TypeError("The provider/2 progress sink must be a function or null.");
       }
       await methods.load({
+        ...loadOptions,
         modelId: selection.modelId,
         signal,
-        security,
-        ...(progress ? { onProgress: (value) => progress(provider2ByteProgress(value)) } : {}),
+        ...(security?.secure===true?{security:{secure:true}}:{}),
       });
       return status();
     },
@@ -2496,8 +2290,22 @@ export function adaptV1LlmProvider(provider) {
       assertSelection(selection, role);
       assertActiveSelection(selection);
       throwIfAborted(signal);
-      if (operation === "chat") return methods.chat(payload, { signal });
-      if (operation === "stream") return methods.stream(payload, { signal });
+      if (operation === "chat") {
+        validateStructuralRequest(payload);
+        return Promise.resolve(methods.chat(payload, { signal })).then(
+          function validateV1ChatTerminal(value) {
+            return validateCompletion(value, payload.id);
+          },
+        );
+      }
+      if (operation === "stream") {
+        validateStructuralRequest(payload);
+        return Promise.resolve(methods.stream(payload, { signal })).then(
+          function wrapV1StreamResult(opened) {
+            return validatedV1StreamHandle(opened, payload);
+          },
+        );
+      }
       throw fail("ARCANE_AI_PROVIDER_OPERATION_UNAVAILABLE", "The browser-WASM adapter supports only chat and stream.");
     },
     async unload({ role = "llm", selection, signal = null } = {}) {

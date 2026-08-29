@@ -5,6 +5,7 @@ import test from '../src/testing.mjs';
 import {
     applyAIResponseLength,
     AI_RESPONSE_LENGTH_DEFAULT,
+    AI_RESPONSE_LENGTH_OPTIONS,
     aiResponseLengthInstruction,
     normalizeAIResponseLength
 } from '../runtime/arcane/modules/AIResponseLength.js';
@@ -45,12 +46,22 @@ import {
     availabilityFromReport
 } from '../runtime/arcane/modules/LocalAIReadinessController.js';
 import {
+    appendTranscription,
     createSTTActivationController
 } from '../runtime/arcane/modules/ComponentContracts.js';
 import ConfiguredAIChatSession from '../runtime/arcane/modules/ConfiguredAIChatSession.js';
 import PreferenceStore from '../runtime/arcane/modules/PreferenceStore.js';
 
 const repositoryRoot=new URL('../',import.meta.url);
+
+test('transcription assembly preserves complete whitespace and content',()=>{
+    assert.equal(appendTranscription('', '  first  '), '  first  ');
+    assert.equal(
+        appendTranscription('  first  ', '  second  ', '\n--\n'),
+        '  first  \n--\n  second  '
+    );
+    assert.equal(appendTranscription('existing', ''), 'existing');
+});
 
 test('preference setAll uses the admitted native atomic batch once',async()=>{
     const previousArcane=globalThis.Arcane;
@@ -103,13 +114,13 @@ test('preference setAll uses the admitted native atomic batch once',async()=>{
             batches[0].entries,
             {'spellwire.enabled':true,'spellwire.volume':1}
         );
-        assert.equal(Object.isFrozen(batches[0].entries),true);
-        assert.equal(Object.isFrozen(batches[0].context),true);
+        assert.equal(Object.isFrozen(batches[0].entries),false);
+        assert.equal(Object.isFrozen(batches[0].context),false);
         assert.equal(batches[0].context.signal,controller.signal);
         assert.equal(controller.signal.aborted,true);
         assert.deepEqual(result,{enabled:true,volume:1});
         assert.deepEqual(changed.map(detail=>detail.key),['enabled','volume']);
-        assert.equal(changed.every(detail=>Object.isFrozen(detail.values)),true);
+        assert.equal(changed.every(detail=>Object.isFrozen(detail.values)),false);
         assert.equal(changed.every(detail=>{
             return detail.values.enabled===true&&detail.values.volume===1;
         }),true);
@@ -198,7 +209,7 @@ test('preference setAll preserves successful serial writes before a later failur
     }
 });
 
-test('preference setAll keeps batches above the Core limit on the serial route',async()=>{
+test('preference setAll preserves every entry in an arbitrary-size atomic batch',async()=>{
     const schema=Array.from({length:33},(_,index)=>({
         key:`entry-${index+1}`,
         type:'number',
@@ -208,7 +219,7 @@ test('preference setAll keeps batches above the Core limit on the serial route',
         definition.key,
         index+1
     ]));
-    let batchCalls=0;
+    const batches=[];
     const writes=[];
     const store=new PreferenceStore({
         namespace:'bounded-batch',
@@ -217,26 +228,26 @@ test('preference setAll keeps batches above the Core limit on the serial route',
             async get(){return {found:false,value:null};},
             async set(key,value){writes.push({key,value});},
             async delete(){},
-            async setMany(){batchCalls+=1;}
+            async setMany(entries){batches.push(entries);}
         }
     });
     try{
         assert.deepEqual(await store.setAll(values),values);
-        assert.equal(batchCalls,0);
-        assert.equal(writes.length,33);
-        assert.deepEqual(writes[0],{key:'bounded-batch.entry-1',value:1});
-        assert.deepEqual(writes.at(-1),{key:'bounded-batch.entry-33',value:33});
+        assert.equal(batches.length,1);
+        assert.equal(writes.length,0);
+        assert.equal(batches[0]['bounded-batch.entry-1'],1);
+        assert.equal(batches[0]['bounded-batch.entry-33'],33);
     }finally{
         store.dispose();
     }
 });
 
 test(
-    'local readiness availability is fail-closed and grants no provider readiness',
-    function testFailClosedLocalAIAvailability() {
+    'local readiness availability reflects provider readiness in a mutable result',
+    function testMutableLocalAIAvailability() {
         const empty=availabilityFromReport({});
         assert.deepEqual(empty,{llm:false,stt:false,tts:false});
-        assert.equal(Object.isFrozen(empty),true);
+        assert.equal(Object.isFrozen(empty),false);
         assert.deepEqual(
             availabilityFromReport({
                 slots:{
@@ -310,8 +321,14 @@ test('configured chat accepts bounded initial history and keeps request context 
             {role:'user',content:'prior request'},
             {role:'assistant',content:'prior response'},
         ],
+        request:{localOnly:true,toolChoice:'auto'},
     });
-    await session.send('current request',{signal:controller.signal});
+    await session.send('current request',{
+        request:{toolChoice:'none'},
+        signal:controller.signal,
+    });
+    assert.equal(requests[0].localOnly,true);
+    assert.equal(requests[0].toolChoice,'none');
     assert.ok(requests[0].messages.some(message=>message.content==='prior request'));
     assert.ok(requests[0].messages.some(message=>String(message.content).includes('request-only context')));
     assert.ok(!session.history().some(message=>String(message.content).includes('request-only context')));
@@ -339,7 +356,10 @@ test('configured chat round-trips structural tool context and keeps prepared tur
                 tool_calls:[{
                     id:'lookup-1',
                     type:'function',
-                    function:{name:'lookup',arguments:'{"id":"alpha"}'},
+                    function:{
+                        name:'lookup',
+                        arguments:'{"id":"alpha","message":"Looking up Alpha."}'
+                    },
                 }],
             },
         ],
@@ -367,13 +387,31 @@ test('configured chat round-trips structural tool context and keeps prepared tur
                     role:'assistant',
                     content:'',
                     tool_calls:[
-                        {id:'one',type:'function',function:{name:'lookup',arguments:'{}'}},
-                        {id:'two',type:'function',function:{name:'lookup',arguments:'{}'}},
+                        {id:'one',type:'function',function:{name:'lookup',arguments:'{"message":"Looking up the first record."}'}},
+                        {id:'two',type:'function',function:{name:'lookup',arguments:'{"message":"Looking up the second record."}'}},
                     ],
                 },
             ],
         }),
         /exactly one structural tool call/u,
+    );
+    assert.throws(
+        ()=>new ConfiguredAIChatSession({
+            request:{
+                tools:[{
+                    type:'function',
+                    function:{
+                        name:'lookup',
+                        parameters:{
+                            type:'object',
+                            properties:{id:{type:'string'}},
+                            required:['id'],
+                        },
+                    },
+                }],
+            },
+        }),
+        error=>error?.code==='AI_CHAT_TOOL_MESSAGE_REQUIRED',
     );
 
     const prefixed=new ConfiguredAIChatSession({
@@ -403,7 +441,7 @@ test('configured chat normalizes one fail-closed OpenAI-compatible completion',a
                             type:'function',
                             function:Object.freeze({
                                 name:'lookup',
-                                arguments:'{"id":"alpha"}'
+                                arguments:'{"id":"alpha","message":"Looking up Alpha."}'
                             })
                         })
                     ])
@@ -424,7 +462,10 @@ test('configured chat normalizes one fail-closed OpenAI-compatible completion',a
             tool_calls:[{
                 id:'lookup-1',
                 type:'function',
-                function:{name:'lookup',arguments:'{"id":"alpha"}'}
+                function:{
+                    name:'lookup',
+                    arguments:'{"id":"alpha","message":"Looking up Alpha."}'
+                }
             }]
         },
         done:true,
@@ -432,8 +473,8 @@ test('configured chat normalizes one fail-closed OpenAI-compatible completion',a
         promptEvalCount:12,
         evalCount:7
     });
-    assert.equal(Object.isFrozen(response),true);
-    assert.equal(Object.isFrozen(response.message),true);
+    assert.equal(Object.isFrozen(response),false);
+    assert.equal(Object.isFrozen(response.message),false);
     assert.equal(session.history().at(-1).tool_calls[0].id,'lookup-1');
 
     for(const invalid of [
@@ -476,7 +517,7 @@ test('configured chat normalizes one fail-closed OpenAI-compatible completion',a
 test('the Arcane Ollama module publishes one immutable complete browser surface',()=>{
     assert.equal(ollama,exportedOllama);
     assert.ok(ollama instanceof Ollama);
-    assert.ok(Object.isFrozen(ollama));
+    assert.equal(Object.isFrozen(ollama),false);
     assert.deepEqual(
         Object.getOwnPropertyNames(Ollama.prototype).sort(),
         [
@@ -570,12 +611,12 @@ test('Ollama convenience helpers normalize only their documented result fields',
         installOllamaBridge({version:async()=>({version:' 0.6.8 '})});
         const objectResult=await ollama.readiness();
         assert.deepEqual(objectResult,{ready:true,version:'0.6.8',errorCode:null});
-        assert.ok(Object.isFrozen(objectResult));
+        assert.equal(Object.isFrozen(objectResult),false);
 
         installOllamaBridge({version:async()=>' 0.7.0 '});
         const stringResult=await ollama.readiness();
         assert.deepEqual(stringResult,{ready:true,version:'0.7.0',errorCode:null});
-        assert.ok(Object.isFrozen(stringResult));
+        assert.equal(Object.isFrozen(stringResult),false);
     });
 
     await t.test('readiness reduces failures to one stable error code',async()=>{
@@ -592,7 +633,7 @@ test('Ollama convenience helpers normalize only their documented result fields',
             version:null,
             errorCode:'LOCAL_OLLAMA_REQUEST_FAILED'
         });
-        assert.ok(Object.isFrozen(result));
+        assert.equal(Object.isFrozen(result),false);
     });
 
     await t.test('text helpers preserve argument identity and return only text',async()=>{
@@ -685,8 +726,8 @@ test('Core local-model helpers preserve admission truth without granting authori
         modelId:'model:latest',
         label:'Model:latest'
     }]);
-    assert.ok(Object.isFrozen(catalog));
-    assert.ok(Object.isFrozen(catalog[0]));
+    assert.equal(Object.isFrozen(catalog),false);
+    assert.equal(Object.isFrozen(catalog[0]),false);
 
     const admission=getCoreLocalModelCatalogWithAdmissionFailures({
         ollama:{activeParallelRequests:3},
@@ -729,7 +770,7 @@ test('Core speech projection requires both role health and bounded catalog evide
         }
     });
     assert.deepEqual(result,{stt:true,tts:true});
-    assert.ok(Object.isFrozen(result));
+    assert.equal(Object.isFrozen(result),false);
     assert.throws(
         ()=>getCoreLocalSpeechAvailability({
             speech:{synthesisAvailable:true},
@@ -745,20 +786,23 @@ test('Core speech projection requires both role health and bounded catalog evide
     );
 });
 
-test('AI response-length helpers normalize one provider-independent prompt contract',()=>{
+test('AI response-length compatibility preserves complete provider-independent prompts',()=>{
     assert.equal(AI_RESPONSE_LENGTH_DEFAULT,'medium');
+    assert.deepEqual(
+        AI_RESPONSE_LENGTH_OPTIONS.map(option=>option.label),
+        ['Complete','Complete','Complete']
+    );
     assert.equal(normalizeAIResponseLength(' HIGH '),'high');
     assert.equal(normalizeAIResponseLength('unknown'),'medium');
-    const instruction=aiResponseLengthInstruction('low');
-    assert.match(instruction,/Aim for 1 to 5 sentences/u);
-    const applied=applyAIResponseLength('System context.','low');
-    assert.match(applied,/System context[.]\n\n## Application-selected response length/u);
-    assert.equal(applyAIResponseLength(applied,'high'),applied);
+    assert.equal(aiResponseLengthInstruction('low'),'');
+    const prompt='  System context with every surrounding character.  ';
+    assert.equal(applyAIResponseLength(prompt,'low'),prompt);
+    assert.equal(applyAIResponseLength(prompt,'high'),prompt);
     assert.throws(()=>applyAIResponseLength(null,'medium'),/must be a string/u);
 });
 
 test(
-    'AI runtime state is sticky, immutable, role-independent, and capability-neutral',
+    'AI runtime state is sticky, mutable, role-independent, and capability-neutral',
     async function testAIRuntimeStateContract() {
         assert.equal(AI_RUNTIME_PROTOCOL, 'arcane-ai-runtime-state/1');
         assert.equal(AI_RUNTIME_STATE_EVENT, 'arcane-ai-runtime-state');
@@ -780,9 +824,6 @@ test(
                 'disposed'
             ]
         );
-        assert.ok(Object.isFrozen(AI_RUNTIME_ROLES));
-        assert.ok(Object.isFrozen(AI_RUNTIME_STATES));
-
         const initial = getAIRuntimeState();
         assert.deepEqual(
             initial,
@@ -796,9 +837,9 @@ test(
                 }
             }
         );
-        assert.ok(Object.isFrozen(initial));
-        assert.ok(Object.isFrozen(initial.roles));
-        assert.ok(Object.values(initial.roles).every(Object.isFrozen));
+        initial.annotation='caller state annotation';
+        assert.equal(initial.annotation,'caller state annotation');
+        delete initial.annotation;
 
         const stateController = new AbortController();
         const snapshots = [];
@@ -846,7 +887,7 @@ test(
                             phase: 'weights',
                             completed: 4,
                             total: 8,
-                            unit: 'bytes',
+                            unit: 'items',
                             heartbeat: true
                         }
                     }
@@ -856,7 +897,12 @@ test(
             assert.equal(stateEvents.at(-1), loading);
             assert.equal(loading.roles.llm, initial.roles.llm);
             assert.equal(loading.roles.stt, initial.roles.stt);
-            assert.ok(Object.isFrozen(loading.roles.tts.progress));
+            loading.roles.tts.progress.annotation='caller progress annotation';
+            assert.equal(
+                loading.roles.tts.progress.annotation,
+                'caller progress annotation'
+            );
+            delete loading.roles.tts.progress.annotation;
 
             const beforeMalformed = getAIRuntimeState();
             assert.throws(
@@ -911,7 +957,7 @@ test(
                                     phase: 'weights',
                                     completed: 2,
                                     total: 1,
-                                    unit: 'bytes',
+                                    unit: 'items',
                                     heartbeat: false
                                 }
                             }
@@ -938,7 +984,9 @@ test(
                     }
                 )
             );
-            assert.ok(Object.isFrozen(failed.roles.tts.error));
+            failed.roles.tts.error.context='complete failure context';
+            assert.equal(failed.roles.tts.error.context,'complete failure context');
+            delete failed.roles.tts.error.context;
             assert.equal(failed.roles.llm, initial.roles.llm);
             assert.equal(failed.roles.stt, initial.roles.stt);
 
@@ -951,7 +999,9 @@ test(
                         reason: action === 'dispose' ? 'teardown' : 'user'
                     }
                 );
-                assert.ok(Object.isFrozen(intent));
+                intent.context='caller intent context';
+                assert.equal(intent.context,'caller intent context');
+                delete intent.context;
             }
             assert.equal(getAIRuntimeState(), stateBeforeIntents);
             assert.deepEqual(
@@ -1060,7 +1110,7 @@ test(
 
                 const startSnapshot = getAIRuntimeState();
                 const standbyTTS = startSnapshot.roles.tts;
-                const deferredTranscriptionStart = startAIRuntime();
+                const defaultLanguageModelStart = startAIRuntime();
                 assert.deepEqual(
                     startupIntents,
                     [
@@ -1071,25 +1121,38 @@ test(
                         }
                     ]
                 );
-                const deferredTranscriptionWaits = Promise.allSettled(
+                const defaultLanguageModelWaits = Promise.allSettled(
                     [
-                        deferredTranscriptionStart.barrier,
-                        deferredTranscriptionStart.settled
+                        defaultLanguageModelStart.barrier,
+                        defaultLanguageModelStart.settled
                     ]
                 );
-                deferredTranscriptionStart.cancel();
-                await deferredTranscriptionWaits;
+                defaultLanguageModelStart.cancel();
+                await defaultLanguageModelWaits;
                 startupIntents.length = 0;
-                const mutedStart = startAIRuntime({startTranscription: true});
-                assert.ok(Object.isFrozen(mutedStart));
+                const explicitLLMActivationStart = startAIRuntime(
+                    {startLanguageModel: false}
+                );
+                assert.deepEqual(startupIntents, []);
+                const explicitLLMBarrier = await explicitLLMActivationStart.barrier;
+                const explicitLLMSettlement = await explicitLLMActivationStart.settled;
+                assert.equal(explicitLLMBarrier.chatReady, false);
+                assert.equal(explicitLLMBarrier.roles.llm.requested, false);
+                assert.equal(explicitLLMBarrier.roles.llm.state, startSnapshot.roles.llm);
+                assert.deepEqual(explicitLLMSettlement, explicitLLMBarrier);
+                startupIntents.length = 0;
+                const mutedStart = startAIRuntime(
+                    {
+                        startLanguageModel: false,
+                        startTranscription: true
+                    }
+                );
+                mutedStart.context='caller startup context';
+                assert.equal(mutedStart.context,'caller startup context');
+                delete mutedStart.context;
                 assert.deepEqual(
                     startupIntents,
                     [
-                        {
-                            role: 'llm',
-                            action: 'load',
-                            reason: 'startup'
-                        },
                         {
                             role: 'stt',
                             action: 'load',
@@ -1118,35 +1181,22 @@ test(
                         }
                     )
                 );
-                publishAIRuntimeRoleState(
-                    'llm',
-                    runtimeRoleState(
-                        'llm',
-                        {
-                            state: 'ready',
-                            providerId: 'wllama',
-                            modelId: 'wllama-test-model',
-                            localOnly: true,
-                            loaded: true
-                        }
-                    )
-                );
                 const barrierReport = await mutedStart.barrier;
                 assert.equal(barrierReport.startRevision, startSnapshot.revision);
+                assert.equal(barrierReport.startLanguageModel, false);
                 assert.equal(barrierReport.startMuted, true);
                 assert.equal(barrierReport.startTranscription, true);
-                assert.equal(barrierReport.chatReady, true);
-                assert.equal(barrierReport.roles.llm.requested, true);
+                assert.equal(barrierReport.chatReady, false);
+                assert.equal(barrierReport.roles.llm.requested, false);
                 assert.equal(barrierReport.roles.stt.requested, true);
                 assert.equal(barrierReport.roles.tts.requested, false);
-                assert.equal(
-                    barrierReport.roles.llm.state.modelId,
-                    'wllama-test-model'
-                );
-                assert.equal(barrierReport.roles.stt.state.state, 'loading');
+                assert.equal(barrierReport.roles.llm.state, startSnapshot.roles.llm);
+                assert.equal(barrierReport.roles.stt.state.state, 'unloaded');
                 assert.equal(barrierReport.roles.tts.state, standbyTTS);
                 assert.equal(startupReports.at(-1), barrierReport);
-                assert.ok(Object.isFrozen(barrierReport));
+                barrierReport.context='complete startup report';
+                assert.equal(barrierReport.context,'complete startup report');
+                delete barrierReport.context;
                 assert.equal(settledReport, null);
 
                 publishAIRuntimeRoleState(
@@ -1184,6 +1234,7 @@ test(
                 const startupController = new AbortController();
                 const unmutedStart = startAIRuntime(
                     {
+                        startLanguageModel: false,
                         startMuted: false,
                         signal: startupController.signal
                     }
@@ -1199,17 +1250,32 @@ test(
                     ]
                 );
 
+                publishAIRuntimeRoleState(
+                    'tts',
+                    runtimeRoleState(
+                        'tts',
+                        {
+                            state: 'loading',
+                            providerId: 'speech-t5',
+                            modelId: 'speech-t5-q8',
+                            localOnly: true,
+                            operationId: 'tts-load-1'
+                        }
+                    )
+                );
+
                 const cancelledWaits = Promise.allSettled(
                     [unmutedStart.barrier, unmutedStart.settled]
                 );
                 startupController.abort();
                 const cancellation = await cancelledWaits;
-                assert.equal(cancellation[0].status, 'rejected');
+                assert.equal(cancellation[0].status, 'fulfilled');
                 assert.equal(cancellation[1].status, 'rejected');
-                assert.equal(cancellation[0].reason, cancellation[1].reason);
-                assert.equal(cancellation[0].reason.name, 'AbortError');
+                assert.equal(cancellation[0].value.chatReady, false);
+                assert.equal(cancellation[0].value.roles.llm.requested, false);
+                assert.equal(cancellation[1].reason.name, 'AbortError');
                 assert.equal(
-                    cancellation[0].reason.code,
+                    cancellation[1].reason.code,
                     'ARCANE_AI_REQUEST_ABORTED'
                 );
                 assert.deepEqual(
@@ -1221,13 +1287,13 @@ test(
                             reason: 'startup'
                         },
                         {
-                            role: 'llm',
+                            role: 'tts',
                             action: 'unload',
                             reason: 'startup'
                         }
                     ]
                 );
-                assert.equal(startupReports.length, startupEventCount);
+                assert.equal(startupReports.length, startupEventCount + 1);
                 unmutedStart.cancel();
             } finally {
                 unsubscribeStartupIntents();
@@ -1297,12 +1363,8 @@ test(
                     return {started, release};
                 },
                 holdNextRequest: function holdNextTestProviderRequest() {
-                    let markAborted;
                     let markStarted;
                     let release;
-                    const aborted = new Promise(function createHeldRequestAbort(resolve) {
-                        markAborted = resolve;
-                    });
                     const started = new Promise(function createHeldRequestStart(resolve) {
                         markStarted = resolve;
                     });
@@ -1310,11 +1372,10 @@ test(
                         release = resolve;
                     });
                     heldRequest = {
-                        markAborted,
                         markStarted,
                         released
                     };
-                    return {aborted, started, release};
+                    return {started, release};
                 },
                 catalog: function catalogTestProvider() {
                     return [{id: `${id}-model`}];
@@ -1325,8 +1386,7 @@ test(
                         authority: {
                             protocol: AI_MODEL_AUTHORITY_PROTOCOL,
                             providerId: id,
-                            modelId: selection.modelId,
-                            admitted: true
+                            modelId: selection.modelId
                         }
                     };
                 },
@@ -1395,23 +1455,8 @@ test(
                         if (heldRequest) {
                             const gate = heldRequest;
                             heldRequest = null;
-                            function observeHeldRequestAbort() {
-                                gate.markAborted();
-                            }
                             gate.markStarted();
-                            signal.addEventListener(
-                                'abort',
-                                observeHeldRequestAbort,
-                                {once: true}
-                            );
-                            try {
-                                await gate.released;
-                            } finally {
-                                signal.removeEventListener(
-                                    'abort',
-                                    observeHeldRequestAbort
-                                );
-                            }
+                            await gate.released;
                         }
                         if (signal.aborted) {
                             const error = new Error('cancelled');
@@ -1527,7 +1572,8 @@ test(
             },
             expectedProviders: {stt: null, tts: null}
         });
-        assert.ok(Object.isFrozen(hydratedSpeech));
+        hydratedSpeech.context='caller hydration context';
+        assert.equal(hydratedSpeech.context,'caller hydration context');
         assert.equal(runtime.providerIdentity('stt', 'local-stt').id, 'local-stt');
         assert.equal(runtime.providerIdentity('tts', 'local-tts').id, 'local-tts');
         assert.deepEqual(
@@ -1562,7 +1608,9 @@ test(
             }
         );
         assert.equal(unregisterPendingLLM(), true);
-        assert.ok(Object.isFrozen(localRoutes));
+        localRoutes.context='caller route context';
+        assert.equal(localRoutes.context,'caller route context');
+        delete localRoutes.context;
         assert.equal(runtime.protocol, AI_PROVIDER_RUNTIME_PROTOCOL);
         assert.equal(runtime.status('llm').state, 'unloaded');
         assert.equal(runtime.status('llm').providerId, 'local-llm');
@@ -1590,25 +1638,31 @@ test(
         assert.equal(runtime.status(), beforeInvalidStartup);
 
         const startupOptions = {
+            startLanguageModel: false,
             startMuted: true,
             startTranscription: false
         };
         const startupPromise = runtime.start(startupOptions);
+        startupOptions.startLanguageModel = true;
         startupOptions.startMuted = false;
         startupOptions.startTranscription = true;
         const startup = await startupPromise;
         const barrier = await startup.barrier;
         const settled = await startup.settled;
-        assert.equal(barrier.chatReady, true);
-        assert.equal(settled.chatReady, true);
-        assert.equal(settled.roles.llm.state.state, 'ready');
+        assert.equal(barrier.chatReady, false);
+        assert.equal(settled.chatReady, false);
+        assert.equal(settled.startLanguageModel, false);
+        assert.equal(settled.roles.llm.requested, false);
+        assert.equal(settled.roles.llm.state.state, 'unloaded');
         assert.equal(settled.startTranscription, false);
         assert.equal(settled.roles.stt.requested, false);
         assert.equal(settled.roles.stt.state.state, 'unloaded');
         assert.equal(settled.roles.tts.requested, false);
-        assert.equal(localLLM.counters.load, 1);
+        assert.equal(localLLM.counters.load, 0);
         assert.equal(localSTT.counters.load, 0);
         assert.equal(localTTS.counters.load, 0);
+        await runtime.load('llm', {localOnly: true});
+        assert.equal(localLLM.counters.load, 1);
         await runtime.load('stt', {localOnly: true});
         assert.equal(localSTT.counters.load, 1);
 
@@ -1619,47 +1673,34 @@ test(
             ),
             'local result'
         );
-        const requestsBeforeSupersession = localLLM.counters.request;
+        const requestsBeforeQueue = localLLM.counters.request;
         const heldRequest = localLLM.holdNextRequest();
         const firstRequest = runtime.chat(
             {messages: [], requestId: 'first'},
             {localOnly: true}
-        );
-        const firstRejection = assert.rejects(
-            firstRequest,
-            function rejectSupersededActiveRequest(error) {
-                return error?.code === 'ARCANE_AI_REQUEST_ABORTED';
-            }
         );
         await heldRequest.started;
         const intermediateRequest = runtime.chat(
             {messages: [], requestId: 'intermediate'},
             {localOnly: true}
         );
-        const intermediateRejection = assert.rejects(
-            intermediateRequest,
-            function rejectIntermediateRequestAdmission(error) {
-                return error?.code === 'ARCANE_AI_OPERATION_SUPERSEDED';
-            }
-        );
         const newestRequest = runtime.chat(
             {messages: [], requestId: 'newest'},
             {localOnly: true}
         );
-        await heldRequest.aborted;
         assert.equal(
             localLLM.counters.request,
-            requestsBeforeSupersession + 1,
-            'The newest request must wait for the superseded provider promise.'
+            requestsBeforeQueue + 1,
+            'Queued requests must wait for the active provider promise.'
         );
         await assert.rejects(
             runtime.load('llm', {localOnly: true}),
-            function keepLoadFailClosedDuringRequestAdmission(error) {
+            function keepLoadUnavailableDuringRequest(error) {
                 return error?.code === 'ARCANE_AI_ROLE_BUSY';
             }
         );
         assert.throws(
-            function keepReconfigurationFailClosedDuringRequestAdmission() {
+            function keepReconfigurationUnavailableDuringRequest() {
                 runtime.configure(localRoutes);
             },
             function isRequestOwnershipConfigurationGuard(error) {
@@ -1667,12 +1708,16 @@ test(
             }
         );
         heldRequest.release();
-        await Promise.all([firstRejection, intermediateRejection]);
-        assert.equal(await newestRequest, 'local result');
+        assert.deepEqual(
+            await Promise.all([firstRequest, intermediateRequest, newestRequest]),
+            ['local result','local result','local result']
+        );
         assert.equal(
             localLLM.counters.request,
-            requestsBeforeSupersession + 2
+            requestsBeforeQueue + 3
         );
+        assert.equal(localLLM.requests.at(-3).requestId, 'first');
+        assert.equal(localLLM.requests.at(-2).requestId, 'intermediate');
         assert.equal(localLLM.requests.at(-1).requestId, 'newest');
         assert.equal(runtime.status('llm').state, 'ready');
         assert.equal(runtime.status('llm').busy, false);
@@ -1748,7 +1793,8 @@ test(
                 expectedProvider: localSTT
             }
         );
-        assert.ok(Object.isFrozen(replacedSTT));
+        replacedSTT.context='caller STT replacement context';
+        assert.equal(replacedSTT.context,'caller STT replacement context');
         assert.equal(runtime.status('tts'), retainedTTSState);
         assert.equal(runtime.selection('tts'), retainedTTSSelection);
         assert.equal(runtime.ownsProvider('tts', localTTS), true);
@@ -1783,7 +1829,8 @@ test(
                 expectedProvider: localTTS
             }
         );
-        assert.ok(Object.isFrozen(replacedTTS));
+        replacedTTS.context='caller TTS replacement context';
+        assert.equal(replacedTTS.context,'caller TTS replacement context');
         assert.equal(runtime.status('stt'), retainedSTTState);
         assert.equal(runtime.selection('stt'), retainedSTTSelection);
         assert.equal(runtime.ownsProvider('stt', replacementSTT), true);
@@ -1842,7 +1889,8 @@ test(
                 }
             }
         );
-        assert.ok(Object.isFrozen(speechOnlyRoutes));
+        speechOnlyRoutes.context='caller speech route context';
+        assert.equal(speechOnlyRoutes.context,'caller speech route context');
         assert.deepEqual(runtime.status('llm'), llmBeforeSpeechConfiguration);
         assert.equal(runtime.status('llm').state, 'ready');
         assert.equal(runtime.status('stt').state, 'unloaded');
@@ -1934,7 +1982,7 @@ test(
 );
 
 test(
-    'legacy Cloud and admitted Core routes publish truthful provider-v2 readiness',
+    'legacy Cloud and available Core routes publish truthful provider-v2 readiness',
     async function testLegacyLLMProviderAdapters() {
         const previousWindow=globalThis.window;
         const previousArcane=globalThis.Arcane;
@@ -2180,8 +2228,7 @@ test(
                         authority:{
                             protocol:AI_MODEL_AUTHORITY_PROTOCOL,
                             providerId:'catalog-tts',
-                            modelId:selection.modelId,
-                            admitted:true
+                            modelId:selection.modelId
                         }
                     };
                 },
@@ -2306,13 +2353,13 @@ test(
         const previousLocalStorage=globalThis.localStorage;
         const previousDocument=globalThis.document;
         const dbopfsReads=[];
-        const dbopfs=Object.freeze({
+        const dbopfs={
             readyPromise:Promise.resolve(),
             async getTableHandle(tableName){
                 dbopfsReads.push(tableName);
                 throw new Error('Browser speech configuration must not load artifacts.');
             }
-        });
+        };
         const localStorage={
             getItem(){return null;},
             setItem(){},
@@ -2332,76 +2379,27 @@ test(
         globalThis.localStorage=localStorage;
         globalThis.document=documentObject;
 
-        function graphFile(index,kind,path,revision,mediaType,runtimeRequestUrls=[]){
-            const sha256=(index+1).toString(16).repeat(64);
-            return {
-                kind,
-                path,
-                sourceUrl:`https://speech.example/${revision}/${sha256}/${path}`,
-                revision,
-                license:'Apache-2.0',
-                mediaType,
-                bytes:1,
-                sha256,
-                runtimeRequestUrls
-            };
-        }
-
-        function browserSpeechGraph(createBrowserSpeechArtifactGraph,role,providerId,suffix){
-            const runtimeRevision=`${role}-runtime-${suffix}`;
-            const modelRevision=`${role}-model-${suffix}`;
-            const modelRoute=`https://speech.example/${modelRevision}/request/config.json`;
-            const voiceRoute=role==='tts'
-                ?`https://speech.example/${modelRevision}/request/voice.bin`
-                :null;
-            const files=[
-                graphFile(
-                    0,
-                    'runtime-entrypoint-javascript',
-                    'runtime/entry.mjs',
-                    runtimeRevision,
-                    'text/javascript'
-                ),
-                graphFile(
-                    1,
-                    'runtime-auxiliary-javascript',
-                    'runtime/ort.mjs',
-                    runtimeRevision,
-                    'text/javascript'
-                ),
-                graphFile(
-                    2,
-                    'runtime-wasm-binary',
-                    'runtime/ort.wasm',
-                    runtimeRevision,
-                    'application/wasm'
-                ),
-                graphFile(
-                    3,
-                    'model-configuration-json',
-                    'model/config.json',
-                    modelRevision,
-                    'application/json',
-                    [modelRoute]
-                )
-            ];
+        function browserSpeechRole(role,providerId,suffix){
+            const runtimeVersion=role==='stt'?'3.5.1':'1.2.1';
+            const runtimePath='runtime/entry.mjs';
+            const modelFiles=[{
+                path:'model/model.onnx',
+                url:`https://speech.example/${role}/${suffix}/model.onnx`,
+                mediaType:'application/octet-stream'
+            }];
             if(role==='tts'){
-                files.push(graphFile(
-                    4,
-                    'voice-style-binary',
-                    'voices/af_contract.bin',
-                    modelRevision,
-                    'application/octet-stream',
-                    [voiceRoute]
-                ));
+                modelFiles.push({
+                    path:'voices/af_contract.bin',
+                    url:`https://speech.example/${role}/${suffix}/af_contract.bin`,
+                    mediaType:'application/octet-stream'
+                });
             }
-            return createBrowserSpeechArtifactGraph({
+            return {
                 providerId,
-                role,
                 model:{
                     id:`${role}-model-${suffix}`,
                     repository:`example/${role}-${suffix}`,
-                    revision:modelRevision,
+                    revision:`${role}-model-${suffix}`,
                     dtype:'q8',
                     ...(role==='stt'
                         ?{inputSampleRate:16_000}
@@ -2409,112 +2407,50 @@ test(
                             outputSampleRate:24_000,
                             defaultVoice:'af_contract',
                             voices:[{id:'af_contract',path:'voices/af_contract.bin'}]
-                        })
+                        }),
+                    files:modelFiles
                 },
                 runtime:{
                     adapter:role==='stt'?'transformers-whisper':'kokoro-js',
-                    version:'1.0.0',
-                    revision:runtimeRevision,
-                    entrypoint:'runtime/entry.mjs',
-                    onnxWasm:{
-                        namespace:role==='stt'
-                            ?'transformers-env-backends-onnx-wasm'
-                            :'kokoro-env-wasm-paths',
-                        mjsPath:'runtime/ort.mjs',
-                        wasmPath:'runtime/ort.wasm',
-                        ...(role==='stt'?{numThreads:1}:{})
-                    },
-                    negativeRuntimeRequestUrls:[]
+                    version:runtimeVersion,
+                    revision:`${role}-runtime-${suffix}`,
+                    entry:runtimePath,
+                    ...(role==='stt'
+                        ?{wasmPaths:'https://speech.example/stt/wasm/'}
+                        :{}),
+                    files:[{
+                        path:runtimePath,
+                        url:`https://speech.example/${role}/${suffix}/runtime.mjs`,
+                        mediaType:'text/javascript'
+                    }]
                 },
-                files,
-                edges:{
-                    staticImports:[],
-                    dynamicImports:[],
-                    moduleWorkers:[],
-                    fetches:[{
-                        modulePath:'runtime/entry.mjs',
-                        occurrence:1,
-                        edgePolicy:'artifact-targets-admitted',
-                        targetPaths:['model/config.json']
-                    }],
-                    cacheOpens:role==='tts'?[{
-                        modulePath:'runtime/entry.mjs',
-                        occurrence:1,
-                        edgePolicy:'artifact-targets-admitted',
-                        cacheName:'kokoro-voices',
-                        targetPaths:['voices/af_contract.bin']
-                    }]:[]
-                },
-                transforms:[]
-            });
+                offline:false
+            };
         }
 
         let ai=null;
         try{
-            const [{
+            const {
                 default:AI,
                 AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL
-            },{
-                createBrowserSpeechArtifactGraph
-            }]=await Promise.all([
-                import('../runtime/arcane/modules/AI.js?browser-speech-role-contract'),
-                import('../browser-runtime/ai/browser-speech.mjs')
-            ]);
+            }=await import('../runtime/arcane/modules/AI.js?browser-speech-role-contract');
             ai=new AI('OPENAI','OPENAI','OPENAI','OPENAI','OPENAI','OPENAI');
             const runtime=ai.providerRuntime;
-            const role=function browserSpeechRole(role,providerId,suffix){
-                return Object.freeze({
-                    providerId,
-                    graph:browserSpeechGraph(
-                        createBrowserSpeechArtifactGraph,
-                        role,
-                        providerId,
-                        suffix
-                    ),
-                    security:Object.freeze({secure:true}),
-                    offline:false
-                });
-            };
-            const directSTTRole=function directBrowserSpeechSTTRole(providerId){
-                const runtimeVersion='3.5.1';
-                return Object.freeze({
-                    providerId,
-                    model:Object.freeze({
-                        id:'whisper-tiny-en-direct',
-                        repository:'onnx-community/whisper-tiny.en',
-                        revision:'0123456789abcdef0123456789abcdef01234567',
-                        files:Object.freeze([])
-                    }),
-                    runtime:Object.freeze({
-                        adapter:'transformers-whisper',
-                        version:runtimeVersion,
-                        revision:runtimeVersion,
-                        entry:'runtime/transformers.js',
-                        wasmPaths:'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/',
-                        files:Object.freeze([Object.freeze({
-                            path:'runtime/transformers.js',
-                            url:'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/transformers.js',
-                            mediaType:'text/javascript'
-                        })])
-                    }),
-                    offline:false
-                });
-            };
             const initialExternalTTSSelection=runtime.selection('tts');
-            const pendingSTTSelection=Object.freeze({
-                providerId:'boss-stt-direct',
-                modelId:'whisper-tiny-en-direct',
+            const pendingSTTSelection={
+                providerId:'browser-stt-direct',
+                modelId:'stt-model-direct',
                 localOnly:null
-            });
+            };
             runtime.configureSpeech({
-                stt:Object.freeze({
+                stt:{
                     default:pendingSTTSelection,
                     localOnly:null
-                }),
-                tts:Object.freeze({
+                },
+                tts:{
                     default:initialExternalTTSSelection,
                     localOnly:null
-                })
+                }
             });
             const externalTTSIdentity=runtime.providerIdentity('tts','OPENAI');
             const externalTTSSelection=runtime.selection('tts');
@@ -2525,12 +2461,12 @@ test(
                     hydrationProviderIds.push(snapshot.roles.stt.providerId);
                 }
             );
-            const initialSTTOnly=Object.freeze({
+            const initialSTTOnly={
                 protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
                 id:'browser-speech-initial-stt-only',
                 dbopfs,
-                stt:directSTTRole('boss-stt-direct')
-            });
+                stt:browserSpeechRole('stt','browser-stt-direct','direct')
+            };
             let initialSTTDescriptor;
             try{
                 initialSTTDescriptor=await ai.configureBrowserSpeech(
@@ -2542,17 +2478,13 @@ test(
             assert.equal(hydrationProviderIds.includes('OPENAI'),false);
             assert.equal(
                 hydrationProviderIds.every(providerId=>
-                    providerId==='boss-stt-direct'
+                    providerId==='browser-stt-direct'
                 ),
                 true
             );
             assert.equal(ai.browserSpeechConfiguration,initialSTTOnly);
-            assert.equal(initialSTTDescriptor.stt.providerId,'boss-stt-direct');
-            assert.equal(initialSTTDescriptor.stt.modelId,'whisper-tiny-en-direct');
-            assert.equal(
-                Object.hasOwn(initialSTTDescriptor.stt,'artifactGraphId'),
-                false
-            );
+            assert.equal(initialSTTDescriptor.stt.providerId,'browser-stt-direct');
+            assert.equal(initialSTTDescriptor.stt.modelId,'stt-model-direct');
             assert.equal(initialSTTDescriptor.tts,null);
             assert.deepEqual(
                 runtime.providerIdentity('tts','OPENAI'),
@@ -2565,73 +2497,75 @@ test(
             assert.equal(runtime.selection('tts'),externalTTSSelection);
             assert.equal(runtime.status('tts'),externalTTSStatus);
 
-            const initial=Object.freeze({
+            const initial={
                 protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
                 id:'browser-speech-both-a',
                 dbopfs,
-                stt:role('stt','boss-stt-a','a'),
-                tts:role('tts','boss-tts-a','a')
-            });
+                stt:browserSpeechRole('stt','browser-stt-a','a'),
+                tts:browserSpeechRole('tts','browser-tts-a','a')
+            };
             const initialDescriptor=await ai.configureBrowserSpeech(initial);
             assert.equal(ai.browserSpeechConfiguration,initial);
-            assert.equal(initialDescriptor.stt.providerId,'boss-stt-a');
-            assert.equal(initialDescriptor.tts.providerId,'boss-tts-a');
-            assert.equal(Object.hasOwn(initialDescriptor.stt,'artifactGraphId'),true);
-            assert.equal(Object.hasOwn(initialDescriptor.tts,'artifactGraphId'),true);
-            assert.equal(runtime.selection('stt').providerId,'boss-stt-a');
-            assert.equal(runtime.selection('tts').providerId,'boss-tts-a');
+            assert.equal(initialDescriptor.stt.providerId,'browser-stt-a');
+            assert.equal(initialDescriptor.tts.providerId,'browser-tts-a');
+            assert.equal(runtime.selection('stt').providerId,'browser-stt-a');
+            assert.equal(runtime.selection('tts').providerId,'browser-tts-a');
             assert.equal(runtime.status('stt').state,'unloaded');
             assert.equal(runtime.status('tts').state,'unloaded');
             assert.equal(ai.muted,true);
             assert.deepEqual(dbopfsReads,[]);
 
-            const retainedTTSIdentity=runtime.providerIdentity('tts','boss-tts-a');
+            const retainedTTSIdentity=runtime.providerIdentity('tts','browser-tts-a');
             const retainedTTSSelection=runtime.selection('tts');
             const retainedTTSStatus=runtime.status('tts');
             const retainedTTSDescriptor=initialDescriptor.tts;
-            const sttOnly=Object.freeze({
+            const sttOnly={
                 protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
                 id:'browser-speech-stt-b',
                 dbopfs,
-                stt:role('stt','boss-stt-b','b')
-            });
+                stt:browserSpeechRole('stt','browser-stt-b','b')
+            };
             const sttDescriptor=await ai.configureBrowserSpeech(sttOnly);
-            assert.equal(sttDescriptor.stt.providerId,'boss-stt-b');
-            assert.equal(Object.hasOwn(sttDescriptor.stt,'artifactGraphId'),true);
+            assert.equal(sttDescriptor.stt.providerId,'browser-stt-b');
             assert.equal(sttDescriptor.tts,retainedTTSDescriptor);
             assert.deepEqual(
-                runtime.providerIdentity('tts','boss-tts-a'),
+                runtime.providerIdentity('tts','browser-tts-a'),
                 retainedTTSIdentity
             );
             assert.deepEqual(runtime.selection('tts'),retainedTTSSelection);
             assert.equal(runtime.status('tts'),retainedTTSStatus);
             assert.equal(ai.muted,true);
-            assert.equal(runtime.providerIdentity('stt','boss-stt-a'),null);
+            assert.equal(runtime.providerIdentity('stt','browser-stt-a'),null);
             assert.equal(ai.browserSpeechConfiguration.stt,sttOnly.stt);
             assert.equal(ai.browserSpeechConfiguration.tts,initial.tts);
-            assert.equal(Object.isFrozen(ai.browserSpeechConfiguration),true);
+            ai.browserSpeechConfiguration.annotation='caller configuration';
+            assert.equal(
+                ai.browserSpeechConfiguration.annotation,
+                'caller configuration'
+            );
+            delete ai.browserSpeechConfiguration.annotation;
             assert.equal(await ai.configureBrowserSpeech(sttOnly),sttDescriptor);
 
-            const retainedSTTIdentity=runtime.providerIdentity('stt','boss-stt-b');
+            const retainedSTTIdentity=runtime.providerIdentity('stt','browser-stt-b');
             const retainedSTTSelection=runtime.selection('stt');
             const retainedSTTStatus=runtime.status('stt');
             const retainedSTTDescriptor=sttDescriptor.stt;
-            const ttsOnly=Object.freeze({
+            const ttsOnly={
                 protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
                 id:'browser-speech-tts-b',
                 dbopfs,
-                tts:role('tts','boss-tts-b','b')
-            });
+                tts:browserSpeechRole('tts','browser-tts-b','b')
+            };
             const ttsDescriptor=await ai.configureBrowserSpeech(ttsOnly);
             assert.equal(ttsDescriptor.stt,retainedSTTDescriptor);
-            assert.equal(ttsDescriptor.tts.providerId,'boss-tts-b');
+            assert.equal(ttsDescriptor.tts.providerId,'browser-tts-b');
             assert.deepEqual(
-                runtime.providerIdentity('stt','boss-stt-b'),
+                runtime.providerIdentity('stt','browser-stt-b'),
                 retainedSTTIdentity
             );
             assert.deepEqual(runtime.selection('stt'),retainedSTTSelection);
             assert.equal(runtime.status('stt'),retainedSTTStatus);
-            assert.equal(runtime.providerIdentity('tts','boss-tts-a'),null);
+            assert.equal(runtime.providerIdentity('tts','browser-tts-a'),null);
             assert.equal(ai.browserSpeechConfiguration.stt,sttOnly.stt);
             assert.equal(ai.browserSpeechConfiguration.tts,ttsOnly.tts);
             assert.equal(runtime.status('stt').state,'unloaded');
@@ -2641,8 +2575,8 @@ test(
             assert.equal(await ai.disposeBrowserSpeech(),true);
             assert.equal(runtime.selection('stt'),null);
             assert.equal(runtime.selection('tts'),null);
-            assert.equal(runtime.providerIdentity('stt','boss-stt-b'),null);
-            assert.equal(runtime.providerIdentity('tts','boss-tts-b'),null);
+            assert.equal(runtime.providerIdentity('stt','browser-stt-b'),null);
+            assert.equal(runtime.providerIdentity('tts','browser-tts-b'),null);
             assert.deepEqual(dbopfsReads,[]);
             ai.configureProviders({
                 llm:{default:null,localOnly:null},
@@ -2750,13 +2684,13 @@ test(
                 }
             }
         };
-        const activationReasons=Object.freeze({
+        const activationReasons={
             languageModelActivationRequested:'language-model-activation-requested',
             languageModelActivationRejected:'language-model-activation-rejected'
-        });
-        const activationErrorCodes=Object.freeze({
+        };
+        const activationErrorCodes={
             languageModelActivationRejected:'ARCANE_CHAT_LANGUAGE_MODEL_ACTIVATION_REQUEST_REJECTED'
-        });
+        };
         let operationSequence=0;
         function publishActivation(type,detail,options={}){
             const event=new ActivationEvent(type,{
@@ -2766,7 +2700,7 @@ test(
                 cancelable:options.cancelable
             });
             event.operationId=options.operationId??null;
-            event.publicDetail=Object.freeze({...options.publicDetail});
+            event.publicDetail={...options.publicDetail};
             return host.dispatchEvent(event);
         }
         const controller=createAIActivationController({
@@ -2782,18 +2716,19 @@ test(
             },
             readErrorFields(error,boundaryCode){
                 const causeCode=typeof error?.code==='string'?error.code.trim():'';
-                return Object.freeze({
+                return {
                     code:boundaryCode,
                     ...(causeCode&&causeCode!==boundaryCode?{causeCode}:{})
-                });
+                };
             },
             reasons:activationReasons,
             errorCodes:activationErrorCodes
         });
-        assert.ok(Object.isFrozen(controller));
+        controller.annotation='caller activation controller';
+        assert.equal(controller.annotation,'caller activation controller');
         assert.equal(intents.length,0);
 
-        const unloaded=Object.freeze({
+        const unloaded={
             role:'llm',
             state:'unloaded',
             providerId:'browser-llm',
@@ -2801,7 +2736,7 @@ test(
             localOnly:true,
             progress:null,
             error:null
-        });
+        };
         controller.synchronize(unloaded);
         assert.equal(panel.hidden,false);
         assert.equal(panel.attributes.get('aria-busy'),'false');
@@ -2812,7 +2747,8 @@ test(
 
         assert.equal(await controller.request('load'),true);
         assert.deepEqual(intents,[{role:'llm',action:'load',reason:'user'}]);
-        assert.ok(Object.isFrozen(intents[0]));
+        intents[0].context='caller activation intent';
+        assert.equal(intents[0].context,'caller activation intent');
         const loadEvent=events.find(
             function findLoadRequest(event) {
                 return event.type==='chat-ai-activation-request'
@@ -2829,37 +2765,38 @@ test(
         );
         assert.match(loadEvent.operationId,/^chat-test:llm-activation:/u);
         assert.equal(loadEvent.detail.state,unloaded);
-        assert.ok(Object.isFrozen(loadEvent.detail));
+        loadEvent.detail.context='complete activation detail';
+        assert.equal(loadEvent.detail.context,'complete activation detail');
 
         preventNextRequest=true;
         assert.equal(await controller.request('load'),false);
         assert.equal(intents.length,1,'preventDefault must suppress the activation callback');
 
-        const loading=Object.freeze({
+        const loading={
             ...unloaded,
             state:'loading',
-            progress:Object.freeze({
+            progress:{
                 phase:'download',
                 completed:4,
                 total:10,
-                unit:'bytes',
+                unit:'items',
                 heartbeat:true
-            })
-        });
+            }
+        };
         controller.synchronize(loading);
         assert.equal(panel.attributes.get('aria-busy'),'true');
         assert.equal(title.textContent,'Starting language model');
-        assert.match(status.textContent,/download, 4 of 10 bytes, active heartbeat/u);
+        assert.equal(status.textContent,'download');
         assert.equal(button.textContent,'Cancel loading');
         assert.equal(await controller.request('unload'),true);
         assert.deepEqual(intents.at(-1),{role:'llm',action:'unload',reason:'user'});
 
-        controller.synchronize(Object.freeze({...unloaded,state:'unloading'}));
+        controller.synchronize({...unloaded,state:'unloading'});
         assert.equal(title.textContent,'Canceling language model load');
         assert.equal(button.disabled,true);
 
         const runtimeFailure=new Error('Runtime authority rejected the selected model.');
-        controller.synchronize(Object.freeze({...unloaded,state:'error',error:runtimeFailure}));
+        controller.synchronize({...unloaded,state:'error',error:runtimeFailure});
         assert.equal(title.textContent,'Language model activation failed');
         assert.equal(status.textContent,runtimeFailure.message);
         assert.equal(button.textContent,'Try again');
@@ -2887,8 +2824,13 @@ test(
             errorEvent.publicDetail.reason,
             activationReasons.languageModelActivationRejected
         );
-        assert.ok(Object.isFrozen(errorEvent.detail));
-        assert.ok(Object.isFrozen(errorEvent.publicDetail));
+        errorEvent.detail.context='complete activation error';
+        errorEvent.publicDetail.context='complete public activation error';
+        assert.equal(errorEvent.detail.context,'complete activation error');
+        assert.equal(
+            errorEvent.publicDetail.context,
+            'complete public activation error'
+        );
 
         let rejectSupersededActivation;
         activationResult=new Promise(
@@ -2896,17 +2838,17 @@ test(
                 rejectSupersededActivation=reject;
             }
         );
-        controller.synchronize(Object.freeze({...unloaded,state:'error'}));
+        controller.synchronize({...unloaded,state:'error'});
         const supersededActivation=controller.request('load');
         await Promise.resolve();
         const activationErrorsBeforeSupersession=events.filter(
             event=>event.type==='chat-ai-activation-error'
         ).length;
-        controller.synchronize(Object.freeze({
+        controller.synchronize({
             ...unloaded,
             state:'loading',
             operationId:'replacement-llm-operation'
-        }));
+        });
         rejectSupersededActivation(
             Object.assign(
                 new Error('The superseded activation settled late.'),
@@ -2920,7 +2862,7 @@ test(
             'sticky role supersession must suppress stale activation failure settlement'
         );
 
-        controller.synchronize(Object.freeze({...unloaded,state:'ready'}));
+        controller.synchronize({...unloaded,state:'ready'});
         assert.equal(panel.hidden,true);
         assert.match(
             source,
@@ -2936,6 +2878,88 @@ test(
             source,
             /speech[.]setAvailability/u,
             'Chat compatibility availability must not synthesize speech readiness.'
+        );
+        assert.match(
+            source,
+            /time[.]dateTime=value[.]toISOString\(\);[\s\S]*?toLocaleTimeString\(\[\],\{[\s\S]*?hour:'2-digit',[\s\S]*?minute:'2-digit',[\s\S]*?hourCycle:'h23'[\s\S]*?\}\);[\s\S]*?time[.]title=value[.]toLocaleString\(\);/u,
+            'Transcript timestamps must preserve ISO metadata, full local titles, and visible local HH:MM text.'
+        );
+        assert.match(
+            source,
+            /[.]chat_output > li \{[\s\S]*?min-inline-size:0;[\s\S]*?max-inline-size:min\(92%,48rem\);[\s\S]*?overflow-x: hidden;[\s\S]*?\}/u,
+            'Chat cards must contain nested content at narrow widths and text zoom.'
+        );
+        assert.match(
+            source,
+            /[.]message_tool_call pre\{[\s\S]*?min-inline-size:0;[\s\S]*?max-inline-size:100%;[\s\S]*?white-space:pre-wrap;[\s\S]*?overflow-x:auto;[\s\S]*?overflow-wrap:anywhere;[\s\S]*?\}/u,
+            'Complete structural arguments must wrap or scroll within their owning card.'
+        );
+        assert.match(
+            source,
+            /const dispositions=new Map\(\[[\s\S]*?\['executed','Executed'\],[\s\S]*?\['declined','Declined'\],[\s\S]*?\['cancelled','Cancelled'\],[\s\S]*?\['not-executed','Not executed'\][\s\S]*?\]\);/u,
+            'Chat.submitToolResult must preserve every public settlement disposition.'
+        );
+        assert.match(
+            source,
+            /async function submitToolResult\([\s\S]*?const ownership=createChatSubmissionOwnership\(context[.]signal\?\?null\);[\s\S]*?return observeHostSubmission\(result,eventContext,ownership\);/u,
+            'Tool-result settlement must remain owned through asynchronous host submission.'
+        );
+        assert.match(
+            source,
+            /const text=`\$\{dispositions[.]get\(disposition\)\} — \$\{options[.]message\}`;[\s\S]*?content:text,[\s\S]*?role:'tool',[\s\S]*?tool_call_id:toolCallId/u,
+            'Tool-result transcript text must use the caller-provided user-facing settlement message.'
+        );
+        assert.match(
+            source,
+            /if\(message[.]role==='tool'&&!message[.]content[.]trim\(\)\)\{[\s\S]*?'AI_CHAT_INVALID_TOOL_MESSAGE'/u,
+            'Restored tool results must contain nonblank user-facing text.'
+        );
+        assert.match(
+            source,
+            /function visibleErrorMessage\(error,fallback\)\{[\s\S]*?error\?[.]userSafe===true[\s\S]*?return fallback;/u,
+            'Unknown failures must use generic visible copy unless explicitly marked user-safe.'
+        );
+        assert.match(
+            source,
+            /async function streamMessage\(text=''[\s\S]*?typeof text!=='string'[\s\S]*?ARCANE_CHAT_STREAM_CONTENT_INVALID/u,
+            'Nontext stream content must be diagnosed instead of rendered into the transcript.'
+        );
+        assert.match(
+            source,
+            /pendingStructuralToolMessage=structuralToolMessage\(call\);[\s\S]*?userMessage[.]textContent=structuralToolMessage\(call\);[\s\S]*?setSessionStatus\('tool',pendingStructuralToolMessage\);/u,
+            'The structural arguments.message text must drive the pending status and visible tool card.'
+        );
+        assert.match(
+            source,
+            /if\(activeSessionMessageToken===sessionMessageToken\)\{\s*activeSessionMessageToken=null;\s*sessionMessagePending=false;[\s\S]*?\}\s*dispatchChatEvent\(\s*'chat-session-message'/u,
+            'Terminal session ownership must release before a reentrant terminal event listener runs.'
+        );
+        const structuralFailureStart=source.indexOf(
+            '&&internalStructuralToolFailure(error)'
+        );
+        const structuralFailureEnd=source.indexOf(
+            '}else if(!destroyed&&bindingGeneration===sessionBindingGeneration)',
+            structuralFailureStart
+        );
+        assert.notEqual(structuralFailureStart,-1);
+        assert.notEqual(structuralFailureEnd,-1);
+        const structuralFailureSource=source.slice(
+            structuralFailureStart,
+            structuralFailureEnd
+        );
+        assert.match(
+            structuralFailureSource,
+            /console[.]error\('Arcane structural tool protocol failure[.]',error\);/u
+        );
+        assert.match(
+            structuralFailureSource,
+            /restoreRejectedStructuralDraft\(messageId,context[.]operationId,text\);/u,
+            'A rejected user turn must be restored after its textarea draft was cleared.'
+        );
+        assert.doesNotMatch(
+            structuralFailureSource,
+            /renderSessionMessageFailure|visibleErrorMessage/u,
+            'Internal structural protocol diagnostics must not become assistant transcript errors.'
         );
         const dispatchStart=source.indexOf('function dispatchChatEvent(');
         const dispatchEnd=source.indexOf('\n\n    function publicErrorFields',dispatchStart);
@@ -2962,17 +2986,17 @@ test(
             return function createChatSubmissionHarness({cancelProjection=false}={}){
                 const aiRuntimeStateAbortController=new AbortController();
                 const activeSubmissionOwnerships=new Set();
-                const chatReasons=Object.freeze({
+                const chatReasons={
                     messageSubmissionRequested:'message-submission-requested',
                     messageSubmissionCancelled:'message-submission-cancelled',
                     callerSignalAborted:'caller-signal-aborted',
                     componentDestroyed:'component-destroyed',
                     hostMessageSubmissionRejected:'host-message-submission-rejected'
-                });
-                const chatErrorCodes=Object.freeze({
+                };
+                const chatErrorCodes={
                     messageSubmissionAborted:'ARCANE_CHAT_MESSAGE_SUBMISSION_ABORTED',
                     hostMessageSubmissionRejected:'ARCANE_CHAT_HOST_MESSAGE_SUBMISSION_REJECTED'
-                });
+                };
                 let destroyed=false;
                 let eventOperationSequence=0;
                 let hostSubmissionGeneration=0;
@@ -3003,19 +3027,19 @@ test(
                     }
                 };
                 const events={
-                    descriptor:Object.freeze({instanceId:'chat-contract'}),
+                    descriptor:{instanceId:'chat-contract'},
                     dispatch(type,detail,options={}){
                         canonicalDispatchCount+=1;
-                        return Object.freeze({
+                        return {
                             accepted:true,
-                            occurrence:Object.freeze({
+                            occurrence:{
                                 type,
-                                detail:Object.freeze({...detail}),
+                                detail:{...detail},
                                 operationId:options.operationId??null,
-                                publicDetail:Object.freeze({...options.publicDetail}),
+                                publicDetail:{...options.publicDetail},
                                 cancelable:options.cancelable===true
-                            })
-                        });
+                            }
+                        };
                     }
                 };
                 function projectArcaneDOMEvent(target,occurrence,options={}){
@@ -3053,7 +3077,7 @@ test(
                     source:'user',
                     signal:callerController.signal
                 });
-                return Object.freeze({
+                return {
                     submission,
                     callerController,
                     resolveHost,
@@ -3071,15 +3095,15 @@ test(
                         aiRuntimeStateAbortController.abort(reason);
                     },
                     state(){
-                        return Object.freeze({
+                        return {
                             sent:[...sent],
                             canonicalDispatchCount,
                             projectionCount,
                             projectedEvent,
                             activeSubmissionCount:activeSubmissionOwnerships.size
-                        });
+                        };
                     }
-                });
+                };
             };`
         )(ActivationEvent);
 
@@ -3091,7 +3115,11 @@ test(
         assert.equal(cancelledState.sent.length,0);
         assert.equal(cancelledState.projectedEvent.defaultPrevented,true);
         assert.equal(cancelledState.projectedEvent.operationId,'chat-contract:message:1');
-        assert.ok(Object.isFrozen(cancelledState.projectedEvent.detail.context));
+        cancelledState.projectedEvent.detail.context.annotation='complete cancellation context';
+        assert.equal(
+            cancelledState.projectedEvent.detail.context.annotation,
+            'complete cancellation context'
+        );
         assert.equal(cancelledState.projectedEvent.detail.context.signal.aborted,true);
         assert.equal(
             cancelledState.projectedEvent.detail.context.signal.reason.code,
@@ -3136,10 +3164,10 @@ test(
             `'use strict';
             const aiRuntimeStateAbortController=new AbortController();
             ${source.slice(retryStart,retryEnd)}
-            return Object.freeze({
+            return {
                 controller:aiRuntimeStateAbortController,
                 wait:waitForConversationTimeboxRetry
-            });`
+            };`
         )();
         const retryWait=retryHarness.wait(100);
         retryHarness.controller.abort();
@@ -3152,7 +3180,144 @@ test(
 );
 
 test(
-    'shared speech components expose explicit admitted STT activation without hidden startup',
+    'shared speech preserves configured unmute until selected TTS is ready',
+    async function testSpeechConfiguredUnmuteContract() {
+        const source = await readFile(
+            new URL('runtime/arcane/components/speech.html', repositoryRoot),
+            'utf8'
+        );
+        const configuredStart = source.indexOf(
+            'function applyConfiguredMutedState(muted)'
+        );
+        const configuredEnd = source.indexOf(
+            '\n    function synchronizeAIRuntimeState',
+            configuredStart
+        );
+        const transitionsStart = source.indexOf(
+            'function applyRoleTransitions(previousSTTRole, previousTTSRole)'
+        );
+        const transitionsEnd = source.indexOf(
+            '\n    function renderSTTActivationState',
+            transitionsStart
+        );
+        const continuationStart = source.indexOf(
+            'function continuePendingUnmute()'
+        );
+        const continuationEnd = source.indexOf(
+            '\n    async function requestTTSIntent',
+            continuationStart
+        );
+        const settleStart = source.indexOf(
+            'function settleSuccessfulUnmute()'
+        );
+        const settleEnd = continuationStart;
+        assert.notEqual(configuredStart, -1);
+        assert.notEqual(configuredEnd, -1);
+        assert.notEqual(transitionsStart, -1);
+        assert.notEqual(transitionsEnd, -1);
+        assert.notEqual(continuationStart, -1);
+        assert.notEqual(continuationEnd, -1);
+        assert.notEqual(settleStart, -1);
+
+        const configured = source.slice(configuredStart, configuredEnd);
+        const transitions = source.slice(transitionsStart, transitionsEnd);
+        const continuation = source.slice(continuationStart, continuationEnd);
+        const settle = source.slice(settleStart, settleEnd);
+        assert.match(
+            source,
+            /if \(!host\.initialMuted\) \{\s+applyConfiguredMutedState\(false\);/u
+        );
+        assert.match(configured, /pendingUnmute = true;/u);
+        assert.doesNotMatch(configured, /pendingUnmute = false;/u);
+        assert.match(configured, /continuePendingUnmute\(\);/u);
+        assert.match(
+            transitions,
+            /settleSuccessfulUnmute\(\);\s+continuePendingUnmute\(\);/u
+        );
+        assert.match(continuation, /!selectedRole\(ttsRole\)/u);
+        assert.match(continuation, /ttsRole\.state !== 'unloaded'/u);
+        assert.match(continuation, /void requestUserUnmute\(\);/u);
+
+        const createHarness = Function(
+            `'use strict';
+            return function createConfiguredUnmuteHarness(initialRole) {
+                let pendingUnmute = false;
+                let destroyed = false;
+                let pendingTTSIntent = null;
+                let activeTTSIntent = null;
+                let ttsRole = {...initialRole};
+                let loadRequests = 0;
+                const host = {muted: true};
+                function requestUserMute() {
+                    pendingUnmute = false;
+                    host.muted = true;
+                }
+                function requestUserUnmute() {
+                    loadRequests += 1;
+                    return Promise.resolve(true);
+                }
+                function selectedRole(role) {
+                    return typeof role.providerId === 'string'
+                        && role.providerId.length > 0
+                        && typeof role.modelId === 'string'
+                        && role.modelId.length > 0;
+                }
+                function synchronizeAIMutedState() {}
+                function renderControls() {}
+                function renderStatus() {}
+                function resumeTTSPlayback() {}
+                ${configured}
+                ${settle}
+                ${continuation}
+                return {
+                    configure: applyConfiguredMutedState,
+                    transition(state) {
+                        ttsRole = {...ttsRole, state};
+                        settleSuccessfulUnmute();
+                        continuePendingUnmute();
+                    },
+                    snapshot() {
+                        return {pendingUnmute, muted: host.muted, loadRequests};
+                    }
+                };
+            };`
+        )();
+        const loading = createHarness({
+            state: 'loading',
+            providerId: 'browser-tts',
+            modelId: 'kokoro-q8'
+        });
+        loading.configure(false);
+        assert.deepEqual(
+            loading.snapshot(),
+            {pendingUnmute: true, muted: true, loadRequests: 0}
+        );
+        loading.transition('ready');
+        assert.deepEqual(
+            loading.snapshot(),
+            {pendingUnmute: false, muted: false, loadRequests: 0}
+        );
+
+        const delayedSelection = createHarness({
+            state: 'unavailable',
+            providerId: null,
+            modelId: null
+        });
+        delayedSelection.configure(false);
+        delayedSelection.transition('unloaded');
+        assert.equal(delayedSelection.snapshot().loadRequests, 0);
+        const selectedAfterConfiguration = createHarness({
+            state: 'unloaded',
+            providerId: 'browser-tts',
+            modelId: 'kokoro-q8'
+        });
+        selectedAfterConfiguration.configure(false);
+        assert.equal(selectedAfterConfiguration.snapshot().loadRequests, 1);
+    }
+);
+
+test(
+    'shared speech components expose explicit available STT activation without hidden startup',
     async function testSpeechSTTActivationContract() {
         const source = await readFile(
             new URL('runtime/arcane/components/speech.html', repositoryRoot),
@@ -3247,23 +3412,22 @@ test(
                 EventClass: ActivationEvent
             }
         );
-        assert.ok(Object.isFrozen(controller));
+        controller.annotation='caller speech activation controller';
+        assert.equal(controller.annotation,'caller speech activation controller');
         assert.equal(intents.length, 0);
 
-        const unloaded = Object.freeze(
-            {
-                role: 'stt',
-                state: 'unloaded',
-                providerId: 'browser-stt',
-                modelId: 'selected-stt-model',
-                localOnly: true,
-                loaded: false,
-                busy: false,
-                operationId: null,
-                progress: null,
-                error: null
-            }
-        );
+        const unloaded = {
+            role: 'stt',
+            state: 'unloaded',
+            providerId: 'browser-stt',
+            modelId: 'selected-stt-model',
+            localOnly: true,
+            loaded: false,
+            busy: false,
+            operationId: null,
+            progress: null,
+            error: null
+        };
         controller.synchronize(unloaded);
         assert.equal(controller.action, 'load');
         assert.equal(controller.visible, true);
@@ -3278,7 +3442,8 @@ test(
             intents,
             [{role: 'stt', action: 'load', reason: 'user'}]
         );
-        assert.ok(Object.isFrozen(intents[0]));
+        intents[0].context='caller speech activation intent';
+        assert.equal(intents[0].context,'caller speech activation intent');
         const loadEvent = events.find(
             function findSTTLoadRequest(event) {
                 return event.type === 'speech-stt-activation-request'
@@ -3290,7 +3455,8 @@ test(
         assert.equal(loadEvent.composed, true);
         assert.equal(loadEvent.cancelable, true);
         assert.equal(loadEvent.detail.state, unloaded);
-        assert.ok(Object.isFrozen(loadEvent.detail));
+        loadEvent.detail.context='complete speech activation detail';
+        assert.equal(loadEvent.detail.context,'complete speech activation detail');
 
         preventNextRequest = true;
         assert.equal(await controller.request('load'), false);
@@ -3301,59 +3467,47 @@ test(
         assert.equal(await reentrantRequest, false);
         assert.equal(intents.length, 1, 'event reentry must not duplicate intent');
 
-        const loading = Object.freeze(
-            {
-                ...unloaded,
-                state: 'loading',
-                operationId: 'stt-load-1',
-                progress: Object.freeze(
-                    {
-                        phase: 'download',
-                        completed: 4,
-                        total: 10,
-                        unit: 'bytes',
-                        heartbeat: true
-                    }
-                )
+        const loading = {
+            ...unloaded,
+            state: 'loading',
+            operationId: 'stt-load-1',
+            progress: {
+                phase: 'download',
+                completed: 4,
+                total: 10,
+                unit: 'items',
+                heartbeat: true
             }
-        );
+        };
         controller.synchronize(loading);
         assert.equal(controller.action, 'unload');
         assert.equal(controller.label, 'Cancel loading');
-        assert.match(controller.status, /download, 4 of 10 bytes, active heartbeat/u);
+        assert.equal(controller.status, 'Transcription download; Cancel is available.');
         assert.equal(await controller.request('unload'), true);
         assert.deepEqual(
             intents.at(-1),
             {role: 'stt', action: 'unload', reason: 'user'}
         );
-        controller.synchronize(
-            Object.freeze(
-                {
-                    ...loading,
-                    progress: Object.freeze(
-                        {
-                            ...loading.progress,
-                            total: null,
-                            heartbeat: false
-                        }
-                    )
-                }
-            )
-        );
+        controller.synchronize({
+            ...loading,
+            progress: {
+                ...loading.progress,
+                total: null,
+                heartbeat: false
+            }
+        });
         assert.equal(
             controller.status,
-            'Transcription download, 4 bytes; Cancel is available.'
+            'Transcription download; Cancel is available.'
         );
 
-        controller.synchronize(
-            Object.freeze({...loading, state: 'unloading', progress: null})
-        );
+        controller.synchronize({...loading, state: 'unloading', progress: null});
         assert.equal(controller.action, null);
         assert.equal(controller.label, 'Canceling…');
         assert.match(controller.status, /releasing/u);
 
         const callbackFailure = new Error('STT activation callback failed.');
-        controller.synchronize(Object.freeze({...unloaded, state: 'error'}));
+        controller.synchronize({...unloaded, state: 'error'});
         assert.equal(controller.label, 'Try again');
         synchronizeNextRequest = loading;
         assert.equal(await controller.request('load'), false);
@@ -3362,13 +3516,14 @@ test(
             'unload',
             'synchronous state replacement must suppress the stale load intent'
         );
-        controller.synchronize(Object.freeze({...unloaded, state: 'error'}));
+        controller.synchronize({...unloaded, state: 'error'});
         activationFailure = callbackFailure;
         assert.equal(await controller.request('load'), false);
         const errorEvent = events.at(-1);
         assert.equal(errorEvent.type, 'speech-stt-activation-error');
         assert.equal(errorEvent.detail.error, callbackFailure);
-        assert.ok(Object.isFrozen(errorEvent.detail));
+        errorEvent.detail.context='complete speech activation error';
+        assert.equal(errorEvent.detail.context,'complete speech activation error');
 
         let rejectDeferredActivation;
         const deferredPromise = new Promise(
@@ -3397,17 +3552,13 @@ test(
             errorCount
         );
 
-        controller.synchronize(
-            Object.freeze(
-                {
-                    ...unloaded,
-                    state: 'ready',
-                    loaded: true,
-                    busy: true,
-                    operationId: 'stt-transcribe-1'
-                }
-            )
-        );
+        controller.synchronize({
+            ...unloaded,
+            state: 'ready',
+            loaded: true,
+            busy: true,
+            operationId: 'stt-transcribe-1'
+        });
         assert.equal(controller.action, null);
         assert.equal(controller.status, 'Transcription busy.');
 
@@ -3538,7 +3689,8 @@ test(
                 causeCode: 'ARCANE_AI_BROWSER_SPEECH_TTS_SYNTHESIS_REJECTED'
             }
         );
-        assert.ok(Object.isFrozen(speechFailure));
+        speechFailure.context='complete speech failure context';
+        assert.equal(speechFailure.context,'complete speech failure context');
         assert.deepEqual(
             publicSpeechErrorFields(
                 Object.assign(
@@ -3560,26 +3712,27 @@ test(
             'Speech compatibility input must neither create readiness nor replace a selected sticky STT role.'
         );
 
-        const admissionStart = voiceSource.indexOf(
+        const availabilityStart = voiceSource.indexOf(
             'function canStartVoiceRecording('
         );
-        const admissionEnd = voiceSource.indexOf(
+        const availabilityEnd = voiceSource.indexOf(
             '\n\n    function optionsFromDataset',
-            admissionStart
+            availabilityStart
         );
-        assert.notEqual(admissionStart, -1);
-        assert.notEqual(admissionEnd, -1);
-        const admissionSource = voiceSource.slice(admissionStart, admissionEnd);
+        assert.notEqual(availabilityStart, -1);
+        assert.notEqual(availabilityEnd, -1);
+        const availabilitySource = voiceSource.slice(
+            availabilityStart,
+            availabilityEnd
+        );
         const canStartVoiceRecording = Function(
-            `'use strict';\n${admissionSource}\nreturn canStartVoiceRecording;`
+            `'use strict';\n${availabilitySource}\nreturn canStartVoiceRecording;`
         )();
-        const ready = Object.freeze(
-            {
-                ...unloaded,
-                state: 'ready',
-                loaded: true
-            }
-        );
+        const ready = {
+            ...unloaded,
+            state: 'ready',
+            loaded: true
+        };
         for (const unavailableState of [
             'unavailable',
             'unloaded',
@@ -3590,7 +3743,7 @@ test(
         ]) {
             assert.equal(
                 canStartVoiceRecording(
-                    Object.freeze({...unloaded, state: unavailableState}),
+                    {...unloaded, state: unavailableState},
                     'idle',
                     false
                 ),
@@ -3600,7 +3753,7 @@ test(
         assert.equal(canStartVoiceRecording(ready, 'idle', false), true);
         assert.equal(canStartVoiceRecording(ready, 'error', false), true);
         assert.equal(
-            canStartVoiceRecording(Object.freeze({...ready, busy: true}), 'idle', false),
+            canStartVoiceRecording({...ready, busy: true}, 'idle', false),
             false
         );
         assert.equal(canStartVoiceRecording(ready, 'recording', false), false);
@@ -3715,9 +3868,9 @@ test(
                 function finishRecording(){}
                 function recordingError(){}
                 function recordingInterrupted(){}
-                ${admissionSource}
+                ${availabilitySource}
                 ${voiceSource.slice(startLifecycleStart, startLifecycleEnd)}
-                return Object.freeze({
+                return {
                     busy(){sttRole={...sttRole,busy:true};},
                     get permissionRequests(){return permissionRequests;},
                     get recorderStarts(){return recorderStarts;},
@@ -3726,7 +3879,7 @@ test(
                     start:startRecording,
                     get state(){return state;},
                     get trackStops(){return trackStops;}
-                });
+                };
             };`
         )();
         const busyDuringPermission = createStartLifecycleHarness();
@@ -3779,10 +3932,10 @@ test(
                 state='idle';
             }
             ${voiceSource.slice(stopLifecycleStart, stopLifecycleEnd)}
-            return Object.freeze({
+            return {
                 run:stopRecording,
                 get stopCalls(){return stopCalls;}
-            });`
+            };`
         )();
         assert.equal(stopDuringDestroy.run(), false);
         assert.equal(stopDuringDestroy.stopCalls, 0);
@@ -3797,7 +3950,7 @@ test(
         assert.match(
             voiceSource,
             /async function startRecording\(\)\{[\s\S]*!canStartVoiceRecording\(sttRole,state,destroyed\)[\s\S]*getUserMedia/u,
-            'Programmatic recording must fail before microphone access when STT is not admitted.'
+            'Programmatic recording must fail before microphone access when STT is unavailable.'
         );
         assert.match(
             voiceSource,
@@ -3823,11 +3976,11 @@ test(
             `'use strict';
             let transcriptionAbortController=null;
             ${releaseSource}
-            return Object.freeze({
+            return {
                 get active(){return transcriptionAbortController;},
                 release:releaseTranscriptionController,
                 set active(value){transcriptionAbortController=value;}
-            });`
+            };`
         )();
         const staleController = new AbortController();
         const currentController = new AbortController();
@@ -3975,7 +4128,7 @@ test(
                     ${voiceSource.slice(saveBlockStart, saveBlockEnd)}
                     return isCurrentVoiceOperation(generation,'saving');
                 }
-                return Object.freeze({
+                return {
                     get cancellations(){return cancellations;},
                     complete:completeStream,
                     get controller(){return controller;},
@@ -3989,7 +4142,7 @@ test(
                     get state(){return state;},
                     get transcript(){return transcript;},
                     get transitions(){return transitions;}
-                });
+                };
             };`
         )();
         for (const activeState of [
@@ -4228,7 +4381,7 @@ test(
                 }
                 ${voiceSource.slice(successStart, successEnd)}
                 const generation=sessionGeneration;
-                return Object.freeze({
+                return {
                     events,
                     run(){
                         return reportTranscriptionSuccess(
@@ -4240,7 +4393,7 @@ test(
                     },
                     get state(){return state;},
                     transitions
-                });
+                };
             };`
         )();
         const replacedFromFirstSuccess = createSuccessHarness(
@@ -4366,7 +4519,7 @@ test(
                     callback();
                 }
                 ${voiceSource.slice(initialState, initializationEnd)}
-                return Object.freeze({events,ready:host.ready,subscriptions});
+                return {events,ready:host.ready,subscriptions};
             };`
         )();
         assert.deepEqual(
@@ -4448,11 +4601,11 @@ test(
             }
             const CustomEvent=class UnexpectedCustomEvent{};
             ${cancellationSource}
-            return Object.freeze({
+            return {
                 cancel:cancelSTTOperation,
                 get generation(){return sessionGeneration;},
                 get state(){return state;}
-            });`
+            };`
         )();
         assert.equal(savingCancellation.cancel('runtime-unready'), false);
         assert.equal(
@@ -4482,7 +4635,7 @@ test(
                 }
             )
         };
-        controller.synchronize(Object.freeze({...unloaded, state: 'error'}));
+        controller.synchronize({...unloaded, state: 'error'});
         const destroyedLoad = controller.request('load');
         const errorsBeforeDestroy = events.filter(
             function countErrorsBeforeSTTActivationDestroy(event) {
@@ -4548,7 +4701,11 @@ test(
             event => event.instanceId === instanceId && event.type === 'calculator-result'
         );
         assert.deepEqual(resultOccurrence.detail, {result: 5});
-        assert.ok(Object.isFrozen(resultOccurrence.detail));
+        resultOccurrence.detail.annotation='complete result occurrence';
+        assert.equal(
+            resultOccurrence.detail.annotation,
+            'complete result occurrence'
+        );
         assert.equal(resultOccurrence.operationId, localEvents[0].operationId);
 
         let domainError;
@@ -4569,7 +4726,11 @@ test(
         assert.deepEqual(errorOccurrence.detail, {
             code: CALCULATOR_ENGINE_ERROR_CODES.domain
         });
-        assert.ok(Object.isFrozen(errorOccurrence.detail));
+        errorOccurrence.detail.annotation='complete error occurrence';
+        assert.equal(
+            errorOccurrence.detail.annotation,
+            'complete error occurrence'
+        );
         assert.throws(
             function rejectCalculatorInputFailure() {
                 engine.calculate('');
