@@ -7,6 +7,10 @@ on:
         description: Successful Check workflow run containing the selected npm package
         required: true
         type: string
+      artifact_id:
+        description: Exact npm package artifact from the selected Check run
+        required: true
+        type: string
       version:
         description: Exact numeric package version in the selected Check artifact
         required: true
@@ -48,7 +52,7 @@ jobs:
       - name: Download the selected Check package
         uses: actions/download-artifact@v8
         with:
-          name: arcane-sdk-npm-${{ inputs.version }}
+          artifact-ids: ${{ inputs.artifact_id }}
           path: ${{ runner.temp }}/arcane-sdk-npm-release
           github-token: ${{ github.token }}
           run-id: ${{ inputs.check_run_id }}
