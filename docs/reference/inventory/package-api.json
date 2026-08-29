@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 211,
+  "memberCount": 212,
   "members": [
     {
       "id": "root:APP_BUNDLE_DESCRIPTOR_NAME",
@@ -2030,6 +2030,22 @@
       "availability": "Node control plane; browser data plane",
       "protocol": "Node ESM",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"
+    },
+    {
+      "id": "root:startSourceExampleServer",
+      "name": "startSourceExampleServer",
+      "displayName": "startSourceExampleServer()",
+      "kind": "function",
+      "signature": "async startSourceExampleServer(options={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Starts a generic source-example server over explicit directory mounts with complete streaming and HTTP range transport.",
+      "availability": "Node control plane; browser data plane",
+      "protocol": "Node ESM and HTTP/1.1 static source transport",
+      "normalization": "Explicit URL mounts, optional file inclusion lists, lazy missing directories, and a closeable server result"
     },
     {
       "id": "root:TARGET_ADAPTER_PROTOCOL",

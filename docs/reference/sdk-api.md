@@ -200,6 +200,7 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `SpeechPlayback` | class | `arcane-os/speech-playback` | Portable runtime modules | Node with injected media adapters, or browser/native WebView media |
 | `splitSpeechText()` | function | `arcane-os/speech-playback` | Portable runtime modules | Node and browser |
 | `startDevServer()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node control plane; browser data plane |
+| `startSourceExampleServer()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node control plane; browser data plane |
 | `TARGET_ADAPTER_PROTOCOL` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `TARGET_IDS` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `test()` | function | `arcane-os` | Events, processes, and testing | Node |
@@ -3663,6 +3664,110 @@ async function inspectSourceServer(workspaceRoot, signal) {
     } finally {
         await running.close();
     }
+}
+```
+
+## startSourceExampleServer()
+
+### Overview
+
+Starts a generic server for examples that consume live source trees. The
+caller explicitly maps URL prefixes to directories, so an example can serve
+its own small wrapper, SDK `src`, `browser-runtime`, and `runtime` trees, and an
+external model directory without copying those files or owning a static-server
+implementation.
+
+### Signature, options, and result
+
+```text
+async startSourceExampleServer(options={})
+```
+
+Import it from `arcane-os`. Options are
+`{mounts, startPath='/', host='127.0.0.1', port=0, tls,
+crossOriginIsolated=false, signal, onEvent}`. `mounts` is a nonempty array of
+`{urlPath, root, index?, include?}` records:
+
+- `urlPath` is an absolute URL path. Nested mounts are allowed and the longest
+  matching URL path owns the request.
+- `root` is a filesystem path or `file:` URL. It is resolved when the server
+  starts, but the directory does not need to exist until a file is requested.
+- `index` optionally names the relative file used for a mount or directory URL.
+- `include` optionally lists exact relative files and directory prefixes ending
+  in `/`. When omitted, every regular file under the mount is addressable.
+
+`startPath` is returned in the public URL and receives a redirect from `/` when
+it is not `/`. `host` and `port` are passed to the owned Node listener; an
+explicit `0.0.0.0` or `::` host allows LAN access. `tls`, when supplied, is the
+ordinary options object passed to `node:https.createServer`. Set
+`crossOriginIsolated:true` when a browser-WASM example needs
+`Cross-Origin-Opener-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp`; otherwise those headers are
+absent. The helper adds no Content Security Policy.
+
+GET and HEAD stream the complete selected regular file. A single HTTP Range is
+handled automatically, including open-ended and suffix ranges. Content length,
+content range, and range offsets exist only as required HTTP transport framing;
+they are not size limits, admission rules, progress values, or product policy.
+Missing mounts remain lazy and return 404 until their files exist. Unsupported
+methods return 405 and an invalid range returns 416.
+
+The promise settles after the listener is ready and resolves to
+`{server, protocol, host, port, origin, url, close, closed}`. `server` is the
+raw Node HTTP or HTTPS server, `close()` is idempotent, and `closed` settles
+when the listener closes. It rejects with an operational server failure after
+the listener closes. An abort signal closes the listener. Optional `onEvent`
+receives `source-server.starting`, `source-server.started`,
+`source-server.request.failed`, and `source-server.failed` records; an event
+listener failure is logged without replacing the request outcome.
+
+### Availability and normalization
+
+**Node control plane; browser data plane.** Explicit URL mounts, complete file
+streaming, protocol-local HTTP ranges, and a closeable server result. Deep
+protocol: [Node ESM](protocols.md).
+
+### Example
+
+```javascript
+import {startSourceExampleServer} from 'arcane-os';
+
+async function serveSourceExample(signal) {
+    const running = await startSourceExampleServer({
+        mounts: [
+            {
+                urlPath: '/examples/chat',
+                root: new URL('./', import.meta.url),
+                index: 'index.html',
+                include: ['index.html', 'app.js', 'assets/']
+            },
+            {
+                urlPath: '/src',
+                root: new URL('../../src/', import.meta.url)
+            },
+            {
+                urlPath: '/browser-runtime',
+                root: new URL('../../browser-runtime/', import.meta.url)
+            },
+            {
+                urlPath: '/runtime',
+                root: new URL('../../runtime/', import.meta.url)
+            },
+            {
+                urlPath: '/examples/chat/models',
+                root: process.env.ARCANE_EXAMPLE_MODEL_ROOT
+                    || new URL('./models/', import.meta.url)
+            }
+        ],
+        startPath: '/examples/chat/',
+        host: '127.0.0.1',
+        port: 8444,
+        crossOriginIsolated: true,
+        signal
+    });
+
+    console.log(`Serving on ${running.url}`);
+    return running;
 }
 ```
 
