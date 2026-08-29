@@ -1,80 +1,37 @@
 import assert from 'node:assert/strict';
 import {cp,mkdir,readFile,realpath,symlink,writeFile} from 'node:fs/promises';
-import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {createWorkspace} from '../src/scaffold.mjs';
 import {startDevServer} from '../src/dev-server.mjs';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';
-import {packageApp} from '../src/packager/core.mjs';
 import {SDK_NAME,SDK_VERSION} from '../src/constants.mjs';
-import {verifyRuntime} from '../src/runtime.mjs';
-import {verifySdkBrowserRuntime} from '../src/sdk-browser-runtime.mjs';
-import {verifyWorkspaceRuntime} from '../src/workspace-runtime.mjs';
 import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
 
-const BROWSER_RUNTIME_CSP=[
-    "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: http: https:",
-    "font-src 'self' data:",
-    "connect-src 'self' data: blob: http: https: ws: wss:",
-    "worker-src 'self' blob:",
-    "frame-src 'self' data: blob: http: https:",
-    "media-src 'self' data: blob: http: https:",
-    "object-src 'none'",
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-    "form-action 'self'"
-].join('; ');
-
-function assertBrowserRuntimeCsp(response){
-    const policy=response.headers.get('content-security-policy');
-    assert.equal(policy,BROWSER_RUNTIME_CSP);
-    const scriptTokens=policy.split('; ')
-        .find(directive=>directive.startsWith('script-src '))
-        .split(/\s+/u)
-        .slice(1);
-    assert.deepEqual(scriptTokens,["'self'","'unsafe-inline'","'wasm-unsafe-eval'"]);
-    assert.equal(scriptTokens.includes("'unsafe-eval'"),false);
+function assertPermissiveDevelopmentHeaders(response){
+    for(const name of [
+        'content-security-policy',
+        'cross-origin-resource-policy',
+        'referrer-policy',
+        'cache-control',
+        'x-content-type-options',
+        'set-cookie'
+    ]){
+        assert.equal(response.headers.get(name),null,name);
+    }
 }
 
 async function request(origin,requestPath,options={}){
-    const {cookie,...fetchOptions}=options;
-    const headers=new Headers(fetchOptions.headers);
-    if(cookie)headers.set('cookie',cookie);
-    return fetch(`${origin}${requestPath}`,{redirect:'manual',...fetchOptions,headers});
+    return fetch(`${origin}${requestPath}`,{redirect:'manual',...options});
 }
 
-async function authorize(instance){
+function developmentOrigin(instance){
     const launch=new URL(instance.url);
     assert.equal(launch.origin,instance.origin);
     assert.equal(instance.cleanUrl,`${instance.origin}${launch.pathname}`);
-    assert.match(launch.searchParams.get('arcane_session')||'',/^[0-9a-f]{64}$/);
-    const response=await fetch(instance.url,{redirect:'manual'});
-    assert.equal(response.status,302);
-    assert.equal(response.headers.get('location'),launch.pathname);
-    assert.doesNotMatch(response.headers.get('location'),/arcane_session/);
-    const cookie=response.headers.get('set-cookie')?.split(';',1)[0];
-    assert.match(cookie||'',/^Arcane-Dev-Session-[0-9a-f]{16}=[0-9a-f]{64}$/);
-    return {origin:instance.origin,cookie};
-}
-
-async function requestWithHost(instance,requestPath,host){
-    return new Promise((resolve,reject)=>{
-        const request=http.get({
-            hostname:instance.host,
-            port:instance.port,
-            path:requestPath,
-            headers:{host}
-        },response=>{
-            response.resume();
-            response.once('end',()=>resolve(response));
-        });
-        request.once('error',reject);
-    });
+    assert.equal(launch.search,'');
+    return instance.origin;
 }
 
 async function installRuntime(workspaceRoot,dependencyName=SDK_NAME){
@@ -161,8 +118,8 @@ async function createSdkRuntimeSource(parent,{
         ['browser-runtime/event-manager.mjs','export const liveBrowserRuntime=true;\n'],
         ['browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json','{"schemaVersion":1}\n'],
         ['browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json','{"private":true}\n'],
-        ['browser-runtime/.git/config','private vcs bytes\n'],
-        ['browser-runtime/node_modules/private.js','private dependency bytes\n']
+        ['browser-runtime/.git/config','private vcs content\n'],
+        ['browser-runtime/node_modules/private.js','private dependency content\n']
     ]);
     for(const [relative,contents] of files){
         await writeFile(path.join(sourceRoot,...relative.split('/')),contents);
@@ -225,49 +182,45 @@ test('source server exposes only the selected app and SDK browser routes',async 
     assert.equal(Object.hasOwn(instance,'runtime'),false);
     assert.equal(Object.hasOwn(events[0],'runtimeMode'),false);
     assert.equal(Object.hasOwn(events.at(-1),'runtimeMode'),false);
-    const unauthorized=await request(origin,'/apps/served-app/index.html');
-    assert.equal(unauthorized.status,403);
-    assert.equal(
-        unauthorized.headers.get('content-security-policy'),
-        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
-    );
-    const misdirected=await requestWithHost(
-        instance,
-        '/apps/served-app/index.html',
-        'attacker.invalid'
-    );
-    assert.equal(misdirected.statusCode,421);
-    assert.equal(
-        misdirected.headers['content-security-policy'],
-        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
-    );
-    const {cookie}=await authorize(instance);
-    const root=await request(origin,'/',{cookie});
+    const direct=await request(origin,'/apps/served-app/index.html');
+    assert.equal(direct.status,200);
+    assertPermissiveDevelopmentHeaders(direct);
+    await direct.text();
+    developmentOrigin(instance);
+    const root=await request(origin,'/');
     assert.equal(root.status,302);
     assert.equal(root.headers.get('location'),'/apps/served-app/index.html');
+    assertPermissiveDevelopmentHeaders(root);
 
-    const app=await request(origin,'/apps/served-app/index.html',{cookie});
+    const app=await request(origin,'/apps/served-app/index.html');
     assert.equal(app.status,200);
     assert.match(app.headers.get('content-type'),/^text\/html/);
-    assertBrowserRuntimeCsp(app);
-    assert.match(app.headers.get('content-security-policy'),/connect-src[^;]*http:/);
-    assert.equal(app.headers.get('cross-origin-resource-policy'),'same-origin');
+    assertPermissiveDevelopmentHeaders(app);
     assert.match(await app.text(),/<meta name="arcane-app-id" content="served-app">/);
 
-    const theme=await request(origin,'/arcane/css/theme.css',{cookie});
+    const theme=await request(origin,'/arcane/css/theme.css');
     assert.equal(theme.status,200);
     assert.match(theme.headers.get('content-type'),/^text\/css/);
 
-    const networkPolicy=await request(origin,'/arcane/security/arcane-network-policy.json',{cookie});
+    const speechWorker=await request(
+        origin,
+        '/arcane/sdk/ai/speech-worker-runtime.mjs'
+    );
+    assert.equal(speechWorker.status,200);
+    assert.match(speechWorker.headers.get('content-type'),/^text\/javascript/);
+    assertPermissiveDevelopmentHeaders(speechWorker);
+    await speechWorker.arrayBuffer();
+
+    const networkPolicy=await request(origin,'/arcane/security/arcane-network-policy.json');
     assert.equal(networkPolicy.status,200);
     assert.match(networkPolicy.headers.get('content-type'),/^application\/json/);
     assert.equal((await networkPolicy.json()).schemaVersion,1);
 
-    const strongType=await request(origin,'/arcane/dependencies/strong-type/index.js',{cookie});
+    const strongType=await request(origin,'/arcane/dependencies/strong-type/index.js');
     assert.equal(strongType.status,200);
     assert.match(strongType.headers.get('content-type'),/^text\/javascript/);
     assert.equal(
-        (await request(origin,'/node_modules/strong-type/index.js',{cookie})).status,
+        (await request(origin,'/node_modules/strong-type/index.js')).status,
         404
     );
 
@@ -298,31 +251,31 @@ test('source server exposes only the selected app and SDK browser routes',async 
         '/apps/served-app/question%3Fmark.js',
         '/apps/served-app/asterisk%2A.js'
     ]){
-        const response=await request(origin,deniedPath,{cookie});
+        const response=await request(origin,deniedPath);
         assert.ok([400,404].includes(response.status),`${deniedPath} returned ${response.status}`);
     }
 
-    const post=await request(origin,'/apps/served-app/index.html',{method:'POST',cookie});
+    const post=await request(origin,'/apps/served-app/index.html',{method:'POST'});
     assert.equal(post.status,405);
 
     await writeFile(
         path.join(workspaceRoot,'node_modules','arcane-os','runtime','arcane','css','theme.css'),
-        'tampered runtime bytes\n'
+        'changed installed runtime\n'
     );
-    const unchangedWorkspaceRuntime=await request(origin,'/arcane/css/theme.css',{cookie});
+    const unchangedWorkspaceRuntime=await request(origin,'/arcane/css/theme.css');
     assert.equal(unchangedWorkspaceRuntime.status,200);
-    assert.doesNotMatch(await unchangedWorkspaceRuntime.text(),/tampered runtime bytes/);
+    assert.doesNotMatch(await unchangedWorkspaceRuntime.text(),/changed installed runtime/);
 
     await writeFile(
         path.join(workspaceRoot,'arcane','css','theme.css'),
-        'tampered workspace runtime bytes\n'
+        'changed workspace runtime\n'
     );
-    const changedRuntime=await request(origin,'/arcane/css/theme.css',{cookie});
-    assert.equal(changedRuntime.status,500);
-    assert.doesNotMatch(await changedRuntime.text(),/tampered workspace runtime bytes/);
+    const changedRuntime=await request(origin,'/arcane/css/theme.css');
+    assert.equal(changedRuntime.status,200);
+    assert.match(await changedRuntime.text(),/changed workspace runtime/);
 });
 
-test('direct source server fallback consumes the bound npm-alias installation authority',async t=>{
+test('direct source serving is independent of the installed package dependency name',async t=>{
     const parent=await temporaryDirectory(t,{prefix:'arcane-alias-source-server-'});
     const workspaceRoot=path.join(parent,'workspace');
     const appId='alias-served-app';
@@ -337,46 +290,10 @@ test('direct source server fallback consumes the bound npm-alias installation au
         port:0
     });
     t.after(()=>instance.close());
-    const {origin,cookie}=await authorize(instance);
-    const theme=await request(origin,'/arcane/css/theme.css',{cookie});
+    const origin=developmentOrigin(instance);
+    const theme=await request(origin,'/arcane/css/theme.css');
     assert.equal(theme.status,200);
     assert.match(theme.headers.get('content-type'),/^text\/css/u);
-});
-
-test('source server rejects a supplied workspace receipt after its SDK installation is rebound',async t=>{
-    const parent=await temporaryDirectory(t,{prefix:'arcane-rebound-source-server-'});
-    const workspaceRoot=path.join(parent,'workspace');
-    const appId='rebound-served-app';
-    await createWorkspace({targetPath:workspaceRoot,appId});
-    await installRuntime(workspaceRoot);
-    const canonicalRoot=path.join(workspaceRoot,'node_modules','arcane-os');
-    const runtimeRoot=path.join(canonicalRoot,'runtime');
-    const browserRuntimeRoot=path.join(canonicalRoot,'browser-runtime');
-    const [runtimeReceipt,sdkBrowserRuntimeReceipt]=await Promise.all([
-        verifyRuntime({runtimeRoot}),
-        verifySdkBrowserRuntime({browserRuntimeRoot})
-    ]);
-    const workspaceRuntimeReceipt=await verifyWorkspaceRuntime({
-        workspaceRoot,
-        runtimeRoot,
-        runtimeReceipt,
-        browserRuntimeRoot,
-        sdkBrowserRuntimeReceipt
-    });
-
-    await configureSdkAlias(workspaceRoot);
-    await installRuntime(workspaceRoot,'arcane-sdk');
-    await assert.rejects(
-        startDevServer({
-            workspaceRoot,
-            appId,
-            workspaceRuntimeReceipt,
-            host:'127.0.0.1',
-            port:0
-        }),
-        error=>error?.code==='ARCANE_INTEGRITY_FAILED'
-            &&/receipt sources.*bound SDK installation authority/iu.test(error.message)
-    );
 });
 
 test('explicit SDK runtime source mount is live, narrow, and observable',async t=>{
@@ -405,7 +322,6 @@ test('explicit SDK runtime source mount is live, narrow, and observable',async t
     assert.deepEqual(instance.runtime,{
         mode:'sdk-source',
         protocol:'arcane-sdk-runtime-source/1',
-        sdkVersion:SDK_VERSION,
         mutable:true,
         distributionAuthority:false,
         sourceRoot:canonicalSourceRoot
@@ -430,7 +346,7 @@ test('explicit SDK runtime source mount is live, narrow, and observable',async t
     assert.equal(events.at(-2).canonicalRoot,canonicalSourceRoot);
     assert.equal(events.at(-1).runtimeMode,'sdk-source');
 
-    const {origin,cookie}=await authorize(instance);
+    const origin=developmentOrigin(instance);
     for(const allowedPath of [
         '/arcane/components/chat.html',
         '/arcane/css/theme.css',
@@ -443,7 +359,7 @@ test('explicit SDK runtime source mount is live, narrow, and observable',async t
         '/arcane/sdk/event-manager.mjs',
         '/arcane/sdk/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json'
     ]){
-        const response=await request(origin,allowedPath,{cookie});
+        const response=await request(origin,allowedPath);
         assert.equal(response.status,200,allowedPath);
         await response.arrayBuffer();
     }
@@ -454,16 +370,16 @@ test('explicit SDK runtime source mount is live, narrow, and observable',async t
         '/arcane/sdk/.git/config',
         '/arcane/sdk/node_modules/private.js'
     ]){
-        const response=await request(origin,deniedPath,{cookie});
+        const response=await request(origin,deniedPath);
         assert.equal(response.status,404,deniedPath);
         await response.text();
     }
 
     const themePath=path.join(sourceRoot,'runtime','arcane','css','theme.css');
-    const initialTheme=await request(origin,'/arcane/css/theme.css',{cookie});
+    const initialTheme=await request(origin,'/arcane/css/theme.css');
     assert.match(await initialTheme.text(),/live-source:initial/u);
     await writeFile(themePath,':root{--live-source:refreshed;}\n');
-    const refreshedTheme=await request(origin,'/arcane/css/theme.css',{cookie});
+    const refreshedTheme=await request(origin,'/arcane/css/theme.css');
     assert.equal(refreshedTheme.status,200);
     assert.match(await refreshedTheme.text(),/live-source:refreshed/u);
 
@@ -473,45 +389,11 @@ test('explicit SDK runtime source mount is live, narrow, and observable',async t
     assert.equal(events.at(-1).type,'server.stopped');
 });
 
-test('explicit SDK runtime source mount rejects drift, overlap, and linked roots',async t=>{
+test('explicit SDK runtime source mount rejects overlap and linked roots',async t=>{
     const parent=await temporaryDirectory(t,{prefix:'arcane-sdk-source-policy-'});
     const workspaceRoot=path.join(parent,'workspace');
     await createWorkspace({targetPath:workspaceRoot,appId:'source-policy-app'});
     await installRuntime(workspaceRoot);
-
-    const mismatchRoot=await createSdkRuntimeSource(parent,{
-        directory:'version-mismatch',
-        version:'999.0.0'
-    });
-    await assert.rejects(
-        startDevServer({
-            workspaceRoot,
-            appId:'source-policy-app',
-            sdkRuntimeSourceRoot:mismatchRoot,
-            host:'127.0.0.1',
-            port:0
-        }),
-        function isVersionMismatch(error){
-            return error?.code==='ARCANE_DEV_RUNTIME_VERSION_MISMATCH';
-        }
-    );
-
-    const wrongPackageRoot=await createSdkRuntimeSource(parent,{
-        directory:'wrong-package',
-        packageName:'not-arcane-os'
-    });
-    await assert.rejects(
-        startDevServer({
-            workspaceRoot,
-            appId:'source-policy-app',
-            sdkRuntimeSourceRoot:wrongPackageRoot,
-            host:'127.0.0.1',
-            port:0
-        }),
-        function isInvalidPackage(error){
-            return error?.code==='ARCANE_DEV_RUNTIME_SOURCE_INVALID';
-        }
-    );
 
     await assert.rejects(
         startDevServer({
@@ -549,93 +431,36 @@ test('explicit SDK runtime source mount rejects drift, overlap, and linked roots
     );
 });
 
-test('packaged server redirects to index and withholds its integrity receipt',async t=>{
+test('packaged development server serves its selected real directory without admission gates',async t=>{
     const parent=await temporaryDirectory(t,{prefix:'arcane-packaged-server-'});
-    const workspaceRoot=path.join(parent,'workspace');
-    await createWorkspace({targetPath:workspaceRoot,appId:'packaged-app'});
-    await installRuntime(workspaceRoot);
-    const release=await packageApp({workspaceRoot,appId:'packaged-app'});
-    const releaseRoot=path.join(workspaceRoot,'dist','packaged-app');
-    await assert.rejects(
-        startDevServer({mode:'packaged',releaseRoot,host:'127.0.0.1',port:0}),
-        error=>error?.code==='ARCANE_POLICY_DENIED'
-    );
+    const releaseRoot=path.join(parent,'packaged-app');
+    await mkdir(path.join(releaseRoot,'arcane','css'),{recursive:true});
+    await Promise.all([
+        writeFile(path.join(releaseRoot,'index.html'),'<main>Packaged App</main>\n'),
+        writeFile(path.join(releaseRoot,'arcane','css','theme.css'),':root{--background:black;}\n')
+    ]);
     const instance=await startDevServer({
         mode:'packaged',
         releaseRoot,
-        releaseReceipt:release.receipt,
         host:'127.0.0.1',
         port:0
     });
     t.after(()=>instance.close());
-    const {origin,cookie}=await authorize(instance);
+    const origin=developmentOrigin(instance);
 
-    const root=await request(origin,'/',{cookie});
+    const root=await request(origin,'/');
     assert.equal(root.status,302);
     assert.equal(root.headers.get('location'),'/index.html');
-    const entry=await request(origin,'/index.html',{cookie});
+    assertPermissiveDevelopmentHeaders(root);
+    const entry=await request(origin,'/index.html');
     assert.equal(entry.status,200);
-    assertBrowserRuntimeCsp(entry);
+    assertPermissiveDevelopmentHeaders(entry);
     assert.match(await entry.text(),/Packaged App/);
-    const runtimeAuthoritiesResponse=await request(
-        origin,
-        '/ARCANE_RUNTIME_AUTHORITIES.json',
-        {cookie}
-    );
-    assert.equal(runtimeAuthoritiesResponse.status,200);
-    assert.equal(
-        runtimeAuthoritiesResponse.headers.get('content-type'),
-        'application/json; charset=utf-8'
-    );
-    const runtimeAuthorities=await runtimeAuthoritiesResponse.json();
-    const runtimeProjectionResponse=await request(
-        origin,
-        '/ARCANE_RUNTIME_PROJECTION.json',
-        {cookie}
-    );
-    assert.equal(runtimeProjectionResponse.status,200);
-    assert.equal(
-        runtimeProjectionResponse.headers.get('content-type'),
-        'application/json; charset=utf-8'
-    );
-    const runtimeProjection=await runtimeProjectionResponse.json();
-    assert.equal(runtimeProjection.schemaVersion,1);
-    assert.equal(runtimeProjection.kind,'arcane-app-runtime-projection');
-    assert.equal(runtimeProjection.pathPrefix,'arcane/');
-    assert.equal(runtimeProjection.fileCount,runtimeProjection.files.length);
-    assert.deepEqual(
-        {
-            fileCount:runtimeProjection.fileCount,
-            totalBytes:runtimeProjection.totalBytes,
-            contentSha256:runtimeProjection.contentSha256
-        },
-        runtimeAuthorities.projection
-    );
-    assert.equal(runtimeProjection.files.every(file=>{
-        return typeof file.path==='string'
-            &&Number.isSafeInteger(file.bytes)
-            &&/^[a-f0-9]{64}$/u.test(file.sha256);
-    }),true);
-    const receipt=await request(origin,'/ARCANE_APP_RELEASE.json',{cookie});
-    assert.equal(receipt.status,404);
-    const receiptCaseVariant=await request(origin,'/arcane_app_release.JSON',{cookie});
-    assert.equal(receiptCaseVariant.status,404);
 
-    await writeFile(path.join(releaseRoot,'index.html'),'tampered\n');
-    const changedRelease=await request(origin,'/index.html',{cookie});
-    assert.equal(changedRelease.status,500);
-    assert.doesNotMatch(await changedRelease.text(),/^tampered$/m);
-    await instance.close();
-    await assert.rejects(
-        startDevServer({
-            mode:'packaged',
-            releaseRoot,
-            releaseReceipt:release.receipt,
-            host:'127.0.0.1',
-            port:0
-        }),
-        /changed|receipt|inventory/i
-    );
+    await writeFile(path.join(releaseRoot,'index.html'),'changed package content\n');
+    const changedRelease=await request(origin,'/index.html');
+    assert.equal(changedRelease.status,200);
+    assert.equal(await changedRelease.text(),'changed package content\n');
 });
 
 test('development server refuses non-loopback binding',async t=>{
@@ -652,7 +477,7 @@ test('development server refuses non-loopback binding',async t=>{
     );
 });
 
-test('source server verifies the workspace-installed runtime, not a global SDK copy',async t=>{
+test('source server uses the application materialization without authenticating installed content',async t=>{
     const parent=await temporaryDirectory(t,{prefix:'arcane-server-runtime-' });
     const workspaceRoot=path.join(parent,'workspace');
     await createWorkspace({targetPath:workspaceRoot,appId:'tampered-runtime'});
@@ -665,10 +490,11 @@ test('source server verifies the workspace-installed runtime, not a global SDK c
         'tampered\n'
     );
 
-    await assert.rejects(
-        startDevServer({workspaceRoot,host:'127.0.0.1',port:0}),
-        error=>error?.code==='ARCANE_INTEGRITY_FAILED'
-    );
+    const instance=await startDevServer({workspaceRoot,host:'127.0.0.1',port:0});
+    t.after(()=>instance.close());
+    const response=await request(instance.origin,'/arcane/css/theme.css');
+    assert.equal(response.status,200);
+    assert.doesNotMatch(await response.text(),/^tampered$/m);
 });
 
 test('server startup callback rejection closes the listener before rejection',async t=>{

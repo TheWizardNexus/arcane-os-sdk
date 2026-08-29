@@ -19,7 +19,7 @@ class MemoryLockManager{
         }
         const previous=this.tails.get(name)??Promise.resolve();
         const current=previous.then(function runMemoryLock(){
-            return callback(Object.freeze({name,mode:'exclusive'}));
+            return callback({name,mode:'exclusive'});
         });
         const tail=current.catch(function ignoreMemoryLockFailure(){});
         this.tails.set(name,tail);
@@ -90,11 +90,12 @@ function accepted(requestId='request-accepted',providerId='provider-accepted'){
         classification:'accepted',
         requestId,
         providerId,
+        providerResponse:{id:providerId,note:'complete provider result'},
         statusCode:202
     };
 }
 
-test('MailOutbox fails closed without a Web Locks compatible manager',function lockManagerRequired(){
+test('MailOutbox reports a missing Web Locks compatible manager',function lockManagerRequired(){
     assert.throws(
         function constructWithoutLockManager(){
             return new MailOutbox({
@@ -107,7 +108,7 @@ test('MailOutbox fails closed without a Web Locks compatible manager',function l
     );
 });
 
-test('enqueue durably writes the immutable body before the first delivery attempt',async function persistBeforeDelivery(){
+test('enqueue durably writes the complete serialized content before the first delivery attempt',async function persistBeforeDelivery(){
     const storage=new MemoryOutboxStorage();
     const observed=[];
     const signal={
@@ -135,12 +136,21 @@ test('enqueue durably writes the immutable body before the first delivery attemp
     assert.equal(observed[0].stored.state,'sending');
     assert.equal(observed[0].stored.serializedReport,JSON.stringify(report));
     assert.equal(observed[0].request.serializedReport,JSON.stringify(report));
-    assert.equal(Object.isFrozen(observed[0].request),true);
-    assert.equal(Object.isFrozen(observed[0].request.report),true);
-    assert.equal(Object.isFrozen(signal),false);
+    observed[0].request.report.text='caller-local update';
+    observed[0].request.note='caller-local metadata';
+    assert.equal(observed[0].request.report.text,'caller-local update');
+    assert.equal(observed[0].request.note,'caller-local metadata');
+    assert.equal(observed[0].request.serializedReport,JSON.stringify(report));
     assert.equal(record.state,'accepted');
     assert.equal(record.result.providerId,'provider-accepted');
+    assert.deepEqual(record.result.providerResponse,{
+        id:'provider-accepted',
+        note:'complete provider result'
+    });
     assert.equal(record.protocol,MAIL_OUTBOX_PROTOCOL);
+    record.result.providerId='caller-local provider';
+    assert.equal(record.result.providerId,'caller-local provider');
+    assert.equal((await outbox.get('report-durable-1')).result.providerId,'provider-accepted');
 });
 
 test('an accepted delivery result outranks a late caller cancellation',async function acceptedAfterCancellation(){
@@ -204,7 +214,7 @@ test('cancellation during the sending write restores the non-attempted state',as
     assert.equal(record.lastAttemptAt,null);
 });
 
-test('ordinary accepted state requires both gateway and provider acceptance identifiers',async function acceptanceEvidence(){
+test('accepted state uses the delivery request identifier without requiring provider metadata',async function acceptanceEvidence(){
     const storage=new MemoryOutboxStorage();
     const outbox=new MailOutbox({
         storage,
@@ -219,12 +229,13 @@ test('ordinary accepted state requires both gateway and provider acceptance iden
         reportKey:'report-evidence-1'
     });
 
-    assert.equal(record.state,'failed');
-    assert.equal(record.result,null);
-    assert.equal(record.failure.code,'MAIL_OUTBOX_DELIVERY_RESULT_INVALID');
+    assert.equal(record.state,'accepted');
+    assert.equal(record.result.requestId,'request-without-provider');
+    assert.equal(record.result.providerId,null);
+    assert.equal(record.failure,null);
 });
 
-test('accepted state admits the exact Arcane Core mail contract without fabricating a provider id',async function nativeAcceptanceEvidence(){
+test('accepted state preserves optional delivery authority metadata without fabricating a provider id',async function nativeAcceptanceEvidence(){
     const storage=new MemoryOutboxStorage();
     const outbox=new MailOutbox({
         storage,
@@ -250,7 +261,7 @@ test('accepted state admits the exact Arcane Core mail contract without fabricat
     assert.equal(record.result.acceptanceAuthority,'arcane-core-mail-send-v1');
 });
 
-test('accepted state rejects an unrecognized acceptance authority',async function rejectAcceptanceAuthority(){
+test('accepted state preserves optional syntactically valid delivery authority metadata',async function preserveAcceptanceAuthority(){
     const storage=new MemoryOutboxStorage();
     const outbox=new MailOutbox({
         storage,
@@ -271,8 +282,9 @@ test('accepted state rejects an unrecognized acceptance authority',async functio
         reportKey:'report-untrusted-evidence-1'
     });
 
-    assert.equal(record.state,'failed');
-    assert.equal(record.failure.code,'MAIL_OUTBOX_DELIVERY_RESULT_INVALID');
+    assert.equal(record.state,'accepted');
+    assert.equal(record.result.acceptanceAuthority,'untrusted-authority');
+    assert.equal(record.failure,null);
 });
 
 test('accepted provider evidence rejects malformed acceptance authority metadata',async function rejectMalformedAcceptanceAuthority(){
@@ -301,12 +313,11 @@ test('accepted provider evidence rejects malformed acceptance authority metadata
     assert.equal(record.failure.code,'MAIL_OUTBOX_DELIVERY_RESULT_INVALID');
 });
 
-test('invalid durable files do not hide valid records or consume logical capacity',async function invalidRecordInventory(){
+test('invalid durable files remain visible beside valid records and quarantine completely',async function invalidRecordInventory(){
     const storage=new MemoryOutboxStorage();
     storage.table('mail_outbox').set('broken-record.mail-outbox.json',{broken:true});
     const outbox=new MailOutbox({
         storage,
-        maxRecords:1,
         isOnline:function online(){return false;},
         clock:function clock(){return 1900;},
         deliver:async function deliver(){return accepted();}
@@ -326,15 +337,16 @@ test('invalid durable files do not hide valid records or consume logical capacit
     assert.equal(audit.records.length,1);
     assert.equal(audit.invalidRecords.length,1);
     assert.equal(audit.totalFiles,2);
-    assert.equal(audit.truncated,false);
+    assert.equal(audit.scannedFiles,2);
 
-    const quarantine=await outbox.quarantineInvalid({limit:1});
+    const quarantine=await outbox.quarantineInvalid();
     assert.equal(quarantine.quarantined.length,1);
     assert.equal(quarantine.remainingInvalidRecords,0);
     assert.equal(storage.table('mail_outbox').has('broken-record.mail-outbox.json'),false);
     const retained=storage.table('mail_outbox_quarantine').get('broken-record.mail-outbox.json');
     assert.equal(retained.protocol,'arcane-mail-outbox-quarantine/1');
     assert.equal(retained.reasonCode,'MAIL_OUTBOX_RECORD_INVALID');
+    assert.equal(retained.serializedValue,JSON.stringify({broken:true}));
 });
 
 test('invalid durable records have explicit repair and delete paths',async function invalidRecordMaintenance(){
@@ -408,28 +420,29 @@ test('storage read failures propagate and never authorize destructive maintenanc
     );
 });
 
-test('quarantine retains the source when no bounded snapshot can be captured',async function quarantineSnapshotRequired(){
+test('quarantine captures the complete JSON-serializable invalid record',async function completeQuarantineSnapshot(){
     const storage=new MemoryOutboxStorage();
-    storage.table('mail_outbox').set('oversized-invalid.mail-outbox.json','x'.repeat(128));
+    const fileName='complete-invalid-record.mail-outbox.json';
+    const invalidRecord={
+        broken:true,
+        detail:'Synthetic invalid record content.\n'.repeat(4_096),
+        nested:{status:'retained'}
+    };
+    storage.table('mail_outbox').set(fileName,invalidRecord);
     const outbox=new MailOutbox({
         storage,
-        maxReportBytes:64,
         isOnline:function online(){return false;},
         clock:function clock(){return 1970;},
         deliver:async function deliver(){return accepted();}
     });
 
-    await assert.rejects(
-        outbox.quarantineInvalid({limit:1}),
-        function snapshotRequired(error){
-            return error?.code==='MAIL_OUTBOX_QUARANTINE_SNAPSHOT_UNAVAILABLE';
-        }
-    );
-    assert.equal(storage.table('mail_outbox').has('oversized-invalid.mail-outbox.json'),true);
-    assert.equal(
-        storage.table('mail_outbox_quarantine').has('oversized-invalid.mail-outbox.json'),
-        false
-    );
+    const result=await outbox.quarantineInvalid();
+    assert.equal(result.quarantined.length,1);
+    assert.equal(result.remainingInvalidRecords,0);
+    assert.equal(storage.table('mail_outbox').has(fileName),false);
+    const retained=storage.table('mail_outbox_quarantine').get(fileName);
+    assert.equal(retained.serializedValue,JSON.stringify(invalidRecord));
+    assert.deepEqual(JSON.parse(retained.serializedValue),invalidRecord);
 });
 
 test('quarantine propagates a revalidation read failure without deleting the source',async function quarantineReadFailure(){
@@ -453,7 +466,7 @@ test('quarantine propagates a revalidation read failure without deleting the sou
     });
 
     await assert.rejects(
-        outbox.quarantineInvalid({limit:1}),
+        outbox.quarantineInvalid(),
         function storageFailure(error){return error?.code==='MAIL_OUTBOX_STORAGE_FAILED';}
     );
     assert.equal(storage.table('mail_outbox').has(fileName),true);
@@ -533,39 +546,38 @@ test('shared-table maintenance cannot delete a record repaired by another instan
     assert.equal((await repairOutbox.get('report-race-repair')).state,'queued');
 });
 
-test('enqueue requires maintenance before it would exceed the bounded inventory scan',async function boundedInventoryMaintenance(){
+test('quarantine processes the complete invalid inventory without caller count limits',async function completeInventoryMaintenance(){
     const storage=new MemoryOutboxStorage();
     storage.table('mail_outbox').set('broken-record-one.mail-outbox.json',{broken:true});
     storage.table('mail_outbox').set('broken-record-two.mail-outbox.json',{broken:true});
     const outbox=new MailOutbox({
         storage,
-        maxInvalidRecords:1,
-        maxRecords:1,
         isOnline:function online(){return false;},
         clock:function clock(){return 1975;},
         deliver:async function deliver(){return accepted();}
     });
     const request={
-        report:{type:'report',subject:'Bounded inventory',to:[],text:'hello'},
-        reportKey:'report-bounded-inventory'
+        report:{type:'report',subject:'Complete inventory',to:[],text:'hello'},
+        reportKey:'report-complete-inventory'
     };
 
-    await assert.rejects(
-        outbox.enqueue(request,{attempt:false}),
-        function maintenanceRequired(error){
-            return error?.code==='MAIL_OUTBOX_MAINTENANCE_REQUIRED';
-        }
-    );
-    const quarantined=await outbox.quarantineInvalid({limit:1});
-    assert.equal(quarantined.quarantined.length,1);
-    assert.equal(quarantined.remainingInvalidRecords,1);
+    const before=await outbox.audit();
+    assert.equal(before.records.length,0);
+    assert.equal(before.invalidRecords.length,2);
+    assert.equal(before.totalFiles,2);
+    assert.equal(before.scannedFiles,2);
+
+    const quarantined=await outbox.quarantineInvalid();
+    assert.equal(quarantined.quarantined.length,2);
+    assert.equal(quarantined.remainingInvalidRecords,0);
 
     const queued=await outbox.enqueue(request,{attempt:false});
     assert.equal(queued.state,'queued');
     const audit=await outbox.audit();
-    assert.equal(audit.truncated,false);
     assert.equal(audit.records.length,1);
-    assert.equal(audit.invalidRecords.length,1);
+    assert.equal(audit.invalidRecords.length,0);
+    assert.equal(audit.totalFiles,1);
+    assert.equal(audit.scannedFiles,1);
 });
 
 test('offline enqueue remains queued and the owned online listener drains it',async function onlineDrain(){
@@ -635,14 +647,13 @@ test('offline drain still recovers a later interrupted sending record',async fun
     assert.equal((await outbox.get('report-offline-z')).failure.uncertain,true);
 });
 
-test('drain is FIFO and bounds provider attempts',async function boundedFifo(){
+test('drain processes the complete FIFO inventory',async function completeFifoDrain(){
     const storage=new MemoryOutboxStorage();
     let now=3000;
     let online=false;
     const delivered=[];
     const outbox=new MailOutbox({
         storage,
-        maxAttemptsPerDrain:2,
         isOnline:function onlineStatus(){return online;},
         clock:function clock(){return now;},
         deliver:async function deliver(request){
@@ -658,15 +669,11 @@ test('drain is FIFO and bounds provider attempts',async function boundedFifo(){
         now+=1;
     }
     online=true;
-    const first=await outbox.drain();
-    assert.deepEqual(delivered,['report-fifo-1','report-fifo-2']);
-    assert.equal(first.attempted,2);
-    assert.equal(first.bounded,true);
-    assert.equal(first.pending,1);
-
-    const second=await outbox.drain();
+    const summary=await outbox.drain();
     assert.deepEqual(delivered,['report-fifo-1','report-fifo-2','report-fifo-3']);
-    assert.equal(second.pending,0);
+    assert.equal(summary.considered,3);
+    assert.equal(summary.attempted,3);
+    assert.equal(summary.pending,0);
 });
 
 test('uncertain delivery retries the exact key and body inside the Resend window',async function stableRetry(){
@@ -687,7 +694,9 @@ test('uncertain delivery retries the exact key and body inside the Resend window
                     status:'delivery_uncertain',
                     classification:'ambiguous',
                     requestId:'request-uncertain',
-                    statusCode:207
+                    statusCode:207,
+                    details:{message:'complete uncertain provider detail'},
+                    providerResponse:{trace:'complete uncertain provider response'}
                 };
             }
             return accepted('request-replayed','provider-replayed');
@@ -697,6 +706,12 @@ test('uncertain delivery retries the exact key and body inside the Resend window
     const retrying=await outbox.enqueue({report,reportKey:'report-retry-1'});
     assert.equal(retrying.state,'retry_wait');
     assert.equal(retrying.failure.uncertain,true);
+    assert.deepEqual(retrying.failure.details,{
+        message:'complete uncertain provider detail'
+    });
+    assert.deepEqual(retrying.failure.providerResponse,{
+        trace:'complete uncertain provider response'
+    });
 
     now+=1000;
     const completed=await outbox.drain();
@@ -746,7 +761,8 @@ test('only explicit retryable or uncertain thrown failures enter retry_wait',asy
             clock:function clock(){return 6000;},
             deliver:async function deliver(){
                 const error=new Error('safe synthetic failure');
-                error.code='MAIL_GATEWAY_BACKPRESSURE';
+                error.code='MAIL_PROVIDER_RETRYABLE';
+                error.details={message:'complete synthetic provider detail'};
                 error.retryable=true;
                 error.retryAfterSeconds=3;
                 throw error;
@@ -759,10 +775,14 @@ test('only explicit retryable or uncertain thrown failures enter retry_wait',asy
         assert.equal(record.state,'retry_wait');
         assert.equal(record.failure.retryable,true);
         assert.equal(record.failure.uncertain,false);
+        assert.equal(record.failure.message,'safe synthetic failure');
+        assert.deepEqual(record.failure.details,{
+            message:'complete synthetic provider detail'
+        });
         assert.equal(record.nextAttemptAt,9000);
     });
 
-    await t.test('unclassified error fails closed',async function unclassifiedError(){
+    await t.test('unclassified error becomes a permanent failure',async function unclassifiedError(){
         const storage=new MemoryOutboxStorage();
         const outbox=new MailOutbox({
             storage,
@@ -782,7 +802,7 @@ test('only explicit retryable or uncertain thrown failures enter retry_wait',asy
     });
 });
 
-test('one reportKey cannot be rebound to different serialized bytes',async function idempotencyConflict(){
+test('one reportKey cannot be rebound to different serialized content',async function idempotencyContentConflict(){
     const storage=new MemoryOutboxStorage();
     const outbox=new MailOutbox({
         storage,
@@ -805,7 +825,7 @@ test('one reportKey cannot be rebound to different serialized bytes',async funct
     );
 });
 
-test('concurrent enqueue calls cannot race a reportKey onto different bytes',async function concurrentIdempotencyConflict(){
+test('concurrent enqueue calls cannot race a reportKey onto different serialized content',async function concurrentIdempotencyContentConflict(){
     const storage=new MemoryOutboxStorage();
     const outbox=new MailOutbox({
         storage,
@@ -831,7 +851,7 @@ test('concurrent enqueue calls cannot race a reportKey onto different bytes',asy
     }));
 });
 
-test('shared-table instances cannot race a reportKey onto different bytes',async function sharedIdempotencyConflict(){
+test('shared-table instances cannot race a reportKey onto different serialized content',async function sharedIdempotencyContentConflict(){
     const storage=new MemoryOutboxStorage();
     const options={
         storage,

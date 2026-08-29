@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from '../src/testing.mjs';
 import Mail,{
-    MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES,
+    DEFAULT_MAIL_REQUEST_TIMEOUT_MS,
     MAIL_OUTBOX_PROTOCOL,
     Mail as NamedMail,
     MailOutbox,
@@ -14,14 +14,12 @@ import Mail,{
 } from '../src/mail-api.mjs';
 import * as mailApi from '../src/mail-api.mjs';
 
-const PUBLIC_MAIL_EXPORTS=Object.freeze([
+const PUBLIC_MAIL_EXPORTS=[
     'DEFAULT_MAIL_REQUEST_TIMEOUT_MS',
-    'MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES',
     'MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS',
     'MAIL_OUTBOX_PROTOCOL',
     'MAIL_OUTBOX_STATES',
     'MAIL_OUTBOX_TABLE',
-    'MAX_MAIL_RESPONSE_BYTES',
     'Mail',
     'MailOutbox',
     'MailTransportError',
@@ -31,7 +29,7 @@ const PUBLIC_MAIL_EXPORTS=Object.freeze([
     'resolveMailConfig',
     'sendMailReport',
     'serializeMailReport'
-]);
+];
 
 test('the portable Mail source entrypoint exposes one exact export contract',function mailApiExports(){
     assert.deepEqual(Object.keys(mailApi).sort(),[...PUBLIC_MAIL_EXPORTS].sort());
@@ -45,7 +43,7 @@ test('the portable Mail source entrypoint exposes one exact export contract',fun
     assert.equal(typeof sendMailReport,'function');
     assert.equal(typeof serializeMailReport,'function');
     assert.equal(MAIL_OUTBOX_PROTOCOL,'arcane-mail-outbox/1');
-    assert.deepEqual(MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES,['arcane-core-mail-send-v1']);
+    assert.equal(DEFAULT_MAIL_REQUEST_TIMEOUT_MS,null);
     for(const method of ['audit','deleteInvalid','quarantineInvalid','repairInvalid']){
         assert.equal(typeof MailOutbox.prototype[method],'function');
     }

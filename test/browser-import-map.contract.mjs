@@ -360,15 +360,118 @@ try{
     const scriptDirective=policy.split(';')
         .map(value=>value.trim())
         .find(value=>value.startsWith('script-src '));
+    const workerDirective=policy.split(';')
+        .map(value=>value.trim())
+        .find(value=>value.startsWith('worker-src '));
     const scriptTokens=(scriptDirective||'').split(/\\s+/u).slice(1);
+    const workerTokens=(workerDirective||'').split(/\\s+/u).slice(1);
     requireCondition(
         JSON.stringify(scriptTokens)===JSON.stringify([
-            "'self'","'unsafe-inline'","'wasm-unsafe-eval'"
+            "'self'","blob:","'unsafe-inline'","'wasm-unsafe-eval'"
         ]),
         'The Arcane browser server did not return the narrow WebAssembly CSP: '
             +JSON.stringify(scriptTokens)+'.'
     );
+    requireCondition(
+        JSON.stringify(workerTokens)===JSON.stringify(["'self'",'blob:']),
+        'The Arcane browser server did not return the narrow Worker CSP: '
+            +JSON.stringify(workerTokens)+'.'
+    );
     requireCondition(!scriptTokens.includes("'unsafe-eval'"),'Broad string evaluation was enabled.');
+    requireCondition(!scriptTokens.includes('data:'),'Data URL script execution was enabled.');
+
+    const cspViolations=[];
+    const captureCspViolation=event=>cspViolations.push({
+        blockedURI:event.blockedURI,
+        effectiveDirective:event.effectiveDirective
+    });
+    let blobModuleUrl=null;
+    let blobWorkerUrl=null;
+    let blobWorker=null;
+    let blobWorkerImport=null;
+    try{
+        globalThis.addEventListener('securitypolicyviolation',captureCspViolation);
+        blobModuleUrl=URL.createObjectURL(new Blob([
+            "export const sentinel='arcane-worker-blob-import';"
+        ],{type:'text/javascript'}));
+        blobWorkerUrl=URL.createObjectURL(new Blob([
+            "self.onmessage=async event=>{",
+            "try{const module=await import(event.data.moduleUrl);",
+            "self.postMessage({ok:true,sentinel:module.sentinel});}",
+            "catch(error){self.postMessage({ok:false,error:{",
+            "name:error?.name??'Error',message:error?.message??String(error)}});}",
+            "};"
+        ],{type:'text/javascript'}));
+        blobWorker=new Worker(blobWorkerUrl,{type:'module'});
+        blobWorkerImport=await new Promise((resolve,reject)=>{
+            let settled=false;
+            let timeout=null;
+            function releaseBlobWorkerWait(){
+                if(timeout!==null){
+                    clearTimeout(timeout);
+                    timeout=null;
+                }
+                blobWorker.removeEventListener('message',receiveBlobWorkerMessage);
+                blobWorker.removeEventListener('error',receiveBlobWorkerError);
+            }
+            function settleBlobWorkerWait(callback,value){
+                if(settled)return;
+                settled=true;
+                releaseBlobWorkerWait();
+                callback(value);
+            }
+            function receiveBlobWorkerMessage(event){
+                if(event.data?.ok===true){
+                    settleBlobWorkerWait(resolve,event.data.sentinel);
+                    return;
+                }
+                settleBlobWorkerWait(
+                    reject,
+                    new Error(event.data?.error?.message
+                        ||'The blob module Worker failed without an error.')
+                );
+            }
+            function receiveBlobWorkerError(event){
+                settleBlobWorkerWait(
+                    reject,
+                    new Error(event.message||'The blob module Worker emitted an error.')
+                );
+            }
+            try{
+                blobWorker.addEventListener('message',receiveBlobWorkerMessage);
+                blobWorker.addEventListener('error',receiveBlobWorkerError);
+                timeout=setTimeout(
+                    function rejectBlobWorkerTimeout(){
+                        settleBlobWorkerWait(
+                            reject,
+                            new Error('The blob module Worker did not settle.')
+                        );
+                    },
+                    5_000
+                );
+                blobWorker.postMessage({moduleUrl:blobModuleUrl});
+            }catch(error){
+                settleBlobWorkerWait(reject,error);
+            }
+        });
+        await new Promise(function drainQueuedCspViolationEvents(resolve){
+            setTimeout(resolve,0);
+        });
+    }finally{
+        if(blobWorker!==null)blobWorker.terminate();
+        if(blobWorkerUrl!==null)URL.revokeObjectURL(blobWorkerUrl);
+        if(blobModuleUrl!==null)URL.revokeObjectURL(blobModuleUrl);
+        globalThis.removeEventListener('securitypolicyviolation',captureCspViolation);
+    }
+    requireCondition(
+        blobWorkerImport==='arcane-worker-blob-import',
+        'The Worker did not import the admitted blob module.'
+    );
+    requireCondition(
+        cspViolations.length===0,
+        'The admitted blob Worker/module flow violated CSP: '+JSON.stringify(cspViolations)+'.'
+    );
+    document.documentElement.dataset.arcaneCspBlobWorkerImport='passed';
 
     let evalError=null;
     let functionError=null;
@@ -452,6 +555,9 @@ try{
         userAgent:navigator.userAgent,
         csp:{
             scriptTokens,
+            workerTokens,
+            blobWorkerImport,
+            blobViolationCount:cspViolations.length,
             evalError:evalError.name,
             functionError:functionError.name,
             wasmBytes:wasmBytes.byteLength,
@@ -1413,7 +1519,10 @@ function assertBrowserReport(report,{chromeMajor}){
     assert.doesNotMatch(report.userAgent,/\b(?:Edg|OPR)\//u);
     assert.equal(Number(report.userAgent.match(/HeadlessChrome\/(\d+)\./u)?.[1]),chromeMajor);
     assert.deepEqual(report.csp,{
-        scriptTokens:["'self'","'unsafe-inline'","'wasm-unsafe-eval'"],
+        scriptTokens:["'self'",'blob:',"'unsafe-inline'","'wasm-unsafe-eval'"],
+        workerTokens:["'self'",'blob:'],
+        blobWorkerImport:'arcane-worker-blob-import',
+        blobViolationCount:0,
         evalError:'EvalError',
         functionError:'EvalError',
         wasmBytes:8_524_865,

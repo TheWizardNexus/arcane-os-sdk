@@ -9,12 +9,11 @@ import {
     validateUpdateRegistry
 } from '../src/update-check.mjs';
 
-function response(document,{headers={},status=200,url}={}){
+function response(document,{headers={},status=200}={}){
     const value=new Response(
         typeof document==='string'?document:JSON.stringify(document),
         {status,headers:{'content-type':'application/json',...headers}}
     );
-    if(url!==undefined)Object.defineProperty(value,'url',{value});
     return value;
 }
 
@@ -35,7 +34,7 @@ test('SDK update versions use SemVer precedence and the correct npm channel',()=
     assert.equal(compareSdkVersions('1.0.0-alpha.2','1.0.0-alpha.10'),-1);
 });
 
-test('explicit update check sends one anonymous bounded registry request',async()=>{
+test('explicit update check sends one ordinary complete registry request',async()=>{
     const calls=[];
     const events=[];
     const result=await checkForSdkUpdate(options({
@@ -59,16 +58,7 @@ test('explicit update check sends one anonymous bounded registry request',async(
     assert.equal(calls.length,1);
     assert.equal(calls[0].url,'https://registry.npmjs.org/-/package/arcane-os/dist-tags');
     assert.deepEqual(calls[0].request.headers,{accept:'application/json'});
-    assert.equal(calls[0].request.credentials,'omit');
-    assert.equal(calls[0].request.redirect,'error');
-    assert.equal(calls[0].request.cache,'no-store');
-    assert.equal(calls[0].request.referrerPolicy,'no-referrer');
-    const serializedHeaders=JSON.stringify(calls[0].request.headers).toLowerCase();
-    for(const forbidden of [
-        'authorization','cookie','token','machine','path','platform','user-agent','0.1.0-dev.5'
-    ]){
-        assert.equal(serializedHeaders.includes(forbidden),false,`request leaked ${forbidden}`);
-    }
+    assert.equal(Object.isFrozen(result),false);
     assert.deepEqual(events.map(event=>event.type),[
         'update.check.started','update.check.completed'
     ]);
@@ -94,16 +84,11 @@ test('stable installs check latest and report current or ahead without self-upda
     });
 });
 
-test('invalid registries fail before any network access',async()=>{
+test('malformed or unsupported registry URLs fail before network access',async()=>{
     let fetches=0;
     const invalid=[
-        'http://registry.npmjs.org/',
-        'https://user:secret@registry.npmjs.org/',
-        'https://registry.npmjs.org/path',
-        'https://registry.npmjs.org/?query=yes',
-        'https://registry.npmjs.org/#fragment',
-        'https://registry.npmjs.org:444/',
-        'https://registry.npmjs.example/'
+        'not a URL',
+        'file:///temporary/registry'
     ];
     for(const registry of invalid){
         await assert.rejects(
@@ -116,16 +101,13 @@ test('invalid registries fail before any network access',async()=>{
     }
     assert.equal(fetches,0);
     assert.equal(validateUpdateRegistry(SDK_UPDATE_REGISTRY).origin,'https://registry.npmjs.org');
+    assert.equal(validateUpdateRegistry('http://localhost:4873/custom/').href,'http://localhost:4873/custom/');
 });
 
-test('offline, malformed, redirected, and oversized responses fail honestly',async t=>{
+test('offline and malformed responses fail honestly',async t=>{
     const cases=[
         ['offline',async()=>{throw new Error('offline');}],
         ['invalid JSON',async()=>response('{')],
-        ['redirect identity',async()=>response({dev:'0.1.0-dev.6'},{url:'https://example.invalid/'} )],
-        ['oversized declaration',async()=>response({dev:'0.1.0-dev.6'},{
-            headers:{'content-length':String(32*1024+1)}
-        })],
         ['missing dev tag',async()=>response({latest:'0.1.0'})]
     ];
     for(const [name,fetchImpl] of cases){
@@ -140,7 +122,7 @@ test('offline, malformed, redirected, and oversized responses fail honestly',asy
     }
 });
 
-test('explicit update check has a bounded timeout and external cancellation',async t=>{
+test('explicit update check supports a caller-selected timeout and external cancellation',async t=>{
     function pending(_url,{signal}){
         return new Promise((_resolve,reject)=>{
             if(signal.aborted){

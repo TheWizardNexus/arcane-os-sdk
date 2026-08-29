@@ -5,7 +5,8 @@ import test from '../src/testing.mjs';
 import {arcaneEvents} from '../src/event-manager.mjs';
 import {
     SPEECH_PLAYBACK_STATE_EVENT,
-    SpeechPlayback
+    SpeechPlayback,
+    splitSpeechText
 } from '../runtime/arcane/modules/SpeechPlayback.js';
 
 class ContractAudio extends EventTarget {
@@ -72,6 +73,8 @@ function minimalWavBlob() {
 test(
     'SpeechPlayback uses caller policy, owned cancellation, and canonical state',
     async function testProviderNeutralSpeechPlayback() {
+        const completeNarration='Complete narration. '.repeat(20_000);
+        assert.deepEqual(splitSpeechText(completeNarration),[completeNarration]);
         const requests = [];
         const states = [];
         const occurrences = [];
@@ -127,7 +130,7 @@ test(
         });
         assert.equal(requests[0].signal instanceof AbortSignal, true);
         assert.equal(states.some(state => state.state === 'ready'), true);
-        assert.equal(states.every(state => Object.isFrozen(state)), true);
+        assert.equal(states.every(state => !Object.isFrozen(state)), true);
         const playbackReadyOccurrence=occurrences.find(occurrence => (
             occurrence.detail.state === 'ready'
             && occurrence.instanceId === playback.events.descriptor.instanceId

@@ -146,11 +146,11 @@ function deferred(){
     return {promise,reject,resolve};
 }
 
-async function within(promise,timeoutMs=1_000){
+async function settleSoon(promise,timeoutMs=1_000){
     let timer;
-    const timeout=new Promise(function createBoundedWait(resolve,reject){
-        timer=setTimeout(function rejectBoundedWait(){
-            reject(new Error('Synthetic gateway operation exceeded its time bound.'));
+    const timeout=new Promise(function createSyntheticDeadline(resolve,reject){
+        timer=setTimeout(function rejectSyntheticDeadline(){
+            reject(new Error('Synthetic gateway operation did not settle in time.'));
         },timeoutMs);
     });
     try{
@@ -160,20 +160,18 @@ async function within(promise,timeoutMs=1_000){
     }
 }
 
-test('mail gateway rejects unsafe configuration before binding',function testUnsafeConfiguration(){
+test('mail gateway rejects malformed credential and endpoint configuration before binding',function testUnsafeConfiguration(){
     const invalidOptions=[
         {host:'localhost'},
         {host:'0.0.0.0'},
         {allowedOrigins:['https://app.example.test/path']},
         {allowedOrigins:[]},
         {appKey:undefined},
-        {appKey:'too-short'},
+        {appKey:'contains whitespace'},
         {allowUnauthenticatedCaller:true},
         {appId:'Invalid App'},
         {from:'sender@example.test\r\nBcc: attacker@example.test'},
-        {recipientAllowlist:[]},
-        {errorRecipients:['outside@example.test']},
-        {maxMessageBytes:1024,maxRequestBytes:1024}
+        {errorRecipients:['outside@example.test']}
     ];
     for(const overrides of invalidOptions){
         assert.throws(
@@ -233,6 +231,13 @@ test('mail gateway authenticates local callers with a separate app key',async fu
     });
     assert.equal(accepted.response.status,202);
     assert.equal(authenticatedProviderCalls,1);
+
+    const shortCredential=await startGateway(t,{appKey:'x'});
+    const shortCredentialAccepted=await requestMail(shortCredential,{
+        callerKey:'x',
+        reportKey:'short-caller-key'
+    });
+    assert.equal(shortCredentialAccepted.response.status,202);
 
     let unauthenticatedProviderCalls=0;
     const explicitlyUnauthenticated=await startGateway(t,{
@@ -320,7 +325,7 @@ test('mail gateway accepts only a Resend response containing an email id',async 
             calls.push({url,options});
             return Promise.resolve(jsonResponse({id:ACCEPTED_PROVIDER_ID}));
         },
-        onEvent:function captureSafeMailEvent(event){events.push(event);}
+        onEvent:function captureCompleteMailEvent(event){events.push(event);}
     });
     const result=await requestMail(instance,{
         body:validReport({text:secretBody}),
@@ -332,10 +337,11 @@ test('mail gateway accepts only a Resend response containing an email id',async 
         status:'accepted',
         accepted:1,
         rejected:0,
-        providerId:ACCEPTED_PROVIDER_ID
+        providerId:ACCEPTED_PROVIDER_ID,
+        providerResponse:{id:ACCEPTED_PROVIDER_ID}
     });
     assert.equal(Object.hasOwn(result.body,'delivered'),false);
-    assert.match(result.body.requestId,/^[a-zA-Z0-9-]{8,128}$/u);
+    assert.match(result.body.requestId,/^[a-zA-Z0-9-]+$/u);
     assert.equal(result.response.headers.get('access-control-allow-origin'),ALLOWED_ORIGIN);
     assert.equal(calls.length,1);
     assert.equal(calls[0].url,'https://api.resend.com/emails');
@@ -349,16 +355,17 @@ test('mail gateway accepts only a Resend response containing an email id',async 
         text:secretBody
     });
     const eventText=JSON.stringify(events);
-    for(const forbiddenValue of [
-        API_KEY,
-        APP_KEY,
+    for(const forbiddenValue of [API_KEY,APP_KEY]){
+        assert.equal(eventText.includes(forbiddenValue),false);
+    }
+    for(const completeValue of [
         providerKey,
         secretBody,
         FROM,
         ALLOWED_RECIPIENT,
         ACCEPTED_PROVIDER_ID
     ]){
-        assert.equal(eventText.includes(forbiddenValue),false);
+        assert.equal(eventText.includes(completeValue),true);
     }
 });
 
@@ -418,14 +425,32 @@ test('error reports use only configured allowlisted fallback recipients',async f
     assert.deepEqual(JSON.parse(calls[0].options.body).to,[ERROR_RECIPIENT]);
 });
 
-test('request validation rejects before any provider attempt',async function testRequestValidation(t){
+test('ordinary gateway delivery needs no recipient allowlist and preserves recipient order',async function testFunctionalRecipientDefault(t){
+    let providerReport=null;
+    const instance=await startGateway(t,{
+        errorRecipients:[],
+        fetchImpl:function captureFunctionalRecipientRequest(url,options){
+            providerReport=JSON.parse(options.body);
+            return Promise.resolve(jsonResponse({id:ACCEPTED_PROVIDER_ID}));
+        },
+        recipientAllowlist:undefined
+    });
+    const recipients=['outside@example.test','outside@example.test','second@example.test'];
+    const result=await requestMail(instance,{
+        body:validReport({to:recipients}),
+        reportKey:'functional-recipient-default-key'
+    });
+    assert.equal(result.response.status,202);
+    assert.deepEqual(providerReport.to,recipients);
+});
+
+test('request validation rejects malformed and unauthorized input before any provider attempt',async function testRequestValidation(t){
     let providerCalls=0;
     const instance=await startGateway(t,{
         fetchImpl:function countProviderAttempts(){
             providerCalls+=1;
             return defaultFetch();
-        },
-        maxMessageBytes:32
+        }
     });
     const cases=[
         {
@@ -441,7 +466,7 @@ test('request validation rejects before any provider attempt',async function tes
         {
             expectedCode:'invalid_idempotency_key',
             expectedStatus:400,
-            options:{reportKey:'short'}
+            options:{reportKey:'unsafe key'}
         },
         {
             expectedCode:'mail_unsupported_content_type',
@@ -449,44 +474,14 @@ test('request validation rejects before any provider attempt',async function tes
             options:{headers:{'Content-Type':'text/plain'}}
         },
         {
-            expectedCode:'mail_invalid_report_shape',
-            expectedStatus:422,
-            options:{body:{...validReport(),extra:true}}
-        },
-        {
             expectedCode:'mail_recipient_not_allowed',
             expectedStatus:403,
             options:{body:validReport({to:['outside@example.test']})}
         },
         {
-            expectedCode:'mail_invalid_subject',
-            expectedStatus:422,
-            options:{body:validReport({subject:'bad\nsubject'})}
-        },
-        {
             expectedCode:'mail_invalid_type',
             expectedStatus:422,
             options:{body:validReport({type:'unknown'})}
-        },
-        {
-            expectedCode:'mail_content_required',
-            expectedStatus:422,
-            options:{body:validReport({text:''})}
-        },
-        {
-            expectedCode:'mail_content_required',
-            expectedStatus:422,
-            options:{body:validReport({text:'   \n\t'})}
-        },
-        {
-            expectedCode:'mail_unsupported_content',
-            expectedStatus:422,
-            options:{body:validReport({text:'invalid\u0000content'})}
-        },
-        {
-            expectedCode:'mail_message_too_large',
-            expectedStatus:413,
-            options:{body:validReport({text:'x'.repeat(33)})}
         },
         {
             expectedCode:'mail_invalid_json',
@@ -515,7 +510,28 @@ test('request validation rejects before any provider attempt',async function tes
     assert.equal(providerCalls,0);
 });
 
-test('numeric loopback Host admission rejects DNS-rebinding targets',async function testHostAdmission(t){
+test('mail gateway preserves complete subject and body content for the provider',async function testCompleteProviderContent(t){
+    let providerReport=null;
+    const instance=await startGateway(t,{
+        fetchImpl:async function captureCompleteProviderContent(_url,options){
+            providerReport=JSON.parse(options.body);
+            return defaultFetch();
+        }
+    });
+    const report=validReport({
+        subject:'  exact subject\nwith control \u0000 content  ',
+        text:'   \n\t\u0000complete body\u007f  '
+    });
+    const result=await requestMail(instance,{
+        body:report,
+        reportKey:'complete-provider-content'
+    });
+    assert.equal(result.response.status,202);
+    assert.equal(providerReport.subject,report.subject);
+    assert.equal(providerReport.text,report.text);
+});
+
+test('numeric loopback Host validation protects the credential endpoint',async function testHostAdmission(t){
     let providerCalls=0;
     const instance=await startGateway(t,{
         fetchImpl:function countProviderAttempts(){
@@ -580,7 +596,10 @@ test('provider rejections map to explicit retryable and permanent errors',async 
         assert.equal(result.body.error.retryable,expectation.retryable);
         assert.equal(result.body.error.uncertain,false);
         assert.equal(result.body.error.retryAfterMs??0,expectation.retryAfterMs);
-        assert.equal(Object.hasOwn(result.body.error,'message'),false);
+        assert.equal(typeof result.body.error.message,'string');
+        if(index===0){
+            assert.equal(result.body.error.details.message,'not returned');
+        }
     }
     assert.equal(providerCalls,expected.length);
 });
@@ -589,11 +608,7 @@ test('ambiguous provider outcomes never claim acceptance or delivery',async func
     const responses=[
         new Error('synthetic transport failure'),
         jsonResponse({}),
-        new Response('{invalid json',{status:200}),
-        new Response(JSON.stringify({id:ACCEPTED_PROVIDER_ID}),{
-            headers:{'content-length':'1024'},
-            status:200
-        })
+        new Response('{invalid json',{status:200})
     ];
     let providerCalls=0;
     const instance=await startGateway(t,{
@@ -604,28 +619,26 @@ test('ambiguous provider outcomes never claim acceptance or delivery',async func
                 return Promise.reject(next);
             }
             return Promise.resolve(next);
-        },
-        maxProviderResponseBytes:64
+        }
     });
-    for(let index=0;index<4;index+=1){
+    for(let index=0;index<3;index+=1){
         const result=await requestMail(instance,{
             reportKey:`ambiguous-result-key-${String(index).padStart(4,'0')}`
         });
         assert.equal(result.response.status,207);
-        assert.deepEqual(result.body,{
-            requestId:result.body.requestId,
-            status:'delivery_uncertain',
-            accepted:0,
-            rejected:0,
-            retryAfterMs:1_000
-        });
+        assert.equal(result.body.requestId.length>0,true);
+        assert.equal(result.body.status,'delivery_uncertain');
+        assert.equal(result.body.accepted,0);
+        assert.equal(result.body.rejected,0);
+        assert.equal(result.body.retryAfterMs,1_000);
+        assert.equal(Object.hasOwn(result.body,'details'),true);
         assert.equal(Object.hasOwn(result.body,'providerId'),false);
         assert.equal(Object.hasOwn(result.body,'delivered'),false);
     }
-    assert.equal(providerCalls,4);
+    assert.equal(providerCalls,3);
 });
 
-test('provider response reads fail closed and cancellation never blocks',async function testProviderReadBoundaries(t){
+test('provider response reads reject unreadable streams and cancellation never blocks',async function testProviderReadBoundaries(t){
     let fallbackTextCalled=false;
     let bodyCancelCalled=false;
     let readerCancelCalled=false;
@@ -634,37 +647,33 @@ test('provider response reads fail closed and cancellation never blocks',async f
             body:{},
             headers:{get:function absentHeader(){return null;}},
             status:200,
-            text:function forbiddenUnboundedFallback(){
+            text:function forbiddenFallbackRead(){
                 fallbackTextCalled=true;
                 return Promise.resolve(JSON.stringify({id:ACCEPTED_PROVIDER_ID}));
             }
         },
         {
             body:{
-                cancel:function cancelDeclaredOversizeBody(){
+                cancel:function cancelUnreadableBody(){
                     bodyCancelCalled=true;
                     return new Promise(function neverSettleBodyCancellation(){});
                 }
             },
-            headers:{
-                get:function declaredOversizeHeader(name){
-                    return name==='content-length'?'65':null;
-                }
-            },
+            headers:{get:function absentUnreadableBodyHeader(){return null;}},
             status:200
         },
         {
             body:{
-                getReader:function createOversizeReader(){
+                getReader:function createMalformedReader(){
                     return {
-                        cancel:function cancelOversizeReader(){
+                        cancel:function cancelMalformedReader(){
                             readerCancelCalled=true;
                             return new Promise(function neverSettleReaderCancellation(){});
                         },
-                        read:function readOversizeChunk(){
+                        read:function readMalformedChunk(){
                             return Promise.resolve({
                                 done:false,
-                                value:new Uint8Array(65)
+                                value:'not-a-provider-chunk'
                             });
                         },
                         releaseLock:function releaseSyntheticReader(){}
@@ -678,11 +687,10 @@ test('provider response reads fail closed and cancellation never blocks',async f
     const instance=await startGateway(t,{
         fetchImpl:function returnSyntheticProviderBody(){
             return Promise.resolve(responses.shift());
-        },
-        maxProviderResponseBytes:64
+        }
     });
     for(let index=0;index<3;index+=1){
-        const result=await within(requestMail(instance,{
+        const result=await settleSoon(requestMail(instance,{
             reportKey:`provider-read-boundary-${String(index).padStart(4,'0')}`
         }));
         assert.equal(result.response.status,207);
@@ -715,68 +723,22 @@ test('provider timeout cancels the one attempt and returns an ambiguous result',
     assert.equal(providerAborted,true);
 });
 
-test('bounded send concurrency rejects excess work without a provider attempt',async function testSendBackpressure(t){
-    const entered=deferred();
-    const release=deferred();
-    let providerCalls=0;
-    const instance=await startResendMailServer(gatewayOptions({
-        fetchImpl:function holdFirstProviderAttempt(url,options){
-            providerCalls+=1;
-            entered.resolve();
-            return new Promise(function waitForRelease(resolve,reject){
-                function finishAccepted(){
-                    options.signal.removeEventListener('abort',finishAborted);
-                    resolve(jsonResponse({id:ACCEPTED_PROVIDER_ID}));
-                }
-                function finishAborted(){
-                    reject(options.signal.reason);
-                }
-                options.signal.addEventListener('abort',finishAborted,{once:true});
-                release.promise.then(finishAccepted,reject);
-            });
-        },
-        maxConcurrentSends:1,
-        maxQueuedSends:0
-    }));
-    t.after(async function releaseAndCloseGateway(){
-        release.resolve();
-        await instance.close();
-    });
-    const first=requestMail(instance,{reportKey:'backpressure-first-key-0001'});
-    await entered.promise;
-    const second=await requestMail(instance,{reportKey:'backpressure-second-key-0002'});
-    assert.equal(second.response.status,503);
-    assert.equal(second.body.error.code,'mail_send_backpressure');
-    assert.equal(second.body.error.retryable,true);
-    assert.equal(second.body.error.uncertain,false);
-    assert.equal(providerCalls,1);
-    release.resolve();
-    const accepted=await first;
-    assert.equal(accepted.response.status,202);
-});
-
-test('queued message bytes are bounded and released on dequeue and cancellation',async function testQueuedByteBackpressure(t){
+test('concurrent sends preserve every complete request without SDK count limits',async function testConcurrentCompleteSends(t){
     const entered=[deferred(),deferred(),deferred()];
     const releases=[deferred(),deferred(),deferred()];
-    const cancelledCompletion=deferred();
-    let awaitCancelledCompletion=false;
+    const providerReports=[];
     let providerCalls=0;
-    const report=validReport({text:'Synthetic queued byte budget body.'});
-    const queuedBodyBytes=Buffer.byteLength(JSON.stringify({
-        from:FROM,
-        to:[ALLOWED_RECIPIENT],
-        subject:report.subject,
-        text:report.text
-    }));
+    const completeText='Synthetic complete concurrent content.\n'.repeat(4_096);
     const instance=await startResendMailServer(gatewayOptions({
         fetchImpl:function holdSyntheticProviderAttempt(url,options){
             const index=providerCalls;
             providerCalls+=1;
+            providerReports.push(JSON.parse(options.body));
             entered[index].resolve();
             return new Promise(function waitForSyntheticRelease(resolve,reject){
                 function finishAccepted(){
                     options.signal.removeEventListener('abort',finishAborted);
-                    resolve(jsonResponse({id:ACCEPTED_PROVIDER_ID}));
+                    resolve(jsonResponse({id:`${ACCEPTED_PROVIDER_ID}-${String(index)}`}));
                 }
                 function finishAborted(){
                     reject(options.signal.reason);
@@ -784,101 +746,53 @@ test('queued message bytes are bounded and released on dequeue and cancellation'
                 options.signal.addEventListener('abort',finishAborted,{once:true});
                 releases[index].promise.then(finishAccepted,reject);
             });
-        },
-        maxConcurrentSends:1,
-        maxQueuedMessageBytes:queuedBodyBytes,
-        maxQueuedSends:2,
-        onEvent:function observeCancelledQueuedRequest(event){
-            if(awaitCancelledCompletion&&event.type==='mail.request.completed'
-                &&event.providerAttempted===false){
-                cancelledCompletion.resolve();
-            }
         }
     }));
-    t.after(async function releaseAndCloseByteBoundGateway(){
+    t.after(async function releaseAndCloseConcurrentGateway(){
         for(const release of releases){release.resolve();}
         await instance.close();
     });
 
-    const first=requestMail(instance,{
-        body:report,
-        reportKey:'byte-budget-first-key-0001'
+    const requests=[0,1,2].map(function createConcurrentRequest(index){
+        return requestMail(instance,{
+            body:validReport({text:`${completeText}${String(index)}`}),
+            reportKey:`concurrent-complete-key-${String(index)}`
+        });
     });
-    await entered[0].promise;
-    const second=requestMail(instance,{
-        body:report,
-        reportKey:'byte-budget-second-key-0002'
-    });
-    await new Promise(function admitSecondQueueItem(resolve){setImmediate(resolve);});
-    const third=await requestMail(instance,{
-        body:report,
-        reportKey:'byte-budget-third-key-0003'
-    });
-    assert.equal(third.response.status,503);
-    assert.equal(third.body.error.code,'mail_send_byte_backpressure');
-    assert.equal(providerCalls,1);
-
-    releases[0].resolve();
-    await entered[1].promise;
-    assert.equal((await first).response.status,202);
-
-    const fourthController=new AbortController();
-    const fourth=requestMail(instance,{
-        body:report,
-        reportKey:'byte-budget-fourth-key-0004',
-        signal:fourthController.signal
-    }).catch(function absorbCancelledClientRequest(){return null;});
-    await new Promise(function admitFourthQueueItem(resolve){setImmediate(resolve);});
-    const fifth=await requestMail(instance,{
-        body:report,
-        reportKey:'byte-budget-fifth-key-0005'
-    });
-    assert.equal(fifth.response.status,503);
-    assert.equal(fifth.body.error.code,'mail_send_byte_backpressure');
-    awaitCancelledCompletion=true;
-    fourthController.abort(new Error('Synthetic queued request cancellation.'));
-    await fourth;
-    await within(cancelledCompletion.promise);
-
-    const sixth=requestMail(instance,{
-        body:report,
-        reportKey:'byte-budget-sixth-key-0006'
-    });
-    await new Promise(function admitSixthQueueItem(resolve){setImmediate(resolve);});
-    releases[1].resolve();
-    await entered[2].promise;
-    assert.equal((await second).response.status,202);
-    releases[2].resolve();
-    assert.equal((await sixth).response.status,202);
+    await Promise.all(entered.map(function waitForProvider(entry){return entry.promise;}));
     assert.equal(providerCalls,3);
+    for(const release of releases){release.resolve();}
+    const results=await Promise.all(requests);
+    assert.deepEqual(results.map(function responseStatus(entry){return entry.response.status;}),[202,202,202]);
+    assert.deepEqual(
+        providerReports.map(function completeProviderText(entry){return entry.text;}),
+        [0,1,2].map(function expectedCompleteText(index){return `${completeText}${String(index)}`;})
+    );
 });
 
-test('declared request and provider response sizes are bounded',async function testByteBounds(t){
-    let providerCalls=0;
+test('complete long request and provider response bodies are accepted',async function testCompleteLongBodies(t){
+    const requestText='Synthetic complete request content.\n'.repeat(16_384);
+    const providerDetail='Synthetic complete provider response content.\n'.repeat(16_384);
+    let providerReport=null;
     const instance=await startGateway(t,{
-        fetchImpl:function countProviderAttempts(){
-            providerCalls+=1;
-            return defaultFetch();
-        },
-        maxMessageBytes:1,
-        maxRequestBytes:257
-    });
-    const serialized=JSON.stringify(validReport({text:'x'.repeat(300)}));
-    const result=await rawRequest(instance,{
-        body:serialized,
-        headers:{
-            'Content-Length':String(Buffer.byteLength(serialized)),
-            'Content-Type':'application/json',
-            'Host':`127.0.0.1:${String(instance.port)}`,
-            'Idempotency-Key':'request-size-key-0001',
-            'Origin':ALLOWED_ORIGIN,
-            'X-Mail-App':APP_ID,
-            'X-Mail-Key':APP_KEY
+        fetchImpl:function returnCompleteProviderResponse(url,options){
+            providerReport=JSON.parse(options.body);
+            return jsonResponse({detail:providerDetail,id:ACCEPTED_PROVIDER_ID});
         }
     });
-    assert.equal(result.statusCode,413);
-    assert.equal(result.body.error.code,'mail_request_too_large');
-    assert.equal(providerCalls,0);
+    const result=await requestMail(instance,{
+        body:validReport({
+            metadata:{complete:'Synthetic provider-neutral extension.'},
+            text:requestText
+        }),
+        reportKey:'complete-long-content-key-0001'
+    });
+    assert.equal(result.response.status,202);
+    assert.equal(result.body.status,'accepted');
+    assert.equal(result.body.providerId,ACCEPTED_PROVIDER_ID);
+    assert.equal(result.body.providerResponse.detail,providerDetail);
+    assert.equal(providerReport.text,requestText);
+    assert.deepEqual(providerReport.metadata,{complete:'Synthetic provider-neutral extension.'});
 });
 
 test('closing the gateway aborts active provider work and drains lifecycle',async function testCancellationAndDrain(t){

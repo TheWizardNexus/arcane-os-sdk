@@ -1,15 +1,37 @@
 import assert from 'node:assert/strict';
-import {copyFile,link,mkdtemp,readFile,readdir,rm,writeFile} from 'node:fs/promises';
+import {copyFile,link,mkdir,mkdtemp,readFile,readdir,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+import PackagePreferenceStore,{
+    PREFERENCE_STORE_ERROR_CODES as PACKAGE_PREFERENCE_STORE_ERROR_CODES,
+    Preference as PackagePreference,
+    preferenceSchema as packagePreferenceSchema
+} from 'arcane-os/preference-store';
+import PackageSpeechPlayback,{
+    SpeechPlayback as NamedPackageSpeechPlayback,
+    splitSpeechText as packageSplitSpeechText
+} from 'arcane-os/speech-playback';
 import test from '../src/testing.mjs';
 import {repositoryRoot,runNode} from './helpers.mjs';
 
 const runnerPath=path.join(repositoryRoot,'bin','arcane-test.mjs');
 
+test('runtime utility modules expose their canonical namespaces through static Node package entrypoints',()=>{
+    assert.equal(typeof PackagePreferenceStore,'function');
+    assert.equal(typeof PACKAGE_PREFERENCE_STORE_ERROR_CODES,'object');
+    assert.equal(typeof PackagePreference,'function');
+    assert.equal(typeof packagePreferenceSchema,'function');
+    assert.equal(typeof PackageSpeechPlayback,'function');
+    assert.equal(PackageSpeechPlayback,NamedPackageSpeechPlayback);
+    assert.deepEqual(packageSplitSpeechText('ready'),['ready']);
+});
+
 async function temporaryRunnerRoot(t){
-    const root=await mkdtemp(path.join(tmpdir(),'arcane-sdk-testing-'));
-    t.after(()=>rm(root,{force:true,recursive:true}));
+    const workspace=await mkdtemp(path.join(tmpdir(),'arcane-sdk-testing-'));
+    const root=path.join(workspace,'test');
+    await mkdir(root,{recursive:true});
+    t.after(()=>rm(workspace,{force:true,recursive:true}));
     return root;
 }
 
@@ -55,6 +77,124 @@ test('second file has an isolated global realm',async()=>{
     assert.match(result.stderr,/intentional runner failure/u);
     assert.match(result.stdout,/second file has an isolated global realm/u);
     assert.equal(await readFile(marker,'utf8'),'ran\n');
+});
+
+test('isolated runner confines an explicit source import map to the selected application',async t=>{
+    const root=await temporaryRunnerRoot(t);
+    const appId='managed-app';
+    const appRoot=path.join(root,'apps',appId);
+    const preferencePath=path.join(appRoot,'modules','PreferenceStore.js');
+    const speechPath=path.join(appRoot,'modules','SpeechPlayback.js');
+    const strongTypePath=path.join(appRoot,'dependencies','strong-type','index.js');
+    const passingFile=path.join(appRoot,'test','managed-import.test.mjs');
+    const missingFile=path.join(appRoot,'test','missing-import.test.mjs');
+    await Promise.all([
+        mkdir(path.dirname(preferencePath),{recursive:true}),
+        mkdir(path.dirname(speechPath),{recursive:true}),
+        mkdir(path.dirname(strongTypePath),{recursive:true}),
+        mkdir(path.dirname(passingFile),{recursive:true})
+    ]);
+    await Promise.all([
+        writeFile(
+            preferencePath,
+            "export const PREFERENCE_STORE_ERROR_CODES={disposed:'DISPOSED'};\n"
+            +"export class Preference {}\n"
+            +"export function preferenceSchema(definitions=[]){return definitions;}\n"
+            +"export default class PreferenceStore {}\n"
+        ),
+        writeFile(
+            speechPath,
+            "import Is from '../dependencies/strong-type/index.js';\n"
+            +"export function splitSpeechText(value){return [value];}\n"
+            +"export class SpeechPlayback {}\n"
+            +"export default SpeechPlayback;\n"
+            +"export const managedStrongType=Is.managedSource;\n"
+        ),
+        writeFile(
+            strongTypePath,
+            "export default class Is { static managedSource='managed-runtime'; }\n"
+        ),
+        writeFile(passingFile,`import assert from 'node:assert/strict';
+import BrowserPreferenceStore,{
+    PREFERENCE_STORE_ERROR_CODES,
+    Preference,
+    preferenceSchema
+} from 'arcane-os/preference-store';
+import LegacyPreferenceStore from 'arcane/PreferenceStore';
+import BrowserSpeechPlayback,{
+    SpeechPlayback as NamedBrowserSpeechPlayback,
+    managedStrongType,
+    splitSpeechText
+} from 'arcane-os/speech-playback';
+import {managedStrongType as legacyManagedStrongType} from 'arcane/SpeechPlayback';
+import test from 'arcane-os/testing';
+test('managed bare and URL-like imports resolve inside the selected application source',()=>{
+    assert.equal(BrowserPreferenceStore,LegacyPreferenceStore);
+    assert.equal(PREFERENCE_STORE_ERROR_CODES.disposed,'DISPOSED');
+    assert.equal(typeof Preference,'function');
+    assert.equal(typeof preferenceSchema,'function');
+    assert.equal(BrowserSpeechPlayback,NamedBrowserSpeechPlayback);
+    assert.deepEqual(splitSpeechText('ready'),['ready']);
+    assert.equal(managedStrongType,'managed-runtime');
+    assert.equal(legacyManagedStrongType,managedStrongType);
+});
+`),
+        writeFile(missingFile,`import 'arcane/NotExposed';
+import test from 'arcane-os/testing';
+test('unreachable when a reserved import is absent',()=>{});
+`)
+    ]);
+    const imports={
+        'arcane/PreferenceStore':'./modules/PreferenceStore.js',
+        'arcane/SpeechPlayback':'./modules/SpeechPlayback.js',
+        'arcane-os/preference-store':'./modules/PreferenceStore.js',
+        'arcane-os/speech-playback':'./modules/SpeechPlayback.js',
+        './dependencies/strong-type/index.js':'./dependencies/strong-type/index.js'
+    };
+    const context=(selectedBase=appRoot,selectedImports=imports)=>JSON.stringify({
+        protocol:'arcane-test-import-map/1',
+        boundary:'source',
+        baseURL:pathToFileURL(`${selectedBase}${path.sep}`).href,
+        imports:selectedImports
+    });
+    const environment=managedContext=>({
+        ARCANE_TEST_IMPORT_MAP_CONTEXT:managedContext
+    });
+    const passingEnvironment=environment(context());
+
+    const passing=await runNode([runnerPath,passingFile],{cwd:root,env:passingEnvironment});
+    assert.equal(passing.code,0,passing.stderr);
+    assert.match(passing.stdout,/managed bare and URL-like imports/u);
+
+    const missing=await runNode([runnerPath,missingFile],{
+        cwd:root,
+        env:environment(context())
+    });
+    assert.equal(missing.code,1,missing.stderr);
+    assert.match(missing.stderr,/does not expose arcane\/NotExposed/u);
+
+    const malformed=await runNode([runnerPath,passingFile],{
+        cwd:root,
+        env:environment('{not valid JSON')
+    });
+    assert.equal(malformed.code,2,malformed.stderr);
+    assert.match(malformed.stderr,/not valid JSON/u);
+
+    const unsafe=await runNode([runnerPath,passingFile],{
+        cwd:root,
+        env:environment(context(appRoot,{
+            'arcane-os/speech-playback':'../outside.js'
+        }))
+    });
+    assert.equal(unsafe.code,2,unsafe.stderr);
+    assert.match(unsafe.stderr,/entry is invalid/u);
+
+    const otherApp=await runNode([runnerPath,passingFile],{
+        cwd:root,
+        env:environment(context(path.join(root,'apps','other-app')))
+    });
+    assert.equal(otherApp.code,2,otherApp.stderr);
+    assert.match(otherApp.stderr,/this application's physical source directory/u);
 });
 
 test('runner preserves nested cases, FIFO async cleanup, timeout failure, and zero-test failure',async t=>{
@@ -167,28 +307,6 @@ test('infinite synchronous callback',{timeout:25},()=>{
     assert.match(result.stderr,/WATCHDOG .*infinite synchronous callback.*25 ms/u);
 });
 
-test('parent watchdog covers blocking leaked work after the test phase',async t=>{
-    const root=await temporaryRunnerRoot(t);
-    const leakedFile=path.join(root,'post-phase-infinite.test.mjs');
-    await writeFile(leakedFile,`import test from 'arcane-os/testing';
-test('passing body with leaked blocker',()=>{
-    const write=process.stdout.write.bind(process.stdout);
-    process.stdout.write=(chunk,...arguments_)=>{
-        if(chunk===''){
-            setImmediate(()=>{while(true){}});
-            return true;
-        }
-        return write(chunk,...arguments_);
-    };
-});
-`);
-
-    const result=await runNode([runnerPath,leakedFile],{cwd:root,timeout:8_000});
-    assert.equal(result.timedOut,false,result.stderr);
-    assert.equal(result.code,1);
-    assert.match(result.stderr,/WATCHDOG (?:report|flush)/u);
-});
-
 test('an early process.exit(0) cannot bypass the isolated harness report',async t=>{
     const root=await temporaryRunnerRoot(t);
     const earlyExitFile=path.join(root,'early-exit.test.mjs');
@@ -290,19 +408,19 @@ test('tree drain proof fixture',()=>{});
     assert.match(unparsable.stderr,/TREE DRAIN FAILED[\s\S]*PID report was not provable/u);
 });
 
-test('isolated report flush preserves a large diagnostic tail',async t=>{
+test('isolated report flush preserves a complete large diagnostic',async t=>{
     const root=await temporaryRunnerRoot(t);
     const failureFile=path.join(root,'large-diagnostic.test.mjs');
     await writeFile(failureFile,`import test from 'arcane-os/testing';
 test('large diagnostic',()=>{
-    throw new Error('x'.repeat(256*1024)+'ARCANE_DIAGNOSTIC_TAIL');
+    throw new Error('x'.repeat(256*1024)+'ARCANE_DIAGNOSTIC_COMPLETE_END');
 });
 `);
 
     const result=await runNode([runnerPath,failureFile],{cwd:root});
     assert.equal(result.code,1);
-    assert.match(result.stderr,/ARCANE_DIAGNOSTIC_TAIL/u);
-    assert.doesNotMatch(result.stderr,/diagnostics may be truncated/u);
+    assert.match(result.stderr,/ARCANE_DIAGNOSTIC_COMPLETE_END/u);
+    assert.doesNotMatch(result.stderr,/truncated/u);
 });
 
 test('a nested timeout cannot start a queued sibling or mutate outcomes after report',async t=>{

@@ -111,9 +111,7 @@ test('the time-travel flag captures DOM interactions, mutations, and open shadow
         dom:{
             root:roots.documentRoot,
             MutationObserver:FakeMutationObserver,
-            eventTypes:['click','input'],
-            captureInputValues:true,
-            captureNodeMarkup:true
+            eventTypes:['click','input']
         }
     });
 
@@ -148,7 +146,7 @@ test('the time-travel flag captures DOM interactions, mutations, and open shadow
     assert.equal(interactions[0].payload[0].eventType,'click');
     assert.equal(interactions[0].payload[0].target.selector,'#launch');
     assert.equal(interactions[0].payload[0].details.clientX,12);
-    assert.equal(interactions[2].payload[0].value,'[REDACTED]');
+    assert.equal(interactions[2].payload[0].value,'not-recorded');
     assert.ok(interactions.every(record=>record.timestamp==='2026-08-24T06:00:00.000Z'));
     assert.ok(interactions.every(record=>record.source==='dom'&&record.category==='interaction'));
 
@@ -160,7 +158,7 @@ test('the time-travel flag captures DOM interactions, mutations, and open shadow
         mutationType:'attributes',
         target:{
             kind:'element',selector:'#launch',tagName:'button',id:'launch',
-            role:null,name:null,type:null,private:false
+            role:null,name:null,type:null,content:'<button id="launch">Launch</button>'
         },
         attributeName:'data-state',namespace:null,before:null,after:'running'
     });
@@ -168,7 +166,7 @@ test('the time-travel flag captures DOM interactions, mutations, and open shadow
     assert.equal(mutations[1].payload[0].added[0].content,'<span>Ready</span>');
 });
 
-test('DOM capture defaults redact text entry, clipboard, markup, attributes, URLs, and stacks',()=>{
+test('DOM capture defaults preserve complete interaction and mutation content',()=>{
     const roots=fixture();
     roots.documentRoot.location.href='https://arcane.test/app?token=url-secret';
     roots.documentRoot.title='title-secret';
@@ -218,40 +216,54 @@ test('DOM capture defaults redact text entry, clipboard, markup, attributes, URL
     const records=manager.getEventStack({type:DOM_INTERACTION_EVENT});
     assert.equal(records.length,4);
     for(const record of records){
-        assert.equal(record.stack,null);
-        assert.equal(record.payload[0].details.data,'[REDACTED]');
-        assert.equal(record.payload[0].details.key,'[REDACTED]');
-        assert.equal(record.payload[0].details.code,'[REDACTED]');
-        assert.equal(record.payload[0].details.charCode,'[REDACTED]');
-        assert.equal(record.payload[0].details.keyCode,'[REDACTED]');
-        assert.equal(record.payload[0].details.which,'[REDACTED]');
-        assert.equal(record.payload[0].details.detail,'[REDACTED]');
-        assert.equal(record.payload[0].value,undefined);
-        assert.equal(record.payload[0].details.clipboardData,undefined);
+        assert.equal(typeof record.stack,'string');
+        assert.equal(record.payload[0].details.data,'composition-secret');
+        assert.equal(record.payload[0].details.key,'k');
+        assert.equal(record.payload[0].details.code,'KeyK');
+        assert.equal(record.payload[0].details.charCode,75);
+        assert.equal(record.payload[0].details.keyCode,75);
+        assert.equal(record.payload[0].details.which,75);
+        assert.deepEqual(record.payload[0].details.detail,{password:'detail-secret'});
+        assert.equal(record.payload[0].value,'not-recorded');
+        assert.equal(record.payload[0].details.clipboardData.getData.$type,'function');
     }
     const mutations=manager.getEventStack({type:DOM_MUTATION_EVENT});
     assert.deepEqual(
         [mutations[0].payload[0].before,mutations[0].payload[0].after],
-        ['[REDACTED URL]','[REDACTED URL]']
+        [
+            'https://before.test/?secret=old-url-secret',
+            'https://arcane.test/path?secret=attribute-secret'
+        ]
     );
     assert.deepEqual(
         [mutations[1].payload[0].before,mutations[1].payload[0].after],
-        ['[REDACTED]','[REDACTED]']
+        ['old-value-secret','attribute-value-secret']
     );
-    assert.equal(mutations[2].payload[0].added[0].content,'[CONTENT OMITTED]');
-    assert.equal(manager.history[0].payload[0].root.url,'[REDACTED URL]');
+    assert.equal(mutations[2].payload[0].added[0].content,'<span>markup-secret</span>');
+    assert.equal(
+        manager.history[0].payload[0].root.url,
+        'https://arcane.test/app?token=url-secret'
+    );
+    assert.equal(manager.history[0].payload[0].root.title,'title-secret');
 
     const exported=manager.exportStack();
-    for(const secret of [
-        'url-secret','composition-secret','detail-secret','clipboard-secret',
-        'attribute-secret','old-url-secret','attribute-value-secret',
-        'old-value-secret','markup-secret','title-secret'
+    for(const content of [
+        'url-secret','attribute-secret','old-url-secret','markup-secret','title-secret'
     ]){
-        assert.equal(exported.includes(secret),false,`export leaked ${secret}`);
+        assert.equal(exported.includes(content),true,`event stack omitted ${content}`);
+    }
+    for(const completeContent of [
+        'composition-secret','detail-secret','attribute-value-secret','old-value-secret'
+    ]){
+        assert.equal(
+            exported.includes(completeContent),
+            true,
+            `event stack omitted ${completeContent}`
+        );
     }
 });
 
-test('removed nodes inherit private mutation redaction after their ancestry is detached',()=>{
+test('removed nodes preserve complete mutation content after their ancestry is detached',()=>{
     const roots=fixture();
     const manager=new EventManager({
         timeTravel:true,
@@ -260,7 +272,6 @@ test('removed nodes inherit private mutation redaction after their ancestry is d
             root:roots.documentRoot,
             MutationObserver:FakeMutationObserver,
             eventTypes:[],
-            captureNodeMarkup:true,
             observeOpenShadowRoots:false
         }
     });
@@ -281,13 +292,13 @@ test('removed nodes inherit private mutation redaction after their ancestry is d
     }]);
 
     const mutation=manager.getEventStack({type:DOM_MUTATION_EVENT})[0];
-    assert.equal(mutation.payload[0].target.private,true);
-    assert.equal(mutation.payload[0].removed[0].target.private,false);
-    assert.equal(mutation.payload[0].removed[0].content,'[REDACTED]');
-    assert.equal(manager.exportStack().includes('detached-private-secret'),false);
+    assert.equal(Object.hasOwn(mutation.payload[0].target,'private'),false);
+    assert.equal(Object.hasOwn(mutation.payload[0].removed[0].target,'private'),false);
+    assert.equal(mutation.payload[0].removed[0].content,'<span>detached-private-secret</span>');
+    assert.equal(manager.exportStack().includes('detached-private-secret'),true);
 });
 
-test('private autocomplete and URL-shaped selector identifiers remain redacted',()=>{
+test('autocomplete values and complete selector identifiers are retained',()=>{
     const roots=fixture();
     const autocompleteInput=new FakeElement('input',{
         id:'credential',parentElement:roots.body,root:roots.documentRoot,
@@ -314,7 +325,6 @@ test('private autocomplete and URL-shaped selector identifiers remain redacted',
             root:roots.documentRoot,
             MutationObserver:FakeMutationObserver,
             eventTypes:['click','input'],
-            captureInputValues:true,
             observeOpenShadowRoots:false
         }
     });
@@ -329,17 +339,16 @@ test('private autocomplete and URL-shaped selector identifiers remain redacted',
     );
 
     const interactions=manager.getEventStack({type:DOM_INTERACTION_EVENT});
-    assert.equal(interactions[0].payload[0].value,'[REDACTED]');
-    assert.equal(interactions[0].payload[0].details.data,'[REDACTED]');
-    assert.equal(interactions[1].payload[0].target.selector,'button[id]');
-    assert.ok(interactions[2].payload[0].target.selector.endsWith('[data-testid]'));
+    assert.equal(interactions[0].payload[0].value,'uppercase-autocomplete-secret');
+    assert.equal(interactions[0].payload[0].details.data,'uppercase-input-secret');
+    assert.ok(interactions[1].payload[0].target.selector.startsWith('#'));
+    assert.ok(interactions[1].payload[0].target.selector.includes('selector-id-secret'));
+    assert.ok(interactions[2].payload[0].target.selector.includes('selector-testid-secret'));
     const exported=manager.exportStack();
-    for(const secret of [
-        'uppercase-autocomplete-secret','uppercase-input-secret',
-        'selector-id-secret','selector-testid-secret'
-    ]){
-        assert.equal(exported.includes(secret),false,`export leaked ${secret}`);
-    }
+    assert.equal(exported.includes('uppercase-autocomplete-secret'),true);
+    assert.equal(exported.includes('uppercase-input-secret'),true);
+    assert.equal(exported.includes('selector-id-secret'),true);
+    assert.equal(exported.includes('selector-testid-secret'),true);
     manager.disableTimeTravel();
 });
 

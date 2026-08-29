@@ -69,6 +69,8 @@ test('mail browser acceptance fixture proves an empty offline start and event-ow
     assert.doesNotMatch(app,/[A-Z0-9._%+-]+@[A-Z0-9.-]+[.][A-Z]{2,}/iu);
     assert.match(server,/import \{startDevServer\} from '[.][.]\/[.][.]\/[.][.]\/src\/dev-server[.]mjs'/u);
     assert.match(server,/sdkRuntimeSourceRoot/u);
-    assert.deepEqual(descriptor.security.connectOrigins,['http://127.0.0.1:8025']);
-    assert.deepEqual(packageDocument.security.connectOrigins,descriptor.security.connectOrigins);
+    assert.equal('permissions' in descriptor,false);
+    assert.equal('minimumCoreVersion' in descriptor.requirements,false);
+    assert.deepEqual(descriptor.security,{connectOrigins:['http://127.0.0.1:8025']});
+    assert.deepEqual(packageDocument.security,descriptor.security);
 });

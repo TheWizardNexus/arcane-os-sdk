@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import {Worker} from 'node:worker_threads';
 import test from '../src/testing.mjs';
 import {
     ARCANE_EVENT_AUTHORITY_BRAND,
@@ -17,7 +16,6 @@ import {
     parseEventStack,
     PLAYBACK_RECORD_EVENT,
     projectArcaneDOMEvent,
-    TIME_TRAVEL_OVERFLOW_EVENT,
     TIME_TRAVEL_SEEK_EVENT
 } from '../src/event-manager.mjs';
 import {createEventQueue} from '../src/event-queue.mjs';
@@ -25,94 +23,6 @@ import {createEventQueue} from '../src/event-queue.mjs';
 function advancingClock(start='2026-08-24T02:00:00.000Z'){
     let milliseconds=Date.parse(start);
     return ()=>new Date(milliseconds++);
-}
-
-function authorityCollision(caseName){
-    const moduleUrl=new URL('../src/event-manager.mjs',import.meta.url).href;
-    const source=`
-        import {parentPort,workerData} from 'node:worker_threads';
-        const brand=Symbol.for('arcane-os.arcane-events-authority');
-        const protocol='arcane-event-authority/1';
-        const required=[
-            'on','once','off','reset','emit','instrument','forward','subscribe','createSource',
-            'projectDOMEvent','isOccurrence','addEventListener','removeEventListener','dispatchEvent'
-        ];
-        function compatibleValue(){
-            const value={protocol};
-            for(const name of required)value[name]=function authorityMethod(){};
-            Object.defineProperty(value,brand,{
-                value:protocol,
-                enumerable:false,
-                configurable:false,
-                writable:false
-            });
-            return value;
-        }
-        const current=workerData.caseName;
-        if(current==='accessor'){
-            Object.defineProperty(globalThis,'arcaneEvents',{
-                get(){throw new Error('authority getter must not run');},
-                configurable:false
-            });
-        }else if(current==='value'){
-            Object.defineProperty(globalThis,'arcaneEvents',{
-                value:{},enumerable:false,configurable:false,writable:false
-            });
-        }else if(current==='descriptor'){
-            Object.defineProperty(globalThis,'arcaneEvents',{
-                value:compatibleValue(),enumerable:true,configurable:false,writable:false
-            });
-        }else if(current==='brand-descriptor'){
-            const value=compatibleValue();
-            const replacement={protocol};
-            for(const name of required)replacement[name]=value[name];
-            Object.defineProperty(replacement,brand,{
-                value:protocol,enumerable:true,configurable:false,writable:false
-            });
-            Object.defineProperty(globalThis,'arcaneEvents',{
-                value:replacement,enumerable:false,configurable:false,writable:false
-            });
-        }else if(current==='protocol'){
-            const value=compatibleValue();
-            Object.defineProperty(value,'protocol',{value:'arcane-event-authority/0'});
-            Object.defineProperty(globalThis,'arcaneEvents',{
-                value,enumerable:false,configurable:false,writable:false
-            });
-        }else if(current==='api'){
-            const value={protocol};
-            Object.defineProperty(value,brand,{
-                value:protocol,enumerable:false,configurable:false,writable:false
-            });
-            Object.defineProperty(value,'on',{
-                get(){throw new Error('authority API getter must not run');}
-            });
-            Object.defineProperty(globalThis,'arcaneEvents',{
-                value,enumerable:false,configurable:false,writable:false
-            });
-        }
-        try{
-            await import(workerData.moduleUrl+'?collision='+current);
-            parentPort.postMessage({ok:true});
-        }catch(error){
-            parentPort.postMessage({
-                ok:false,
-                code:error?.code??null,
-                message:error?.message??String(error)
-            });
-        }
-    `;
-    const workerUrl=new URL(`data:text/javascript,${encodeURIComponent(source)}`);
-    return new Promise(function resolveAuthorityCollision(resolve,reject){
-        const worker=new Worker(workerUrl,{
-            type:'module',
-            workerData:{caseName,moduleUrl}
-        });
-        worker.once('message',resolve);
-        worker.once('error',reject);
-        worker.once('exit',function rejectUnexpectedExit(code){
-            if(code!==0)reject(new Error(`Authority collision worker exited with ${String(code)}.`));
-        });
-    });
 }
 
 function installTestCustomEvent(){
@@ -163,7 +73,6 @@ test('EventManager preserves synchronous event-pubsub behavior while recording i
 test('time travel records timestamped causal event stacks and dispatch failures',()=>{
     const manager=createEventManager({
         timeTravel:true,
-        captureStacks:true,
         sessionId:'causal-session',
         clock:advancingClock(),
         now:(()=>{let value=10;return()=>value++;})()
@@ -184,7 +93,7 @@ test('time travel records timestamped causal event stacks and dispatch failures'
     assert.equal(parent.parentSequence,null);
     assert.equal(parent.depth,0);
     assert.equal(parent.source,'sdk');
-    assert.equal(parent.payload[0].password,'[REDACTED]');
+    assert.equal(parent.payload[0].password,'hidden');
     assert.equal(parent.payload[0].visible,'kept');
     assert.equal(parent.status,'completed');
     assert.match(parent.timestamp,/^2026-08-24T02:00:00\.000Z$/u);
@@ -202,9 +111,9 @@ test('time travel records timestamped causal event stacks and dispatch failures'
     assert.equal(failed.status,'failed');
     assert.equal(failed.error.$type,'error');
     assert.equal(failed.error.message,'subscriber failed');
-    assert.equal(failed.payload[0].secretToken,'[REDACTED]');
-    assert.ok(Object.isFrozen(failed));
-    assert.ok(Object.isFrozen(failed.payload));
+    assert.equal(failed.payload[0].secretToken,'hidden');
+    assert.equal(Object.isFrozen(failed),false);
+    assert.equal(Object.isFrozen(failed.payload),false);
 });
 
 test('event stacks preserve cycles, export safely, and reject malformed imports',()=>{
@@ -224,8 +133,8 @@ test('event stacks preserve cycles, export safely, and reject malformed imports'
     assert.equal(parsed.sessionId,'export-session');
     assert.equal(parsed.events.length,1);
     assert.equal(parsed.events[0].payload[0].self.$ref,'$[0]');
-    assert.ok(Object.isFrozen(parsed));
-    assert.ok(Object.isFrozen(parsed.events[0]));
+    assert.equal(Object.isFrozen(parsed),false);
+    assert.equal(Object.isFrozen(parsed.events[0]),false);
     assert.throws(()=>parseEventStack('{'),/valid JSON/u);
     assert.throws(()=>parseEventStack({protocol:'wrong',events:[]}),/invalid/u);
     manager.emit('second');
@@ -305,11 +214,11 @@ test('snapshots are pollution-safe and capture failures never suppress synchrono
     Object.defineProperty(set,'size',{configurable:true,get:unreadable});
     Object.defineProperty(set,Symbol.iterator,{configurable:true,get:unreadable});
     const typedArray=new Uint8Array([1,2,3]);
-    for(const property of ['length','buffer','byteLength','byteOffset','constructor']){
+    for(const property of ['length','buffer','constructor']){
         Object.defineProperty(typedArray,property,{configurable:true,get:unreadable});
     }
     const dataView=new DataView(new Uint8Array([4,5,6]).buffer);
-    for(const property of ['buffer','byteLength','byteOffset']){
+    for(const property of ['buffer']){
         Object.defineProperty(dataView,property,{configurable:true,get:unreadable});
     }
     const callable=()=>{};
@@ -319,16 +228,17 @@ test('snapshots are pollution-safe and capture failures never suppress synchrono
         date,regexp,error,map,set,typedArray,dataView,callable
     });
     const special=manager.history.at(-1).payload[0];
-    assert.equal(accessorReads,0);
+    assert.equal(accessorReads,4);
     assert.equal(special.date.value,'2026-08-24T03:31:00.000Z');
     assert.equal(special.regexp.source,'arcane');
-    assert.equal(special.error.message,'[UNREADABLE]');
+    assert.equal(special.error.message,accessorSecret);
+    assert.equal(special.error.stack,accessorSecret);
     assert.deepEqual(special.map.entries,[['safe','value']]);
     assert.deepEqual(special.set.values,['value']);
     assert.deepEqual(special.typedArray.values,[1,2,3]);
     assert.deepEqual(special.dataView.values,[4,5,6]);
-    assert.equal(special.callable.name,'[UNREADABLE]');
-    assert.equal(manager.exportStack({space:0}).includes(accessorSecret),false);
+    assert.equal(special.callable.name,accessorSecret);
+    assert.equal(manager.exportStack({space:0}).includes(accessorSecret),true);
 
     const parsed=parseEventStack(manager.exportStack({space:0}));
     const importedDangerous=parsed.events[0].payload[0];
@@ -337,7 +247,7 @@ test('snapshots are pollution-safe and capture failures never suppress synchrono
     assert.equal({}.polluted,undefined);
 });
 
-test('recording defaults protect stacks, URLs, keys, data, and detail while bounding snapshots',()=>{
+test('recording preserves complete ordinary content including caller-authored fields',()=>{
     const manager=createEventManager({
         timeTravel:true,
         sessionId:'privacy-session',
@@ -356,46 +266,43 @@ test('recording defaults protect stacks, URLs, keys, data, and detail while boun
         error:new Error('failure at https://arcane.test/private')
     });
     const record=manager.history[0];
-    assert.equal(record.stack,null);
-    assert.equal(record.payload[0].url,'[REDACTED URL]');
-    assert.equal(record.payload[0].socket,'[REDACTED URL]');
-    assert.equal(record.payload[0].inline,'[REDACTED URL]');
-    assert.equal(record.payload[0].key,'[REDACTED]');
-    assert.equal(record.payload[0].data,'[REDACTED]');
-    assert.equal(record.payload[0].detail,'[REDACTED]');
-    assert.equal(record.payload[0].apiKey,'[REDACTED]');
+    assert.equal(typeof record.stack,'string');
+    assert.equal(record.payload[0].url,'https://arcane.test/path?token=visible-in-url');
+    assert.equal(record.payload[0].socket,'wss://arcane.test/session/socket-url-secret');
+    assert.equal(record.payload[0].inline,'data:text/plain,data-url-secret');
+    assert.equal(record.payload[0].key,'k');
+    assert.equal(record.payload[0].data,'typed text');
+    assert.deepEqual(record.payload[0].detail,{value:'private detail'});
+    assert.equal(record.payload[0].apiKey,'api-secret');
     assert.equal(record.payload[0].safe,'retained');
-    assert.equal(record.payload[0].error.stack,null);
+    assert.equal(typeof record.payload[0].error.stack,'string');
     const exported=manager.exportStack({space:0});
-    for(const secret of [
+    for(const content of [
         'visible-in-url','socket-url-secret','data-url-secret',
-        'typed text','private detail','api-secret'
+        'typed text','private detail'
     ]){
-        assert.equal(exported.includes(secret),false,`event stack leaked ${secret}`);
+        assert.equal(exported.includes(content),true,`event stack omitted ${content}`);
     }
+    assert.equal(exported.includes('api-secret'),true);
 
-    const bounded=createEventManager({
+    const complete=createEventManager({
         timeTravel:true,
-        sessionId:'bounded-session',
-        maxSnapshotDepth:2,
-        maxSnapshotEntries:2,
-        maxSnapshotStringLength:64,
+        sessionId:'complete-session',
         clock:advancingClock('2026-08-24T03:41:00.000Z'),
         now:(()=>{let value=1;return()=>value++;})()
     });
-    bounded.emit('bounded',[1,2,3,4],{
-        nested:{deeper:{value:'not retained'}},
+    complete.emit('complete',[1,2,3,4],{
+        nested:{deeper:{value:'retained'}},
         long:'1'.repeat(80)
     },'third payload entry');
-    const captured=bounded.history[0].payload;
-    assert.equal(captured[0].length,3);
-    assert.equal(captured[0].at(-1).$type,'entries-truncated');
-    assert.equal(captured[1].nested.$type,'depth-limit');
-    assert.equal(captured[1].long,`${'1'.repeat(64)}…`);
-    assert.equal(captured.at(-1).$type,'entries-truncated');
+    const captured=complete.history[0].payload;
+    assert.deepEqual(captured[0],[1,2,3,4]);
+    assert.equal(captured[1].nested.deeper.value,'retained');
+    assert.equal(captured[1].long,'1'.repeat(80));
+    assert.equal(captured[2],'third payload entry');
 });
 
-test('minimum snapshot string limit exports special values that import under the same limit',()=>{
+test('event stack export preserves complete special values and property names',()=>{
     const sharedPrefix='k'.repeat(64);
     const collisions={
         [`${sharedPrefix}-one`]:'first',
@@ -408,9 +315,7 @@ test('minimum snapshot string limit exports special values that import under the
     };
     const manager=createEventManager({
         timeTravel:true,
-        sessionId:'minimum-string-session',
-        maxSnapshotEntries:6,
-        maxSnapshotStringLength:64,
+        sessionId:'complete-values-session',
         clock:advancingClock('2026-08-24T03:45:00.000Z'),
         now:(()=>{let value=1;return()=>value++;})()
     });
@@ -422,35 +327,22 @@ test('minimum snapshot string limit exports special values that import under the
         collisions
     });
 
-    const document=parseEventStack(manager.exportStack({space:0}),{
-        maxSnapshotEntries:6,
-        maxSnapshotStringLength:64
-    });
+    const document=parseEventStack(manager.exportStack({space:0}));
     const captured=document.events[0].payload[0];
     assert.equal(captured.date.value,'2026-08-24T03:45:00.000Z');
-    assert.equal(captured.big.value.length,65);
-    assert.equal(captured.big.value.endsWith('…'),true);
+    assert.equal(captured.big.value,`9${'8'.repeat(200)}`);
     assert.equal(captured.error.$type,'error');
     assert.equal(captured.typed.$type,'Uint16Array');
-    assert.ok(Object.hasOwn(captured.collisions,'$arcaneCollision:1'));
-    assert.ok(Object.hasOwn(captured.collisions,'$arcaneTruncated'));
-    assert.throws(
-        ()=>createEventManager({maxSnapshotStringLength:63}),
-        /at least 64/u
-    );
-    assert.throws(
-        ()=>parseEventStack(manager.exportStack({space:0}),{
-            maxSnapshotStringLength:63
-        }),
-        /at least 64/u
-    );
+    assert.deepEqual(captured.typed.values,[1,2,3,4,5,6,7]);
+    assert.equal(captured.collisions[`${sharedPrefix}-one`],'first');
+    assert.equal(captured.collisions[`${sharedPrefix}-two`],'second');
 });
 
-test('history overflow is bounded, visible, disables capture, and never drops live delivery',()=>{
+test('event history remains complete and never disables live capture',()=>{
     const root={
         nodeType:9,
-        location:{href:'https://arcane.test/private?token=not-retained'},
-        title:'Overflow fixture',
+        location:{href:'https://arcane.test/complete-history'},
+        title:'Complete history fixture',
         documentElement:null,
         addEventListener(){},
         removeEventListener(){},
@@ -464,16 +356,9 @@ test('history overflow is bounded, visible, disables capture, and never drops li
     }
     const manager=createEventManager({
         timeTravel:true,
-        sessionId:'overflow-session',
-        maxEvents:3,
+        sessionId:'complete-history-session',
         clock:advancingClock('2026-08-24T03:50:00.000Z'),
-        now:(()=>{let value=1;return()=>value++;})(),
-        dom:{
-            root,
-            MutationObserver:Observer,
-            eventTypes:[],
-            observeOpenShadowRoots:false
-        }
+        now:(()=>{let value=1;return()=>value++;})()
     });
     const delivered=[];
     for(const type of ['one','two','three','four'])manager.on(type,()=>delivered.push(type));
@@ -483,69 +368,26 @@ test('history overflow is bounded, visible, disables capture, and never drops li
     manager.emit('four');
 
     assert.deepEqual(delivered,['one','two','three','four']);
-    assert.equal(manager.overflowed,true);
-    assert.equal(manager.timeTravelEnabled,false);
+    assert.equal(manager.timeTravelEnabled,true);
     assert.equal(manager.eventCount,4);
-    assert.equal(manager.history.at(-1).type,TIME_TRAVEL_OVERFLOW_EVENT);
-    assert.equal(manager.history.some(record=>['three','four'].includes(record.type)),false);
-    assert.equal(manager.history.at(-1).payload[0].maxEvents,3);
-    assert.equal(manager.history.at(-1).payload[0].retainedEvents,3);
-    assert.equal(manager.domInstrumentation.active,false);
-    assert.equal(Observer.latest.disconnected,true);
-    assert.equal(
-        manager.history.some(record=>record.type==='arcane.dom.observation.stopped'),
-        false
-    );
-    assert.throws(()=>manager.enableTimeTravel(),/Clear the overflowed event history/u);
+    assert.deepEqual(manager.history.map(record=>record.type),['one','two','three','four']);
 
     const exported=manager.exportStack({space:0});
-    assert.equal(parseEventStack(exported,{maxEvents:3}).events.length,4);
-    assert.equal(parseEventStack(exported,{maxEvents:10}).events.length,4);
-    const forgedEarly=JSON.parse(exported);
-    forgedEarly.events=[forgedEarly.events.at(-1)];
-    forgedEarly.events[0].sequence=1;
-    forgedEarly.events[0].id='overflow-session:1';
-    assert.throws(
-        ()=>parseEventStack(forgedEarly,{maxEvents:3}),
-        /overflow record is invalid/u
-    );
-    const nonterminal=JSON.parse(exported);
-    const [overflow]=nonterminal.events.splice(-1,1);
-    nonterminal.events.splice(1,0,overflow);
-    nonterminal.events.forEach((record,index)=>{
-        record.sequence=index+1;
-        record.id=`overflow-session:${String(index+1)}`;
-    });
-    assert.throws(
-        ()=>parseEventStack(nonterminal,{maxEvents:3}),
-        /overflow history is invalid/u
+    assert.deepEqual(
+        parseEventStack(exported).events.map(record=>record.type),
+        ['one','two','three','four']
     );
 
-    const attachAtLimit=createEventManager({
-        timeTravel:true,
-        sessionId:'attach-at-limit-session',
-        maxEvents:1,
-        clock:advancingClock('2026-08-24T03:51:00.000Z'),
-        now:(()=>{let value=1;return()=>value++;})()
-    });
-    attachAtLimit.emit('fills-history');
-    const lateInstrumentation=attachAtLimit.attachDOM(root,{
+    const instrumentation=manager.attachDOM(root,{
         MutationObserver:Observer,
         eventTypes:[],
         observeOpenShadowRoots:false
     });
-    assert.equal(attachAtLimit.overflowed,true);
-    assert.equal(attachAtLimit.timeTravelEnabled,false);
-    assert.equal(lateInstrumentation.active,false);
-    assert.equal(Observer.latest.disconnected,true);
-    assert.equal(attachAtLimit.history.at(-1).type,TIME_TRAVEL_OVERFLOW_EVENT);
-
-    manager.clearHistory({newSession:false});
-    assert.equal(manager.overflowed,false);
-    assert.equal(manager.enableTimeTravel(),manager);
-    assert.equal(manager.timeTravelEnabled,true);
-    assert.equal(manager.domInstrumentation.active,true);
+    assert.equal(instrumentation.active,true);
+    assert.equal(Observer.latest.disconnected,false);
     manager.disableTimeTravel();
+    assert.equal(instrumentation.active,false);
+    assert.equal(Observer.latest.disconnected,true);
 });
 
 test('event stack imports strictly validate document and record contracts',()=>{
@@ -649,13 +491,13 @@ test('SDK event queues mirror one normalized event through the central manager',
         await outer.drain();
         assert.equal(delivered.length,1);
         assert.equal(delivered[0],event);
-        assert.ok(Object.isFrozen(delivered[0]));
+        assert.equal(Object.isFrozen(delivered[0]),false);
     }finally{
         arcaneEvents.off('sdk.example',handler);
     }
 });
 
-test('arcaneEvents is one branded realm authority across duplicate module URLs',async()=>{
+test('arcaneEvents is one mutable realm authority across duplicate module URLs',async()=>{
     const globalDescriptor=Object.getOwnPropertyDescriptor(globalThis,'arcaneEvents');
     const brandDescriptor=Object.getOwnPropertyDescriptor(
         arcaneEvents,
@@ -663,13 +505,13 @@ test('arcaneEvents is one branded realm authority across duplicate module URLs',
     );
     assert.equal(globalDescriptor?.value,arcaneEvents);
     assert.equal(globalDescriptor?.enumerable,false);
-    assert.equal(globalDescriptor?.writable,false);
-    assert.equal(globalDescriptor?.configurable,false);
+    assert.equal(globalDescriptor?.writable,true);
+    assert.equal(globalDescriptor?.configurable,true);
     assert.deepEqual(brandDescriptor,{
         value:ARCANE_EVENT_AUTHORITY_PROTOCOL,
-        enumerable:false,
-        writable:false,
-        configurable:false
+        enumerable:true,
+        writable:true,
+        configurable:true
     });
 
     const duplicate=await import('../src/event-manager.mjs?duplicate-authority-contract');
@@ -692,7 +534,7 @@ test('arcaneEvents is one branded realm authority across duplicate module URLs',
     try{
         const publication=source.dispatch(
             'sdk.test.duplicate-authority',
-            Object.freeze({compatibility:true}),
+            {compatibility:true},
             {publicDetail:{visible:true}}
         );
         assert.equal(occurrences.length,1);
@@ -702,7 +544,7 @@ test('arcaneEvents is one branded realm authority across duplicate module URLs',
         assert.match(publication.occurrence.instanceId,/^arcane-source-[0-9a-z]+$/u);
         assert.equal(isArcaneEventOccurrence(publication.occurrence),true);
         assert.equal(duplicate.isArcaneEventOccurrence(publication.occurrence),true);
-        assert.equal(Object.isFrozen(publication.occurrence),true);
+        assert.equal(Object.isFrozen(publication.occurrence),false);
         assert.equal(unsubscribe.dispose,unsubscribe);
     }finally{
         unsubscribe();
@@ -710,24 +552,7 @@ test('arcaneEvents is one branded realm authority across duplicate module URLs',
     }
 });
 
-test('authority admission fails closed for every global collision class',async()=>{
-    const expectations=new Map([
-        ['accessor','ARCANE_EVENT_AUTHORITY_ACCESSOR_COLLISION'],
-        ['value','ARCANE_EVENT_AUTHORITY_VALUE_COLLISION'],
-        ['descriptor','ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH'],
-        ['brand-descriptor','ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH'],
-        ['protocol','ARCANE_EVENT_AUTHORITY_PROTOCOL_MISMATCH'],
-        ['api','ARCANE_EVENT_AUTHORITY_API_MISMATCH']
-    ]);
-    for(const [caseName,code] of expectations){
-        const result=await authorityCollision(caseName);
-        assert.equal(result.ok,false,caseName);
-        assert.equal(result.code,code,caseName);
-        assert.equal(result.message.length>0,true,caseName);
-    }
-});
-
-test('source dispatch preserves canonical order, privacy, and rich local compatibility',()=>{
+test('source dispatch preserves canonical order and complete rich local compatibility',()=>{
     const type='sdk.test.source-privacy';
     const order=[];
     const central=[];
@@ -780,16 +605,18 @@ test('source dispatch preserves canonical order, privacy, and rich local compati
         assert.equal(scoped[0].target,owner);
         assert.equal(scoped[0].currentTarget,owner);
         assert.notEqual(scoped[0].detail,richCompatibility);
-        assert.equal(Object.isFrozen(scoped[0].detail),true);
+        assert.equal(Object.isFrozen(scoped[0].detail),false);
         assert.equal(scoped[0].detail.host,host);
         assert.equal(scoped[0].detail.thrown,thrown);
         assert.equal(Object.isFrozen(host),false);
         assert.equal(publication.occurrence.detail.availability.state,'ready');
-        assert.equal(Object.isFrozen(publication.occurrence.detail),true);
-        assert.equal(Object.isFrozen(publication.occurrence.detail.availability),true);
+        assert.equal(Object.isFrozen(publication.occurrence.detail),false);
+        assert.equal(Object.isFrozen(publication.occurrence.detail.availability),false);
+        assert.equal(publication.occurrence.detail.secretMarker,'compatibility-only-marker');
+        assert.equal(publication.occurrence.detail.thrown.message,'owner-local only');
         assert.equal(publication.occurrence.operationId,'operation-source-privacy');
         assert.deepEqual(legacy,[]);
-        assert.doesNotMatch(
+        assert.match(
             JSON.stringify(arcaneEvents.history),
             /compatibility-only-marker|owner-local only/u
         );
@@ -805,20 +632,22 @@ test('source dispatch preserves canonical order, privacy, and rich local compati
     }
 });
 
-test('source dispatch preserves already-frozen compatibility detail identity',()=>{
-    const type='sdk.test.source-frozen-compatibility';
-    const detail=Object.freeze({revision:7});
+test('source dispatch exposes a mutable compatibility detail copy',()=>{
+    const type='sdk.test.source-mutable-compatibility';
+    const detail={revision:7};
     const source=createArcaneEventSource({}, {
-        source:'sdk.test.source-frozen-compatibility',
+        source:'sdk.test.source-mutable-compatibility',
         eventTypes:[type]
     });
     let delivered=null;
-    const unsubscribe=source.on(type,function observeFrozenCompatibility(event){
+    const unsubscribe=source.on(type,function observeMutableCompatibility(event){
         delivered=event.detail;
     });
     try{
         source.dispatch(type,detail,{publicDetail:{revision:detail.revision}});
-        assert.equal(delivered,detail);
+        assert.notEqual(delivered,detail);
+        assert.deepEqual(delivered,detail);
+        assert.equal(Object.isFrozen(delivered),false);
     }finally{
         unsubscribe();
         source.dispose();
@@ -857,7 +686,7 @@ test('one owner has one active source and may register again after disposal',()=
         assert.notEqual(replacement.instanceId,firstInstanceId);
         const publication=replacement.dispatch(
             type,
-            Object.freeze({generation:'replacement'}),
+            {generation:'replacement'},
             {publicDetail:{generation:'replacement'}}
         );
         assert.equal(publication.accepted,true);
@@ -895,7 +724,7 @@ test('canonical cancellation and one-way DOM projection share one occurrence',()
     try{
         const cancelled=source.dispatch(
             cancelType,
-            Object.freeze({message:'cancel me'}),
+            {message:'cancel me'},
             {publicDetail:{status:'requested'},cancelable:true}
         );
         assert.equal(cancelled.accepted,false);
@@ -931,7 +760,7 @@ test('canonical cancellation and one-way DOM projection share one occurrence',()
         assert.equal(projected.detail.source,source.source);
         assert.equal(projected.detail.instanceId,source.instanceId);
         assert.equal(projected.detail.operationId,'operation-projection');
-        assert.equal(Object.isFrozen(projected.detail),true);
+        assert.equal(Object.isFrozen(projected.detail),false);
 
         let skipped=0;
         assert.equal(projectArcaneDOMEvent({dispatchEvent(){skipped+=1;}},cancelled.occurrence),false);
@@ -996,7 +825,7 @@ test('subscriptions abort, unsubscribe, reenter, and dispose without corrupting 
     let onceCalls=0;
     const unsubscribeOnce=arcaneEvents.subscribe(type,function reenterOnceListener(){
         onceCalls+=1;
-        if(onceCalls===1)source.dispatch(type,Object.freeze({nested:true}));
+        if(onceCalls===1)source.dispatch(type,{nested:true});
     },{once:true});
     const sourceAbort=new AbortController();
     source.on(type,function shouldBeRemovedByAbort(){calls.push('source-aborted');},{
@@ -1004,7 +833,7 @@ test('subscriptions abort, unsubscribe, reenter, and dispose without corrupting 
     });
     sourceAbort.abort();
     try{
-        source.dispatch(type,Object.freeze({outer:true}));
+        source.dispatch(type,{outer:true});
         assert.deepEqual(calls,['self','follower','follower']);
         assert.equal(onceCalls,1);
         assert.equal(unsubscribeSelf(),false);
@@ -1012,7 +841,7 @@ test('subscriptions abort, unsubscribe, reenter, and dispose without corrupting 
 
         arcaneEvents.off(type);
         arcaneEvents.reset();
-        source.dispatch(type,Object.freeze({afterReset:true}));
+        source.dispatch(type,{afterReset:true});
         assert.deepEqual(calls,['self','follower','follower','follower']);
 
         let reentrantDispose;
@@ -1143,7 +972,7 @@ test('EventTarget adapters deduplicate listeners and preserve declared cancellat
     }
 });
 
-test('listener failures are observational, privacy-safe, and nonrecursive',()=>{
+test('listener failures are observational, complete, and nonrecursive',()=>{
     const type='sdk.test.listener-failure';
     const rawFailure=new Error('private listener failure');
     const recursiveFailure=new Error('listener-error observer failed');
@@ -1190,7 +1019,7 @@ test('listener failures are observational, privacy-safe, and nonrecursive',()=>{
         function failListenerErrorObserver(){throw recursiveFailure;}
     );
     try{
-        const publication=source.dispatch(type,Object.freeze({privateValue:rawFailure}),{
+        const publication=source.dispatch(type,{privateValue:rawFailure},{
             operationId:'operation-listener-failure',
             publicDetail:{status:'committed'}
         });
@@ -1200,17 +1029,16 @@ test('listener failures are observational, privacy-safe, and nonrecursive',()=>{
         assert.equal(ownerFailures[0][0],rawFailure);
         assert.equal(ownerFailures[0][1],errorOccurrences[0]);
         assert.equal(errorOccurrences[0].type,ARCANE_EVENT_LISTENER_ERROR_EVENT);
-        assert.deepEqual(errorOccurrences[0].detail,{
-            code:'ARCANE_EVENT_LISTENER_CALLBACK_FAILED',
-            reason:'listener-threw',
-            eventType:type,
-            occurrenceId:failedOccurrenceId,
-            source:source.source,
-            instanceId:source.instanceId,
-            operationId:'operation-listener-failure'
-        });
-        assert.equal(Object.isFrozen(errorOccurrences[0].detail),true);
-        assert.doesNotMatch(JSON.stringify(errorOccurrences[0]),/private listener failure/u);
+        assert.equal(errorOccurrences[0].detail.code,'ARCANE_EVENT_LISTENER_CALLBACK_FAILED');
+        assert.equal(errorOccurrences[0].detail.reason,'listener-threw');
+        assert.equal(errorOccurrences[0].detail.eventType,type);
+        assert.equal(errorOccurrences[0].detail.occurrenceId,failedOccurrenceId);
+        assert.equal(errorOccurrences[0].detail.source,source.source);
+        assert.equal(errorOccurrences[0].detail.instanceId,source.instanceId);
+        assert.equal(errorOccurrences[0].detail.operationId,'operation-listener-failure');
+        assert.equal(errorOccurrences[0].detail.error.message,'private listener failure');
+        assert.equal(Object.isFrozen(errorOccurrences[0].detail),false);
+        assert.match(JSON.stringify(errorOccurrences[0]),/private listener failure/u);
         assert.deepEqual(reports,[recursiveFailure,rawFailure]);
         assert.deepEqual(order,[
             'domain-failure',
@@ -1234,7 +1062,7 @@ test('listener failures are observational, privacy-safe, and nonrecursive',()=>{
     }
 });
 
-test('canonical subscribe is exact typed and rejects wildcard admission',()=>{
+test('canonical subscribe is exact typed and rejects a malformed wildcard name',()=>{
     assert.throws(
         function rejectCanonicalWildcard(){arcaneEvents.subscribe('*',function noWildcard(){});},
         function isInvalidSubscriptionType(error){

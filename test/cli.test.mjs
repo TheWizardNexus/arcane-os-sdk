@@ -28,6 +28,7 @@ test('CLI help and version succeed through the shipped executable',async()=>{
     assert.match(help.stdout,/external or integrated Arcane workspace/);
     assert.match(help.stdout,/arcane-os executables/);
     assert.match(help.stdout,/test --scope shared --test-file/);
+    assert.match(help.stdout,/upgrade \[--workspace <directory>\] \[--app <id>\]/u);
     assert.match(help.stdout,/import-map \[--workspace <directory>\] \[--app <id>\]/u);
     assert.match(help.stdout,/dev .*--sdk-runtime-source <sdk-root>/u);
     assert.match(help.stdout,/verify-bundle <file[.]arcane-app[.]tar[.]gz>/);
@@ -141,6 +142,33 @@ test('CLI import-map command follows workspace and app option grammar',async()=>
     assert.equal(invocations[0].options.appId,'hello-world');
     assert.equal(invocations[0].options.scope,'app');
     assert.equal(parseNdjson(stdout.read()).at(-1).type,'operation.completed');
+});
+
+test('CLI upgrade selects one application for its normal npm upgrade',async()=>{
+    const stdout=memoryStream();
+    const stderr=memoryStream();
+    const invocations=[];
+    const cwd=path.join('C:\\','sdk-cli-fixture');
+    const exitCode=await runCliInProcess([
+        'upgrade',
+        '--workspace','consumer',
+        '--app','selected-app',
+        '--output','ndjson'
+    ],{
+        cwd,
+        stdout:stdout.stream,
+        stderr:stderr.stream,
+        execute:async(command,options)=>{
+            invocations.push({command,options});
+            return {kind:'arcane-application-upgrade',appId:options.appId};
+        }
+    });
+    assert.equal(exitCode,0,stderr.read());
+    assert.equal(invocations.length,1);
+    assert.equal(invocations[0].command,'upgrade');
+    assert.equal(invocations[0].options.workspaceRoot,path.resolve(cwd,'consumer'));
+    assert.equal(invocations[0].options.appId,'selected-app');
+    assert.equal(invocations[0].options.scope,'app');
 });
 
 test('CLI update checking is explicit, structured, and fails honestly',async t=>{
@@ -406,6 +434,7 @@ test('CLI rejects incomplete shared tests and shared output commands before exec
         ['test','--scope','shared'],
         ['test','--scope','shared','--test-file','test/one.test.mjs','--app','one'],
         ['check','--scope','shared','--skip-tests'],
+        ['package','--skip-tests'],
         ['package','--scope','shared'],
         ['bundle','--scope','shared'],
         ['verify-bundle'],

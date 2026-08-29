@@ -121,7 +121,19 @@ test('descriptor schema and runtime agree on native icon and capability semantic
         path.join(repositoryRoot,'schemas','arcane-app.schema.json'),
         'utf8'
     ));
+    const ordinaryBrowser=descriptor({
+        native:{type:'app',icon:null,order:100,bundledApps:[]},
+        requirements:{arcaneProtocol:'arcane/1',features:[]},
+        targets:['browser']
+    });
+    Reflect.deleteProperty(ordinaryBrowser,'permissions');
+    Reflect.deleteProperty(ordinaryBrowser,'security');
+    const nativeWithoutCoreFloor=descriptor({
+        requirements:{arcaneProtocol:'arcane/1',features:[]}
+    });
     const cases=[
+        {name:'ordinary browser omissions',value:ordinaryBrowser,expected:true},
+        {name:'native omission of Core floor',value:nativeWithoutCoreFloor,expected:false},
         {name:'native raster icon',value:descriptor(),expected:true},
         {
             name:'native null icon',

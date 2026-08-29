@@ -10,12 +10,6 @@ import {
     validateDiscoveredApplication,
     validateWorkspace
 } from '../src/workspace.mjs';
-import {verifyRuntime} from '../src/runtime.mjs';
-import {
-    SDK_BROWSER_RUNTIME_CONTENT_SHA256,
-    SDK_BROWSER_RUNTIME_MANIFEST_SHA256,
-    verifySdkBrowserRuntime
-} from '../src/sdk-browser-runtime.mjs';
 import {workspaceTemplate} from '../src/templates/workspace-template.mjs';
 import {repositoryRoot,runNode,temporaryDirectory} from './helpers.mjs';
 
@@ -46,7 +40,7 @@ test('workspace scaffold creates a private external app using the exact SDK vers
     assert.equal(packager.sharedPayloads['browser-runtime'][0].source,'arcane');
     assert.equal(packager.sharedPayloads['browser-runtime'][0].destination,'arcane');
     assert.deepEqual(packager.sharedPayloads['browser-runtime'][0].include,[
-        'components','css','dependencies','entities','img','modules','sdk','security'
+        'components','css','dependencies','entities','img','modules','sdk'
     ]);
     assert.deepEqual(packager.sharedPayloads['browser-runtime'][1],{
         source:'node_modules/arcane-os',
@@ -55,34 +49,29 @@ test('workspace scaffold creates a private external app using the exact SDK vers
         exclude:[]
     });
 
-    const workflow=await readFile(path.join(targetPath,'.github','workflows','check.yml'),'utf8');
-    assert.match(workflow,/run: npm ci --ignore-scripts/);
-    assert.doesNotMatch(workflow,/run: npm install/);
+    await assert.rejects(
+        readFile(path.join(targetPath,'.github','workflows','check.yml'),'utf8'),
+        error=>error?.code==='ENOENT'
+    );
     assert.match(await readFile(path.join(targetPath,'.gitignore'),'utf8'),/^build\/$/mu);
 
     const lock=JSON.parse(await readFile(path.join(targetPath,'arcane.lock.json'),'utf8'));
     assert.equal(lock.sdk.name,'arcane-os');
     assert.equal(lock.sdk.version,SDK_VERSION);
     assert.equal(lock.protocols.arcane,'arcane/1');
-    assert.match(lock.runtime.contentSha256,/^[0-9a-f]{64}$/);
-    const browserRelease=JSON.parse(await readFile(
-        path.join(repositoryRoot,'browser-runtime','ARCANE_SDK_BROWSER_RELEASE.json'),
-        'utf8'
-    ));
-    assert.deepEqual(lock.sdkBrowserRuntime,{
-        manifest:'node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json',
-        manifestSha256:SDK_BROWSER_RUNTIME_MANIFEST_SHA256,
-        contentSha256:SDK_BROWSER_RUNTIME_CONTENT_SHA256,
-        builder:browserRelease.builder,
-        sdkVersion:browserRelease.sdkVersion,
-        source:browserRelease.source
-    });
+    assert.deepEqual(lock.runtime,{root:'node_modules/arcane-os/runtime'});
+    assert.deepEqual(lock.sdkBrowserRuntime,{root:'node_modules/arcane-os/browser-runtime'});
+    assert.doesNotMatch(JSON.stringify(lock),/sha|digest|integrity|bytes/iu);
 
     const appRoot=path.join(targetPath,'apps','signal-lab');
     const descriptor=JSON.parse(await readFile(path.join(appRoot,'arcane-app.json'),'utf8'));
     const packageManifest=JSON.parse(await readFile(path.join(appRoot,'arcane-package.json'),'utf8'));
     assert.equal(descriptor.schemaVersion,2);
     assert.equal(descriptor.id,'signal-lab');
+    assert.equal(Object.hasOwn(descriptor,'permissions'),false);
+    assert.equal(Object.hasOwn(descriptor,'security'),false);
+    assert.equal(Object.hasOwn(descriptor.requirements,'minimumCoreVersion'),false);
+    assert.equal(Object.hasOwn(packageManifest,'security'),false);
     assert.deepEqual(projectPackageManifest(descriptor),packageManifest);
     const html=await readFile(path.join(appRoot,'index.html'),'utf8');
     const theme=html.indexOf('./arcane/css/theme.css');
@@ -262,25 +251,19 @@ test('create refuses a nonempty target and init preserves existing authored file
     assert.ok(receipt.createdFiles.includes('apps/preserved-app/index.html'));
 });
 
-test('init rejects an unadmitted browser-runtime lock before materializing arcane bytes',async t=>{
+test('init rejects an incompatible structural SDK lock before materializing runtime content',async t=>{
     const workspaceRoot=await temporaryDirectory(t);
-    const runtimeRelease=await verifyRuntime();
-    const sdkBrowserRuntimeRelease=await verifySdkBrowserRuntime();
-    const generated=workspaceTemplate({
-        appId:'forged-lock',
-        runtimeRelease,
-        sdkBrowserRuntimeRelease
-    });
+    const generated=workspaceTemplate({appId:'forged-lock'});
     const forged=JSON.parse(generated.files.get('arcane.lock.json'));
-    forged.sdkBrowserRuntime.source.authority='forged-consumer';
+    forged.sdkBrowserRuntime.root='node_modules/another-sdk/browser-runtime';
     const lockPath=path.join(workspaceRoot,'arcane.lock.json');
     const original=`${JSON.stringify(forged,null,2)}\n`;
     await writeFile(lockPath,original);
 
     await assert.rejects(
         initWorkspace({workspaceRoot,appId:'forged-lock'}),
-        error=>error?.code==='ARCANE_WORKSPACE_INVALID'
-            &&/does not match the authenticated SDK runtime admission/u.test(error.message)
+        error=>error?.code==='ARCANE_WORKSPACE_LOCK_INVALID'
+            &&/compatible Arcane SDK installation/u.test(error.message)
     );
     assert.equal(await readFile(lockPath,'utf8'),original);
     await assert.rejects(
@@ -289,103 +272,16 @@ test('init rejects an unadmitted browser-runtime lock before materializing arcan
     );
 });
 
-test('workspace lock admission is exact-key closed and dependency-order deterministic',async t=>{
-    const parent=await temporaryDirectory(t,{prefix:'arcane-lock-admission-'});
-    const workspaceRoot=path.join(parent,'workspace');
-    await createWorkspace({targetPath:workspaceRoot,appId:'lock-contract'});
-    const installedRoot=path.join(workspaceRoot,'node_modules','arcane-os');
-    await mkdir(path.join(installedRoot,'runtime'),{recursive:true});
-    await mkdir(path.join(installedRoot,'browser-runtime'),{recursive:true});
-    for(const relative of [
-        'package.json',
-        'runtime/ARCANE_RUNTIME_RELEASE.json',
-        'browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json'
-    ]){
-        await cp(path.join(repositoryRoot,relative),path.join(installedRoot,relative));
-    }
-    const lockPath=path.join(workspaceRoot,'arcane.lock.json');
-    const admitted=JSON.parse(await readFile(lockPath,'utf8'));
-
-    const reordered=structuredClone(admitted);
-    const first=reordered.sdkBrowserRuntime.source.dependencies[0];
-    reordered.sdkBrowserRuntime.source.dependencies[0]={
-        integrity:first.integrity,
-        resolved:first.resolved,
-        version:first.version,
-        name:first.name
-    };
-    const source=reordered.sdkBrowserRuntime.source;
-    reordered.sdkBrowserRuntime.source={
-        dependencies:source.dependencies,
-        browserEntry:source.browserEntry,
-        protocol:source.protocol,
-        repository:source.repository,
-        authority:source.authority
-    };
-    await writeFile(lockPath,`${JSON.stringify(reordered,null,2)}\n`);
-    assert.equal(
-        (await validateWorkspace({workspaceRoot,appId:'lock-contract'})).valid,
-        true
-    );
-
-    const mutations=[
-        ['root extra',lock=>{lock.extra=true;}],
-        ['sdk extra',lock=>{lock.sdk.extra=true;}],
-        ['runtime extra',lock=>{lock.runtime.extra=true;}],
-        ['browser extra',lock=>{lock.sdkBrowserRuntime.extra=true;}],
-        ['source extra',lock=>{lock.sdkBrowserRuntime.source.extra=true;}],
-        ['protocol extra',lock=>{lock.protocols.extra='x';}],
-        ['dependency extra',lock=>{lock.sdkBrowserRuntime.source.dependencies[0].extra=true;}],
-        ['dependency order',lock=>{lock.sdkBrowserRuntime.source.dependencies.reverse();}],
-        ['registry identity',lock=>{
-            lock.sdkBrowserRuntime.source.dependencies[0].resolved=
-                'https://registry.npmjs.org/event-pubsub/-/event-pubsub-6.1.1.tgz';
-        }],
-        ['manifest path',lock=>{lock.sdkBrowserRuntime.manifest='browser-runtime/forged.json';}],
-        ['manifest hash',lock=>{lock.sdkBrowserRuntime.manifestSha256='0'.repeat(64);}],
-        ['content hash',lock=>{lock.sdkBrowserRuntime.contentSha256='0'.repeat(64);}],
-        ['source authority',lock=>{lock.sdkBrowserRuntime.source.authority='consumer';}]
-    ];
-    for(const [label,mutate] of mutations){
-        const candidate=structuredClone(admitted);
-        mutate(candidate);
-        await writeFile(lockPath,`${JSON.stringify(candidate,null,2)}\n`);
-        await assert.rejects(
-            validateWorkspace({workspaceRoot,appId:'lock-contract'}),
-            error=>error?.code==='ARCANE_WORKSPACE_INVALID'
-                &&/lock|browser runtime|incompatible/u.test(error.message),
-            label
-        );
-    }
+test('workspace template lock contains only semantic SDK roots and protocols',()=>{
+    const generated=workspaceTemplate({appId:'lock-contract'});
+    const lock=JSON.parse(generated.files.get('arcane.lock.json'));
+    assert.deepEqual(lock.runtime,{root:'node_modules/arcane-os/runtime'});
+    assert.deepEqual(lock.sdkBrowserRuntime,{root:'node_modules/arcane-os/browser-runtime'});
+    assert.doesNotMatch(JSON.stringify(lock),/sha|digest|integrity|bytes/iu);
 });
 
-test('workspace template rejects forged SDK browser receipt identities and digests',async()=>{
-    const runtimeRelease=await verifyRuntime();
-    const browserRelease=await verifySdkBrowserRuntime();
-    const mutations=[
-        receipt=>{receipt.manifestSha256='0'.repeat(64);},
-        receipt=>{receipt.contentSha256='0'.repeat(64);},
-        receipt=>{receipt.source.repository='https://example.invalid/consumer.git';},
-        receipt=>{receipt.source.browserEntry='arcane-os';},
-        receipt=>{receipt.source.dependencies.reverse();},
-        receipt=>{receipt.source.dependencies[0].integrity='sha512-forged';}
-    ];
-    for(const mutate of mutations){
-        const forged=structuredClone(browserRelease);
-        mutate(forged);
-        assert.throws(
-            ()=>workspaceTemplate({
-                appId:'forged-browser-receipt',
-                runtimeRelease,
-                sdkBrowserRuntimeRelease:forged
-            }),
-            /does not contain a valid trusted identity/u
-        );
-    }
-});
-
-// Five full authenticated scaffolds are serialized here. Each target retains the
-// default watchdog while the aggregate admits their measured Windows runtime.
+// Five complete native scaffolds are serialized here so their shared workspace
+// outputs do not collide.
 test('every native scaffold includes a real raster icon and declares browser plus its selected target',{timeout:60_000},async t=>{
     const parent=await temporaryDirectory(t);
     for(const target of ['portable','windows-x64','linux-x64','linux-arm64','android-arm64']){
@@ -402,6 +298,10 @@ test('every native scaffold includes a real raster icon and declares browser plu
 
             assert.equal(receipt.target,target);
             assert.deepEqual(descriptor.targets,['browser',target].sort());
+            assert.equal(descriptor.requirements.minimumCoreVersion,'0.8.12');
+            assert.equal(Object.hasOwn(descriptor,'permissions'),false);
+            assert.equal(Object.hasOwn(descriptor,'security'),false);
+            assert.equal(Object.hasOwn(packageManifest,'security'),false);
             assert.equal(descriptor.native.icon,'img/icon.png');
             assert.ok(descriptor.package.include.includes('img/icon.png'));
             assert.deepEqual(projectPackageManifest(descriptor),packageManifest);
@@ -476,12 +376,12 @@ test('init preserves one exact npm alias and derives its package routes and lock
     );
     const lock=JSON.parse(await readFile(path.join(workspaceRoot,'arcane.lock.json'),'utf8'));
     assert.equal(
-        lock.runtime.manifest,
-        'node_modules/arcane-sdk/runtime/ARCANE_RUNTIME_RELEASE.json'
+        lock.runtime.root,
+        'node_modules/arcane-sdk/runtime'
     );
     assert.equal(
-        lock.sdkBrowserRuntime.manifest,
-        'node_modules/arcane-sdk/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json'
+        lock.sdkBrowserRuntime.root,
+        'node_modules/arcane-sdk/browser-runtime'
     );
 });
 
@@ -569,14 +469,8 @@ test('init rejects an npm alias declared under the canonical SDK dependency key'
 
 test('init binds an existing external package route before defaulting a missing SDK declaration',async t=>{
     const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-sdk-bound-alias-init-'});
-    const [runtimeRelease,sdkBrowserRuntimeRelease]=await Promise.all([
-        verifyRuntime(),
-        verifySdkBrowserRuntime()
-    ]);
     const generated=workspaceTemplate({
         appId:'bound-alias-sdk-app',
-        runtimeRelease,
-        sdkBrowserRuntimeRelease,
         sdkDependencyName:'arcane-sdk',
         sdkDependencySpecifier:`npm:arcane-os@${SDK_VERSION}`,
         sdkPackageSource:'node_modules/arcane-sdk'
@@ -606,15 +500,9 @@ test('init binds an existing external package route before defaulting a missing 
 });
 
 test('workspace template rejects an npm alias under the canonical SDK dependency key',async()=>{
-    const [runtimeRelease,sdkBrowserRuntimeRelease]=await Promise.all([
-        verifyRuntime(),
-        verifySdkBrowserRuntime()
-    ]);
     assert.throws(
         ()=>workspaceTemplate({
             appId:'canonical-alias-template-app',
-            runtimeRelease,
-            sdkBrowserRuntimeRelease,
             sdkDependencyName:'arcane-os',
             sdkDependencySpecifier:`npm:arcane-os@${SDK_VERSION}`,
             sdkPackageSource:'node_modules/arcane-os'

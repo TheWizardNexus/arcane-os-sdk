@@ -6,9 +6,7 @@
   "entry": "index.html",
   "strategy": "static",
   "security": {
-    "connectOrigins": ["http://127.0.0.1:8025"],
-    "frameOrigins": [],
-    "mediaOrigins": []
+    "connectOrigins": ["http://127.0.0.1:8025"]
   },
   "include": ["mail-browser-proof.css", "index.html", "manifest.json", "modules"],
   "exclude": [],

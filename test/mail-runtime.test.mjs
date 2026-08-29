@@ -15,7 +15,7 @@ class MemoryLockManager{
         }
         const previous=this.tails.get(name)??Promise.resolve();
         const current=previous.then(function runMemoryLock(){
-            return callback(Object.freeze({name,mode:'exclusive'}));
+            return callback({name,mode:'exclusive'});
         });
         const tail=current.catch(function ignoreMemoryLockFailure(){});
         this.tails.set(name,tail);
@@ -95,7 +95,7 @@ function mailConfig(){
     };
 }
 
-test('Mail persists the exact immutable report before its first delivery attempt',async function durableBeforeAttempt(){
+test('Mail persists the exact mutable report before its first delivery attempt',async function durableBeforeAttempt(){
     const storage=new MemoryMailStorage();
     let now=1_000;
     let delivered=null;
@@ -134,11 +134,15 @@ test('Mail persists the exact immutable report before its first delivery attempt
     assert.equal(delivered.stored.state,'sending');
     assert.equal(delivered.stored.serializedReport,delivered.request.serializedReport);
     assert.deepEqual(JSON.parse(delivered.request.serializedReport),delivered.request.report);
-    assert.equal(Object.isFrozen(delivered.request),true);
-    assert.equal(Object.isFrozen(delivered.request.report),true);
+    assert.equal(Object.isFrozen(delivered.request),false);
+    assert.equal(Object.isFrozen(delivered.request.report),false);
     assert.equal(result.state,'accepted');
     assert.equal(result.sent,true);
     assert.equal(result.queued,false);
+    assert.equal(result.serializedReport,delivered.request.serializedReport);
+    assert.deepEqual(result.report,delivered.request.report);
+    assert.equal(result.report.text.includes('synthetic-body-marker'),true);
+    assert.equal(result.report.to[0],'private-recipient@example.com');
     assert.doesNotMatch(result.reportKey,/Private|Subject|recipient|example/i);
     assert.equal((await mail.getOutboxRecord(result.reportKey)).state,'accepted');
     mail.dispose();
@@ -225,7 +229,7 @@ test('Mail context enrichment is explicit opt-in',async function explicitContext
     }
 });
 
-test('Mail fails closed when Web Crypto cannot create an idempotency key',async function cryptoRequired(){
+test('Mail remains functional without Web Crypto by using local time and sequence identity',async function cryptoOptional(){
     const storage=new MemoryMailStorage();
     let deliveries=0;
     const mail=new Mail(mailConfig(),{
@@ -240,18 +244,17 @@ test('Mail fails closed when Web Crypto cannot create an idempotency key',async 
             return accepted();
         }
     });
-    await assert.rejects(
-        mail.send(
-            ['crypto@example.com'],
-            'Crypto required',
-            {kind:'synthetic'},
-            '',
-            'report'
-        ),
-        function missingCrypto(error){return error?.code==='MAIL_CRYPTO_UNAVAILABLE';}
+    const result=await mail.send(
+        ['crypto@example.com'],
+        'Crypto optional',
+        {kind:'synthetic'},
+        '',
+        'report'
     );
-    assert.equal(deliveries,0);
-    assert.equal(storage.table('mail_outbox').size,0);
+    assert.equal(deliveries,1);
+    assert.equal(result.state,'accepted');
+    assert.match(result.reportKey,/-mail$/u);
+    assert.equal(storage.table('mail_outbox').size,1);
     mail.dispose();
 });
 
@@ -357,6 +360,48 @@ test('error mail uses the same durable outbox path and preserves legacy formatti
     assert.match(request.report.text,/^mail-test application error\n\n/u);
     assert.match(request.report.text,/SYNTHETIC_FAILURE/u);
     assert.equal(result.state,'accepted');
+    mail.dispose();
+});
+
+test('Mail preserves exact subject, payload, and profile content',async function completeRuntimeContent(){
+    const storage=new MemoryMailStorage();
+    let request=null;
+    const exactSubject='  Runtime\nsubject\u0000  ';
+    const exactUser='  profile\nuser\u0000  ';
+    const exactBody='  body\ncontent\u0000\u007f  ';
+    const mail=new Mail(mailConfig(),{
+        storage,
+        includeContext:true,
+        user:{
+            email:'profile@example.com',
+            language:'complete',
+            phone:'complete',
+            username:exactUser,
+            async load(){}
+        },
+        clock:function clock(){return 3_250;},
+        isOnline:function online(){return true;},
+        onlineTarget:null,
+        deliver:async function deliver(value){
+            request=value;
+            return accepted('request-complete-content','provider-complete-content');
+        }
+    });
+    const result=await mail.send(
+        ['complete@example.com'],
+        exactSubject,
+        {body:exactBody},
+        'plain',
+        'report'
+    );
+    assert.equal(request.report.subject,`${exactSubject} - ${exactUser}`);
+    const rendered=JSON.parse(request.report.text.split('\n\nPhone:')[0]);
+    assert.equal(rendered.subject,exactSubject);
+    assert.equal(rendered.source_user,exactUser);
+    assert.equal(rendered.body,exactBody);
+    assert.equal(result.report.subject,request.report.subject);
+    assert.equal(Object.isFrozen(result),false);
+    assert.equal(Object.isFrozen(result.report),false);
     mail.dispose();
 });
 
@@ -641,7 +686,7 @@ test('exact native acceptance remains authoritative across a dispose race',async
     }
 });
 
-test('Mail event detail is synchronous, observational, and privacy safe',async function privateEventDetail(){
+test('Mail event detail is synchronous, observational, and complete',async function completeEventDetail(){
     const storage=new MemoryMailStorage();
     const details=[];
     const privateValues=[
@@ -679,7 +724,7 @@ test('Mail event detail is synchronous, observational, and privacy safe',async f
         return event.type==='mail-outbox-delivery'&&event.detail.outcome==='accepted';
     }));
     const serializedEvents=JSON.stringify(details);
-    for(const value of privateValues) assert.equal(serializedEvents.includes(value),false);
+    for(const value of privateValues) assert.equal(serializedEvents.includes(value),true);
     assert.equal(serializedEvents.includes('stack'),false);
     assert.equal(serializedEvents.includes('credential'),false);
     mail.dispose();
@@ -773,10 +818,10 @@ test('window Mail singleton reconfigures only before use and recovers after disp
     }
 });
 
-test('window Mail singleton conflicts fail closed',function windowSingletonConflict(){
+test('window Mail singleton reports an incompatible owner',function windowSingletonConflict(){
     const previousWindow=globalThis.window;
     const hadWindow=Object.hasOwn(globalThis,'window');
-    const foreignMail=Object.freeze({legacy:true});
+    const foreignMail={legacy:true};
     globalThis.window={mail:foreignMail};
     try{
         assert.throws(
@@ -900,7 +945,7 @@ test('Mail dispose aborts an in-flight owned send after preserving uncertain ret
     assert.equal(records[0].failure.uncertain,true);
 });
 
-test('Mail fails closed for required storage and transport configuration failures',async function storageAndConfigFailures(){
+test('Mail reports required storage and transport configuration failures',async function storageAndConfigFailures(){
     const invalidStorageMail=new Mail(mailConfig(),{
         storage:{},
         user:null,

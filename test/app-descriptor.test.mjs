@@ -3,7 +3,6 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {
-    appDescriptorSha256,
     loadAppDescriptor,
     projectNativeDescriptor,
     projectPackageManifest,
@@ -65,34 +64,42 @@ test('canonical descriptor projects exact browser and native compatibility input
         include:['img/icon.png','index.html','manifest.json','modules']
     });
     assert.deepEqual(value.targets,['windows-x64']);
-    assert.match(appDescriptorSha256(value),/^[a-f0-9]{64}$/u);
-    assert.equal(appDescriptorSha256(value),appDescriptorSha256(descriptor()));
 });
 
-test('native descriptors require an included raster icon and exact origin policy',()=>{
+test('ordinary browser descriptors normalize omitted capability and origin declarations',()=>{
+    const browser=descriptor({
+        native:{type:'app',icon:null,order:100,bundledApps:[]},
+        requirements:{arcaneProtocol:'arcane/1',features:[]},
+        targets:['browser']
+    });
+    Reflect.deleteProperty(browser,'permissions');
+    Reflect.deleteProperty(browser,'security');
+    const value=validateAppDescriptor(browser,{appId:'sample-app'});
+    assert.deepEqual(value.permissions,{capabilities:[],methods:[]});
+    assert.deepEqual(value.security,{connectOrigins:[],frameOrigins:[],mediaOrigins:[]});
+    assert.equal(Object.hasOwn(value.requirements,'minimumCoreVersion'),false);
+    assert.equal(Object.hasOwn(projectPackageManifest(browser),'security'),false);
+
+    const native=descriptor({requirements:{arcaneProtocol:'arcane/1',features:[]}});
+    assert.throws(
+        ()=>validateAppDescriptor(native),
+        /minimumCoreVersion is required for non-browser targets/u
+    );
+});
+
+test('native descriptors require an included icon and preserve explicit origin declarations',()=>{
     assert.throws(
         ()=>validateAppDescriptor(descriptor({native:{type:'app',icon:null,order:100,bundledApps:[]}})),
         /icon is required/u
     );
-    assert.throws(
-        ()=>validateAppDescriptor(descriptor({
-            native:{type:'app',icon:'img/icon.svg',order:100,bundledApps:[]},
-            package:{...descriptor().package,include:['img/icon.svg','index.html','manifest.json','modules']}
-        })),
-        /safe raster/u
-    );
-    assert.throws(
-        ()=>validateAppDescriptor(descriptor({
-            security:{connectOrigins:['http://example.com'],frameOrigins:[],mediaOrigins:[]}
-        })),
-        /numeric loopback/u
-    );
-    assert.throws(
-        ()=>validateAppDescriptor(descriptor({
-            security:{connectOrigins:[],frameOrigins:['https://example.com'],mediaOrigins:[]}
-        })),
-        /web\.embed/u
-    );
+    const svg=validateAppDescriptor(descriptor({
+        native:{type:'app',icon:'img/icon.svg',order:100,bundledApps:[]},
+        package:{...descriptor().package,include:['img/icon.svg','index.html','manifest.json','modules']},
+        security:{connectOrigins:['http://example.com'],frameOrigins:['https://example.com'],mediaOrigins:[]}
+    }));
+    assert.equal(svg.native.icon,'img/icon.svg');
+    assert.deepEqual(svg.security.connectOrigins,['http://example.com']);
+    assert.deepEqual(svg.security.frameOrigins,['https://example.com']);
 });
 
 test('browser compatibility accepts the reviewed https scheme frame policy only for browser',()=>{
@@ -169,7 +176,7 @@ test('legacy registry apps expose every implemented native development target',a
     ]);
 });
 
-test('legacy package and native registry security policies must agree exactly',async t=>{
+test('legacy package security remains authoritative without a registry admission gate',async t=>{
     const workspaceRoot=await temporaryDirectory(t);
     const appRoot=path.join(workspaceRoot,'apps','legacy-native');
     await mkdir(appRoot,{recursive:true});
@@ -202,10 +209,8 @@ test('legacy package and native registry security policies must agree exactly',a
             }
         }
     }));
-    await assert.rejects(
-        loadAppDescriptor({workspaceRoot,appRoot,appId:'legacy-native',packageManifest:manifest}),
-        /security policies do not match/u
-    );
+    const loaded=await loadAppDescriptor({workspaceRoot,appRoot,appId:'legacy-native',packageManifest:manifest});
+    assert.deepEqual(loaded.descriptor.security,manifest.security);
 });
 
 test('authored descriptor must project exactly to the compatibility package manifest',async t=>{

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {cp,lstat,mkdir,readFile,rm,writeFile} from 'node:fs/promises';
+import {cp,lstat,mkdir,readFile,rm,symlink,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {SDK_NAME,SDK_VERSION} from '../src/constants.mjs';
@@ -8,12 +8,14 @@ import {
     checkApplication,
     createApplication,
     developApplication,
+    executeOperation,
     initializeApplication,
     materializeInstalledSdkRuntime,
     packageApplication,
     projectPackageManifest,
     runApplication,
     testApplication,
+    upgradeApplication,
     validateWorkspace,
     verifyApplication
 } from '../src/index.mjs';
@@ -24,17 +26,12 @@ async function writeJson(filePath,value){
     await writeFile(filePath,`${JSON.stringify(value,null,2)}\n`);
 }
 
-async function authorize(instance){
+function developmentOrigin(instance){
     const launch=new URL(instance.url);
     assert.equal(launch.origin,instance.origin);
     assert.equal(instance.cleanUrl,`${instance.origin}${launch.pathname}`);
-    assert.match(launch.searchParams.get('arcane_session')||'',/^[0-9a-f]{64}$/);
-    const response=await fetch(instance.url,{redirect:'manual'});
-    assert.equal(response.status,302);
-    assert.equal(response.headers.get('location'),launch.pathname);
-    const cookie=response.headers.get('set-cookie')?.split(';',1)[0];
-    assert.match(cookie||'',/^Arcane-Dev-Session-[0-9a-f]{16}=[0-9a-f]{64}$/);
-    return cookie;
+    assert.equal(launch.search,'');
+    return instance.origin;
 }
 
 async function installSdkAliasRuntime(workspaceRoot,dependencyName='arcane-sdk'){
@@ -70,10 +67,9 @@ async function installSdkAliasRuntime(workspaceRoot,dependencyName='arcane-sdk')
     return installedRoot;
 }
 
-async function request(instance,requestPath,cookie){
+async function request(instance,requestPath){
     return fetch(`${instance.origin}${requestPath}`,{
-        redirect:'manual',
-        headers:{cookie}
+        redirect:'manual'
     });
 }
 
@@ -183,7 +179,7 @@ async function configureLegacyIntegratedWorkspace(workspaceRoot){
     );
 }
 
-test('installed SDK materialization refreshes an alias projection transactionally',async t=>{
+test('installed SDK materialization copies the complete alias runtime without identity metadata',async t=>{
     const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-installed-runtime-'});
     await writeJson(path.join(workspaceRoot,'package.json'),{
         name:'installed-runtime-fixture',
@@ -194,66 +190,51 @@ test('installed SDK materialization refreshes an alias projection transactionall
     const installedRoot=await installSdkAliasRuntime(workspaceRoot);
 
     const created=await materializeInstalledSdkRuntime({workspaceRoot});
-    assert.equal(created.status,'created');
-    assert.match(created.generation,/^[a-f0-9-]{36}$/u);
+    assert.equal(created.status,'materialized');
     assert.equal(created.installation.dependencyName,'arcane-sdk');
     assert.equal(created.installation.packageSource,'node_modules/arcane-sdk');
-    assert.equal(created.persistentReceipt.installedPackage.dependencyName,'arcane-sdk');
-    assert.equal(created.persistentReceipt.installedPackage.packageName,SDK_NAME);
-    assert.equal(created.persistentReceipt.installedPackage.packageVersion,SDK_VERSION);
-    assert.equal(created.persistentReceipt.generation,created.generation);
-    assert.equal(created.persistentReceipt.projection.fileCount,created.workspaceRuntimeReceipt.fileCount);
-    assert.equal(
-        created.persistentReceipt.projection.contentSha256,
-        created.workspaceRuntimeReceipt.contentSha256
-    );
-    const createdReceiptBytes=await readFile(created.receiptPath);
+    assert.equal(created.installation.canonicalPackageRoot,installedRoot);
+    assert.equal(created.workspaceRuntime.kind,'arcane-workspace-runtime-content');
+    assert.equal(created.workspaceRuntime.runtimeRoot,path.join(workspaceRoot,'arcane'));
+    assert.equal(Object.hasOwn(created,'generation'),false);
+    assert.equal(Object.hasOwn(created,'persistentReceipt'),false);
+    assert.equal(Object.hasOwn(created,'receiptPath'),false);
+    assert.equal(Object.hasOwn(created,'lockReconciliation'),false);
 
-    const reused=await materializeInstalledSdkRuntime({workspaceRoot});
-    assert.equal(reused.status,'reused');
-    assert.equal(reused.generation,created.generation);
-    assert.deepEqual(await readFile(reused.receiptPath),createdReceiptBytes);
-
-    await rm(reused.receiptPath);
-    const stalePath=path.join(workspaceRoot,'arcane','stale-runtime-byte.txt');
+    const stalePath=path.join(workspaceRoot,'arcane','stale-runtime-file.txt');
     await writeFile(stalePath,'stale\n');
-    const legacyRefreshed=await materializeInstalledSdkRuntime({workspaceRoot});
-    assert.equal(legacyRefreshed.status,'refreshed');
-    assert.notEqual(legacyRefreshed.generation,created.generation);
-    await assert.rejects(lstat(stalePath),{code:'ENOENT'});
-
-    const priorReceiptBytes=await readFile(legacyRefreshed.receiptPath);
-    const priorRuntimeBytes=await readFile(
-        path.join(workspaceRoot,'arcane','css','theme.css')
-    );
-    await writeFile(path.join(installedRoot,'materialization-generation.txt'),'next\n');
-    const cancellation=new AbortController();
-    await assert.rejects(
-        materializeInstalledSdkRuntime({
-            workspaceRoot,
-            signal:cancellation.signal,
-            onEvent:event=>{
-                if(event.type==='workspace.runtime.materialize.progress'){
-                    cancellation.abort(new Error('cancel before materialization commit'));
-                }
-            }
-        }),
-        error=>error?.code==='ARCANE_CANCELLED'
-    );
-    assert.deepEqual(await readFile(legacyRefreshed.receiptPath),priorReceiptBytes);
-    assert.deepEqual(
-        await readFile(path.join(workspaceRoot,'arcane','css','theme.css')),
-        priorRuntimeBytes
-    );
-
     const refreshed=await materializeInstalledSdkRuntime({workspaceRoot});
-    assert.equal(refreshed.status,'refreshed');
-    assert.notEqual(refreshed.generation,legacyRefreshed.generation);
-    assert.equal(refreshed.persistentReceipt.installedPackage.canonicalLocation,installedRoot);
-    assert.deepEqual(
-        JSON.parse(await readFile(refreshed.receiptPath,'utf8')),
-        refreshed.persistentReceipt
-    );
+    assert.equal(refreshed.status,'materialized');
+    await assert.rejects(lstat(stalePath),{code:'ENOENT'});
+});
+
+test('application upgrade runs the application npm upgrade without runtime reconciliation',async t=>{
+    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-upgrade-'});
+    const appId='upgrade-app';
+    await createApplication({
+        targetPath:workspaceRoot,
+        appId,
+        displayName:'Upgrade App'
+    });
+    await installSdkAliasRuntime(workspaceRoot,SDK_NAME);
+    const staleRuntimePath=path.join(workspaceRoot,'arcane','stale-runtime-file.txt');
+    await writeFile(staleRuntimePath,'stale\n');
+    const reviewPath=path.join(workspaceRoot,'apps',appId,'modules','review.html');
+    await writeFile(reviewPath,'<main>ordinary application content</main>\n');
+
+    const upgraded=await upgradeApplication({workspaceRoot,appId});
+    assert.equal(upgraded.kind,'arcane-application-upgrade');
+    assert.equal(upgraded.command,'npm');
+    assert.deepEqual(upgraded.args,['upgrade']);
+    assert.equal(upgraded.cwd,workspaceRoot);
+    assert.equal(upgraded.code,0);
+    assert.equal(typeof upgraded.stdout,'string');
+    assert.equal(typeof upgraded.stderr,'string');
+    assert.equal(Object.hasOwn(upgraded,'runtime'),false);
+    assert.equal(Object.hasOwn(upgraded,'importMap'),false);
+    assert.equal(Object.hasOwn(upgraded,'lockReconciliation'),false);
+    assert.equal(await readFile(staleRuntimePath,'utf8'),'stale\n');
+    assert.equal(await readFile(reviewPath,'utf8'),'<main>ordinary application content</main>\n');
 });
 
 test('unchanged two-route integrated Arcane workspace keeps legacy dev and package behavior',async t=>{
@@ -282,23 +263,23 @@ test('unchanged two-route integrated Arcane workspace keeps legacy dev and packa
 
     const development=await developApplication({workspaceRoot,appId,host:'127.0.0.1',port:0});
     t.after(()=>development.close());
-    const cookie=await authorize(development);
+    developmentOrigin(development);
     assert.equal(
-        (await request(development,'/node_modules/strong-type/index.js',cookie)).status,
+        (await request(development,'/node_modules/strong-type/index.js')).status,
         200
     );
     await development.close();
     await development.lifecycle;
 
     const packaged=await packageApplication({workspaceRoot,appId});
-    assert.equal(packaged.release.app,appId);
+    assert.equal(packaged.release.appId,appId);
     assert.equal(
         await readFile(path.join(workspaceRoot,'dist',appId,'node_modules','strong-type','index.js'),'utf8'),
         await readFile(path.join(workspaceRoot,'node_modules','strong-type','index.js'),'utf8')
     );
     const built=await buildApplication({workspaceRoot,appId,target:'browser'});
     assert.equal(built.target,'browser');
-    assert.equal(built.release.app,appId);
+    assert.equal(built.release.appId,appId);
     const running=await runApplication({
         workspaceRoot,
         appId,
@@ -316,6 +297,10 @@ test('integrated Arcane workspace supports the complete browser app workflow',as
     const parent=await temporaryDirectory(t,{prefix:'arcane-integrated-workspace-'});
     const workspaceRoot=path.join(parent,'workspace');
     const appId='integrated-app';
+    const fragmentPath=path.join(
+        workspaceRoot,'apps',appId,'modules','navigation-fragment.html'
+    );
+    const fragmentBytes='<nav data-arcane-fragment>Navigation fragment</nav>\n';
     let packaged;
 
     await t.test('creates an integrated workspace without a managed SDK install',async()=>{
@@ -339,6 +324,27 @@ test('integrated Arcane workspace supports the complete browser app workflow',as
             path.join(workspaceRoot,'apps','other-app','test','other-must-not-run.test.mjs'),
             "import test from 'arcane-os/testing';\ntest('other app test must not run',()=>{throw new Error('other app test ran');});\n"
         );
+        await writeFile(
+            path.join(workspaceRoot,'apps',appId,'test','managed-runtime.test.mjs'),
+            `import assert from 'node:assert/strict';
+import SpeechPlayback,{splitSpeechText} from 'arcane-os/speech-playback';
+import test from 'arcane-os/testing';
+test('selected source app tests consume public Node package entrypoints',()=>{
+    assert.equal(typeof SpeechPlayback,'function');
+    assert.deepEqual(splitSpeechText('complete source content'),['complete source content']);
+});
+`
+        );
+        const entryPath=path.join(workspaceRoot,'apps',appId,'index.html');
+        const reviewPath=path.join(workspaceRoot,'apps',appId,'modules','review.html');
+        await writeFile(
+            reviewPath,
+            (await readFile(entryPath,'utf8')).replace(
+                '<base href="../../">',
+                '<base href="../../../">'
+            )
+        );
+        await writeFile(fragmentPath,fragmentBytes);
 
         await assert.rejects(lstat(path.join(workspaceRoot,'arcane.lock.json')),{code:'ENOENT'});
         await assert.rejects(
@@ -372,6 +378,20 @@ test('integrated Arcane workspace supports the complete browser app workflow',as
         );
     });
 
+    await t.test('refreshes directly navigable documents and preserves HTML fragments',async()=>{
+        const refreshed=await executeOperation('import-map',{workspaceRoot,appId});
+        assert.equal(refreshed.importMap.documentCount,2);
+        assert.deepEqual(
+            refreshed.importMap.documentPaths.map(file=>path.relative(workspaceRoot,file).replaceAll('\\','/')),
+            [`apps/${appId}/index.html`,`apps/${appId}/modules/review.html`]
+        );
+        assert.match(
+            await readFile(path.join(workspaceRoot,'apps',appId,'modules','review.html'),'utf8'),
+            /<script type="importmap" data-arcane-import-map>[\s\S]*arcane\/SpeechPlayback/u
+        );
+        assert.equal(await readFile(fragmentPath,'utf8'),fragmentBytes);
+    });
+
     await t.test('checks only the selected application test scope',async()=>{
         const checked=await checkApplication({workspaceRoot,appId});
         assert.equal(checked.ok,true);
@@ -394,15 +414,14 @@ test('integrated Arcane workspace supports the complete browser app workflow',as
         });
         t.after(()=>development.close());
         assert.equal(development.mode,'source');
-        const developmentCookie=await authorize(development);
+        developmentOrigin(development);
         const sourceEntry=await request(
             development,
-            `/apps/${appId}/index.html`,
-            developmentCookie
+            `/apps/${appId}/index.html`
         );
         assert.equal(sourceEntry.status,200);
         assert.match(await sourceEntry.text(),/Integrated App/);
-        const sourceTheme=await request(development,'/arcane/css/theme.css',developmentCookie);
+        const sourceTheme=await request(development,'/arcane/css/theme.css');
         assert.equal(sourceTheme.status,200);
         assert.match(await sourceTheme.text(),/--background/);
         await development.close();
@@ -412,18 +431,20 @@ test('integrated Arcane workspace supports the complete browser app workflow',as
     await t.test('packages an integrated application release',async()=>{
         packaged=await packageApplication({workspaceRoot,appId});
         assert.equal(packaged.workspaceMode,'integrated');
-        assert.equal(packaged.runtimeContentSha256,null);
-        assert.equal(packaged.release.app,appId);
-        assert.match(packaged.release.contentSha256,/^[0-9a-f]{64}$/);
+        assert.equal(packaged.release.appId,appId);
+        assert.equal(packaged.release.manifest.app.id,appId);
+        assert.ok(packaged.release.files.includes('index.html'));
+        assert.equal(Object.hasOwn(packaged,'tests'),false);
+        assert.equal(Object.hasOwn(packaged.release,'contentSha256'),false);
     });
 
-    await t.test('verifies the packaged release against its content hash',async()=>{
+    await t.test('inspects the packaged release against its complete file inventory',async()=>{
         const verified=await verifyApplication({workspaceRoot,appId});
         assert.equal(verified.workspaceMode,'integrated');
-        assert.equal(verified.runtimeContentSha256,null);
-        assert.equal(verified.release.app,appId);
+        assert.equal(verified.release.appId,appId);
         assert.equal(verified.release.verified,true);
-        assert.equal(verified.release.contentSha256,packaged.release.contentSha256);
+        assert.deepEqual(verified.release.files,packaged.release.files);
+        assert.equal(Object.hasOwn(verified.release,'contentSha256'),false);
     });
 
     await t.test('builds an unsigned browser directory from the release',async()=>{
@@ -438,8 +459,8 @@ test('integrated Arcane workspace supports the complete browser app workflow',as
         assert.equal(built.target,'browser');
         assert.equal(built.format,'directory');
         assert.equal(built.signing,'none');
-        assert.equal(built.runtimeContentSha256,null);
-        assert.equal(built.release.app,appId);
+        assert.equal(Object.hasOwn(built,'runtimeContentSha256'),false);
+        assert.equal(built.release.appId,appId);
     });
 
     await t.test('runs packaged app and shared runtime assets in a browser host',async()=>{
@@ -454,11 +475,11 @@ test('integrated Arcane workspace supports the complete browser app workflow',as
         assert.equal(running.target,'browser');
         assert.equal(running.mode,'packaged');
         assert.equal(running.verified.verified,true);
-        const runningCookie=await authorize(running);
-        const packagedEntry=await request(running,'/index.html',runningCookie);
+        developmentOrigin(running);
+        const packagedEntry=await request(running,'/index.html');
         assert.equal(packagedEntry.status,200);
         assert.match(await packagedEntry.text(),/Integrated App/);
-        const packagedTheme=await request(running,'/arcane/css/theme.css',runningCookie);
+        const packagedTheme=await request(running,'/arcane/css/theme.css');
         assert.equal(packagedTheme.status,200);
         assert.match(await packagedTheme.text(),/--background/);
         await running.close();
@@ -466,7 +487,7 @@ test('integrated Arcane workspace supports the complete browser app workflow',as
     });
 });
 
-test('programmatic application tests preserve bounded isolated failure diagnostics',async t=>{
+test('programmatic application tests preserve complete isolated failure diagnostics',async t=>{
     const parent=await temporaryDirectory(t,{prefix:'arcane-test-diagnostics-'});
     const workspaceRoot=path.join(parent,'workspace');
     const appId='diagnostic-app';
@@ -505,15 +526,6 @@ test('programmatic application tests preserve bounded isolated failure diagnosti
         assert.match(error.message,/at .*diagnostic-0\.test\.mjs/);
         assert.deepEqual(error.details?.testFiles,relativeFiles);
         assert.equal(error.details?.failures?.length,relativeFiles.length);
-        assert.equal(error.details?.outputTruncated,true);
-        const capturedBytes=error.details.failures.reduce(
-            (total,failure)=>total
-                +Buffer.byteLength(failure.stdout,'utf8')
-                +Buffer.byteLength(failure.stderr,'utf8'),
-            0
-        );
-        assert.equal(error.details.outputBytes,capturedBytes);
-        assert.ok(capturedBytes<=error.details.outputLimitBytes);
         for(let index=0;index<error.details.failures.length;index+=1){
             const failure=error.details.failures[index];
             assert.equal(failure.testFile,relativeFiles[index]);
@@ -527,16 +539,34 @@ test('programmatic application tests preserve bounded isolated failure diagnosti
         return true;
     };
 
-    await t.test('testApplication reports bounded per-file diagnostics',async()=>{
+    await t.test('testApplication reports complete per-file diagnostics',async()=>{
         await assert.rejects(
             testApplication({workspaceRoot,workspaceMode:'integrated',appId,appRoot}),
             assertDiagnostics
         );
     });
-    await t.test('checkApplication preserves bounded per-file diagnostics',async()=>{
+    await t.test('checkApplication preserves complete per-file diagnostics',async()=>{
         await assert.rejects(
             checkApplication({workspaceRoot,appId}),
             assertDiagnostics
         );
     });
+});
+
+test('application test discovery rejects links that leave the selected app test-code tree',async t=>{
+    const parent=await temporaryDirectory(t,{prefix:'arcane-test-path-boundary-'});
+    const workspaceRoot=path.join(parent,'workspace');
+    const appId='test-path-app';
+    await createApplication({targetPath:workspaceRoot,appId,displayName:'Test Path App'});
+    await configureIntegratedWorkspace(workspaceRoot);
+    const appRoot=path.join(workspaceRoot,'apps',appId);
+    const testRoot=path.join(appRoot,'test');
+    const outside=path.join(parent,'outside.test.mjs');
+    await writeFile(outside,"export const outside=true;\n");
+    await symlink(outside,path.join(testRoot,'linked.test.mjs'),'file');
+
+    await assert.rejects(
+        testApplication({workspaceRoot,workspaceMode:'integrated',appId,appRoot}),
+        /tests refuse symbolic links/u
+    );
 });
