@@ -64,7 +64,9 @@ test('the selected npm tarball installs and exposes the public SDK',{
         './runtime/arcane/modules/SpeechPlayback.js'
     );
 
-    const capabilityContract=path.join(consumerRoot,'installed-capability.test.mjs');
+    const testRoot=path.join(consumerRoot,'test');
+    await mkdir(testRoot);
+    const capabilityContract=path.join(testRoot,'installed-capability.test.mjs');
     await writeFile(capabilityContract,`import assert from 'node:assert/strict';
 import {SDK_VERSION,createEventManager,listTargets} from 'arcane-os';
 import test from 'arcane-os/testing';
