@@ -34,8 +34,8 @@
       "summary": "Owns provider-selectable chat and the one-time caller-authority browser STT/TTS configuration, lifecycle, synthesis, transcription, and playback boundary.",
       "availability": "Browser + native bridge + cloud",
       "protocol": "arcane-ai-browser-speech-configuration/1, AIProviderRuntime arcane-ai-provider/2 routes, globalThis.arcaneEvents, OpenAI HTTPS, Arcane.ollama, Arcane.speech, Android WebView bridge",
-      "normalization": "Complete mutable caller-owned browser speech authority, SDK-owned provider registration/replacement/disposal, explicit STT/TTS activation, sticky readiness, exact structural call identity with required arguments.message, nonblank matching tool-result sequencing, all-choice validation, native Ollama structural adaptation, complete-response then single-tool then completion callback ordering, observed async callbacks, Blob/File transcription, playable audio, mute, and cancellation are normalized; provider/model/runtime/voice policy remains caller-owned.",
-      "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact calls, synthesis/transcription, and playback controls; installs `window.ai` and projects `ai-ready`."
+      "normalization": "Complete mutable caller-owned browser speech authority, SDK-owned provider registration/replacement/disposal, explicit STT/TTS activation, sticky readiness, exact structural call identity with required arguments.message, nonblank matching tool-result sequencing, all-choice validation, native Ollama structural adaptation, complete-response then single-tool then completion callback ordering, observed async callbacks, Blob/File transcription, playable audio, active-generation TTS operation-failure routing, mute, and cancellation are normalized; provider/model/runtime/voice policy remains caller-owned.",
+      "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact calls, synthesis/transcription, and playback controls; installs `window.ai` and projects `ai-ready` plus active-generation `ai-tts-failure`."
     },
     {
       "file": "runtime/arcane/modules/AIPreferenceRuntime.js",
@@ -932,8 +932,8 @@
       ],
       "summary": "Parses the deterministic packaged Modelfile subset and extracts the SYSTEM prompt.",
       "availability": "Cross-host",
-      "protocol": "Optional same-origin read-only fetch",
-      "normalization": "Strict normalized definition with coded syntax errors.",
+      "protocol": "Optional ordinary read-only fetch",
+      "normalization": "Complete mutable definition data with coded syntax errors for malformed input.",
       "surface": "`parseModelDefinition()`, `loadModelDefinitionSystemPrompt()`."
     },
     {

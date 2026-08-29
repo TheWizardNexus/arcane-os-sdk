@@ -173,8 +173,8 @@ console.log(result.advisories.get(messages[0]));`
     Object.freeze({
         name:'ModelDefinition.js',
         classification:'public-first-party',
-        lifecycleSideEffects:"parseModelDefinition() is pure. loadModelDefinitionSystemPrompt() makes one bounded read-only GET with redirect rejection and credentials:'same-origin'; it accepts cross-origin URLs when CORS permits but sends credentials only to same-origin targets, and never contacts a model service itself.",
-        paramsResults:'parseModelDefinition(source) returns deep-frozen {from,system,parameters} for the exact FROM + triple-quoted SYSTEM + unique PARAMETER subset. loadModelDefinitionSystemPrompt(url,{fetchImpl?}) resolves the SYSTEM prompt string.',
+        lifecycleSideEffects:'parseModelDefinition() is pure. loadModelDefinitionSystemPrompt() makes one complete read-only GET using the fetch implementation\'s ordinary redirect, credentials, and cache behavior, and never contacts a model service itself.',
+        paramsResults:'parseModelDefinition(source) returns mutable {from,system,parameters} for the exact FROM + triple-quoted SYSTEM + unique PARAMETER subset, preserving complete SYSTEM and parameter content. loadModelDefinitionSystemPrompt(url,{fetchImpl?}) resolves the complete SYSTEM prompt string.',
         events:[],
         errors:['MODEL_DEFINITION_INVALID','MODEL_DEFINITION_UNAVAILABLE','Fetch rejection is preserved.'],
         capabilitiesCore:'None.',

@@ -40,7 +40,7 @@ own asynchronous work, cancellation, and backpressure.
 
 | Module | Kind | Capability | Availability | Normalization |
 | --- | --- | --- | --- | --- |
-| [`AI.js`](#aijs) | esm | Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structured output, streaming, and queued audio playback. | Browser + native bridge + cloud | High-level chat/speech behavior is normalized; provider diagnostics and media errors remain mixed. |
+| [`AI.js`](#aijs) | esm | Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structured output, streaming, and queued audio playback. | Browser + native bridge + cloud | High-level chat/speech behavior and active TTS operation failures are normalized; provider diagnostics remain mixed. |
 | [`AIPreferenceRuntime.js`](#aipreferenceruntimejs) | esm | Applies and reads non-persistent per-user AI preference overrides. | Cross-host | Normalized six-slot preference state. |
 | [`AIPreferenceTuple.js`](#aipreferencetuplejs) | esm | Normalizes and compares the six provider/model preference slots. | Cross-host | Fully normalized frozen tuple. |
 | [`AIProviderRuntime.js`](#aiproviderruntimejs) | esm | Owns provider-neutral selection, lifecycle, routing, startup, requests, streaming, cancellation, and independent LLM/STT/TTS state. | Cross-host runtime; provider-specific availability | Normalized required provider members plus route/status contracts, with explicit local-only selection and no implicit fallback. |
@@ -93,7 +93,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`MD.js`](#mdjs) | esm | Renders complete Markdown with Marked and exposes the complete rendered markup. | Browser / native WebView | Complete raw and rendered Marked values; parse errors vendor-native. |
 | [`MemoryRecords.js`](#memoryrecordsjs) | esm | Normalizes memory content and detects meaningful stored memory. | Cross-host | Fully normalized string/boolean results. |
 | [`MessageAdvisory.js`](#messageadvisoryjs) | esm | Normalizes message content advisories and contains per-message inspection failures. | Cross-host | Normalized advisory records; inspector failures converted to unavailable results. |
-| [`ModelDefinition.js`](#modeldefinitionjs) | esm | Parses the deterministic packaged Modelfile subset and extracts the SYSTEM prompt. | Cross-host | Strict normalized definition with coded syntax errors. |
+| [`ModelDefinition.js`](#modeldefinitionjs) | esm | Parses the deterministic packaged Modelfile subset and extracts the SYSTEM prompt. | Cross-host | Complete mutable definition with coded malformed-input errors. |
 | [`Ollama.js`](#ollamajs) | esm | Provides the first-class Arcane Ollama client without direct access to localhost:11434. | Native bridge | Principal methods preserve provider-native envelopes; readiness/text/unload helpers normalize. |
 | [`OllamaModelIdentifier.js`](#ollamamodelidentifierjs) | esm | Validates and canonicalizes the syntax of Ollama model identifiers without granting model admission. | Cross-host | Fully normalized string/boolean result. |
 | [`OllamaSettings.js`](#ollamasettingsjs) | esm | Defines complete runtime/service preference schemas and deterministic Arcane brain alias names. | Cross-host | Fully normalized settings/name contract. |
@@ -143,7 +143,7 @@ default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and
 `streamRequest()`, `streamMessage()`, `fetchRequest()`, `fetch()`,
 `streamTTS()`, `finishTTS()`, `fetchTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`,
 `playAudio()`; consumes `user-entity-loaded` and `arcane-ollama-ready`,
-installs `window.ai`, and emits `ai-ready`.
+installs `window.ai`, and emits `ai-ready` and `ai-tts-failure`.
 
 The provider-runtime methods keep LLM, STT, and TTS selection explicit. They do
 not reinterpret one provider's failure as permission to select another
@@ -198,6 +198,12 @@ rejected. It propagates the caller-owned signal and returns a playable `Blob`;
 it does not independently choose a provider, cloud fallback, model, runtime, or
 voice policy for the application. Existing `streamTTS()` and `finishTTS()` use
 this same request boundary.
+Every active-generation, non-abort synthesis, decode, playback-start, or
+playback-resume failure emits `ai-tts-failure` with the complete `Error`, exact
+operation boundary, generation, and stable reason. Muting, explicit
+cancellation, permission waiting, and superseded generations do not emit a
+failure. The operation event does not rewrite provider readiness; the consuming
+Chat/Speech surface owns its visible mute and recovery state.
 `fetchSTT(audioFile,responseHandler,signal)` propagates the caller-owned signal;
 provider routes accept a `Blob` or `File` directly and leave media decoding,
 PCM normalization, and WAV construction to the selected shared provider;
@@ -2165,7 +2171,7 @@ Exact exports: `loadModelDefinitionSystemPrompt`, `parseModelDefinition`.
 
 ### Availability and normalization
 
-**Cross-host.** Strict normalized definition with coded syntax errors. Transport: Optional same-origin read-only fetch. [Deep protocol details](protocols.md).
+**Cross-host.** Complete mutable definition data with coded syntax errors for malformed input. Transport: Optional ordinary read-only fetch using the fetch implementation's redirect, credentials, and cache behavior. [Deep protocol details](protocols.md).
 
 ### Example
 

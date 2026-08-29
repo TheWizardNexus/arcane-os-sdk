@@ -5,7 +5,7 @@
         --arcane-speech-padding-block-start: .65rem;
         --arcane-speech-padding-inline: .75rem;
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr) max-content max-content;
+        grid-template-columns: auto minmax(0, 1fr) max-content;
         align-items: center;
         gap: var(--arcane-space-3, .75rem);
         box-sizing: border-box;
@@ -94,16 +94,8 @@
         color: var(--arcane-danger, var(--danger-color));
     }
 
-    #endButton {
-        grid-column: 3;
-        justify-self: end;
-        background: var(--arcane-danger, var(--danger-color));
-        border-color: var(--arcane-danger, var(--danger-color));
-        color: var(--arcane-action-text, var(--button-text-color, var(--text-color)));
-    }
-
     #muteButton {
-        grid-column: 4;
+        grid-column: 3;
         justify-self: end;
         float: none;
         background: var(--arcane-secondary, var(--secondary-color));
@@ -125,11 +117,6 @@
             grid-column: 2 / span 2;
         }
 
-        #endButton {
-            grid-row: 1;
-            grid-column: 2;
-        }
-
         #muteButton {
             grid-row: 1;
             grid-column: 3;
@@ -142,10 +129,10 @@
 <button id="sttActivationButton" type="button" hidden disabled>Start transcription</button>
 <button id="stopButton" type="button" class="hidden" disabled>Send</button>
 <p id="speechStatus" class="speech_status" role="status" aria-live="polite"></p>
-<button id="endButton" type="button" class="end">End</button>
 <button id="muteButton" type="button" class="mute" aria-pressed="true" aria-label="Voice unavailable" disabled>Voice unavailable</button>
 
 <script type="module">
+    const completeValue = (value) => value;
     const {
         createArcaneEventSource,
         projectArcaneDOMEvent
@@ -187,7 +174,6 @@
     const recordButton = shadowRoot.querySelector('#recordButton');
     const sttActivationButton = shadowRoot.querySelector('#sttActivationButton');
     const stopButton = shadowRoot.querySelector('#stopButton');
-    const endButton = shadowRoot.querySelector('#endButton');
     const muteButton = shadowRoot.querySelector('#muteButton');
     const speechStatus = shadowRoot.querySelector('#speechStatus');
     const silenceDuration = 0;
@@ -260,17 +246,23 @@
 
     function publicSpeechErrorFields(error, boundaryCode) {
         let causeCode = '';
+        let message = '';
         try {
             causeCode = typeof error?.code === 'string'
-                ? error.code.trim()
+                ? error.code
+                : '';
+            message = typeof error?.message === 'string'
+                ? error.message
                 : '';
         } catch {}
-        return Object.freeze(
+        return completeValue(
             {
+                error,
                 code: boundaryCode,
                 ...(causeCode && causeCode !== boundaryCode
                     ? { causeCode }
-                    : {})
+                    : {}),
+                ...(message ? { message } : {})
             }
         );
     }
@@ -327,7 +319,7 @@
         }
     );
 
-    const lifecycleListenerOptions = Object.freeze(
+    const lifecycleListenerOptions = completeValue(
         { signal: runtimeStateAbortController.signal }
     );
     recordButton.addEventListener('pointerdown', handleRecordPointerDown, lifecycleListenerOptions);
@@ -339,7 +331,6 @@
     recordButton.addEventListener('blur', handleRecordBlur, lifecycleListenerOptions);
     stopButton.addEventListener('click', stop, lifecycleListenerOptions);
     muteButton.addEventListener('click', muteToggle, lifecycleListenerOptions);
-    endButton.addEventListener('click', submitCompletionCommand, lifecycleListenerOptions);
     window.addEventListener(
         'pagehide',
         destroy,
@@ -352,8 +343,8 @@
             signal: runtimeStateAbortController.signal
         }
     );
-    if (!host.initialMuted && ttsRole.state === 'ready') {
-        host.muted = false;
+    if (!host.initialMuted) {
+        applyConfiguredMutedState(false);
     }
     synchronizeAIMutedState();
     renderControls();
@@ -385,7 +376,7 @@
     );
 
     function unavailableRole(role) {
-        return Object.freeze(
+        return completeValue(
             {
                 role,
                 state: 'unavailable',
@@ -458,6 +449,13 @@
         if (microphoneWasAvailable && !host.availability.microphone) {
             cancelSTTOperation('microphone-unavailable');
         }
+        if (
+            !microphoneWasAvailable
+            && host.availability.microphone
+            && localStatus?.owner === 'microphone'
+        ) {
+            localStatus = null;
+        }
         applyRoleTransitions(previousSTTRole, previousTTSRole);
         return { ...host.availability };
     }
@@ -482,9 +480,12 @@
         if (muted) {
             requestUserMute();
         } else {
-            pendingUnmute = false;
-            host.muted = ttsRole.state !== 'ready';
-            synchronizeAIMutedState();
+            pendingUnmute = true;
+            host.muted = true;
+            if (!settleSuccessfulUnmute()) {
+                synchronizeAIMutedState();
+                continuePendingUnmute();
+            }
         }
         renderControls();
         renderStatus();
@@ -495,6 +496,12 @@
         const previousTTSRole = ttsRole;
         sttRole = snapshot.roles.stt;
         ttsRole = snapshot.roles.tts;
+        if (sttRole.state === 'error' && previousSTTRole.state !== 'error') {
+            console.error('Arcane transcription runtime failed.', sttRole.error);
+        }
+        if (ttsRole.state === 'error' && previousTTSRole.state !== 'error') {
+            console.error('Arcane voice runtime failed.', ttsRole.error);
+        }
         clearSettledTTSIntent();
         applyRoleTransitions(previousSTTRole, previousTTSRole);
     }
@@ -524,6 +531,7 @@
         }
 
         settleSuccessfulUnmute();
+        continuePendingUnmute();
 
         synchronizeAIMutedState();
         renderControls();
@@ -742,19 +750,21 @@
         if (!progress) {
             return fallback;
         }
-
-        const amount = progress.total === null
-            ? `${progress.completed} ${progress.unit}`
-            : `${progress.completed} of ${progress.total} ${progress.unit}`;
-        const heartbeat = progress.heartbeat ? ', active heartbeat' : '';
-        return `${progress.phase}, ${amount}${heartbeat}`;
+        return progress.phase;
     }
 
     function visibleErrorMessage(error, fallback) {
-        const message = typeof error?.message === 'string'
-            ? error.message.trim()
-            : '';
-        return (message || fallback).slice(0, 240);
+        try {
+            if (error?.userSafe === true) {
+                const message = typeof error.userMessage === 'string'
+                    ? error.userMessage
+                    : error.message;
+                if (typeof message === 'string' && message.trim()) {
+                    return message;
+                }
+            }
+        } catch {}
+        return fallback;
     }
 
     async function observeMicrophonePermission() {
@@ -880,11 +890,6 @@
         stop();
     }
 
-    function submitCompletionCommand(event) {
-        event.target.disabled = true;
-        void transcribe('End now, run all tool functions.');
-    }
-
     function muteToggle() {
         if (pendingTTSIntent === 'load' || ttsRole.state === 'loading') {
             requestUserMute();
@@ -982,6 +987,25 @@
         return true;
     }
 
+    function continuePendingUnmute() {
+        if (!pendingUnmute || destroyed || !selectedRole(ttsRole)) {
+            return false;
+        }
+        if (
+            pendingTTSIntent === 'load'
+            || activeTTSIntent?.action === 'load'
+            || ttsRole.state === 'loading'
+        ) {
+            return false;
+        }
+        if (ttsRole.state !== 'unloaded') {
+            return false;
+        }
+
+        void requestUserUnmute();
+        return true;
+    }
+
     async function requestTTSIntent(action, reason) {
         if (destroyed) {
             return false;
@@ -991,7 +1015,7 @@
         }
         const generation = ++ttsIntentGeneration;
         const operationId = nextSpeechOperationId(`tts-${action}`);
-        const intent = Object.freeze({ action, generation, operationId });
+        const intent = completeValue({ action, generation, operationId });
         activeTTSIntent = intent;
         ttsOperationId = operationId;
         pendingTTSIntent = action === 'load' && ttsRole.state === 'ready'
@@ -1054,6 +1078,7 @@
             `ARCANE_SPEECH_TTS_${action.toUpperCase()}_REJECTED`
         );
         const reason = `tts-${action}-rejected`;
+        console.error(`Arcane voice ${action} request failed.`, error);
         dispatchSpeechEvent(
             'speech-tts-lifecycle-error',
             {
@@ -1084,43 +1109,58 @@
         if (destroyed) {
             return false;
         }
-        const playbackRejected = boundary === 'playback';
-        const message = visibleErrorMessage(
-            error,
-            playbackRejected
-                ? 'Speech playback failed.'
-                : 'Speech synthesis failed.'
-        );
+        const failures = {
+            synthesis: {
+                code: 'ARCANE_SPEECH_TTS_SYNTHESIS_REQUEST_REJECTED',
+                message: 'Speech synthesis failed.',
+                reason: 'tts-synthesis-rejected'
+            },
+            decode: {
+                code: 'ARCANE_SPEECH_TTS_DECODE_REJECTED',
+                message: 'Speech audio could not be decoded.',
+                reason: 'tts-decode-rejected'
+            },
+            'playback-start': {
+                code: 'ARCANE_SPEECH_TTS_PLAYBACK_START_REJECTED',
+                message: 'Speech playback could not start.',
+                reason: 'tts-playback-start-rejected'
+            },
+            'playback-resume': {
+                code: 'ARCANE_SPEECH_TTS_PLAYBACK_RESUME_REJECTED',
+                message: 'Speech playback could not resume.',
+                reason: 'tts-playback-resume-rejected'
+            }
+        };
+        const normalizedBoundary = Object.hasOwn(failures, boundary)
+            ? boundary
+            : 'synthesis';
+        const failure = failures[normalizedBoundary];
+        const message = visibleErrorMessage(error, failure.message);
         host.muted = true;
         stopTTSPlayback();
         localStatus = {
-            message: `${playbackRejected ? 'Speech playback' : 'Speech synthesis'} failed: ${message}`,
+            message,
             tone: 'error'
         };
-        const errorFields = publicSpeechErrorFields(
-            error,
-            playbackRejected
-                ? 'ARCANE_SPEECH_TTS_PLAYBACK_RESUME_REJECTED'
-                : 'ARCANE_SPEECH_TTS_SYNTHESIS_REQUEST_REJECTED'
-        );
-        const reason = playbackRejected
-            ? 'tts-playback-resume-rejected'
-            : 'tts-synthesis-rejected';
+        const errorFields = publicSpeechErrorFields(error, failure.code);
+        console.error(`Arcane ${normalizedBoundary} speech operation failed.`, error);
         dispatchSpeechEvent(
             'speech-synthesis-error',
             {
+                boundary: normalizedBoundary,
                 ...errorFields,
                 error,
                 message,
-                reason
+                reason: failure.reason
             },
             {
                 bubbles: true,
                 composed: true,
-                operationId: nextSpeechOperationId('synthesis'),
+                operationId: nextSpeechOperationId(`tts-${normalizedBoundary}`),
                 publicDetail: {
+                    boundary: normalizedBoundary,
                     ...errorFields,
-                    reason
+                    reason: failure.reason
                 }
             }
         );
@@ -1156,7 +1196,7 @@
 
         void Promise.resolve(aiRuntime.resumeAudio()).catch(
             function reportTTSResumeFailure(error) {
-                reportTTSError(error, 'playback');
+                reportTTSError(error, 'playback-resume');
             }
         );
     }
@@ -1170,7 +1210,7 @@
             {
                 operationId,
                 publicDetail: {
-                    characterCount: transcription.length
+                    text: transcription
                 }
             }
         );
@@ -1214,11 +1254,14 @@
                 ['NotAllowedError', 'NotFoundError', 'NotReadableError', 'SecurityError']
                     .includes(error?.name)
             ) {
-                setAvailability({ microphone: false });
                 localStatus = {
                     message: 'Microphone access is unavailable. Text chat is still available.',
-                    tone: 'error'
+                    tone: 'error',
+                    owner: 'microphone'
                 };
+                if (microphonePermissionStatus?.state === 'denied') {
+                    setAvailability({ microphone: false });
+                }
                 dispatchSpeechEvent(
                     'speech-microphone-unavailable',
                     { reason: error.name },
@@ -1466,6 +1509,7 @@
             'ARCANE_SPEECH_STT_TRANSCRIPTION_REQUEST_REJECTED'
         );
         const reason = 'stt-transcription-rejected';
+        console.error('Arcane speech transcription failed.', error);
         dispatchSpeechEvent(
             'speech-transcription-error',
             {

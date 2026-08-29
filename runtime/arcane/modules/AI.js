@@ -21,6 +21,7 @@ credentials='omit';
 
 const LEGACY_AI_SERVICES=new Set(['OPENAI','OLLAMA','LOCAL_SPEACH']);
 export const AI_READY_EVENT='ai-ready';
+const AI_TTS_FAILURE_EVENT='ai-tts-failure';
 export const AI_INITIALIZATION_ERROR_CODES=completeValue({
     userReadyRegistrationCollision:
         'ARCANE_AI_USER_READY_REGISTRATION_COLLISION'
@@ -955,6 +956,7 @@ class AI {
                 eventTypes:completeValue(
                     [
                         AI_READY_EVENT,
+                        AI_TTS_FAILURE_EVENT,
                         ...Object.values(AI_BROWSER_SPEECH_EVENT_TYPES)
                     ]
                 )
@@ -1000,6 +1002,7 @@ class AI {
     #legacySpeechProviders=new Map();
     #legacySpeechReadiness=Promise.resolve(null);
     #speechControlGeneration=0;
+    #speechFailureSequence=0;
     #stopOllamaReady=null;
     #preferenceTuple=completeValue([
         'OPENAI',
@@ -5243,7 +5246,10 @@ class AI {
         try{
             this.#assertServiceConfigured(this.ttsService,'tts');
         }catch(error){
-            console.warn('AI speech provider is unavailable.');
+            this.#publishTTSFailure(error,{
+                boundary:'synthesis',
+                generation:this.speechGeneration
+            });
             return Promise.resolve(false);
         }
 
@@ -5350,7 +5356,11 @@ class AI {
             }
         ).catch(
             function discardFailedSpeechJob(error){
-                return runtime.#failSpeechJob(job,error);
+                return runtime.#failSpeechJob(
+                    job,
+                    error,
+                    job.state==='decoding'?'decode':'synthesis'
+                );
             }
         );
 
@@ -5375,6 +5385,7 @@ class AI {
             return this.#cancelSpeechJob(job);
         }
 
+        job.state='decoding';
         const audioContext=this.#getSpeechAudioContext();
         return this.playAudio(
             audio.chunks,
@@ -5855,6 +5866,12 @@ class AI {
                 this.speechResumePending=false;
             }
             this.#waitForSpeechGesture(error);
+            if(error?.name!=='NotAllowedError'){
+                this.#publishTTSFailure(error,{
+                    boundary:'playback-resume',
+                    generation:this.speechGeneration
+                });
+            }
             return false;
         }
 
@@ -5864,7 +5881,7 @@ class AI {
 
     async playAudio(
         audioChunks=[],
-        audioContext=this.#getSpeechAudioContext(),
+        audioContext=null,
         sourceNode=null,
         audioType=this.audioType,
         speechJob=null
@@ -5887,19 +5904,20 @@ class AI {
 
         try{
             job.state='decoding';
+            const playbackContext=audioContext||this.#getSpeechAudioContext();
             const audioBlob=new Blob(audioChunks,{type:audioType});
             const arrayBuffer=await audioBlob.arrayBuffer();
-            const audioBuffer=await audioContext.decodeAudioData(arrayBuffer);
+            const audioBuffer=await playbackContext.decodeAudioData(arrayBuffer);
 
             if(this.muted||job.generation!==this.speechGeneration){
                 return this.#cancelSpeechJob(job);
             }
 
-            const preparedSource=sourceNode||audioContext.createBufferSource();
+            const preparedSource=sourceNode||playbackContext.createBufferSource();
             const runtime=this;
 
             preparedSource.buffer=audioBuffer;
-            preparedSource.connect(audioContext.destination);
+            preparedSource.connect(playbackContext.destination);
             preparedSource.__arcaneStarted=false;
             preparedSource.onended=function finishQueuedSpeechSource(){
                 runtime.nextSentance(job);
@@ -5910,14 +5928,20 @@ class AI {
             this.#requestSpeechPlayback();
             return true;
         }catch(error){
-            return this.#failSpeechJob(job,error);
+            return this.#failSpeechJob(job,error,'decode');
         }
     }
 
     #requestSpeechPlayback(){
+        const runtime=this;
         this.#pumpSpeechPlayback().catch(
             function reportSpeechPlaybackFailure(error){
-                console.warn('AI audio playback failed.');
+                const job=runtime.speechJobs[0];
+                if(job){
+                    runtime.#failSpeechJob(job,error,'playback-start');
+                    return;
+                }
+                console.error('AI audio playback failed without an active speech job.',error);
             }
         );
     }
@@ -5928,10 +5952,12 @@ class AI {
         }
 
         this.speechPlaybackStarting=true;
+        let activeJob=null;
 
         try{
             while(!this.isSpeaking&&!this.muted){
                 const job=this.speechJobs[0];
+                activeJob=job||null;
 
                 if(!job){
                     return false;
@@ -5972,14 +5998,21 @@ class AI {
                     job.sourceNode.__arcaneStarted=true;
                     this.currentSpeechJob=job;
                     this.isSpeaking=true;
-                    job.sourceNode.start(0);
+                    await job.sourceNode.start(0);
                     return true;
                 }catch(error){
                     this.currentSpeechJob=null;
                     this.isSpeaking=false;
-                    this.#failSpeechJob(job,error);
+                    this.#failSpeechJob(job,error,'playback-start');
                 }
             }
+        }catch(error){
+            if(activeJob){
+                this.#failSpeechJob(activeJob,error,'playback-start');
+            }else if(!this.muted&&!isAIRequestAbort(error)){
+                console.error('AI audio playback failed without an active speech job.',error);
+            }
+            return false;
         }finally{
             this.speechPlaybackStarting=false;
 
@@ -6025,12 +6058,75 @@ class AI {
         return false;
     }
 
-    #failSpeechJob(job,error){
+    #publishTTSFailure(error,{
+        boundary='synthesis',
+        generation=this.speechGeneration
+    }={}){
+        if(
+            generation!==this.speechGeneration
+            ||this.muted
+            ||isAIRequestAbort(error)
+        ){
+            return false;
+        }
+
+        const boundaries=new Set([
+            'synthesis',
+            'decode',
+            'playback-start',
+            'playback-resume'
+        ]);
+        const normalizedBoundary=boundaries.has(boundary)
+            ?boundary
+            :'synthesis';
+        const reason=`tts-${normalizedBoundary}-rejected`;
+        const operationId=
+            `${this.#events.instanceId}:tts-failure:${(++this.#speechFailureSequence).toString(36)}`;
+
+        console.error(`AI speech ${normalizedBoundary} failed.`,error);
+
+        try{
+            const {occurrence}=this.#events.dispatch(
+                AI_TTS_FAILURE_EVENT,
+                completeValue({
+                    ai:this,
+                    boundary:normalizedBoundary,
+                    error,
+                    generation,
+                    reason
+                }),
+                {
+                    operationId,
+                    publicDetail:completeValue({
+                        boundary:normalizedBoundary,
+                        ...(typeof error?.code==='string'?{code:error.code}:{}),
+                        generation,
+                        reason
+                    })
+                }
+            );
+            projectArcaneDOMEvent(window,occurrence);
+        }catch(reportingError){
+            console.error(
+                'AI speech failure could not be published to the runtime event boundary.',
+                reportingError
+            );
+        }
+
+        return true;
+    }
+
+    #failSpeechJob(job,error,boundary='synthesis'){
         if(job.state==='failed'||job.state==='cancelled'){
             return false;
         }
 
         job.state='failed';
+
+        this.#publishTTSFailure(error,{
+            boundary,
+            generation:job.generation
+        });
 
         if(job.sourceNode){
             job.sourceNode.onended=null;
@@ -6041,10 +6137,6 @@ class AI {
         if(this.currentSpeechJob===job){
             this.currentSpeechJob=null;
             this.isSpeaking=false;
-        }
-
-        if(job.generation===this.speechGeneration&&error?.name!=='AbortError'){
-            console.warn('AI speech synthesis failed.');
         }
 
         this.#requestSpeechPlayback();

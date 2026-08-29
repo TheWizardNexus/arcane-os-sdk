@@ -1,9 +1,5 @@
-const MAX_MODEL_DEFINITION_CHARACTERS=128*1024;
-const MAX_SYSTEM_PROMPT_CHARACTERS=96*1024;
-const MAX_PARAMETER_COUNT=32;
-const MAX_RESPONSE_BYTES=MAX_MODEL_DEFINITION_CHARACTERS*4;
-const MODEL_REFERENCE=/^[A-Za-z0-9][A-Za-z0-9._/-]{0,191}(?::[A-Za-z0-9][A-Za-z0-9._-]{0,63})?$/;
-const PARAMETER_NAME=/^[a-z][a-z0-9_]{0,63}$/;
+const MODEL_REFERENCE=/^[A-Za-z0-9][A-Za-z0-9._/-]*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$/;
+const PARAMETER_NAME=/^[a-z][a-z0-9_]*$/;
 
 function fail(message){
     const error=new TypeError(message);
@@ -11,83 +7,18 @@ function fail(message){
     throw error;
 }
 
-function freeze(value){
-    if(!value||typeof value!=='object'||Object.isFrozen(value)){
-        return value;
+async function completeResponseText(response){
+    if(typeof response?.text!=='function'){
+        fail('The model definition response is not readable.');
     }
 
-    for(const child of Object.values(value)){
-        freeze(child);
+    const text=await response.text();
+
+    if(typeof text!=='string'){
+        fail('The model definition response is not readable text.');
     }
 
-    return Object.freeze(value);
-}
-
-function responseLength(response){
-    const raw=response?.headers?.get?.('content-length');
-
-    if(raw===null||raw===undefined||raw===''){
-        return null;
-    }
-
-    const value=Number(raw);
-    return Number.isSafeInteger(value)&&value>=0?value:Number.POSITIVE_INFINITY;
-}
-
-async function boundedResponseText(response,maxBytes=MAX_RESPONSE_BYTES){
-    const declaredLength=responseLength(response);
-
-    if(declaredLength!==null&&declaredLength>maxBytes){
-        fail('The model definition response exceeds the allowed size.');
-    }
-
-    const reader=response?.body?.getReader?.();
-
-    if(!reader){
-        if(typeof response?.text!=='function'){
-            fail('The model definition response is not readable.');
-        }
-
-        const text=await response.text();
-
-        if(typeof text!=='string'||new TextEncoder().encode(text).byteLength>maxBytes){
-            fail('The model definition response exceeds the allowed size.');
-        }
-
-        return text;
-    }
-
-    const decoder=new TextDecoder('utf-8',{fatal:true});
-    const parts=[];
-    let total=0;
-
-    try{
-        while(true){
-            const {done,value}=await reader.read();
-
-            if(done){
-                break;
-            }
-            if(!(value instanceof Uint8Array)){
-                fail('The model definition response contained an invalid byte chunk.');
-            }
-
-            total+=value.byteLength;
-            if(total>maxBytes){
-                await reader.cancel?.();
-                fail('The model definition response exceeds the allowed size.');
-            }
-            parts.push(decoder.decode(value,{stream:true}));
-        }
-        parts.push(decoder.decode());
-    }catch(error){
-        if(error?.code==='MODEL_DEFINITION_INVALID'){
-            throw error;
-        }
-        fail('The model definition response is not valid UTF-8 text.');
-    }
-
-    return parts.join('');
+    return text;
 }
 
 /**
@@ -98,17 +29,15 @@ async function boundedResponseText(response,maxBytes=MAX_RESPONSE_BYTES){
 export function parseModelDefinition(source){
     if(typeof source!=='string'
         ||!source
-        ||source.length>MAX_MODEL_DEFINITION_CHARACTERS
         ||source.includes('\0')
     ){
-        fail('The model definition must be bounded non-empty text.');
+        fail('The model definition must be non-empty text without null characters.');
     }
 
-    const normalized=source.replaceAll('\r\n','\n');
-
-    if(normalized.includes('\r')||normalized.startsWith('\uFEFF')){
-        fail('The model definition must use canonical UTF-8 line endings.');
-    }
+    const normalized=source
+        .replace(/^\uFEFF/u,'')
+        .replaceAll('\r\n','\n')
+        .replaceAll('\r','\n');
 
     const match=normalized.match(
         /^FROM ([^\n]+)\n\nSYSTEM """\n([\s\S]*?)\n"""(?:\n\n([\s\S]+?))?\n?$/
@@ -125,17 +54,8 @@ export function parseModelDefinition(source){
     if(!MODEL_REFERENCE.test(from)){
         fail('The model definition contains an invalid base-model reference.');
     }
-    if(!system.trim()
-        ||system!==system.trim()
-        ||system.length>MAX_SYSTEM_PROMPT_CHARACTERS
-        ||system.split('\n').some(function systemLineTooLong(line){
-            return line.length>4096;
-        })
-    ){
+    if(!system.trim()){
         fail('The model definition contains an invalid SYSTEM prompt.');
-    }
-    if(parameterLines.length>MAX_PARAMETER_COUNT){
-        fail('The model definition contains an invalid parameter count.');
     }
 
     const parameters={};
@@ -145,8 +65,7 @@ export function parseModelDefinition(source){
 
         if(!parameter
             ||!PARAMETER_NAME.test(parameter[1])
-            ||parameter[2]!==parameter[2].trim()
-            ||parameter[2].length>256
+            ||!parameter[2].trim()
             ||Object.hasOwn(parameters,parameter[1])
         ){
             fail(`The model definition contains an invalid parameter line: ${line}`);
@@ -155,13 +74,13 @@ export function parseModelDefinition(source){
         parameters[parameter[1]]=parameter[2];
     }
 
-    return freeze({from,system,parameters});
+    return {from,system,parameters};
 }
 
 /**
- * Loads a packaged definition with a read-only same-origin GET and returns the
- * SYSTEM block. The definition is never evaluated and no model service is
- * contacted by this helper.
+ * Loads a packaged definition with an ordinary read-only GET and returns the
+ * complete SYSTEM block. The definition is never evaluated and no model
+ * service is contacted by this helper.
  */
 export async function loadModelDefinitionSystemPrompt(url,{
     fetchImpl=globalThis.fetch
@@ -171,10 +90,7 @@ export async function loadModelDefinitionSystemPrompt(url,{
     }
 
     const response=await fetchImpl(url,{
-        method:'GET',
-        credentials:'same-origin',
-        cache:'default',
-        redirect:'error'
+        method:'GET'
     });
 
     if(!response||response.ok!==true){
@@ -185,5 +101,5 @@ export async function loadModelDefinitionSystemPrompt(url,{
         throw error;
     }
 
-    return parseModelDefinition(await boundedResponseText(response)).system;
+    return parseModelDefinition(await completeResponseText(response)).system;
 }

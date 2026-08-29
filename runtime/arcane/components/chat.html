@@ -914,6 +914,7 @@
     let latestAIRuntimeRoles=null;
     const hostSubmissionBarrier=new ConversationSubmissionBarrier();
     const aiRuntimeStateAbortController=new AbortController();
+    const AI_TTS_FAILURE_EVENT='ai-tts-failure';
     let programmaticSubmissionQueue=Promise.resolve(true);
     let conversationTimeboxController=null;
     let conversationTimeboxUnsubscribe=null;
@@ -1673,6 +1674,17 @@
         'pagehide',
         destroy,
         {once:true,signal:aiRuntimeStateAbortController.signal}
+    );
+    window.addEventListener(
+        AI_TTS_FAILURE_EVENT,
+        function reportActiveRuntimeTTSFailure(event){
+            const aiRuntime=boundChatAI??globalThis.ai;
+            if(!aiRuntime||event.detail?.ai!==aiRuntime){
+                return;
+            }
+            reportTTSError(event.detail?.error,event.detail?.boundary);
+        },
+        {signal:aiRuntimeStateAbortController.signal}
     );
 
     function setConversationComplete(complete=true){
@@ -3246,7 +3258,9 @@
                 aiRuntime?.stopAudio?.();
                 if(typeof aiRuntime?.resumeAudio==='function'){
                     void Promise.resolve(aiRuntime.resumeAudio()).catch(
-                        reportTTSError
+                        function reportPlaybackResumeFailure(error){
+                            reportTTSError(error,'playback-resume');
+                        }
                     );
                 }
             }
@@ -3275,28 +3289,38 @@
         return message;
     }
 
-    function reportTTSError(error){
+    function reportTTSError(error,boundary='synthesis'){
         if(destroyed){
             return false;
         }
         if(typeof speech.reportTTSError==='function'){
             try{
-                speech.reportTTSError(error);
+                speech.reportTTSError(error,boundary);
                 return true;
             }catch(reportingError){
                 error=reportingError;
             }
         }
 
-        const message=visibleErrorMessage(error,'Speech synthesis failed.');
+        const message=visibleErrorMessage(
+            error,
+            boundary==='decode'
+                ?'Speech audio could not be decoded.'
+                :boundary==='playback-start'
+                    ?'Speech playback could not start.'
+                    :boundary==='playback-resume'
+                        ?'Speech playback could not resume.'
+                        :'Speech synthesis failed.'
+        );
         dispatchChatEvent(
             'chat-speech-synthesis-error',
-            {error,message},
+            {boundary,error,message},
             {
                 bubbles:true,
                 composed:true,
                 operationId:nextChatOperationId('speech-synthesis'),
                 publicDetail:{
+                    boundary,
                     reason:chatReasons.speechSynthesisRejected,
                     ...publicErrorFields(
                         error,

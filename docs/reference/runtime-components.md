@@ -86,7 +86,7 @@ appropriate.
 | [`screen-capture.html`](#screen-capturehtml) | Presents image, video, or GIF display-capture workflow. | `capture` (`ScreenCapture` instance)<br>`destroy()` | `screen-capture-ready`<br>`screen-capture-result` | State/result normalized; media permission/codec failures mixed |
 | [`source-code-viewer.html`](#source-code-viewerhtml) | Renders line-addressable source code with load, error, focus, and state behavior. | `configure()`<br>`load()`<br>`render()`<br>`clear()`<br>`fail()`<br>`focus()`<br>`focusLine()`<br>`destroy()` | `source-code-viewer-ready`<br>`source-code-viewer-state`<br>`source-code-viewer-state-loading`<br>`source-code-viewer-state-ready`<br>`source-code-viewer-state-empty`<br>`source-code-viewer-state-error` | Normalized source/state |
 | [`source-explanation.html`](#source-explanationhtml) | Presents an evidence finding, source selection, explanation, and save state. | `showFinding()`<br>`populate()`<br>`selectSource()`<br>`markSaved()`<br>`destroy()` | `source-explanation-ready`<br>`source-explanation-save`<br>`source-explanation-source-selected` | DOM-normalized |
-| [`speech.html`](#speechhtml) | Coordinates explicit STT activation, speech controls, transcription completion, mute state, and microphone availability. | `configure()`<br>`setAvailability()`<br>`setMuted()`<br>`reportTTSError()`<br>`requestSTTActivation()`<br>`destroy()`<br>`availability`<br>`muted`<br>`initialMuted`<br>`componentReady` | `speech-ready`<br>`speech-transcription-complete`<br>`speech-transcription-error`<br>`speech-transcription-cancelled`<br>`speech-microphone-unavailable`<br>`speech-stt-activation-request`<br>`speech-stt-activation-error`<br>`speech-tts-lifecycle-error`<br>`speech-synthesis-error` | Sticky runtime speech readiness, explicit STT activation, request cancellation, and TTS mute lifecycle intent normalized; provider/model authority and media behavior remain external |
+| [`speech.html`](#speechhtml) | Coordinates explicit STT activation, speech controls, transcription completion, mute state, and microphone availability. | `configure()`<br>`setAvailability()`<br>`setMuted()`<br>`reportTTSError()`<br>`requestSTTActivation()`<br>`destroy()`<br>`availability`<br>`muted`<br>`initialMuted`<br>`componentReady` | `speech-ready`<br>`speech-transcription-complete`<br>`speech-transcription-error`<br>`speech-transcription-cancelled`<br>`speech-microphone-unavailable`<br>`speech-stt-activation-request`<br>`speech-stt-activation-error`<br>`speech-tts-lifecycle-error`<br>`speech-synthesis-error` | Sticky runtime speech readiness, explicit STT activation, request cancellation, TTS mute lifecycle intent, and exact TTS operation failures normalized; provider/model authority remains external |
 | [`summary-strip.html`](#summary-striphtml) | Displays compact selectable KPI or summary items. | `configure()`<br>`setItems()`<br>`updateItem()`<br>`clear()`<br>`destroy()` | `summary-strip-ready`<br>`summary-strip-change`<br>`summary-strip-select` | DOM-normalized |
 | [`table.html`](#tablehtml) | Builds and updates a simple header/body table. | `buildHeader()`<br>`buildTable()`<br>`destroy()` | `table-ready`<br>`header-update`<br>`body-update` | DOM-normalized |
 | [`task-progress.html`](#task-progresshtml) | Runs and displays a task list with started/change/complete/error state. | `configure()`<br>`setTasks()`<br>`updateTask()`<br>`runTasks()`<br>`clear()`<br>`destroy()` | `task-progress-ready`<br>`task-progress-started`<br>`task-progress-change`<br>`task-progress-complete`<br>`task-progress-error` | Task state normalized; injected task results mixed |
@@ -337,6 +337,12 @@ activation controller, removes its `pagehide` listener, calls the optional
 speech controller's `destroy()`, sets `ready` to `false`, and returns
 `true`; later calls return `false`. It does not initiate a provider load or
 unload.
+
+Chat listens for the bound (or current global) AI runtime's `ai-tts-failure`
+event and forwards its complete Error and exact operation boundary to
+`speech.reportTTSError()`. This includes decode and playback-start failures that
+settle after `streamTTS()` has already resolved. Runtime mute, cancellation,
+permission waiting, and stale generations remain non-errors.
 
 Events: `chat-ready`, `chat-session-bound`, `chat-session-message`,
 `chat-session-error`, `chat-send-message`, `chat-send-error`,
@@ -1044,6 +1050,13 @@ Canceling state while `unloading`, and Try again with the sticky error while
 `error`. Selected-unloaded, busy, and error states are shown as distinct facts;
 none is treated as ready.
 
+Only captured microphone input that completes the selected STT route emits
+`speech-transcription-complete`. A transient capture rejection reports
+`speech-microphone-unavailable` but remains locally retryable; an observed
+permission-denied state disables capture until the browser reports that the
+permission is available again, at which point the microphone-owned status is
+cleared.
+
 The default `requestSTTActivation(intent)` forwards the mutable
 `{role:'stt',action:'load'|'unload',reason:'user'}` record to
 `requestAIRuntimeIntent()`. Before calling it, the component emits a bubbling,
@@ -1060,6 +1073,17 @@ unknown diagnostics remain available through the developer console and error
 events; they do not become control labels or status text by default. The same
 boundary applies to STT activation, transcription, TTS lifecycle, synthesis,
 and playback failures.
+
+`reportTTSError()` recognizes `synthesis`, `decode`, `playback-start`, and
+`playback-resume`. It mutes and stops the failed operation, preserves sticky
+provider readiness, and emits `speech-synthesis-error` with the exact boundary,
+stable reason/code, generic user-safe status, and complete Error in the local
+event detail.
+
+- `synthesis`: `tts-synthesis-rejected` / `ARCANE_SPEECH_TTS_SYNTHESIS_REQUEST_REJECTED`;
+- `decode`: `tts-decode-rejected` / `ARCANE_SPEECH_TTS_DECODE_REJECTED`;
+- `playback-start`: `tts-playback-start-rejected` / `ARCANE_SPEECH_TTS_PLAYBACK_START_REJECTED`;
+- `playback-resume`: `tts-playback-resume-rejected` / `ARCANE_SPEECH_TTS_PLAYBACK_RESUME_REJECTED`.
 
 The component emits no activation request on import or state observation.
 Provider registration and selection remain inert, and default
@@ -1098,7 +1122,9 @@ Speech operation ids are
 boundary codes are `ARCANE_SPEECH_MICROPHONE_CAPTURE_REJECTED`,
 `ARCANE_SPEECH_STT_TRANSCRIPTION_REQUEST_REJECTED`,
 `ARCANE_SPEECH_TTS_LOAD_REJECTED`, `ARCANE_SPEECH_TTS_UNLOAD_REJECTED`,
-`ARCANE_SPEECH_TTS_SYNTHESIS_REQUEST_REJECTED`, and
+`ARCANE_SPEECH_TTS_SYNTHESIS_REQUEST_REJECTED`,
+`ARCANE_SPEECH_TTS_DECODE_REJECTED`,
+`ARCANE_SPEECH_TTS_PLAYBACK_START_REJECTED`, and
 `ARCANE_SPEECH_TTS_PLAYBACK_RESUME_REJECTED`. Each of those component-boundary
 public projections keeps the exact boundary in `code` and preserves a distinct
 string code from the browser, runtime, or provider additively as `causeCode`.
@@ -1107,7 +1133,8 @@ A missing STT method therefore uses boundary
 `causeCode:'ARCANE_SPEECH_STT_RUNTIME_METHOD_UNAVAILABLE'`.
 
 Stable rejection reasons are `stt-transcription-rejected`,
-`tts-load-rejected`, `tts-unload-rejected`, `tts-synthesis-rejected`, and
+`tts-load-rejected`, `tts-unload-rejected`, `tts-synthesis-rejected`,
+`tts-decode-rejected`, `tts-playback-start-rejected`, and
 `tts-playback-resume-rejected`. Shared activation rejection uses
 `ARCANE_STT_ACTIVATION_REQUEST_REJECTED` and `activation-request-rejected`.
 
