@@ -47,6 +47,54 @@ const {createArcaneAI}=await import(
     '../browser-runtime/ai/browser-wasm.mjs?persistent-session-contract'
 );
 
+test('persistent chat binds the current SDK AI request boundary without shortening content',async()=>{
+    const requests=[];
+    const controller=new AbortController();
+    const input='Complete caller message '.repeat(24);
+    const response='Complete assistant response '.repeat(24);
+    const context='Complete request-only context '.repeat(12);
+    const ai={
+        async fetchRequest(request){
+            requests.push(request);
+            return {message:{role:'assistant',content:response}};
+        },
+    };
+    const session=await PersistentAIChatSession.create({
+        ai,
+        contextBuilder:async()=>context,
+        maxContextCharacters:1,
+        maxMessageCharacters:1,
+        maxMessages:1,
+        memory:false,
+        request:{localOnly:true},
+        systemPrompt:'Complete system prompt '.repeat(12),
+    });
+
+    const result=await session.send({
+        message:{content:input},
+        signal:controller.signal,
+    });
+
+    assert.equal(session.ai,ai);
+    assert.equal(requests.length,1);
+    assert.equal(requests[0].localOnly,true);
+    assert.equal(requests[0].signal,controller.signal);
+    assert.ok(requests[0].messages.some(message=>message.content===input));
+    assert.ok(requests[0].messages.some(message=>message.content===context));
+    assert.equal(result.message.content,response);
+    assert.equal(Object.isFrozen(requests[0]),false);
+    assert.equal(Object.isFrozen(requests[0].messages.at(-1)),false);
+    assert.equal(Object.isFrozen(result.message),false);
+
+    await assert.rejects(
+        PersistentAIChatSession.create({
+            ai,
+            chat:async()=>({message:{role:'assistant',content:'ambiguous'}}),
+        }),
+        error=>error?.code==='AI_CHAT_AMBIGUOUS_PROVIDER',
+    );
+});
+
 test('persistent chat retains transient turns in recurring context without writing them',async()=>{
     const requests=[];
     const session=await PersistentAIChatSession.create({
@@ -276,8 +324,11 @@ test('persistent chat rolls back recurring context on durable failure and retain
 
     await session.send({message:{content:'find alpha'}});
     const publicToolCall=session.chatEntity.messages.at(-1).tool_calls[0];
-    assert.ok(Object.isFrozen(publicToolCall));
-    assert.ok(Object.isFrozen(publicToolCall.function));
+    assert.deepEqual(publicToolCall,{
+        id:'lookup-1',
+        type:'function',
+        function:{name:'lookup',arguments:'{"id":"alpha"}'},
+    });
     await assert.rejects(
         session.send({message:{content:'skip the pending tool'}}),
         error=>error?.code==='AI_CHAT_TOOL_RESULT_REQUIRED',

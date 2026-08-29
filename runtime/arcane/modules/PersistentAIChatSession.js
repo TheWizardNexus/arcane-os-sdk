@@ -44,6 +44,12 @@ async function configuredArcaneChat(request){
     return api.chat(request);
 }
 
+function configuredAIChat(ai){
+    return function requestConfiguredAI(request){
+        return ai.fetchRequest(request);
+    };
+}
+
 function normalizeSend(input){
     if(!isPlainRecord(input)) throw new TypeError('Persistent chat input must be a plain object.');
     assertKnownKeys(input,new Set(['message','response','signal']),'Persistent chat input');
@@ -75,16 +81,16 @@ function normalizeSend(input){
         );
     }
     if(!signalLike(input.signal)) throw new TypeError('signal must be an AbortSignal.');
-    return Object.freeze({
+    return {
         messagePersist,
-        requestMessage:Object.freeze({
+        requestMessage:{
             content:input.message.content,
             role,
             ...(toolCallId?{tool_call_id:toolCallId}:{}),
-        }),
+        },
         responsePersist,
         signal:input.signal??null,
-    });
+    };
 }
 
 function fileName(value){
@@ -113,7 +119,7 @@ class PersistentAIChatSession{
         assertKnownKeys(
             options,
             new Set([
-                'chat','chatEntity','chatFileName','contextBuilder','loadExisting','maxContextCharacters',
+                'ai','chat','chatEntity','chatFileName','contextBuilder','loadExisting','maxContextCharacters',
                 'maxMessageCharacters','maxMessages','memory','request','responseLength','systemPrompt'
             ]),
             'Persistent chat options',
@@ -121,7 +127,22 @@ class PersistentAIChatSession{
         if(options.chatEntity!==undefined&&!(options.chatEntity instanceof ChatEntity)){
             throw new TypeError('chatEntity must be a ChatEntity.');
         }
-        const chat=options.chat??configuredArcaneChat;
+        if(options.ai!==undefined&&(
+            !options.ai
+            ||typeof options.ai!=='object'
+            ||typeof options.ai.fetchRequest!=='function'
+        )){
+            throw new TypeError('ai must expose fetchRequest(request).');
+        }
+        if(options.ai!==undefined&&options.chat!==undefined){
+            throw coded(
+                new TypeError('Specify either ai or chat, not both.'),
+                'AI_CHAT_AMBIGUOUS_PROVIDER',
+            );
+        }
+        const chat=options.ai===undefined
+            ?options.chat??configuredArcaneChat
+            :configuredAIChat(options.ai);
         if(typeof chat!=='function') throw new TypeError('chat must be a function.');
         const systemPrompt=options.systemPrompt??'';
         if(typeof systemPrompt!=='string') throw new TypeError('systemPrompt must be a string.');
@@ -138,7 +159,7 @@ class PersistentAIChatSession{
             throw new TypeError('loadExisting requires chatFileName or chatEntity.');
         }
         this.#memory=boolean(options.memory,'memory',true);
-        this.#options=Object.freeze({...options,chat,loadExisting,systemPrompt});
+        this.#options={...options,chat,loadExisting,systemPrompt};
         this.#readyPromise=this.#initialize();
     }
 
@@ -150,6 +171,7 @@ class PersistentAIChatSession{
 
     get chatEntity(){return this.#entity;}
     get fileName(){return this.#entity.fileName;}
+    get ai(){return this.#options.ai??null;}
 
     async #initialize(){
         if(this.#options.loadExisting) await this.#entity.load();
@@ -157,7 +179,7 @@ class PersistentAIChatSession{
         const storedSystem=storedMessages.find(message=>message.role==='system');
         const initialMessages=storedMessages
             .filter(message=>['user','assistant','tool'].includes(message.role))
-            .map(message=>Object.freeze({
+            .map(message=>({
                 role:message.role,
                 content:String(message.content??''),
                 ...(message.tool_calls?{tool_calls:message.tool_calls}:{}),
@@ -174,9 +196,6 @@ class PersistentAIChatSession{
             chat:this.#options.chat,
             contextBuilder:this.#options.contextBuilder,
             initialMessages,
-            maxContextCharacters:this.#options.maxContextCharacters,
-            maxMessageCharacters:this.#options.maxMessageCharacters,
-            maxMessages:this.#options.maxMessages,
             request:this.#options.request,
             systemPrompt:this.#options.systemPrompt||String(storedSystem?.content??''),
         };
@@ -238,7 +257,10 @@ class PersistentAIChatSession{
             await this.#entity.addTurn({
                 assistantMessage:result.message,
                 extractMemory:this.#memory&&settings.messagePersist&&settings.responsePersist,
-                memoryRequest:messages=>this.#options.chat({messages}),
+                memoryRequest:messages=>this.#options.chat({
+                    ...this.#options.request,
+                    messages,
+                }),
                 messagePersist:settings.messagePersist,
                 requestMessage:settings.requestMessage,
                 responsePersist:settings.responsePersist,

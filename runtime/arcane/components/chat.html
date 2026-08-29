@@ -20,7 +20,7 @@
         margin-inline: auto;
         padding: clamp(.65rem, 1.5vw, 1.25rem);
         gap: var(--arcane-chat-gap);
-        overflow: hidden;
+        overflow: visible;
     }
 
     .chat_area .thinking{
@@ -129,6 +129,20 @@
         border:0;
     }
 
+    .chat_session_status{
+        display:block;
+        flex:0 0 auto;
+        min-height:1.25em;
+        padding-inline:.25rem;
+        color:var(--text-color);
+        font-size:.82rem;
+        overflow-wrap:anywhere;
+    }
+
+    .chat_session_status[data-state="error"]{
+        color:var(--danger-color,var(--text-color));
+    }
+
     .chat_output {
         flex:1 1 auto;
         box-sizing: border-box;
@@ -137,7 +151,7 @@
         margin: 0;
         padding: clamp(1rem, 2vw, 1.5rem);
         list-style: none;
-        overflow-y: auto;
+        overflow: visible;
         scrollbar-gutter: stable;
         border: 1px solid var(--arcane-border, var(--border-color));
         border-radius: var(--arcane-chat-radius);
@@ -271,7 +285,6 @@
         box-sizing: border-box;
         width: 100%;
         min-height: 3rem;
-        max-height: 10rem;
         margin: 0;
         padding: .82rem .9rem;
         border: 1px solid var(--arcane-border, var(--border-color));
@@ -281,8 +294,8 @@
         font: inherit;
         font-size: 1rem;
         line-height: 1.35;
-        resize: none;
-        overflow-y: auto;
+        resize: vertical;
+        overflow: visible;
     }
 
     .chat_input:focus-visible {
@@ -380,6 +393,16 @@
         outline-offset: .18rem;
     }
 
+    :host([presentation="basic"]) .chat_input_area {
+        grid-template-columns:minmax(0,1fr) auto;
+    }
+
+    :host([presentation="basic"]) #chat_upload,
+    :host([presentation="basic"]) #file_upload_input,
+    :host([presentation="basic"]) .controls {
+        display:none;
+    }
+
     @media (max-width: 44rem) {
         .chat_area {
             padding: var(--arcane-space-2, .5rem);
@@ -453,8 +476,7 @@
         background: var(--border-color);
         padding:.4em;
         border: 1px solid var(--accent-color);
-        max-height: 15em;
-        overflow: auto;
+        overflow: visible;
     }
 </style>
 
@@ -479,6 +501,13 @@
         >Starting the elapsed timer.</span>
     </section>
     <ul type='text' class='chat_output' id='chat_output' tabindex='-1' aria-label='Conversation transcript'></ul>
+    <output
+        id="chat_session_status"
+        class="chat_session_status"
+        role="status"
+        aria-live="polite"
+        data-state="idle"
+    >Chat session is not connected.</output>
     <section
         id="ai_activation"
         class="ai_activation"
@@ -494,7 +523,7 @@
         <button type="button" id="ai_activation_button">Start language model</button>
     </section>
     <div class="chat_input_area">
-        <textarea type='text' class='chat_input' id='chat_input'></textarea>
+        <textarea type='text' class='chat_input' id='chat_input' placeholder='Message' aria-label='Message'></textarea>
         <button type="button" id="chat_upload" class="chat_upload" title="Upload files" aria-label="Upload files">
             <img class='upload-icon' src="./arcane/img/upload.svg" />
         </button>
@@ -503,7 +532,7 @@
             <img class='send-icon' src="./arcane/img/send.svg" />
         </button>
     </div>
-    <html-import id="speech" href="./arcane/components/speech.html?v=3"></html-import>
+    <span id="speech_mount"></span>
     <section class="controls">
         <select id="languages">
             <option value="english" selected>English</option>
@@ -690,12 +719,27 @@
     }=await import('arcane-os/event-manager');
 
     const host=this;
+    const componentURL=new URL(
+        host.getAttribute('href')||'./arcane/components/chat.html',
+        document.baseURI
+    );
+    const speechMount=host.shadowRoot.querySelector('#speech_mount');
+    const speechImport=document.createElement('html-import');
+    speechImport.id='speech';
+    speechImport.setAttribute(
+        'href',
+        new URL('./speech.html?v=3',componentURL).href
+    );
+    speechMount.replaceWith(speechImport);
     const events=createArcaneEventSource(
         host,
         {
             source:'arcane.component.chat',
             eventTypes:[
                 'chat-ready',
+                'chat-session-bound',
+                'chat-session-message',
+                'chat-session-error',
                 'chat-send-message',
                 'chat-send-error',
                 'chat-file-uploaded',
@@ -714,7 +758,8 @@
     const textArea=shadowRoot.querySelector('#chat_input');
     const chatOutput = shadowRoot.querySelector('#chat_output');
     const send = shadowRoot.querySelector('#chat_submit');
-    const speech = shadowRoot.querySelector('#speech');
+    const chatSessionStatus=shadowRoot.querySelector('#chat_session_status');
+    const speech = speechImport;
     const uploadBtn = shadowRoot.querySelector('#chat_upload');
     const fileInput = shadowRoot.querySelector('#file_upload_input');
     const conversationTimeboxPanel=shadowRoot.querySelector('#conversation_timebox');
@@ -728,12 +773,14 @@
         {default:MD},
         {default:FileEntity},
         {ConversationSubmissionBarrier,requireConversationTimeboxDelivery},
-        {requestAIRuntimeIntent,subscribeAIRuntimeState}
+        {requestAIRuntimeIntent,subscribeAIRuntimeState},
+        {createPersistentAIChatSession}
     ]=await Promise.all([
         import('../modules/MD.js'),
         import('../entities/File.js'),
         import('../modules/ConversationTimebox.js'),
-        import('../modules/AIRuntimeState.js')
+        import('../modules/AIRuntimeState.js'),
+        import('../modules/PersistentAIChatSession.js')
     ]);
 
     host.language=host.language||'English';
@@ -754,10 +801,20 @@
     let hostSubmissionGeneration=0;
     let eventOperationSequence=0;
     let destroyed=false;
+    let boundChatSession=null;
+    let boundChatAI=null;
+    let sessionBindingPending=false;
+    let sessionMessagePending=false;
+    let sessionBindingGeneration=0;
+    let sessionMessageSequence=0;
     const activeSubmissionOwnerships=new Set();
-    const conversationTimeboxRetryDelays=Object.freeze([0,500,1_500]);
-    const chatReasons=Object.freeze({
+    const conversationTimeboxRetryDelays=[0,500,1_500];
+    const chatReasons={
         ready:'chat-ready',
+        sessionBindingCompleted:'session-binding-completed',
+        sessionBindingRejected:'session-binding-rejected',
+        sessionMessageCompleted:'session-message-completed',
+        sessionMessageRejected:'session-message-rejected',
         messageSubmissionRequested:'message-submission-requested',
         messageSubmissionCancelled:'message-submission-cancelled',
         callerSignalAborted:'caller-signal-aborted',
@@ -771,8 +828,12 @@
         languageModelActivationRejected:'language-model-activation-rejected',
         speechSynthesisRejected:'speech-synthesis-rejected',
         conversationTimeboxDeliveryRejected:'conversation-timebox-delivery-rejected'
-    });
-    const chatErrorCodes=Object.freeze({
+    };
+    const chatErrorCodes={
+        destroyed:'ARCANE_CHAT_DESTROYED',
+        sessionAlreadyBound:'ARCANE_CHAT_SESSION_ALREADY_BOUND',
+        sessionBindingRejected:'ARCANE_CHAT_SESSION_BINDING_REJECTED',
+        sessionMessageRejected:'ARCANE_CHAT_SESSION_MESSAGE_REJECTED',
         messageSubmissionAborted:'ARCANE_CHAT_MESSAGE_SUBMISSION_ABORTED',
         languageModelActivationRejected:'ARCANE_CHAT_LANGUAGE_MODEL_ACTIVATION_REQUEST_REJECTED',
         hostMessageSubmissionRejected:'ARCANE_CHAT_HOST_MESSAGE_SUBMISSION_REJECTED',
@@ -780,7 +841,7 @@
         languageChangeCallbackRejected:'ARCANE_CHAT_LANGUAGE_CHANGE_CALLBACK_REJECTED',
         speechSynthesisRejected:'ARCANE_CHAT_SPEECH_SYNTHESIS_REQUEST_REJECTED',
         conversationTimeboxDeliveryRejected:'ARCANE_CHAT_CONVERSATION_TIMEBOX_DELIVERY_REJECTED'
-    });
+    };
 
     function nextChatOperationId(kind){
         eventOperationSequence+=1;
@@ -826,13 +887,230 @@
 
     function publicErrorFields(error,boundaryCode){
         let causeCode='';
+        let message='';
         try{
-            causeCode=typeof error?.code==='string'?error.code.trim():'';
+            causeCode=typeof error?.code==='string'?error.code:'';
+            message=typeof error?.message==='string'?error.message:'';
         }catch{}
-        return Object.freeze({
+        return {
+            error,
             code:boundaryCode,
-            ...(causeCode&&causeCode!==boundaryCode?{causeCode}:{})
-        });
+            ...(causeCode&&causeCode!==boundaryCode?{causeCode}:{}),
+            ...(message?{message}:{})
+        };
+    }
+
+    function chatError(message,code){
+        const error=new Error(message);
+        error.code=code;
+        return error;
+    }
+
+    function isPlainRecord(value){
+        return Boolean(value)
+            &&typeof value==='object'
+            &&!Array.isArray(value)
+            &&Object.getPrototypeOf(value)===Object.prototype;
+    }
+
+    function visibleErrorMessage(error,fallback){
+        try{
+            if(typeof error?.message==='string'&&error.message){
+                return error.message;
+            }
+        }catch{}
+        return fallback;
+    }
+
+    function setSessionStatus(state,message){
+        const status={state:String(state),message:String(message)};
+        host.sessionStatus=status;
+        chatSessionStatus.dataset.state=status.state;
+        chatSessionStatus.value=status.message;
+        chatSessionStatus.textContent=status.message;
+        return status;
+    }
+
+    function compatibleChatSession(session){
+        return Boolean(session)
+            &&typeof session==='object'
+            &&typeof session.ready==='function'
+            &&typeof session.history==='function'
+            &&typeof session.send==='function';
+    }
+
+    function appendTranscriptMessage(role,content,name){
+        if(typeof content!=='string'){
+            throw new TypeError('Chat session message content must be a string.');
+        }
+        const item=chatOutput.ownerDocument.createElement('li');
+        item.className=role==='user'?'user':'ai';
+        const heading=chatOutput.ownerDocument.createElement('strong');
+        heading.textContent=`${name} ${getMilTime()}:`;
+        const markdown=chatOutput.ownerDocument.createElement('div');
+        markdown.className='markdown';
+        markdown.raw=content;
+        markdown.innerHTML=new MD(content).rendered;
+        item.append(
+            heading,
+            chatOutput.ownerDocument.createElement('br'),
+            chatOutput.ownerDocument.createElement('br'),
+            markdown
+        );
+        chatOutput.append(item);
+        return item;
+    }
+
+    function renderSessionHistory(history){
+        if(!Array.isArray(history)){
+            throw new TypeError('Chat session history must be an array.');
+        }
+        const fragment=chatOutput.ownerDocument.createDocumentFragment();
+        const rendered=[];
+        for(const message of history){
+            if(!message||typeof message!=='object'||Array.isArray(message)){
+                throw new TypeError('Chat session history contains an invalid message.');
+            }
+            if(message.role==='system'){
+                continue;
+            }
+            if(!['assistant','tool','user'].includes(message.role)){
+                throw new TypeError(`Chat session history contains an unsupported role: ${message.role}.`);
+            }
+            if(typeof message.content!=='string'){
+                throw new TypeError('Chat session history message content must be a string.');
+            }
+            const item=chatOutput.ownerDocument.createElement('li');
+            item.className=message.role==='user'?'user':'ai';
+            const name=message.role==='user'
+                ?host.name
+                :message.role==='tool'
+                ?'Tool'
+                :host.aiName;
+            const heading=chatOutput.ownerDocument.createElement('strong');
+            heading.textContent=`${name}:`;
+            const markdown=chatOutput.ownerDocument.createElement('div');
+            markdown.className='markdown';
+            markdown.raw=message.content;
+            markdown.innerHTML=new MD(message.content).rendered;
+            item.append(
+                heading,
+                chatOutput.ownerDocument.createElement('br'),
+                chatOutput.ownerDocument.createElement('br'),
+                markdown
+            );
+            fragment.append(item);
+            rendered.push(item);
+        }
+        chatOutput.replaceChildren(fragment);
+        chatOutput.scrollTop=chatOutput.scrollHeight;
+        return rendered;
+    }
+
+    async function bindSession(options={}){
+        if(destroyed){
+            throw chatError(
+                'The chat component has been destroyed and cannot bind a session.',
+                chatErrorCodes.destroyed
+            );
+        }
+        if(!isPlainRecord(options)){
+            throw new TypeError('Chat session binding options must be a plain object.');
+        }
+        const unsupported=Object.keys(options).find(
+            key=>!['ai','session','sessionOptions'].includes(key)
+        );
+        if(unsupported){
+            throw new TypeError(`Unsupported chat session binding option: ${unsupported}.`);
+        }
+        if(sessionBindingPending||boundChatSession){
+            throw chatError(
+                'This chat component already has a session binding.',
+                chatErrorCodes.sessionAlreadyBound
+            );
+        }
+        const ai=options.ai??null;
+        const suppliedSession=options.session??null;
+        const sessionOptions=options.sessionOptions??{};
+        if((ai===null)===(suppliedSession===null)){
+            throw new TypeError('Specify exactly one of ai or session when binding chat.');
+        }
+        if(!isPlainRecord(sessionOptions)){
+            throw new TypeError('sessionOptions must be a plain object.');
+        }
+        if(suppliedSession!==null&&Object.keys(sessionOptions).length>0){
+            throw new TypeError('sessionOptions cannot be used with an existing session.');
+        }
+        if(suppliedSession!==null&&!compatibleChatSession(suppliedSession)){
+            throw new TypeError('session must expose ready(), history(), and send().');
+        }
+
+        const operationId=nextChatOperationId('session-binding');
+        const generation=++sessionBindingGeneration;
+        sessionBindingPending=true;
+        setSessionStatus('binding','Opening chat session…');
+        try{
+            const session=suppliedSession??await createPersistentAIChatSession({
+                ...sessionOptions,
+                ai
+            });
+            await session.ready();
+            const history=await session.history();
+            if(destroyed||generation!==sessionBindingGeneration){
+                throw chatError(
+                    'The chat component was destroyed before session binding completed.',
+                    chatErrorCodes.destroyed
+                );
+            }
+            renderSessionHistory(history);
+            boundChatSession=session;
+            boundChatAI=ai??session.ai??null;
+            host.session=session;
+            setSessionStatus('ready','Chat ready.');
+            const detail={chat:host,session,ai:boundChatAI,history};
+            dispatchChatEvent(
+                'chat-session-bound',
+                detail,
+                {
+                    bubbles:true,
+                    composed:true,
+                    operationId,
+                    publicDetail:{
+                        ...detail,
+                        reason:chatReasons.sessionBindingCompleted
+                    }
+                }
+            );
+            return session;
+        }catch(error){
+            if(!destroyed&&generation===sessionBindingGeneration){
+                const message=visibleErrorMessage(error,'The chat session could not be opened.');
+                setSessionStatus('error',message);
+                dispatchChatEvent(
+                    'chat-session-error',
+                    {phase:'binding',error,options},
+                    {
+                        bubbles:true,
+                        composed:true,
+                        operationId,
+                        publicDetail:{
+                            phase:'binding',
+                            options,
+                            reason:chatReasons.sessionBindingRejected,
+                            ...publicErrorFields(
+                                error,
+                                chatErrorCodes.sessionBindingRejected
+                            )
+                        }
+                    }
+                );
+            }
+            throw error;
+        }finally{
+            if(generation===sessionBindingGeneration){
+                sessionBindingPending=false;
+            }
+        }
     }
 
     function isAbortSignal(value){
@@ -879,11 +1157,11 @@
             return true;
         }
 
-        const ownership=Object.freeze({
+        const ownership={
             signal:controller.signal,
             abort:abortChatSubmission,
             release:releaseChatSubmissionOwnership
-        });
+        };
         activeSubmissionOwnerships.add(ownership);
 
         function followAbortSignal(signal,fallbackReason){
@@ -949,8 +1227,11 @@
     host.setInitialSpeechMuted=setInitialSpeechMuted;
     host.setConversationComplete=setConversationComplete;
     host.bindConversationTimebox=bindConversationTimebox;
+    host.bindSession=bindSession;
     host.submitMessage=submitMessage;
     host.destroy=destroy;
+    host.session=null;
+    host.sessionStatus={state:'idle',message:'Chat session is not connected.'};
     host.aiAvailability={llm:false,stt:false,tts:false};
     host.conversationComplete=false;
     applyAIAvailability(host.aiAvailability);
@@ -975,7 +1256,7 @@
         chatArea.dataset.conversationComplete=String(complete);
         textArea.disabled=complete;
         uploadBtn.disabled=complete;
-        send.disabled=complete||!host.aiAvailability.llm;
+        send.disabled=complete||!host.aiAvailability.llm||sessionMessagePending;
         if(complete){
             textArea.blur?.();
             chatOutput.focus?.({preventScroll:true});
@@ -1020,7 +1301,7 @@
             status=''
         }={}
     ){
-        const messageId=String(id).trim();
+        const messageId=String(id);
         const normalizedTotal=Number.isFinite(Number(total))
             ?Math.max(0,Math.floor(Number(total)))
             :0;
@@ -1134,7 +1415,7 @@
 
     function applyAIAvailability(availability){
         host.aiAvailability={...availability};
-        send.disabled=host.conversationComplete||!availability.llm;
+        send.disabled=host.conversationComplete||!availability.llm||sessionMessagePending;
         send.title=availability.llm
             ?'Send message'
             :'The selected language model service is unavailable.';
@@ -1161,9 +1442,9 @@
 
         function visibleError(error,fallback){
             const message=typeof error?.message==='string'
-                ?error.message.trim()
+                ?error.message
                 :'';
-            return (message||fallback).slice(0,240);
+            return message||fallback;
         }
 
         function cancellation(error){
@@ -1258,8 +1539,8 @@
                 return false;
             }
             requestError='';
-            const intent=Object.freeze({role:'llm',action,reason:'user'});
-            const request=Object.freeze({intent,state:role});
+            const intent={role:'llm',action,reason:'user'};
+            const request={intent,state:role};
             const operationId=typeof role?.operationId==='string'&&role.operationId
                 ?role.operationId
                 :createOperationId('llm-activation');
@@ -1272,12 +1553,7 @@
                     composed:true,
                     cancelable:true,
                     operationId,
-                    publicDetail:{
-                        role:'llm',
-                        action,
-                        reason:reasons.languageModelActivationRequested,
-                        state:role.state
-                    }
+                    publicDetail:request
                 }
             );
             if(!accepted||destroyed||generation!==requestGeneration){
@@ -1308,15 +1584,12 @@
                 requestError=message;
                 publish(
                     'chat-ai-activation-error',
-                    Object.freeze({request,error,message}),
+                    {request,error,message},
                     {
                         bubbles:true,
                         composed:true,
                         operationId,
-                        publicDetail:{
-                            role:'llm',
-                            action,
-                            reason:reasons.languageModelActivationRejected,
+                        publicDetail:{request,error,message,
                             ...readErrorFields(
                                 error,
                                 errorCodes.languageModelActivationRejected
@@ -1366,7 +1639,7 @@
         }
 
         button.addEventListener('click',activateSelectedAI);
-        return Object.freeze({request,synchronize,destroy});
+        return {request,synchronize,destroy};
     }
 
     function synchronizeAIRuntimeState(snapshot){
@@ -1503,7 +1776,7 @@
         const operationId=typeof context?.operationId==='string'&&context.operationId
             ?context.operationId
             :nextChatOperationId('conversation-timebox');
-        const deliveryContext=Object.freeze({...context,operationId});
+        const deliveryContext={...context,operationId};
         const prior=programmaticSubmissionQueue.catch(
             function ignorePriorProgrammaticSubmissionFailure(){
                 return false;
@@ -1668,14 +1941,18 @@
             return false;
         }
 
-        let message=chatOutput.querySelector(`#message-${id}`);
+        let message=[...chatOutput.children].find(
+            candidate=>candidate.id===`message-${id}`
+        )||null;
         
         if(!message){
             await receivedMessage(host.aiName,isThinking?'':text,id);
             if(!isThinking){
                 return false;
             }
-            message=chatOutput.querySelector(`#message-${id}`);
+            message=[...chatOutput.children].find(
+                candidate=>candidate.id===`message-${id}`
+            )||null;
             if(!message){
                 return false;
             }
@@ -1712,7 +1989,7 @@
             &&host.aiAvailability.tts
             &&speech.muted===false
         ){
-            const aiRuntime=globalThis.ai;
+            const aiRuntime=boundChatAI??globalThis.ai;
             if(typeof aiRuntime?.streamTTS==='function'){
                 void Promise.resolve(aiRuntime.streamTTS(text)).catch(
                     reportTTSError
@@ -1780,7 +2057,7 @@
                             cancelable:true,
                             operationId,
                             publicDetail:{
-                                size:Number.isFinite(file.size)?file.size:null,
+                                file,
                                 type:String(file.type||''),
                                 reason:chatReasons.fileStorageCompleted
                             }
@@ -1796,7 +2073,7 @@
                             composed:true,
                             operationId,
                             publicDetail:{
-                                size:Number.isFinite(file.size)?file.size:null,
+                                file,
                                 type:String(file.type||''),
                                 reason:chatReasons.fileStorageRejected,
                                 ...publicErrorFields(
@@ -1894,11 +2171,134 @@
 
         // Reset height to shrink to content size
         textArea.style.height = 'auto';
-        let scrollHeight = textArea.scrollHeight;
-        let computedStyle = window.getComputedStyle(textArea);
-        let lineHeight = parseInt(computedStyle.lineHeight, 10) || parseInt(computedStyle.fontSize, 10) * 1.2;
-        let maxHeight = lineHeight * 10;
-        textArea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+        textArea.style.height = `${textArea.scrollHeight}px`;
+    }
+
+    function renderSessionMessageFailure(messageId,error){
+        const message=[...chatOutput.children].find(
+            candidate=>candidate.id===`message-${messageId}`
+        )||null;
+        if(!message){
+            return false;
+        }
+        message.classList.add('session_error');
+        message.querySelector('.thinking')?.remove();
+        const markdown=message.querySelector('.markdown');
+        const text=visibleErrorMessage(error,'The AI request failed.');
+        markdown.raw=text;
+        markdown.innerHTML=new MD(text).rendered;
+        chatOutput.scrollTop=chatOutput.scrollHeight;
+        return true;
+    }
+
+    async function sendMessageThroughBoundSession(text,context){
+        const session=boundChatSession;
+        const bindingGeneration=sessionBindingGeneration;
+        if(!session){
+            throw chatError(
+                'The chat session is not bound.',
+                chatErrorCodes.sessionBindingRejected
+            );
+        }
+        if(sessionMessagePending){
+            throw chatError(
+                'A chat session message is already active.',
+                'AI_CHAT_BUSY'
+            );
+        }
+
+        const request={
+            message:{content:text},
+            signal:context.signal
+        };
+        const messageId=`session-${++sessionMessageSequence}`;
+        sessionMessagePending=true;
+        applyAIAvailability(host.aiAvailability);
+        setSessionStatus('sending','AI is responding…');
+        try{
+            await receivedMessage(host.aiName,'',messageId);
+            await streamMessage('',messageId,true);
+            setMessageProgress(
+                messageId,
+                {
+                    label:'AI response',
+                    indeterminate:true,
+                    status:'Working'
+                }
+            );
+            const result=await session.send(request);
+            if(
+                destroyed
+                ||context.signal.aborted
+                ||bindingGeneration!==sessionBindingGeneration
+                ||session!==boundChatSession
+            ){
+                return false;
+            }
+            if(!result||typeof result!=='object'||Array.isArray(result)){
+                throw new TypeError('The chat session returned an invalid result.');
+            }
+            if(!result.message||typeof result.message.content!=='string'){
+                throw new TypeError('The chat session result must contain assistant message content.');
+            }
+            await streamMessage(result.message.content,messageId,false);
+            setSessionStatus('ready','Chat ready.');
+            const detail={
+                session,
+                request,
+                result,
+                message:result.message,
+                context
+            };
+            dispatchChatEvent(
+                'chat-session-message',
+                detail,
+                {
+                    bubbles:true,
+                    composed:true,
+                    operationId:context.operationId||null,
+                    publicDetail:{
+                        ...detail,
+                        reason:chatReasons.sessionMessageCompleted
+                    }
+                }
+            );
+            return result;
+        }catch(error){
+            if(!destroyed&&bindingGeneration===sessionBindingGeneration){
+                renderSessionMessageFailure(messageId,error);
+                setSessionStatus(
+                    'error',
+                    visibleErrorMessage(error,'The AI request failed.')
+                );
+                dispatchChatEvent(
+                    'chat-session-error',
+                    {phase:'message',session,request,context,error},
+                    {
+                        bubbles:true,
+                        composed:true,
+                        operationId:context.operationId||null,
+                        publicDetail:{
+                            phase:'message',
+                            session,
+                            request,
+                            context,
+                            reason:chatReasons.sessionMessageRejected,
+                            ...publicErrorFields(
+                                error,
+                                chatErrorCodes.sessionMessageRejected
+                            )
+                        }
+                    }
+                );
+            }
+            throw error;
+        }finally{
+            sessionMessagePending=false;
+            if(!destroyed){
+                applyAIAvailability(host.aiAvailability);
+            }
+        }
     }
 
     function observeHostSubmission(result,context,ownership){
@@ -1957,12 +2357,15 @@
         if(!host.aiAvailability.llm){
             return false;
         }
-        const submissionContext=Object.freeze({
+        if(sessionBindingPending||sessionMessagePending){
+            return false;
+        }
+        const submissionContext={
             source:'user',
             preserveDraft:false,
             synthetic:false,
             ...context
-        });
+        };
         const text=textOverride.length>0?textOverride:textArea.value;
         if(!text.trim()){
             return false;
@@ -1972,13 +2375,11 @@
             ?submissionContext.operationId
             :nextChatOperationId('message');
         const ownership=createChatSubmissionOwnership(submissionContext.signal??null);
-        const eventContext=Object.freeze(
-            {
-                ...submissionContext,
-                operationId,
-                signal:ownership.signal
-            }
-        );
+        const eventContext={
+            ...submissionContext,
+            operationId,
+            signal:ownership.signal
+        };
         if(ownership.signal.aborted){
             ownership.release();
             return false;
@@ -1997,7 +2398,8 @@
                     cancelable:true,
                     operationId,
                     publicDetail:{
-                        messageLength:text.length,
+                        message:text,
+                        context:eventContext,
                         source:eventContext.source,
                         synthetic:eventContext.synthetic===true,
                         reason:chatReasons.messageSubmissionRequested
@@ -2022,7 +2424,6 @@
             return false;
         }
         try{
-            const messageTime = getMilTime();
             if(!eventContext.preserveDraft){
                 textArea.value='';
             }
@@ -2031,21 +2432,12 @@
             // console.log(forceText,text,1);
             if(!eventContext.synthetic&&!eventContext.reuseVisibleMessage){
                 hostSubmissionGeneration++;
-                chatOutput.innerHTML += `
-                    <li class='user'>
-                        <strong>${host.name} ${messageTime}:</strong>
-                        <br>
-                        <br>
-                        <div class='markdown'>
-                            ${new MD(text).rendered}
-                        </div>
-                    </li>
-                `;
+                appendTranscriptMessage('user',text,host.name);
             }
             chatOutput.scrollTop = chatOutput.scrollHeight;
 
             if(host.aiAvailability.tts&&speech.muted===false){
-                const aiRuntime=globalThis.ai;
+                const aiRuntime=boundChatAI??globalThis.ai;
                 aiRuntime?.stopAudio?.();
                 if(typeof aiRuntime?.resumeAudio==='function'){
                     void Promise.resolve(aiRuntime.resumeAudio()).catch(
@@ -2056,7 +2448,9 @@
 
             let result;
             try{
-                result=host.sendMessage(text,eventContext);
+                result=boundChatSession
+                    ?sendMessageThroughBoundSession(text,eventContext)
+                    :host.sendMessage(text,eventContext);
             }catch(error){
                 result=Promise.reject(error);
             }
@@ -2068,19 +2462,12 @@
     }
 
     async function receivedMessage(name = 'Assistant', text = '', id=''){
-        const messageTime = getMilTime();
-        //console.log(text)
-        chatOutput.innerHTML += `
-            <li class='ai' ${id? `id="message-${id}"`:''}>
-                <strong>${name} ${messageTime}:</strong>
-                <br>
-                <br>
-                <div class='markdown'>
-                    ${new MD(text).rendered}
-                </div>
-            </li>
-        `;
+        const message=appendTranscriptMessage('assistant',text,name);
+        if(id){
+            message.id=`message-${id}`;
+        }
         chatOutput.scrollTop = chatOutput.scrollHeight;
+        return message;
     }
 
     function reportTTSError(error){
@@ -2096,8 +2483,8 @@
             }
         }
 
-        const message=typeof error?.message==='string'&&error.message.trim()
-            ?error.message.trim().slice(0,240)
+        const message=typeof error?.message==='string'&&error.message
+            ?error.message
             :'Speech synthesis failed.';
         dispatchChatEvent(
             'chat-speech-synthesis-error',
@@ -2121,8 +2508,10 @@
 
     function destroy(){
         if(destroyed){
-            return;
+            return false;
         }
+        sessionBindingGeneration+=1;
+        setSessionStatus('destroyed','Chat closed.');
         destroyed=true;
         const destroyReason=createChatSubmissionAbort(
             chatReasons.componentDestroyed,
@@ -2138,9 +2527,15 @@
         conversationTimeboxUnsubscribe=null;
         conversationTimeboxController=null;
         initialSpeechMuteListenerInstalled=false;
+        sessionBindingPending=false;
+        sessionMessagePending=false;
+        boundChatSession=null;
+        boundChatAI=null;
+        host.session=null;
         speech.destroy?.();
         events.dispose();
         host.ready=false;
+        return true;
     }
 
     // Initialize and adjust on input

@@ -3,234 +3,39 @@
 <head>
     <meta charset="utf-8">
     <meta name="arcane-app-id" content="hello-world">
-    <base href="../../">
     <script type="importmap" data-arcane-import-map>
 {
   "imports": {
-    "#arcane/persistent-ai-chat-session": "./arcane/modules/PersistentAIChatSession.js",
-    "./node_modules/strong-type/index.js": "./arcane/dependencies/strong-type/index.js",
-    "arcane-os/ai/browser-speech": "./arcane/sdk/ai/browser-speech.mjs",
-    "arcane-os/ai/browser-wasm": "./arcane/sdk/ai/browser-wasm.mjs",
-    "arcane-os/event-manager": "./arcane/sdk/event-manager.mjs",
-    "arcane/AI": "./arcane/modules/AI.js",
-    "arcane/AIPreferenceRuntime": "./arcane/modules/AIPreferenceRuntime.js",
-    "arcane/AIPreferenceTuple": "./arcane/modules/AIPreferenceTuple.js",
-    "arcane/AIProviderRuntime": "./arcane/modules/AIProviderRuntime.js",
-    "arcane/AIResponseLength": "./arcane/modules/AIResponseLength.js",
-    "arcane/AIResponseURLPolicy": "./arcane/modules/AIResponseURLPolicy.js",
-    "arcane/AIRuntimeState": "./arcane/modules/AIRuntimeState.js",
-    "arcane/AnsiText": "./arcane/modules/AnsiText.js",
-    "arcane/ApiModelDatabase": "./arcane/modules/ApiModelDatabase.js",
-    "arcane/AppDataScope": "./arcane/modules/AppDataScope.js",
-    "arcane/AppearancePreferences": "./arcane/modules/AppearancePreferences.js",
-    "arcane/ArcaneCommunicationBridge": "./arcane/modules/ArcaneCommunicationBridge.js",
-    "arcane/ArcaneNavigationPolicy": "./arcane/modules/ArcaneNavigationPolicy.js",
-    "arcane/ArcaneNetworkPolicy": "./arcane/modules/ArcaneNetworkPolicy.js",
-    "arcane/AsyncBoundary": "./arcane/modules/AsyncBoundary.js",
-    "arcane/BrowserTestSuite": "./arcane/modules/BrowserTestSuite.js",
-    "arcane/CalculatorEngine": "./arcane/modules/CalculatorEngine.js",
-    "arcane/ChartLibrary": "./arcane/modules/ChartLibrary.js",
-    "arcane/ChatRecords": "./arcane/modules/ChatRecords.js",
-    "arcane/CommunicationAppController": "./arcane/modules/CommunicationAppController.js",
-    "arcane/CommunicationHub": "./arcane/modules/CommunicationHub.js",
-    "arcane/CommunicationPreferences": "./arcane/modules/CommunicationPreferences.js",
-    "arcane/CommunicationProviderRegistry": "./arcane/modules/CommunicationProviderRegistry.js",
-    "arcane/ComponentContracts": "./arcane/modules/ComponentContracts.js",
-    "arcane/ConfiguredAIChatSession": "./arcane/modules/ConfiguredAIChatSession.js",
-    "arcane/ConversationActionItems": "./arcane/modules/ConversationActionItems.js",
-    "arcane/ConversationClosingReport": "./arcane/modules/ConversationClosingReport.js",
-    "arcane/ConversationTimebox": "./arcane/modules/ConversationTimebox.js",
-    "arcane/CoreLocalModelCatalog": "./arcane/modules/CoreLocalModelCatalog.js",
-    "arcane/DBLS": "./arcane/modules/DBLS.js",
-    "arcane/DBOPFS": "./arcane/modules/DBOPFS.js",
-    "arcane/DBOPFSDocumentLibrary": "./arcane/modules/DBOPFSDocumentLibrary.js",
-    "arcane/DataMaintenance": "./arcane/modules/DataMaintenance.js",
-    "arcane/DevelopmentWorkspace": "./arcane/modules/DevelopmentWorkspace.js",
-    "arcane/DirectoryPicker": "./arcane/modules/DirectoryPicker.js",
-    "arcane/DocumentLexicalSearch": "./arcane/modules/DocumentLexicalSearch.js",
-    "arcane/DocumentNavigation": "./arcane/modules/DocumentNavigation.js",
-    "arcane/Errors": "./arcane/modules/Errors.js",
-    "arcane/GifEncoder": "./arcane/modules/GifEncoder.js",
-    "arcane/HTMLImport": "./arcane/modules/HTMLImport.js",
-    "arcane/InMemoryCommunicationProvider": "./arcane/modules/InMemoryCommunicationProvider.js",
-    "arcane/IsolatedModelQuestionRunner": "./arcane/modules/IsolatedModelQuestionRunner.js",
-    "arcane/LocalAIReadiness": "./arcane/modules/LocalAIReadiness.js",
-    "arcane/LocalAIReadinessController": "./arcane/modules/LocalAIReadinessController.js",
-    "arcane/MD": "./arcane/modules/MD.js",
-    "arcane/Mail": "./arcane/modules/Mail.js",
-    "arcane/MailOutbox": "./arcane/modules/MailOutbox.mjs",
-    "arcane/MailTransport": "./arcane/modules/MailTransport.mjs",
-    "arcane/Marked.min": "./arcane/modules/Marked.min.js",
-    "arcane/MemoryRecords": "./arcane/modules/MemoryRecords.js",
-    "arcane/MessageAdvisory": "./arcane/modules/MessageAdvisory.js",
-    "arcane/ModelDefinition": "./arcane/modules/ModelDefinition.js",
-    "arcane/Ollama": "./arcane/modules/Ollama.js",
-    "arcane/OllamaModelIdentifier": "./arcane/modules/OllamaModelIdentifier.js",
-    "arcane/OllamaSettings": "./arcane/modules/OllamaSettings.js",
-    "arcane/OpenMeteoWeatherProvider": "./arcane/modules/OpenMeteoWeatherProvider.js",
-    "arcane/PersistentAIChatSession": "./arcane/modules/PersistentAIChatSession.js",
-    "arcane/PreferenceStore": "./arcane/modules/PreferenceStore.js",
-    "arcane/Questionnaire": "./arcane/modules/Questionnaire.js",
-    "arcane/RecordLinkIndex": "./arcane/modules/RecordLinkIndex.js",
-    "arcane/RecordPassageIndex": "./arcane/modules/RecordPassageIndex.js",
-    "arcane/RecordReviewStore": "./arcane/modules/RecordReviewStore.js",
-    "arcane/RevocableProjectionLedger": "./arcane/modules/RevocableProjectionLedger.js",
-    "arcane/RiskSignalAnalyzer": "./arcane/modules/RiskSignalAnalyzer.js",
-    "arcane/ScamRiskPolicy": "./arcane/modules/ScamRiskPolicy.js",
-    "arcane/ScopedOPFSCache": "./arcane/modules/ScopedOPFSCache.js",
-    "arcane/ScreenCapture": "./arcane/modules/ScreenCapture.js",
-    "arcane/SpeechPlayback": "./arcane/modules/SpeechPlayback.js",
-    "arcane/StaticDocumentCatalog": "./arcane/modules/StaticDocumentCatalog.js",
-    "arcane/SystemAppearance": "./arcane/modules/SystemAppearance.js",
-    "arcane/SystemToolRegistry": "./arcane/modules/SystemToolRegistry.js",
-    "arcane/TerminalClient": "./arcane/modules/TerminalClient.js",
-    "arcane/TerminalCommandRegistry": "./arcane/modules/TerminalCommandRegistry.js",
-    "arcane/ThemeBootstrap": "./arcane/modules/ThemeBootstrap.js",
-    "arcane/ThemeManager": "./arcane/modules/ThemeManager.js",
-    "arcane/TimeGuard": "./arcane/modules/TimeGuard.js",
-    "arcane/ToolCallRouter": "./arcane/modules/ToolCallRouter.js",
-    "arcane/WaitForComponent": "./arcane/modules/WaitForComponent.js",
-    "arcane/YouTubeMedia": "./arcane/modules/YouTubeMedia.js",
-    "arcane/entities/ApiModelRecord": "./arcane/entities/ApiModelRecord.js",
-    "arcane/entities/Calculation": "./arcane/entities/Calculation.js",
-    "arcane/entities/Chat": "./arcane/entities/Chat.js",
-    "arcane/entities/CommunicationMessage": "./arcane/entities/CommunicationMessage.js",
-    "arcane/entities/CommunicationThread": "./arcane/entities/CommunicationThread.js",
-    "arcane/entities/Preference": "./arcane/entities/Preference.js",
-    "arcane/entities/TerminalSession": "./arcane/entities/TerminalSession.js",
-    "arcane/entities/Theme": "./arcane/entities/Theme.js",
-    "arcane/entities/User": "./arcane/entities/User.js",
-    "arcane/entities/Weather": "./arcane/entities/Weather.js",
-    "event-pubsub": "./arcane/sdk/dependencies/event-pubsub/index.js"
+    "/runtime/node_modules/strong-type/index.js": "/node_modules/strong-type/index.js",
+    "arcane-os/ai/browser-speech": "/browser-runtime/ai/browser-speech.mjs",
+    "arcane-os/ai/browser-wasm": "/browser-runtime/ai/browser-wasm.mjs",
+    "arcane-os/event-manager": "/src/event-manager.mjs",
+    "arcane/AI": "/runtime/arcane/modules/AI.js",
+    "arcane/DBOPFS": "/runtime/arcane/modules/DBOPFS.js",
+    "arcane/HTMLImport": "/runtime/arcane/modules/HTMLImport.js",
+    "arcane/ThemeBootstrap": "/runtime/arcane/modules/ThemeBootstrap.js",
+    "arcane/WaitForComponent": "/runtime/arcane/modules/WaitForComponent.js",
+    "event-pubsub": "/node_modules/event-pubsub/index.js"
   }
 }
 </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="rgb(23, 34, 56)">
     <title>Arcane Hello World</title>
-    <link rel="manifest" href="./apps/hello-world/manifest.json">
-    <link rel="stylesheet" href="./arcane/css/theme.css?v=1">
-    <link rel="stylesheet" href="./arcane/css/primitives.css?v=1">
-    <link rel="stylesheet" href="./apps/hello-world/hello-world.css?v=1">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="stylesheet" href="/runtime/arcane/css/theme.css?v=1">
+    <link rel="stylesheet" href="/runtime/arcane/css/primitives.css?v=1">
+    <link rel="stylesheet" href="./hello-world.css?v=1">
 </head>
 <body>
     <main class="app-shell">
-        <section class="arcane-card" aria-labelledby="app-title">
-            <header class="arcane-card__header">
-                <div>
-                    <p class="eyebrow">Arcane application</p>
-                    <h1 id="app-title">Hello, Arcane World!</h1>
-                </div>
-            </header>
-            <div class="arcane-card__body">
-                <div class="app-features">
-                    <section class="app-feature" aria-labelledby="imports-feature-title">
-                        <h2 id="imports-feature-title">Named browser imports</h2>
-                        <p>Arcane supplies the theme, button styles, and app-scoped storage through stable JavaScript names.</p>
-                        <p id="app-status" role="status" aria-live="polite">Ready to say hello.</p>
-                        <button id="app-action" class="arcane-button" type="button">Say hello</button>
-                    </section>
-                    <section class="app-feature" aria-labelledby="parity-feature-title">
-                        <h2 id="parity-feature-title">Same files in dev and dist</h2>
-                        <p>The import map resolves the committed <code>arcane/</code> tree during development and the byte-identical packaged tree in <code>dist/hello-world/</code>.</p>
-                        <p class="app-environment">Regenerate it at any time with <code>npm run import-map</code>.</p>
-                    </section>
-                    <section class="app-feature app-feature--ai" aria-labelledby="ai-feature-title">
-                        <h2 id="ai-feature-title">Full SDK AI lifecycle</h2>
-                        <p>Arcane gives language, speech synthesis, and speech transcription separate provider lifecycles. Each role loads, runs, cancels, and unloads without changing the other two.</p>
-                        <p>The normalized <code>arcane/AI</code> module hydrates only the selected browser speech route. An omitted Cloud or Core role stays unchanged, so STT and TTS can use different providers.</p>
-                        <p class="ai-model-note"><strong>No external AI model or adapter artifact downloads at import time.</strong> A role's network load is the only control that may fetch its upstream artifacts. Offline load uses compatible app-scoped DBOPFS data or reports a cache miss. The ordinary <code>secure:false</code> path warns when optional byte checks are not requested.</p>
-                        <p id="speech-authority-status" class="speech-authority-note" role="status" aria-live="polite"><strong>Speech authority required:</strong> Arcane ships no speech runtime bytes, model weights, or voices, nor any third-party legal corpora. Before using speech, the application must select version-pinned upstream STT and TTS authorities in <code>modules/SpeechAuthorities.js</code>.</p>
-
-                        <div class="ai-role-grid">
-                            <section class="ai-role" aria-labelledby="llm-role-title">
-                                <header class="ai-role__header">
-                                    <p class="ai-role__eyebrow">LLM</p>
-                                    <h3 id="llm-role-title">Generate text and inspect tool calls</h3>
-                                </header>
-                                <p>The SDK loads Granite 4.1 3B Q4_K_S from this app's 1,998,371,424 bytes (1.86 GiB) first-use download or DBOPFS cache. Status distinguishes warn-first unchecked bytes from completed optional integrity checks. This 0.3.1 LLM path requires a WebGPU-capable browser.</p>
-                                <p id="ai-lifecycle" class="app-environment">Lifecycle: unloaded.</p>
-                                <p id="ai-status" class="role-status" role="status" aria-live="polite">Model not loaded. No model download has started.</p>
-                                <div class="ai-controls" aria-label="Language model lifecycle controls">
-                                    <button id="ai-load" class="arcane-button" type="button">Network load LLM (1.86 GiB if not cached)</button>
-                                    <button id="ai-load-offline" class="arcane-button" type="button">Load LLM from app cache</button>
-                                    <button id="ai-cancel" class="arcane-button" type="button" hidden disabled>Cancel LLM operation</button>
-                                    <button id="ai-unload" class="arcane-button" type="button" disabled>Unload LLM</button>
-                                </div>
-                                <div class="ai-progress-block">
-                                    <progress id="ai-progress" max="1998371424" value="0" aria-labelledby="ai-progress-label" hidden></progress>
-                                    <p id="ai-progress-label" class="app-environment">No LLM operation in progress.</p>
-                                </div>
-                                <label class="ai-field-label" for="ai-prompt">Prompt</label>
-                                <textarea id="ai-prompt" rows="3" maxlength="2000" aria-describedby="ai-prompt-limit">Say hello in one short sentence. If useful, propose the show_greeting tool.</textarea>
-                                <p id="ai-prompt-limit" class="app-environment">Up to 2,000 characters keeps tutorial tokenization bounded.</p>
-                                <button id="ai-send" class="arcane-button" type="button" disabled>Ask local AI</button>
-                                <h4>Response</h4>
-                                <pre id="ai-response" class="ai-output">Load the model to begin.</pre>
-                                <h4>Proposed tool calls</h4>
-                                <pre id="ai-tool-calls" class="ai-output">No tool calls proposed. Structural output is displayed only; the application invokes no tool.</pre>
-                            </section>
-
-                            <section class="ai-role" aria-labelledby="tts-role-title">
-                                <header class="ai-role__header">
-                                    <p class="ai-role__eyebrow">TTS</p>
-                                    <h3 id="tts-role-title">Synthesize a WAV response</h3>
-                                </header>
-                                <p>Configure a licensed voice and version-pinned upstream Kokoro runtime and model authority before loading. Arcane never autoplays the result.</p>
-                                <p id="tts-lifecycle" class="app-environment">Lifecycle: unavailable until speech authority is configured.</p>
-                                <p id="tts-status" class="role-status" role="status" aria-live="polite">Speech authority required. No speech download has started.</p>
-                                <div class="ai-controls" aria-label="Text-to-speech lifecycle controls">
-                                    <button id="tts-load" class="arcane-button" type="button" disabled>Network load TTS</button>
-                                    <button id="tts-load-offline" class="arcane-button" type="button" disabled>Load TTS from app cache</button>
-                                    <button id="tts-cancel" class="arcane-button" type="button" hidden disabled>Cancel TTS operation</button>
-                                    <button id="tts-unload" class="arcane-button" type="button" disabled>Unload TTS</button>
-                                </div>
-                                <div class="ai-progress-block">
-                                    <progress id="tts-progress" max="1" value="0" aria-labelledby="tts-progress-label" hidden></progress>
-                                    <p id="tts-progress-label" class="app-environment">No TTS operation in progress.</p>
-                                </div>
-                                <label class="ai-field-label" for="tts-input">Text to speak</label>
-                                <textarea id="tts-input" rows="3" maxlength="500" aria-describedby="tts-input-limit">Hello from Arcane's independent text-to-speech lifecycle.</textarea>
-                                <p id="tts-input-limit" class="app-environment">Up to 500 characters per synthesis keeps this tutorial's browser work bounded.</p>
-                                <button id="tts-synthesize" class="arcane-button" type="button" disabled>Synthesize WAV</button>
-                                <h4 id="tts-audio-title">Generated audio</h4>
-                                <p class="app-environment">Playback begins only when you use the audio controls.</p>
-                                <audio id="tts-audio" class="tts-audio" controls preload="none" aria-labelledby="tts-audio-title" hidden>
-                                    Your browser does not support WAV playback.
-                                </audio>
-                            </section>
-
-                            <section class="ai-role" aria-labelledby="stt-role-title">
-                                <header class="ai-role__header">
-                                    <p class="ai-role__eyebrow">STT</p>
-                                    <h3 id="stt-role-title">Transcribe a selected audio file</h3>
-                                </header>
-                                <p>Configure a licensed, version-pinned upstream Whisper runtime and model authority before loading. This example reads only the file you select; it never requests microphone access.</p>
-                                <p id="stt-lifecycle" class="app-environment">Lifecycle: unavailable until speech authority is configured.</p>
-                                <p id="stt-status" class="role-status" role="status" aria-live="polite">Speech authority required. No speech download has started.</p>
-                                <div class="ai-controls" aria-label="Speech-to-text lifecycle controls">
-                                    <button id="stt-load" class="arcane-button" type="button" disabled>Network load STT</button>
-                                    <button id="stt-load-offline" class="arcane-button" type="button" disabled>Load STT from app cache</button>
-                                    <button id="stt-cancel" class="arcane-button" type="button" hidden disabled>Cancel STT operation</button>
-                                    <button id="stt-unload" class="arcane-button" type="button" disabled>Unload STT</button>
-                                </div>
-                                <div class="ai-progress-block">
-                                    <progress id="stt-progress" max="1" value="0" aria-labelledby="stt-progress-label" hidden></progress>
-                                    <p id="stt-progress-label" class="app-environment">No STT operation in progress.</p>
-                                </div>
-                                <label class="ai-field-label" for="stt-file">Audio file to transcribe</label>
-                                <input id="stt-file" class="ai-file-input" type="file" accept="audio/*" aria-describedby="stt-file-limit" disabled>
-                                <p id="stt-file-limit" class="app-environment">Choose one audio file up to 8 MiB. Selecting it is an explicit local action; the example does not record or capture audio.</p>
-                                <button id="stt-transcribe" class="arcane-button" type="button" disabled>Transcribe selected file</button>
-                                <h4>Transcript</h4>
-                                <pre id="stt-transcript" class="ai-output">Load STT and select an audio file to begin.</pre>
-                            </section>
-                        </div>
-                    </section>
-                </div>
-            </div>
-        </section>
+        <h1 id="app-title">Hello, Arcane World!</h1>
+        <html-import
+            id="hello-world-chat"
+            href="/runtime/arcane/components/chat.html?v=1"
+            presentation="basic">
+        </html-import>
     </main>
-    <script type="module" src="./apps/hello-world/modules/App.js?v=1"></script>
+    <script type="module" src="./modules/App.js?v=1"></script>
 </body>
 </html>
