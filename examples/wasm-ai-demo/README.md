@@ -14,6 +14,7 @@ The Arcane SDK owns the shared behavior:
 - Chat creates and binds the SDK's `PersistentAIChatSession`, which owns local conversation persistence.
 - `DBOPFSDocumentLibrary` owns the profile-specific local document corpus and lexical retrieval.
 - `PreferenceStore` owns model and profile selection persistence.
+- `startSourceExampleServer` owns live-source mounts, complete file streaming, model Range transport, TLS, and the browser-WASM isolation headers.
 
 The example owns its branded outer shell, model/profile catalog, General, PreCrisis, and BOSS prompt policy, maintained BOSS demo catalog, local-document controls, and profile-specific tool declarations. SDK Chat displays structural tool calls; the example records them through Chat's public tool-result method with the explicit `not-executed` disposition so the persisted conversation can continue without pretending an action ran. Every declared tool requires a nonempty user-facing `message`, matching the browser-WASM provider contract.
 
@@ -43,7 +44,7 @@ Then open:
 
     http://localhost:4173/examples/wasm-ai-demo/
 
-The example server uses only Node's built-in modules and serves the current checkout's direct `/src`, `/browser-runtime`, and `/runtime` paths. Open the exact URL it prints at startup. HTTP is the default; when local certificate files are present in `examples/wasm-ai-demo/tls/`, the printed URL uses HTTPS instead. To reuse an existing local certificate directory without copying it into Git, set `ARCANE_WASM_TLS_ROOT` before starting the server.
+The example's thin server entry supplies its paths and assets to the SDK's `startSourceExampleServer`; the SDK owns serving the current checkout's direct `/src`, `/browser-runtime`, and `/runtime` paths. Open the exact URL it prints at startup. HTTP is the default; when local certificate files are present in `examples/wasm-ai-demo/tls/`, the printed URL uses HTTPS instead. To reuse an existing local certificate directory without copying it into Git, set `ARCANE_WASM_TLS_ROOT` before starting the server.
 
 For example, a local launch can point at preserved prototype assets without making them source authority:
 
