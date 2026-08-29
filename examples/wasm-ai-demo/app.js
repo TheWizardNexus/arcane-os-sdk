@@ -444,7 +444,7 @@ async function initializeApplication() {
     waitForComponent(chat, {
       errorEvent: "html-import-error",
       event: "chat-ready",
-      methods: ["bindSession", "setInitialSpeechMuted", "submitToolResult"],
+      methods: ["bindSession", "submitToolResult"],
       property: "ready",
     }),
   ]);
@@ -498,7 +498,6 @@ async function initializeApplication() {
 
   try {
     await ai.configureBrowserSpeech(speechConfiguration(dbopfs));
-    chat.setInitialSpeechMuted(false);
   } catch (error) {
     console.error("Arcane SDK speech configuration failed.", error);
   }
