@@ -258,6 +258,7 @@ function localModelDescriptor(model) {
 
 function speechConfiguration(dbopfs) {
   const transformersDistribution = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0/dist/";
+  const transformersWasmDistribution = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0-dev.20260416-b7804b056c/dist/";
   const kokoroWasmDistribution = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/";
   return {
     protocol: AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
@@ -276,7 +277,9 @@ function speechConfiguration(dbopfs) {
         version: "4.2.0",
         revision: "4.2.0",
         entry: "transformers.min.js",
-        wasmPaths: transformersDistribution,
+        // Transformers 4.2.0 selects this exact ONNX Runtime Web build. Its
+        // WASM factory and binary live in that package, not the JS bundle path.
+        wasmPaths: transformersWasmDistribution,
         files: [{
           path: "transformers.min.js",
           url: `${transformersDistribution}transformers.min.js`,
