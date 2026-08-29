@@ -2,6 +2,7 @@ import arcaneThemeReady from "arcane/ThemeBootstrap";
 import "arcane/HTMLImport";
 import AI, { AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL } from "arcane/AI";
 import DBOPFS from "arcane/DBOPFS";
+import { loadModelDefinitionSystemPrompt } from "arcane/ModelDefinition";
 import PreferenceStore from "arcane/PreferenceStore";
 import waitForComponent from "arcane/WaitForComponent";
 import { subscribeAIRuntimeState } from "arcane/AIRuntimeState";
@@ -168,14 +169,6 @@ function generalSystemPrompt() {
   return `You are ${selectedModel.label}, a ${selectedModel.parameterWords} parameter model running locally in this browser. Be concise, helpful, and direct. Accurately identify yourself as ${selectedModel.label}; do not claim to be a hosted service.`;
 }
 
-function extractSystemPrompt(modelfile, profile) {
-  const match = String(modelfile).match(/(?:^|\r?\n)SYSTEM\s+"""\s*\r?\n([\s\S]*?)\r?\n"""/);
-  if (!match?.[1]?.trim()) {
-    throw new Error(`${profile.label} Modelfile has no SYSTEM block.`);
-  }
-  return match[1].trim();
-}
-
 function browserProfileNote(profile) {
   if (profile.id === "precrisis") {
     return [
@@ -199,11 +192,7 @@ async function loadProfile() {
     systemPrompt = generalSystemPrompt();
     return systemPrompt;
   }
-  const response = await fetch(selectedProfile.sourceUrl, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`Unable to load ${selectedProfile.label}: HTTP ${response.status}.`);
-  }
-  const profilePrompt = extractSystemPrompt(await response.text(), selectedProfile);
+  const profilePrompt = await loadModelDefinitionSystemPrompt(selectedProfile.sourceUrl);
   systemPrompt = `${profilePrompt}\n\n${browserProfileNote(selectedProfile)}`;
   return systemPrompt;
 }

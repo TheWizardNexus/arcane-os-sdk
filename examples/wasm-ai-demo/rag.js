@@ -276,27 +276,15 @@ async function retrieveRagContext(query, {
 } = {}) {
   const profile = normalizeProfileId(profileId);
   const library = await libraryFor(profile, { dbopfs, signal });
-  const result = await library.search(String(query || ""), { signal });
-  const matches = result.matches.filter((document) => document.score > 0);
-  const documents = matches.map((document) => [
-    "[BEGIN DOCUMENT]",
-    `id: ${document.id}`,
-    `title: ${document.title}`,
-    `path: ${document.path}`,
-    document.body,
-    "[END DOCUMENT]",
-  ].join("\n"));
-  let text = "";
-  if (documents.length && profile === "boss") {
-    text = [
-      "<boss_library_context>",
-      ...documents,
-      "</boss_library_context>",
-    ].join("\n\n");
-  } else if (documents.length) {
-    text = ["LOCAL DOCUMENT CONTEXT", ...documents].join("\n\n");
-  }
-  return { failures: result.failures, matches, text };
+  const result = await library.buildContext(String(query || ""), { signal });
+  const text = result.text && profile === "boss"
+    ? ["<boss_library_context>", result.text, "</boss_library_context>"].join("\n\n")
+    : result.text;
+  return {
+    failures: result.failures,
+    matches: result.documents,
+    text,
+  };
 }
 
 export {
