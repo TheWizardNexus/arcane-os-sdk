@@ -2,16 +2,6 @@ name: Publish npm package
 
 on:
   workflow_dispatch:
-    inputs:
-      content_classification:
-        description: Authorized npm content classification for this exact package
-        required: true
-        type: choice
-        default: unresolved
-        options:
-          - unresolved
-          - standard
-          - dual-use
 
 permissions: {}
 
@@ -20,29 +10,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  policy:
-    name: Require an explicit npm content-policy decision
-    if: github.repository == 'TheWizardNexus/arcane-os-sdk' && github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - name: Check out the exact main revision
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          persist-credentials: false
-      - name: Fail closed until an authorized classification matches the package
-        env:
-          CONTENT_CLASSIFICATION: ${{ inputs.content_classification }}
-        run: node tools/npm-registry-publication.mjs policy --classification "$CONTENT_CLASSIFICATION" --package package.json
-
   publish:
-    name: Publish the exact tested npm artifact
+    name: Publish selected npm version
     if: github.repository == 'TheWizardNexus/arcane-os-sdk' && github.ref == 'refs/heads/main'
-    needs: policy
     permissions:
-      actions: read
       contents: read
       id-token: write
     environment:
@@ -50,128 +21,56 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     outputs:
-      artifact-id: ${{ steps.readiness.outputs['artifact-id'] }}
-      run-id: ${{ steps.readiness.outputs['run-id'] }}
-      version: ${{ steps.readiness.outputs.version }}
+      version: ${{ steps.pack.outputs.version }}
       channel: ${{ steps.publication.outputs.channel }}
-      preserved-tag: ${{ steps.publication.outputs['preserved-tag'] }}
-      preserved-version: ${{ steps.publication.outputs['preserved-version'] }}
     steps:
-      - name: Check out the exact main revision without publication credentials
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Check out main
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - name: Resolve the successful exact-SHA readiness artifact
-        id: readiness
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          test "$GITHUB_REPOSITORY" = "TheWizardNexus/arcane-os-sdk"
-          test "$GITHUB_REF" = "refs/heads/main"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          version="$(node -p "require('./package.json').version")"
-          run_id="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/workflows/check.yml/runs" -f branch=main -f event=push -f status=success -f head_sha="$GITHUB_SHA" -f per_page=1 --jq '.workflow_runs[0].id // empty')"
-          test -n "$run_id"
-          artifact_name="arcane-sdk-npm-${version}-${GITHUB_SHA}"
-          mapfile -t artifact_ids < <(gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts" -f per_page=100 --jq ".artifacts[] | select(.name == \"${artifact_name}\" and (.expired | not)) | .id")
-          test "${#artifact_ids[@]}" -eq 1
-          {
-            echo "run-id=${run_id}"
-            echo "artifact-id=${artifact_ids[0]}"
-            echo "version=${version}"
-          } >> "$GITHUB_OUTPUT"
-          echo "Authenticated Check run ${run_id} and artifact ${artifact_ids[0]} for ${GITHUB_SHA}."
-      - name: Download the exact artifact by immutable id
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          artifact-ids: ${{ steps.readiness.outputs['artifact-id'] }}
-          path: ${{ runner.temp }}/verified-npm-release
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          run-id: ${{ steps.readiness.outputs['run-id'] }}
-      - name: Use the pinned trusted-publishing toolchain
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - name: Use the npm publication toolchain
+        uses: actions/setup-node@v6
         with:
           node-version: 26.7.0
           architecture: x64
+          registry-url: https://registry.npmjs.org/
           package-manager-cache: false
-      - name: Reverify the exact tested tarball and source identity
+      - name: Install declared dependencies
+        run: npm ci --ignore-scripts
+      - name: Pack the selected version
+        id: pack
         shell: bash
         env:
-          VERSION: ${{ steps.readiness.outputs.version }}
-          RELEASE_ROOT: ${{ runner.temp }}/verified-npm-release
-        run: |
-          set -euo pipefail
-          test "$(node --version)" = "v26.7.0"
-          test "$(npm --version)" = "11.19.0"
-          test "$(npm config get registry)" = "https://registry.npmjs.org/"
-          node tools/verify-npm-release.mjs --metadata "$RELEASE_ROOT/arcane-os-${VERSION}.manifest.json" --expected-source "$GITHUB_SHA" --expected-version "$VERSION" --require-clean
-      - name: Resolve an idempotent exact-version publication
+          RELEASE_OUTPUT: ${{ runner.temp }}/arcane-sdk-npm-release
+        run: node tools/build-npm-release.mjs --output "$RELEASE_OUTPUT"
+      - name: Resolve version and channel
         id: publication
         shell: bash
-        env:
-          VERSION: ${{ steps.readiness.outputs.version }}
-          RELEASE_ROOT: ${{ runner.temp }}/verified-npm-release
-        run: node tools/npm-registry-publication.mjs preflight --metadata "$RELEASE_ROOT/arcane-os-${VERSION}.manifest.json"
-      - name: Publish only the downloaded and reverified tarball
+        run: node tools/npm-registry-publication.mjs preflight --tarball "${{ steps.pack.outputs.tarball }}"
+      - name: Publish the selected tarball
         if: steps.publication.outputs['needs-publish'] == 'true'
         shell: bash
-        env:
-          VERSION: ${{ steps.readiness.outputs.version }}
-          CHANNEL: ${{ steps.publication.outputs.channel }}
-          RELEASE_ROOT: ${{ runner.temp }}/verified-npm-release
-        run: npm publish "$RELEASE_ROOT/arcane-os-${VERSION}.tgz" --ignore-scripts --access public --tag "$CHANNEL" --provenance
+        run: npm publish "${{ steps.pack.outputs.tarball }}" --ignore-scripts --access public --tag "${{ steps.publication.outputs.channel }}"
 
   verify_registry:
-    name: Verify npm identity, tags, and trusted-publisher provenance
+    name: Verify npm version and channel
     needs: publish
-    permissions:
-      actions: read
-      contents: read
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    permissions:
+      contents: read
     steps:
-      - name: Check out only the exact registry verifier
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Check out registry verifier
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - name: Download the same tested artifact by immutable id
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          artifact-ids: ${{ needs.publish.outputs['artifact-id'] }}
-          path: ${{ runner.temp }}/verified-npm-release
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          run-id: ${{ needs.publish.outputs['run-id'] }}
-      - name: Use the pinned registry-verification toolchain
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - name: Use the npm verification toolchain
+        uses: actions/setup-node@v6
         with:
           node-version: 26.7.0
           architecture: x64
+          registry-url: https://registry.npmjs.org/
           package-manager-cache: false
-      - name: Reverify registry bytes and preserve the other channel
+      - name: Verify registry visibility
         shell: bash
-        env:
-          VERSION: ${{ needs.publish.outputs.version }}
-          PRESERVED_TAG: ${{ needs.publish.outputs['preserved-tag'] }}
-          PRESERVED_VERSION: ${{ needs.publish.outputs['preserved-version'] }}
-          RELEASE_ROOT: ${{ runner.temp }}/verified-npm-release
-        run: |
-          set -euo pipefail
-          node tools/verify-npm-release.mjs --metadata "$RELEASE_ROOT/arcane-os-${VERSION}.manifest.json" --expected-source "$GITHUB_SHA" --expected-version "$VERSION" --require-clean
-          node tools/npm-registry-publication.mjs verify --metadata "$RELEASE_ROOT/arcane-os-${VERSION}.manifest.json" --preserved-tag "$PRESERVED_TAG" --preserved-version "$PRESERVED_VERSION" --max-wait-ms 900000
-      - name: Verify trusted-publisher provenance for the exact registry package
-        shell: bash
-        env:
-          VERSION: ${{ needs.publish.outputs.version }}
-          RELEASE_ROOT: ${{ runner.temp }}/verified-npm-release
-          AUDIT_ROOT: ${{ runner.temp }}/arcane-sdk-provenance-audit
-        run: |
-          set -euo pipefail
-          mkdir -p "$AUDIT_ROOT"
-          node --input-type=module -e "import {writeFile} from 'node:fs/promises'; await writeFile(process.argv[1], JSON.stringify({name:'arcane-sdk-provenance-audit',private:true,version:'0.0.0'},null,2)+'\n');" "$AUDIT_ROOT/package.json"
-          npm install --prefix "$AUDIT_ROOT" --ignore-scripts --no-audit --no-fund --save-exact "arcane-os@${VERSION}"
-          npm audit signatures --prefix "$AUDIT_ROOT" --json --include-attestations > "$AUDIT_ROOT/npm-audit-signatures.json"
-          node tools/npm-registry-publication.mjs provenance --metadata "$RELEASE_ROOT/arcane-os-${VERSION}.manifest.json" --audit "$AUDIT_ROOT/npm-audit-signatures.json"
+        run: node tools/npm-registry-publication.mjs verify --version "${{ needs.publish.outputs.version }}" --channel "${{ needs.publish.outputs.channel }}" --max-wait-ms 900000

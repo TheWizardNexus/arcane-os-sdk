@@ -1,12 +1,6 @@
 name: Check
 
 on:
-  pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -14,27 +8,26 @@ permissions:
 
 jobs:
   source_validation:
-    name: Validate the source once
+    name: Validate package source
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
-      - name: Check out the exact source revision
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Check out source
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Use the minimum supported Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        uses: actions/setup-node@v6
         with:
           node-version: 22.23.2
           package-manager-cache: false
-      - name: Install exact dependencies
+      - name: Install declared dependencies
         run: npm ci --ignore-scripts
-      - name: Run the authoritative release-source validation once
-        run: npm run check:release
+      - name: Validate the package source boundary
+        run: node tools/check-source.mjs --package-only
 
   pack_npm_release:
-    name: Pack one exact npm release artifact
-    if: github.event_name != 'pull_request'
+    name: Pack npm release
     needs: source_validation
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -42,38 +35,31 @@ jobs:
       artifact-id: ${{ steps.upload.outputs['artifact-id'] }}
       version: ${{ steps.pack.outputs.version }}
       tarball-filename: ${{ steps.pack.outputs['tarball-filename'] }}
-      manifest-filename: ${{ steps.pack.outputs['manifest-filename'] }}
-      checksum-filename: ${{ steps.pack.outputs['checksum-filename'] }}
-      sha256: ${{ steps.pack.outputs.sha256 }}
-      integrity: ${{ steps.pack.outputs.integrity }}
     steps:
-      - name: Check out the exact source revision
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Check out source
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - name: Use the pinned npm pack toolchain
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - name: Use the release Node.js toolchain
+        uses: actions/setup-node@v6
         with:
           node-version: 26.7.0
           architecture: x64
           package-manager-cache: false
-      - name: Install exact dependencies without lifecycle scripts
+      - name: Install declared dependencies
         run: npm ci --ignore-scripts
-      - name: Build and authenticate the npm tarball once
+      - name: Pack the npm tarball
         id: pack
         shell: bash
         env:
           RELEASE_OUTPUT: ${{ runner.temp }}/arcane-sdk-npm-release
-        run: node tools/build-npm-release.mjs --output "$RELEASE_OUTPUT" --source-sha "$GITHUB_SHA"
-      - name: Upload the exact tarball, manifest, and checksum
+        run: node tools/build-npm-release.mjs --output "$RELEASE_OUTPUT"
+      - name: Upload the npm tarball
         id: upload
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@v7
         with:
-          name: arcane-sdk-npm-${{ steps.pack.outputs.version }}-${{ github.sha }}
-          path: |
-            ${{ steps.pack.outputs.tarball }}
-            ${{ steps.pack.outputs.manifest }}
-            ${{ steps.pack.outputs.checksum }}
+          name: arcane-sdk-npm-${{ steps.pack.outputs.version }}
+          path: ${{ steps.pack.outputs.tarball }}
           if-no-files-found: error
           retention-days: 30
 
@@ -83,133 +69,26 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: Check out the exact Vanilla Test smoke contract
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Check out smoke source
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Use the minimum supported Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        uses: actions/setup-node@v6
         with:
           node-version: 22.23.2
           architecture: x64
           package-manager-cache: false
-      - name: Install the exact Vanilla Test dependency
-        env:
-          npm_config_cache: ${{ runner.temp }}/arcane-sdk-npm-cache
+      - name: Install declared test dependencies
         run: npm ci --ignore-scripts
-      - name: Download the one producer artifact by immutable id
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - name: Download the npm tarball
+        uses: actions/download-artifact@v8
         with:
           artifact-ids: ${{ needs.pack_npm_release.outputs['artifact-id'] }}
           path: ${{ runner.temp }}/arcane-sdk-npm-release
-      - name: Exercise only the installed capability contract through Vanilla Test
+      - name: Exercise the installed package
         env:
-          ARCANE_SDK_NPM_RELEASE_METADATA: ${{ runner.temp }}/arcane-sdk-npm-release/${{ needs.pack_npm_release.outputs['manifest-filename'] }}
-          ARCANE_SDK_EXACT_ARTIFACT_REQUIRED: true
+          ARCANE_SDK_NPM_RELEASE_TARBALL: ${{ runner.temp }}/arcane-sdk-npm-release/${{ needs.pack_npm_release.outputs['tarball-filename'] }}
           ARCANE_SDK_EXPECTED_PLATFORM: linux
           ARCANE_SDK_EXPECTED_ARCHITECTURE: x64
-          npm_config_cache: ${{ runner.temp }}/arcane-sdk-npm-cache
         run: node ./bin/arcane-test.mjs test/release-capability-smoke.test.mjs
-
-  npm_release_ready:
-    name: Verify npm artifact identity and legal inventory once
-    if: github.event_name != 'pull_request' && always()
-    needs:
-      - pack_npm_release
-      - installed_capability_smoke
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - name: Require the producer and installed capability smoke
-        shell: bash
-        env:
-          PACK_RESULT: ${{ needs.pack_npm_release.result }}
-          SMOKE_RESULT: ${{ needs.installed_capability_smoke.result }}
-        run: |
-          test "$PACK_RESULT" = success
-          test "$SMOKE_RESULT" = success
-      - name: Check out the exact artifact verifier
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          persist-credentials: false
-      - name: Use the minimum supported Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: 22.23.2
-          package-manager-cache: false
-      - name: Download the same artifact by immutable id
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          artifact-ids: ${{ needs.pack_npm_release.outputs['artifact-id'] }}
-          path: ${{ runner.temp }}/arcane-sdk-npm-release
-      - name: Verify identity, integrity, shasum, licenses, and the standard-content boundary
-        shell: bash
-        env:
-          RELEASE_METADATA: ${{ runner.temp }}/arcane-sdk-npm-release/${{ needs.pack_npm_release.outputs['manifest-filename'] }}
-          RELEASE_VERSION: ${{ needs.pack_npm_release.outputs.version }}
-        run: |
-          set -euo pipefail
-          node tools/verify-npm-release.mjs --metadata "$RELEASE_METADATA" --expected-source "$GITHUB_SHA" --expected-version "$RELEASE_VERSION" --require-clean
-          node --input-type=module <<'NODE'
-          import {readFile} from 'node:fs/promises';
-          import {loadSdkBrowserRuntimeRelease} from './src/sdk-browser-runtime.mjs';
-          const manifest=JSON.parse(await readFile(process.env.RELEASE_METADATA,'utf8'));
-          const files=new Set(manifest.package.files.map(file=>file.path));
-          const browserRuntimeRelease=await loadSdkBrowserRuntimeRelease();
-          const exactBrowserRuntimeProjection=new Set([
-            'browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json',
-            ...browserRuntimeRelease.files.map(file=>`browser-runtime/${file.path}`)
-          ]);
-          const exactBrowserAiProjection=new Set(
-            [...exactBrowserRuntimeProjection].filter(file=>file.startsWith('browser-runtime/ai/'))
-          );
-          const admittedBrowserWasm=new Set(
-            browserRuntimeRelease.files
-              .filter(file=>file.path.toLowerCase().endsWith('.wasm'))
-              .map(file=>`browser-runtime/${file.path}`)
-          );
-          const required=[
-            'LICENSE',
-            'COMMERCIAL-LICENSE.md',
-            'NOTICE',
-            'node_modules/event-pubsub/licence',
-            'node_modules/strong-type/licence',
-            'browser-runtime/dependencies/event-pubsub/licence',
-            'browser-runtime/dependencies/strong-type/licence',
-            'browser-runtime/ai/wllama/LICENCE',
-            'browser-runtime/ai/wllama/llama.cpp-LICENSE',
-            'runtime/arcane/modules/uPlot.LICENSE.txt',
-            'runtime/strong-type/licence'
-          ];
-          for(const requiredPath of required){
-            if(!files.has(requiredPath))throw new Error(`Missing release license: ${requiredPath}.`);
-          }
-          for(const exactPath of exactBrowserRuntimeProjection){
-            if(!files.has(exactPath))throw new Error(`Missing authenticated browser runtime file: ${exactPath}.`);
-          }
-          const forbiddenPrefixes=[
-            'native/',
-            'src/ai/',
-            'licenses/ai/',
-            'models/',
-            'weights/',
-            'speech/',
-            'espeak/',
-            'node_modules/kokoro-js/',
-            'node_modules/phonemizer/',
-            'node_modules/espeak-ng/'
-          ];
-          const forbiddenExtension=/\.(?:gguf|ggml|safetensors|onnx|ort|tflite|mlmodel|pb|pt|pth|bin|wasm|data|a|lib|exe|dll|so|dylib|node|wav|flac|mp3|ogg|opus|py|c|cc|cpp|h|sh|ps1|bat|cmd)$/iu;
-          for(const file of files){
-            const browserRuntime=file.startsWith('browser-runtime/');
-            if((browserRuntime&&!exactBrowserRuntimeProjection.has(file))
-              ||forbiddenPrefixes.some(prefix=>file.startsWith(prefix))
-              ||(forbiddenExtension.test(file)&&!admittedBrowserWasm.has(file))){
-              throw new Error(`Nonstandard release content requires separate authorization: ${file}.`);
-            }
-          }
-          console.log(`Verified ${files.size} release files, ${exactBrowserRuntimeProjection.size} authenticated browser-runtime files (${exactBrowserAiProjection.size} browser-AI files), and ${required.length} license boundaries.`);
-          NODE

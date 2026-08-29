@@ -9,5 +9,3 @@
 *.yaml text eol=lf
 *.xml text eol=lf
 runtime/arcane/img/* binary
-browser-runtime/** -text -whitespace
-runtime/** -text -whitespace

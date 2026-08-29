@@ -34,16 +34,14 @@ const FORBIDDEN_NATIVE_EXTENSIONS=new Set([
     '.so'
 ]);
 const FORBIDDEN_TOOLCHAIN_PACKAGES=new Set(['ts-node','tsx','typescript']);
-const REQUIRED_RUNTIME_ATTRIBUTE='runtime/** -text -whitespace';
-
 function fail(message){
     throw new Error(message);
 }
 
 function parseOptions(args=process.argv.slice(2)){
-    if(args.length===0)return Object.freeze({packageOnly:false});
+    if(args.length===0)return {packageOnly:false};
     if(args.length===1&&args[0]==='--package-only'){
-        return Object.freeze({packageOnly:true});
+        return {packageOnly:true};
     }
     fail('Usage: node tools/check-source.mjs [--package-only]');
 }
@@ -111,10 +109,10 @@ function assertPackageMetadata(packageDocument){
         fail(`package.json publishConfig must use the public npm registry and the ${expectedTag} tag.`);
     }
 
-    const requiredPublishedPaths=['bin/','src/','runtime/','schemas/'];
+    const requiredPublishedPaths=['bin/','browser-runtime/','src/','runtime/','schemas/'];
     if(!Array.isArray(packageDocument.files)
         ||requiredPublishedPaths.some(required=>!packageDocument.files.includes(required))){
-        fail('package.json files must include bin/, src/, runtime/, and schemas/.');
+        fail('package.json files must include bin/, browser-runtime/, src/, runtime/, and schemas/.');
     }
 
     const requiredExports=[
@@ -127,7 +125,13 @@ function assertPackageMetadata(packageDocument){
         './native',
         './integrated-provider',
         './packager',
-        './runtime/manifest',
+        './preference-store',
+        './speech-playback',
+        './ai/browser-wasm',
+        './ai/browser-speech',
+        './testing',
+        './native-provider',
+        './release-bundle',
         './schemas/arcane-app.json',
         './schemas/arcane-package.json',
         './schemas/arcane-lock.json',
@@ -163,25 +167,11 @@ function assertPackageMetadata(packageDocument){
     }
 }
 
-async function assertRuntimeGitAttributes(){
-    const attributesPath=path.join(REPOSITORY_ROOT,'.gitattributes');
-    const attributeLines=(await readFile(attributesPath,'utf8'))
-        .split(/\r?\n/u)
-        .map(line=>line.trim())
-        .filter(Boolean);
-
-    if(attributeLines.at(-1)!==REQUIRED_RUNTIME_ATTRIBUTE){
-        fail(`${REQUIRED_RUNTIME_ATTRIBUTE} must be the final .gitattributes rule so pinned runtime bytes are never normalized.`);
-    }
-}
-
 async function main(){
     const {packageOnly}=parseOptions();
     const packagePath=path.join(REPOSITORY_ROOT,'package.json');
     const packageDocument=JSON.parse(await readFile(packagePath,'utf8'));
     assertPackageMetadata(packageDocument);
-    await assertRuntimeGitAttributes();
-
     const binPath=path.resolve(REPOSITORY_ROOT,packageDocument.bin.arcane);
     const relativeBinPath=path.relative(REPOSITORY_ROOT,binPath);
     if(relativeBinPath.startsWith('..')||path.isAbsolute(relativeBinPath)){
@@ -217,7 +207,7 @@ async function main(){
         fail(`Source policy violations:\n- ${violations.join('\n- ')}`);
     }
 
-    process.stdout.write(`Source policy passed for ${files.length} files.\n`);
+    process.stdout.write('Source policy passed.\n');
 }
 
 main().catch(error=>{

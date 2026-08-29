@@ -1,243 +1,161 @@
-import {createHash} from 'node:crypto';
-import {lstat,readFile} from 'node:fs/promises';
+import {readFile} from 'node:fs/promises';
 import path from 'node:path';
+import {promisify} from 'node:util';
+import {gunzip} from 'node:zlib';
 
-export const NPM_RELEASE_SCHEMA_VERSION=1;
-export const NPM_RELEASE_KIND='arcane-sdk-npm-release';
-export const NPM_RELEASE_MAX_TARBALL_BYTES=256*1024*1024;
-export const NPM_RELEASE_NODE_VERSION='26.7.0';
-export const NPM_RELEASE_NPM_VERSION='11.19.0';
-
-const CANONICAL_REPOSITORY='https://github.com/TheWizardNexus/arcane-os-sdk';
-const SHA1_PATTERN=/^[0-9a-f]{40}$/u;
-const SHA256_PATTERN=/^[0-9a-f]{64}$/u;
+const gunzipAsync=promisify(gunzip);
+const PACKAGE_NAME='arcane-os';
 const VERSION_PATTERN=/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u;
-const REQUIRED_PACKAGE_FILES=Object.freeze([
-    'LICENSE',
-    'NOTICE',
-    'bin/arcane-test.mjs',
-    'bin/arcane.mjs',
-    'package.json',
-    'src/testing.mjs'
+const ROOT_PACKAGE_FILES=new Set([
+    'CHANGELOG.md','COMMERCIAL-LICENSE.md','LICENSE','NOTICE','README.md','package.json'
 ]);
+const PACKAGE_PREFIXES=[
+    'bin/','browser-runtime/','node_modules/event-pubsub/','node_modules/strong-type/',
+    'runtime/','schemas/','src/'
+];
+const REQUIRED_PACKAGE_FILES=[
+    'CHANGELOG.md','COMMERCIAL-LICENSE.md','LICENSE','NOTICE','README.md',
+    'bin/arcane-test.mjs','bin/arcane.mjs','package.json','src/index.mjs','src/testing.mjs'
+];
 
 function fail(message){
     throw new Error(`ARCANE_NPM_RELEASE_INVALID: ${message}`);
 }
 
-function isPlainObject(value){
-    return value!==null&&typeof value==='object'&&!Array.isArray(value)
-        &&Object.getPrototypeOf(value)===Object.prototype;
+function tarText(buffer,start,length){
+    const field=buffer.subarray(start,start+length);
+    const end=field.indexOf(0);
+    return field.subarray(0,end===-1?field.length:end).toString('utf8').trim();
 }
 
-function exactKeys(value,expected,label){
-    if(!isPlainObject(value))fail(`${label} must be a plain object.`);
-    const keys=Object.keys(value);
-    if(keys.length!==expected.length||keys.some((key,index)=>key!==expected[index])){
-        fail(`${label} must contain exactly these ordered fields: ${expected.join(', ')}.`);
+function tarInteger(buffer,start,length,label){
+    const field=buffer.subarray(start,start+length);
+    if((field[0]&0x80)!==0){
+        let value=BigInt(field[0]&0x7f);
+        for(let index=1;index<field.length;index+=1)value=(value<<8n)|BigInt(field[index]);
+        if(value>BigInt(Number.MAX_SAFE_INTEGER))fail(`${label} cannot be represented by Node.js.`);
+        return Number(value);
     }
+    const source=field.toString('ascii').replace(/\0.*$/u,'').trim();
+    if(source==='')return 0;
+    if(!/^[0-7]+$/u.test(source))fail(`${label} is not valid tar framing.`);
+    const value=Number.parseInt(source,8);
+    if(!Number.isSafeInteger(value))fail(`${label} cannot be represented by Node.js.`);
+    return value;
 }
 
-function positiveInteger(value,label){
-    if(!Number.isSafeInteger(value)||value<1)fail(`${label} must be a positive safe integer.`);
+function paxFields(data){
+    const fields={};
+    let offset=0;
+    while(offset<data.length){
+        const space=data.indexOf(0x20,offset);
+        if(space===-1)fail('Extended tar header is malformed.');
+        const recordLength=Number.parseInt(data.subarray(offset,space).toString('ascii'),10);
+        if(!Number.isSafeInteger(recordLength)||recordLength<1||offset+recordLength>data.length){
+            fail('Extended tar header has invalid framing.');
+        }
+        const record=data.subarray(space+1,offset+recordLength-1).toString('utf8');
+        const separator=record.indexOf('=');
+        if(separator>0)fields[record.slice(0,separator)]=record.slice(separator+1);
+        offset+=recordLength;
+    }
+    return fields;
 }
 
-function nonnegativeInteger(value,label){
-    if(!Number.isSafeInteger(value)||value<0)fail(`${label} must be a nonnegative safe integer.`);
+function normalizedPackagePath(value){
+    if(typeof value!=='string'||!value.startsWith('package/')||value.includes('\\')
+        ||value.includes('\0')){
+        fail(`Packed path is outside the npm package root: ${value}.`);
+    }
+    const relative=value.slice('package/'.length).replace(/\/$/u,'');
+    const segments=relative.split('/');
+    if(relative===''||segments.some(segment=>segment===''||segment==='.'||segment==='..')){
+        fail(`Packed path is outside the npm package boundary: ${value}.`);
+    }
+    return relative;
 }
 
-function portablePackagePath(value){
-    if(typeof value!=='string'||value===''||value.includes('\\')||value.startsWith('/')
-        ||value.endsWith('/')||value.includes('\0'))return false;
-    const segments=value.split('/');
-    return segments.every(segment=>segment!==''&&segment!=='.'&&segment!=='..');
+function allowedPackagePath(relative){
+    return ROOT_PACKAGE_FILES.has(relative)
+        ||PACKAGE_PREFIXES.some(prefix=>relative.startsWith(prefix)||relative===prefix.slice(0,-1));
 }
 
-function canonicalJson(value){
-    return `${JSON.stringify(value,null,2)}\n`;
-}
-
-function canonicalBase64(value){
-    if(typeof value!=='string'||value==='')return false;
-    const bytes=Buffer.from(value,'base64');
-    return bytes.length===64&&bytes.toString('base64')===value;
-}
-
-function validateManifest(manifest){
-    exactKeys(
-        manifest,
-        ['schemaVersion','kind','name','version','source','artifact','package','toolchain'],
-        'Release manifest'
-    );
-    if(manifest.schemaVersion!==NPM_RELEASE_SCHEMA_VERSION){
-        fail(`Unsupported schema version: ${manifest.schemaVersion}.`);
-    }
-    if(manifest.kind!==NPM_RELEASE_KIND||manifest.name!=='arcane-os'){
-        fail('Release manifest identity is not the Arcane OS SDK npm artifact.');
-    }
-    if(typeof manifest.version!=='string'||!VERSION_PATTERN.test(manifest.version)){
-        fail(`Invalid package version: ${manifest.version}.`);
-    }
-
-    exactKeys(manifest.source,['repository','commit','clean'],'Release source');
-    if(manifest.source.repository!==CANONICAL_REPOSITORY){
-        fail(`Unexpected source repository: ${manifest.source.repository}.`);
-    }
-    if(typeof manifest.source.commit!=='string'||!/^[0-9a-f]{40}$/u.test(manifest.source.commit)){
-        fail('Release source commit must be one lowercase 40-character Git SHA.');
-    }
-    if(typeof manifest.source.clean!=='boolean')fail('Release source clean must be boolean.');
-
-    exactKeys(
-        manifest.artifact,
-        ['file','bytes','sha256','integrity','shasum'],
-        'Release artifact'
-    );
-    const expectedFilename=`arcane-os-${manifest.version}.tgz`;
-    if(manifest.artifact.file!==expectedFilename){
-        fail(`Release artifact filename must be ${expectedFilename}.`);
-    }
-    positiveInteger(manifest.artifact.bytes,'Release artifact bytes');
-    if(manifest.artifact.bytes>NPM_RELEASE_MAX_TARBALL_BYTES){
-        fail(`Release artifact exceeds ${NPM_RELEASE_MAX_TARBALL_BYTES} bytes.`);
-    }
-    if(typeof manifest.artifact.sha256!=='string'||!SHA256_PATTERN.test(manifest.artifact.sha256)){
-        fail('Release artifact SHA-256 is invalid.');
-    }
-    if(typeof manifest.artifact.shasum!=='string'||!SHA1_PATTERN.test(manifest.artifact.shasum)){
-        fail('Release artifact npm shasum is invalid.');
-    }
-    if(typeof manifest.artifact.integrity!=='string'
-        ||!manifest.artifact.integrity.startsWith('sha512-')
-        ||!canonicalBase64(manifest.artifact.integrity.slice('sha512-'.length))){
-        fail('Release artifact npm SHA-512 integrity is invalid.');
-    }
-
-    exactKeys(
-        manifest.package,
-        ['entryCount','unpackedBytes','files'],
-        'Packed package inventory'
-    );
-    positiveInteger(manifest.package.entryCount,'Packed package entry count');
-    positiveInteger(manifest.package.unpackedBytes,'Packed package unpacked bytes');
-    if(!Array.isArray(manifest.package.files)
-        ||manifest.package.files.length!==manifest.package.entryCount){
-        fail('Packed package files must match the declared entry count.');
-    }
+function parseTarArchive(archive){
+    const files=[];
     const seen=new Set();
-    let previous='';
-    let totalBytes=0;
-    for(const [index,file] of manifest.package.files.entries()){
-        exactKeys(file,['path','bytes'],`Packed package file ${index}`);
-        if(!portablePackagePath(file.path))fail(`Unsafe packed package path: ${file.path}.`);
-        if(seen.has(file.path))fail(`Duplicate packed package path: ${file.path}.`);
-        if(previous!==''&&previous.localeCompare(file.path,'en')>=0){
-            fail('Packed package file inventory must be strictly sorted.');
+    let packageDocument=null;
+    let extended={};
+    let longPath=null;
+    let offset=0;
+
+    while(offset+512<=archive.length){
+        const header=archive.subarray(offset,offset+512);
+        if(header.every(value=>value===0))break;
+        const storedName=tarText(header,0,100);
+        const prefix=tarText(header,345,155);
+        const type=String.fromCharCode(header[156]||0);
+        const contentLength=tarInteger(header,124,12,'Tar entry length');
+        const contentStart=offset+512;
+        const contentEnd=contentStart+contentLength;
+        if(contentEnd>archive.length)fail('Tar entry extends beyond the archive.');
+        const content=archive.subarray(contentStart,contentEnd);
+        offset=contentStart+(Math.ceil(contentLength/512)*512);
+
+        if(type==='x'||type==='g'){
+            extended={...extended,...paxFields(content)};
+            continue;
         }
-        nonnegativeInteger(file.bytes,`Packed package file bytes for ${file.path}`);
-        if(file.path.startsWith('.github/')||file.path.startsWith('test/')){
-            fail(`Private repository path leaked into the npm package: ${file.path}.`);
+        if(type==='L'){
+            longPath=content.toString('utf8').replace(/\0.*$/u,'');
+            continue;
         }
-        seen.add(file.path);
-        previous=file.path;
-        totalBytes+=file.bytes;
+
+        const headerPath=prefix===''?storedName:`${prefix}/${storedName}`;
+        const packedPath=extended.path??longPath??headerPath;
+        extended={};
+        longPath=null;
+        const relative=normalizedPackagePath(packedPath);
+        if(!allowedPackagePath(relative)){
+            fail(`Packed path is outside the published package boundary: ${relative}.`);
+        }
+        if(type==='5')continue;
+        if(seen.has(relative))fail(`Packed path appears more than once: ${relative}.`);
+        seen.add(relative);
+        files.push(relative);
+        if(relative==='package.json'){
+            try{
+                packageDocument=JSON.parse(content.toString('utf8'));
+            }catch(error){
+                fail(`Packed package.json is malformed: ${error.message}`);
+            }
+        }
     }
-    if(totalBytes!==manifest.package.unpackedBytes){
-        fail('Packed package file sizes do not equal the declared unpacked byte count.');
-    }
+
     for(const required of REQUIRED_PACKAGE_FILES){
         if(!seen.has(required))fail(`Required npm package file is missing: ${required}.`);
     }
-
-    exactKeys(manifest.toolchain,['node','npm'],'Release toolchain');
-    if(manifest.toolchain.node!==NPM_RELEASE_NODE_VERSION
-        ||manifest.toolchain.npm!==NPM_RELEASE_NPM_VERSION){
-        fail(
-            `Release toolchain must be Node ${NPM_RELEASE_NODE_VERSION} `+
-            `with npm ${NPM_RELEASE_NPM_VERSION}.`
-        );
-    }
-    return manifest;
+    return {files,packageDocument};
 }
 
-export function parseNpmReleaseManifest(bytes){
-    const source=Buffer.isBuffer(bytes)?bytes:Buffer.from(bytes);
-    if(source.length<2||source.length>4*1024*1024){
-        fail('Release manifest must be between 2 bytes and 4 MiB.');
-    }
-    let manifest;
+export async function verifyNpmReleaseArtifact({tarballPath,expectedVersion=null}){
+    if(typeof tarballPath!=='string'||tarballPath==='')fail('A release tarball path is required.');
+    const resolvedTarball=path.resolve(tarballPath);
+    let archive;
     try{
-        manifest=JSON.parse(source.toString('utf8'));
+        archive=await gunzipAsync(await readFile(resolvedTarball));
     }catch(error){
-        fail(`Release manifest is not valid JSON: ${error.message}`);
+        fail(`Release tarball cannot be read: ${error.message}`);
     }
-    validateManifest(manifest);
-    if(!source.equals(Buffer.from(canonicalJson(manifest)))){
-        fail('Release manifest JSON is not canonical.');
+    const {files,packageDocument}=parseTarArchive(archive);
+    if(packageDocument===null||typeof packageDocument!=='object'||Array.isArray(packageDocument)){
+        fail('Packed package.json must contain one JSON object.');
     }
-    return Object.freeze(manifest);
-}
-
-async function readStableRegularFile(filePath,{maximumBytes,label}){
-    const before=await lstat(filePath,{bigint:true});
-    if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1n){
-        fail(`${label} must be one regular single-link file.`);
+    if(packageDocument.name!==PACKAGE_NAME)fail(`Packed package name must be ${PACKAGE_NAME}.`);
+    if(typeof packageDocument.version!=='string'||!VERSION_PATTERN.test(packageDocument.version)){
+        fail(`Packed package version is invalid: ${packageDocument.version}.`);
     }
-    if(before.size<1n||before.size>BigInt(maximumBytes)){
-        fail(`${label} has an unsupported byte length: ${before.size}.`);
+    if(expectedVersion!==null&&packageDocument.version!==expectedVersion){
+        fail(`Packed package version ${packageDocument.version} does not equal ${expectedVersion}.`);
     }
-    const bytes=await readFile(filePath);
-    const after=await lstat(filePath,{bigint:true});
-    if(after.dev!==before.dev||after.ino!==before.ino||after.size!==before.size
-        ||after.mtimeNs!==before.mtimeNs||after.ctimeNs!==before.ctimeNs
-        ||after.nlink!==1n||bytes.length!==Number(before.size)){
-        fail(`${label} changed while it was read.`);
-    }
-    return bytes;
-}
-
-function digest(bytes,algorithm,encoding='hex'){
-    return createHash(algorithm).update(bytes).digest(encoding);
-}
-
-export async function verifyNpmReleaseArtifact({metadataPath,tarballPath,requireCleanSource=false}){
-    const resolvedMetadata=path.resolve(metadataPath);
-    const manifest=parseNpmReleaseManifest(await readStableRegularFile(resolvedMetadata,{
-        maximumBytes:4*1024*1024,
-        label:'npm release manifest'
-    }));
-    if(requireCleanSource&&!manifest.source.clean){
-        fail('Release artifact was not built from a clean source checkout.');
-    }
-    const resolvedTarball=path.resolve(
-        tarballPath??path.join(path.dirname(resolvedMetadata),manifest.artifact.file)
-    );
-    if(path.basename(resolvedTarball)!==manifest.artifact.file){
-        fail('Release tarball filename does not match its manifest.');
-    }
-    const bytes=await readStableRegularFile(resolvedTarball,{
-        maximumBytes:NPM_RELEASE_MAX_TARBALL_BYTES,
-        label:'npm release tarball'
-    });
-    const actual={
-        bytes:bytes.length,
-        sha256:digest(bytes,'sha256'),
-        integrity:`sha512-${digest(bytes,'sha512','base64')}`,
-        shasum:digest(bytes,'sha1')
-    };
-    for(const [field,value] of Object.entries(actual)){
-        if(value!==manifest.artifact[field]){
-            fail(`Release tarball ${field} does not match its manifest.`);
-        }
-    }
-    const checksumPath=`${resolvedTarball}.sha256`;
-    const checksumBytes=await readStableRegularFile(checksumPath,{
-        maximumBytes:256,
-        label:'npm release checksum'
-    });
-    const expectedChecksum=`${manifest.artifact.sha256}  ${manifest.artifact.file}\n`;
-    if(!checksumBytes.equals(Buffer.from(expectedChecksum))){
-        fail('Release tarball checksum sidecar does not match its manifest.');
-    }
-    return Object.freeze({manifest,tarballPath:resolvedTarball,checksumPath});
+    return {version:packageDocument.version,packageDocument,paths:files,tarballPath:resolvedTarball};
 }
