@@ -4,10 +4,11 @@ This directory derives the complete committed Arcane application API reference
 from the SDK runtime's exact upstream Arcane OS commit
 `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`. The imported reference defines
 protocol `arcane/1` at that source identity. Its canonical inventories and
-focused member contracts were verified unchanged at committed Arcane OS `main`
-commit `13f3ce0ae34f77a3495331c8b4c30b1bb105f8ed` during this import. SDK-local
-provenance, link, and package-boundary annotations are intentionally added here,
-so these Markdown files are not represented as byte-identical upstream blobs.
+focused member contracts were imported from committed Arcane OS `main` commit
+`13f3ce0ae34f77a3495331c8b4c30b1bb105f8ed`. SDK-local links and
+package-boundary annotations are intentionally added here, so the imported
+Markdown remains a maintained SDK reference rather than a second runtime
+authority.
 
 The snapshot contains:
 
@@ -30,19 +31,18 @@ The snapshot contains:
 | Ollama runtime/module overview | [Ollama module](ollama-module.md) |
 | Per-member guides | [`reference/arcane-api/`](reference/arcane-api/) |
 
-## Runtime pin and current Core admission
+## Runtime source and Core compatibility
 
-The SDK's browser runtime and this source reference use the same pinned Arcane
-OS commit. They remain different artifact classes: the SDK ships exact renderer
-bytes. A native build does not infer compatibility from a higher Core version
-or a matching protocol name. This SDK version accepts a selected checkout and
-Core only when its current native plan's exact protocol, version, feature,
-capability, method, provider, and identity-bound receipt checks all pass. That
-is present-build admission evidence, not a promise that a future SDK will accept
-this Core or that this SDK will accept a future Core.
+The SDK's browser runtime and this source reference use the same selected Arcane
+OS source commit, but they remain different artifact classes. A native build
+does not infer compatibility from a higher Core version or a matching protocol
+name. It compares the protocol, version, features, capabilities, methods, and
+provider contract required by the selected build. That present-build result is
+not a promise that a future SDK will accept this Core or that this SDK will
+accept a future Core.
 
-Documentation provenance does not admit a Core. The SDK's native plan,
-provider, and receipt checks remain authoritative for a particular build.
+Documentation does not select a Core. The selected native plan and provider
+contracts remain authoritative for a particular build.
 
 ## Reading order
 
@@ -52,10 +52,9 @@ need WebView2, WebKitGTK, Android WebView, development HTTP, Core RPC, event,
 or provider boundaries can continue into the SDK's
 [protocol and host architecture guide](../protocols.md).
 
-## Source, receipt, and license links
+## Source and license links
 
 - [Pinned upstream ARCANE-OS source](https://github.com/TheWizardNexus/ARCANE-OS/tree/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e)
-- [SDK runtime release manifest](../../../runtime/ARCANE_RUNTIME_RELEASE.json)
 - [SDK runtime source pin](../../../tools/runtime-source.json)
 - [AGPL license](../../../LICENSE)
 - [Commercial-license notice](../../../COMMERCIAL-LICENSE.md)

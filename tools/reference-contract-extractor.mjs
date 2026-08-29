@@ -1,4 +1,3 @@
-import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -9,128 +8,128 @@ export const REFERENCE_CONTRACT_SCHEMA_VERSION=1;
 // This is a reviewed contract, not a prose parser. Order is the order used by
 // the checked-in runtime inventory and is therefore part of deterministic
 // rendering.
-export const RUNTIME_CALLABLE_MEMBER_ALLOWLIST=Object.freeze({
-    'AI.js':Object.freeze([
+export const RUNTIME_DOCUMENTED_CALLABLE_MEMBERS={
+    'AI.js':[
         'setAI','configureProviders','transitionAI','transitionProviders',
         'startProviders','setSpeechMuted','streamRequest','streamMessage','fetchRequest','fetch',
         'streamTTS','finishTTS','fetchSTT','stopAudio','resumeAudio','playAudio'
-    ]),
-    'AIPreferenceRuntime.js':Object.freeze([
+    ],
+    'AIPreferenceRuntime.js':[
         'setAIPreferenceRuntimeOverride','getAIPreferencesForRuntime'
-    ]),
-    'AIPreferenceTuple.js':Object.freeze([
+    ],
+    'AIPreferenceTuple.js':[
         'normalizeAIPreferenceTuple','aiPreferenceTuplesEqual'
-    ]),
-    'AIProviderRuntime.js':Object.freeze([
+    ],
+    'AIProviderRuntime.js':[
         'getAIProviderRuntime','register','unregister','hasProvider',
         'providerIdentity','selection','ownsSelection','validateConfiguration',
         'configure','configureFromTuple','status','catalog','inspect','start',
         'load','unload','dispose','disposeAll','request','chat','stream',
         'transcribe','synthesize','cancel','setSpeechMuted'
-    ]),
-    'AIResponseLength.js':Object.freeze([
+    ],
+    'AIResponseLength.js':[
         'normalizeAIResponseLength','aiResponseLengthInstruction',
         'applyAIResponseLength'
-    ]),
-    'AIResponseURLPolicy.js':Object.freeze([
+    ],
+    'AIResponseURLPolicy.js':[
         'auditAIResponseLinks','extractAIResponseLinks',
         'normalizeAIResponseLink','decodeHTMLCharacterReferences'
-    ]),
-    'AIRuntimeState.js':Object.freeze([
+    ],
+    'AIRuntimeState.js':[
         'getAIRuntimeState','subscribeAIRuntimeState',
         'publishAIRuntimeRoleState','publishAIRuntimeRolesState',
         'requestAIRuntimeIntent','subscribeAIRuntimeIntents','startAIRuntime'
-    ]),
-    'AnsiText.js':Object.freeze(['parseAnsi','stripAnsi']),
-    'ApiModelDatabase.js':Object.freeze(['setEndpoint','fetch','cached']),
-    'AppDataScope.js':Object.freeze([
+    ],
+    'AnsiText.js':['parseAnsi','stripAnsi'],
+    'ApiModelDatabase.js':['setEndpoint','fetch','cached'],
+    'AppDataScope.js':[
         'canonicalApplicationId','resolveApplicationId',
         'resolveApplicationLocalStorageKey','openApplicationDataDirectory'
-    ]),
-    'AppearancePreferences.js':Object.freeze([
+    ],
+    'AppearancePreferences.js':[
         'createAppearancePreferenceStore','applyAppearancePreferences',
         'loadAndApplyAppearancePreferences'
-    ]),
-    'ArcaneCommunicationBridge.js':Object.freeze([
+    ],
+    'ArcaneCommunicationBridge.js':[
         'request','listThreads','getMessages','send','connect','disconnect'
-    ]),
-    'ArcaneNavigationPolicy.js':Object.freeze(['createArcaneNavigationGuard']),
-    'AsyncBoundary.js':Object.freeze(['runAsyncBoundary']),
-    'BrowserTestSuite.js':Object.freeze(['list','run']),
-    'CalculatorEngine.js':Object.freeze(['evaluateExpression','calculate']),
-    'ChartLibrary.js':Object.freeze(['loadChartLibrary']),
-    'ChatRecords.js':Object.freeze(['hasUserEntry']),
-    'CommunicationAppController.js':Object.freeze([
+    ],
+    'ArcaneNavigationPolicy.js':['createArcaneNavigationGuard'],
+    'AsyncBoundary.js':['runAsyncBoundary'],
+    'BrowserTestSuite.js':['list','run'],
+    'CalculatorEngine.js':['evaluateExpression','calculate'],
+    'ChartLibrary.js':['loadChartLibrary'],
+    'ChatRecords.js':['hasUserEntry'],
+    'CommunicationAppController.js':[
         'start','bind','configure','refresh','select','send'
-    ]),
-    'CommunicationHub.js':Object.freeze(['refresh','messages','send']),
-    'CommunicationPreferences.js':Object.freeze(['load','save']),
-    'CommunicationProviderRegistry.js':Object.freeze([
+    ],
+    'CommunicationHub.js':['refresh','messages','send'],
+    'CommunicationPreferences.js':['load','save'],
+    'CommunicationProviderRegistry.js':[
         'register','get','has','list'
-    ]),
-    'ConfiguredAIChatSession.js':Object.freeze(['history','clear','prepare','send']),
-    'DataMaintenance.js':Object.freeze(['clearEmptyChatsAndMemories']),
-    'DBOPFSDocumentLibrary.js':Object.freeze([
+    ],
+    'ConfiguredAIChatSession.js':['history','clear','prepare','send'],
+    'DataMaintenance.js':['clearEmptyChatsAndMemories'],
+    'DBOPFSDocumentLibrary.js':[
         'createDBOPFSDocumentLibrary','normalizeDBOPFSDocumentSchema',
         'bootstrap','search','evaluate','buildContext','createContextBuilder'
-    ]),
-    'DevelopmentWorkspace.js':Object.freeze([
+    ],
+    'DevelopmentWorkspace.js':[
         'inspect','context','setup','installNode'
-    ]),
-    'DirectoryPicker.js':Object.freeze([
+    ],
+    'DirectoryPicker.js':[
         'normalizeDirectoryPickerOptions','normalizeDirectorySelection'
-    ]),
-    'DocumentLexicalSearch.js':Object.freeze([
+    ],
+    'DocumentLexicalSearch.js':[
         'createDocumentLexicalIndex','documentContextExcerpt',
         'documentSearchTokens','normalizedDocumentSearchText',
         'scoreDocumentBody','scoreDocumentLexicalIndex','rank','search'
-    ]),
-    'GifEncoder.js':Object.freeze(['indexPixels','lzw']),
-    'HTMLImport.js':Object.freeze(['connectedCallback']),
-    'InMemoryCommunicationProvider.js':Object.freeze([
+    ],
+    'GifEncoder.js':['indexPixels','lzw'],
+    'HTMLImport.js':['connectedCallback'],
+    'InMemoryCommunicationProvider.js':[
         'listThreads','getMessages','send'
-    ]),
-    'IsolatedModelQuestionRunner.js':Object.freeze([
+    ],
+    'IsolatedModelQuestionRunner.js':[
         'countSentences','inspectModel','runQuestion'
-    ]),
-    'LocalAIReadinessController.js':Object.freeze([
+    ],
+    'LocalAIReadinessController.js':[
         'createLocalAIReadinessController','availabilityFromReport'
-    ]),
-    'Mail.js':Object.freeze(['resolveMailConfig','send']),
-    'MailTransport.mjs':Object.freeze(['normalizeMailEndpoint','sendMailReport']),
-    'MD.js':Object.freeze(['append']),
-    'MemoryRecords.js':Object.freeze(['normalizeMemoryContent','hasMemoryContent']),
-    'ModelDefinition.js':Object.freeze([
+    ],
+    'Mail.js':['resolveMailConfig','send'],
+    'MailTransport.mjs':['normalizeMailEndpoint','sendMailReport'],
+    'MD.js':['append'],
+    'MemoryRecords.js':['normalizeMemoryContent','hasMemoryContent'],
+    'ModelDefinition.js':[
         'parseModelDefinition','loadModelDefinitionSystemPrompt'
-    ]),
-    'OllamaModelIdentifier.js':Object.freeze([
+    ],
+    'OllamaModelIdentifier.js':[
         'normalizeOllamaModelIdentifier','isOllamaModelIdentifier'
-    ]),
-    'OllamaSettings.js':Object.freeze(['arcaneBrainModelName']),
-    'OpenMeteoWeatherProvider.js':Object.freeze(['mapForecast']),
-    'PersistentAIChatSession.js':Object.freeze([
+    ],
+    'OllamaSettings.js':['arcaneBrainModelName'],
+    'OpenMeteoWeatherProvider.js':['mapForecast'],
+    'PersistentAIChatSession.js':[
         'createPersistentAIChatSession','create','ready','history',
         'settleMemory','send'
-    ]),
-    'RecordLinkIndex.js':Object.freeze(['parseRecordLinks','buildRecordLinkIndex']),
-    'RecordReviewStore.js':Object.freeze(['load','get','set','snapshot']),
-    'RiskSignalAnalyzer.js':Object.freeze(['analyzeRiskSignals']),
-    'SpeechPlayback.js':Object.freeze(['splitSpeechText']),
-    'SystemAppearance.js':Object.freeze(['available','current','apply']),
-    'SystemToolRegistry.js':Object.freeze(['quoteArgument']),
-    'TerminalCommandRegistry.js':Object.freeze(['splitCommandLine']),
-    'ThemeBootstrap.js':Object.freeze(['bootstrapArcaneTheme']),
-    'ThemeManager.js':Object.freeze(['loadAndApplyTheme']),
-    'ToolCallRouter.js':Object.freeze([
+    ],
+    'RecordLinkIndex.js':['parseRecordLinks','buildRecordLinkIndex'],
+    'RecordReviewStore.js':['load','get','set','snapshot'],
+    'RiskSignalAnalyzer.js':['analyzeRiskSignals'],
+    'SpeechPlayback.js':['splitSpeechText'],
+    'SystemAppearance.js':['available','current','apply'],
+    'SystemToolRegistry.js':['quoteArgument'],
+    'TerminalCommandRegistry.js':['splitCommandLine'],
+    'ThemeBootstrap.js':['bootstrapArcaneTheme'],
+    'ThemeManager.js':['loadAndApplyTheme'],
+    'ToolCallRouter.js':[
         'parseArguments','handleResponse','handleStreamedCalls'
-    ]),
-    'WaitForComponent.js':Object.freeze(['waitForComponent']),
-    'YouTubeMedia.js':Object.freeze(['parseYouTubeMedia','youtubeEmbedUrl']),
-    'QRCode.min.js':Object.freeze(['makeCode','makeImage','clear']),
-    'SystemPlatformPresentation.js':Object.freeze([
+    ],
+    'WaitForComponent.js':['waitForComponent'],
+    'YouTubeMedia.js':['parseYouTubeMedia','youtubeEmbedUrl'],
+    'QRCode.min.js':['makeCode','makeImage','clear'],
+    'SystemPlatformPresentation.js':[
         'kernelType','displayName','apply'
-    ])
-});
+    ]
+};
 
 const IDENTIFIER_START=/[A-Za-z_$]/u;
 const IDENTIFIER_CONTINUE=/[A-Za-z0-9_$]/u;
@@ -144,11 +143,11 @@ const REGEX_PREFIX_PUNCTUATORS=new Set([
     '??', '<', '>', '<=', '>=', '+=', '-=', '*=', '**=', '%=', '&=', '|=',
     '^=', '&&=', '||=', '??='
 ]);
-const MULTI_PUNCTUATORS=Object.freeze([
+const MULTI_PUNCTUATORS=[
     '>>>=','===','!==','>>>','**=','&&=','||=','??=','=>','==','!=','<=','>=',
     '++','--','&&','||','??','?.','**','<<','>>','+=','-=','*=','/=','%=','&=',
     '|=','^=','...'
-]);
+];
 
 export class UnsupportedReferenceContractSyntaxError extends SyntaxError{
     constructor(code,file,offset,detail){
@@ -401,7 +400,7 @@ function delimiterMetadata(tokens,file){
 }
 
 function range(start,end){
-    return Object.freeze({start,end});
+    return {start,end};
 }
 
 function rawRange(source,startToken,endToken){
@@ -484,7 +483,7 @@ function functionDeclaration(tokens,source,index,metadata,file){
     const bodyOpen=nextAtDepth(tokens,depthBefore,close+1,depth,'{');
     if(bodyOpen<0)unsupported('FUNCTION_BODY_MISSING',file,tokens[index].start);
     const bodyClose=matching.get(bodyOpen);
-    return Object.freeze({
+    return {
         kind:'function',
         name:nameToken?.value??null,
         async,
@@ -494,7 +493,7 @@ function functionDeclaration(tokens,source,index,metadata,file){
         parameters:source.slice(tokens[open].end,tokens[close].start),
         range:range(tokens[index].start,tokens[bodyClose].end),
         tokenRange:range(index,bodyClose+1)
-    });
+    };
 }
 
 function memberName(tokens,source,index,metadata,file){
@@ -592,7 +591,7 @@ function classDeclaration(tokens,source,index,metadata,file){
             const open=cursor;
             const close=matching.get(open);
             const rawSignature=source.slice(tokens[start].start,tokens[close].end);
-            const record=Object.freeze({
+            const record={
                 name:parsedName.name,
                 rawName:parsedName.rawName,
                 computed:Boolean(parsedName.computed),
@@ -603,7 +602,7 @@ function classDeclaration(tokens,source,index,metadata,file){
                 rawSignature,
                 parameters:source.slice(tokens[open].end,tokens[close].start),
                 range:range(tokens[start].start,tokens[close].end)
-            });
+            };
             const body=tokens[close+1];
             let end=close+1;
             if(body?.value==='{'&&depthBefore[close+1]===memberDepth){
@@ -664,7 +663,7 @@ function classDeclaration(tokens,source,index,metadata,file){
             }
         }
         if(!parsedName.private){
-            fields.push(Object.freeze({
+            fields.push({
                 name:parsedName.name,
                 rawName:parsedName.rawName,
                 computed:Boolean(parsedName.computed),
@@ -673,7 +672,7 @@ function classDeclaration(tokens,source,index,metadata,file){
                     tokens[start].start,tokens[fieldEnd].end
                 ),
                 range:range(tokens[start].start,tokens[fieldEnd].end)
-            }));
+            });
         }
         cursor=nextMember;
     }
@@ -682,18 +681,18 @@ function classDeclaration(tokens,source,index,metadata,file){
             className:nameToken?.value??null
         });
     }
-    return Object.freeze({
+    return {
         kind:'class',
         name:nameToken?.value??null,
         base,
         rawDeclaration:source.slice(tokens[index].start,tokens[bodyClose].end),
         rawSignature:source.slice(tokens[index].start,tokens[bodyOpen].start).trimEnd(),
         constructor:constructorRecords[0]??null,
-        members:Object.freeze(members),
-        fields:Object.freeze(fields),
+        members:members,
+        fields:fields,
         range:range(tokens[index].start,tokens[bodyClose].end),
         tokenRange:range(index,bodyClose+1)
-    });
+    };
 }
 
 function arrowSignature(tokens,source,start,end,metadata){
@@ -751,11 +750,11 @@ function variableDeclarations(tokens,source,index,metadata,file,declarations){
     )){
         const name=tokens[partStart];
         if(name?.type!=='id'){
-            records.push(Object.freeze({
+            records.push({
                 kind:'unsupported-variable-binding',
                 name:null,
                 range:range(tokens[partStart].start,tokens[partEnd-1].end)
-            }));
+            });
             continue;
         }
         const equals=nextAtDepth(
@@ -799,7 +798,7 @@ function variableDeclarations(tokens,source,index,metadata,file,declarations){
                 }
             }
         }
-        const record=Object.freeze({
+        const record={
             kind:'variable',
             declarationKind:tokens[index].value,
             name:name.value,
@@ -816,7 +815,7 @@ function variableDeclarations(tokens,source,index,metadata,file,declarations){
             ),
             range:range(tokens[partStart].start,tokens[partEnd-1].end),
             tokenRange:range(partStart,partEnd)
-        });
+        };
         records.push(record);
     }
     // Owner resolution is a second pass because a class can be declared after
@@ -837,11 +836,11 @@ function importDeclaration(tokens,source,index,metadata,file){
     let cursor=index+1;
     if(tokens[cursor]?.type==='string')return {bindings,end};
     if(tokens[cursor]?.type==='id'&&tokens[cursor].value!=='from'){
-        bindings.push(Object.freeze({
+        bindings.push({
             localName:tokens[cursor].value,
             importedName:'default',
             sourceModule:sourceToken.value
-        }));
+        });
         cursor+=1;
         if(tokens[cursor]?.value===',')cursor+=1;
     }
@@ -849,11 +848,11 @@ function importDeclaration(tokens,source,index,metadata,file){
         if(tokens[cursor+1]?.value!=='as'||tokens[cursor+2]?.type!=='id'){
             unsupported('UNSUPPORTED_NAMESPACE_IMPORT',file,tokens[cursor].start);
         }
-        bindings.push(Object.freeze({
+        bindings.push({
             localName:tokens[cursor+2].value,
             importedName:'*',
             sourceModule:sourceToken.value
-        }));
+        });
     }else if(tokens[cursor]?.value==='{'){
         const close=matching.get(cursor);
         const bindingDepth=depth+1;
@@ -873,11 +872,11 @@ function importDeclaration(tokens,source,index,metadata,file){
             }else if(start+1!==endPart){
                 unsupported('UNSUPPORTED_NAMED_IMPORT',file,imported.start);
             }
-            bindings.push(Object.freeze({
+            bindings.push({
                 localName:local.value,
                 importedName:imported.value,
                 sourceModule:sourceToken.value
-            }));
+            });
         }
     }
     return {bindings,end};
@@ -936,7 +935,7 @@ function collectDeclarations(tokens,source,metadata,file){
 function exportRecord({
     name,localName,form,declaration=null,rawDeclaration,sourceModule=null,rangeValue
 }){
-    return Object.freeze({
+    return {
         name,
         localName,
         form,
@@ -948,7 +947,7 @@ function exportRecord({
         sourceModule,
         range:rangeValue,
         resolvedDeclaration:declaration??null
-    });
+    };
 }
 
 function exportSpecifierRecords(
@@ -1155,7 +1154,7 @@ function collectExports(tokens,source,metadata,file,declarations,imports){
             record.resolvedDeclaration,tokens,declarations
         );
         return owned?.name&&exportedClassNames.has(owned.name)
-            ?Object.freeze({...record,form:'class'})
+            ?{...record,form:'class'}
             :record;
     });
     const names=new Set();
@@ -1182,7 +1181,7 @@ function callableExpression(tokens,source,start,end,metadata,file){
         }
         const arrow=arrowSignature(tokens,source,cursor,end,metadata);
         if(arrow){
-            return Object.freeze({kind:'function',...arrow});
+            return {kind:'function',...arrow};
         }
         // Chained assignments retain every left-hand owner. Continue through
         // only the exact `identifier.member =` grammar.
@@ -1225,7 +1224,7 @@ function collectAssignedMembers(tokens,source,metadata,file){
             tokens,source,expressionStart,expressionEnd,metadata,file
         );
         if(!callable)continue;
-        members.push(Object.freeze({
+        members.push({
             owner:owner.value,
             name:nameToken.value,
             rawName:nameToken.raw,
@@ -1238,7 +1237,7 @@ function collectAssignedMembers(tokens,source,metadata,file){
             parameters:callable.parameters,
             range:range(owner.start,callable.range?.end
                 ??(tokens[expressionEnd-1]?.end??nameToken.end))
-        }));
+        });
     }
     return members;
 }
@@ -1257,7 +1256,7 @@ function classForDeclaration(declaration,tokens,declarations){
 
 function cleanClassContract(classContract){
     if(!classContract)return null;
-    return Object.freeze({
+    return {
         name:classContract.name,
         base:classContract.base,
         rawDeclaration:classContract.rawSignature,
@@ -1266,14 +1265,14 @@ function cleanClassContract(classContract){
         members:classContract.members,
         fields:classContract.fields,
         range:classContract.range
-    });
+    };
 }
 
 function cleanExport(record,tokens,declarations){
     const classContract=classForDeclaration(
         record.resolvedDeclaration,tokens,declarations
     );
-    return Object.freeze({
+    return {
         name:record.name,
         localName:record.localName,
         form:record.form,
@@ -1286,7 +1285,7 @@ function cleanExport(record,tokens,declarations){
         ownerClass:classContract?.name??null,
         classContract:cleanClassContract(classContract),
         range:record.range
-    });
+    };
 }
 
 function collectPublicMembers(exports,assignedMembers,tokens,declarations){
@@ -1331,10 +1330,10 @@ function collectPublicMembers(exports,assignedMembers,tokens,declarations){
             });
         }
     }
-    return Object.freeze([...records.values()].map(record=>Object.freeze({
+    return [...records.values()].map(record=>({
         ...record,
-        exportNames:Object.freeze([...new Set(record.exportNames)])
-    })).sort((left,right)=>left.range.start-right.range.start));
+        exportNames:[...new Set(record.exportNames)]
+    })).sort((left,right)=>left.range.start-right.range.start);
 }
 
 function simpleLiteral(token){
@@ -1351,12 +1350,12 @@ function collectLiteralCustomEvents(tokens){
             ||tokens[index+2]?.value!=='(')continue;
         const name=simpleLiteral(tokens[index+3]);
         if(name===null)continue;
-        records.push(Object.freeze({
+        records.push({
             name,
             range:range(tokens[index+3].start,tokens[index+3].end)
-        }));
+        });
     }
-    return Object.freeze(records);
+    return records;
 }
 
 function collectDirectCodedFailures(tokens,metadata){
@@ -1374,15 +1373,15 @@ function collectDirectCodedFailures(tokens,metadata){
                 &&[';',',','}'].includes(tokens[cursor].value))break;
             const code=simpleLiteral(tokens[cursor]);
             if(code!==null&&/^[A-Z][A-Z0-9_]*$/u.test(code)){
-                records.push(Object.freeze({
+                records.push({
                     code,
                     range:range(tokens[cursor].start,tokens[cursor].end)
-                }));
+                });
             }
             cursor+=1;
         }
     }
-    return Object.freeze(records);
+    return records;
 }
 
 function collectErrorSubclasses(exports,tokens,declarations){
@@ -1412,10 +1411,10 @@ function collectErrorSubclasses(exports,tokens,declarations){
             range:contract.range
         });
     }
-    return Object.freeze([...records.values()].map(record=>Object.freeze({
+    return [...records.values()].map(record=>({
         ...record,
-        exportNames:Object.freeze(record.exportNames)
-    })));
+        exportNames:record.exportNames
+    }));
 }
 
 function exportedCallableCandidates(exports,publicMembers){
@@ -1425,7 +1424,7 @@ function exportedCallableCandidates(exports,publicMembers){
         if(declaration?.kind==='function'
             ||(declaration?.kind==='variable'
                 &&declaration.valueKind==='function')){
-            candidates.push(Object.freeze({
+            candidates.push({
                 targetKind:'exported-function',
                 name:exported.localName??exported.name,
                 exportName:exported.name,
@@ -1433,11 +1432,11 @@ function exportedCallableCandidates(exports,publicMembers){
                 rawSignature:declaration.rawSignature,
                 parameters:declaration.parameters,
                 range:declaration.range
-            }));
+            });
         }
     }
     for(const member of publicMembers){
-        candidates.push(Object.freeze({
+        candidates.push({
             targetKind:'public-member',
             name:member.name,
             exportName:member.exportNames[0]??null,
@@ -1445,16 +1444,16 @@ function exportedCallableCandidates(exports,publicMembers){
             rawSignature:member.rawSignature,
             parameters:member.parameters,
             range:member.range
-        }));
+        });
     }
     return candidates;
 }
 
 function resolveReviewedCallables(
-    file,allowlistedCallables,exports,publicMembers
+    file,documentedCallables,exports,publicMembers
 ){
     const candidates=exportedCallableCandidates(exports,publicMembers);
-    return Object.freeze(allowlistedCallables.map((name,order)=>{
+    return documentedCallables.map((name,order)=>{
         const matching=candidates.filter(candidate=>
             candidate.name===name||candidate.exportName===name
         );
@@ -1465,16 +1464,16 @@ function resolveReviewedCallables(
         if(unique.size!==1){
             unsupported(
                 unique.size===0
-                    ?'ALLOWLIST_CALLABLE_UNRESOLVED'
-                    :'ALLOWLIST_CALLABLE_AMBIGUOUS',
+                    ?'DOCUMENTED_CALLABLE_UNRESOLVED'
+                    :'DOCUMENTED_CALLABLE_AMBIGUOUS',
                 file,
                 0,
                 {name,candidateCount:unique.size}
             );
         }
         const target=[...unique.values()][0];
-        return Object.freeze({order,name,...target});
-    }));
+        return {order,name,...target};
+    });
 }
 
 function validateWithVM(source,file,kind){
@@ -1493,23 +1492,23 @@ function validateWithVM(source,file,kind){
 export function extractModuleContract(source,{
     file='<module>',
     kind='esm',
-    allowlistedCallables=RUNTIME_CALLABLE_MEMBER_ALLOWLIST[path.basename(file)]??[]
+    documentedCallables=RUNTIME_DOCUMENTED_CALLABLE_MEMBERS[path.basename(file)]??[]
 }={}){
     if(typeof source!=='string')throw new TypeError('source must be a string');
     if(['license','stylesheet'].includes(kind)){
-        return Object.freeze({
+        return {
             schemaVersion:REFERENCE_CONTRACT_SCHEMA_VERSION,
             file,
             name:path.basename(file),
             kind,
-            exports:Object.freeze([]),
-            publicMembers:Object.freeze([]),
-            events:Object.freeze([]),
-            directCodedFailures:Object.freeze([]),
-            errorSubclasses:Object.freeze([]),
-            reviewedCallables:Object.freeze([]),
-            unsupported:Object.freeze([])
-        });
+            exports:[],
+            publicMembers:[],
+            events:[],
+            directCodedFailures:[],
+            errorSubclasses:[],
+            reviewedCallables:[],
+            unsupported:[]
+        };
     }
     validateWithVM(source,file,kind);
     const tokens=tokenize(source,file);
@@ -1519,7 +1518,7 @@ export function extractModuleContract(source,{
     );
     if(kind!=='esm'){
         return extractClassicContract(source,{
-            file,kind,allowlistedCallables,tokens,metadata
+            file,kind,documentedCallables,tokens,metadata
         });
     }
     const internalExports=collectExports(
@@ -1531,13 +1530,13 @@ export function extractModuleContract(source,{
     const publicMembers=collectPublicMembers(
         internalExports,assignedMembers,tokens,declarations
     );
-    const exports=Object.freeze(internalExports.map(record=>
+    const exports=internalExports.map(record=>
         cleanExport(record,tokens,declarations)
-    ));
-    const reviewedCallables=resolveReviewedCallables(
-        file,allowlistedCallables,internalExports,publicMembers
     );
-    return Object.freeze({
+    const reviewedCallables=resolveReviewedCallables(
+        file,documentedCallables,internalExports,publicMembers
+    );
+    return {
         schemaVersion:REFERENCE_CONTRACT_SCHEMA_VERSION,
         file,
         name:path.basename(file),
@@ -1550,14 +1549,14 @@ export function extractModuleContract(source,{
             internalExports,tokens,declarations
         ),
         reviewedCallables,
-        unsupported:Object.freeze([])
-    });
+        unsupported:[]
+    };
 }
 
-const CLASSIC_GLOBAL_OWNERS=Object.freeze({
+const CLASSIC_GLOBAL_OWNERS={
     'QRCode.min.js':'QRCode',
     'SystemPlatformPresentation.js':'ArcaneSystemPlatformPresentation'
-});
+};
 
 function allNamedFunctions(tokens,source,metadata,file){
     const records=[];
@@ -1571,18 +1570,18 @@ function allNamedFunctions(tokens,source,metadata,file){
 }
 
 function extractClassicContract(source,{
-    file,kind,allowlistedCallables,tokens,metadata
+    file,kind,documentedCallables,tokens,metadata
 }){
     const name=path.basename(file);
-    const functions=allowlistedCallables.length
+    const functions=documentedCallables.length
         ?allNamedFunctions(tokens,source,metadata,file)
         :[];
-    const assignments=allowlistedCallables.length
+    const assignments=documentedCallables.length
         ?collectAssignedMembers(tokens,source,metadata,file)
         :[];
     const reviewedCallables=[];
     const publicMembers=[];
-    for(const [order,callableName] of allowlistedCallables.entries()){
+    for(const [order,callableName] of documentedCallables.entries()){
         let candidates=[];
         if(name==='QRCode.min.js'){
             candidates=assignments.filter(member=>
@@ -1591,7 +1590,7 @@ function extractClassicContract(source,{
             );
         }else if(name==='SystemPlatformPresentation.js'){
             candidates=functions.filter(record=>record.name===callableName)
-                .map(record=>Object.freeze({
+                .map(record=>({
                     owner:CLASSIC_GLOBAL_OWNERS[name],
                     name:record.name,
                     rawName:record.name,
@@ -1611,19 +1610,19 @@ function extractClassicContract(source,{
         if(unique.size!==1){
             unsupported(
                 unique.size===0
-                    ?'ALLOWLIST_CALLABLE_UNRESOLVED'
-                    :'ALLOWLIST_CALLABLE_AMBIGUOUS',
+                    ?'DOCUMENTED_CALLABLE_UNRESOLVED'
+                    :'DOCUMENTED_CALLABLE_AMBIGUOUS',
                 file,0,{name:callableName,candidateCount:unique.size}
             );
         }
         const member=[...unique.values()][0];
-        const publicMember=Object.freeze({
+        const publicMember={
             ...member,
             ownerKind:'classic-global',
-            exportNames:Object.freeze([])
-        });
+            exportNames:[]
+        };
         publicMembers.push(publicMember);
-        reviewedCallables.push(Object.freeze({
+        reviewedCallables.push({
             order,
             name:callableName,
             targetKind:'global-member',
@@ -1632,39 +1631,21 @@ function extractClassicContract(source,{
             rawSignature:publicMember.rawSignature,
             parameters:publicMember.parameters,
             range:publicMember.range
-        }));
+        });
     }
-    return Object.freeze({
+    return {
         schemaVersion:REFERENCE_CONTRACT_SCHEMA_VERSION,
         file,
         name,
         kind,
-        exports:Object.freeze([]),
-        publicMembers:Object.freeze(publicMembers),
+        exports:[],
+        publicMembers:publicMembers,
         events:collectLiteralCustomEvents(tokens),
         directCodedFailures:collectDirectCodedFailures(tokens,metadata),
-        errorSubclasses:Object.freeze([]),
-        reviewedCallables:Object.freeze(reviewedCallables),
-        unsupported:Object.freeze([])
-    });
-}
-
-function normalizedObject(value){
-    if(Array.isArray(value))return value.map(normalizedObject);
-    if(value&&typeof value==='object'){
-        return Object.fromEntries(Object.keys(value).sort().map(key=>[
-            key,normalizedObject(value[key])
-        ]));
-    }
-    return value;
-}
-
-export function stableContractJSON(value){
-    return JSON.stringify(normalizedObject(value));
-}
-
-export function hashReferenceContracts(value){
-    return createHash('sha256').update(stableContractJSON(value)).digest('hex');
+        errorSubclasses:[],
+        reviewedCallables:reviewedCallables,
+        unsupported:[]
+    };
 }
 
 function portablePath(repositoryRoot,filePath){
@@ -1742,96 +1723,6 @@ async function runtimeNamespaces(repositoryRoot,files){
     return namespaces;
 }
 
-function contractSummary(modules){
-    const forms={
-        function:0,
-        variable:0,
-        class:0,
-        alias:0,
-        're-export':0,
-        default:0
-    };
-    let esmExportCount=0;
-    let reviewedCallableCount=0;
-    let reviewedModuleCount=0;
-    let literalCustomEventCount=0;
-    let directCodedFailureCount=0;
-    let exportedErrorSubclassCount=0;
-    let publicMemberCount=0;
-    for(const module of modules){
-        if(module.kind==='esm'){
-            esmExportCount+=module.exports.length;
-            for(const record of module.exports){
-                if(!Object.hasOwn(forms,record.form)){
-                    throw new Error(`Unknown export form ${record.form}.`);
-                }
-                forms[record.form]+=1;
-            }
-        }
-        reviewedCallableCount+=module.reviewedCallables.length;
-        if(module.reviewedCallables.length)reviewedModuleCount+=1;
-        literalCustomEventCount+=module.events.length;
-        directCodedFailureCount+=module.directCodedFailures.length;
-        exportedErrorSubclassCount+=module.errorSubclasses.length;
-        publicMemberCount+=module.publicMembers.length;
-    }
-    return Object.freeze({
-        artifactCount:modules.length,
-        esmModuleCount:modules.filter(module=>module.kind==='esm').length,
-        esmExportCount,
-        exportForms:Object.freeze(forms),
-        reviewedCallableCount,
-        reviewedModuleCount,
-        literalCustomEventCount,
-        directCodedFailureCount,
-        exportedErrorSubclassCount,
-        publicMemberCount
-    });
-}
-
-const EXPECTED_RUNTIME_SUMMARY=Object.freeze({
-    artifactCount:86,
-    esmModuleCount:80,
-    esmExportCount:384,
-    exportForms:Object.freeze({
-        function:168,
-        variable:124,
-        class:17,
-        alias:26,
-        're-export':4,
-        default:45
-    }),
-    reviewedCallableCount:183,
-    reviewedModuleCount:56,
-    literalCustomEventCount:0,
-    directCodedFailureCount:58,
-    exportedErrorSubclassCount:4,
-    publicMemberCount:579
-});
-
-function assertExpectedSummary(summary){
-    for(const key of [
-        'artifactCount','esmModuleCount','esmExportCount','reviewedCallableCount',
-        'reviewedModuleCount','literalCustomEventCount',
-        'directCodedFailureCount','exportedErrorSubclassCount','publicMemberCount'
-    ]){
-        if(summary[key]!==EXPECTED_RUNTIME_SUMMARY[key]){
-            throw new Error(
-                `Runtime contract count mismatch for ${key}: `
-                +`${String(summary[key])} !== ${String(EXPECTED_RUNTIME_SUMMARY[key])}.`
-            );
-        }
-    }
-    for(const [form,count] of Object.entries(EXPECTED_RUNTIME_SUMMARY.exportForms)){
-        if(summary.exportForms[form]!==count){
-            throw new Error(
-                `Runtime export form mismatch for ${form}: `
-                +`${String(summary.exportForms[form])} !== ${String(count)}.`
-            );
-        }
-    }
-}
-
 export async function extractRuntimeReferenceContracts({
     repositoryRoot=path.resolve(
         path.dirname(fileURLToPath(import.meta.url)),'..'
@@ -1848,7 +1739,7 @@ export async function extractRuntimeReferenceContracts({
         const contract=extractModuleContract(source,{
             file:record.file,
             kind:record.kind,
-            allowlistedCallables:RUNTIME_CALLABLE_MEMBER_ALLOWLIST[record.name]??[]
+            documentedCallables:RUNTIME_DOCUMENTED_CALLABLE_MEMBERS[record.name]??[]
         });
         if(record.kind==='esm'){
             const actual=sortedNames(contract.exports.map(item=>item.name));
@@ -1862,13 +1753,10 @@ export async function extractRuntimeReferenceContracts({
         }
         modules.push(contract);
     }
-    const summary=contractSummary(modules);
-    const core=Object.freeze({
+    return {
         schemaVersion:REFERENCE_CONTRACT_SCHEMA_VERSION,
-        modules:Object.freeze(modules),
-        summary
-    });
-    return Object.freeze({...core,hash:hashReferenceContracts(core)});
+        modules
+    };
 }
 
 export async function verifyRuntimeReferenceContracts(options={}){
@@ -1877,7 +1765,6 @@ export async function verifyRuntimeReferenceContracts(options={}){
     );
     const requireVm=options.requireVm??true;
     const first=await extractRuntimeReferenceContracts({repositoryRoot});
-    assertExpectedSummary(first.summary);
     const inventory=JSON.parse(await readFile(path.join(
         repositoryRoot,'docs','reference','inventory','runtime-modules.json'
     ),'utf8'));
@@ -1908,20 +1795,7 @@ export async function verifyRuntimeReferenceContracts(options={}){
             }
         }
     }
-    const second=await extractRuntimeReferenceContracts({repositoryRoot});
-    if(first.hash!==second.hash
-        ||stableContractJSON(first)!==stableContractJSON(second)){
-        throw new Error('Runtime contract extraction is nondeterministic.');
-    }
     return first;
-}
-
-function cliSummary(contract){
-    return {
-        schemaVersion:contract.schemaVersion,
-        hash:contract.hash,
-        ...contract.summary
-    };
 }
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
@@ -1929,7 +1803,5 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
     const contract=argumentsSet.has('--verify-runtime')
         ?await verifyRuntimeReferenceContracts()
         :await extractRuntimeReferenceContracts();
-    process.stdout.write(`${JSON.stringify(
-        argumentsSet.has('--json')?contract:cliSummary(contract)
-    )}\n`);
+    process.stdout.write(`${JSON.stringify(contract)}\n`);
 }

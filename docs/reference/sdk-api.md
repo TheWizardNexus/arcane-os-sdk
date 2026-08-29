@@ -1,7 +1,8 @@
 # Arcane OS SDK JavaScript API
 
-The npm package exposes a Node.js ESM control plane, the Node-and-browser
-`arcane-os/event-manager` entrypoint, and the browser-only
+The npm package exposes a Node.js ESM control plane, the portable
+`arcane-os/event-manager`, `arcane-os/mail`, `arcane-os/preference-store`, and
+`arcane-os/speech-playback` entrypoints, and the browser-only
 `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints.
 Those package subpaths are distinct from application-facing projection modules
 in the managed browser map, such as `arcane/AIProviderRuntime`,
@@ -17,7 +18,7 @@ This table is the Node `package.json#exports` map: it defines package
 entrypoints for SDK/tooling code. It is distinct from the generated browser
 import map that resolves application-facing `arcane/*` modules and the focused
 EventManager entry. See [browser runtime delivery](protocols.md#browser-runtime-delivery)
-for the installed-inventory-derived physical-runtime contract in SDK `0.3.1`.
+for the installed-inventory-derived physical-runtime contract in SDK `0.3.4`.
 
 | Specifier | Purpose |
 | --- | --- |
@@ -32,21 +33,20 @@ for the installed-inventory-derived physical-runtime contract in SDK `0.3.1`.
 | `arcane-os/packager` | Low-level browser app packager. |
 | `arcane-os/release-bundle` | Deterministic external release bundles. |
 | `arcane-os/event-manager` | Central synchronous events, complete time-travel history, playback, and optional DOM instrumentation. |
-| `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, complete DBOPFS model storage, streaming, cancellation, and structural tool-call results; `secure:true` is a dormant hardening intent only. |
-| `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS provider mechanisms, ordinary upstream assets, materialized/native routing, Workers, and cancellation; `secure:true` is a dormant hardening intent only. |
+| `arcane-os/preference-store` | Portable preference records and injected storage adapters. |
+| `arcane-os/speech-playback` | Portable speech preparation, playback state, and injected media adapters. |
+| `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, complete DBOPFS model storage, streaming, cancellation, and structural tool-call results. |
+| `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS provider mechanisms, ordinary upstream assets, materialized/native routing, Workers, and cancellation. |
 | `arcane-os/mail` | Portable Mail runtime, durable outbox, complete transport responses, and provider-neutral acceptance contracts. |
 
-JSON schemas, the runtime manifest, and `package.json` are data-only export subpaths. In Node ESM, import JSON with `with {type: 'json'}`, or resolve and read it explicitly.
+Eight JSON schemas and `package.json` are data-only export subpaths. In Node ESM, import JSON with `with {type: 'json'}`, or resolve and read it explicitly.
 
 ## Shared operation contract
 
 High-level operations accept one options object. Common fields are `workspaceRoot`, `appId`, `target`, `signal`, and `onEvent`; only fields meaningful to that operation are consumed. Long work acknowledges first, owns its child tasks, keeps event delivery ordered and backpressured, emits progress or heartbeats, observes cancellation where safe, and rejects with `ArcaneError` on failure.
 
 One invocation selects one workspace, app, operation, target, architecture,
-format, signing profile, and output root. No API silently loops over all apps or
-targets. APIs that retain legacy receipt names are explicit selected-release
-verification helpers; ordinary development and application paths do not invoke
-them as content or execution gates.
+format, and output root. No API silently loops over all apps or targets.
 
 Protocol mechanics are intentionally kept in the [deep protocol guide](protocols.md). The compact availability and normalization sentence beneath each member is the normal application-facing view.
 
@@ -57,8 +57,8 @@ entrypoint in `package.json#exports`. Records are grouped by export name and
 `Object.is()` binding identity, then retain the sorted entrypoints that expose
 that binding; `memberCount` in
 [`inventory/package-api.json`](inventory/package-api.json) is the resulting
-graph-node count. The remaining data-only subpaths are the runtime manifest,
-JSON Schemas, and package metadata. Runtime projection modules in the managed
+graph-node count. The remaining data-only subpaths are eight JSON Schemas and
+package metadata. Runtime projection modules in the managed
 browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 
 | Member | Kind | Import | Group | Availability |
@@ -67,7 +67,6 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `APP_BUNDLE_EXTENSION` | constant | `arcane-os` | Packaging and release bundles | Node |
 | `APP_BUNDLE_FORMAT` | constant | `arcane-os` | Packaging and release bundles | Node |
 | `APP_BUNDLE_KIND` | constant | `arcane-os` | Packaging and release bundles | Node |
-| `APP_BUNDLE_LIMITS` | constant | `arcane-os` | Packaging and release bundles | Node |
 | `APP_BUNDLE_MANIFEST_NAME` | constant | `arcane-os` | Packaging and release bundles | Node |
 | `APP_BUNDLE_RELEASE_PATH` | constant | `arcane-os` | Packaging and release bundles | Node |
 | `APP_BUNDLE_SCHEMA_VERSION` | constant | `arcane-os` | Packaging and release bundles | Node |
@@ -80,21 +79,12 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `ARCANE_NATIVE_PROVIDER_PATHS` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `ARCANE_PORTABLE_PROVIDER_PATH` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `ARCANE_PROTOCOL` | constant | `arcane-os` | Identity and protocol constants | Node |
-| `ARCANE_UPSTREAM_COMMIT` | constant | `arcane-os` | Identity and protocol constants | Node |
 | `ARCANE_UPSTREAM_REPOSITORY` | constant | `arcane-os` | Identity and protocol constants | Node |
 | `ArcaneError` | class | `arcane-os` | Errors | Node |
 | `adaptV1LlmProvider()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser; the wrapped provider retains its own WebGPU, storage, model, and lifecycle requirements |
 | `assertIntegratedNativeToolchain()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `assertIntegratedPortableToolchain()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
-| `assertNativeApplicationToolchainCompatibility()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
-| `assertNativeToolchainCompatibility()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
-| `assertPortableToolchainCompatibility()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `assessArcaneOllama()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node; Microsoft NT managed-service assessment |
-| `authenticateAppReleaseAuthority()` | function | `arcane-os` | Packaging and release bundles | Node |
-| `authenticateAppReleaseReceipt()` | function | `arcane-os` | Packaging and release bundles | Node |
-| `authenticateNativeBuildPlan()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
-| `authenticateRuntimeReceipt()` | function | `arcane-os` | Runtime and app descriptors | Node |
-| `authenticateSharedPayloadSnapshot()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `buildApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `buildTarget()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL` | constant | `arcane-os/ai/browser-speech` | Browser speech providers | Browser metadata; graph construction starts no fetch, cache, Worker, provider, or event operation |
@@ -105,6 +95,7 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `checkApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `CLI_EVENT_PROTOCOL` | constant | `arcane-os` | Identity and protocol constants | Node |
 | `CLI_NAME` | constant | `arcane-os` | Identity and protocol constants | Node |
+| `completeValueText()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Compatible JavaScript module host; no browser capability required |
 | `createApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `createArcaneAI()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser; compatible LLM provider or controller required |
 | `createAppReleaseBundle()` | function | `arcane-os` | Packaging and release bundles | Node |
@@ -134,6 +125,7 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `executeNativeBuildPlan()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `executeOperation()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `fail()` | function | `arcane-os` | Errors | Node |
+| `getSdkBrowserRuntimeRoot()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `getSdkRoot()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `getTargetAdapter()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `incrementSemver()` | function | `arcane-os/packager` | Packaging and release bundles | Node |
@@ -142,13 +134,18 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `inspectApp()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `inspectWorkspaceProfile()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node |
 | `INTEGRATED_TOOLCHAIN_PROTOCOL` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
+| `listRuntimeFiles()` | function | `arcane-os` | Runtime and app descriptors | Node |
+| `listSdkBrowserRuntimeFiles()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `listTargets()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `loadAppDescriptor()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `loadArcaneIntegratedProvider()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `loadArcaneNativeProvider()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `loadArcanePortableProvider()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `loadRuntimeRelease()` | function | `arcane-os` | Runtime and app descriptors | Node |
+| `loadSdkBrowserRuntimeRelease()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `materializeInstalledSdkRuntime()` | function | `arcane-os` | Runtime and app descriptors | Node |
+| `materializeWorkspaceRuntime()` | function | `arcane-os` | Runtime and app descriptors | Node |
+| `materializeWorkspaceRuntimeContent()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `NATIVE_BUILD_PLAN_PROTOCOL` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `NATIVE_BUILDER_PROTOCOL` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `normalizeError()` | function | `arcane-os` | Errors | Node |
@@ -161,7 +158,6 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `parseSemver()` | function | `arcane-os/packager` | Packaging and release bundles | Node |
 | `planApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `prepareNativeTarget()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
-| `prepareSharedPayloadSnapshot()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `PreferenceStore default export` | class | `arcane-os/preference-store` | Portable runtime modules | Node with injected adapters, or browser/native WebView storage |
 | `PREFERENCE_STORE_ERROR_CODES` | constant | `arcane-os/preference-store` | Portable runtime modules | Node and browser |
 | `PREFERENCE_STORE_EVENT_TYPES` | constant | `arcane-os/preference-store` | Portable runtime modules | Node and browser |
@@ -169,8 +165,8 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `preferenceSchema()` | function | `arcane-os/preference-store` | Portable runtime modules | Node and browser |
 | `projectNativeDescriptor()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `projectPackageManifest()` | function | `arcane-os` | Runtime and app descriptors | Node |
-| `readVerifiedAppReleaseFile()` | function | `arcane-os` | Packaging and release bundles | Node |
-| `readVerifiedRuntimeFile()` | function | `arcane-os` | Runtime and app descriptors | Node |
+| `readRuntimeFile()` | function | `arcane-os` | Runtime and app descriptors | Node |
+| `readSdkBrowserRuntimeFile()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `registeredTestCount()` | function | `arcane-os` | Events, processes, and testing | Node |
 | `RELEASE_MANIFEST_NAME` | constant | `arcane-os/packager` | Packaging and release bundles | Node |
 | `repositoryApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
@@ -218,7 +214,6 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `verifyAppReleaseBundle()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `verifyBundleApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `verifyNativeArtifact()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
-| `verifyRuntime()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `verifyTarget()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `SDK_UPDATE_REGISTRY` | constant | `arcane-os` | Explicit SDK update checks | Node; on-demand CLI or maintainer check only |
 | `SDK_UPDATE_TIMEOUT_MS` | constant | `arcane-os` | Explicit SDK update checks | Node; on-demand CLI or maintainer check only |
@@ -380,32 +375,6 @@ import {APP_BUNDLE_KIND} from 'arcane-os';
 console.log(APP_BUNDLE_KIND);
 ```
 
-## APP_BUNDLE_LIMITS
-
-### Overview
-
-Frozen compressed-size, expanded-size, entry-count, and path limits enforced by bundle creation and verification.
-
-### Value and import
-
-```text
-const APP_BUNDLE_LIMITS
-```
-
-Import it from `arcane-os` or `arcane-os/release-bundle`. Treat arrays and records as immutable public values.
-
-### Availability and normalization
-
-**Node.** Exact immutable SDK value. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
-
-### Example
-
-```javascript
-import {APP_BUNDLE_LIMITS} from 'arcane-os';
-
-console.log(APP_BUNDLE_LIMITS);
-```
-
 ## APP_BUNDLE_MANIFEST_NAME
 
 ### Overview
@@ -534,90 +503,6 @@ Import it from `arcane-os/packager`. Treat arrays and records as immutable publi
 import {APP_CONFIG_NAME} from 'arcane-os/packager';
 
 console.log(APP_CONFIG_NAME);
-```
-
-## authenticateAppReleaseAuthority()
-
-### Overview
-
-Explicitly verifies that the selected app release state carries its authored descriptor for external delivery.
-
-### Signature and result
-
-```text
-async authenticateAppReleaseAuthority(receipt, { releaseRoot, expectedPackageConfig, expectedDescriptor, signal }={})
-```
-
-Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
-
-### Availability and normalization
-
-**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
-
-### Example
-
-```javascript
-import {authenticateAppReleaseAuthority} from 'arcane-os';
-
-async function useauthenticateAppReleaseAuthority(...arguments_) {
-    return authenticateAppReleaseAuthority(...arguments_);
-}
-```
-
-## authenticateAppReleaseReceipt()
-
-### Overview
-
-Explicitly verifies a selected application release against its complete current filesystem state.
-
-### Signature and result
-
-```text
-async authenticateAppReleaseReceipt(receipt, options={})
-```
-
-Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
-
-### Availability and normalization
-
-**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
-
-### Example
-
-```javascript
-import {authenticateAppReleaseReceipt} from 'arcane-os';
-
-async function useauthenticateAppReleaseReceipt(...arguments_) {
-    return authenticateAppReleaseReceipt(...arguments_);
-}
-```
-
-## authenticateSharedPayloadSnapshot()
-
-### Overview
-
-Authenticates the same-process immutable shared-payload snapshot consumed by app packaging.
-
-### Signature and result
-
-```text
-async authenticateSharedPayloadSnapshot(receipt, options={})
-```
-
-Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
-
-### Availability and normalization
-
-**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
-
-### Example
-
-```javascript
-import {authenticateSharedPayloadSnapshot} from 'arcane-os';
-
-async function useauthenticateSharedPayloadSnapshot(...arguments_) {
-    return authenticateSharedPayloadSnapshot(...arguments_);
-}
 ```
 
 ## bumpVersion()
@@ -862,8 +747,7 @@ async packageApp(options)
 
 Import it from `arcane-os` or `arcane-os/packager`. Packaging refreshes the
 managed map once and preserves the complete selected source and browser
-document inventory without clipping, tailing, elision, byte limits, hashes, or
-ordinary admission receipts. It rejects malformed configuration, descriptors,
+document inventory. It rejects malformed configuration, descriptors,
 and the malformed selected release archive while preserving the previously
 selected output on failure. Each selected browser document receives the same
 deterministic map. The package root also contains the public
@@ -873,7 +757,7 @@ deterministic map. The package root also contains the public
 {
   schemaVersion: 1,
   kind: 'arcane-app-runtime-projection',
-  sdkVersion: '0.3.1',
+  sdkVersion: '0.3.4',
   pathPrefix: 'arcane/',
   files: [{path}]
 }
@@ -978,62 +862,6 @@ Import it from `arcane-os/packager`. The signature above states whether settleme
 import {parseSemver} from 'arcane-os/packager';
 
 console.log(parseSemver('1.2.3'));
-```
-
-## prepareSharedPayloadSnapshot()
-
-### Overview
-
-Verifies and snapshots the shared runtime/dependency payload once for reuse by one packaging generation.
-
-### Signature and result
-
-```text
-async prepareSharedPayloadSnapshot({ workspaceRoot:requestedWorkspaceRoot, sharedPayloadIds, signal, onEvent }={})
-```
-
-Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
-
-### Availability and normalization
-
-**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
-
-### Example
-
-```javascript
-import {prepareSharedPayloadSnapshot} from 'arcane-os';
-
-async function useprepareSharedPayloadSnapshot(...arguments_) {
-    return prepareSharedPayloadSnapshot(...arguments_);
-}
-```
-
-## readVerifiedAppReleaseFile()
-
-### Overview
-
-Reads one complete file during explicit selected app-release verification.
-
-### Signature and result
-
-```text
-async readVerifiedAppReleaseFile(receipt, { releaseRoot, relativePath, signal }={})
-```
-
-Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
-
-### Availability and normalization
-
-**Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
-
-### Example
-
-```javascript
-import {readVerifiedAppReleaseFile} from 'arcane-os';
-
-async function usereadVerifiedAppReleaseFile(...arguments_) {
-    return readVerifiedAppReleaseFile(...arguments_);
-}
 ```
 
 ## RELEASE_MANIFEST_NAME
@@ -1281,32 +1109,31 @@ import {APP_DESCRIPTOR_SCHEMA_VERSION} from 'arcane-os';
 console.log(APP_DESCRIPTOR_SCHEMA_VERSION);
 ```
 
-## authenticateRuntimeReceipt()
+## getSdkBrowserRuntimeRoot()
 
 ### Overview
 
-Explicitly verifies a selected runtime release against its complete current runtime root.
+Returns the absolute SDK browser-runtime root selected by the installed package.
 
 ### Signature and result
 
 ```text
-async authenticateRuntimeReceipt(receipt, { runtimeRoot=path.join(sdkRoot, 'runtime'), signal }={})
+getSdkBrowserRuntimeRoot()
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
+Import it from `arcane-os`. The return value is the default root accepted by the
+browser-runtime inventory and reader functions.
 
 ### Availability and normalization
 
-**Node.** SDK-normalized inputs, errors, events, and documented result. Deep protocol: [Node ESM](protocols.md).
+**Node.** Returns one absolute directory path. Deep protocol: [Node ESM](protocols.md).
 
 ### Example
 
 ```javascript
-import {authenticateRuntimeReceipt} from 'arcane-os';
+import {getSdkBrowserRuntimeRoot} from 'arcane-os';
 
-async function useauthenticateRuntimeReceipt(...arguments_) {
-    return authenticateRuntimeReceipt(...arguments_);
-}
+console.log(getSdkBrowserRuntimeRoot());
 ```
 
 ## getSdkRoot()
@@ -1363,16 +1190,73 @@ async function useloadAppDescriptor(...arguments_) {
 }
 ```
 
-## loadRuntimeRelease()
+## listRuntimeFiles()
 
 ### Overview
 
-Reads and structurally validates the synchronized runtime release manifest.
+Lists every regular file beneath one selected SDK runtime root as an ordered,
+slash-normalized relative path.
 
 ### Signature and result
 
 ```text
-async loadRuntimeRelease({runtimeRoot=path.join(sdkRoot, 'runtime')}={})
+async listRuntimeFiles({runtimeRoot=path.join(sdkRoot, 'runtime'),signal}={})
+```
+
+The function traverses the selected directory, observes `signal`, and returns
+the complete sorted path list.
+
+### Availability and normalization
+
+**Node.** Complete relative-path inventory. Deep protocol: [Node ESM](protocols.md).
+
+### Example
+
+```javascript
+import {listRuntimeFiles} from 'arcane-os';
+
+const files=await listRuntimeFiles();
+```
+
+## listSdkBrowserRuntimeFiles()
+
+### Overview
+
+Lists every regular file beneath one selected SDK browser-runtime root as an
+ordered, slash-normalized relative path.
+
+### Signature and result
+
+```text
+async listSdkBrowserRuntimeFiles({browserRuntimeRoot=defaultRoot,signal}={})
+```
+
+The function traverses the selected directory, observes `signal`, and returns
+the complete sorted path list.
+
+### Availability and normalization
+
+**Node.** Complete relative-path inventory. Deep protocol: [Node ESM](protocols.md).
+
+### Example
+
+```javascript
+import {listSdkBrowserRuntimeFiles} from 'arcane-os';
+
+const files=await listSdkBrowserRuntimeFiles();
+```
+
+## loadRuntimeRelease()
+
+### Overview
+
+Returns the selected runtime root, SDK version, and complete current file
+inventory derived directly from that directory.
+
+### Signature and result
+
+```text
+async loadRuntimeRelease({runtimeRoot=path.join(sdkRoot, 'runtime'),signal}={})
 ```
 
 Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
@@ -1391,12 +1275,42 @@ async function useloadRuntimeRelease(...arguments_) {
 }
 ```
 
+## loadSdkBrowserRuntimeRelease()
+
+### Overview
+
+Returns the selected browser-runtime root, SDK version, and complete current
+file inventory derived directly from that directory.
+
+### Signature and result
+
+```text
+async loadSdkBrowserRuntimeRelease({browserRuntimeRoot=defaultRoot,signal}={})
+```
+
+Import it from `arcane-os`. The mutable result contains `sdkVersion`,
+`browserRuntimeRoot`, and ordered `files`.
+
+### Availability and normalization
+
+**Node.** SDK-normalized inputs, errors, and documented result. Deep protocol: [Node ESM](protocols.md).
+
+### Example
+
+```javascript
+import {loadSdkBrowserRuntimeRelease} from 'arcane-os';
+
+const release=await loadSdkBrowserRuntimeRelease();
+```
+
 ## materializeInstalledSdkRuntime()
 
 ### Overview
 
 Materializes the complete installed SDK runtime and browser-runtime content.
-It uses no byte identities, hashes, digests, receipts, or lock reconciliation.
+After full runtime replacement, it writes or replaces semantic
+`arcane.lock.json` from the actual installed dependency name, package name,
+package version, alias source, and projected roots.
 
 ### Signature and result
 
@@ -1409,9 +1323,8 @@ Import it through the exact dependency key declared by the workspace: normally
 `npm:arcane-os@<version>`. It resolves that declaration under the shared
 workspace-operation lock and replaces the complete projection by staged
 whole-tree replacement. The mutable result includes the installed-package
-location and materialized workspace runtime paths. It never creates or
-reconciles `arcane.lock.json`, writes runtime identity metadata, installs
-dependencies, or merges application source.
+location, materialized workspace runtime paths, and `workspaceLock` path and
+document. It does not install dependencies or merge application source.
 
 Replacement removes files absent from the selected runtime content and restores
 the prior tree if commit fails. `signal` and
@@ -1431,6 +1344,63 @@ import {materializeInstalledSdkRuntime} from 'arcane-os';
 // 'arcane-sdk' instead.
 
 const result=await materializeInstalledSdkRuntime({workspaceRoot});
+```
+
+## materializeWorkspaceRuntime()
+
+### Overview
+
+Compatibility alias for `materializeWorkspaceRuntimeContent()`.
+
+### Signature and result
+
+```text
+async materializeWorkspaceRuntime(options={})
+```
+
+Import it from `arcane-os`. It forwards the complete options record and returns
+the same materialization result.
+
+### Availability and normalization
+
+**Node.** Complete workspace runtime content. Deep protocol: [Installed SDK runtime materialization](protocols.md#installed-sdk-runtime-materialization).
+
+### Example
+
+```javascript
+import {materializeWorkspaceRuntime} from 'arcane-os';
+
+const result=await materializeWorkspaceRuntime({workspaceRoot});
+```
+
+## materializeWorkspaceRuntimeContent()
+
+### Overview
+
+Replaces one workspace's complete projected runtime and browser-runtime content
+from selected source roots. It does not resolve a package declaration or write
+the installed-package lock document owned by `materializeInstalledSdkRuntime()`.
+
+### Signature and result
+
+```text
+async materializeWorkspaceRuntimeContent({workspaceRoot,runtimeRoot=path.join(getSdkRoot(), 'runtime'),browserRuntimeRoot=getSdkBrowserRuntimeRoot(),signal,onEvent}={})
+```
+
+The operation stages the complete projection, replaces the prior tree at the
+commit boundary, restores it if commit fails, and removes paths absent from the
+selected sources.
+
+### Availability and normalization
+
+**Node.** Complete workspace runtime content and a mutable materialization result. Deep protocol: [Installed SDK runtime materialization](protocols.md#installed-sdk-runtime-materialization).
+
+### Example
+
+```javascript
+import {materializeWorkspaceRuntimeContent} from 'arcane-os';
+
+const result=await materializeWorkspaceRuntimeContent({workspaceRoot});
 ```
 
 ## PreferenceStore default export
@@ -1754,32 +1724,58 @@ async function useprojectPackageManifest(...arguments_) {
 }
 ```
 
-## readVerifiedRuntimeFile()
+## readRuntimeFile()
 
 ### Overview
 
-Reads one complete runtime file during explicit selected runtime-release verification.
+Reads one complete contained file from a selected SDK runtime root.
 
 ### Signature and result
 
 ```text
-async readVerifiedRuntimeFile(receipt, { runtimeRoot=path.join(sdkRoot, 'runtime'), relativePath, signal }={})
+async readRuntimeFile({runtimeRoot=path.join(sdkRoot, 'runtime'),relativePath,signal}={})
 ```
 
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
+The relative path must identify a regular file contained by the selected root.
+The result is the complete file `Buffer`.
 
 ### Availability and normalization
 
-**Node.** SDK-normalized inputs, errors, events, and documented result. Deep protocol: [Node ESM](protocols.md).
+**Node.** Contained runtime file access with cancellation. Deep protocol: [Node ESM](protocols.md).
 
 ### Example
 
 ```javascript
-import {readVerifiedRuntimeFile} from 'arcane-os';
+import {readRuntimeFile} from 'arcane-os';
 
-async function usereadVerifiedRuntimeFile(...arguments_) {
-    return readVerifiedRuntimeFile(...arguments_);
-}
+const content=await readRuntimeFile({relativePath:'arcane/modules/AI.js'});
+```
+
+## readSdkBrowserRuntimeFile()
+
+### Overview
+
+Reads one complete contained file from a selected SDK browser-runtime root.
+
+### Signature and result
+
+```text
+async readSdkBrowserRuntimeFile({browserRuntimeRoot=defaultRoot,relativePath,signal}={})
+```
+
+The relative path must identify a regular file contained by the selected root.
+The result is the complete file `Buffer`.
+
+### Availability and normalization
+
+**Node.** Contained browser-runtime file access with cancellation. Deep protocol: [Node ESM](protocols.md).
+
+### Example
+
+```javascript
+import {readSdkBrowserRuntimeFile} from 'arcane-os';
+
+const content=await readSdkBrowserRuntimeFile({relativePath:'ai/browser-wasm.mjs'});
 ```
 
 ## validateAppDescriptor()
@@ -1809,35 +1805,6 @@ async function usevalidateAppDescriptor(...arguments_) {
     return validateAppDescriptor(...arguments_);
 }
 ```
-
-## verifyRuntime()
-
-### Overview
-
-Explicitly verifies the complete synchronized runtime selected for release and returns a frozen result.
-
-### Signature and result
-
-```text
-async verifyRuntime({ runtimeRoot=path.join(sdkRoot, 'runtime'), signal, onEvent }={})
-```
-
-Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
-
-### Availability and normalization
-
-**Node.** SDK-normalized inputs, errors, events, and documented result. Deep protocol: [Node ESM](protocols.md).
-
-### Example
-
-```javascript
-import {verifyRuntime} from 'arcane-os';
-
-async function useverifyRuntime(...arguments_) {
-    return verifyRuntime(...arguments_);
-}
-```
-
 
 # Targets, native plans, and providers
 
@@ -1972,118 +1939,6 @@ import {assertIntegratedPortableToolchain} from 'arcane-os';
 
 async function useassertIntegratedPortableToolchain(...arguments_) {
     return assertIntegratedPortableToolchain(...arguments_);
-}
-```
-
-## assertNativeApplicationToolchainCompatibility()
-
-### Overview
-
-Checks prepared native toolchain state against the selected application's declared Core requirements.
-
-### Signature and result
-
-```text
-assertNativeApplicationToolchainCompatibility({prepared, toolchainReceipt}={})
-```
-
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
-
-### Availability and normalization
-
-**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
-
-### Example
-
-```javascript
-import {assertNativeApplicationToolchainCompatibility} from 'arcane-os';
-
-async function useassertNativeApplicationToolchainCompatibility(...arguments_) {
-    return assertNativeApplicationToolchainCompatibility(...arguments_);
-}
-```
-
-## assertNativeToolchainCompatibility()
-
-### Overview
-
-Validates that a prepared toolchain provides the required Core version, protocol, features, capabilities, and methods.
-
-### Signature and result
-
-```text
-assertNativeToolchainCompatibility({ appDescriptor, toolchainReceipt, minimumCoreVersion }={})
-```
-
-Import it from `arcane-os` or `arcane-os/native`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
-
-### Availability and normalization
-
-**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
-
-### Example
-
-```javascript
-import {assertNativeToolchainCompatibility} from 'arcane-os';
-
-async function useassertNativeToolchainCompatibility(...arguments_) {
-    return assertNativeToolchainCompatibility(...arguments_);
-}
-```
-
-## assertPortableToolchainCompatibility()
-
-### Overview
-
-Portable-target compatibility wrapper for native application and toolchain selection.
-
-### Signature and result
-
-```text
-assertPortableToolchainCompatibility(options={})
-```
-
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
-
-### Availability and normalization
-
-**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
-
-### Example
-
-```javascript
-import {assertPortableToolchainCompatibility} from 'arcane-os';
-
-async function useassertPortableToolchainCompatibility(...arguments_) {
-    return assertPortableToolchainCompatibility(...arguments_);
-}
-```
-
-## authenticateNativeBuildPlan()
-
-### Overview
-
-Validates a selected native build plan and its prepared inputs before execution.
-
-### Signature and result
-
-```text
-async authenticateNativeBuildPlan(plan, { expectedNativeBuilder, expectedTarget, signal, onEvent }={})
-```
-
-Import it from `arcane-os` or `arcane-os/native`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
-
-### Availability and normalization
-
-**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
-
-### Example
-
-```javascript
-import {authenticateNativeBuildPlan} from 'arcane-os';
-
-async function useauthenticateNativeBuildPlan(...arguments_) {
-    return authenticateNativeBuildPlan(...arguments_);
 }
 ```
 
@@ -2747,32 +2602,6 @@ import {ARCANE_PROTOCOL} from 'arcane-os';
 console.log(ARCANE_PROTOCOL);
 ```
 
-## ARCANE_UPSTREAM_COMMIT
-
-### Overview
-
-Exact Arcane OS source commit from which the synchronized runtime was built.
-
-### Value and import
-
-```text
-const ARCANE_UPSTREAM_COMMIT
-```
-
-Import it from `arcane-os`. Treat arrays and records as immutable public values.
-
-### Availability and normalization
-
-**Node.** Exact immutable SDK value. Deep protocol: [Node ESM](protocols.md).
-
-### Example
-
-```javascript
-import {ARCANE_UPSTREAM_COMMIT} from 'arcane-os';
-
-console.log(ARCANE_UPSTREAM_COMMIT);
-```
-
 ## ARCANE_UPSTREAM_REPOSITORY
 
 ### Overview
@@ -3030,8 +2859,7 @@ The import-map operation also reports the stable operation-specific strings
 `ARCANE_IMPORT_MAP_INVALID`, `ARCANE_IMPORT_MAP_UNRESOLVED`, and
 `ARCANE_IMPORT_MAP_COLLISION`; package assembly can additionally report
 `ARCANE_IMPORT_MAP_CLEANUP_FAILED`. They are normalized `ArcaneError.code`
-values, but are not properties added to this frozen general registry in SDK
-`0.3.1`.
+values, but are not properties added to this general registry in SDK `0.3.4`.
 
 ### Value and import
 
@@ -3789,7 +3617,7 @@ async validateWorkspace({
 }={})
 ```
 
-Import it from `arcane-os`. It resolves to a frozen validation result with
+Import it from `arcane-os`. It resolves to a validation result with
 `valid`, `workspaceMode`, `workspaceRoot`, `appId`, `appRoot`, the selected
 configuration/application, lock data, and completed checks. For an external
 workspace it additionally returns the exact installed package authority:
@@ -3801,19 +3629,17 @@ workspace it additionally returns the exact installed package authority:
     packageSource,
     canonicalPackageRoot,
     packageName: 'arcane-os',
-    packageVersion: '0.3.1',
+    packageVersion: '0.3.4',
     runtimeRoot,
-    browserRuntimeRoot,
-    runtimeManifest,
-    browserRuntimeManifest
+    browserRuntimeRoot
   }
 }
 ```
 
 The dependency can be named `arcane-os` or be one exact npm alias for
-`npm:arcane-os@0.3.1`. The selected installation must still be one direct,
+`npm:arcane-os@0.3.4`. The selected installation must still be one direct,
 physical, non-link package directory whose manifest identifies exactly as
-`arcane-os@0.3.1`; duplicate canonical/alias declarations reject.
+`arcane-os@0.3.4`; duplicate canonical/alias declarations reject.
 `allowMissingManagedImportMap` is an internal packaging/development seam. An
 ordinary caller should leave it `false`.
 
@@ -4063,8 +3889,7 @@ The exact command `'import-map'` dispatches one app-scoped refresh
 across every `.html`/`.htm` file selected by the descriptor's existing
 include/exclude rules and returns `{workspaceRoot, workspaceMode, appId,
 importMap}`. A normal `importMap` value reports the generated imports and
-complete ordered `documentPaths` without byte counts, hashes, digests, or
-ordinary admission receipts. The canonical integrated-legacy layout returns its documented skip
+complete ordered `documentPaths`. The canonical integrated-legacy layout returns its documented skip
 record instead. This route mutates the map artifact and selected managed HTML
 documents as one atomic refresh and has no
 supported dry-run.
@@ -4120,8 +3945,7 @@ then packages the complete selected content without automatically running tests
 or checks. Verification occurs only when explicitly requested or when required
 for the selected release output. A failure leaves the previously accepted
 distribution untouched. Success returns the low-level package result and
-complete import-map document inventory without byte counts, hashes, digests, or
-ordinary receipts. External
+complete import-map document inventory. External
 packages publish `ARCANE_RUNTIME_PROJECTION.json`; private
 `ARCANE_APP_RELEASE.json` remains an internal verification authority rather
 than an application route.
@@ -5962,6 +5786,37 @@ console.log(BROWSER_WASM_RUNTIME_AUTHORITY.package.version);
 Complete lifecycle, model authority, cache, cancellation, and tool behavior:
 [Browser-WASM local AI](ai/browser-wasm.md).
 
+## completeValueText()
+
+### Overview
+
+Returns complete caller content as text. Strings are returned unchanged;
+supported non-string values become readable JSON text without clipping, with
+explicit representations for cycles, special primitives, maps, sets, dates,
+regular expressions, typed views, buffers, functions, symbols, and accessors.
+
+### Signature and result
+
+```text
+completeValueText(value)
+```
+
+Import it from `arcane-os/ai/browser-wasm`. The function reads no provider,
+model, cache, or browser capability.
+
+### Availability and normalization
+
+**Browser or compatible JavaScript module host.** Complete strings remain exact;
+other supported values normalize to complete readable JSON text.
+
+### Example
+
+```javascript
+import {completeValueText} from 'arcane-os/ai/browser-wasm';
+
+console.log(completeValueText({content:'Complete response'}));
+```
+
 ## createArcaneAI()
 
 ### Overview
@@ -5987,11 +5842,10 @@ and returns complete terminal text and structural tool-call records. Use
 content/reasoning data, while structural fragments remain internal until the
 complete terminal result validates.
 
-When `llm` is an existing `ModelController`, it retains the optional hardening
-and load policy chosen when that controller was created. `createArcaneAI()` does not
-reapply its `loadPolicy` argument in that case, and supplying `security` with an
-existing controller throws `TypeError`. Provider input creates a new controller
-and applies the supplied `loadPolicy` and app-level `security` normally.
+When `llm` is an existing `ModelController`, it retains the load policy chosen
+when that controller was created. `createArcaneAI()` does not reapply its
+`loadPolicy` argument in that case. Provider input creates a new controller and
+applies the supplied `loadPolicy`.
 
 `createChatSession(options)` asynchronously imports the private managed
 `#arcane/persistent-ai-chat-session` specifier, resolves a
@@ -6013,13 +5867,6 @@ cannot open another tool loop, without calling Wllama directly. A streamed
 structural call is published only after its exact ID, type, name, and argument
 string match the terminal response; omission or divergence rejects with
 `AI_CHAT_STREAM_TOOL_CALL_MISMATCH` before persistence or commit.
-
-Optional hardening uses `{security:{secure?:boolean}}` and defaults to
-`secure:false`. Ordinary operation is complete and functional without byte
-counts, limits, hashes, digests, integrity records, or admission metadata.
-`secure:true` records hardening intent only. Historical checking remains
-disabled and cannot run until a separate user review authorizes its exact
-implementation and scope.
 
 ### Availability and normalization
 
@@ -6073,8 +5920,7 @@ Validates a caller-owned ordered model-file descriptor and creates the
 cancellable HTTPS source accepted by the browser-WASM store/provider. The
 canonical descriptor is `{id,files:[{name?,url},...]}`. The nonempty file array
 has unique normalized names and URLs. The one-file `{id,url,name?}` shape also
-normalizes to one ordered member. Ordinary sources have no byte count, byte
-limit, hash, digest, or byte-identity metadata.
+normalizes to one ordered member.
 
 ### Signature and result
 
@@ -6159,20 +6005,14 @@ never invokes a handler or executes a tool; a matching executed, declined,
 cancelled, or not-executed `role:'tool'` result is required before another user
 turn.
 
-Provider `security` defaults to `{secure:false}`. That ordinary mode remains
-fully functional and never requires byte counts, hashes, digests, integrity
-records, freezes, or admission metadata. `secure:true` records intent but does
-not activate the historical checking implementation; that code remains
-disabled pending separate user review.
-
 ### Availability and normalization
 
 **Browser context with WebAssembly, OPFS/DBOPFS, and WebGPU.** A load succeeds
 after Wllama confirms the complete model is loaded. There is no CPU fallback.
 Cross-origin isolation and coarse hardware fields remain observations rather
 than hard gates. Ordinary status reports complete catalog compatibility and
-lifecycle state without integrity or byte evidence. Adapter selection
-is instrumented as `arcane.ai.browser-wasm.webgpu.adapter.selected`.
+lifecycle state. Adapter selection is instrumented as
+`arcane.ai.browser-wasm.webgpu.adapter.selected`.
 Cancellation normalizes to `ARCANE_AI_REQUEST_ABORTED`; load or availability failures
 surface stable `ARCANE_AI_*` codes such as `ARCANE_AI_WEBGPU_REQUIRED`,
 `ARCANE_AI_MODEL_FULL_OFFLOAD_UNPROVEN`, and
@@ -6210,8 +6050,7 @@ createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models', estimateS
 The mutable result contains `kind`, `tableName`, the original `adapter`, and
 `ready`, `install`, `ensure`, and `remove`. `ensure()` returns `files`, the
 one-file compatibility `file` or `null`, the manifest, and
-`cache:'cached'|'installed'`. It preserves the complete model content without
-byte counts, limits, hashes, digests, or ordinary verification receipts.
+`cache:'cached'|'installed'`. It preserves the complete model content.
 `offline:true` never downloads and rejects a miss with
 `ARCANE_AI_MODEL_OFFLINE_MISS`. Version-2/3 compatibility is internal; every
 new successful completion is recorded as version 4.
@@ -6370,7 +6209,7 @@ Normalizes one complete caller-owned browser speech materialization graph. The
 caller declares runtime, model, and voice sources together with their paths,
 media types, routing aliases, and model/runtime identity,
 sample rate, and TTS default voice where applicable. The SDK selects none of
-those values and computes no byte identity.
+those values.
 
 ### Signature and result
 
@@ -6387,13 +6226,9 @@ never required or interpreted for runtime materialization. `edges` and
 routing.
 
 The result is one mutable `arcane-ai-browser-speech-artifact-graph/1` record
-containing `{protocol,kind,providerId,role,model,runtime,files,edges,transforms}`
-and an optional `security` field only when the caller supplies `{secure:true}`.
-The historical `kind` and `runtime.moduleGraph` value is
-`browser-speech-authenticated-artifact-graph`; it activates no authentication,
-admission, or isolation stage. The security field records future intent only
-and must not enable the dormant hardening implementation without a separate
-explicit review with the user.
+containing `{protocol,kind,providerId,role,model,runtime,files,edges,transforms,
+security?}`. The historical `kind` and `runtime.moduleGraph` value remains
+`browser-speech-authenticated-artifact-graph` for compatibility.
 
 ### Availability and normalization
 
@@ -6433,26 +6268,17 @@ createBrowserSpeechAuthority({ providerId, role, model, runtime, security }={})
 supplies `{adapter,version,revision,entry,wasmPaths?,files}`; the adapter is
 exactly `transformers-whisper` for STT or `kokoro-js` for TTS. File records use
 unique relative `path`, a caller-selected `url`, and optional `mediaType`.
-Ordinary records contain no byte counts, byte limits,
-hashes, digests, or byte identities. The runtime entry names one JavaScript
-module in the selected runtime.
+The runtime entry names one JavaScript module in the selected runtime.
 
 The result is a mutable `arcane-ai-model-authority/1` record containing the
 provider/model/role identity, normalized runtime and model file declarations,
-optional default voice, and no security field when security is omitted or false.
-Construction validates the descriptor structure without adding an ordinary
-content gate.
-
-Ordinary loading remains fully functional. An explicit `{secure:true}` value is
-preserved only as future intent; no hardening executes until that implementation
-is separately reviewed with and authorized by the user.
+and optional default voice. Construction validates the descriptor structure.
 
 ### Availability and normalization
 
 **Browser descriptor construction; actual use requires the selected provider
 Web APIs.** Credential-bearing URLs, duplicate identities, mismatched adapters,
-and malformed runtime descriptors reject. This function grants no
-publisher authenticity or license rights.
+and malformed runtime descriptors reject.
 
 ### Example
 
@@ -6504,22 +6330,20 @@ createDbopfsSpeechArtifactStore({ dbopfs, tableName='arcane_ai_browser_speech', 
 The mutable result is `{protocol,tableName,prepare,remove}`.
 `prepare(authority,{signal,onProgress,offline=false,security})` uses a complete
 compatible cache or downloads every declared file, preserves complete content
-without byte/hash/digest gates,
-materializes object URLs, and returns
+and materializes object URLs, then returns
 `{cache,runtime,model,release}`. Call `release()` when the Worker no longer
 needs those URLs. `offline:true` never fetches and rejects a miss with
 `ARCANE_AI_ARTIFACT_OFFLINE_MISS`. `remove(authority)` deletes that exact
 authority's files and selection metadata. `onProgress` remains an optional
 provider-interface callback, but the current store publishes no progress
-records. `security` is an intent-only seam and performs no hardening work.
+records.
 
 ### Availability and normalization
 
 **Browser with a ready DBOPFS instance, OPFS, Web Locks, Fetch or an injected
 fetch function, File/Blob, and object URLs.** An unavailable authority lock
 fails as `ARCANE_AI_STORAGE_BUSY`; download, malformed cache, graph, and storage
-failures remain observable `ARCANE_AI_*` errors. Cache selection metadata is
-neither a completion/integrity receipt nor publisher proof.
+failures remain observable `ARCANE_AI_*` errors.
 
 ### Example
 
@@ -7066,4 +6890,4 @@ const body = serializeMailReport(report);
 
 ## Data export subpaths
 
-The package also exposes the exact runtime manifest, eight JSON Schemas (including `arcane-os/schemas/event-stack.json`), and its package manifest. These are data contracts, not callable JavaScript members. See [schema and manifest contracts](../architecture.md) and the files under `schemas/`.
+The package also exposes eight JSON Schemas (including `arcane-os/schemas/event-stack.json`) and its package manifest. These are data contracts, not callable JavaScript members. See [schema contracts](../architecture.md) and the files under `schemas/`.

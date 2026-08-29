@@ -214,6 +214,12 @@ portable runtime subpaths such as `arcane-os/preference-store` and
 modules. The result reports the complete map written to the selected
 application; no fixed entry count is a release contract.
 
+SDK `0.3.4` preserves the physical workspace route count and ordered include
+list. External and modern integrated routes require `components`, `css`,
+`dependencies`, `entities`, `img`, `modules`, and `sdk`; a physical workspace
+may omit only an optional trailing `security` include. The external license
+route remains separate and second.
+
 ### Result and safety
 
 Success returns the normal selected-workspace wrapper:
@@ -310,6 +316,12 @@ Starts one loopback development server for one selected app and maps the exact
 workspace/runtime routes. It is a development convenience, not a production
 security boundary.
 
+For an external workspace, the server exposes the selected projected
+`arcane/` root, including `arcane/sdk` and `arcane/dependencies`, alongside the
+application. Integrated workspaces retain their configured physical routes.
+The explicit live-source SDK mapping remains unchanged and does not replace the
+installed projection.
+
 ```text
 arcane dev [--app <id>] [--host 127.0.0.1] [--port 8000]
 ```
@@ -402,8 +414,7 @@ arcane package [--app <id>] [--dry-run]
 
 ### Result
 
-The result includes the release root, manifest, and complete selected inventory
-without byte counts, hashes, digests, provenance receipts, or test evidence.
+The result includes the release root, manifest, and complete selected inventory.
 `--dry-run` plans the package without refreshing source, running tests, or
 replacing output.
 
@@ -474,8 +485,7 @@ arcane verify-bundle <file.arcane-app.tar.gz>
 
 The verifier rejects genuinely malformed archives, unsafe or colliding paths,
 unsupported archive members, trailing data, and inconsistent descriptor or
-inventory structure. It does not impose byte counts, byte limits, hashes,
-digests, provenance, or admission policy.
+inventory structure.
 
 ### Example
 

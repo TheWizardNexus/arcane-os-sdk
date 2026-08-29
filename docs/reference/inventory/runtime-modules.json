@@ -3,9 +3,9 @@
   "source": {
     "authority": "sdk-canonical",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
-    "commit": "9c4ec2213af98cbc53fca073a799435a89c6650f",
+    "commit": "9e657b31f758a2c7943446533fe87afda206ac49",
     "path": "runtime/arcane",
-    "sdkVersion": "0.3.1",
+    "sdkVersion": "0.3.4",
     "legacyProjection": {
       "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
       "commit": "c540014afe69f14cf5ae60493b7295f36dbcec64",

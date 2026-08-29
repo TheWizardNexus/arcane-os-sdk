@@ -78,7 +78,7 @@ resolves `arcane-os/event-manager` to
 `event-pubsub` to
 `./arcane/sdk/dependencies/event-pubsub/index.js`. The canonical
 integrated-legacy workspace retains its older physical routes instead. The
-hash-pinned Arcane browser runtime does not inject this SDK-authored module into
+selected Arcane browser runtime does not inject this SDK-authored module into
 Shell, Provisioner, Core, or built-in apps. There is no transparent fallback to
 the Node package root, `arcane/1`, HTTP, WebSocket, Ollama, or a cloud event
 service.

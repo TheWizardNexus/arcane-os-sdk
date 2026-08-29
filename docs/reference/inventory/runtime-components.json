@@ -3,9 +3,9 @@
   "source": {
     "authority": "sdk-canonical",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
-    "commit": "75b01e7ddcd751f7970d8c1aaf18bfff05b706b7",
+    "commit": "9e657b31f758a2c7943446533fe87afda206ac49",
     "path": "runtime/arcane/components",
-    "sdkVersion": "0.3.1",
+    "sdkVersion": "0.3.4",
     "legacyProjection": {
       "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
       "commit": "c540014afe69f14cf5ae60493b7295f36dbcec64",
@@ -766,7 +766,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "UI/runtime state, explicit STT activation intent, and request-owned cancellation are normalized; positive compatibility booleans cannot manufacture provider readiness; provider/model authority and media behavior remain external"
+      "normalization": "UI/runtime state, explicit STT activation intent, request-owned cancellation, and capture generation/operation correlation are normalized; pending release retires only its generation and stale permission settlement cannot clear a newer retry; positive compatibility booleans cannot manufacture provider readiness; provider/model authority and media behavior remain external"
     },
     {
       "file": "runtime/arcane/components/summary-strip.html",

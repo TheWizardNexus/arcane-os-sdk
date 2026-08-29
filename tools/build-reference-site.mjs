@@ -1,72 +1,29 @@
-import {createHash} from 'node:crypto';
 import {
     mkdir,
     readFile,
     readdir,
     rmdir,
-    stat,
     unlink,
     writeFile
 } from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {Marked,Renderer,marked} from '../runtime/arcane/modules/Marked.min.js';
 import {verifyRuntimeReferenceContracts} from './reference-contract-extractor.mjs';
-import {
-    behaviorExampleEvidence,
-    createReferenceModuleContractMap,
-    referenceGuideBehaviorEvidence
-} from './reference-module-contracts.mjs';
+import {createReferenceModuleContractMap} from './reference-module-contracts.mjs';
 
 const scriptPath=fileURLToPath(import.meta.url);
 const repositoryRoot=path.resolve(path.dirname(scriptPath),'..');
 const referenceSourceRoot=path.join(repositoryRoot,'docs','reference');
 const referenceOutputRoot=path.join(repositoryRoot,'site','reference');
 const canonicalRoot='https://thewizardnexus.github.io/arcane-os-sdk/';
-const publishedVersions=Object.freeze({
-    sdk:'0.3.1',
+const publishedVersions={
+    sdk:'0.3.4',
     runtime:'0.8.12',
     protocol:'arcane/1'
-});
+};
 const manifestOutput='site/reference/reference-manifest.json';
 const referenceCssOutput='site/reference/reference.css';
 const referenceScriptOutput='site/reference/reference.js';
-const maximumTableOfContentsEntries=40;
-const expectedRuntimeContractSummary=Object.freeze({
-    artifactCount:86,
-    esmModuleCount:80,
-    esmExportCount:384,
-    exportForms:Object.freeze({
-        function:168,
-        variable:124,
-        class:17,
-        alias:26,
-        're-export':4,
-        default:45
-    }),
-    reviewedCallableCount:183,
-    reviewedModuleCount:56,
-    literalCustomEventCount:0,
-    directCodedFailureCount:58,
-    exportedErrorSubclassCount:4,
-    publicMemberCount:579
-});
-const publishedReleaseMarkdown=[
-    '## Published 0.3.1',
-    '',
-    'The verified published package is exactly `arcane-os@0.3.1` from source commit `d118cee133f41773dab9c8841ab0fccfd776c0bc`. The npm `latest` dist-tag resolves to `0.3.1`; the separate `dev` dist-tag remains `0.1.0-dev.5`.',
-    '',
-    '| Evidence | Exact value |',
-    '| --- | --- |',
-    '| npm integrity | `sha512-g9C0cXK6Xim4Mu8D7zLKn3XErIo8UZEjIaGUA1fwnU6nVbB8XXgLD6/AjaVln+na6ihIHLzsHGgyTeic4yNggg==` |',
-    '| npm shasum | `b02c2d9bbd69c74ec69bed94174eeb09a523f093` |',
-    '| Immutable release tarball | `arcane-os-0.3.1.tgz`; 7,238,316 bytes; SHA-256 `ac09c64f9d326f86dd560c7b4387c6956ef24553611cfd22f0ba68810daaff4f` |',
-    '| GitHub release | [`0.3.1`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.3.1) (tag and title are both exactly `0.3.1`) |',
-    '| Hosted source/artifact gate | [Check run 33140411052](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33140411052) |',
-    '| Trusted publication | [Run 33140501395](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33140501395) |',
-    '',
-    'The npm SLSA provenance binds the published package to that exact source commit and `.github/workflows/publish-dev.yml`. Hashes prove byte identity or consistency; provenance establishes the recorded source/workflow relationship. Neither claim alone proves browser hardware support, native admission, or a particular application\'s provider/model policy.'
-].join('\n');
 
 const referenceCss=String.raw`.reference-prose {
   min-width: 0;
@@ -597,10 +554,10 @@ if(typeof document!=='undefined'){
 }
 `;
 
-const navigationGroups=Object.freeze([
-    Object.freeze({
+const navigationGroups=[
+    {
         title:'Start here',
-        items:Object.freeze([
+        items:[
             ['Overview','docs/reference/README.md'],
             ['SDK JavaScript API','docs/reference/sdk-api.md'],
             ['CLI','docs/reference/cli.md'],
@@ -608,11 +565,11 @@ const navigationGroups=Object.freeze([
             ['Availability','docs/reference/availability-and-normalization.md'],
             ['Protocols','docs/reference/protocols.md'],
             ['Behavioral testing','docs/reference/behavioral-testing.md']
-        ])
-    }),
-    Object.freeze({
+        ]
+    },
+    {
         title:'Runtime',
-        items:Object.freeze([
+        items:[
             ['Normalized AI','@reference/ai'],
             ['Browser-WASM AI','docs/reference/ai/browser-wasm.md'],
             ['Browser speech','docs/reference/ai/browser-speech.md'],
@@ -620,11 +577,11 @@ const navigationGroups=Object.freeze([
             ['Entities','docs/reference/runtime-entities.md'],
             ['Components','docs/reference/runtime-components.md'],
             ['Ollama provider API (advanced)','docs/reference/arcane-ollama.md']
-        ])
-    }),
-    Object.freeze({
+        ]
+    },
+    {
         title:'Core',
-        items:Object.freeze([
+        items:[
             ['Core map','docs/reference/core/README.md'],
             ['Arcane API','docs/reference/core/arcane-api.md'],
             ['Capabilities and admission','@reference/core/capabilities'],
@@ -634,23 +591,17 @@ const navigationGroups=Object.freeze([
             ['Entity exports','docs/reference/core/arcane-entities.md'],
             ['Ollama internals (advanced)','docs/reference/core/ollama-module.md'],
             ['Focused member guides','docs/reference/core/reference/arcane-api/']
-        ])
-    }),
-    Object.freeze({
+        ]
+    },
+    {
         title:'Data',
-        items:Object.freeze([
+        items:[
             ['Machine inventories','docs/reference/inventory/']
-        ])
-    })
-]);
+        ]
+    }
+];
 
-const capabilityPolicyProvenance=Object.freeze({
-    upstreamCommit:'567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e',
-    methodPolicyBlob:'b541a47ae53b782a4709036456847e4f626539c7',
-    androidProjectionBlob:'53c06a18429b6c9e2f9742a73e7adac05a4252bf'
-});
-
-const capabilityPolicyRecords=Object.freeze([
+const capabilityPolicyRecords=[
     {capability:'ai.inference',methods:'ai.chat ai.profile.current localai.isolated.inspect localai.isolated.question localai.services.recover localai.status ollama.chat ollama.embed ollama.generate speech.status speech.synthesize speech.transcribe',android:'Android projects localai.status, ollama.chat, speech.status, speech.synthesize, and speech.transcribe only to exact application IDs boss and precrisis. The projected ollama.chat stream also admits the correlated ollama.chunk event.',restrictions:'Isolated operations are Kempo-only; localai.services.recover is privileged, exclusive, and limited to exact application IDs boss and precrisis. Kempo also suppresses raw Ollama chat/generate/embed at runtime.'},
     {capability:'ai.models.manage',methods:'ollama.brain.create ollama.copy ollama.create ollama.delete ollama.pull ollama.push ollama.selection.set',restrictions:'Model mutation is Core-only. Brain creation is Settings-only; selection mutation is Settings/Shell-only; operations are exclusive.'},
     {capability:'ai.models.read',methods:'ai.models ollama.models ollama.running ollama.selection.get ollama.show ollama.version',restrictions:'Diagnostics are app-bound to Settings, Shell, or Terminal; selection read is Settings/Shell-only.'},
@@ -688,17 +639,17 @@ const capabilityPolicyRecords=Object.freeze([
     {capability:'system.read',methods:'permissions.status platform.status',android:'platform.status is a canonical Core + Android method.'},
     {capability:'terminal.execute',methods:'terminal.close terminal.list terminal.resize terminal.signal terminal.start terminal.write',android:'All six terminal methods are canonical Core + Android methods.',restrictions:'Terminal-app-only.'},
     {capability:'users.manage',methods:'users.activate users.add users.applyPassword users.list users.resetPassword users.restoreShell users.validate users.verifyShell',restrictions:'Provisioner-only; five operations are privileged and mutating operations are exclusive.'}
-].map(record=>Object.freeze({
+].map(record=>({
     ...record,
-    methods:Object.freeze(record.methods.split(' '))
-})));
+    methods:record.methods.split(' ')
+}));
 
-const capabilityFreeRpcMethods=Object.freeze([
-    Object.freeze({method:'app.current',availability:'Core and canonical Android projection'}),
-    Object.freeze({method:'capabilities.list',availability:'Core only; Android nests authority under platform.status'}),
-    Object.freeze({method:'system.ping',availability:'Core and canonical Android projection'}),
-    Object.freeze({method:'version.current',availability:'Core and canonical Android projection'})
-]);
+const capabilityFreeRpcMethods=[
+    {method:'app.current',availability:'Core and canonical Android projection'},
+    {method:'capabilities.list',availability:'Core only; Android nests authority under platform.status'},
+    {method:'system.ping',availability:'Core and canonical Android projection'},
+    {method:'version.current',availability:'Core and canonical Android projection'}
+];
 
 function posixPath(value){
     return value.split(path.sep).join('/');
@@ -715,10 +666,6 @@ function safeRepositoryPath(relativePath){
         throw new Error(`Path escapes the repository: ${relativePath}`);
     }
     return absolutePath;
-}
-
-function sha256(value){
-    return createHash('sha256').update(value).digest('hex');
 }
 
 function escapeHtml(value){
@@ -741,9 +688,7 @@ function plainMarkdown(value){
 }
 
 function descriptionText(value){
-    const plain=plainMarkdown(value);
-    if(plain.length<=157)return plain;
-    return `${plain.slice(0,156).trimEnd()}…`;
+    return plainMarkdown(value);
 }
 
 function githubHeadingBase(value){
@@ -842,16 +787,21 @@ function canonicalUrl(route){
 }
 
 function sourceMetadata(markdown,source){
-    const tokens=marked.lexer(markdown);
-    const titleToken=tokens.find(token=>token.type==='heading'&&token.depth===1);
-    if(!titleToken)throw new Error(`${source} must have one top-level title.`);
-    const paragraph=tokens.find(token=>token.type==='paragraph');
-    const title=plainMarkdown(titleToken.text);
+    const normalized=String(markdown).replaceAll('\r\n','\n').replaceAll('\r','\n');
+    const titleMatch=/^ {0,3}#\s+(.+?)\s*#*\s*$/mu.exec(normalized);
+    if(!titleMatch)throw new Error(`${source} must have one top-level title.`);
+    const titleSource=titleMatch[1];
+    const remaining=normalized.slice(titleMatch.index+titleMatch[0].length);
+    const paragraph=remaining
+        .split(/\n[ \t]*\n/u)
+        .map(block=>block.trim())
+        .find(block=>block&&!/^(?:#{1,6}\s|```|~~~|[-+*]\s|[0-9]+[.)]\s|\|)/u.test(block));
+    const title=plainMarkdown(titleSource);
     return {
         title,
-        titleId:githubHeadingBase(titleToken.text),
+        titleId:githubHeadingBase(titleSource),
         description:descriptionText(
-            paragraph?.text??`Arcane OS SDK developer reference for ${title}.`
+            paragraph??`Arcane OS SDK developer reference for ${title}.`
         )
     };
 }
@@ -940,142 +890,472 @@ function createLinkResolver({source,output,targets}){
     };
 }
 
-function createMarkdownRenderer({source,output,targets,metadata}){
-    const renderer=new Renderer();
-    const resolveLink=createLinkResolver({source,output,targets});
-    const slug=createHeadingSlugger();
-    const tableOfContents=[];
-    let skippedTitle=false;
-    let groupedSections=false;
+function closingDelimiter(value,delimiter,start){
+    let cursor=start;
+    while(cursor<value.length){
+        const found=value.indexOf(delimiter,cursor);
+        if(found<0)return -1;
+        let escapes=0;
+        for(let index=found-1;index>=0&&value[index]==='\\';index--)escapes++;
+        if(escapes%2===0)return found;
+        cursor=found+delimiter.length;
+    }
+    return -1;
+}
 
-    renderer.heading=function heading(token){
-        const id=slug(token.text);
-        if(!skippedTitle&&token.depth===1){
-            skippedTitle=true;
-            if(id!==metadata.titleId){
-                throw new Error(`${source} title fragment changed during rendering.`);
+function closingBracket(value,start){
+    let depth=1;
+    let codeWidth=0;
+    for(let index=start;index<value.length;index++){
+        const character=value[index];
+        if(character==='\\'){
+            index++;
+            continue;
+        }
+        if(character==='`'){
+            let width=1;
+            while(value[index+width]==='`')width++;
+            if(codeWidth===0)codeWidth=width;
+            else if(codeWidth===width)codeWidth=0;
+            index+=width-1;
+            continue;
+        }
+        if(codeWidth>0)continue;
+        if(character==='[')depth++;
+        else if(character===']'){
+            depth--;
+            if(depth===0)return index;
+        }
+    }
+    return -1;
+}
+
+function closingParenthesis(value,start){
+    let depth=1;
+    let quote='';
+    for(let index=start;index<value.length;index++){
+        const character=value[index];
+        if(character==='\\'){
+            index++;
+            continue;
+        }
+        if(quote){
+            if(character===quote)quote='';
+            continue;
+        }
+        if(character==='"'||character==="'"){
+            quote=character;
+            continue;
+        }
+        if(character==='(')depth++;
+        else if(character===')'){
+            depth--;
+            if(depth===0)return index;
+        }
+    }
+    return -1;
+}
+
+function linkDestination(value){
+    const trimmed=String(value).trim();
+    const angle=/^<([^<>]+)>(?:\s+(?:"([^"]*)"|'([^']*)'|\(([^()]*)\)))?$/u.exec(trimmed);
+    if(angle){
+        return {href:angle[1],title:angle[2]??angle[3]??angle[4]??''};
+    }
+    const ordinary=/^(\S+?)(?:\s+(?:"([^"]*)"|'([^']*)'|\(([^()]*)\)))?$/u.exec(trimmed);
+    if(!ordinary)return {href:trimmed,title:''};
+    return {href:ordinary[1],title:ordinary[2]??ordinary[3]??ordinary[4]??''};
+}
+
+function codeSpan(value,index){
+    let width=1;
+    while(value[index+width]==='`')width++;
+    const delimiter='`'.repeat(width);
+    const end=closingDelimiter(value,delimiter,index+width);
+    if(end<0)return null;
+    let text=value.slice(index+width,end).replace(/[\r\n]+/gu,' ');
+    if(text.startsWith(' ')&&text.endsWith(' ')&&!/^ +$/u.test(text)){
+        text=text.slice(1,-1);
+    }
+    return {html:`<code>${escapeHtml(text)}</code>`,end:end+width};
+}
+
+function inlineLink(value,index,resolveLink,image=false){
+    const bracket=image?index+2:index+1;
+    const labelEnd=closingBracket(value,bracket);
+    if(labelEnd<0||value[labelEnd+1]!=='(')return null;
+    const targetEnd=closingParenthesis(value,labelEnd+2);
+    if(targetEnd<0)return null;
+    const label=value.slice(bracket,labelEnd);
+    const {href,title}=linkDestination(value.slice(labelEnd+2,targetEnd));
+    const resolved=resolveLink(href);
+    if(image){
+        const alt=plainMarkdown(label);
+        if(resolved.textOnly)return {html:escapeHtml(alt),end:targetEnd+1};
+        const titleAttribute=title?` title="${escapeHtml(title)}"`:'';
+        return {
+            html:`<img src="${escapeHtml(resolved.href)}" alt="${escapeHtml(alt)}"${titleAttribute}>`,
+            end:targetEnd+1
+        };
+    }
+    const contents=renderInline(label,resolveLink);
+    if(resolved.textOnly)return {html:contents,end:targetEnd+1};
+    const titleAttribute=title?` title="${escapeHtml(title)}"`:'';
+    const external=resolved.external?' target="_blank" rel="noreferrer"':'';
+    return {
+        html:`<a href="${escapeHtml(resolved.href)}"${titleAttribute}${external}>${contents}</a>`,
+        end:targetEnd+1
+    };
+}
+
+function renderInline(value,resolveLink){
+    const input=String(value);
+    let output='';
+    let index=0;
+    while(index<input.length){
+        if(input.startsWith('  \n',index)){
+            output+='<br>\n';
+            index+=3;
+            continue;
+        }
+        const character=input[index];
+        if(character==='\\'){
+            if(input[index+1]==='\n'){
+                output+='<br>\n';
+                index+=2;
+            }else if(index+1<input.length){
+                output+=escapeHtml(input[index+1]);
+                index+=2;
+            }else{
+                output+='\\';
+                index++;
             }
-            return '';
+            continue;
         }
-        let depth=token.depth;
-        if(token.depth===1){
-            groupedSections=true;
-            depth=2;
-        }else if(groupedSections){
-            depth=Math.min(6,token.depth+1);
+        if(character==='`'){
+            const span=codeSpan(input,index);
+            if(span){
+                output+=span.html;
+                index=span.end;
+                continue;
+            }
         }
-        const label=this.parser.parseInline(token.tokens);
-        if(depth===2)tableOfContents.push({id,label:plainMarkdown(token.text)});
-        return `<h${String(depth)} id="${escapeHtml(id)}">${label}</h${String(depth)}>\n`;
-    };
+        if(character==='!'&&input[index+1]==='['){
+            const image=inlineLink(input,index,resolveLink,true);
+            if(image){
+                output+=image.html;
+                index=image.end;
+                continue;
+            }
+        }
+        if(character==='['){
+            const link=inlineLink(input,index,resolveLink);
+            if(link){
+                output+=link.html;
+                index=link.end;
+                continue;
+            }
+        }
+        const delimiter=input.startsWith('**',index)||input.startsWith('__',index)
+            ?input.slice(index,index+2)
+            :input.startsWith('~~',index)
+                ?'~~'
+                :character==='*'||character==='_'
+                    ?character
+                    :'';
+        if(delimiter){
+            const end=closingDelimiter(input,delimiter,index+delimiter.length);
+            if(end>index+delimiter.length){
+                const contents=renderInline(
+                    input.slice(index+delimiter.length,end),
+                    resolveLink
+                );
+                const tag=delimiter==='~~'?'del':delimiter.length===2?'strong':'em';
+                output+=`<${tag}>${contents}</${tag}>`;
+                index=end+delimiter.length;
+                continue;
+            }
+        }
+        if(character==='<'){
+            const breakMatch=/^<br\s*\/?>/iu.exec(input.slice(index));
+            if(breakMatch){
+                output+='<br>';
+                index+=breakMatch[0].length;
+                continue;
+            }
+        }
+        output+=character==='\n'?'\n':escapeHtml(character);
+        index++;
+    }
+    return output;
+}
 
-    renderer.link=function link(token){
-        const resolved=resolveLink(token.href);
-        if(resolved.textOnly)return this.parser.parseInline(token.tokens);
-        const title=token.title?` title="${escapeHtml(token.title)}"`:'';
-        const external=resolved.external?' target="_blank" rel="noreferrer"':'';
-        return `<a href="${escapeHtml(resolved.href)}"${title}${external}>${this.parser.parseInline(token.tokens)}</a>`;
-    };
+function tableCells(line){
+    let source=String(line).trim();
+    if(source.startsWith('|'))source=source.slice(1);
+    if(source.endsWith('|'))source=source.slice(0,-1);
+    const cells=[];
+    let cell='';
+    let codeWidth=0;
+    for(let index=0;index<source.length;index++){
+        const character=source[index];
+        if(character==='\\'&&index+1<source.length){
+            cell+=character+source[index+1];
+            index++;
+            continue;
+        }
+        if(character==='`'){
+            let width=1;
+            while(source[index+width]==='`')width++;
+            if(codeWidth===0)codeWidth=width;
+            else if(codeWidth===width)codeWidth=0;
+            cell+='`'.repeat(width);
+            index+=width-1;
+            continue;
+        }
+        if(character==='|'&&codeWidth===0){
+            cells.push(cell.trim());
+            cell='';
+            continue;
+        }
+        cell+=character;
+    }
+    cells.push(cell.trim());
+    return cells;
+}
 
-    renderer.image=function image(token){
-        const resolved=resolveLink(token.href);
-        if(resolved.textOnly)return escapeHtml(token.text);
-        const title=token.title?` title="${escapeHtml(token.title)}"`:'';
-        return `<img src="${escapeHtml(resolved.href)}" alt="${escapeHtml(token.text)}"${title}>`;
-    };
+function tableDivider(line){
+    const cells=tableCells(line);
+    return cells.length>0&&cells.every(cell=>/^:?-{3,}:?$/u.test(cell));
+}
 
-    renderer.code=function code(token){
-        const language=(token.lang??'text').trim().split(/\s+/u,1)[0]
-            .replace(/[^A-Za-z0-9_+.-]/gu,'')||'text';
-        const label=language==='text'?'Code':language;
-        const javascript=['js','javascript','mjs'].includes(language.toLowerCase());
-        const trimmed=token.text.trim();
-        const copyable=javascript&&trimmed.startsWith('{')&&trimmed.endsWith('}')
-            ?`const result = ${trimmed};`
-            :token.text;
-        const contents=escapeHtml(copyable);
-        return `<div class="code-block reference-code"><div class="code-bar"><span>${escapeHtml(label)}</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-${escapeHtml(language)}">${contents}\n</code></pre></div>\n`;
+function listItem(line){
+    const match=/^ {0,3}([-+*]|([0-9]+)[.)])\s+(.+)$/u.exec(line);
+    if(!match)return null;
+    return {
+        ordered:Boolean(match[2]),
+        start:match[2]?Number(match[2]):null,
+        text:match[3]
     };
+}
 
-    const renderTable=renderer.table;
-    renderer.table=function table(token){
-        const columns=Array.isArray(token.header)?token.header.length:0;
-        return `<div class="table-wrap" data-columns="${String(columns)}" role="region" aria-label="Scrollable reference table" tabindex="0">${renderTable.call(this,token)}</div>\n`;
+function headingLine(line){
+    const match=/^ {0,3}(#{1,6})\s+(.+?)\s*#*\s*$/u.exec(line);
+    return match?{depth:match[1].length,text:match[2]}:null;
+}
+
+function fenceLine(line){
+    const match=/^ {0,3}(`{3,}|~{3,})(.*)$/u.exec(line);
+    return match?{marker:match[1][0],width:match[1].length,info:match[2].trim()}:null;
+}
+
+function thematicBreak(line){
+    const compact=line.trim().replaceAll(' ','');
+    return /^\*{3,}$/u.test(compact)||/^-{3,}$/u.test(compact)||/^_{3,}$/u.test(compact);
+}
+
+function blockStart(lines,index){
+    const line=lines[index]??'';
+    return Boolean(
+        headingLine(line)
+        ||fenceLine(line)
+        ||listItem(line)
+        ||/^ {0,3}>/u.test(line)
+        ||thematicBreak(line)
+        ||(line.includes('|')&&tableDivider(lines[index+1]??''))
+    );
+}
+
+function renderCodeBlock(text,info){
+    const language=(info||'text').split(/\s+/u,1)[0]
+        .replace(/[^A-Za-z0-9_+.-]/gu,'')||'text';
+    const label=language==='text'?'Code':language;
+    const javascript=['js','javascript','mjs'].includes(language.toLowerCase());
+    const trimmed=text.trim();
+    const copyable=javascript&&trimmed.startsWith('{')&&trimmed.endsWith('}')
+        ?`const result = ${trimmed};`
+        :text;
+    return `<div class="code-block reference-code"><div class="code-bar"><span>${escapeHtml(label)}</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-${escapeHtml(language)}">${escapeHtml(copyable)}\n</code></pre></div>\n`;
+}
+
+function renderHeading({depth,text},context){
+    const id=context.slug(text);
+    if(!context.skippedTitle&&depth===1){
+        context.skippedTitle=true;
+        if(id!==context.metadata.titleId){
+            throw new Error(`${context.source} title fragment changed during rendering.`);
+        }
+        return '';
+    }
+    let outputDepth=depth;
+    if(depth===1){
+        context.groupedSections=true;
+        outputDepth=2;
+    }else if(context.groupedSections){
+        outputDepth=Math.min(6,depth+1);
+    }
+    if(outputDepth===2){
+        context.tableOfContents.push({id,label:plainMarkdown(text)});
+    }
+    return `<h${String(outputDepth)} id="${escapeHtml(id)}">${renderInline(text,context.resolveLink)}</h${String(outputDepth)}>\n`;
+}
+
+function renderTable(lines,index,context){
+    const headers=tableCells(lines[index]);
+    const dividers=tableCells(lines[index+1]);
+    const alignments=dividers.map(cell=>{
+        const left=cell.startsWith(':');
+        const right=cell.endsWith(':');
+        return left&&right?'center':right?'right':left?'left':'';
+    });
+    const rows=[];
+    let cursor=index+2;
+    while(cursor<lines.length&&lines[cursor].trim()&&lines[cursor].includes('|')){
+        if(blockStart(lines,cursor))break;
+        rows.push(tableCells(lines[cursor]));
+        cursor++;
+    }
+    const cellHtml=(tag,cell,column)=>{
+        const alignment=alignments[column]
+            ?` align="${alignments[column]}"`
+            :'';
+        return `<${tag}${alignment}>${renderInline(cell??'',context.resolveLink)}</${tag}>`;
     };
-
-    renderer.html=function html(token){
-        if(/^<br\s*\/?>$/iu.test(token.raw.trim())) return '<br>';
-        return escapeHtml(token.raw);
+    const header=`<thead>\n<tr>\n${headers.map((cell,column)=>cellHtml('th',cell,column)).join('\n')}\n</tr>\n</thead>`;
+    const body=rows.map(row=>{
+        const width=Math.max(headers.length,row.length);
+        return `<tr>\n${Array.from({length:width},(_,column)=>cellHtml('td',row[column],column)).join('\n')}\n</tr>`;
+    }).join('\n');
+    return {
+        html:`<div class="table-wrap" data-columns="${String(headers.length)}" role="region" aria-label="Scrollable reference table" tabindex="0"><table>\n${header}\n<tbody>${body}</tbody>\n</table>\n</div>\n`,
+        next:cursor
     };
+}
 
-    return {renderer,tableOfContents};
+function renderList(lines,index,context){
+    const first=listItem(lines[index]);
+    const items=[];
+    let cursor=index;
+    while(cursor<lines.length){
+        const item=listItem(lines[cursor]);
+        if(!item||item.ordered!==first.ordered)break;
+        const content=[item.text];
+        cursor++;
+        while(cursor<lines.length&&lines[cursor].trim()){
+            if(listItem(lines[cursor])||blockStart(lines,cursor))break;
+            content.push(lines[cursor].replace(/^ {1,4}/u,''));
+            cursor++;
+        }
+        items.push(renderInline(content.join('\n'),context.resolveLink));
+        if(!lines[cursor]?.trim()){
+            let next=cursor;
+            while(next<lines.length&&!lines[next].trim())next++;
+            const following=listItem(lines[next]??'');
+            if(!following||following.ordered!==first.ordered)break;
+            cursor=next;
+        }
+    }
+    const tag=first.ordered?'ol':'ul';
+    const start=first.ordered&&first.start!==1?` start="${String(first.start)}"`:'';
+    return {
+        html:`<${tag}${start}>\n${items.map(item=>`<li>${item}</li>`).join('\n')}\n</${tag}>\n`,
+        next:cursor
+    };
+}
+
+function renderMarkdownBlocks(markdown,context){
+    const lines=String(markdown).replaceAll('\r\n','\n').replaceAll('\r','\n').split('\n');
+    let output='';
+    let index=0;
+    while(index<lines.length){
+        if(!lines[index].trim()){
+            index++;
+            continue;
+        }
+        const fence=fenceLine(lines[index]);
+        if(fence){
+            const contents=[];
+            index++;
+            while(index<lines.length){
+                const candidate=lines[index].trimStart();
+                const run=new RegExp(`^${fence.marker}{${String(fence.width)},}\\s*$`,'u');
+                if(run.test(candidate)){
+                    index++;
+                    break;
+                }
+                contents.push(lines[index]);
+                index++;
+            }
+            output+=renderCodeBlock(contents.join('\n'),fence.info);
+            continue;
+        }
+        const heading=headingLine(lines[index]);
+        if(heading){
+            output+=renderHeading(heading,context);
+            index++;
+            continue;
+        }
+        if(lines[index].includes('|')&&tableDivider(lines[index+1]??'')){
+            const table=renderTable(lines,index,context);
+            output+=table.html;
+            index=table.next;
+            continue;
+        }
+        if(listItem(lines[index])){
+            const list=renderList(lines,index,context);
+            output+=list.html;
+            index=list.next;
+            continue;
+        }
+        if(/^ {0,3}>/u.test(lines[index])){
+            const quoted=[];
+            while(index<lines.length){
+                const match=/^ {0,3}>\s?(.*)$/u.exec(lines[index]);
+                if(!match)break;
+                quoted.push(match[1]);
+                index++;
+            }
+            output+=`<blockquote>\n${renderMarkdownBlocks(quoted.join('\n'),context)}</blockquote>\n`;
+            continue;
+        }
+        if(thematicBreak(lines[index])){
+            output+='<hr>\n';
+            index++;
+            continue;
+        }
+        const paragraph=[];
+        while(index<lines.length&&lines[index].trim()){
+            if(paragraph.length&&blockStart(lines,index))break;
+            paragraph.push(lines[index]);
+            index++;
+        }
+        output+=`<p>${renderInline(paragraph.join('\n'),context.resolveLink)}</p>\n`;
+    }
+    return output;
 }
 
 function renderMarkdown(markdown,options){
-    const {renderer,tableOfContents}=createMarkdownRenderer(options);
-    const parser=new Marked({renderer,gfm:true,async:false});
-    const detailsPattern=/<details>\s*\r?\n<summary>([\s\S]*?)<\/summary>\s*\r?\n([\s\S]*?)\r?\n<\/details>/giu;
+    const context={
+        ...options,
+        resolveLink:createLinkResolver(options),
+        slug:createHeadingSlugger(),
+        tableOfContents:[],
+        skippedTitle:false,
+        groupedSections:false
+    };
+    const normalized=String(markdown).replaceAll('\r\n','\n').replaceAll('\r','\n');
+    const detailsPattern=/<details>\s*\n<summary>([\s\S]*?)<\/summary>\s*\n([\s\S]*?)\n<\/details>/giu;
     let cursor=0;
     let body='';
-    for(const match of markdown.matchAll(detailsPattern)){
-        body+=parser.parse(markdown.slice(cursor,match.index));
+    for(const match of normalized.matchAll(detailsPattern)){
+        body+=renderMarkdownBlocks(normalized.slice(cursor,match.index),context);
         body+=`<details><summary>${escapeHtml(plainMarkdown(match[1]))}</summary>\n`;
-        body+=parser.parse(match[2].trim());
+        body+=renderMarkdownBlocks(match[2].trim(),context);
         body+='</details>\n';
         cursor=match.index+match[0].length;
     }
-    body+=parser.parse(markdown.slice(cursor));
-    return {body,tableOfContents};
-}
-
-function publicReferenceMarkdown(markdown,source){
-    let output=markdown;
-    if(source==='docs/reference/README.md'){
-        output=output.replace(
-            /\n## Version scope and provenance[\s\S]*?\n## MDN-style page contract/u,
-            '\n## Version scope\n\nThis site documents SDK `0.3.1`, runtime bundle `0.8.12`, and protocol `arcane/1`. Native availability still depends on the selected Core satisfying the current build plan\'s feature, capability, method, provider, and application-identity checks. A matching protocol label alone is not authority or compatibility.\n\n'
-                +publishedReleaseMarkdown
-                +'\n\n## MDN-style page contract'
-        );
-        output=output.replace(/\n## Source, receipts, and licensing[\s\S]*$/u,'\n');
-    }
-    if(source==='docs/reference/core/README.md'){
-        output=output
-            .replace(
-                /This directory derives[\s\S]*?The snapshot contains:/u,
-                'This snapshot documents the complete application-facing Arcane Core contract admitted by this SDK. Application code should feature-detect the relevant namespace and method, then treat current capability and host checks as authoritative.\n\nThe snapshot contains:'
-            )
-            .replace('- 35 namespaces, constructors, and values;','- 35 namespaces, one `Arcane.Error` constructor, and one protocol value;')
-            .replace('- 106 application-facing methods;','- 113 application-facing methods (106 RPC authorities, five renderer-local helpers, and two aliases);')
-            .replace('- 141 MDN-style member guides with exact H2 keys, substantive contract detail,','- 150 public member records with exact keys, substantive contract detail,');
-        output=output.replace(
-            /\n## Runtime pin and current Core admission[\s\S]*?\n## Reading order/u,
-            '\n## Runtime admission\n\nA native build admits a selected Core only when the current build plan\'s protocol, version, feature, capability, method, provider, and identity checks pass. Documentation never grants that authority.\n\n## Reading order'
-        );
-        output=output.replace(/\n## Source, receipt, and license links[\s\S]*$/u,'\n');
-    }
-    if(source==='docs/reference/core/arcane-api.md'){
-        output=output.replace(
-            /The complete\r?\nlayout and same-origin browser limitation are maintained in the repository-only\r?\n\[Application data isolation\][\s\S]*?private-developer-material\)\./u,
-            'The public [AppDataScope module contract](../runtime-modules.md#appdatascopejs) documents the browser layout, same-origin limitation, and fail-closed application identity boundary.'
-        );
-        output=output.replace(/\n## Maintenance rule[\s\S]*$/u,'\n');
-    }
-    if(source==='docs/reference/core/ollama-module.md'){
-        output=output.replace(
-            /## Upstream Arcane OS model\r?\n\r?\nThis section describes assets and maintainer commands[\s\S]*?commands from an app or SDK checkout\./u,
-            '## Provider implementation context\n\nThis advanced section describes the model identities and managed-service behavior that application developers can observe through admitted Core status and provider APIs. Repository maintenance commands and private source navigation are intentionally omitted from the public application reference.'
-        );
-        output=output.replace(
-            / In the upstream ARCANE-OS maintainer checkout only,[\s\S]*?supported repository workflow\./u,
-            ' Application code never performs repository maintenance or raw provider setup; the installed Provisioner owns verified service establishment and repair.'
-        );
-        output=output.replace(
-            /The public \[Device and model support\][\s\S]*?not managed variants\./u,
-            'The [public availability matrix](../availability-and-normalization.md) records current platform maturity. Larger model families remain validation targets, not automatically managed variants.'
-        );
-    }
-    return output;
+    body+=renderMarkdownBlocks(normalized.slice(cursor),context);
+    return {body,tableOfContents:context.tableOfContents};
 }
 
 function navigationHtml({output,targets}){
@@ -1091,16 +1371,11 @@ function navigationHtml({output,targets}){
 }
 
 function tableOfContentsHtml(entries){
-    const visible=entries.slice(0,maximumTableOfContentsEntries);
-    const links=visible.map(entry=>
+    const links=entries.map(entry=>
         `<a href="#${escapeHtml(entry.id)}">${escapeHtml(entry.label)}</a>`
     ).join('');
-    const remaining=entries.length-visible.length;
-    const more=remaining>0
-        ?`<p class="toc-more">${String(remaining)} additional sections remain searchable in the page.</p>`
-        :'';
     return entries.length
-        ?`<nav aria-label="On this page">${links}</nav>${more}`
+        ?`<nav aria-label="On this page">${links}</nav>`
         :'<p class="toc-more">This collection is fully listed in the main content.</p>';
 }
 
@@ -1202,15 +1477,10 @@ function renderPage({
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p>${tableOfContentsHtml(tableOfContents)}</aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="${escapeHtml(siteHome)}" aria-label="Arcane OS SDK documentation home"><img src="${escapeHtml(icon)}" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK ${publishedVersions.sdk}, runtime bundle ${publishedVersions.runtime}, and protocol ${publishedVersions.protocol}; the latest verified published package is 0.3.1.</p><nav aria-label="Footer navigation"><a href="${escapeHtml(architecture)}">Architecture</a><a href="${escapeHtml(compatibility)}">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="${escapeHtml(siteHome)}" aria-label="Arcane OS SDK documentation home"><img src="${escapeHtml(icon)}" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK ${publishedVersions.sdk}, runtime bundle ${publishedVersions.runtime}, and protocol ${publishedVersions.protocol}; the latest published package is ${publishedVersions.sdk}.</p><nav aria-label="Footer navigation"><a href="${escapeHtml(architecture)}">Architecture</a><a href="${escapeHtml(compatibility)}">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>
 `;
-}
-
-function directoryDigest(records){
-    const payload=records.map(record=>`${record.source}\0${record.sourceSha256}\n`).join('');
-    return sha256(payload);
 }
 
 function titleFromSource(contents,source){
@@ -1220,9 +1490,9 @@ function titleFromSource(contents,source){
 function collectionBodyForInventories({output,inventoryInputs}){
     const items=inventoryInputs.map(input=>{
         const href=relativeOutputHref(output,input.output);
-        return `<li><strong><a href="${escapeHtml(href)}">${escapeHtml(path.posix.basename(input.output))}</a></strong><span>${String(input.bytes.length)} bytes · SHA-256 <code>${input.sourceSha256}</code></span></li>`;
+        return `<li><strong><a href="${escapeHtml(href)}">${escapeHtml(path.posix.basename(input.output))}</a></strong><span>Complete machine-readable reference inventory.</span></li>`;
     }).join('');
-    return `<h2 id="machine-readable-inventories">Machine-readable inventories</h2><p>These JSON documents are copied byte-for-byte from the checked reference source. They are suitable for completeness tooling, API browsers, and independent contract checks.</p><ul class="reference-collection-list">${items}</ul>`;
+    return `<h2 id="machine-readable-inventories">Machine-readable inventories</h2><p>These JSON documents preserve the complete checked reference content for API browsers and contract tooling.</p><ul class="reference-collection-list">${items}</ul>`;
 }
 
 function collectionBodyForCoreMembers({output,memberInputs}){
@@ -1360,7 +1630,7 @@ const session = await terminal.start({shell: 'auto', columns: 100, rows: 30});
 await terminal.write(session.id, 'node --version\\n');`,
         'IsolatedModelQuestionRunner.js':`import IsolatedModelQuestionRunner from '/arcane/modules/IsolatedModelQuestionRunner.js';
 
-async function askVerifiedModel({model, expectedModel, prompt, onPhase}) {
+async function askSelectedModel({model, expectedModel, prompt, onPhase}) {
     const runner = new IsolatedModelQuestionRunner({
         localAI: globalThis.Arcane.localAI,
         maxSentences: 5
@@ -1392,7 +1662,7 @@ function reviewedModuleDetails(record){
             `<p><strong>Provider lifecycle:</strong> the read-only <code>providerRuntime</code> plus <code>configureProviders(config)</code>, <code>transitionAI(llmService, sttService, ttsService, model, modelTTS, modelSTT)</code>, <code>transitionProviders(selections)</code>, <code>startProviders(options)</code>, and <code>setSpeechMuted(muted)</code> keep LLM, STT, and TTS selection explicit. Each transition stops queued audio, unloads all three current roles, and then applies replacement routes; <code>transitionAI()</code> returns aggregate runtime status and <code>transitionProviders()</code> returns the admitted route configuration. Selected <code>OPENAI</code> and <code>OLLAMA</code> compatibility routes expose truthful capability-only readiness through internal provider/2 adapters; they do not probe, download, or fake a loaded local model.</p>`,
             `<p><strong>Primary methods:</strong> <code>setAI(llmService, sttService, ttsService, model, modelTTS, modelSTT)</code>, <code>streamRequest(options={})</code>, <code>streamMessage(...)</code>, <code>fetchRequest(options={})</code>, <code>fetch(...)</code>, <code>streamTTS(text='', end=false)</code>, <code>finishTTS()</code>, <code>fetchSTT(audioFile, responseHandler=(text='')=&gt;{}, signal=null)</code>, <code>stopAudio()</code>, <code>resumeAudio(audioContext=null, fromUserGesture=true)</code>, and <code>playAudio(audioChunks=[], audioContext, sourceNode=null, audioType=this.audioType, speechJob=null)</code>.</p>`,
             `<p><strong>Properties and compatibility members:</strong> getters <code>url</code>, <code>urlTTS</code>, and <code>urlSTT</code> expose selected endpoints; their setters intentionally return <code>false</code> without changing the endpoint. <code>license</code> is a runtime credential getter/setter. <code>configured</code> reports chat readiness only, not speech readiness. Public state includes <code>ready</code>, <code>muted</code>, provider/model/reasoning selections, audio format/type/speed, and speech queue state. The misspelled <code>nextSentance(job=this.currentSpeechJob)</code> and selector <code>LOCAL_SPEACH</code> are retained compatibility spellings.</p>`,
-            `<p>Streaming resolves text or a tool-name-to-argument-string record. <code>fetchRequest()</code> preserves the selected provider-native response. STT resolves text. Browser speech normalizes the existing Blob/File request to authoritative 16 kHz mono PCM; TTS accepts only WAV on the shared route and returns a WAV byte result. TTS and playback controls resolve booleans. <code>structuredOutput</code> accepts false/null/undefined, true or <code>json</code>, or a plain JSON Schema. <code>localOnly</code> fails closed and never selects cloud fallback. Stream chunk callbacks run synchronously; response and stream-completion callbacks are awaited and can reject, while diagnostic request-callback failures are contained.</p>`,
+            `<p>Streaming resolves text or a tool-name-to-argument-string record. <code>fetchRequest()</code> preserves the selected provider-native response. STT resolves text. Browser speech normalizes the existing Blob/File request to authoritative 16 kHz mono PCM; TTS accepts only WAV on the shared route and returns WAV audio. TTS and playback controls resolve booleans. <code>structuredOutput</code> accepts false/null/undefined, true or <code>json</code>, or a plain JSON Schema. <code>localOnly</code> never selects cloud fallback. Stream chunk callbacks run synchronously; response and stream-completion callbacks are awaited and can reject, while diagnostic request-callback failures are contained.</p>`,
             `<p><strong>Lifecycle:</strong> importing this module imports DBOPFS and User, can initialize their singletons, consumes <code>user-entity-loaded</code> and <code>arcane-ollama-ready</code>, installs <code>globalThis.ai</code>, and emits <code>ai-ready</code>. Operational warnings and failures may be written to the developer console, but the payload logging statements in this runtime are inactive. There is no automatic local-to-cloud fallback.</p>`,
             `<p><strong>Stable errors:</strong> <code>AI_NATIVE_LOCAL_REQUIRED</code>, <code>AI_PROVIDER_NOT_CONFIGURED</code>, <code>AI_MODEL_INVALID</code>, <code>AI_LOCAL_MODEL_REQUIRED</code>, <code>AI_STRUCTURED_OUTPUT_INVALID</code>, <code>AI_REQUIRED_TOOL_UNAVAILABLE</code>, <code>AI_REQUIRED_TOOL_CALL_MISSING</code>, <code>AI_SERVICE_UNREACHABLE</code>, <code>AI_REQUEST_FAILED</code>, <code>AI_REQUEST_ABORTED</code>, and <code>AI_ANDROID_NATIVE_SPEECH_UNAVAILABLE</code>. Provider-runtime and shared-speech paths also surface <code>ARCANE_AI_MODEL_AUTHORITY_REQUIRED</code>, <code>ARCANE_AI_PROVIDER_DISPOSED</code>, <code>ARCANE_AI_PROVIDER_RUNTIME_INVALID</code>, <code>ARCANE_AI_PROVIDER_UNAVAILABLE</code>, <code>ARCANE_AI_REQUEST_ABORTED</code>, <code>ARCANE_AI_ROLE_BUSY</code>, <code>ARCANE_AI_ROLE_NOT_READY</code>, <code>ARCANE_AI_INVALID_REQUEST</code>, <code>ARCANE_AI_AUDIO_DECODE_UNAVAILABLE</code>, <code>ARCANE_AI_AUDIO_DECODE_FAILED</code>, <code>ARCANE_AI_INVALID_PROVIDER_RESULT</code>, and <code>ARCANE_AI_UNSUPPORTED_RESPONSE_FORMAT</code>.</p>`
         ].join('');
@@ -1400,9 +1670,9 @@ function reviewedModuleDetails(record){
     if(record.name==='ConfiguredAIChatSession.js'){
         return [
             `<h2 id="reviewed-member-contract">Reviewed member contract</h2><p><code>new ConfiguredAIChatSession(options={})</code> accepts exactly <code>chat</code>, <code>contextBuilder</code>, <code>initialMessages</code>, <code>maxContextCharacters</code>, <code>maxMessageCharacters</code>, <code>maxMessages</code>, <code>request</code>, <code>responseLength</code>, and <code>systemPrompt</code>. <code>initialMessages</code> is an array of closed bounded <code>user</code>, <code>assistant</code>, or <code>tool</code> messages with no system role; any <code>tool_calls</code> array contains exactly one structural assistant tool call, which must receive its matching tool result before another user turn or tool-call sequence. Message count defaults to 65 and accepts 3–128; per-message characters default to 131,072 and accepts 1–131,072; context characters default to 131,072 and accepts 1–524,288. Response length is <code>low</code>, <code>medium</code>, or <code>high</code>, with invalid values normalized to medium. The request cannot own <code>messages</code>, <code>stream</code>, <code>tools</code>, or <code>tool_choice</code>.</p>`,
-            `<p><code>history()</code> returns a new deeply frozen snapshot. <code>clear()</code> preserves the system prompt and throws <code>AI_CHAT_BUSY</code> during a send. <code>prepare(input,options={})</code> performs the bounded request and returns one frozen <code>{response,commit,rollback}</code> transaction. <code>send(input,options={})</code> accepts user or tool input, prepares the request, and commits atomically. Each accepts <code>signal</code>; cancellation is <code>AbortError</code> with code <code>AI_CHAT_ABORTED</code>. An optional async <code>contextBuilder({input,history,signal})</code> receives a frozen input/history snapshot and the same cancellation signal, is framed as untrusted user data for the current request, and is never committed.</p>`,
+            `<p><code>history()</code> returns a new complete snapshot. <code>clear()</code> preserves the system prompt and throws <code>AI_CHAT_BUSY</code> during a send. <code>prepare(input,options={})</code> performs the bounded request and returns one <code>{response,commit,rollback}</code> transaction. <code>send(input,options={})</code> accepts user or tool input, prepares the request, and commits atomically. Each accepts <code>signal</code>; cancellation is <code>AbortError</code> with code <code>AI_CHAT_ABORTED</code>. An optional async <code>contextBuilder({input,history,signal})</code> receives the input/history snapshot and same cancellation signal, is included only for the current request, and is never committed.</p>`,
             `<p>The default provider resolves <code>globalThis.Arcane.ai.chat</code> at send time, so construction can precede bridge readiness; injection makes the class cross-host. It performs no persistence, streaming, tool execution, rendering, provider selection, or events.</p>`,
-            `<p>The injected <code>chat(request)</code> callback may return the prior normalized result or exactly one non-stream OpenAI-compatible choice. The prior form preserves its explicit <code>done</code> boolean; OpenAI-compatible choice normalization sets <code>done:true</code>. Both produce a deeply frozen <code>{provider:string|null, model:string|null, message:{role:'assistant',content,tool_calls?}, done:boolean, doneReason:string|null, promptEvalCount:nonnegativeInteger|null, evalCount:nonnegativeInteger|null}</code>. Tool calls remain structural data and are not executed. Stable failures include <code>AI_CHAT_UNAVAILABLE</code>, <code>AI_CHAT_BUSY</code>, <code>AI_CHAT_CONTEXT_LIMIT</code>, <code>AI_CHAT_INVALID_RESPONSE</code>, and <code>AI_CHAT_ABORTED</code>; an injected provider rejection is preserved and failed/malformed turns do not modify history.</p>`
+            `<p>The injected <code>chat(request)</code> callback may return the prior normalized result or exactly one non-stream OpenAI-compatible choice. The prior form preserves its explicit <code>done</code> boolean; OpenAI-compatible choice normalization sets <code>done:true</code>. Both produce a complete <code>{provider:string|null, model:string|null, message:{role:'assistant',content,tool_calls?}, done:boolean, doneReason:string|null, promptEvalCount:nonnegativeInteger|null, evalCount:nonnegativeInteger|null}</code> result. Tool calls remain structural data and are not executed. Stable failures include <code>AI_CHAT_UNAVAILABLE</code>, <code>AI_CHAT_BUSY</code>, <code>AI_CHAT_CONTEXT_LIMIT</code>, <code>AI_CHAT_INVALID_RESPONSE</code>, and <code>AI_CHAT_ABORTED</code>; an injected provider rejection is preserved and failed/malformed turns do not modify history.</p>`
         ].join('');
     }
     return '';
@@ -1655,16 +1925,13 @@ function renderRuntimeModulePage(record,{
         ['Member','Kind','Exact public declaration','Parameter syntax'],
         memberRows
     );
-    const behaviorExample=Object.hasOwn(behaviorExampleEvidence,record.name);
-    const exampleLabel=behaviorExample
-        ?'Behavior example'
-        :record.kind==='worker'
-            ?'Worker protocol example'
-            :['classic-script','stylesheet'].includes(record.kind)
-                ?'Load example'
-                :record.kind==='license'
-                    ?'Non-executable companion asset'
-                    :'Contract example';
+    const exampleLabel=record.kind==='worker'
+        ?'Worker protocol example'
+        :['classic-script','stylesheet'].includes(record.kind)
+            ?'Load example'
+            :record.kind==='license'
+                ?'Non-executable companion asset'
+                :'Contract example';
     const exampleBody=record.kind==='license'
         ?`<p>${escapeHtml(semanticContract.example)}</p>`
         :referenceCodeBlock(
@@ -1688,27 +1955,23 @@ function renderRuntimeModulePage(record,{
 
 function baseAIDecisionBody({output,targets}){
     const link=(source,label,fragment='')=>`<a href="${escapeHtml(`${relativeOutputHref(output,targets.get(source))}${fragment}`)}">${escapeHtml(label)}</a>`;
-    return `<aside class="callout callout-info"><strong>Application default.</strong> Start with normalized AI. Provider selection, model admission, protected credentials, and host transport remain behind the application contract.</aside><h2 id="choose-the-normalized-surface">Choose the normalized surface</h2><div class="table-wrap" data-columns="3" role="region" aria-label="Normalized AI surface choices" tabindex="0"><table><thead><tr><th>Need</th><th>Use</th><th>Contract</th></tr></thead><tbody><tr><td>Renderer chat, streaming, speech, tools, or structured output</td><td>${link('@reference/module/ai','AI.js')}</td><td>Default import; installs <code>globalThis.ai</code> after user initialization and emits <code>ai-ready</code>.</td></tr><tr><td>Provider-neutral Core chat</td><td>${link('docs/reference/core/reference/arcane-api/ai-and-ollama.md','Arcane.ai.chat()','#arcaneaichat')}</td><td>One normalized result through the admitted provider; no automatic fallback.</td></tr><tr><td>Caller-configured browser-local text inference</td><td>${link('docs/reference/ai/browser-wasm.md','arcane-os/ai/browser-wasm')}</td><td>Browser-only Wllama lifecycle with a canonical model URL, inherited optional byte-length and SHA-256 checks, observed-byte metadata, honest integrity status, and structural tool results.</td></tr><tr><td>Bounded conversational history</td><td>${link('@reference/module/configured-ai-chat-session','ConfiguredAIChatSession.js')}</td><td>Defaults to <code>Arcane.ai.chat()</code>; owns context limits and atomic turn commit.</td></tr><tr><td>Speech playback</td><td>${link('@reference/module/speech-playback','SpeechPlayback.js')}</td><td>Normalized chunks and playback over admitted native speech or browser media.</td></tr><tr><td>Local readiness and catalog</td><td>${link('@reference/module/local-ai-readiness','LocalAIReadiness.js')}</td><td>Feature-detected readiness; does not grant lifecycle or model-management authority.</td></tr></tbody></table></div><h2 id="runtime-ai-module">Runtime AI module</h2><p><code>AI.js</code> has one export: its default <code>AI</code> class. Import the default binding for explicit use, or load the module for its lifecycle and wait for <code>ai-ready</code> before reading <code>globalThis.ai</code>.</p>${referenceCodeBlock('JavaScript',moduleExample({name:'AI.js'}))}<h2 id="core-ai-chat">Core Arcane.ai</h2><p><code>globalThis.Arcane.ai</code> is a distinct provider-neutral Core surface. Ordinary applications call <code>profile()</code> and <code>chat()</code>; Settings-only provider mutation remains separately admitted.</p>${referenceCodeBlock('JavaScript',`async function explainActiveModelAfterUserChoice() {
+    return `<aside class="callout callout-info"><strong>Application default.</strong> Start with normalized AI. Provider selection, model choice, protected credentials, and host transport remain behind the application contract.</aside><h2 id="choose-the-normalized-surface">Choose the normalized surface</h2><div class="table-wrap" data-columns="3" role="region" aria-label="Normalized AI surface choices" tabindex="0"><table><thead><tr><th>Need</th><th>Use</th><th>Contract</th></tr></thead><tbody><tr><td>Renderer chat, streaming, speech, tools, or structured output</td><td>${link('@reference/module/ai','AI.js')}</td><td>Default import; installs <code>globalThis.ai</code> after user initialization and emits <code>ai-ready</code>.</td></tr><tr><td>Provider-neutral Core chat</td><td>${link('docs/reference/core/reference/arcane-api/ai-and-ollama.md','Arcane.ai.chat()','#arcaneaichat')}</td><td>One normalized result through the selected provider; no automatic fallback.</td></tr><tr><td>Caller-configured browser-local text inference</td><td>${link('docs/reference/ai/browser-wasm.md','arcane-os/ai/browser-wasm')}</td><td>Browser-only Wllama lifecycle with a caller-owned ordered multi-file descriptor <code>{id, files:[{name?,url},...]}</code>, complete DBOPFS caching, streaming, cancellation, and structural tool results.</td></tr><tr><td>Bounded conversational history</td><td>${link('@reference/module/configured-ai-chat-session','ConfiguredAIChatSession.js')}</td><td>Defaults to <code>Arcane.ai.chat()</code>; owns context limits and atomic turn commit.</td></tr><tr><td>Speech playback</td><td>${link('@reference/module/speech-playback','SpeechPlayback.js')}</td><td>Normalized chunks and playback over available native speech or browser media.</td></tr><tr><td>Local readiness and catalog</td><td>${link('@reference/module/local-ai-readiness','LocalAIReadiness.js')}</td><td>Feature-detected readiness; does not grant lifecycle or model-management authority.</td></tr></tbody></table></div><h2 id="runtime-ai-module">Runtime AI module</h2><p><code>AI.js</code> has one export: its default <code>AI</code> class. Import the default binding for explicit use, or load the module for its lifecycle and wait for <code>ai-ready</code> before reading <code>globalThis.ai</code>.</p>${referenceCodeBlock('JavaScript',moduleExample({name:'AI.js'}))}<h2 id="core-ai-chat">Core Arcane.ai</h2><p><code>globalThis.Arcane.ai</code> is a distinct provider-neutral Core surface. Ordinary applications call <code>profile()</code> and <code>chat()</code>; Settings-only provider mutation remains separately available.</p>${referenceCodeBlock('JavaScript',`async function explainActiveModelAfterUserChoice() {
     const profile = await globalThis.Arcane.ai.profile();
     const result = await globalThis.Arcane.ai.chat({
         expectedProvider: profile.provider,
         messages: [{role: 'user', content: 'Explain the active model in one sentence.'}]
     });
     console.info(result.message.content);
-}`)}<h2 id="browser-wasm-local-text-inference">Browser-WASM local text inference</h2><p>${link('docs/reference/ai/browser-wasm.md','Browser-WASM local AI')} is an explicit browser-only option for a caller-configured GGUF model. It packages the Wllama engine, not model weights. It neither supplies native or speech APIs nor executes returned tools. A normal cache miss can download; <code>load({offline:true})</code> requires a compatible DBOPFS cache, applies only enabled checks, and still requires successful Wllama loading.</p><h2 id="advanced-provider-apis">Advanced provider APIs</h2><p>${link('docs/reference/arcane-ollama.md','Arcane Ollama')} is provider-specific and lower-level. Some admitted applications can call Ollama chat, generate, or embed methods; diagnostics and management are more restricted, and some operations intentionally fail. Never send a renderer directly to <code>127.0.0.1:11434</code>.</p><h2 id="availability-errors-and-fallback">Availability, errors, and fallback</h2><p>Feature-detect the selected normalized surface and inspect ${link('@reference/core/capabilities','effective capabilities')} when a native call is unavailable. Local and cloud providers keep their documented availability and error codes. Arcane does not silently switch providers after failure.</p>`;
+}`)}<h2 id="browser-wasm-local-text-inference">Browser-WASM local text inference</h2><p>${link('docs/reference/ai/browser-wasm.md','Browser-WASM local AI')} is an explicit browser-only option for a caller-configured GGUF model. It packages the Wllama engine, not model weights. It neither supplies native or speech APIs nor executes returned tools. A normal cache miss can download; <code>load({offline:true})</code> requires a compatible DBOPFS cache and successful Wllama loading.</p><h2 id="advanced-provider-apis">Advanced provider APIs</h2><p>${link('docs/reference/arcane-ollama.md','Arcane Ollama')} is provider-specific and lower-level. Some admitted applications can call Ollama chat, generate, or embed methods; diagnostics and management are more restricted, and some operations intentionally fail. Never send a renderer directly to <code>127.0.0.1:11434</code>.</p><h2 id="availability-errors-and-fallback">Availability, errors, and fallback</h2><p>Feature-detect the selected normalized surface and inspect ${link('@reference/core/capabilities','effective capabilities')} when a native call is unavailable. Local and cloud providers keep their documented availability and error codes. Arcane does not silently switch providers after failure.</p>`;
 }
 
 function aiDecisionBody({output,targets}){
     const link=(source,label,fragment='')=>`<a href="${escapeHtml(`${relativeOutputHref(output,targets.get(source))}${fragment}`)}">${escapeHtml(label)}</a>`;
-    const choiceRows=`<tr><td>Provider registration, normalized lifecycle, and per-role state</td><td>${link('@reference/module/ai-provider-runtime','AIProviderRuntime.js')} and ${link('@reference/module/ai-runtime-state','AIRuntimeState.js')}</td><td>One application-owned runtime validates selections, publishes independent LLM/STT/TTS state, and routes requests without silent fallback.</td></tr><tr><td>Visible selected-model activation request</td><td>${link('docs/reference/runtime-components.md','chat.html','#chathtml')}</td><td>Send remains disabled for a selected unloaded LLM; a keyboard-operable Start/Try again or Cancel loading control emits a cancelable public request before the host callback. The provider/runtime owner decides whether and how to execute the resulting intent.</td></tr><tr><td>Caller-configured browser-local speech</td><td>${link('docs/reference/ai/browser-speech.md','arcane-os/ai/browser-speech')}</td><td>Browser-only Whisper STT and Kokoro TTS providers over caller-owned, pinned model and adapter closures; no bundled model or runtime bytes.</td></tr><tr><td>Durable chat history and document retrieval</td><td>${link('@reference/module/persistent-ai-chat-session','PersistentAIChatSession.js')} and ${link('@reference/module/dbopfs-document-library','DBOPFSDocumentLibrary.js')}</td><td>Explicit persistence plus bounded lexical retrieval or caller-source evaluation; provider choice and application policy remain outside the storage helpers.</td></tr>`;
+    const choiceRows=`<tr><td>Provider registration, normalized lifecycle, and per-role state</td><td>${link('@reference/module/ai-provider-runtime','AIProviderRuntime.js')} and ${link('@reference/module/ai-runtime-state','AIRuntimeState.js')}</td><td>One application-owned runtime validates selections, publishes independent LLM/STT/TTS state, and routes requests without silent fallback.</td></tr><tr><td>Visible selected-model activation request</td><td>${link('docs/reference/runtime-components.md','chat.html','#chathtml')}</td><td>Send remains disabled for a selected unloaded LLM; a keyboard-operable Start/Try again or Cancel loading control emits a cancelable public request before the host callback. The provider/runtime owner decides whether and how to execute the resulting intent.</td></tr><tr><td>Caller-configured browser-local speech</td><td>${link('docs/reference/ai/browser-speech.md','arcane-os/ai/browser-speech')}</td><td>Browser-only Whisper STT and Kokoro TTS providers over caller-owned, pinned model and adapter closures; no bundled model or runtime assets.</td></tr><tr><td>Durable chat history and document retrieval</td><td>${link('@reference/module/persistent-ai-chat-session','PersistentAIChatSession.js')} and ${link('@reference/module/dbopfs-document-library','DBOPFSDocumentLibrary.js')}</td><td>Explicit persistence plus bounded lexical retrieval or caller-source evaluation; provider choice and application policy remain outside the storage helpers.</td></tr>`;
     const lifecycle=`<h2 id="provider-runtime-and-state">Provider runtime and normalized state</h2><p>${link('@reference/module/ai-provider-runtime','AIProviderRuntime.js')} owns admitted provider registration, configuration, lifecycle, cancellation, speech mute state, and normalized request routing. ${link('@reference/module/ai-runtime-state','AIRuntimeState.js')} publishes the normalized aggregate and independent <code>llm</code>, <code>stt</code>, and <code>tts</code> role states. Applications should consume those state records instead of inferring readiness from a loaded module or protocol label.</p>`;
-    const browserSpeech=`<h2 id="browser-speech-providers">Browser speech providers</h2><p>${link('docs/reference/ai/browser-speech.md','Browser speech')} is the explicit browser-only choice for caller-supplied Whisper speech-to-text and Kokoro text-to-speech runtimes. It implements <code>arcane-ai-provider/2</code>, downloads nothing on import, and ships no model weights, adapter runtime bytes, voices, URLs, catalog, or cloud fallback.</p>`;
-    const durable=`<h2 id="durable-chat-and-retrieval">Durable chat and retrieval</h2><p>${link('@reference/module/persistent-ai-chat-session','PersistentAIChatSession.js')} makes chat persistence explicit. ${link('@reference/module/dbopfs-document-library','DBOPFSDocumentLibrary.js')} and ${link('@reference/module/document-lexical-search','DocumentLexicalSearch.js')} provide bounded document storage, caller-source evaluation, context construction, and lexical ranking without assuming a provider or copying provider runtime bytes.</p>`;
+    const browserSpeech=`<h2 id="browser-speech-providers">Browser speech providers</h2><p>${link('docs/reference/ai/browser-speech.md','Browser speech')} is the explicit browser-only choice for caller-supplied Whisper speech-to-text and Kokoro text-to-speech runtimes. It implements <code>arcane-ai-provider/2</code>, downloads nothing on import, and ships no model weights, adapter runtime assets, voices, URLs, catalog, or cloud fallback.</p>`;
+    const durable=`<h2 id="durable-chat-and-retrieval">Durable chat and retrieval</h2><p>${link('@reference/module/persistent-ai-chat-session','PersistentAIChatSession.js')} makes chat persistence explicit. ${link('@reference/module/dbopfs-document-library','DBOPFSDocumentLibrary.js')} and ${link('@reference/module/document-lexical-search','DocumentLexicalSearch.js')} provide bounded document storage, caller-source evaluation, context construction, and lexical ranking without assuming a provider or copying provider runtime assets.</p>`;
     return baseAIDecisionBody({output,targets})
-        .replace(
-            'Browser-only Wllama lifecycle with a canonical model URL, inherited optional byte-length and SHA-256 checks, observed-byte metadata, honest integrity status, and structural tool results.',
-            'Browser-only Wllama lifecycle with a caller-owned canonical ordered multi-file descriptor <code>{id, files:[{name?,url,bytes?,sha256?},...]}</code>, inherited optional byte-length and SHA-256 checks, observed-byte metadata, honest integrity status, and structural tool results.'
-        )
         .replace(
             '</tbody></table></div><h2 id="runtime-ai-module">',
             `${choiceRows}</tbody></table></div>${lifecycle}<h2 id="runtime-ai-module">`
@@ -1733,83 +1996,7 @@ function capabilityPolicyBody({output,targets}){
     const free=capabilityFreeRpcMethods.map(record=>
         `<tr><td><code>${escapeHtml(record.method)}</code></td><td>${escapeHtml(record.availability)}</td></tr>`
     ).join('');
-    return `<aside class="callout callout-info"><strong>Authority is an intersection.</strong> A capability grant alone is never sufficient: exact method admission, app ID/type, host projection, elevation, provider state, and runtime checks can narrow it further.</aside><h2 id="how-to-read-this-policy">How to read this policy</h2><p>These are the <strong>37 Core RPC capability-policy strings</strong>, not the entire application capability vocabulary. Descriptor methods below are exact <code>permissions.methods</code> RPC names and do not always equal their JavaScript member label. Use the <a href="${escapeHtml(memberGuides)}">focused Arcane member guides</a> for application-facing signatures and results.</p><p>All policy methods exist in Core. Only a canonical Core + Android marker or a named Android projection reaches Android. The policy does not by itself define Microsoft NT versus Linux behavior.</p>${records}<h2 id="capability-free-rpc-methods">Capability-free RPC methods</h2><div class="table-wrap" role="region" aria-label="Capability-free RPC methods" tabindex="0"><table><thead><tr><th>Method</th><th>Availability</th></tr></thead><tbody>${free}</tbody></table></div>`;
-}
-
-function coreExtensionOverlay({source,output,targets}){
-    const link=(targetSource,label,fragment='')=>{
-        const target=targets.get(targetSource);
-        return `<a href="${escapeHtml(`${relativeOutputHref(output,target)}${fragment}`)}">${escapeHtml(label)}</a>`;
-    };
-    if(source==='docs/reference/core/arcane-api.md'){
-        const ai=link(
-            'docs/reference/core/reference/arcane-api/ai-and-ollama.md',
-            'isolated-model member guides',
-            '#arcanelocalaiinspectisolatedmodel'
-        );
-        const repository=link(
-            'docs/reference/core/reference/arcane-api/applications-terminal-capabilities.md',
-            'repository-service member guides',
-            '#arcanerepositorykemposnapshot'
-        );
-        return {
-            body:`<aside class="callout callout-info"><strong>Complete public tree.</strong> The pinned <code>globalThis.Arcane</code> surface contains 150 records: 113 callable methods, 35 namespaces, one <code>Arcane.Error</code> constructor, and one protocol value. The 113 callables are 106 RPC authorities, five renderer-local helpers, and two aliases.</aside><h2 id="owning-application-extensions">Owning-application extensions</h2><p>These public paths are intentionally app-bound extensions of the shared bridge. Their presence does not grant authority.</p><div class="table-wrap" role="region" aria-label="Owning application extension inventory" tabindex="0"><table><thead><tr><th>Public JavaScript path</th><th>Authority and host</th></tr></thead><tbody><tr><td><code>Arcane.localAI.inspectIsolatedModel(request)</code></td><td><code>ai.inference</code>; Kempo-only; admitted Core; ${ai}</td></tr><tr><td><code>Arcane.localAI.runIsolatedQuestion(request, controls?)</code></td><td><code>ai.inference</code>; Kempo-only; exclusive Core operation; ${ai}</td></tr><tr><td><code>Arcane.repository.kempo</code></td><td>Kempo-only namespace: <code>snapshot</code>, <code>begin</code>, <code>score</code>, <code>publish</code>; ${repository}</td></tr><tr><td><code>Arcane.repository.spellwire</code></td><td>Spellwire-only namespace: <code>snapshot</code>; ${repository}</td></tr></tbody></table></div>`,
-            tableOfContents:[{id:'owning-application-extensions',label:'Owning-application extensions'}]
-        };
-    }
-    if(source==='docs/reference/core/reference/arcane-api/ai-and-ollama.md'){
-        return {
-            body:`<h2 id="arcanelocalaiinspectisolatedmodel">Arcane.localAI.inspectIsolatedModel()</h2><h3>Syntax</h3>${referenceCodeBlock('JavaScript',`const inspection = await Arcane.localAI.inspectIsolatedModel({
-    model,
-    expectedModel,
-    contextTokens
-});`)}<h3>Parameters</h3><p><code>request</code> must be an exact own-data record <code>{model, expectedModel, contextTokens}</code>. <code>contextTokens</code> is a safe integer from 1,024 through 262,144. <code>expectedModel</code> is exact <code>{id,name,provider,digest,sizeBytes,modifiedAt}</code>: id/name/model agree, provider is <code>ollama</code>, digest is 64 lowercase hexadecimal characters, size is a positive safe integer, and modified time is parseable or null.</p><h3>Return value</h3><p>Resolves strict <code>{schemaVersion:1, model, defaults:{systemPromptPresent:false,messageCount:0}, admission}</code>. Admission proves the same context was admitted after Core rechecks installed identity, digest, size, modification time, empty stored defaults, and current resources.</p><h3>Availability and errors</h3><p>Kempo-only, <code>ai.inference</code>, admitted desktop Core or normalized development transport. No Android projection and no standalone browser/cloud authority. Client timeout is 45 seconds. Invalid/evidence/identity/defaults/admission/not-installed/active-operation failures normalize through <code>Arcane.Error</code>.</p><h2 id="arcanelocalairunisolatedquestion">Arcane.localAI.runIsolatedQuestion()</h2><h3>Syntax</h3>${referenceCodeBlock('JavaScript',`const result = await Arcane.localAI.runIsolatedQuestion({
-    model,
-    expectedModel,
-    prompt,
-    systemPrompt,
-    options: {num_ctx: 8192, temperature: 0.2},
-    think: 'low'
-}, {
-    onPhase(phase, event) {
-        console.info(phase, event.heartbeat === true ? event.elapsedMs : 'transition');
-    }
-});`)}<h3>Parameters and controls</h3><p>The request is exact <code>{model,prompt,systemPrompt,options,expectedModel,think?}</code>. Prompt is nonempty and at most 256 KiB UTF-8; system prompt is nonempty and at most 8 KiB. Options are exactly <code>{num_ctx,temperature}</code>, with context 1,024–262,144 and temperature 0–2. <code>think</code> is <code>low</code>, <code>medium</code>, or <code>high</code>. Core overwrites any caller operation ID. Optional <code>onPhase(phase,event)</code> receives only this operation and is always unsubscribed.</p><h3>Return, lifecycle, and cancellation</h3><p>Resolves strict <code>{schemaVersion:1,model,answer,startedAt,completedAt,elapsedMs,isolation}</code>. Isolation proves unload/absence before and after, <code>keepAlive:0</code>, exactly two messages, and empty defaults. Phases are <code>unload_before</code>, <code>verify_before</code>, <code>chat</code>, <code>unload_after</code>, and <code>verify_after</code>; chat heartbeats arrive every five seconds. Cleanup runs after primary failure and cleanup failure is terminal.</p><p>This Kempo-only <code>ai.inference</code> method is exclusive, Core-only, and uses a 50-minute client timeout. Renderer timeout/page teardown cannot abort Core cleanup. Stable error families include invalid request/evidence, identity mismatch, defaults present/invalid, admission failure, not installed, operation active, inference failed, and cleanup failed.</p>`,
-            tableOfContents:[
-                {id:'arcanelocalaiinspectisolatedmodel',label:'Arcane.localAI.inspectIsolatedModel()'},
-                {id:'arcanelocalairunisolatedquestion',label:'Arcane.localAI.runIsolatedQuestion()'}
-            ]
-        };
-    }
-    if(source==='docs/reference/core/reference/arcane-api/namespaces.md'){
-        return {
-            body:`<h2 id="arcanerepositorykempo">Arcane.repository.kempo</h2><p>Fixed Kempo repository-service namespace with <code>snapshot(runId?)</code>, <code>begin(request)</code>, <code>score(request)</code>, and <code>publish(request)</code>. It accepts no arbitrary repository root, remote, or credential. Every method is Core-only and exact app ID <code>kempo</code>-bound; snapshot requires <code>repository.kempo.read</code>, while the three exclusive mutations require <code>repository.kempo.write</code>.</p><p>A snapshot resolves frozen <code>{repositoryId,branch,remoteHead,identity,catalog,runs,validation}</code>; each run is <code>{runId,path,sha256,document}</code>. A mutation resolves frozen <code>{repositoryId,branch,remoteHead,commit,identity,pushed,verified,run}</code> only after rereading and verifying the accepted remote state.</p><h2 id="arcanerepositoryspellwire">Arcane.repository.spellwire</h2><p>Fixed SpellWire repository-service namespace with parameterless <code>snapshot()</code>. It accepts no arbitrary repository root, remote, branch, path, or credential. The method is Core-only, exact app ID <code>spellwire</code>-bound, and requires <code>repository.spellwire.read</code>.</p><p>The frozen result is <code>{repositoryId:'spellwire',branch:'main',remoteHead,fetchedAt,files}</code>. Each selected file is a UTF-8 <code>{path,content}</code> record authenticated against the accepted Git tree and bounded by file-count, per-file, total-byte, and serialized-result limits.</p>`,
-            tableOfContents:[
-                {id:'arcanerepositorykempo',label:'Arcane.repository.kempo'},
-                {id:'arcanerepositoryspellwire',label:'Arcane.repository.spellwire'}
-            ]
-        };
-    }
-    if(source==='docs/reference/core/reference/arcane-api/applications-terminal-capabilities.md'){
-        const records=[
-            {id:'arcanerepositorykemposnapshot',title:'Arcane.repository.kempo.snapshot()',syntax:'snapshot(runId?)',capability:'repository.kempo.read',request:'No argument, or one lowercase run slug (at most 80 characters). The client sends {} or {runId}.',result:'Frozen {repositoryId,branch,remoteHead,identity,catalog,runs,validation}; every run is {runId,path,sha256,document}.'},
-            {id:'arcanerepositorykempobegin',title:'Arcane.repository.kempo.begin()',syntax:'begin({runId,briefVersion})',capability:'repository.kempo.write',request:'Exact {runId,briefVersion}; briefVersion must equal the published KEMPO scoring-rubric version.',result:'Verified mutation result {repositoryId,branch,remoteHead,commit,identity,pushed,verified:true,run}; repeated identical in-progress acknowledgement can be a verified no-write.'},
-            {id:'arcanerepositorykemposcore',title:'Arcane.repository.kempo.score()',syntax:'score({runId,questionId,score,letterScores})',capability:'repository.kempo.write',request:'questionId is 1–100. score is integer 0–10 or literal FAIL. Numeric letterScores has exactly K/E/M/P/O integers 0–2 summing to score; FAIL requires null.',result:'Verified mutation result with the reread run. It advances the server-assigned question, or makes the evaluation completed/failed.'},
-            {id:'arcanerepositorykempopublish',title:'Arcane.repository.kempo.publish()',syntax:'publish({document})',capability:'repository.kempo.write',request:'Exact {document}; document must satisfy the pinned KEMPO publication schema, canonical prompt/source evidence, empty evaluation state, and a unique lowercase metadata.runId.',result:'Verified mutation result for the published run; an already-identical publication is a verified no-write, while conflicting reuse rejects.'},
-            {id:'arcanerepositoryspellwiresnapshot',title:'Arcane.repository.spellwire.snapshot()',syntax:'snapshot()',capability:'repository.spellwire.read',request:'No parameters. Renderer-selected repository, branch, path, remote, and credential inputs are rejected.',result:"Frozen {repositoryId:'spellwire',branch:'main',remoteHead,fetchedAt,files}; files are bounded UTF-8 {path,content} records verified against the accepted Git tree."}
-        ];
-        return {
-            body:`<h2 id="application-repository-services">Application repository services</h2><p>These package-owned Core services are not general Git clients. They accept no caller-selected remote or credential and have no Android projection.</p>${records.map(record=>`<section><h3 id="${record.id}">${record.title}</h3><p><strong>Syntax:</strong> <code>Arcane.repository.${record.title.includes('spellwire')?'spellwire':'kempo'}.${record.syntax}</code>.</p><p><strong>Request:</strong> ${record.request}</p><p><strong>Result:</strong> ${record.result}</p><p>Requires <code>${record.capability}</code>, the matching bound application ID, admitted Core, and a 50-minute client timeout. Kempo mutations are exclusive.</p></section>`).join('')}`,
-            tableOfContents:[{id:'application-repository-services',label:'Application repository services'}]
-        };
-    }
-    if(source==='docs/reference/core/arcane-ai-contracts.md'){
-        return {
-            body:`<h2 id="isolated-model-evidence-and-proof">Isolated model evidence and proof</h2><p>Kempo isolated inference binds a requested model to exact package evidence <code>{id,name,provider:'ollama',digest,sizeBytes,modifiedAt}</code>, a context limit, empty stored defaults, and current native admission. Inspection returns schema-1 model/default/admission proof. A question returns schema-1 answer/timing plus pre/post absence proofs, <code>keepAlive:0</code>, two-message isolation, and empty defaults. These are normalized Arcane contracts, not provider envelopes.</p><p>The question request contains exact model evidence, bounded prompt/system prompt, exact <code>{num_ctx,temperature}</code> options, and optional thinking level. Lifecycle phases and five-second chat heartbeats are diagnostic progress only; they do not widen the terminal result or make the operation renderer-cancellable.</p>`,
-            tableOfContents:[{id:'isolated-model-evidence-and-proof',label:'Isolated model evidence and proof'}]
-        };
-    }
-    return {body:'',tableOfContents:[]};
+    return `<aside class="callout callout-info"><strong>Authority is an intersection.</strong> A capability grant alone is never sufficient: exact method admission, app ID/type, host projection, elevation, provider state, and runtime checks can narrow it further.</aside><h2 id="how-to-read-this-policy">How to read this policy</h2><p>These are the <strong>${String(capabilityPolicyRecords.length)} Core RPC capability-policy strings</strong>, not the entire application capability vocabulary. Descriptor methods below are exact <code>permissions.methods</code> RPC names and do not always equal their JavaScript member label. Use the <a href="${escapeHtml(memberGuides)}">focused Arcane member guides</a> for application-facing signatures and results.</p><p>All policy methods exist in Core. Only a canonical Core + Android marker or a named Android projection reaches Android. The policy does not by itself define Microsoft NT versus Linux behavior.</p>${records}<h2 id="capability-free-rpc-methods">Capability-free RPC methods</h2><div class="table-wrap" role="region" aria-label="Capability-free RPC methods" tabindex="0"><table><thead><tr><th>Method</th><th>Availability</th></tr></thead><tbody>${free}</tbody></table></div>`;
 }
 
 function aiPreamble({source,output,targets}){
@@ -1838,13 +2025,11 @@ function replaceGeneratedRegion(contents,startMarker,endMarker,body){
     return `${contents.slice(0,start+startMarker.length)}\n${body}\n${contents.slice(end)}`;
 }
 
-function outputRecord({source,output,route,sourceBytes,outputBytes,kind}){
+function outputRecord({source,output,route,kind}){
     return {
         source,
         output,
         route,
-        sourceSha256:sha256(sourceBytes),
-        outputSha256:sha256(outputBytes),
         ...(kind?{kind}:{})
     };
 }
@@ -1861,43 +2046,27 @@ async function collectInputs(){
     const markdownInputs=[];
     for(const file of markdownFiles){
         const source=repositoryRelative(file);
-        const bytes=await readFile(file);
+        const markdown=await readFile(file,'utf8');
         markdownInputs.push({
             source,
             output:outputForReferenceSource(source),
             route:referenceRouteForSource(source),
-            bytes,
-            markdown:bytes.toString('utf8')
+            markdown
         });
     }
     const inventoryInputs=[];
     for(const file of inventoryFiles){
         const source=repositoryRelative(file);
         const output=`site/reference/inventory/${path.posix.basename(source)}`;
-        const bytes=await readFile(file);
+        const contents=await readFile(file,'utf8');
         inventoryInputs.push({
             source,
             output,
             route:routeForOutput(output),
-            bytes,
-            sourceSha256:sha256(bytes)
+            contents
         });
     }
     return {markdownInputs,inventoryInputs};
-}
-
-function assertRuntimeContractSummary(summary){
-    for(const [key,expected] of Object.entries(expectedRuntimeContractSummary)){
-        if(key==='exportForms')continue;
-        if(summary[key]!==expected){
-            throw new Error(`Runtime contract summary mismatch for ${key}: ${String(summary[key])} !== ${String(expected)}.`);
-        }
-    }
-    for(const [form,expected] of Object.entries(expectedRuntimeContractSummary.exportForms)){
-        if(summary.exportForms?.[form]!==expected){
-            throw new Error(`Runtime contract export-form mismatch for ${form}: ${String(summary.exportForms?.[form])} !== ${String(expected)}.`);
-        }
-    }
 }
 
 export async function createReferenceSite(){
@@ -1908,26 +2077,21 @@ export async function createReferenceSite(){
     if(!runtimeModuleInventoryInput){
         throw new Error('The runtime module inventory is required.');
     }
-    const runtimeModuleInventory=JSON.parse(runtimeModuleInventoryInput.bytes.toString('utf8'));
+    const runtimeModuleInventory=JSON.parse(runtimeModuleInventoryInput.contents);
     const runtimeModuleRecords=runtimeModuleInventory.artifacts;
-    if(!Array.isArray(runtimeModuleRecords)
-        ||runtimeModuleRecords.length!==expectedRuntimeContractSummary.artifactCount){
-        throw new Error(
-            `Expected exactly ${String(expectedRuntimeContractSummary.artifactCount)} runtime module artifacts.`
-        );
+    if(!Array.isArray(runtimeModuleRecords)){
+        throw new Error('The runtime module inventory must contain an artifacts array.');
     }
     const runtimeContracts=await verifyRuntimeReferenceContracts({
         repositoryRoot,
         requireVm:false
     });
-    assertRuntimeContractSummary(runtimeContracts.summary);
     const semanticContracts=createReferenceModuleContractMap(runtimeModuleRecords);
     const sourceContracts=new Map(runtimeContracts.modules.map(contract=>[
         contract.name,contract
     ]));
-    if(sourceContracts.size!==runtimeModuleRecords.length
-        ||runtimeModuleRecords.some(record=>!sourceContracts.has(record.name))){
-        throw new Error('Runtime source-contract inventory parity failed.');
+    if(runtimeModuleRecords.some(record=>!sourceContracts.has(record.name))){
+        throw new Error('A runtime module is missing its source contract.');
     }
     const moduleSlugs=runtimeModuleRecords.map(record=>runtimeModuleSlug(record.name));
     if(new Set(moduleSlugs).size!==moduleSlugs.length){
@@ -1956,30 +2120,21 @@ export async function createReferenceSite(){
     const expectedFiles=new Map();
     const pages=[];
     for(const input of markdownInputs){
-        const publicMarkdown=publicReferenceMarkdown(input.markdown,input.source);
-        const metadata=sourceMetadata(publicMarkdown,input.source);
-        const publishedMarkdown=input.source==='docs/reference/runtime-modules.md'
-            ?publicMarkdown.split('\n## Canonical inventory',1)[0]
-            :publicMarkdown;
-        const rendered=renderMarkdown(publishedMarkdown,{
+        const metadata=sourceMetadata(input.markdown,input.source);
+        const rendered=renderMarkdown(input.markdown,{
             source:input.source,
             output:input.output,
             targets,
             metadata
         });
-        const extensionOverlay=coreExtensionOverlay({
-            source:input.source,
-            output:input.output,
-            targets
-        });
         const moduleDirectory=input.source==='docs/reference/runtime-modules.md'
-            ?`<h2 id="runtime-module-directory">Search all ${String(expectedRuntimeContractSummary.artifactCount)} runtime artifacts</h2><p>Every shipped artifact has one first-party contract page. Search by exact filename, export, behavior, availability, transport, or normalization boundary.</p>${moduleDirectoryBody({records:runtimeModuleRecords,output:input.output,targets,idPrefix:'runtime-module-index'})}`
+            ?`<h2 id="runtime-module-directory">Search all ${String(runtimeModuleRecords.length)} runtime artifacts</h2><p>Every shipped artifact has one first-party contract page. Search by exact filename, export, behavior, availability, transport, or normalization boundary.</p>${moduleDirectoryBody({records:runtimeModuleRecords,output:input.output,targets,idPrefix:'runtime-module-index'})}`
             :'';
-        const body=`${aiPreamble({source:input.source,output:input.output,targets})}${moduleDirectory}${rendered.body}${extensionOverlay.body}`;
+        const body=`${aiPreamble({source:input.source,output:input.output,targets})}${moduleDirectory}${rendered.body}`;
         const tableOfContents=moduleDirectory
-            ?[{id:'runtime-module-directory',label:`Search all ${String(expectedRuntimeContractSummary.artifactCount)} runtime artifacts`},...rendered.tableOfContents,...extensionOverlay.tableOfContents]
-            :[...rendered.tableOfContents,...extensionOverlay.tableOfContents];
-        const html=Buffer.from(renderPage({
+            ?[{id:'runtime-module-directory',label:`Search all ${String(runtimeModuleRecords.length)} runtime artifacts`},...rendered.tableOfContents]
+            :rendered.tableOfContents;
+        const html=renderPage({
             output:input.output,
             route:input.route,
             source:input.source,
@@ -1989,29 +2144,22 @@ export async function createReferenceSite(){
             body,
             tableOfContents,
             targets
-        }));
+        });
         expectedFiles.set(input.output,html);
         const page=outputRecord({
             source:input.source,
             output:input.output,
             route:input.route,
-            sourceBytes:input.bytes,
-            outputBytes:html,
             kind:'markdown'
         });
-        const behaviorEvidence=referenceGuideBehaviorEvidence[input.source];
-        pages.push(behaviorEvidence?{
-            ...page,
-            behaviorEvidence
-        }:page);
+        pages.push(page);
     }
 
     for(const record of runtimeModuleRecords){
         const output=runtimeModuleOutput(record.name);
-        const sourceBytes=await readFile(safeRepositoryPath(record.file));
         const sourceContract=sourceContracts.get(record.name);
         const semanticContract=semanticContracts.get(record.name);
-        const html=Buffer.from(renderPage({
+        const html=renderPage({
             output,
             route:routeForOutput(output),
             source:record.file,
@@ -2035,17 +2183,14 @@ export async function createReferenceSite(){
             ],
             targets,
             kind:'runtime-module'
-        }));
+        });
         expectedFiles.set(output,html);
         const page=outputRecord({
             source:record.file,
             output,
             route:routeForOutput(output),
-            sourceBytes,
-            outputBytes:html,
             kind:'runtime-module'
         });
-        const behaviorEvidence=behaviorExampleEvidence[record.name];
         pages.push({
             ...page,
             moduleClassification:semanticContract.classification,
@@ -2056,33 +2201,13 @@ export async function createReferenceSite(){
                 literalCustomEvents:sourceContract.events.length,
                 directCodedFailures:sourceContract.directCodedFailures.length,
                 exportedErrorSubclasses:sourceContract.errorSubclasses.length
-            },
-            ...(behaviorEvidence?{
-                behaviorEvidence:{
-                    source:{
-                        repository:behaviorEvidence.repository,
-                        commit:behaviorEvidence.commit,
-                        path:behaviorEvidence.sourcePath,
-                        blob:behaviorEvidence.sourceBlob,
-                        sha256:sha256(sourceBytes)
-                    },
-                    test:{
-                        repository:behaviorEvidence.repository,
-                        commit:behaviorEvidence.commit,
-                        path:behaviorEvidence.testPath,
-                        blob:behaviorEvidence.testBlob
-                    }
-                }
-            }: {})
+            }
         });
     }
 
     const aiOutput=targets.get('@reference/ai');
     const aiSource='tools/build-reference-site.mjs#normalized-ai-guide';
-    const aiSourceBytes=Buffer.from(
-        `${baseAIDecisionBody.toString()}\n${aiDecisionBody.toString()}`
-    );
-    const aiHtml=Buffer.from(renderPage({
+    const aiHtml=renderPage({
         output:aiOutput,
         route:routeForOutput(aiOutput),
         source:aiSource,
@@ -2103,27 +2228,24 @@ export async function createReferenceSite(){
         ],
         targets,
         kind:'decision-guide'
-    }));
+    });
     expectedFiles.set(aiOutput,aiHtml);
     pages.push(outputRecord({
         source:aiSource,
         output:aiOutput,
         route:routeForOutput(aiOutput),
-        sourceBytes:aiSourceBytes,
-        outputBytes:aiHtml,
         kind:'generated'
     }));
 
     const capabilitiesOutput=targets.get('@reference/core/capabilities');
     const capabilitiesSource='tools/build-reference-site.mjs#capability-policy';
-    const capabilitiesSourceBytes=Buffer.from(JSON.stringify(capabilityPolicyRecords));
-    const capabilitiesHtml=Buffer.from(renderPage({
+    const capabilitiesHtml=renderPage({
         output:capabilitiesOutput,
         route:routeForOutput(capabilitiesOutput),
         source:capabilitiesSource,
         title:'Core capabilities and method admission',
         titleId:'core-capabilities-and-method-admission',
-        description:'All 37 Core RPC capability-policy strings, their exact methods, host projections, and additional application restrictions.',
+        description:`All ${String(capabilityPolicyRecords.length)} Core RPC capability-policy strings, their exact methods, host projections, and additional application restrictions.`,
         body:capabilityPolicyBody({output:capabilitiesOutput,targets}),
         tableOfContents:[
             {id:'how-to-read-this-policy',label:'How to read this policy'},
@@ -2135,14 +2257,12 @@ export async function createReferenceSite(){
         ],
         targets,
         kind:'capability-policy'
-    }));
+    });
     expectedFiles.set(capabilitiesOutput,capabilitiesHtml);
     pages.push(outputRecord({
         source:capabilitiesSource,
         output:capabilitiesOutput,
         route:routeForOutput(capabilitiesOutput),
-        sourceBytes:capabilitiesSourceBytes,
-        outputBytes:capabilitiesHtml,
         kind:'generated'
     }));
 
@@ -2152,7 +2272,7 @@ export async function createReferenceSite(){
         output:inventoryCollectionOutput,
         inventoryInputs
     });
-    const inventoryCollectionHtml=Buffer.from(renderPage({
+    const inventoryCollectionHtml=renderPage({
         output:inventoryCollectionOutput,
         route:routeForOutput(inventoryCollectionOutput),
         source:inventoryCollectionSource,
@@ -2164,14 +2284,12 @@ export async function createReferenceSite(){
         tableOfContents:[{id:'machine-readable-inventories',label:'Machine-readable inventories'}],
         targets,
         kind:'inventory-collection'
-    }));
+    });
     expectedFiles.set(inventoryCollectionOutput,inventoryCollectionHtml);
     pages.push(outputRecord({
         source:inventoryCollectionSource,
         output:inventoryCollectionOutput,
         route:routeForOutput(inventoryCollectionOutput),
-        sourceBytes:Buffer.from(directoryDigest(inventoryInputs)),
-        outputBytes:inventoryCollectionHtml,
         kind:'collection'
     }));
 
@@ -2183,7 +2301,7 @@ export async function createReferenceSite(){
     const coreCollectionOutput=
         'site/reference/core/reference/arcane-api/index.html';
     const coreCollectionSource='docs/reference/core/reference/arcane-api/';
-    const coreCollectionHtml=Buffer.from(renderPage({
+    const coreCollectionHtml=renderPage({
         output:coreCollectionOutput,
         route:routeForOutput(coreCollectionOutput),
         source:coreCollectionSource,
@@ -2198,65 +2316,52 @@ export async function createReferenceSite(){
         tableOfContents:[{id:'focused-core-member-guides',label:'Focused Core member guides'}],
         targets,
         kind:'core-member-collection'
-    }));
+    });
     expectedFiles.set(coreCollectionOutput,coreCollectionHtml);
     pages.push(outputRecord({
         source:coreCollectionSource,
         output:coreCollectionOutput,
         route:routeForOutput(coreCollectionOutput),
-        sourceBytes:Buffer.from(directoryDigest(coreMemberInputs.map(input=>({
-            source:input.source,
-            sourceSha256:sha256(input.bytes)
-        })))),
-        outputBytes:coreCollectionHtml,
         kind:'collection'
     }));
 
     const inventories=[];
     for(const input of inventoryInputs){
-        expectedFiles.set(input.output,input.bytes);
+        expectedFiles.set(input.output,input.contents);
         inventories.push(outputRecord({
             source:input.source,
             output:input.output,
-            route:input.route,
-            sourceBytes:input.bytes,
-            outputBytes:input.bytes
+            route:input.route
         }));
     }
 
-    const cssBytes=Buffer.from(referenceCss);
-    expectedFiles.set(referenceCssOutput,cssBytes);
-    const scriptBytes=Buffer.from(referenceScript);
-    expectedFiles.set(referenceScriptOutput,scriptBytes);
+    expectedFiles.set(referenceCssOutput,referenceCss);
+    expectedFiles.set(referenceScriptOutput,referenceScript);
     const assets=[outputRecord({
         source:'tools/build-reference-site.mjs#reference-css',
         output:referenceCssOutput,
-        route:routeForOutput(referenceCssOutput),
-        sourceBytes:cssBytes,
-        outputBytes:cssBytes
+        route:routeForOutput(referenceCssOutput)
     }),outputRecord({
         source:'tools/build-reference-site.mjs#reference-script',
         output:referenceScriptOutput,
-        route:routeForOutput(referenceScriptOutput),
-        sourceBytes:scriptBytes,
-        outputBytes:scriptBytes
+        route:routeForOutput(referenceScriptOutput)
     })];
 
     const landingOutput='site/reference/index.html';
-    const landingSourceBytes=await readFile(safeRepositoryPath(landingOutput));
+    const landingSource=await readFile(safeRepositoryPath(landingOutput),'utf8');
     const landingBody=`<section id="modules"><h2>Every runtime module</h2><p>Search the entire shipped module directory here, or open the <a href="runtime-modules/">full module index</a>. Each result leads to a first-party page with exact load form, bindings, callable signatures and parameters, lifecycle, literal public events and coded failures, availability, normalization, a copyable contract example, and related Arcane surfaces.</p>${moduleDirectoryBody({records:runtimeModuleRecords,output:landingOutput,targets,compact:true,idPrefix:'reference-module-directory'})}</section>`;
-    const landingBytes=Buffer.from(replaceGeneratedRegion(
-        landingSourceBytes.toString('utf8'),
+    const landingContents=replaceGeneratedRegion(
+        landingSource,
         '<!-- generated:runtime-module-directory:start -->',
         '<!-- generated:runtime-module-directory:end -->',
         landingBody
-    ));
-    expectedFiles.set(landingOutput,landingBytes);
+    );
+    expectedFiles.set(landingOutput,landingContents);
 
     pages.sort((left,right)=>left.route.localeCompare(right.route));
     inventories.sort((left,right)=>left.route.localeCompare(right.route));
     const sitemapOutput='site/sitemap.xml';
-    const sitemapSourceBytes=await readFile(safeRepositoryPath(sitemapOutput));
+    const sitemapSource=await readFile(safeRepositoryPath(sitemapOutput),'utf8');
     const referenceRoutes=[
         'reference/',
         ...pages.map(page=>page.route)
@@ -2264,13 +2369,13 @@ export async function createReferenceSite(){
     const sitemapReferenceBody=referenceRoutes.map(route=>
         `  <url><loc>${escapeHtml(canonicalUrl(route))}</loc></url>`
     ).join('\n');
-    const sitemapBytes=Buffer.from(replaceGeneratedRegion(
-        sitemapSourceBytes.toString('utf8'),
+    const sitemapContents=replaceGeneratedRegion(
+        sitemapSource,
         '<!-- generated:reference-routes:start -->',
         '<!-- generated:reference-routes:end -->',
         sitemapReferenceBody
-    ));
-    expectedFiles.set(sitemapOutput,sitemapBytes);
+    );
+    expectedFiles.set(sitemapOutput,sitemapContents);
     const manifest={
         schema:'arcane-reference-site/1',
         generatedBy:'tools/build-reference-site.mjs',
@@ -2284,21 +2389,12 @@ export async function createReferenceSite(){
             htmlPages:pages.length,
             inventories:inventories.length
         },
-        runtimeContracts:{
-            schemaVersion:runtimeContracts.schemaVersion,
-            hash:runtimeContracts.hash,
-            summary:runtimeContracts.summary
-        },
-        provenance:{
-            runtime:{...runtimeModuleInventory.source},
-            capabilityPolicy:{...capabilityPolicyProvenance}
-        },
         pages,
         inventories,
         assets
     };
-    const manifestBytes=Buffer.from(`${JSON.stringify(manifest,null,2)}\n`);
-    expectedFiles.set(manifestOutput,manifestBytes);
+    const manifestContents=`${JSON.stringify(manifest,null,2)}\n`;
+    expectedFiles.set(manifestOutput,manifestContents);
     return {
         expectedFiles,
         manifest,
@@ -2374,49 +2470,24 @@ export async function writeReferenceSite(){
         await unlink(file);
         await removeEmptyParents(file);
     }
-    for(const [output,bytes] of plan.expectedFiles){
+    for(const [output,contents] of plan.expectedFiles){
         const file=safeRepositoryPath(output);
         await mkdir(path.dirname(file),{recursive:true});
-        await writeFile(file,bytes);
-    }
-    await verifyReferenceSite(plan);
-    return plan.summary;
-}
-
-export async function verifyReferenceSite(existingPlan=null){
-    const plan=existingPlan??await createReferenceSite();
-    const issues=[];
-    for(const [output,expected] of plan.expectedFiles){
-        try{
-            const actual=await readFile(safeRepositoryPath(output));
-            if(!actual.equals(expected))issues.push(`stale bytes: ${output}`);
-        }catch(error){
-            if(error?.code==='ENOENT')issues.push(`missing output: ${output}`);
-            else throw error;
-        }
-    }
-    for(const output of await unexpectedManagedFiles(plan.expectedFiles)){
-        issues.push(`orphan output: ${output}`);
-    }
-    if(issues.length){
-        throw new Error(`Reference site verification failed:\n- ${issues.join('\n- ')}`);
+        await writeFile(file,contents,'utf8');
     }
     return plan.summary;
 }
 
 async function main(){
     const [mode,...extra]=process.argv.slice(2);
-    if(extra.length||!['--write','--verify'].includes(mode)){
+    if(extra.length||mode!=='--write'){
         throw new Error(
-            'Usage: node tools/build-reference-site.mjs --write|--verify'
+            'Usage: node tools/build-reference-site.mjs --write'
         );
     }
-    const summary=mode==='--write'
-        ?await writeReferenceSite()
-        :await verifyReferenceSite();
-    const action=mode==='--write'?'Wrote and verified':'Verified';
+    const summary=await writeReferenceSite();
     process.stdout.write(
-        `${action} ${String(summary.htmlPages)} reference pages, `+
+        `Wrote ${String(summary.htmlPages)} reference pages, `+
         `${String(summary.inventories)} inventories, and `+
         `${String(summary.files)} managed files.\n`
     );

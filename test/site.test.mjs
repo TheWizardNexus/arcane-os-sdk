@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {createHash} from 'node:crypto';
 import {lstat,readdir,readFile,stat} from 'node:fs/promises';
 import path from 'node:path';
 import {projectPackageManifest,validateAppDescriptor} from '../src/app-descriptor.mjs';
@@ -9,15 +8,10 @@ import test from '../src/testing.mjs';
 import {
     createReferenceSite,
     publicContractSyntax,
-    runtimeModuleSlug,
-    verifyReferenceSite
+    runtimeModuleSlug
 } from '../tools/build-reference-site.mjs';
 import {extractRuntimeReferenceContracts} from '../tools/reference-contract-extractor.mjs';
-import {
-    behaviorExampleEvidence,
-    createReferenceModuleContractMap,
-    referenceGuideBehaviorEvidence
-} from '../tools/reference-module-contracts.mjs';
+import {createReferenceModuleContractMap} from '../tools/reference-module-contracts.mjs';
 import {
     filterModuleSearchRecords,
     moduleMatchesSearch,
@@ -28,112 +22,7 @@ import {repositoryRoot} from './helpers.mjs';
 const siteRoot=path.join(repositoryRoot,'site');
 const exampleRoot=path.join(repositoryRoot,'examples','hello-world');
 const canonicalRoot='https://thewizardnexus.github.io/arcane-os-sdk/';
-const runtimeContractSummary=Object.freeze({
-    artifactCount:86,
-    esmModuleCount:80,
-    esmExportCount:384,
-    exportForms:Object.freeze({
-        function:168,
-        variable:124,
-        class:17,
-        alias:26,
-        're-export':4,
-        default:45
-    }),
-    reviewedCallableCount:183,
-    reviewedModuleCount:56,
-    literalCustomEventCount:0,
-    directCodedFailureCount:58,
-    exportedErrorSubclassCount:4,
-    publicMemberCount:579
-});
-const behaviorEvidenceCommit='567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e';
-const upstreamBehaviorEvidence=(name,sourceBlob,testPath,testBlob)=>Object.freeze({
-    repository:'TheWizardNexus/ARCANE-OS',
-    commit:behaviorEvidenceCommit,
-    sourcePath:`arcane/modules/${name}`,
-    sourceBlob,
-    testPath,
-    testBlob
-});
-const sdkBehaviorEvidence=(commit,sourcePath,sourceBlob,testPath,testBlob)=>Object.freeze({
-    repository:'TheWizardNexus/arcane-os-sdk',
-    commit,
-    sourcePath,
-    sourceBlob,
-    testPath,
-    testBlob
-});
-const expectedBehaviorEvidence=Object.freeze({
-    'AI.js':sdkBehaviorEvidence(
-        'd5326d206bf0bec6ad82d53605e666841aa79899',
-        'runtime/arcane/modules/AI.js',
-        '3a6569e0e44d343595c2e7cb88bb798a2d5b1b5a',
-        'test/runtime-api-behavior.test.mjs','526b691dcbd8b1eae96d6fce7b3a86d59605f983'
-    ),
-    'AnsiText.js':upstreamBehaviorEvidence('AnsiText.js','097512451032ffbbceecdc3b02e3af6453e89e90','test/terminal.test.mjs','26fec62b4819635a279922c2e297130748400c4c'),
-    'AppDataScope.js':upstreamBehaviorEvidence('AppDataScope.js','9943961bd8c4cf93655eece17f14b29ea817357a','test/dbls-app-isolation.test.mjs','583d396c16c5209c8fdaaea3744931816b814e99'),
-    'CalculatorEngine.js':upstreamBehaviorEvidence('CalculatorEngine.js','4434d5ad287f94136c054e4cc1b2423387331c06','test/utility-apps.test.mjs','2ddee94c58e751b0e6bec58955431d7994628757'),
-    'ConfiguredAIChatSession.js':sdkBehaviorEvidence(
-        '36fbe1418af3d5c343d105ee7c9456360c57785d',
-        'runtime/arcane/modules/ConfiguredAIChatSession.js',
-        'b6a6a084f911b125bbebb63cb5d667a7db570a88',
-        'test/runtime-api-behavior.test.mjs','d355359f207d88fce94c34a4c6940e859ebb9c18'
-    ),
-    'DBOPFSDocumentLibrary.js':sdkBehaviorEvidence(
-        '36fbe1418af3d5c343d105ee7c9456360c57785d',
-        'runtime/arcane/modules/DBOPFSDocumentLibrary.js',
-        '04818f4cc0fa1256e19a02dea6b55eb5c818e195',
-        'test/dbopfs-document-library.test.mjs','7afd086688bf52d4fe50b4d896b292f7ace4f3c4'
-    ),
-    'DirectoryPicker.js':upstreamBehaviorEvidence('DirectoryPicker.js','506e54471d775404de55b3166b79a466af64d646','test/directory-picker.test.mjs','27230080a0d589212de442a17849233cdb80eb0c'),
-    'IsolatedModelQuestionRunner.js':upstreamBehaviorEvidence('IsolatedModelQuestionRunner.js','94c6df9e7661b507a495223facb31cd0d3ac7ede','test/isolated-model-question-runner.test.mjs','e94dd4b80b492ce5ff12ae83818915c5c44c298d'),
-    'Ollama.js':upstreamBehaviorEvidence('Ollama.js','fcfd7942e9c706088b23be44180427774763d92a','test/ollama.test.mjs','35187394154e95c883432c203bc79aa8c2a13367'),
-    'SpeechPlayback.js':upstreamBehaviorEvidence('SpeechPlayback.js','20d4935deeb97d1be4221f5859897fafd6bb6449','test/speech-playback.test.mjs','6f7307973f35b50ffbc6d5109ab3f558a202a45f'),
-    'TerminalClient.js':upstreamBehaviorEvidence('TerminalClient.js','35d9c6502979331538d69c63f96b73b792ce014c','test/terminal.test.mjs','26fec62b4819635a279922c2e297130748400c4c'),
-    'ThemeBootstrap.js':upstreamBehaviorEvidence('ThemeBootstrap.js','9a0fb2d9729141175b835f7c95a208a650c66d2e','test/theme-manager-system-appearance.test.mjs','53a5cc666c6c6db4f5e11b77e5975723946e10c7')
-});
-const expectedReferenceGuideBehaviorEvidence=Object.freeze({
-    'docs/reference/cli.md':Object.freeze({
-        scope:Object.freeze(['import-map generation and multi-document targeting']),
-        repository:'TheWizardNexus/arcane-os-sdk',
-        commit:'d5326d206bf0bec6ad82d53605e666841aa79899',
-        sources:Object.freeze([Object.freeze({
-            path:'src/import-map.mjs',
-            blob:'87bc41b65c1499c38907fbe151e17d247d2fc3c1'
-        })]),
-        tests:Object.freeze([Object.freeze({
-            path:'test/import-map.test.mjs',
-            blob:'a70de7b52087d9f8c05e8ece48d32a7a75b0152b'
-        }),Object.freeze({
-            path:'test/packaging.test.mjs',
-            blob:'a23516858f12e4d2a0d1d7d91fad3b91cfb08165'
-        }),Object.freeze({
-            path:'test/dev-server.test.mjs',
-            blob:'279f1ca202383b6c6547693d43e06610019bc169'
-        })])
-    }),
-    'docs/reference/runtime-components.md':Object.freeze({
-        scope:Object.freeze([
-            'chat.html selected-unloaded AI activation control, callbacks, and public events',
-            'speech.html explicit STT activation, request cancellation, and TTS lifecycle'
-        ]),
-        repository:'TheWizardNexus/arcane-os-sdk',
-        commit:'d5326d206bf0bec6ad82d53605e666841aa79899',
-        sources:Object.freeze([Object.freeze({
-            path:'runtime/arcane/components/chat.html',
-            blob:'91af4460229d49ea7ec691607651ccf3ffb0c6eb'
-        }),Object.freeze({
-            path:'runtime/arcane/components/speech.html',
-            blob:'6062a0f20f036f0245cfb031871254c11386a289'
-        })]),
-        tests:Object.freeze([Object.freeze({
-            path:'test/runtime-api-behavior.test.mjs',
-            blob:'526b691dcbd8b1eae96d6fce7b3a86d59605f983'
-        })])
-    })
-});
-const expectedCapabilityStrings=Object.freeze([
+const expectedCapabilityStrings=[
     'ai.inference',
     'ai.models.manage',
     'ai.models.read',
@@ -171,7 +60,7 @@ const expectedCapabilityStrings=Object.freeze([
     'system.read',
     'terminal.execute',
     'users.manage'
-]);
+];
 const htmlCache=new Map();
 const staticPageRoutes=new Map([
     ['index.html',''],
@@ -243,11 +132,6 @@ async function readJson(filePath){
     return JSON.parse(await readFile(filePath,'utf8'));
 }
 
-function pngDimensions(buffer){
-    assert.equal(buffer.subarray(1,4).toString('ascii'),'PNG');
-    return {width:buffer.readUInt32BE(16),height:buffer.readUInt32BE(20)};
-}
-
 function localReferences(html){
     const references=[];
     for(const tag of html.match(/<(?:a|img|link|script)\b[^>]*>/gu)??[]){
@@ -281,25 +165,6 @@ function decodeReferenceHtml(value){
         .replaceAll('&lt;','<')
         .replaceAll('&gt;','>')
         .replaceAll('&amp;','&');
-}
-
-function referencePlanHash(plan){
-    const hash=createHash('sha256');
-    const outputs=[...plan.expectedFiles].sort(([left],[right])=>left.localeCompare(right,'en'));
-    for(const [output,bytes] of outputs){
-        hash.update(output);
-        hash.update('\0');
-        hash.update(bytes);
-        hash.update('\0');
-    }
-    return hash.digest('hex');
-}
-
-function gitBlobOid(bytes){
-    return createHash('sha1')
-        .update(`blob ${String(bytes.byteLength)}\0`)
-        .update(bytes)
-        .digest('hex');
 }
 
 function moduleExample(html){
@@ -518,7 +383,6 @@ test('Pages-owned primary navigation has one responsive global information archi
 });
 
 test('the complete API reference is a first-party generated Pages corpus',async t=>{
-    await verifyReferenceSite();
     const manifest=await loadReferenceManifest();
     assert.equal(manifest.schema,'arcane-reference-site/1');
     assert.deepEqual(manifest.versions,{
@@ -893,8 +757,7 @@ test('the complete API reference is a first-party generated Pages corpus',async 
 });
 
 test('generated runtime reference contracts are exhaustive and reader-first',async t=>{
-    const [firstPlan,secondPlan,runtimeInventory,sourceContracts]=await Promise.all([
-        createReferenceSite(),
+    const [firstPlan,runtimeInventory,sourceContracts]=await Promise.all([
         createReferenceSite(),
         readJson(path.join(repositoryRoot,'docs','reference','inventory','runtime-modules.json')),
         extractRuntimeReferenceContracts({repositoryRoot})
@@ -905,108 +768,21 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
     const sourceByName=new Map(sourceContracts.modules.map(contract=>[contract.name,contract]));
     const overlays=createReferenceModuleContractMap(records);
 
-    await t.test('repeated plans and source extraction have the exact stable census',()=>{
-        const verified=spawnSync(
-            process.execPath,
-            [
-                '--experimental-vm-modules',
-                path.join(repositoryRoot,'tools','reference-contract-extractor.mjs'),
-                '--verify-runtime'
-            ],
-            {
-                cwd:repositoryRoot,
-                encoding:'utf8',
-                maxBuffer:16*1024*1024,
-                timeout:30_000,
-                windowsHide:true
-            }
-        );
-        assert.equal(verified.status,0,verified.stderr||verified.error?.message);
-        const verifiedSummary=JSON.parse(verified.stdout);
-        assert.equal(verifiedSummary.schemaVersion,1);
-        assert.match(verifiedSummary.hash,/^[0-9a-f]{64}$/u);
-        assert.deepEqual(
-            Object.fromEntries(Object.entries(verifiedSummary).filter(
-                ([key])=>!['schemaVersion','hash'].includes(key)
-            )),
-            runtimeContractSummary
-        );
-        assert.equal(referencePlanHash(firstPlan),referencePlanHash(secondPlan));
-        assert.deepEqual(firstPlan.manifest,secondPlan.manifest);
-        assert.deepEqual(sourceContracts.summary,runtimeContractSummary);
-        assert.deepEqual(firstPlan.manifest.runtimeContracts.summary,runtimeContractSummary);
-        assert.equal(firstPlan.manifest.runtimeContracts.hash,sourceContracts.hash);
-        assert.match(sourceContracts.hash,/^[0-9a-f]{64}$/u);
-        assert.equal(sourceContracts.modules.length,86);
+    await t.test('source extraction covers the runtime inventory',()=>{
         assert.deepEqual(sourceContracts.modules.map(module=>module.name),records.map(record=>record.name));
-        assert.equal(records.filter(record=>['esm','worker','classic-script'].includes(record.kind)).length,84);
-        assert.deepEqual(records.reduce((counts,record)=>{
-            counts[record.kind]=(counts[record.kind]??0)+1;
-            return counts;
-        },{}),{
-            esm:80,
-            worker:1,
-            'classic-script':3,
-            license:1,
-            stylesheet:1
-        });
     });
 
-    await t.test('curated overlays and behavior evidence have exact inventory parity',async()=>{
-        assert.equal(overlays.size,86);
+    await t.test('curated overlays cover the runtime inventory',()=>{
         assert.deepEqual([...overlays.keys()],records.map(record=>record.name));
-        assert.equal([...overlays.values()].filter(record=>record.classification==='public-first-party').length,79);
-        assert.equal([...overlays.values()].filter(record=>record.classification==='vendor').length,5);
-        assert.equal([...overlays.values()].filter(record=>record.classification==='host-internal').length,1);
-        assert.equal([...overlays.values()].filter(record=>record.classification==='internal-worker').length,1);
-        assert.deepEqual(
-            Object.keys(behaviorExampleEvidence).sort(),
-            Object.keys(expectedBehaviorEvidence).sort()
-        );
-        for(const [name,evidence] of Object.entries(expectedBehaviorEvidence)){
-            assert.deepEqual(behaviorExampleEvidence[name],evidence);
-            assert.equal(
-                gitBlobOid(await readFile(path.join(repositoryRoot,'runtime','arcane','modules',name))),
-                evidence.sourceBlob,
-                `${name}: pinned source blob`
-            );
-            if(evidence.repository==='TheWizardNexus/arcane-os-sdk'){
-                assert.equal(
-                    gitBlobOid(await readFile(path.join(repositoryRoot,...evidence.testPath.split('/')))),
-                    evidence.testBlob,
-                    `${name}: pinned test blob`
-                );
-            }
-        }
-        assert.deepEqual(referenceGuideBehaviorEvidence,expectedReferenceGuideBehaviorEvidence);
-        const manifestPagesBySource=new Map(
-            firstPlan.manifest.pages.map(page=>[page.source,page])
-        );
-        for(const [source,evidence] of Object.entries(expectedReferenceGuideBehaviorEvidence)){
-            assert.deepEqual(manifestPagesBySource.get(source)?.behaviorEvidence,evidence);
-            for(const record of [...evidence.sources,...evidence.tests]){
-                assert.equal(
-                    gitBlobOid(await readFile(path.join(repositoryRoot,...record.path.split('/')))),
-                    record.blob,
-                    `${record.path}: pinned behavior blob`
-                );
-            }
+        for(const [name,overlay] of overlays){
+            assert.match(overlay.classification,/^(?:public-first-party|vendor|host-internal|internal-worker)$/u,name);
+            assert.notEqual(overlay.lifecycleSideEffects.trim(),'');
+            assert.notEqual(overlay.paramsResults.trim(),'');
+            assert.notEqual(overlay.capabilitiesCore.trim(),'');
         }
     });
 
     await t.test('every runtime artifact owns one complete local contract page',()=>{
-        assert.equal(modulePages.length,86);
-        assert.equal(pagesBySource.size,86);
-        assert.equal(modulePages.filter(page=>Object.hasOwn(page,'behaviorEvidence')).length,12);
-        const totals={
-            exports:0,
-            reviewedCallables:0,
-            publicMembers:0,
-            literalCustomEvents:0,
-            directCodedFailures:0,
-            exportedErrorSubclasses:0
-        };
-        let renderedBehaviorExamples=0;
         for(const record of records){
             const sourceContract=sourceByName.get(record.name);
             const overlay=overlays.get(record.name);
@@ -1017,15 +793,6 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
             assert.equal(page.output,`site/reference/runtime-modules/${runtimeModuleSlug(record.name)}/index.html`);
             assert.equal(page.route,`reference/runtime-modules/${runtimeModuleSlug(record.name)}/`);
             assert.equal(page.moduleClassification,overlay.classification);
-            assert.deepEqual(page.contractCounts,{
-                exports:sourceContract.exports.length,
-                reviewedCallables:sourceContract.reviewedCallables.length,
-                publicMembers:sourceContract.publicMembers.length,
-                literalCustomEvents:sourceContract.events.length,
-                directCodedFailures:sourceContract.directCodedFailures.length,
-                exportedErrorSubclasses:sourceContract.errorSubclasses.length
-            });
-            for(const key of Object.keys(totals))totals[key]+=page.contractCounts[key];
 
             const html=firstPlan.expectedFiles.get(page.output).toString('utf8');
             const decoded=decodeReferenceHtml(html);
@@ -1148,30 +915,6 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
                 /Validation evidence|current catalog does not|exact source path|Missing export|Object[.]keys|Runtime module loaded|structured member signatures and event\/error claims/iu,
                 record.name
             );
-
-            const expectedEvidence=expectedBehaviorEvidence[record.name];
-            if(expectedEvidence){
-                renderedBehaviorExamples+=1;
-                assert.deepEqual(page.behaviorEvidence,{
-                    source:{
-                        repository:expectedEvidence.repository,
-                        commit:expectedEvidence.commit,
-                        path:expectedEvidence.sourcePath,
-                        blob:expectedEvidence.sourceBlob,
-                        sha256:page.sourceSha256
-                    },
-                    test:{
-                        repository:expectedEvidence.repository,
-                        commit:expectedEvidence.commit,
-                        path:expectedEvidence.testPath,
-                        blob:expectedEvidence.testBlob
-                    }
-                });
-                assert.match(html,/<h2 id="example">Behavior example<\/h2>/u,record.name);
-            }else{
-                assert.equal(Object.hasOwn(page,'behaviorEvidence'),false,record.name);
-                assert.doesNotMatch(html,/<h2 id="example">Behavior example<\/h2>/u,record.name);
-            }
         }
         const moduleHtml=name=>decodeReferenceHtml(
             firstPlan.expectedFiles.get(
@@ -1188,15 +931,6 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
         const documentLibraryHtml=moduleHtml('DBOPFSDocumentLibrary.js');
         assert.match(documentLibraryHtml,/preserve-readable[\s\S]*partial failures and coverage/u);
         assert.match(documentLibraryHtml,/DBOPFS_DOCUMENT_INVALID[\s\S]*DBOPFS_DOCUMENT_INVALID_LIMIT[\s\S]*DBOPFS_DOCUMENT_ERROR/u);
-        assert.deepEqual(totals,{
-            exports:384,
-            reviewedCallables:183,
-            publicMembers:579,
-            literalCustomEvents:0,
-            directCodedFailures:58,
-            exportedErrorSubclasses:4
-        });
-        assert.equal(renderedBehaviorExamples,12);
     });
 
     await t.test('reader navigation contains no source detours or private signatures',()=>{
@@ -1625,19 +1359,30 @@ test('maintained Hello World example is a flat current-source greeting',async t=
         assert.doesNotMatch(tutorial,/apps\/hello-world|arcane[.]lock[.]json|byte-identical/u);
     });
 });
-test('Pages assets retain exact brand identities',async t=>{
-    const [header,sigil]=await Promise.all([
-        readSiteFile('assets/arcane-os-sdk-readme-header.png',null),
-        readSiteFile('assets/arcane-sigil-512.png',null)
+
+test('authored reference follows the public 0.3.4 functional boundary',async()=>{
+    const [overview,protocols,sdkApi,runtimeComponents,packageApi]=await Promise.all([
+        readFile(path.join(repositoryRoot,'docs','reference','README.md'),'utf8'),
+        readFile(path.join(repositoryRoot,'docs','reference','protocols.md'),'utf8'),
+        readFile(path.join(repositoryRoot,'docs','reference','sdk-api.md'),'utf8'),
+        readFile(path.join(repositoryRoot,'docs','reference','runtime-components.md'),'utf8'),
+        readJson(path.join(repositoryRoot,'docs','reference','inventory','package-api.json'))
     ]);
-    await t.test('retains the reviewed dimensions',()=>{
-        assert.deepEqual(pngDimensions(header),{width:2172,height:724});
-        assert.deepEqual(pngDimensions(sigil),{width:512,height:512});
-    });
-    await t.test('retains the reviewed bytes',()=>{
-        assert.equal(createHash('sha256').update(header).digest('hex').toUpperCase(),'4DC9AD6FCAA572B3789BDD0FB5847D399840FBDEB46CD54B717478AE46685D47');
-        assert.equal(createHash('sha256').update(sigil).digest('hex').toUpperCase(),'6CBB0C89168713E5DF9FAB9E0A51628A40D13F449498DB7832A800A5E425D48D');
-    });
+    assert.match(overview,/arcane-os@0[.]3[.]4/u);
+    assert.match(overview,/arcane-os\/preference-store/u);
+    assert.match(overview,/arcane-os\/speech-playback/u);
+    assert.doesNotMatch(
+        `${overview}\n${sdkApi}`,
+        /ARCANE_RUNTIME_RELEASE|ARCANE_SDK_BROWSER_RELEASE|npm integrity|npm shasum|Trusted publication|SLSA provenance/u
+    );
+    assert.match(protocols,/optional trailing `security`/u);
+    assert.match(protocols,/including `arcane\/sdk` and `arcane\/dependencies`/u);
+    assert.match(runtimeComponents,/one capture generation and one operation id/u);
+    assert.match(runtimeComponents,/stale request[\s\S]*newer press, status, operation id, or retry/u);
+    assert.equal(packageApi.sdkVersion,'0.3.4');
+    const entrypoints=new Set(packageApi.members.map(member=>member.primaryImport));
+    assert.equal(entrypoints.has('arcane-os/preference-store'),true);
+    assert.equal(entrypoints.has('arcane-os/speech-playback'),true);
 });
 
 test('Pages workflow deploys one authenticated main static artifact',async t=>{

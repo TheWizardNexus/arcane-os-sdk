@@ -288,14 +288,10 @@ mutable role is exactly `{providerId,graph,security?,offline}` or
 `{providerId,model,runtime,security?,offline}`. The graph and direct authority
 forms are mutually exclusive; `providerId` and `id` are nonblank exact strings,
 `graph` is the role-matching graph returned by the SDK browser
-speech artifact API, `security` is optional and ordinary behavior defaults to
-`secure:false`, and
-`offline` is boolean. The direct form forwards its
-caller-selected model, runtime, and optional security descriptors to the shared
+speech artifact API, and `offline` is boolean. The direct form forwards its
+caller-selected model and runtime descriptors to the shared
 provider. In ordinary mode it may use an empty `model.files` inventory and a
-caller-selected upstream `runtime.wasmPaths`. A supplied
-`security:{secure:true}` value records intent only; no hardening runs until that
-implementation is separately reviewed with and authorized by the user. The application
+caller-selected upstream `runtime.wasmPaths`. The application
 chooses every artifact, graph or direct model/runtime authority, provider ID, offline policy,
 sample rate, and TTS default voice. `configureBrowserSpeech()` imports the shared
 browser-speech module, creates one DBOPFS store, constructs and registers the
@@ -1533,7 +1529,7 @@ and `read`, filters source metadata before calling
 **Browser or compatible host with an injected DBOPFS adapter.** The adapter
 keeps the existing `get`, `set`, `getAllKeys`, and `delete` method names; Node
 can use the same class only through an explicitly imported runtime module and a
-compatible storage adapter; SDK `0.3.1` publishes no Node package subpath or
+compatible storage adapter; SDK `0.3.4` publishes no Node package subpath or
 Node storage implementation for it. Bootstrap uses a concurrent
 generation, commits its manifest last, cleans partial data on failure, and
 rejects case-colliding IDs. Search

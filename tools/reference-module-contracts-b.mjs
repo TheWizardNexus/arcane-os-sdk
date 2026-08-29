@@ -1,5 +1,5 @@
-export const referenceModuleContractsB=Object.freeze([
-    Object.freeze({
+export const referenceModuleContractsB=[
+    {
         name:'InMemoryCommunicationProvider.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Construction clones supplied entities into mutable in-memory thread/message state. send() appends one outbound message and advances a per-instance sequence; there is no I/O or global installation.',
@@ -11,8 +11,8 @@ export const referenceModuleContractsB=Object.freeze([
 
 const provider = new Provider({id:'demo', label:'Demo'});
 console.log(await provider.listThreads());`
-    }),
-    Object.freeze({
+    },
+    {
         name:'IsolatedModelQuestionRunner.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Construction only validates and binds an injected localAI bridge. inspectModel() and runQuestion() make one Core call each; onPhase is forwarded only for that operation and the runner retains no listener.',
@@ -34,8 +34,8 @@ async function ask({model, expectedModel, prompt, onPhase}) {
         onPhase
     });
 }`
-    }),
-    Object.freeze({
+    },
+    {
         name:'LocalAIReadiness.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure helpers have no effects. checkLocalAIReadiness() performs only selected-service probes; native mode may make one recovery attempt and one re-probe. Browser mode never probes Ollama, and Android user-managed-loopback never invokes lifecycle recovery.',
@@ -50,8 +50,8 @@ const report = await checkLocalAIReadiness({
     runtime:'browser'
 });
 console.log(report.ready, report.slots);`
-    }),
-    Object.freeze({
+    },
+    {
         name:'LocalAIReadinessController.js',
         classification:'public-first-party',
         lifecycleSideEffects:'The factory attaches local-ai-retry to the optional status component. check() deduplicates active work, updates chat/status presentation, calls onChange, and dispatches one result event. destroy() removes the retry listener.',
@@ -70,8 +70,8 @@ const controller = createLocalAIReadinessController({
 });
 await controller.check();
 controller.destroy();`
-    }),
-    Object.freeze({
+    },
+    {
         name:'Mail.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Import installs window.mail once when window exists. After installation, every later new Mail(config) returns that existing singleton and ignores the new config. send() builds complete content, prefers native delivery, otherwise uses MailTransport; report/crisis formatting may lazily load User/DBOPFS and best-effort persist a report before delivery.',
@@ -86,21 +86,21 @@ const config = resolveMailConfig(
     {document:null, location:new URL('https://hello.example.com/')}
 );
 console.log(config);`
-    }),
-    Object.freeze({
+    },
+    {
         name:'MailOutbox.mjs',
         classification:'public-first-party',
         lifecycleSideEffects:'Construction validates caller-owned DBOPFS-compatible storage, Web Locks, delivery, clock, and online-event adapters. enqueue() persists complete content before delivery; start() owns the online listener; drain() serializes FIFO attempts; stop() and dispose() detach lifecycle work without deleting records.',
         paramsResults:'new MailOutbox(options={}); enqueue({report,reportKey,serializedReport?}); drain({reason,signal?}={}); list(); get(reportKey); removeInvalid(reportKey); start(); stop(); dispose(). createMailOutbox(options) returns the same validated contract.',
-        events:Object.freeze(['mail-outbox-state','mail-outbox-delivery','mail-outbox-drain']),
-        errors:Object.freeze(['MAIL_OUTBOX_INVALID','MAIL_OUTBOX_RECORD_INVALID','MAIL_OUTBOX_CAPACITY_EXCEEDED','MAIL_OUTBOX_DELIVERY_FAILED','MAIL_OUTBOX_DISPOSED']),
+        events:['mail-outbox-state','mail-outbox-delivery','mail-outbox-drain'],
+        errors:['MAIL_OUTBOX_INVALID','MAIL_OUTBOX_RECORD_INVALID','MAIL_OUTBOX_CAPACITY_EXCEEDED','MAIL_OUTBOX_DELIVERY_FAILED','MAIL_OUTBOX_DISPOSED'],
         capabilitiesCore:'None. Delivery authority belongs to the injected transport or admitted Core adapter; acceptance is not inbox-delivery proof.',
         example:String.raw`import {createMailOutbox} from '/arcane/modules/MailOutbox.mjs';
 
 const outbox=createMailOutbox({storage,locks,deliver});
 await outbox.start();`
-    }),
-    Object.freeze({
+    },
+    {
         name:'MailTransport.mjs',
         classification:'public-first-party',
         lifecycleSideEffects:'normalizeMailEndpoint() is pure. sendMailReport() performs one HTTP(S) POST with timeout, same-origin credentials, no-referrer, redirect rejection, idempotency/app headers, and reads the complete response.',
@@ -111,8 +111,8 @@ await outbox.start();`
         example:String.raw`import {normalizeMailEndpoint} from '/arcane/modules/MailTransport.mjs';
 
 console.log(normalizeMailEndpoint('/v1/mail', 'https://mail.example.com/'));`
-    }),
-    Object.freeze({
+    },
+    {
         name:'Marked.min.js',
         classification:'vendor',
         lifecycleSideEffects:'ESM initialization only; later setOptions() and use() calls mutate the module-scoped vendor singleton.',
@@ -123,8 +123,8 @@ console.log(normalizeMailEndpoint('/v1/mail', 'https://mail.example.com/'));`
         example:String.raw`import {marked} from '/arcane/modules/Marked.min.js';
 
 console.log(marked.parse('# Ready'));`
-    }),
-    Object.freeze({
+    },
+    {
         name:'MD.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Import applies Arcane Marked options to the shared vendored singleton. Construction, raw assignment, and append() reparse complete Markdown; safeRendered returns the same complete rendered markup.',
@@ -136,8 +136,8 @@ console.log(marked.parse('# Ready'));`
 
 const md = new MD('# Ready\n<script>alert(1)</script>');
 document.querySelector('main').innerHTML = md.safeRendered;`
-    }),
-    Object.freeze({
+    },
+    {
         name:'MemoryRecords.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure normalization; unwraps at most three JSON-string layers and never mutates input.',
@@ -151,8 +151,8 @@ console.log(
     normalizeMemoryContent('"remember this"'),
     hasMemoryContent({memory:'remember this'})
 );`
-    }),
-    Object.freeze({
+    },
+    {
         name:'MessageAdvisory.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure normalization except for awaiting injected prepare/inspector callbacks. Callback failures are contained as unavailable advisories; inputs are not mutated.',
@@ -169,8 +169,8 @@ const result = await inspectMessageRecords(messages, async () => ({
     summary:'No strong signal.'
 }));
 console.log(result.advisories.get(messages[0]));`
-    }),
-    Object.freeze({
+    },
+    {
         name:'ModelDefinition.js',
         classification:'public-first-party',
         lifecycleSideEffects:'parseModelDefinition() is pure. loadModelDefinitionSystemPrompt() makes one complete read-only GET using the fetch implementation\'s ordinary redirect, credentials, and cache behavior, and never contacts a model service itself.',
@@ -184,8 +184,8 @@ const definition = parseModelDefinition(
     'FROM llama3.2\n\nSYSTEM """\nAnswer briefly.\n"""\n'
 );
 console.log(definition.system);`
-    }),
-    Object.freeze({
+    },
+    {
         name:'Ollama.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Import creates and freezes a singleton, installs non-writable globalThis.arcaneOllama once, and dispatches arcane-ollama-ready. Calls resolve globalThis.Arcane.ollama at call time and never access localhost directly.',
@@ -205,8 +205,8 @@ async function chatWithAdmittedOllamaAfterUserChoice(){
     });
     console.log(response.message?.content);
 }`
-    }),
-    Object.freeze({
+    },
+    {
         name:'OllamaModelIdentifier.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure syntax normalization; does not test installation, admission, ownership, or hardware.',
@@ -217,8 +217,8 @@ async function chatWithAdmittedOllamaAfterUserChoice(){
         example:String.raw`import {normalizeOllamaModelIdentifier} from '/arcane/modules/OllamaModelIdentifier.js';
 
 console.log(normalizeOllamaModelIdentifier('llama3.2:latest'));`
-    }),
-    Object.freeze({
+    },
+    {
         name:'OllamaSettings.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Schema construction occurs at import; otherwise pure and performs no persistence or service mutation.',
@@ -229,8 +229,8 @@ console.log(normalizeOllamaModelIdentifier('llama3.2:latest'));`
         example:String.raw`import {arcaneBrainModelName} from '/arcane/modules/OllamaSettings.js';
 
 console.log(arcaneBrainModelName('My Research Brain'));`
-    }),
-    Object.freeze({
+    },
+    {
         name:'OpenMeteoWeatherProvider.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Construction creates two fetch-backed ApiModelDatabase instances and forwards their request/error events. search() and load() use Open-Meteo HTTPS by default; constructor and setEndpoints() can select caller-owned HTTP(S) endpoints. There is no global installation.',
@@ -243,14 +243,14 @@ console.log(arcaneBrainModelName('My Research Brain'));`
 const weather = new Weather();
 const [place] = await weather.search('Chicago');
 if (place) console.log(await weather.load(place));`
-    }),
-    Object.freeze({
+    },
+    {
         name:'PersistentAIChatSession.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Construction creates or binds one ChatEntity and asynchronously loads existing JSONL history only when requested. send and stream settle pending memory, run one configured chat transaction, persist the coherent user/tool and assistant turn according to explicit per-turn flags, optionally extract memory, then commit live session history atomically. stream uses ai.streamRequest when supplied, buffers one structural call until an exact terminal match, and otherwise falls back to the configured non-stream fetch/chat path.',
         paramsResults:'new PersistentAIChatSession({ai?|chat?,chatEntity,chatFileName,contextBuilder,loadExisting,maxContextCharacters,maxMessageCharacters,maxMessages,memory=true,request,responseLength,systemPrompt}); ai must expose fetchRequest and may expose streamRequest, while ai and chat are mutually exclusive. static create() and createPersistentAIChatSession() await readiness. ready() waits for initialization and resolves the same session. send({message:{content,role:user|tool,tool_call_id?,persist=true},request?,response:{persist=message.persist},signal?}) resolves the configured response. stream(input,{onChunk?,onToolCall?}) resolves the same committed terminal response, exposes a validated exact structural call envelope only after it matches the terminal call, and uses the non-stream path when no stream transport exists. history() returns live model context, transcript() returns UI-visible ChatEntity records with persisted timestamps, and settleMemory() waits for ChatEntity memory work.',
-        events:Object.freeze([]),
-        errors:Object.freeze(['AI_CHAT_UNAVAILABLE','AI_CHAT_ABORTED','AI_CHAT_AMBIGUOUS_PROVIDER','AI_CHAT_BUSY','AI_CHAT_INVALID_RESPONSE','AI_CHAT_INVALID_TOOL_CALL','AI_CHAT_INVALID_TOOL_MESSAGE','AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED','AI_CHAT_TOOL_MESSAGE_REQUIRED','AI_CHAT_TOOL_RESULT_REQUIRED','AI_CHAT_STREAM_TOOL_CALL_MISMATCH','AI_CHAT_INCOHERENT_PERSISTENCE','configured chat, ChatEntity, DBOPFS, and memory errors propagate']),
+        events:[],
+        errors:['AI_CHAT_UNAVAILABLE','AI_CHAT_ABORTED','AI_CHAT_AMBIGUOUS_PROVIDER','AI_CHAT_BUSY','AI_CHAT_INVALID_RESPONSE','AI_CHAT_INVALID_TOOL_CALL','AI_CHAT_INVALID_TOOL_MESSAGE','AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED','AI_CHAT_TOOL_MESSAGE_REQUIRED','AI_CHAT_TOOL_RESULT_REQUIRED','AI_CHAT_STREAM_TOOL_CALL_MISMATCH','AI_CHAT_INCOHERENT_PERSISTENCE','configured chat, ChatEntity, DBOPFS, and memory errors propagate'],
         capabilitiesCore:'Portable persistent chat composition. The default chat calls normalized Arcane.ai.chat; an injected browser or cloud chat function can replace it. DBOPFS method names and ChatEntity semantics remain unchanged, and no provider or storage fallback is invented.',
         example:String.raw`import {
     createPersistentAIChatSession
@@ -269,8 +269,8 @@ async function sendPersistentSupportTurnAfterUserChoice(documents){
     });
     console.log(response.message.content);
 }`
-    }),
-    Object.freeze({
+    },
+    {
         name:'PreferenceStore.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Construction validates schema and initializes mutable defaults only. load/set/reset use an injected adapter when supplied. setAll preserves the complete selected batch and uses one optional adapter setMany call for every selected value when advertised; adapters without setMany retain the complete serial compatibility route under one queued operation. Otherwise an Android bridge selects app-scoped localStorage immediately and does not call Arcane.preferences; non-Android native hosts select Arcane.preferences, whose exact ANDROID_CAPABILITY_UNSUPPORTED failure switches that selected adapter to local fallback. Other failures propagate.',
@@ -293,8 +293,8 @@ const store = new PreferenceStore({
 });
 await store.set('enabled', true);
 console.log(await store.load());`
-    }),
-    Object.freeze({
+    },
+    {
         name:'QRCode.min.js',
         classification:'vendor',
         lifecycleSideEffects:'Classic-script load defines global QRCode. Construction and makeCode() render canvas/SVG/table/image DOM under the target; clear() removes rendered output.',
@@ -312,8 +312,8 @@ new QRCode(document.getElementById('qr'), {
     correctLevel:QRCode.CorrectLevel.H
 });
 </script>`
-    }),
-    Object.freeze({
+    },
+    {
         name:'Questionnaire.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Per-instance in-memory delay only; construction starts no timer and performs no persistence or prompt.',
@@ -326,8 +326,8 @@ new QRCode(document.getElementById('qr'), {
 const questionnaire = new Questionnaire();
 questionnaire.setNotificationTime(1000);
 console.log(questionnaire.checkQuestionnaireShown(Date.now()-1000, false));`
-    }),
-    Object.freeze({
+    },
+    {
         name:'RecordLinkIndex.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure indexing with no mutation of supplied records.',
@@ -342,8 +342,8 @@ const records = [
     {id:'B2000',links:[]}
 ];
 console.log(buildRecordLinkIndex(records));`
-    }),
-    Object.freeze({
+    },
+    {
         name:'RecordPassageIndex.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure bounded text/page/date/rule analysis. Supplied accept callbacks run synchronously; inputs are not mutated.',
@@ -359,8 +359,8 @@ const findings = findRulePassages(
     {recordId:'A1000'}
 );
 console.log(findings[0]);`
-    }),
-    Object.freeze({
+    },
+    {
         name:'RecordReviewStore.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Construction initializes memory only. load/set use an injected adapter, Arcane.storage, or app-scoped localStorage; set() persists the whole normalized map and timestamps the changed review.',
@@ -377,8 +377,8 @@ const store = new RecordReviewStore({adapter:{
 }});
 await store.load();
 console.log(await store.set('A1000',{status:'reviewed',notes:'Checked.'}));`
-    }),
-    Object.freeze({
+    },
+    {
         name:'RevocableProjectionLedger.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Append-only bounded page-memory ledger; async methods complete in-process. It never persists, communicates, authorizes, or executes payloads. Every accepted projection reserves budget for a later revocation; the port adapter is a frozen validated facade.',
@@ -400,8 +400,8 @@ const revoked = await ledger.appendRevocation({
     payload:{reason:'superseded'}
 });
 console.log(stored.status, revoked.status);`
-    }),
-    Object.freeze({
+    },
+    {
         name:'RiskSignalAnalyzer.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure NFKC scan of the complete supplied text; resets each supplied RegExp lastIndex before testing and does not mutate the input.',
@@ -414,8 +414,8 @@ console.log(stored.status, revoked.status);`
 console.log(analyzeRiskSignals('Send a gift card now.', {
     signals:[{id:'gift-card',pattern:/gift card/i,weight:40}]
 }));`
-    }),
-    Object.freeze({
+    },
+    {
         name:'ScamRiskPolicy.js',
         classification:'public-first-party',
         lifecycleSideEffects:'assessScamRisk() and guidance are pure against the selected policy. loadScamNetworkPolicy() fetches/normalizes the static Arcane network policy and updates module-global active policy only when generation/load ordering wins.',
@@ -427,8 +427,8 @@ console.log(analyzeRiskSignals('Send a gift card now.', {
 
 const risk = assessScamRisk('Act now and pay with gift cards.');
 console.log(risk.score, scamSafetyGuidance(risk));`
-    }),
-    Object.freeze({
+    },
+    {
         name:'ScopedOPFSCache.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Construction validates scope/support only. The first operation lazily opens/creates the application data directory and namespace. set() writes one complete JSON file; get() parses the complete file and removes malformed JSON; delete() is exact-key and idempotent. There is no enumeration or clear-all.',
@@ -443,8 +443,8 @@ if (ScopedOPFSCache.supported()) {
     await cache.set('welcome.json',{ready:true});
     console.log(await cache.get('welcome.json'));
 }`
-    }),
-    Object.freeze({
+    },
+    {
         name:'ScreenCapture.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Display permission is requested only by capture methods. Image capture stops tracks in finally. Video/GIF retain streams and GIF sampling state until stop(); stop() encodes, stops tracks, and then resets state. reset() alone clears references and timers but does not stop active media tracks, so call stop() during an active capture.',
@@ -459,8 +459,8 @@ document.querySelector('button').addEventListener('click', async () => {
     const result = await capture.captureImage();
     document.querySelector('img').src = URL.createObjectURL(result.blob);
 });`
-    }),
-    Object.freeze({
+    },
+    {
         name:'SpeechPlayback.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Construction attaches ended/play/pause/error listeners to the supplied audio element. prepare() cancels prior work, serializes synthesis per speech client, creates Blob URLs, autoplays when allowed, and prefetches one segment. cancel/stop release URLs; destroy() also removes listeners and disposes the event source.',
@@ -479,8 +479,8 @@ speakButton.textContent = 'Speak';
 speakButton.addEventListener('click', async () => {
     await speech.prepare({key:'ready',parts:['Arcane is ready.'],autoplay:true});
 });`
-    }),
-    Object.freeze({
+    },
+    {
         name:'StaticDocumentCatalog.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Construction normalizes and indexes the manifest without freezing caller-visible records. Search/list/get are in-memory. hydrate() uses complete memory/cache content or one fetch with UTF-8 decoding and best-effort cache write. buildContext() may hydrate every matching candidate and returns complete context.',
@@ -500,8 +500,8 @@ const catalog = new StaticDocumentCatalog({
     }]
 });
 console.log(catalog.search('welcome')[0]);`
-    }),
-    Object.freeze({
+    },
+    {
         name:'SystemAppearance.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Construction only binds an injected/default bridge. current() and apply() call native methods when present; browser absence becomes an explicit unsupported result.',
@@ -513,8 +513,8 @@ console.log(catalog.search('welcome')[0]);`
 
 const appearance = new SystemAppearance();
 console.log(await appearance.current());`
-    }),
-    Object.freeze({
+    },
+    {
         name:'SystemPlatformPresentation.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Classic-script load installs or overwrites frozen globalThis.ArcaneSystemPlatformPresentation. kernelType()/displayName() are pure; apply() replaces only arcane-kernel classes and the matching dataset field.',
@@ -526,8 +526,8 @@ console.log(await appearance.current());`
 <script>
 console.log(ArcaneSystemPlatformPresentation.apply({platform:'windows'}));
 </script>`
-    }),
-    Object.freeze({
+    },
+    {
         name:'SystemToolRegistry.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure registry and command-string construction; it never executes a command.',
@@ -542,8 +542,8 @@ const tools = new Registry([{
     command:args => 'echo ' + args.map(quoteArgument).join(' ')
 }]);
 console.log(tools.build('echo',['hello world']));`
-    }),
-    Object.freeze({
+    },
+    {
         name:'TerminalClient.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Construction subscribes to three Arcane event channels and tracks sessions. start/close mutate the in-memory session map around Core calls; destroy() invokes subscription disposers but does not close sessions.',
@@ -558,8 +558,8 @@ if (!terminal.available) throw new Error('Native terminal unavailable.');
 terminal.addEventListener('terminal-output', event => console.log(event.detail.data));
 const session = await terminal.start({shell:'auto',columns:100,rows:30});
 await terminal.write(session.id,'node --version\n');`
-    }),
-    Object.freeze({
+    },
+    {
         name:'TerminalCommandRegistry.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure parser/registry. execute() invokes only the registered injected handler and awaits it; it makes no native terminal call by itself.',
@@ -574,8 +574,8 @@ const commands = new Registry([{
     run:({args}) => 'Hello ' + (args[0] ?? 'world')
 }]);
 console.log(await commands.execute('greet Arcane'));`
-    }),
-    Object.freeze({
+    },
+    {
         name:'ThemeBootstrap.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Import immediately starts one shared load/apply promise, publishes globalThis.arcaneThemeReady, and installs one shared appearance.changed subscription when Arcane.events exists. Initial failures are warned and converted to an error-bearing result.',
@@ -587,8 +587,8 @@ console.log(await commands.execute('greet Arcane'));`
 
 console.log((await arcaneThemeReady).state);
 console.log((await bootstrapArcaneTheme()).state);`
-    }),
-    Object.freeze({
+    },
+    {
         name:'ThemeManager.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Construction binds stores and appearance bridge without I/O. load() reads preferences and applies DOM state. Set/save/activate/reset methods persist settings, mutate root presentation, call native appearance, and emit. preview() mutates root without persistence.',
@@ -600,8 +600,8 @@ console.log((await bootstrapArcaneTheme()).state);`
 
 const {manager,state} = await loadAndApplyTheme();
 console.log(state.mode, manager.current());`
-    }),
-    Object.freeze({
+    },
+    {
         name:'TimeGuard.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Browser-only import loads DBOPFS/User, attaches user-entity-loaded, and may install window.timeguard when User is ready. Construction reads window.user times; setters mutate window.user fields. checkGracePeriod() logs elapsed milliseconds.',
@@ -619,8 +619,8 @@ const guard = window.timeguard?.ready
         {once:true}
     ));
 console.log(guard.checkClockRollback());`
-    }),
-    Object.freeze({
+    },
+    {
         name:'ToolCallRouter.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure parsing plus invocation of injected handlers. Complete calls execute sequentially; a streamed-name map executes concurrently with all-settled containment.',
@@ -637,8 +637,8 @@ const response = {choices:[{message:{tool_calls:[{
     }
 }]}}]};
 console.log(await handleResponse(response,{sum:({a,b}) => a+b}));`
-    }),
-    Object.freeze({
+    },
+    {
         name:'uPlot.iife.min.js',
         classification:'vendor',
         lifecycleSideEffects:'Classic-script load defines global uPlot. Construction creates chart DOM/canvas and listeners/hooks; instance mutations redraw; destroy() unsubscribes and removes resources.',
@@ -656,8 +656,8 @@ const chart = new uPlot(
     document.getElementById('chart')
 );
 </script>`
-    }),
-    Object.freeze({
+    },
+    {
         name:'uPlot.LICENSE.txt',
         classification:'vendor',
         lifecycleSideEffects:'Non-executable MIT license companion; loading it as text has no runtime lifecycle.',
@@ -666,8 +666,8 @@ const chart = new uPlot(
         errors:[],
         capabilitiesCore:'None.',
         example:String.raw`<a href="/arcane/modules/uPlot.LICENSE.txt">uPlot MIT license</a>`
-    }),
-    Object.freeze({
+    },
+    {
         name:'uPlot.min.css',
         classification:'vendor',
         lifecycleSideEffects:'Stylesheet load applies uPlot presentation classes to matching DOM; there is no JavaScript state or export.',
@@ -676,8 +676,8 @@ const chart = new uPlot(
         errors:[],
         capabilitiesCore:'None.',
         example:String.raw`<link rel="stylesheet" href="/arcane/modules/uPlot.min.css">`
-    }),
-    Object.freeze({
+    },
+    {
         name:'WaitForComponent.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Attaches configured readiness/error listeners and an optional timer no longer than 60 seconds, then removes all of them on resolution/rejection. Immediate-ready paths clean up synchronously.',
@@ -696,8 +696,8 @@ await waitForComponent(widget,{
     timeoutMs:5000
 });
 widget.refresh();`
-    }),
-    Object.freeze({
+    },
+    {
         name:'YouTubeMedia.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure URL parsing and construction; does not fetch, navigate, embed, or contact YouTube.',
@@ -709,5 +709,5 @@ widget.refresh();`
 
 const media = parseYouTubeMedia('https://youtu.be/dQw4w9WgXcQ');
 console.log(youtubeEmbedUrl(media));`
-    })
-]);
+    }
+];

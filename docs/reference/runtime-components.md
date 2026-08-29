@@ -1103,6 +1103,15 @@ the third argument to `AI.fetchSTT()`. Cancel, a newer capture, and `destroy()`
 abort that controller and suppress late results. This proves request delivery
 was canceled, not that an uncooperative provider stopped underlying work.
 
+Each microphone attempt also owns one capture generation and one operation id
+from the initial `getUserMedia()` request through transcription settlement. A
+release while permission is still pending retires only that generation because
+the browser request cannot be canceled synchronously. If that stale request
+later resolves, the component stops its returned stream without clearing a
+newer press, status, operation id, or retry. Active capture finalization checks
+both the generation and operation id, and successful transcription retains the
+same capture operation id rather than inventing a second correlation boundary.
+
 User Unmute calls the shared `AI.setSpeechMuted(false)` lifecycle owner before
 or with publishing the TTS load intent, so the runtime can legally load TTS.
 Configured `initialMuted:false` records that same unmute intent even when the

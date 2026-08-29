@@ -263,6 +263,44 @@ console.log(BROWSER_WASM_RUNTIME_AUTHORITY.protocol);
 console.log(BROWSER_WASM_RUNTIME_AUTHORITY.package.version); // 3.6.0
 ```
 
+## completeValueText()
+
+### Overview
+
+Returns complete caller content as text. Strings are returned unchanged;
+supported non-string values become readable JSON text. Cycles use `$ref`
+records, and special primitives, maps, sets, dates, regular expressions,
+functions, symbols, typed views, array buffers, and accessors retain explicit
+representations.
+
+### Signature and result
+
+```text
+completeValueText(value)
+```
+
+The function returns one complete string. It reads ordinary data descriptors
+without invoking accessors and records repeated object references by their
+first traversal location.
+
+### Availability and normalization
+
+**Compatible JavaScript module host.** This is a pure value-to-text helper. It
+does not require a provider, model, cache, storage, WebAssembly, or browser
+capability.
+
+### Example
+
+```javascript
+import {completeValueText} from 'arcane-os/ai/browser-wasm';
+
+const status = new Map([
+    ['state','ready'],
+    ['roles',new Set(['llm'])]
+]);
+console.log(completeValueText(status));
+```
+
 ## createArcaneAI()
 
 ### Overview
@@ -489,6 +527,7 @@ release();
 - [Canonical `createArcaneAI()` entry](../sdk-api.md#createarcaneai) and the
   sibling [`BROWSER_WASM_RUNTIME_AUTHORITY`](../sdk-api.md#browserwasmruntimeauthority),
   [`adaptV1LlmProvider()`](../sdk-api.md#adaptv1llmprovider),
+  [`completeValueText()`](../sdk-api.md#completevaluetext),
   [`createBrowserModelSource()`](../sdk-api.md#createbrowsermodelsource),
   [`createBrowserWasmLlmProvider()`](../sdk-api.md#createbrowserwasmllmprovider),
   and [`createDbopfsModelStore()`](../sdk-api.md#createdbopfsmodelstore) entries

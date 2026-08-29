@@ -9,7 +9,7 @@ They are not TypeScript declarations.
 
 ## Portable SDK AI and Core AI
 
-The SDK `0.3.1` has two related but separate normalized boundaries:
+The SDK `0.3.4` has two related but separate normalized boundaries:
 
 | Boundary | Use | Host |
 |---|---|---|
@@ -17,9 +17,9 @@ The SDK `0.3.1` has two related but separate normalized boundaries:
 | `globalThis.Arcane.ai` and `globalThis.Arcane.speech` | Call an admitted Core-normalized AI or native speech method. | Native/Core only when the current app, method, capability, provider, and host are admitted. |
 
 The browser-only [`arcane-os/ai/browser-wasm`](../ai/browser-wasm.md)
-entrypoint provides a caller-authenticated local LLM adapter, and
+entrypoint provides a caller-selected local LLM adapter, and
 [`arcane-os/ai/browser-speech`](../ai/browser-speech.md) provides
-caller-authenticated Whisper/Kokoro provider mechanisms. Neither browser
+caller-selected Whisper/Kokoro provider mechanisms. Neither browser
 entrypoint grants Core authority or silently falls back to native/cloud.
 
 [`PersistentAIChatSession.js`](../runtime-modules.md#persistentaichatsessionjs)

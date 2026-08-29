@@ -39,7 +39,7 @@ a nonzero CLI status.
 Machine output uses `arcane-cli-events/1`. Native planning and providers use:
 
 - `arcane-target-adapter/1` for target adapters;
-- `arcane-native-build-plan/1` for immutable native plans;
+- `arcane-native-build-plan/1` for single-attempt native plans;
 - `arcane-native-builder/1` for injected native builders;
 - `arcane-integrated-toolchain/1` for the fixed integrated shared/Core provider.
 
@@ -96,27 +96,29 @@ application- or Arcane OS-local copier owns this operation.
 The operation resolves that declaration while holding the shared
 workspace-operation lock, copies the complete runtime and browser-runtime
 content, and returns the installed-package location plus the materialized
-workspace runtime paths. It writes no runtime identity, receipt, or lock
-metadata.
+workspace runtime paths. After the complete runtime replacement, it writes or
+replaces semantic `arcane.lock.json` metadata from the actual installed
+dependency name, package name, package version, and alias source.
 
 Materialization writes a complete staging tree before the commit boundary,
 moves any prior runtime to an owned backup, installs the new tree, and restores
 the prior tree if commit fails. Cancellation remains effective through the last
 pre-commit check. Successful whole-tree replacement removes paths absent from
-the selected runtime content. The operation never creates or reconciles
-`arcane.lock.json`.
+the selected runtime content. The lock document describes the selected
+installation and projected roots; it is not a content-identity or admission
+record.
 
 `upgradeApplication()` and `arcane upgrade` run the application's ordinary
-`npm upgrade` command. They do not authenticate or reconcile an Arcane lock,
-runtime projection, or managed import map.
+`npm upgrade` command. They do not independently reconcile the installed SDK
+projection, semantic Arcane lock, or managed import map.
 
 ## Central events and time-travel data
 
 `arcane-os/event-manager` is host-neutral JavaScript. Its live event path is
 synchronous, in-process `event-pubsub`; it does not select WebView2,
 WebKitGTK, Android, HTTP, Core, or a kernel boundary. Optional history uses the
-`arcane-event-stack/1` data format. That protocol names a diagnostic
-diagnostic document, not a network channel and not the `arcane/1` Core RPC
+`arcane-event-stack/1` data format. That protocol names a diagnostic document,
+not a network channel and not the `arcane/1` Core RPC
 protocol.
 
 Live listeners receive the original arguments. Recording separately snapshots
@@ -156,20 +158,29 @@ imports such as:
 import ollama from 'arcane/Ollama';
 ```
 
-The physical-v1 tree lives entirely beneath `arcane/`. SDK `0.3.1` projects the
+The physical-v1 tree lives entirely beneath `arcane/`. SDK `0.3.4` projects the
 complete canonical runtime and browser runtime selected by the installed SDK
 package. Runtime dependencies stay under
 `arcane/dependencies/`; the SDK event and browser-AI closure stays under
 `arcane/sdk/`. This URL-key separation prevents runtime and SDK dependency
 versions from aliasing one another.
 
-The `0.3.1` map derives its complete entries from the selected runtime graph;
+The physical workspace route keeps its established route count and order. The
+external route includes `components`, `css`, `dependencies`, `entities`, `img`,
+`modules`, and `sdk`, followed by optional trailing `security` when that
+directory exists; its external license route remains second. The modern
+integrated physical route uses the same ordered include list in its one route.
+Omitting only that final optional entry is compatible. Removing, reordering, or
+renaming any preceding entry changes the physical contract.
+
+The `0.3.4` map derives its complete entries from the selected runtime graph;
 application source imports do not select a fixed entry count. The operation
 result reports `imports`, `entryCount`, and `excludedModules`; reached-file
 traversal remains internal. The
 managed graph exposes `arcane-os/event-manager`, `arcane-os/ai/browser-wasm`,
-and `arcane-os/ai/browser-speech`; dependency compatibility mappings are added
-when runtime or SDK root traversal observes them.
+`arcane-os/ai/browser-speech`, `arcane-os/preference-store`, and
+`arcane-os/speech-playback`; dependency compatibility mappings are added when
+runtime or SDK root traversal observes them.
 
 The focused physical targets remain stable when their bindings are reached:
 
@@ -222,14 +233,20 @@ The projection contains the complete public paths relative to its declared
 expose the private `/ARCANE_APP_RELEASE.json`. Genuinely malformed projection
 data fails `ARCANE_RUNTIME_PROJECTION_INVALID`.
 
-External `validateWorkspace()` results also expose a frozen `sdkInstallation`
-authority with exactly `dependencyName`, `packageSource`,
+External `validateWorkspace()` results also expose `sdkInstallation` with
+exactly `dependencyName`, `packageSource`,
 `canonicalPackageRoot`, `packageName`, `packageVersion`, `runtimeRoot`,
-`browserRuntimeRoot`, `runtimeManifest`, and `browserRuntimeManifest`. A
+and `browserRuntimeRoot`. A
 workspace may use the canonical dependency name or one exact npm alias such as
-`npm:arcane-os@0.3.1`; the physical package manifest must still identify
-exactly as `arcane-os@0.3.1`. Canonical-plus-alias duplicates, multiple aliases,
+`npm:arcane-os@0.3.4`; the physical package manifest must still identify
+exactly as `arcane-os@0.3.4`. Canonical-plus-alias duplicates, multiple aliases,
 links/junctions, indirect package roots, or version drift are reported.
+
+For external workspaces, `arcane dev` serves the projected `arcane/` root,
+including `arcane/sdk` and `arcane/dependencies`, alongside the selected
+application. Integrated workspaces retain their configured physical routes.
+The explicit live-source development mapping remains a separate development
+path and does not rewrite the installed projection.
 
 The imported module can be pure browser logic, standard-Web-API logic, or a
 client of `globalThis.Arcane`. Import-map resolution is not a new Arcane wire
@@ -281,7 +298,7 @@ Application code should select a normalized role, not an internal protocol.
 The exported
 [`getAIProviderRuntime()` singleton](runtime-modules.md#aiproviderruntimejs)
 comes from the selected runtime and owns independent `llm`, `stt`, and
-`tts` selections. SDK `0.3.1` ships browser-WASM LLM and browser
+`tts` selections. SDK `0.3.4` ships browser-WASM LLM and browser
 speech provider/2 adapters and also adapts selected legacy OpenAI LLM/STT/TTS,
 Core-backed Ollama LLM, and available Core speech STT/TTS routes into provider/2;
 other native, Core, or cloud routes require an externally supplied compatible
@@ -298,7 +315,7 @@ and an adapter into the same provider-neutral lifecycle. For browser speech,
 [`arcane-os/ai/browser-speech`](ai/browser-speech.md) creates independent
 Whisper STT and Kokoro TTS providers that register directly with the normalized
 runtime. The SDK supplies mechanism; applications retain model/runtime choice,
-provenance, licenses, prompts, tools, voices, and disclosure policy.
+licenses, prompts, tools, voices, and disclosure policy.
 
 ### Browser-WASM LLM lifecycle
 
@@ -318,7 +335,7 @@ compatible completed cache, otherwise it rejects with
 `ARCANE_AI_MODEL_OFFLINE_MISS`. Unload releases the active Wllama session but
 does not silently delete the app-owned cache.
 
-SDK `0.3.1` requires WebGPU. Load requests full offload and waits for the runtime
+SDK `0.3.4` requires WebGPU. Load requests full offload and waits for the runtime
 to report a loaded model. `navigator.gpu` presence alone is
 not readiness. There is no CPU fallback, partial-offload success mode, or
 silent switch to native/Core/cloud inference.
@@ -333,13 +350,9 @@ version-pinned npm/package runtime entry and optional upstream `wasmPaths`;
 the selected runtime then downloads models and voices through its normal
 provider fetch and browser cache behavior after explicit `load()`.
 
-`createBrowserSpeechArtifactGraph()` is an ordinary materialization descriptor;
-the historical authenticated-graph discriminator does not activate admission
-or isolation. The SDK default is `secure:false`, and ordinary speech uses the
-caller-selected upstream runtime, model, voice, Fetch, cache, and Worker
-behavior without a restrictive graph gate. A supplied `secure:true` value
-records intent only. It activates no hardening until the user separately
-reviews and authorizes an implementation.
+`createBrowserSpeechArtifactGraph()` is an ordinary materialization descriptor.
+Browser speech uses the caller-selected upstream runtime, model, voice, Fetch,
+cache, and Worker behavior.
 
 Ordinary module routing preserves bare import specifiers for native import-map
 resolution and leaves bare `fetch`, `caches`, and `Worker` calls unchanged when
@@ -651,9 +664,6 @@ The common contract ends where platform truth must remain different:
 ## Complete-content boundary
 
 SDK runtime, app releases, import-map files, bundles, native plans, providers,
-and artifacts preserve their complete selected content. Ordinary paths do not
-count, limit, hash, truncate, clip, tail, elide, or identify content by bytes,
-and they do not require provenance or admission receipts. Optional hardening is
-inactive unless the user explicitly selects `secure:true`. Required credential
+and artifacts preserve their complete selected content. Required credential
 protection, genuinely malformed input rejection, applicable law, external
 protocol requirements, and host platform safety remain in effect.

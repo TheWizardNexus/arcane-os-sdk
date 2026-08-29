@@ -19,7 +19,7 @@ high-level page links to the relevant deep section instead of repeating it.
 | Use the Node.js package API | [SDK JavaScript API](sdk-api.md) |
 | Publish central events, capture bounded time-travel history, or observe the DOM | [EventManager and event-stack reference](event-manager.md) |
 | Use the `arcane` command | [CLI reference](cli.md) |
-| Generate named browser imports or inspect the authenticated physical runtime | [`arcane import-map`](cli.md#arcane-import-map) and [browser runtime delivery](protocols.md#browser-runtime-delivery) |
+| Generate named browser imports or inspect the selected physical runtime | [`arcane import-map`](cli.md#arcane-import-map) and [browser runtime delivery](protocols.md#browser-runtime-delivery) |
 | Choose browser, native, cloud, or cross-host behavior | [Availability and normalization](availability-and-normalization.md) |
 | Import a shipped renderer module | [Runtime module catalog](runtime-modules.md) |
 | Use a shared entity | [Runtime entity modules](runtime-entities.md) and [exact export contracts](core/arcane-entities.md) |
@@ -27,60 +27,52 @@ high-level page links to the relevant deep section instead of repeating it.
 | Call `globalThis.Arcane` | [Arcane Core API](core/arcane-api.md) |
 | Subscribe to native events | [Arcane event reference](core/arcane-events.md) |
 | Use provider-neutral AI lifecycle, chat, speech, persistence, or document context | [Normalized AI](#normalized-ai) |
-| Run a caller-authenticated local LLM in the browser | [Browser-WASM local AI](ai/browser-wasm.md) |
-| Run caller-authenticated Whisper or Kokoro in the browser | [Browser speech providers](ai/browser-speech.md) |
+| Run a caller-selected local LLM in the browser | [Browser-WASM local AI](ai/browser-wasm.md) |
+| Run caller-selected Whisper or Kokoro in the browser | [Browser speech providers](ai/browser-speech.md) |
 | Use Arcane Ollama | [Arcane Ollama guide](arcane-ollama.md) |
 | Understand transports and protocol switching | [Protocol and host architecture](protocols.md) |
 | Run contract and behavior tests | [Behavioral testing](behavioral-testing.md) |
 
-## Version scope and provenance
+## Version scope and source ownership
 
 This repository contains explicitly versioned surfaces with different owners:
 
 | Surface | Source identity | Meaning |
 | --- | --- | --- |
-| SDK and CLI | `arcane-os` `0.3.1` | The Node.js toolchain plus the browser-only `arcane-os/ai/browser-wasm`, `arcane-os/ai/browser-speech`, and portable `arcane-os/mail` entrypoints in this checkout. |
-| Browser runtime | `runtime/ARCANE_RUNTIME_RELEASE.json`, SDK `0.3.1`, protocol `arcane/1` | The SDK-canonical dynamic runtime inventory shipped under `runtime/`; the receipt binds its exact paths, bytes, inventory, and digest. |
-| Browser SDK runtime | `browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json`, SDK `0.3.1` | The dynamically derived browser closure for events, Wllama, and Browser Speech mechanisms. It contains no speech runtime, model, voice, third-party legal/notice, or corresponding-source payloads. |
-| Core reference snapshot | Arcane OS commit `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, protocol `arcane/1` | The application-facing Core contract derived into `docs/reference/core/`. Canonical inventory and focused-member content was verified unchanged at Arcane OS `main` commit `13f3ce0ae34f77a3495331c8b4c30b1bb105f8ed`; SDK-local provenance, link, and package-boundary annotations are added explicitly. |
+| SDK and CLI | `arcane-os` `0.3.4` | The Node.js toolchain, portable `arcane-os/event-manager`, `arcane-os/mail`, `arcane-os/preference-store`, and `arcane-os/speech-playback` entrypoints, plus the browser-only `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints in this checkout. |
+| Browser runtime | SDK `0.3.4`, protocol `arcane/1`, `runtime/` | The SDK-canonical runtime tree. `listRuntimeFiles()`, `readRuntimeFile()`, and `loadRuntimeRelease()` derive its current inventory directly from the selected directory. |
+| Browser SDK runtime | SDK `0.3.4`, `browser-runtime/` | The browser closure for events, Wllama, and Browser Speech mechanisms. `listSdkBrowserRuntimeFiles()`, `readSdkBrowserRuntimeFile()`, and `loadSdkBrowserRuntimeRelease()` derive its current inventory directly from the selected directory. |
+| Core reference snapshot | Arcane OS commit `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, protocol `arcane/1` | The application-facing Core contract imported into `docs/reference/core/`, with SDK-local links and package-boundary notes added explicitly. |
 
-The SDK runtime receipt and Core reference are distinct evidence and have
-different current authorities. A browser module's bytes come from the SDK
-runtime receipt. A native build selects one
-explicit Arcane OS checkout and Core. This SDK version accepts that selection
-only after its current native plan checks the exact declared protocol, version,
-features, capabilities, methods, provider contract, and identity-bound
-receipts. That current-build admission does not promise that a future SDK will
-accept this Core or that this SDK will accept a future Core. A matching protocol
-name or higher version alone is not compatibility or authority.
+The SDK runtime source and Core reference have different owners. A browser
+module comes from the selected SDK runtime tree. A native build selects one
+explicit Arcane OS checkout and Core, then checks the declared protocol,
+version, features, capabilities, methods, and provider contract needed by that
+build. A matching protocol name or higher version alone does not promise
+functional compatibility.
 
-See [Core reference provenance](core/README.md) for the imported inventory and
-the exact distinction between a documentation snapshot and shipped runtime
-bytes.
+See the [Core reference source notes](core/README.md) for the imported inventory
+and the distinction between a documentation snapshot and the selected runtime.
 
-## Published 0.3.1
+## Published 0.3.4
 
-The verified published package is exactly `arcane-os@0.3.1` from source commit
-`d118cee133f41773dab9c8841ab0fccfd776c0bc`. The npm `latest` dist-tag resolves
-to `0.3.1`; the separate `dev` dist-tag remains `0.1.0-dev.5`.
+The published package is `arcane-os@0.3.4` from package-source commit
+`9e657b31f758a2c7943446533fe87afda206ac49`. The npm `latest` dist-tag resolves
+to `0.3.4`.
 
-The singleton-event, Mail, warn-first Browser Speech, and independent mixed-route
-contracts documented below are included in this exact package authority.
+This package includes the portable preference-store and speech-playback
+entrypoints, the browser runtime providers, optional trailing physical-workspace
+`security` route compatibility, and the Speech capture retry-state correction.
+Examples, general documentation, tests, and generated reference-site output are
+repository surfaces and are not included in the npm package.
 
-| Evidence | Exact value |
+| Release boundary | Exact value |
 | --- | --- |
-| npm integrity | `sha512-g9C0cXK6Xim4Mu8D7zLKn3XErIo8UZEjIaGUA1fwnU6nVbB8XXgLD6/AjaVln+na6ihIHLzsHGgyTeic4yNggg==` |
-| npm shasum | `b02c2d9bbd69c74ec69bed94174eeb09a523f093` |
-| Immutable release tarball | `arcane-os-0.3.1.tgz`; 7,238,316 bytes; SHA-256 `ac09c64f9d326f86dd560c7b4387c6956ef24553611cfd22f0ba68810daaff4f` |
-| GitHub release | [`0.3.1`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.3.1) (tag and title are both exactly `0.3.1`) |
-| Hosted source/artifact gate | [Check run 33140411052](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33140411052) |
-| Trusted publication | [Run 33140501395](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33140501395) |
-
-The npm SLSA provenance binds the published package to that exact source commit
-and `.github/workflows/publish-dev.yml`. Hashes prove byte identity or
-consistency; provenance establishes the recorded source/workflow relationship.
-Neither claim alone proves browser hardware support, native admission, or a
-particular application's provider/model policy.
+| npm package | `arcane-os@0.3.4`; `latest=0.3.4` |
+| Package source | `9e657b31f758a2c7943446533fe87afda206ac49` |
+| GitHub release | [`0.3.4`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.3.4) (tag and title are both exactly `0.3.4`) |
+| Selected package run | [Check run 33268940871](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33268940871) |
+| Selected publication run | [Publish run 33268987444](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33268987444) |
 
 ## MDN-style page contract
 
@@ -100,10 +92,11 @@ Public reference entries follow the established Arcane documentation model:
 
 ## Public runtime inventory
 
-The package exposes 200 semantic JavaScript records across 14 JavaScript
-entrypoints, plus eight JSON Schemas, its exact runtime manifest, and package
-metadata. Ten entrypoints are Node.js control-plane surfaces,
-`arcane-os/event-manager` and `arcane-os/mail` run in Node and browsers, and
+The package exposes 205 semantic JavaScript records across 16 JavaScript
+entrypoints, plus eight JSON Schemas and package metadata. Ten entrypoints are
+Node.js control-plane surfaces,
+`arcane-os/event-manager`, `arcane-os/mail`, `arcane-os/preference-store`, and
+`arcane-os/speech-playback` run in Node and browsers, and
 `arcane-os/ai/browser-wasm` plus `arcane-os/ai/browser-speech` are browser-only.
 The [machine-readable package
 inventory](inventory/package-api.json) and [SDK member reference](sdk-api.md)
@@ -119,13 +112,13 @@ The synchronized browser payload exposes:
   mail transport;
 - 15 shared entity modules under `runtime/arcane/entities/`;
 - 39 reusable HTML-import components under `runtime/arcane/components/`;
-- seven shared CSS artifacts, security policy, images, and the vendored
-  `strong-type` dependency.
+- seven shared CSS artifacts, images, optional physical-workspace security
+  files where present, and the vendored `strong-type` dependency.
 
 The module and component catalogs enumerate every shipped artifact, including
-vendor support files that are not ESM imports. The runtime manifest remains the
-byte-level source of truth; the catalogs explain what those bytes let a
-developer do.
+vendor support files that are not ESM imports. The selected runtime directories
+and their current source inventories remain authoritative; the catalogs explain
+what those artifacts let a developer do.
 
 ## Normalized AI
 
@@ -138,8 +131,8 @@ Ollama, Wllama, Whisper, Kokoro, native, or cloud transport:
 | Observe sticky role state and startup settlement | [`AIRuntimeState.js`](runtime-modules.md#airuntimestatejs) | Cross-host EventTarget state; observation grants no authority. |
 | Offer explicit selected-model start/cancel UI | [`chat.html`](runtime-components.md#chathtml), [`speech.html`](runtime-components.md#speechhtml), and [`voice-transcription.html`](runtime-components.md#voice-transcriptionhtml) | Browser/native WebView components; user activation emits a cancelable request before any LLM or STT load intent, and recording stays disabled without sticky ready STT. |
 | Use Core-normalized chat | [`globalThis.Arcane.ai`](core/arcane-ai-contracts.md) | Native/Core only when separately admitted. |
-| Run a caller-selected GGUF LLM locally | [`arcane-os/ai/browser-wasm`](ai/browser-wasm.md) | Browser secure context with WebGPU/full-offload evidence, WebAssembly, and OPFS/DBOPFS. |
-| Run caller-selected Whisper/Kokoro locally | [`arcane-os/ai/browser-speech`](ai/browser-speech.md) | Browser with DBOPFS, Web Locks, Workers, and caller-supplied immutable runtime/model bytes. |
+| Run a caller-selected GGUF LLM locally | [`arcane-os/ai/browser-wasm`](ai/browser-wasm.md) | Browser secure context with WebGPU full-offload availability, WebAssembly, and OPFS/DBOPFS. |
+| Run caller-selected Whisper/Kokoro locally | [`arcane-os/ai/browser-speech`](ai/browser-speech.md) | Browser with DBOPFS, Web Locks, Workers, and caller-supplied runtime and model sources. |
 | Add bounded persistent history and memory | [`PersistentAIChatSession.js`](runtime-modules.md#persistentaichatsessionjs) | Browser/native WebView runtime with ChatEntity/DBOPFS and a configured chat function. |
 | Add explicit document search/context | [`DBOPFSDocumentLibrary.js`](runtime-modules.md#dbopfsdocumentlibraryjs) | Existing DBOPFS-style adapter; search occurs only after the app calls it or deliberately wires its context builder into chat. |
 
@@ -175,11 +168,9 @@ Do not infer local-AI readiness from `Arcane.runtime.current().managedLocalAI`,
 infer authorization from a transport name, or treat an Ollama model inventory
 as package admission. Each method rechecks native policy at invocation time.
 
-## Source, receipts, and licensing
+## Source and licensing
 
-- [Exact SDK runtime release manifest](../../runtime/ARCANE_RUNTIME_RELEASE.json)
 - [SDK runtime authority record](../../tools/runtime-source.json)
-- [Exact browser AI runtime receipt](../../browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json)
 - [AGPL license](../../LICENSE)
 - [Commercial-license notice](../../COMMERCIAL-LICENSE.md)
 - [Third-party and distribution notice](../../NOTICE)

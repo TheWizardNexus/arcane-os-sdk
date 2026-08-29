@@ -162,9 +162,16 @@ test('the public package API inventory matches every JavaScript export and MDN e
     const exportGraph=await livePackageExportGraph(packageDocument);
 
     await t.test('the inventory has stable unique records',()=>{
-        assert.equal(packageDocument.version,'0.3.1');
+        assert.equal(packageDocument.version,'0.3.4');
         assert.equal(inventory.sdkVersion,packageDocument.version);
+        assert.equal(inventory.memberCount,205);
         assert.equal(inventory.memberCount,exportGraph.length);
+        assert.equal(
+            Object.values(packageDocument.exports).filter(target=>
+                typeof target==='string'&&/[.](?:mjs|js)$/u.test(target)
+            ).length,
+            16
+        );
         assert.equal(inventory.members.length,inventory.memberCount);
         assert.equal(new Set(inventory.members.map(member=>member.id)).size,inventory.memberCount);
         assert.equal(
@@ -199,6 +206,37 @@ test('the public package API inventory matches every JavaScript export and MDN e
             ].includes(member.name)),
             false
         );
+        const removedRecords=[
+            'APP_BUNDLE_LIMITS',
+            'ARCANE_UPSTREAM_COMMIT',
+            'assertNativeApplicationToolchainCompatibility',
+            'assertNativeToolchainCompatibility',
+            'assertPortableToolchainCompatibility',
+            'authenticateAppReleaseAuthority',
+            'authenticateAppReleaseReceipt',
+            'authenticateNativeBuildPlan',
+            'authenticateRuntimeReceipt',
+            'authenticateSharedPayloadSnapshot',
+            'prepareSharedPayloadSnapshot',
+            'readVerifiedAppReleaseFile',
+            'readVerifiedRuntimeFile',
+            'verifyRuntime'
+        ];
+        assert.deepEqual(
+            inventory.members.filter(member=>removedRecords.includes(member.name)),
+            []
+        );
+        for(const name of [
+            'getSdkBrowserRuntimeRoot',
+            'listRuntimeFiles',
+            'listSdkBrowserRuntimeFiles',
+            'loadSdkBrowserRuntimeRelease',
+            'materializeWorkspaceRuntime',
+            'materializeWorkspaceRuntimeContent',
+            'readRuntimeFile',
+            'readSdkBrowserRuntimeFile',
+            'completeValueText'
+        ])assert.ok(inventory.members.some(member=>member.name===name),name);
         for(const name of ['createToolchain','executeOperation']){
             const record=inventory.members.find(member=>member.name===name);
             assert.ok(record,name);
@@ -210,6 +248,7 @@ test('the public package API inventory matches every JavaScript export and MDN e
         assert.ok(materialize);
         assert.doesNotMatch(materialize.signature,/reconcileLock/u);
         assert.match(materialize.signature,/workspaceOperationLease/u);
+        assert.match(materialize.summary,/arcane[.]lock[.]json/u);
         assert.equal(
             inventory.members.some(member=>member.name==='reconcileInstalledSdkLock'),
             false
@@ -233,10 +272,6 @@ test('the public package API inventory matches every JavaScript export and MDN e
             ['arcane-os/speech-playback',{
                 target:'./runtime/arcane/modules/SpeechPlayback.js',
                 names:[
-                    'MAX_SPEECH_CHARACTERS',
-                    'MAX_SPEECH_CHUNKS',
-                    'MAX_SPEECH_INPUT',
-                    'PREFERRED_STREAM_SEGMENT',
                     'SPEECH_PLAYBACK_STATE_EVENT',
                     'SPEECH_VOICE_ALIASES',
                     'SPEECH_VOICE_OPTIONS',
@@ -259,6 +294,7 @@ test('the public package API inventory matches every JavaScript export and MDN e
         const browserWasmSignatures=new Map([
             ['BROWSER_WASM_RUNTIME_AUTHORITY','const BROWSER_WASM_RUNTIME_AUTHORITY'],
             ['adaptV1LlmProvider','adaptV1LlmProvider(provider)'],
+            ['completeValueText','completeValueText(value)'],
             ['createArcaneAI',"createArcaneAI({ llm=null, provider=null, loadPolicy='on-demand', security }={})"],
             ['createBrowserModelSource','createBrowserModelSource(descriptor, { fetchImpl=null }={})'],
             ['createBrowserWasmLlmProvider','createBrowserWasmLlmProvider({ source, sources, store, loadDefaults={}, security, logger=console }={})'],
@@ -377,19 +413,12 @@ test('the public package API inventory matches every JavaScript export and MDN e
         );
         const focusedSections=sectionsByHeading(browserWasmGuide);
         const sdkSections=sectionsByHeading(guide);
-        assert.deepEqual([...focusedSections.keys()],[
+        for(const heading of [
             'Lifecycle at a glance',
-            'Model authority, security, and cache admission',
             'Streaming, cancellation, and tools',
             'Errors and unavailable states',
-            'BROWSER_WASM_RUNTIME_AUTHORITY',
-            'createArcaneAI()',
-            'createBrowserModelSource()',
-            'createBrowserWasmLlmProvider()',
-            'createDbopfsModelStore()',
-            'adaptV1LlmProvider()',
             'Related reference'
-        ]);
+        ])assert.ok(focusedSections.has(heading),heading);
         for(const member of records){
             const required=member.kind==='constant'
                 ?['Overview','Value and import','Availability and normalization','Example']
@@ -410,23 +439,14 @@ test('the public package API inventory matches every JavaScript export and MDN e
             '3.6.0',
             'id',
             'url',
-            'bytes',
-            'sha256',
             'files',
             'sources',
-            'security',
-            'secure:false',
-            'checks.byteLength',
-            'checks.sha256',
-            'observed byte length',
             'DBOPFS',
             'arcane.ai.browser-wasm.model.v4',
             'load({offline:true})',
             'ARCANE_AI_MODEL_OFFLINE_MISS',
             'AbortSignal',
             'ARCANE_AI_REQUEST_ABORTED',
-            'ARCANE_AI_MODEL_AUTHORITY_REQUIRED',
-            'ARCANE_AI_STORAGE_CAPACITY_INSUFFICIENT',
             'ARCANE_AI_PROVIDER_ROLE_MISMATCH',
             'ARCANE_AI_PROVIDER_PROGRESS_INVALID',
             'ARCANE_AI_MODEL_NOT_READY',
@@ -437,8 +457,6 @@ test('the public package API inventory matches every JavaScript export and MDN e
             'ARCANE_AI_RUNTIME_BUSY',
             'ARCANE_AI_RUNTIME_FAILED',
             'ARCANE_AI_WEBASSEMBLY_UNAVAILABLE',
-            'ARCANE_AI_MODEL_STORAGE_REQUIREMENT_UNKNOWN',
-            'ARCANE_AI_STORAGE_ESTIMATE_INVALID',
             'ARCANE_AI_WEBGPU_EXECUTION_UNOBSERVED',
             'existing `ModelController`',
             'does not reapply its `loadPolicy`',
@@ -447,15 +465,17 @@ test('the public package API inventory matches every JavaScript export and MDN e
             'no CPU fallback'
         ])assert.match(browserWasmGuide,new RegExp(escapeRegExp(value),'u'),value);
         assert.match(browserWasmGuide,/packages no model weights/u);
-        assert.match(browserWasmGuide,/does not hash or reread a multi-gigabyte model/u);
         assert.match(browserWasmGuide,/Wllama reports that the model is loaded/u);
-        assert.match(browserWasmGuide,/licenseSpdx[\s\S]*not canonical descriptor fields or runtime admission checks/u);
-        assert.match(browserWasmGuide,/WebGPU and proved\s+full offload are mandatory/u);
+        assert.match(browserWasmGuide,/WebGPU[\s\S]*full offload/u);
         assert.match(browserWasmGuide,/structural data/u);
         assert.match(browserWasmGuide,/never (?:invokes a handler or )?executes a tool/u);
         assert.doesNotMatch(browserWasmGuide,/browser-WASM (?:speech|transcription|native) (?:API|provider) is (?:available|shipped)/iu);
         assert.doesNotMatch(browserWasmGuide,/model weights (?:are )?(?:bundled|included)/iu);
         assert.doesNotMatch(browserWasmGuide,/automatically executes? (?:application )?tools?/iu);
+        assert.doesNotMatch(
+            browserWasmGuide,
+            /checks[.]byteLength|checks[.]sha256|observed byte length|identitySha256|artifactGraphAdmission/u
+        );
         assert.match(guide,/arcane\.ai\.browser-wasm\.webgpu\.adapter\.selected/u);
     });
 
@@ -767,12 +787,18 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
             assert.match(source,/createSTTActivationController/u);
             assert.match(source,/subscribeAIRuntimeState/u);
         }
+        assert.match(speechSource,/const generation = \+\+recordingGeneration/u);
+        assert.match(speechSource,/pendingCaptureStart[\s\S]*recordingGeneration \+= 1/u);
+        assert.match(speechSource,/session[.]generation === recordingGeneration[\s\S]*transcriptionOperationId === session[.]operationId/u);
+        assert.match(speechSource,/transcribeAudio\(audioFile, session[.]operationId\)/u);
         assert.match(voiceSource,/canStartVoiceRecording\(sttRole,state,destroyed\)/u);
         assert.match(voiceSource,/fetchSTT\(file,undefined,signal\)/u);
         assert.match(componentGuide,/Start\s+transcription[\s\S]*Cancel\s+loading[\s\S]*Try\s+again/u);
         assert.match(componentGuide,/preventDefault\(\)[\s\S]*suppresses the callback/u);
         assert.match(componentGuide,/emits no activation request on import or state observation/u);
         assert.match(componentGuide,/`startTranscription=false`[\s\S]*does not request STT/u);
+        assert.match(componentGuide,/capture generation[\s\S]*operation id[\s\S]*stale request[\s\S]*newer press/u);
+        assert.match(speech.normalization,/capture generation\/operation correlation[\s\S]*stale permission settlement/u);
         for(const reason of [
             'runtime-unready',
             'stt-provider-request-cancelled',
