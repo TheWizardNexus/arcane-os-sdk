@@ -95,7 +95,7 @@ async function configureIntegratedWorkspace(workspaceRoot){
                 {
                     source:'arcane',
                     destination:'arcane',
-                    include:['components','css','dependencies','entities','img','modules','sdk','security'],
+                    include:['components','css','dependencies','entities','img','modules','sdk'],
                     exclude:[]
                 }
             ]

@@ -94,6 +94,18 @@ function dependencyNameForSdkPackageSource(source){
     }
 }
 
+function routeIncludeMatches(actual,wanted,optionalSecurity){
+    if(!Array.isArray(actual)||!Array.isArray(wanted))return false;
+    if(actual.length===wanted.length
+        &&actual.every(function sameIncludedPath(value,index){return value===wanted[index];})){
+        return true;
+    }
+    return optionalSecurity
+        &&wanted.at(-1)==='security'
+        &&actual.length===wanted.length-1
+        &&actual.every(function sameFunctionalPath(value,index){return value===wanted[index];});
+}
+
 export function resolveSdkPackageDeclaration(rootPackage,{
     allowMissing=false,
     packageSource
@@ -179,19 +191,30 @@ function classifyRootConfig(config){
             include:['index.js','licence','package.json']
         }
     ];
-    const matches=expected=>routes.length===expected.length&&routes.every((route,index)=>{
-        const wanted=expected[index];
-        return isObject(route)&&Object.keys(route).every(key=>['source','destination','include','exclude'].includes(key))
-            &&route.source===wanted.source&&route.destination===wanted.destination
-            &&JSON.stringify(route.include)===JSON.stringify(wanted.include)
-            &&Array.isArray(route.exclude)&&route.exclude.length===0;
-    });
+    const matches=(expected,{optionalArcaneSecurity=false}={})=>{
+        if(routes.length!==expected.length)return false;
+        return routes.every(function routeMatches(route,index){
+            const wanted=expected[index];
+            return isObject(route)
+                &&Object.keys(route).every(function knownRouteKey(key){
+                    return ['source','destination','include','exclude'].includes(key);
+                })
+                &&route.source===wanted.source&&route.destination===wanted.destination
+                &&routeIncludeMatches(
+                    route.include,
+                    wanted.include,
+                    optionalArcaneSecurity&&index===0
+                        &&wanted.source==='arcane'&&wanted.destination==='arcane'
+                )
+                &&Array.isArray(route.exclude)&&route.exclude.length===0;
+        });
+    };
     let workspaceMode;
     let browserRuntimeLayout;
-    if(matches(external)){
+    if(matches(external,{optionalArcaneSecurity:true})){
         workspaceMode='external';
         browserRuntimeLayout='physical-v1';
-    }else if(matches(integrated)){
+    }else if(matches(integrated,{optionalArcaneSecurity:true})){
         workspaceMode='integrated';
         browserRuntimeLayout='physical-v1';
     }else if(matches(integratedLegacy)){
