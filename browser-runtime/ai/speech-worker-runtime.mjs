@@ -1,28 +1,20 @@
 export const SPEECH_WORKER_PROTOCOL = "arcane-ai-speech-worker/1";
 
+const completeValue = (value) => value;
+
 const SPEECH_WORKER_ERROR_PROTOCOL = "arcane-ai-speech-worker-error/1";
 
 const ARTIFACT_GRAPH_MODULE_GRAPH =
   "browser-speech-authenticated-artifact-graph";
 const GRAPH_GUARD_NAME = "__arcaneBrowserSpeechArtifactGraphGuardsV1";
+const MODULE_ROUTER_NAME = "__arcaneBrowserSpeechModuleRouterV1";
 const NESTED_WORKER_PROTOCOL =
   "arcane-ai-browser-speech-artifact-module-worker/1";
-const GRAPH_ADMISSIONS = new Set([
-  "artifact-graph-network-dbopfs-verified",
-  "artifact-graph-dbopfs-cache-verified",
-  "artifact-graph-offline-dbopfs-cache-verified",
-  "artifact-graph-network-dbopfs-partially-checked",
-  "artifact-graph-dbopfs-cache-partially-checked",
-  "artifact-graph-offline-dbopfs-cache-partially-checked",
-  "artifact-graph-network-dbopfs-unchecked",
-  "artifact-graph-dbopfs-cache-unchecked",
-  "artifact-graph-offline-dbopfs-cache-unchecked",
-]);
-const ADAPTERS = Object.freeze({
+const ADAPTERS = completeValue({
   stt: "transformers-whisper",
   tts: "kokoro-js",
 });
-const ONNX_NAMESPACES = Object.freeze({
+const ONNX_NAMESPACES = completeValue({
   stt: "transformers-env-backends-onnx-wasm",
   tts: "kokoro-env-wasm-paths",
 });
@@ -30,7 +22,7 @@ const ARTIFACT_GRAPH_TRANSFORM_KINDS = new Set([
   "function-return-this-to-global-this",
   "typed-array-constructor",
 ]);
-const PUBLIC_WORKER_OPERATIONS = Object.freeze([
+const PUBLIC_WORKER_OPERATIONS = completeValue([
   "load",
   "use",
   "status",
@@ -41,16 +33,16 @@ const TRANSPORT_WORKER_OPERATION_SET = new Set([
   ...PUBLIC_WORKER_OPERATIONS,
   "cancel",
 ]);
-const BOTH_WORKER_ROLES = Object.freeze(["stt", "tts"]);
-const LOAD_OPERATION = Object.freeze(["load"]);
-const USE_OPERATION = Object.freeze(["use"]);
-const STATUS_OPERATION = Object.freeze(["status"]);
-const UNLOAD_OPERATION = Object.freeze(["unload"]);
-const DISPOSE_OPERATION = Object.freeze(["dispose"]);
-const UNLOAD_OR_DISPOSE_OPERATIONS = Object.freeze(["unload", "dispose"]);
-const LOAD_OR_USE_OPERATIONS = Object.freeze(["load", "use"]);
+const BOTH_WORKER_ROLES = completeValue(["stt", "tts"]);
+const LOAD_OPERATION = completeValue(["load"]);
+const USE_OPERATION = completeValue(["use"]);
+const STATUS_OPERATION = completeValue(["status"]);
+const UNLOAD_OPERATION = completeValue(["unload"]);
+const DISPOSE_OPERATION = completeValue(["dispose"]);
+const UNLOAD_OR_DISPOSE_OPERATIONS = completeValue(["unload", "dispose"]);
+const LOAD_OR_USE_OPERATIONS = completeValue(["load", "use"]);
 const SDK_WORKER_ERRORS = new WeakSet();
-const WORKER_ERROR_MESSAGES = Object.freeze({
+const WORKER_ERROR_MESSAGES = completeValue({
   ARCANE_AI_REQUEST_ABORTED: "The speech worker operation was cancelled.",
   ARCANE_AI_NOT_READY: "The speech worker is not loaded.",
   ARCANE_AI_INVALID_REQUEST: "The speech worker request was rejected.",
@@ -77,10 +69,10 @@ const WORKER_ERROR_MESSAGES = Object.freeze({
 const WORKER_ERROR_REASON_ADMISSIONS = new Map();
 
 function registerWorkerErrorReasons(code, roles, operations, reasons) {
-  const admission = Object.freeze({
+  const admission = completeValue({
     code,
-    roles: Object.freeze([...roles]),
-    operations: Object.freeze([...operations]),
+    roles: completeValue([...roles]),
+    operations: completeValue([...operations]),
   });
   for (const reason of reasons) WORKER_ERROR_REASON_ADMISSIONS.set(reason, admission);
 }
@@ -183,7 +175,7 @@ registerWorkerErrorReasons("ARCANE_AI_INVALID_REQUEST", ["tts"], LOAD_OPERATION,
   "tts-default-voice-empty",
 ]);
 registerWorkerErrorReasons("ARCANE_AI_INVALID_REQUEST", ["tts"], USE_OPERATION, [
-  "tts-synthesis-speed-out-of-range",
+  "tts-synthesis-speed-not-positive",
   "tts-synthesis-text-empty",
   "tts-synthesis-voice-empty",
   "tts-synthesis-voice-not-declared",
@@ -465,7 +457,11 @@ function workerError(code, message, cause, reason) {
 }
 
 function isSdkWorkerError(value) {
-  return value instanceof Error && SDK_WORKER_ERRORS.has(value);
+  try {
+    return value instanceof Error && SDK_WORKER_ERRORS.has(value);
+  } catch {
+    return false;
+  }
 }
 
 function admitWorkerFailure(error, code, message, reason) {
@@ -518,20 +514,237 @@ export function collectSpeechTransferables(value) {
 }
 
 function serializedError(error, role, op) {
-  const admission = isSdkWorkerError(error)
-    ? workerErrorReasonAdmission(error.reason, role, op)
+  const sdkError = isSdkWorkerError(error);
+  let reportedCode;
+  let reportedMessage;
+  let reportedReason;
+  let reportedCause;
+  try { reportedCode = Reflect.get(error, "code"); } catch {}
+  try { reportedMessage = Reflect.get(error, "message"); } catch {}
+  try { reportedReason = Reflect.get(error, "reason"); } catch {}
+  if (sdkError) {
+    try { reportedCause = Reflect.get(error, "cause"); } catch (cause) {
+      reportedCause = cause;
+    }
+  } else {
+    reportedCause = error;
+  }
+  const admission = sdkError
+    ? workerErrorReasonAdmission(reportedReason, role, op)
     : null;
-  const admittedCode = isSdkWorkerError(error)
-    && Object.hasOwn(WORKER_ERROR_MESSAGES, error.code)
-    && admission?.code === error.code;
-  const code = admittedCode ? error.code : "ARCANE_AI_PROVIDER_REQUEST_FAILED";
-  const reason = admittedCode ? error.reason : operationFailureReason(role, op);
-  return Object.freeze({
+  const admittedCode = sdkError
+    && Object.hasOwn(WORKER_ERROR_MESSAGES, reportedCode)
+    && admission?.code === reportedCode;
+  const code = admittedCode ? reportedCode : "ARCANE_AI_PROVIDER_REQUEST_FAILED";
+  const reason = admittedCode ? reportedReason : operationFailureReason(role, op);
+  const message = typeof reportedMessage === "string" && reportedMessage.length > 0
+    ? reportedMessage
+    : WORKER_ERROR_MESSAGES[code];
+  const envelope = completeValue({
     protocol: SPEECH_WORKER_ERROR_PROTOCOL,
     code,
-    message: WORKER_ERROR_MESSAGES[code],
+    message,
     reason,
   });
+  if (reportedCause !== undefined) {
+    envelope.cause = serializedDiagnosticValue(reportedCause);
+  }
+  return envelope;
+}
+
+function fallbackSerializedError(error, role, op) {
+  let message;
+  try { message = Reflect.get(error, "message"); } catch {}
+  return completeValue({
+    protocol: SPEECH_WORKER_ERROR_PROTOCOL,
+    code: "ARCANE_AI_PROVIDER_REQUEST_FAILED",
+    message: typeof message === "string" && message.length > 0
+      ? message
+      : WORKER_ERROR_MESSAGES.ARCANE_AI_PROVIDER_REQUEST_FAILED,
+    reason: operationFailureReason(role, op),
+  });
+}
+
+function sendSerializedError(send, response, error, role, op, consoleScope) {
+  try {
+    response.error = serializedError(error, role, op);
+    send(response, []);
+  } catch (transportError) {
+    try {
+      consoleScope?.console?.error?.(
+        "The speech Worker could not transport its complete failure diagnostic.",
+        error,
+        transportError,
+      );
+    } catch {}
+    response.error = fallbackSerializedError(error, role, op);
+    send(response, []);
+  }
+}
+
+function diagnosticText(value, fallback) {
+  try {
+    return String(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function defineDiagnosticProperty(target, key, value) {
+  Object.defineProperty(target, key, {
+    configurable: true,
+    enumerable: true,
+    value,
+    writable: true,
+  });
+}
+
+function diagnosticType(value) {
+  try {
+    return Object.prototype.toString.call(value).slice(8, -1);
+  } catch {
+    return "UninspectableObject";
+  }
+}
+
+function serializedDiagnosticValue(value, seen = new WeakMap()) {
+  if (value === null || value === undefined) return value;
+  const type = typeof value;
+  if (type !== "object" && type !== "function") {
+    return type === "symbol"
+      ? diagnosticText(value, "[symbol could not be represented]")
+      : value;
+  }
+  if (seen.has(value)) return seen.get(value);
+
+  const result = Object.create(null);
+  seen.set(value, result);
+  let descriptors;
+  try {
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch (error) {
+    defineDiagnosticProperty(
+      result,
+      "inspectionError",
+      serializedDiagnosticValue(error, seen),
+    );
+    return result;
+  }
+
+  const symbolProperties = [];
+  for (const key of Reflect.ownKeys(descriptors)) {
+    const descriptor = descriptors[key];
+    const projected = Object.create(null);
+    if (Object.hasOwn(descriptor, "value")) {
+      defineDiagnosticProperty(
+        projected,
+        "value",
+        serializedDiagnosticValue(descriptor.value, seen),
+      );
+    } else {
+      defineDiagnosticProperty(projected, "kind", "accessor");
+      if (descriptor.get !== undefined) {
+        defineDiagnosticProperty(
+          projected,
+          "get",
+          diagnosticText(descriptor.get, "[getter could not be represented]"),
+        );
+      }
+      if (descriptor.set !== undefined) {
+        defineDiagnosticProperty(
+          projected,
+          "set",
+          diagnosticText(descriptor.set, "[setter could not be represented]"),
+        );
+      }
+    }
+    if (typeof key === "symbol") {
+      const symbolProperty = Object.create(null);
+      defineDiagnosticProperty(
+        symbolProperty,
+        "key",
+        diagnosticText(key, "[symbol key could not be represented]"),
+      );
+      defineDiagnosticProperty(symbolProperty, "descriptor", projected);
+      symbolProperties.push(symbolProperty);
+      continue;
+    }
+    defineDiagnosticProperty(
+      result,
+      key,
+      Object.hasOwn(projected, "value") ? projected.value : projected,
+    );
+  }
+
+  for (const key of ["name", "message", "stack", "code", "reason", "details", "cause"]) {
+    if (Object.hasOwn(result, key)) continue;
+    try {
+      const field = Reflect.get(value, key);
+      if (field !== undefined) {
+        defineDiagnosticProperty(
+          result,
+          key,
+          serializedDiagnosticValue(field, seen),
+        );
+      }
+    } catch (error) {
+      defineDiagnosticProperty(result, key, serializedDiagnosticValue(error, seen));
+    }
+  }
+
+  let metadataKey = "$diagnostic";
+  while (Object.hasOwn(result, metadataKey)) metadataKey = `$${metadataKey}`;
+  const metadata = Object.create(null);
+  const valueType = diagnosticType(value);
+  defineDiagnosticProperty(metadata, "type", valueType);
+  if (symbolProperties.length > 0) {
+    defineDiagnosticProperty(metadata, "symbolProperties", symbolProperties);
+  }
+  try {
+    if (type === "function") {
+      defineDiagnosticProperty(
+        metadata,
+        "source",
+        diagnosticText(value, "[function could not be represented]"),
+      );
+    } else if (valueType === "Map") {
+      const entries = [];
+      for (const [key, entry] of value) {
+        entries.push([
+          serializedDiagnosticValue(key, seen),
+          serializedDiagnosticValue(entry, seen),
+        ]);
+      }
+      defineDiagnosticProperty(metadata, "entries", entries);
+    } else if (valueType === "Set") {
+      const entries = [];
+      for (const entry of value) entries.push(serializedDiagnosticValue(entry, seen));
+      defineDiagnosticProperty(metadata, "values", entries);
+    } else if (valueType === "Date") {
+      defineDiagnosticProperty(metadata, "value", Date.prototype.getTime.call(value));
+    } else if (valueType === "RegExp") {
+      defineDiagnosticProperty(metadata, "source", value.source);
+      defineDiagnosticProperty(metadata, "flags", value.flags);
+      defineDiagnosticProperty(metadata, "lastIndex", value.lastIndex);
+    } else if (valueType === "ArrayBuffer" || valueType === "SharedArrayBuffer"
+      || valueType === "Blob" || valueType === "File") {
+      defineDiagnosticProperty(metadata, "value", value);
+    } else {
+      let view = false;
+      try {
+        view = ArrayBuffer.isView(value);
+      } catch {}
+      if (view) defineDiagnosticProperty(metadata, "value", value);
+    }
+  } catch (error) {
+    defineDiagnosticProperty(
+      metadata,
+      "inspectionError",
+      serializedDiagnosticValue(error, seen),
+    );
+  }
+  defineDiagnosticProperty(result, metadataKey, metadata);
+  return result;
 }
 
 function workerErrorReasonAdmission(reason, role, op) {
@@ -549,7 +762,10 @@ export function normalizeSpeechWorkerErrorEnvelope(value, role, op) {
   try {
     const keys = Reflect.ownKeys(value);
     if (keys.some((key) => typeof key !== "string")
-      || keys.sort().join(",") !== "code,message,protocol,reason") return null;
+      || ![
+        "code,message,protocol,reason",
+        "cause,code,message,protocol,reason",
+      ].includes(keys.sort().join(","))) return null;
     descriptors = Object.getOwnPropertyDescriptors(value);
   } catch {
     return null;
@@ -563,13 +779,15 @@ export function normalizeSpeechWorkerErrorEnvelope(value, role, op) {
   const reason = descriptors.reason.value;
   if (protocol !== SPEECH_WORKER_ERROR_PROTOCOL) return null;
   if (!Object.hasOwn(WORKER_ERROR_MESSAGES, code)) return null;
-  if (message !== WORKER_ERROR_MESSAGES[code]) return null;
+  if (typeof message !== "string" || message.length < 1) return null;
   const admission = workerErrorReasonAdmission(reason, role, op);
   if (admission?.code !== code) return null;
-  return Object.freeze({
+  if (descriptors.cause && !Object.hasOwn(descriptors.cause, "value")) return null;
+  return completeValue({
     code,
     message,
     reason,
+    ...(descriptors.cause ? { cause: descriptors.cause.value } : {}),
   });
 }
 
@@ -587,6 +805,22 @@ function requiredText(
     );
   }
   return value.trim();
+}
+
+function requiredContent(
+  value,
+  label,
+  reason,
+) {
+  if (typeof value !== "string" || !value.trim()) {
+    throw workerError(
+      "ARCANE_AI_INVALID_REQUEST",
+      `${label} is required.`,
+      undefined,
+      reason,
+    );
+  }
+  return value;
 }
 
 function requiredSampleRate(value, label, fallback) {
@@ -695,36 +929,6 @@ function validateConfiguration(configuration, role) {
       paths.add(file.path);
     }
     const runtimePaths = new Set(configuration.runtime.files.map((file) => file.path));
-    const security = configuration.security;
-    const securityChecks = security?.checks;
-    if (
-      !security
-      || typeof security !== "object"
-      || Array.isArray(security)
-      || typeof security.secure !== "boolean"
-      || !securityChecks
-      || typeof securityChecks !== "object"
-      || Array.isArray(securityChecks)
-      || typeof securityChecks.byteLength !== "boolean"
-      || typeof securityChecks.sha256 !== "boolean"
-      || typeof configuration.runtime.artifactGraphId !== "string"
-      || !/^[a-f0-9]{64}$/u.test(configuration.runtime.artifactGraphId)
-      || (
-        typeof configuration.runtime.guardCapability !== "string"
-        || !/^[a-f0-9]{64}$/u.test(configuration.runtime.guardCapability)
-        || !GRAPH_ADMISSIONS.has(configuration.runtime.artifactGraphAdmission)
-        || !configuration.runtime.edges
-        || typeof configuration.runtime.edges !== "object"
-        || !Array.isArray(configuration.runtime.transforms)
-      )
-    ) {
-      throw workerError(
-        "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
-        "Artifact graph security, identity, admission, edges, and transforms are required.",
-        undefined,
-        "artifact-graph-worker-configuration-incomplete",
-      );
-    }
     const wasm = configuration.runtime.onnxWasm;
     if (
       !wasm
@@ -732,17 +936,17 @@ function validateConfiguration(configuration, role) {
       || !runtimePaths.has(wasm.mjsPath)
       || !runtimePaths.has(wasm.wasmPath)
     ) {
-      throw workerError(
-        "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
-        "The authenticated ONNX Runtime Web MJS/WASM pair is incomplete or uses the wrong namespace.",
+        throw workerError(
+          "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
+          "The ONNX Runtime Web MJS/WASM pair is incomplete or uses the wrong namespace.",
         undefined,
         "artifact-graph-onnx-wasm-configuration-mismatch",
       );
     }
     if (role === "tts" && wasm.numThreads !== undefined) {
-      throw workerError(
-        "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
-        "Kokoro does not expose a verified numThreads configuration field.",
+        throw workerError(
+          "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
+          "Kokoro does not expose a numThreads configuration field.",
         undefined,
         "kokoro-env-num-threads-field-not-exposed",
       );
@@ -773,17 +977,6 @@ function validateConfiguration(configuration, role) {
         );
       }
     }
-    if (
-      configuration.runtime.negativeRuntimeRequestUrls !== undefined
-      && !Array.isArray(configuration.runtime.negativeRuntimeRequestUrls)
-    ) {
-      throw workerError(
-        "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
-        "Artifact graph negative runtime request routes must be an array.",
-        undefined,
-        "artifact-graph-negative-request-routes-not-array",
-      );
-    }
   }
   return configuration;
 }
@@ -804,6 +997,9 @@ function absoluteRequestUrl(value, scope) {
   }
 }
 
+// Dormant hardening retained for future review only. The closed route reader,
+// cache admission, and legacy fetch isolation below are not used by ordinary
+// execution and must not be enabled without explicit user review.
 function createArtifactRoutes(scope, configuration) {
   const positive = new Map();
   const negative = new Set();
@@ -843,7 +1039,7 @@ function createArtifactRoutes(scope, configuration) {
     }
     negative.add(absolute);
   }
-  return Object.freeze({ files, positive, negative });
+  return completeValue({ files, positive, negative });
 }
 
 function requestMethod(input, init, scope) {
@@ -961,16 +1157,16 @@ function createRouteReader(scope, configuration, originalFetch) {
   function resolve(input) {
     const absolute = absoluteRequestUrl(input, scope);
     const file = routes.positive.get(absolute);
-    if (file) return Object.freeze({ kind: "file", absolute, file });
+    if (file) return completeValue({ kind: "file", absolute, file });
     if (routes.negative.has(absolute)) {
-      return Object.freeze({ kind: "negative", absolute, file: null });
+      return completeValue({ kind: "negative", absolute, file: null });
     }
     return null;
   }
 
   function cacheForPaths(targetPaths) {
     const admittedPaths = new Set(targetPaths);
-    return Object.freeze({
+    return completeValue({
       async match(input) {
         const resolution = resolve(input);
         if (
@@ -1015,13 +1211,13 @@ function createRouteReader(scope, configuration, originalFetch) {
         return false;
       },
       async keys() {
-        return Object.freeze([]);
+        return completeValue([]);
       },
     });
   }
 
   const cache = cacheForPaths(routes.files.map((file) => file.path));
-  return Object.freeze({ cache, cacheForPaths, resolve, responseFor, routes });
+  return completeValue({ cache, cacheForPaths, resolve, responseFor, routes });
 }
 
 function installLegacyAuthorizedFetch(scope, configuration) {
@@ -1061,11 +1257,11 @@ function installLegacyAuthorizedFetch(scope, configuration) {
     authorized,
     "speech-worker-fetch-isolation-unavailable",
   );
-  return Object.freeze({ cache: null, cleanup: restore });
+  return completeValue({ cache: null, cleanup: restore });
 }
 
 function installDeniedCacheIsolation(scope) {
-  const denied = Object.freeze({
+  const denied = completeValue({
     async open() {
       throw workerError(
         "ARCANE_AI_UNDECLARED_ARTIFACT",
@@ -1086,7 +1282,7 @@ function installDeniedCacheIsolation(scope) {
       return false;
     },
     async keys() {
-      return Object.freeze([]);
+      return completeValue([]);
     },
     async delete() {
       return false;
@@ -1234,7 +1430,7 @@ function typedArrayIntrinsics(scope) {
       "artifact-graph-typed-array-validation-unavailable",
     );
   }
-  return Object.freeze({
+  return completeValue({
     constructors,
     dataViewPrototype: DataViewConstructor?.prototype ?? null,
     getPrototypeOf: Object.getPrototypeOf,
@@ -1304,6 +1500,9 @@ function nestedWorkerFailureEvent(scope, error) {
   return event;
 }
 
+// Dormant hardening retained for future review only. Ordinary speech execution
+// never installs this guard, its declared-edge admission, or its isolation
+// controls. Do not enable it for secure mode without explicit user review.
 function createArtifactGraphGuard(scope, configuration, role, reader, originalWorker) {
   const files = runtimeFileMap(configuration);
   const edges = configuration.runtime.edges;
@@ -1366,7 +1565,7 @@ function createArtifactGraphGuard(scope, configuration, role, reader, originalWo
     return true;
   }
 
-  const guard = Object.freeze({
+  const guard = completeValue({
     protocol: "arcane-ai-browser-speech-artifact-graph-runtime/1",
 
     async dynamicImport(capability, modulePath, occurrence, specifier) {
@@ -1487,7 +1686,7 @@ function createArtifactGraphGuard(scope, configuration, role, reader, originalWo
         event.stopImmediatePropagation?.();
         const admitted = normalizeSpeechWorkerErrorEnvelope(event.data.error, role, "load");
         const failure = admitted
-          ? workerError(admitted.code, admitted.message, undefined, admitted.reason)
+          ? workerError(admitted.code, admitted.message, admitted.cause, admitted.reason)
           : workerError(
             "ARCANE_AI_WORKER_MESSAGE_ERROR",
             "The authenticated artifact module Worker error envelope was rejected.",
@@ -1555,7 +1754,7 @@ function createArtifactGraphGuard(scope, configuration, role, reader, originalWo
     },
   });
 
-  return Object.freeze({
+  return completeValue({
     guard,
     transformersCache: (() => {
       const edgesForTransformers = [...cacheOpens.values()].filter((edge) =>
@@ -1650,7 +1849,6 @@ function installStringTimerIsolation(scope, name) {
 function installArtifactGraphEnvironment(scope, configuration, role) {
   const originalFetch = scope.fetch?.bind(scope);
   const originalWorker = scope.Worker;
-  const strictSecurity = configuration.security?.secure === true;
   if (typeof originalFetch !== "function") {
     throw workerError(
       "ARCANE_AI_PROVIDER_UNAVAILABLE",
@@ -1677,124 +1875,316 @@ function installArtifactGraphEnvironment(scope, configuration, role) {
   );
   const restores = [];
   try {
-    if (strictSecurity) {
-      restores.push(installDynamicCodeConstructorIsolation());
-      restores.push(installStringTimerIsolation(scope, "setInterval"));
-      restores.push(installStringTimerIsolation(scope, "setTimeout"));
-      if ("indexedDB" in scope) {
-        restores.push(installScopeValue(
-          scope,
-          "indexedDB",
-          undefined,
-          "artifact-graph-indexeddb-isolation-unavailable",
-        ));
-      }
-      if (scope.navigator && "storage" in scope.navigator) {
-        restores.push(installObjectValue(
-          scope.navigator,
-          "storage",
-          undefined,
-          "WorkerNavigator.storage",
-          "artifact-graph-opfs-isolation-unavailable",
-        ));
-      }
-    }
     restores.push(installScopeValue(
       scope,
       GRAPH_GUARD_NAME,
       graphGuard.guard,
       "artifact-graph-guard-global-definition-rejected",
     ));
-    if (strictSecurity) {
-      restores.push(installScopeValue(
-        scope,
-        "fetch",
-        async function rejectUntransformedArtifactGraphFetch() {
-          throw workerError(
-            "ARCANE_AI_ARTIFACT_GRAPH_FETCH_EDGE_UNDECLARED",
-            "Artifact graph fetch must use its declared transformed edge.",
-            undefined,
-            "artifact-graph-fetch-guard-bypassed",
-          );
-        },
-        "artifact-graph-fetch-isolation-unavailable",
-      ));
-      const cacheStorage = Object.freeze({
-        async open() {
-          throw workerError(
-            "ARCANE_AI_ARTIFACT_GRAPH_CACHE_EDGE_UNDECLARED",
-            "Artifact graph CacheStorage.open must use its declared transformed edge.",
-            undefined,
-            "artifact-graph-cache-open-guard-bypassed",
-          );
-        },
-        async match() {
-          throw workerError(
-            "ARCANE_AI_ARTIFACT_GRAPH_CACHE_EDGE_UNDECLARED",
-            "Artifact graph CacheStorage.match requires a declared cache-open edge.",
-            undefined,
-            "artifact-graph-cache-match-guard-bypassed",
-          );
-        },
-        async has() {
-          return true;
-        },
-        async keys() {
-          return Object.freeze([]);
-        },
-        async delete() {
-          return false;
-        },
-      });
-      restores.push(installScopeValue(
-        scope,
-        "caches",
-        cacheStorage,
-        "artifact-graph-cache-isolation-unavailable",
-      ));
-
-      const deniedCapabilities = [
-        "BroadcastChannel",
-        "EventSource",
-        "Function",
-        "RTCPeerConnection",
-        "ShadowRealm",
-        "SharedWorker",
-        "WebSocket",
-        "WebSocketStream",
-        "WebTransport",
-        "Worker",
-        "XMLHttpRequest",
-        "eval",
-        "importScripts",
-      ];
-      for (const name of deniedCapabilities) {
-        if (!(name in scope)) continue;
-        restores.push(installScopeValue(
-          scope,
-          name,
-          function rejectUndeclaredArtifactGraphCapability() {
-            throw workerError(
-              "ARCANE_AI_ARTIFACT_GRAPH_ISOLATION_UNAVAILABLE",
-              `The authenticated artifact graph denied raw ${name} access.`,
-              undefined,
-              `artifact-graph-${name.toLowerCase()}-capability-undeclared`,
-            );
-          },
-          `artifact-graph-${name.toLowerCase()}-isolation-unavailable`,
-        ));
-      }
-    }
   } catch (error) {
     restoreScopeValues(restores);
     graphGuard.cleanup();
     throw error;
   }
-  return Object.freeze({
+  return completeValue({
     cache: graphGuard.transformersCache,
     cleanup() {
       graphGuard.cleanup();
       restoreScopeValues(restores);
+    },
+  });
+}
+
+function ordinaryRequestUrl(value, scope, base = scope.location?.href) {
+  const input = typeof value === "string" || value instanceof URL
+    ? String(value)
+    : value?.url;
+  if (typeof input !== "string" || input.length < 1) return null;
+  try {
+    return new URL(input, base).href;
+  } catch {
+    return null;
+  }
+}
+
+function isBareModuleSpecifier(value) {
+  return typeof value === "string"
+    && !value.startsWith("./")
+    && !value.startsWith("../")
+    && !value.startsWith("/")
+    && !/^[A-Za-z][A-Za-z\d+.-]*:/u.test(value);
+}
+
+function createOrdinaryRoutes(scope, configuration) {
+  const files = [
+    ...configuration.runtime.files,
+    ...configuration.model.files,
+  ];
+  const filesByPath = new Map(files.map((file) => [file.path, file]));
+  const routes = new Map();
+  const ambiguous = new Set();
+
+  function add(route, file) {
+    const absolute = ordinaryRequestUrl(route, scope);
+    if (!absolute || ambiguous.has(absolute)) return;
+    const existing = routes.get(absolute);
+    if (existing && existing.path !== file.path) {
+      routes.delete(absolute);
+      ambiguous.add(absolute);
+      return;
+    }
+    routes.set(absolute, file);
+  }
+
+  for (const file of files) {
+    add(file.sourceUrl, file);
+    add(file.moduleUrl, file);
+    for (const route of file.runtimeRequestUrls ?? []) add(route, file);
+  }
+  return completeValue({ files, filesByPath, routes });
+}
+
+function createOrdinaryRouteReader(
+  scope,
+  configuration,
+  originalFetch,
+  originalCaches,
+) {
+  const routeTable = createOrdinaryRoutes(scope, configuration);
+  const nativeCaches = new Map();
+  const RequestConstructor = scope.Request ?? globalThis.Request;
+
+  function sourceBase(modulePath) {
+    return routeTable.filesByPath.get(modulePath)?.sourceUrl ?? scope.location?.href;
+  }
+
+  function nativeInput(input, modulePath) {
+    if (typeof input !== "string" && !(input instanceof URL)) return input;
+    return ordinaryRequestUrl(input, scope, sourceBase(modulePath)) ?? input;
+  }
+
+  function resolve(input, modulePath) {
+    const absolute = ordinaryRequestUrl(input, scope, sourceBase(modulePath));
+    const file = absolute ? routeTable.routes.get(absolute) : null;
+    return file ? completeValue({ absolute, file }) : null;
+  }
+
+  function responseFor(resolution, input, init) {
+    const mappedInput = typeof RequestConstructor === "function"
+      && input instanceof RequestConstructor
+      ? new RequestConstructor(resolution.file.moduleUrl, input)
+      : resolution.file.moduleUrl;
+    return originalFetch(mappedInput, init);
+  }
+
+  async function nativeCache(name) {
+    if (!originalCaches || typeof originalCaches.open !== "function") return null;
+    if (!nativeCaches.has(name)) {
+      nativeCaches.set(name, Promise.resolve(originalCaches.open.call(originalCaches, name)));
+    }
+    return nativeCaches.get(name);
+  }
+
+  function cacheForName(name, modulePath) {
+    return completeValue({
+      async match(input, options) {
+        const resolution = resolve(input, modulePath);
+        if (resolution) return responseFor(resolution, input);
+        const cache = await nativeCache(name);
+        return cache?.match(nativeInput(input, modulePath), options);
+      },
+      async put(input, response) {
+        const cache = await nativeCache(name);
+        if (!cache) throw new TypeError("Browser CacheStorage is unavailable.");
+        return cache.put(nativeInput(input, modulePath), response);
+      },
+      async add(input) {
+        const cache = await nativeCache(name);
+        if (!cache) throw new TypeError("Browser CacheStorage is unavailable.");
+        return cache.add(nativeInput(input, modulePath));
+      },
+      async addAll(inputs) {
+        const cache = await nativeCache(name);
+        if (!cache) throw new TypeError("Browser CacheStorage is unavailable.");
+        return cache.addAll(Array.from(inputs, (input) => nativeInput(input, modulePath)));
+      },
+      async delete(input, options) {
+        const cache = await nativeCache(name);
+        return cache ? cache.delete(nativeInput(input, modulePath), options) : false;
+      },
+      async keys(input, options) {
+        const cache = await nativeCache(name);
+        if (!cache) return [];
+        return input === undefined
+          ? cache.keys()
+          : cache.keys(nativeInput(input, modulePath), options);
+      },
+    });
+  }
+
+  return completeValue({ cacheForName, nativeInput, resolve, responseFor });
+}
+
+function createOrdinaryArtifactModuleRouter(
+  scope,
+  configuration,
+  role,
+  reader,
+  originalFetch,
+  originalWorker,
+) {
+  const nestedWorkers = new Set();
+  const router = completeValue({
+    async dynamicImport(modulePath, specifier) {
+      const resolution = isBareModuleSpecifier(specifier)
+        ? null
+        : reader.resolve(specifier, modulePath);
+      const target = resolution?.file.moduleUrl
+        ?? (isBareModuleSpecifier(specifier)
+          ? specifier
+          : reader.nativeInput(specifier, modulePath));
+      return import(target);
+    },
+
+    fetch(modulePath, input, init) {
+      const resolution = reader.resolve(input, modulePath);
+      return resolution
+        ? reader.responseFor(resolution, input, init)
+        : originalFetch(reader.nativeInput(input, modulePath), init);
+    },
+
+    openCache(modulePath, name) {
+      return Promise.resolve(reader.cacheForName(name, modulePath));
+    },
+
+    createWorker(modulePath, specifier, options = {}) {
+      if (typeof originalWorker !== "function") {
+        throw workerError(
+          "ARCANE_AI_PROVIDER_UNAVAILABLE",
+          "Nested browser Workers are unavailable.",
+          undefined,
+          "speech-module-worker-constructor-unavailable",
+        );
+      }
+      const resolution = reader.resolve(specifier, modulePath);
+      if (!resolution) {
+        return new originalWorker(reader.nativeInput(specifier, modulePath), options);
+      }
+      const workerOptions = options && typeof options === "object"
+        ? { ...options, type: "module" }
+        : { type: "module" };
+      const worker = new originalWorker(nestedWorkerUrl(role), workerOptions);
+      nestedWorkers.add(worker);
+      const onBootstrapMessage = (event) => {
+        if (event.data?.protocol !== NESTED_WORKER_PROTOCOL
+          || event.data?.event !== "artifact-module-worker-bootstrap-rejected") return;
+        event.stopImmediatePropagation?.();
+        const admitted = normalizeSpeechWorkerErrorEnvelope(event.data.error, role, "load");
+        const failure = admitted
+          ? workerError(admitted.code, admitted.message, admitted.cause, admitted.reason)
+          : workerError(
+              "ARCANE_AI_WORKER_MESSAGE_ERROR",
+              "The artifact module Worker error envelope was rejected.",
+              undefined,
+              "speech-module-worker-error-envelope-rejected",
+            );
+        worker.dispatchEvent?.(nestedWorkerFailureEvent(scope, failure));
+      };
+      worker.addEventListener?.("message", onBootstrapMessage);
+      try {
+        worker.postMessage({
+          protocol: NESTED_WORKER_PROTOCOL,
+          op: "initialize-artifact-module-worker",
+          role,
+          targetPath: resolution.file.path,
+          configuration,
+        });
+      } catch (error) {
+        nestedWorkers.delete(worker);
+        worker.terminate();
+        throw workerError(
+          "ARCANE_AI_WORKER_MESSAGE_ERROR",
+          "The artifact module Worker initialization message was rejected.",
+          error,
+          "speech-module-worker-initialization-message-rejected",
+        );
+      }
+      return worker;
+    },
+  });
+  return completeValue({
+    router,
+    transformersCache: reader.cacheForName("transformers-cache", null),
+    cleanup() {
+      for (const worker of nestedWorkers) {
+        try {
+          worker.terminate();
+        } catch {
+          // The owning speech Worker is already being torn down.
+        }
+      }
+      nestedWorkers.clear();
+    },
+  });
+}
+
+function installOrdinaryArtifactModuleRouter(scope, configuration, role) {
+  const originalFetch = scope.fetch?.bind(scope);
+  const originalWorker = scope.Worker;
+  const originalCaches = scope.caches;
+  if (typeof originalFetch !== "function") {
+    throw workerError(
+      "ARCANE_AI_PROVIDER_UNAVAILABLE",
+      "Browser fetch is unavailable in the speech Worker.",
+      undefined,
+      "speech-worker-fetch-unavailable",
+    );
+  }
+  const reader = createOrdinaryRouteReader(
+    scope,
+    configuration,
+    originalFetch,
+    originalCaches,
+  );
+  const moduleRouter = createOrdinaryArtifactModuleRouter(
+    scope,
+    configuration,
+    role,
+    reader,
+    originalFetch,
+    originalWorker,
+  );
+  const hadOwn = Object.prototype.hasOwnProperty.call(scope, MODULE_ROUTER_NAME);
+  const previous = scope[MODULE_ROUTER_NAME];
+  try {
+    scope[MODULE_ROUTER_NAME] = moduleRouter.router;
+    if (scope[MODULE_ROUTER_NAME] !== moduleRouter.router) {
+      Object.defineProperty(scope, MODULE_ROUTER_NAME, {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: moduleRouter.router,
+      });
+    }
+  } catch (error) {
+    moduleRouter.cleanup();
+    throw workerError(
+      "ARCANE_AI_PROVIDER_UNAVAILABLE",
+      "The speech Worker cannot install the artifact module router.",
+      error,
+      "speech-module-router-unavailable",
+    );
+  }
+  return completeValue({
+    cache: moduleRouter.transformersCache,
+    cleanup() {
+      moduleRouter.cleanup();
+      try {
+        if (hadOwn) scope[MODULE_ROUTER_NAME] = previous;
+        else delete scope[MODULE_ROUTER_NAME];
+      } catch {
+        // Worker teardown releases the remaining module router reference.
+      }
     },
   });
 }
@@ -1856,14 +2246,6 @@ function assignSetting(object, name, value, cleanup, {
 
 function configuredWasmPaths(configuration) {
   if (configuration.runtime.wasmPaths !== undefined) {
-    if (configuration.security?.secure === true) {
-      throw workerError(
-        "ARCANE_AI_INVALID_REQUEST",
-        "Secure browser speech cannot use remote wasmPaths.",
-        undefined,
-        "speech-worker-secure-remote-wasm-paths-rejected",
-      );
-    }
     return configuration.runtime.wasmPaths;
   }
   const byPath = new Map(configuration.runtime.files.map((file) => [file.path, file]));
@@ -1884,12 +2266,11 @@ function configuredWasmPaths(configuration) {
       "artifact-graph-onnx-wasm-pair-not-materialized",
     );
   }
-  return Object.freeze({ mjs: mjs.moduleUrl, wasm: wasm.moduleUrl });
+  return completeValue({ mjs: mjs.moduleUrl, wasm: wasm.moduleUrl });
 }
 
 function configureRuntimeNamespace(namespace, configuration, role, cache) {
   const cleanup = [];
-  const strictSecurity = configuration.security?.secure === true;
   const restoreSettings = () => {
     for (const restore of cleanup.splice(0).reverse()) {
       try {
@@ -1949,24 +2330,6 @@ function configureRuntimeNamespace(namespace, configuration, role, cache) {
       assignmentRejectedReason: "transformers-env-allow-remote-models-assignment-rejected",
       unavailableReason: "transformers-env-allow-remote-models-unavailable",
     });
-    if (strictSecurity) {
-      assignSetting(env, "useBrowserCache", false, cleanup, {
-        assignmentRejectedReason: "transformers-env-browser-cache-assignment-rejected",
-        unavailableReason: "transformers-env-browser-cache-unavailable",
-      });
-      assignSetting(env, "useFSCache", false, cleanup, {
-        assignmentRejectedReason: "transformers-env-fs-cache-assignment-rejected",
-        unavailableReason: "transformers-env-fs-cache-unavailable",
-      });
-      assignSetting(env, "useCustomCache", cache !== null, cleanup, {
-        assignmentRejectedReason: "transformers-env-custom-cache-toggle-assignment-rejected",
-        unavailableReason: "transformers-env-custom-cache-toggle-unavailable",
-      });
-      assignSetting(env, "customCache", cache, cleanup, {
-        assignmentRejectedReason: "transformers-env-custom-cache-assignment-rejected",
-        unavailableReason: "transformers-env-custom-cache-unavailable",
-      });
-    }
     if (paths) {
       assignSetting(
         wasm,
@@ -1998,39 +2361,6 @@ function configureRuntimeNamespace(namespace, configuration, role, cache) {
     throw error;
   }
   return restoreSettings;
-}
-
-function workerProgress(send, role, requestId, phase, completed = 0, total = null, unit = "items") {
-  send({
-    protocol: SPEECH_WORKER_PROTOCOL,
-    event: "progress",
-    requestId,
-    progress: Object.freeze({
-      phase,
-      completed,
-      total,
-      unit,
-      heartbeat: true,
-    }),
-  }, []);
-}
-
-function upstreamProgress(send, role, requestId) {
-  return function reportSpeechModelProgress(update = {}) {
-    const completed = Number.isFinite(update.loaded)
-      ? update.loaded
-      : Number.isFinite(update.progress) ? update.progress : 0;
-    const total = Number.isFinite(update.total) ? update.total : null;
-    workerProgress(
-      send,
-      role,
-      requestId,
-      `${role}-model-load-progress`,
-      completed,
-      total,
-      Number.isFinite(update.loaded) ? "bytes" : "items",
-    );
-  };
 }
 
 async function disposeEngine(engine) {
@@ -2077,12 +2407,12 @@ async function createWhisperEngine(namespace, configuration, signal, report) {
     }
     throw error;
   }
-  return Object.freeze({
+  return completeValue({
     async transcribe(input, { signal: requestSignal } = {}) {
       throwIfAborted(requestSignal, "stt-transcription-cancelled");
       const output = await transcriber(input.audio, { signal: requestSignal });
       throwIfAborted(requestSignal, "stt-transcription-cancelled");
-      return Object.freeze({ text: String(output?.text ?? "").trim() });
+      return completeValue({ text: String(output?.text ?? "") });
     },
     dispose: () => disposeEngine(transcriber),
   });
@@ -2117,7 +2447,7 @@ async function createKokoroEngine(namespace, configuration, signal, report) {
     }
     throw error;
   }
-  return Object.freeze({
+  return completeValue({
     async synthesize(input, { signal: requestSignal } = {}) {
       throwIfAborted(requestSignal, "tts-synthesis-cancelled");
       const output = await synthesizer.generate(input.text, {
@@ -2129,7 +2459,7 @@ async function createKokoroEngine(namespace, configuration, signal, report) {
       const audio = output?.audio instanceof Float32Array
         ? output.audio
         : new Float32Array(output?.audio ?? []);
-      return Object.freeze({
+      return completeValue({
         audio,
         sampleRate: output?.sampling_rate,
         voice: input.voice,
@@ -2167,9 +2497,9 @@ function validateInput(role, payload, configuration) {
         "stt-transcription-sample-rate-mismatch",
       );
     }
-    return Object.freeze({ audio: payload.audio, sampleRate: inputSampleRate });
+    return completeValue({ audio: payload.audio, sampleRate: inputSampleRate });
   }
-  const text = requiredText(payload?.text, "Kokoro text", "tts-synthesis-text-empty");
+  const text = requiredContent(payload?.text, "Kokoro text", "tts-synthesis-text-empty");
   const voice = requiredText(
     payload?.voice ?? configuration.model.defaultVoice,
     "Kokoro voice",
@@ -2185,15 +2515,15 @@ function validateInput(role, payload, configuration) {
     );
   }
   const speed = payload?.speed ?? 1;
-  if (!Number.isFinite(speed) || speed <= 0 || speed > 4) {
+  if (!Number.isFinite(speed) || speed <= 0) {
     throw workerError(
       "ARCANE_AI_INVALID_REQUEST",
-      "Kokoro speed must be greater than 0 and at most 4.",
+      "Kokoro speed must be greater than 0.",
       undefined,
-      "tts-synthesis-speed-out-of-range",
+      "tts-synthesis-speed-not-positive",
     );
   }
-  return Object.freeze({ text, voice, speed });
+  return completeValue({ text, voice, speed });
 }
 
 function validateResult(role, result, configuration) {
@@ -2206,7 +2536,7 @@ function validateResult(role, result, configuration) {
         "stt-transcription-result-text-not-string",
       );
     }
-    return Object.freeze({ text: result.text.trim() });
+    return completeValue({ text: result.text });
   }
   const outputSampleRate = requiredSampleRate(
     configuration.model.outputSampleRate,
@@ -2239,7 +2569,7 @@ function validateResult(role, result, configuration) {
       );
     }
   }
-  return Object.freeze({
+  return completeValue({
     audio: result.audio,
     sampleRate: outputSampleRate,
     voice: result.voice,
@@ -2264,16 +2594,7 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
 
   function status() {
     const state = disposed ? "disposed" : engine ? "ready" : "unloaded";
-    const security = configuration?.security
-      ? Object.freeze({
-        secure: configuration.security.secure === true,
-        checks: Object.freeze({
-          byteLength: configuration.security.checks?.byteLength === true,
-          sha256: configuration.security.checks?.sha256 === true,
-        }),
-      })
-      : null;
-    return Object.freeze({
+    return completeValue({
       state,
       lifecycleStatus: `${role}-worker-${state}`,
       lifecycleReason,
@@ -2281,9 +2602,6 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
       loaded: engine !== null,
       busy: operations.size > 0,
       activeOperation: operations.values().next().value?.publicOperation ?? null,
-      security,
-      artifactGraphId: configuration?.runtime?.artifactGraphId ?? null,
-      artifactGraphAdmission: configuration?.runtime?.artifactGraphAdmission ?? null,
     });
   }
 
@@ -2304,32 +2622,13 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
       const entry = configuration.runtime.files.find((file) =>
         file.path === configuration.runtime.entry);
       if (graphConfiguration(configuration)) {
-        environment = installArtifactGraphEnvironment(scope, configuration, role);
-      } else if (configuration.security?.secure === true) {
-        const legacyFetch = installLegacyAuthorizedFetch(scope, configuration);
-        try {
-          const restoreCaches = installDeniedCacheIsolation(scope);
-          environment = Object.freeze({
-            cache: null,
-            cleanup() {
-              try {
-                restoreCaches();
-              } finally {
-                legacyFetch.cleanup();
-              }
-            },
-          });
-        } catch (error) {
-          legacyFetch.cleanup();
-          throw error;
-        }
+        environment = installOrdinaryArtifactModuleRouter(scope, configuration, role);
       } else {
-        environment = Object.freeze({
+        environment = completeValue({
           cache: null,
           cleanup() {},
         });
       }
-      workerProgress(send, role, request.id, `${role}-runtime-import-started`);
       loadFailureReason = `${role}-worker-runtime-import-rejected`;
       const namespace = await import(entry.moduleUrl);
       throwIfAborted(signal, `${role}-load-cancelled`);
@@ -2339,14 +2638,12 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
         role,
         environment.cache,
       );
-      workerProgress(send, role, request.id, `${role}-model-load-started`);
       loadFailureReason = `${role}-worker-model-load-rejected`;
-      const report = upstreamProgress(send, role, request.id);
+      const report = () => undefined;
       engine = role === "stt"
         ? await createWhisperEngine(namespace, configuration, signal, report)
         : await createKokoroEngine(namespace, configuration, signal, report);
       lifecycleReason = `${role}-load-completed`;
-      workerProgress(send, role, request.id, `${role}-provider-ready`, 1, 1);
       return status();
     } catch (error) {
       const failure = admitWorkerFailure(
@@ -2486,12 +2783,15 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
       id: request.id,
       ok: true,
       result: result ?? null,
-    }, collectSpeechTransferables(result)), (error) => send({
-      protocol: SPEECH_WORKER_PROTOCOL,
-      id: request.id,
-      ok: false,
-      error: serializedError(error, role, op),
-    }, []));
+    }, collectSpeechTransferables(result)), (error) => {
+      const response = {
+        protocol: SPEECH_WORKER_PROTOCOL,
+        id: request.id,
+        ok: false,
+        error: null,
+      };
+      sendSerializedError(send, response, error, role, op, scope);
+    });
   }
 
   function handleMessage(request) {
@@ -2517,7 +2817,7 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
     if (op === "cancel") {
       const target = operations.get(request.payload?.targetId);
       target?.controller.abort(operationReason(role, target.op, "cancelled"));
-      const result = Promise.resolve(Object.freeze({
+      const result = Promise.resolve(completeValue({
         cancelled: Boolean(target),
         reason: target
           ? operationReason(role, target.op, "cancelled")
@@ -2542,24 +2842,14 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
     return operation;
   }
 
-  return Object.freeze({ handleMessage, status });
-}
-
-function privatePort(value) {
-  return value
-    && typeof value.postMessage === "function"
-    && typeof value.addEventListener === "function"
-    ? value
-    : null;
+  return completeValue({ handleMessage, status });
 }
 
 export function installBrowserSpeechWorker(role, scope = globalThis) {
-  let transport = scope;
-  let transportMode = null;
   const runtime = createSpeechWorkerRuntime({
     role,
     scope,
-    send: (message, transfers) => transport.postMessage(message, transfers),
+    send: (message, transfers) => scope.postMessage(message, transfers),
   });
 
   function receive(request) {
@@ -2567,38 +2857,6 @@ export function installBrowserSpeechWorker(role, scope = globalThis) {
   }
 
   scope.addEventListener("message", (event) => {
-    if (transportMode === "private-message-port") return;
-    const requestedPort = privatePort(event.data?.privatePort);
-    const isGraphLoad = event.data?.op === "load"
-      && graphConfiguration(event.data?.payload?.configuration);
-    const isStrictGraphLoad = isGraphLoad
-      && event.data?.payload?.configuration?.security?.secure === true;
-    if (requestedPort) {
-      if (!isStrictGraphLoad || transportMode !== null) return;
-      transportMode = "private-message-port";
-      transport = requestedPort;
-      requestedPort.addEventListener("message", (portEvent) => receive(portEvent.data));
-      requestedPort.start?.();
-      const { privatePort: ignored, ...request } = event.data;
-      void ignored;
-      receive(request);
-      return;
-    }
-    if (isStrictGraphLoad) {
-      scope.postMessage({
-        protocol: SPEECH_WORKER_PROTOCOL,
-        id: event.data.id,
-        ok: false,
-        error: serializedError(workerError(
-          "ARCANE_AI_ARTIFACT_GRAPH_ISOLATION_UNAVAILABLE",
-          "Strict artifact graph loading requires a private MessagePort.",
-          undefined,
-          "artifact-graph-private-message-port-missing",
-        ), role, "load"),
-      });
-      return;
-    }
-    transportMode ??= "worker-global-message";
     receive(event.data);
   });
   return runtime;
@@ -2625,7 +2883,7 @@ export function installBrowserSpeechArtifactModuleWorker(role, scope = globalThi
     }
     const request = event.data;
     if (request?.protocol !== NESTED_WORKER_PROTOCOL
-      || request.op !== "initialize-authenticated-artifact-module-worker"
+      || request.op !== "initialize-artifact-module-worker"
       || request.role !== role) return;
     initializing = true;
     void (async () => {
@@ -2642,7 +2900,7 @@ export function installBrowserSpeechArtifactModuleWorker(role, scope = globalThi
             "artifact-graph-module-worker-target-not-materialized",
           );
         }
-        environment = installArtifactGraphEnvironment(scope, configuration, role);
+        environment = installOrdinaryArtifactModuleRouter(scope, configuration, role);
         await import(target.moduleUrl);
         scope.removeEventListener("message", bootstrap);
         await new Promise((resolve) => queueMicrotask(resolve));
@@ -2653,17 +2911,27 @@ export function installBrowserSpeechArtifactModuleWorker(role, scope = globalThi
         } catch {
           // Preserve the exact nested Worker bootstrap failure.
         }
-        scope.postMessage({
-          protocol: NESTED_WORKER_PROTOCOL,
-          event: "artifact-module-worker-bootstrap-rejected",
-          error: serializedError(error, role, "load"),
-        });
-        scope.close?.();
+        try {
+          sendSerializedError(
+            (message, transfers) => scope.postMessage(message, transfers),
+            {
+              protocol: NESTED_WORKER_PROTOCOL,
+              event: "artifact-module-worker-bootstrap-rejected",
+              error: null,
+            },
+            error,
+            role,
+            "load",
+            scope,
+          );
+        } finally {
+          scope.close?.();
+        }
       }
     })();
   };
   scope.addEventListener("message", bootstrap);
-  return Object.freeze({
+  return completeValue({
     protocol: NESTED_WORKER_PROTOCOL,
     role,
     lifecycleStatus: `${role}-artifact-module-worker-awaiting-initialization`,

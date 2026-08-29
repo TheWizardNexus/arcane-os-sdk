@@ -59,7 +59,7 @@ function sorted(values){
 async function livePackageExportGraph(packageDocument){
     const graph=[];
     for(const [key,target] of Object.entries(packageDocument.exports)){
-        if(typeof target!=='string'||!target.endsWith('.mjs'))continue;
+        if(typeof target!=='string'||!/[.]m?js$/u.test(target))continue;
         const entrypoint=packageEntrypointName(key);
         const namespace=await import(pathToFileURL(
             path.join(repositoryRoot,target)
@@ -204,7 +204,58 @@ test('the public package API inventory matches every JavaScript export and MDN e
             assert.ok(record,name);
             assert.deepEqual(record.entrypoints,['arcane-os','arcane-os/toolchain']);
         }
-
+        const materialize=inventory.members.find(
+            member=>member.name==='materializeInstalledSdkRuntime'
+        );
+        assert.ok(materialize);
+        assert.doesNotMatch(materialize.signature,/reconcileLock/u);
+        assert.match(materialize.signature,/workspaceOperationLease/u);
+        assert.equal(
+            inventory.members.some(member=>member.name==='reconcileInstalledSdkLock'),
+            false
+        );
+        for(const name of ['upgradeApplication']){
+            const record=inventory.members.find(member=>member.name===name);
+            assert.ok(record,name);
+            assert.deepEqual(record.entrypoints,['arcane-os']);
+        }
+        const portableRuntimeEntrypoints=new Map([
+            ['arcane-os/preference-store',{
+                target:'./runtime/arcane/modules/PreferenceStore.js',
+                names:[
+                    'PREFERENCE_STORE_ERROR_CODES',
+                    'PREFERENCE_STORE_EVENT_TYPES',
+                    'Preference',
+                    'default',
+                    'preferenceSchema'
+                ]
+            }],
+            ['arcane-os/speech-playback',{
+                target:'./runtime/arcane/modules/SpeechPlayback.js',
+                names:[
+                    'MAX_SPEECH_CHARACTERS',
+                    'MAX_SPEECH_CHUNKS',
+                    'MAX_SPEECH_INPUT',
+                    'PREFERRED_STREAM_SEGMENT',
+                    'SPEECH_PLAYBACK_STATE_EVENT',
+                    'SPEECH_VOICE_ALIASES',
+                    'SPEECH_VOICE_OPTIONS',
+                    'SpeechPlayback',
+                    'default',
+                    'splitSpeechText'
+                ]
+            }]
+        ]);
+        for(const [entrypoint,expected] of portableRuntimeEntrypoints){
+            const exportKey=`./${entrypoint.slice('arcane-os/'.length)}`;
+            assert.equal(packageDocument.exports[exportKey],expected.target);
+            assert.deepEqual(
+                sorted(inventory.members
+                    .filter(member=>member.entrypoints.includes(entrypoint))
+                    .map(member=>member.name)),
+                sorted(expected.names)
+            );
+        }
         const browserWasmSignatures=new Map([
             ['BROWSER_WASM_RUNTIME_AUTHORITY','const BROWSER_WASM_RUNTIME_AUTHORITY'],
             ['adaptV1LlmProvider','adaptV1LlmProvider(provider)'],
@@ -240,7 +291,7 @@ test('the public package API inventory matches every JavaScript export and MDN e
             ['BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL','const BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL'],
             ['BROWSER_SPEECH_ARTIFACT_PROTOCOL','const BROWSER_SPEECH_ARTIFACT_PROTOCOL'],
             ['createBrowserKokoroProvider','createBrowserKokoroProvider(options={})'],
-            ['createBrowserSpeechArtifactGraph',"createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', identitySha256, providerId=null, role, model, runtime, files, edges, transforms }={})"],
+            ['createBrowserSpeechArtifactGraph',"createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', security, providerId=null, role, model, runtime, files, edges, transforms }={})"],
             ['createBrowserSpeechAuthority','createBrowserSpeechAuthority({ providerId, role, model, runtime, security }={})'],
             ['createBrowserWhisperProvider','createBrowserWhisperProvider(options={})'],
             ['createDbopfsSpeechArtifactStore',"createDbopfsSpeechArtifactStore({ dbopfs, tableName='arcane_ai_browser_speech', fetchImpl=null, objectUrlFactory=null }={})"]
@@ -270,7 +321,7 @@ test('the public package API inventory matches every JavaScript export and MDN e
 
     await t.test('every JavaScript export is documented in both directions',async()=>{
         for(const [key,target] of Object.entries(packageDocument.exports)){
-            if(typeof target!=='string'||!target.endsWith('.mjs'))continue;
+            if(typeof target!=='string'||!/[.]m?js$/u.test(target))continue;
             const entrypoint=packageEntrypointName(key);
             const expected=sorted(new Set(
                 inventory.members
@@ -420,15 +471,15 @@ test('the public package API inventory matches every JavaScript export and MDN e
         assert.deepEqual([...focusedSections.keys()],[
             'Availability',
             'Public exports',
-            'Protocol and enum registry',
+            'Protocol compatibility',
             'createBrowserSpeechArtifactGraph()',
             'createDbopfsSpeechArtifactStore()',
-            'Authenticated Worker host',
+            'Ordinary module routing',
+            'ONNX runtime configuration',
             'Providers',
-            'Lifecycle, progress, cancellation, and cleanup',
-            'Stable errors and reasons',
-            '`createBrowserSpeechAuthority()` upstream package mode',
-            'Security and ownership summary',
+            'Lifecycle and cancellation',
+            'Errors',
+            'Ownership',
             'Related'
         ]);
         for(const member of records){
@@ -450,7 +501,7 @@ test('the public package API inventory matches every JavaScript export and MDN e
         for(const value of [
             'arcane-os/ai/browser-speech',
             'arcane-ai-browser-speech-artifacts/1',
-            'arcane.ai.browser-speech.authenticated-artifact-graph.v1',
+            'arcane-ai-browser-speech-artifact-graph/1',
             'arcane-ai-provider/2',
             'transformers-whisper',
             'kokoro-js',
@@ -471,9 +522,9 @@ test('the public package API inventory matches every JavaScript export and MDN e
             'AIProviderRuntime',
             'AIRuntimeState'
         ])assert.match(browserSpeechGuide,new RegExp(escapeRegExp(value),'u'),value);
-        assert.match(browserSpeechGuide,/contains no speech runtime, model, or voice payload[\s\S]*never downloads one before explicit `load\(\)`/u);
-        assert.match(browserSpeechGuide,/Runtime\/model\/sample-rate\/default-voice\/voice inventory[\s\S]*remain caller authority/u);
-        assert.match(browserSpeechGuide,/No hardware heuristic,[\s\S]*hidden fallback,[\s\S]*startup download/u);
+        assert.match(browserSpeechGuide,/does not choose a runtime, model, voice, catalog, prompt, or product[\s\S]*Nothing is downloaded or activated[\s\S]*explicitly calls `load\(\)`/u);
+        assert.match(browserSpeechGuide,/Applications own model, runtime, dtype, sample-rate, voice, profile, prompt,[\s\S]*activation, and presentation policy/u);
+        assert.match(browserSpeechGuide,/A failure or cancellation in[\s\S]*does not disable the other role or authorize a fallback provider/u);
         assert.doesNotMatch(browserSpeechGuide,/automatically (?:downloads|selects) (?:a )?(?:model|voice|provider)/iu);
     });
 });

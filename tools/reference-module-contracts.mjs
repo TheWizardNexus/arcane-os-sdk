@@ -113,17 +113,6 @@ const sdkReferenceBehaviorEvidence=(scope,sources,tests)=>Object.freeze({
 });
 
 export const referenceGuideBehaviorEvidence=Object.freeze({
-    'docs/reference/ai/browser-speech.md':sdkReferenceBehaviorEvidence(
-        ['browser speech provider lifecycle, request normalization, and cancellation'],
-        [{
-            path:'browser-runtime/ai/browser-speech-providers.mjs',
-            blob:'6cfa347508881f06f5b061b76ac92f5ddbd7e468'
-        }],
-        [{
-            path:'test/browser-speech-providers.test.mjs',
-            blob:'7ab8312d4ee0354f7ab7daca85510baadd74ac10'
-        }]
-    ),
     'docs/reference/cli.md':sdkReferenceBehaviorEvidence(
         ['import-map generation and multi-document targeting'],
         [{
@@ -239,7 +228,6 @@ export function createReferenceModuleContractMap(records){
         }
     }
     if(JSON.stringify(Object.keys(referenceGuideBehaviorEvidence))!==JSON.stringify([
-        'docs/reference/ai/browser-speech.md',
         'docs/reference/cli.md',
         'docs/reference/runtime-components.md'
     ])){

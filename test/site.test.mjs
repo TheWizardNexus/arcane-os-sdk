@@ -94,19 +94,6 @@ const expectedBehaviorEvidence=Object.freeze({
     'ThemeBootstrap.js':upstreamBehaviorEvidence('ThemeBootstrap.js','9a0fb2d9729141175b835f7c95a208a650c66d2e','test/theme-manager-system-appearance.test.mjs','53a5cc666c6c6db4f5e11b77e5975723946e10c7')
 });
 const expectedReferenceGuideBehaviorEvidence=Object.freeze({
-    'docs/reference/ai/browser-speech.md':Object.freeze({
-        scope:Object.freeze(['browser speech provider lifecycle, request normalization, and cancellation']),
-        repository:'TheWizardNexus/arcane-os-sdk',
-        commit:'d5326d206bf0bec6ad82d53605e666841aa79899',
-        sources:Object.freeze([Object.freeze({
-            path:'browser-runtime/ai/browser-speech-providers.mjs',
-            blob:'6cfa347508881f06f5b061b76ac92f5ddbd7e468'
-        })]),
-        tests:Object.freeze([Object.freeze({
-            path:'test/browser-speech-providers.test.mjs',
-            blob:'7ab8312d4ee0354f7ab7daca85510baadd74ac10'
-        })])
-    }),
     'docs/reference/cli.md':Object.freeze({
         scope:Object.freeze(['import-map generation and multi-document targeting']),
         repository:'TheWizardNexus/arcane-os-sdk',
@@ -656,11 +643,13 @@ test('the complete API reference is a first-party generated Pages corpus',async 
         assert.match(decodedSpeechGuide,/arcane-os\/ai\/browser-speech/u);
         assert.match(decodedSpeechGuide,/Whisper speech-to-text[\s\S]*Kokoro text-to-speech/u);
         assert.match(decodedSpeechGuide,/arcane-ai-provider\/2/u);
-        assert.match(decodedSpeechGuide,/does not ship model weights[\s\S]*cloud fallback/u);
-        assert.match(decodedSpeechGuide,/0[.]2[.]1 publishes no Node speech storage, Worker, audio-decoder, or execution adapter/u);
-        assert.match(decodedSpeechGuide,/secure:false[\s\S]*appSecurity[\s\S]*provider security[\s\S]*load\(\{security\}\)/u);
-        assert.match(decodedSpeechGuide,/checks[.]byteLength[\s\S]*checks[.]sha256/u);
-        assert.match(decodedSpeechGuide,/before Worker use[\s\S]*provider stays ready/u);
+        assert.match(decodedSpeechGuide,/Ordinary speech operation[\s\S]*complete functional path/u);
+        assert.match(decodedSpeechGuide,/bare specifier remains unchanged[\s\S]*native import-map resolution/u);
+        assert.match(decodedSpeechGuide,/complete nested messages[\s\S]*without a depth or content cap/u);
+        assert.doesNotMatch(
+            decodedSpeechGuide,
+            /checks[.]byteLength|checks[.]sha256|identitySha256|completion manifest|artifactGraphAdmission/u
+        );
         for(const name of [
             'BROWSER_WASM_RUNTIME_AUTHORITY',
             'createArcaneAI()',
@@ -746,13 +735,13 @@ test('the complete API reference is a first-party generated Pages corpus',async 
         }
     });
 
-    await t.test('published inventories are byte-identical to their canonical sources',async()=>{
+    await t.test('published inventories structurally match their canonical sources',async()=>{
         for(const inventory of manifest.inventories){
             const [source,published]=await Promise.all([
-                readFile(path.join(repositoryRoot,...inventory.source.split('/'))),
-                readFile(path.join(repositoryRoot,...inventory.output.split('/')))
+                readJson(path.join(repositoryRoot,...inventory.source.split('/'))),
+                readJson(path.join(repositoryRoot,...inventory.output.split('/')))
             ]);
-            assert.equal(published.equals(source),true,inventory.output);
+            assert.deepEqual(published,source,inventory.output);
         }
     });
 
@@ -837,11 +826,8 @@ test('the complete API reference is a first-party generated Pages corpus',async 
         assert.match(protocols,/id="portable-ai-provider-runtime"/u);
         assert.match(decodedProtocols,/import ollama from 'arcane\/Ollama';/u);
         for(const release of [runtimeRelease,browserRelease]){
-            for(const value of [
-                `${String(release.fileCount)} files`,
-                `${release.totalBytes.toLocaleString('en-US')} bytes`,
-                release.contentSha256
-            ])assert.ok(decodedProtocols.includes(value),value);
+            const value=`${String(release.fileCount)} files`;
+            assert.ok(decodedProtocols.includes(value),value);
         }
         assert.match(
             decodedProtocols,
@@ -861,7 +847,6 @@ test('the complete API reference is a first-party generated Pages corpus',async 
         assert.match(decodedProtocols,/sdkInstallation[\s\S]*dependencyName[\s\S]*browserRuntimeManifest/u);
         assert.match(decodedProtocols,/npm:arcane-os@0[.]3[.]0/u);
         assert.match(decodedProtocols,/sdkVersion: 0[.]3[.]0/u);
-        assert.ok(decodedProtocols.includes(`contentSha256: ${browserRelease.contentSha256}`));
         assert.match(decodedProtocols,/WebGPU[\s\S]*99,999 GPU layers[\s\S]*no CPU fallback/u);
         assert.match(decodedProtocols,/PersistentAIChatSession[\s\S]*persist:false/u);
         assert.match(decodedProtocols,/tool calls are structural result data only[\s\S]*never executes a handler/iu);

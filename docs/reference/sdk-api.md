@@ -98,7 +98,7 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `buildApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `buildTarget()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL` | constant | `arcane-os/ai/browser-speech` | Browser speech providers | Browser metadata; graph construction starts no fetch, cache, Worker, provider, or event operation |
-| `BROWSER_SPEECH_ARTIFACT_PROTOCOL` | constant | `arcane-os/ai/browser-speech` | Browser speech providers | Browser metadata; model/runtime use requires DBOPFS, Web Locks, Workers, and caller-supplied immutable artifacts |
+| `BROWSER_SPEECH_ARTIFACT_PROTOCOL` | constant | `arcane-os/ai/browser-speech` | Browser speech providers | Browser metadata; model/runtime use requires caller-selected sources plus the selected DBOPFS, Web Locks, and Worker capabilities |
 | `BROWSER_WASM_RUNTIME_AUTHORITY` | constant | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser metadata; no model or DBOPFS required to inspect |
 | `bumpVersion()` | function | `arcane-os/packager` | Packaging and release bundles | Node |
 | `bundleApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
@@ -108,12 +108,12 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `createApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `createArcaneAI()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser; compatible LLM provider or controller required |
 | `createAppReleaseBundle()` | function | `arcane-os` | Packaging and release bundles | Node |
-| `createBrowserKokoroProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with Workers, object URLs, and caller-selected Kokoro runtime/model artifacts; DBOPFS/Web Locks apply to explicit secure graph mode |
+| `createBrowserKokoroProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with Workers, object URLs, caller-selected Kokoro runtime/model artifacts, and an SDK DBOPFS speech store |
 | `createBrowserModelSource()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser Fetch with a readable response body |
 | `createBrowserSpeechArtifactGraph()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser metadata; construction starts no fetch, cache, Worker, provider, or event operation |
 | `createBrowserSpeechAuthority()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser descriptor construction; use requires the selected storage and provider Web APIs |
 | `createBrowserWasmLlmProvider()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser context with WebAssembly, OPFS/DBOPFS, and WebGPU; no CPU fallback |
-| `createBrowserWhisperProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with Workers, object URLs, and caller-selected Whisper runtime/model artifacts; DBOPFS/Web Locks apply to explicit secure graph mode |
+| `createBrowserWhisperProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with Workers, object URLs, caller-selected Whisper runtime/model artifacts, and an SDK DBOPFS speech store |
 | `createCanonicalUstarHeader()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `createDbopfsModelStore()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser with a ready DBOPFS instance and OPFS |
 | `createDbopfsSpeechArtifactStore()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with ready DBOPFS, Web Locks, Fetch, File/Blob, and object URLs |
@@ -6298,10 +6298,10 @@ role lifecycle and observation, but are not exports of this package subpath.
 
 ### Overview
 
-Stable protocol identifier for an SDK-created authenticated browser speech
-artifact graph. It identifies one complete caller-owned runtime, model, and
-voice dependency graph; it grants no provider, model, runtime, voice, network,
-or license authority.
+Stable protocol identifier for an SDK-created browser speech materialization
+graph. The historical `authenticated` discriminator remains for compatibility;
+it identifies one complete caller-owned runtime, model, and voice routing record
+but grants no provider, model, runtime, voice, network, or license authority.
 
 ### Value and import
 
@@ -6366,49 +6366,42 @@ console.log(BROWSER_SPEECH_ARTIFACT_PROTOCOL);
 
 ### Overview
 
-Validates, canonicalizes, identifies, and freezes one complete caller-owned
-browser speech artifact graph. The caller declares every executable, WASM,
-model, and voice byte together with its immutable source identity, byte length,
-SHA-256 digest, license declaration, runtime route, dependency edge, transform,
-model/runtime identity, sample rate, and TTS default voice where applicable.
-The SDK selects none of those values.
+Normalizes one complete caller-owned browser speech materialization graph. The
+caller declares runtime, model, and voice sources together with their paths,
+media types, routing aliases, and model/runtime identity,
+sample rate, and TTS default voice where applicable. The SDK selects none of
+those values and computes no byte identity.
 
 ### Signature and result
 
 ```text
-createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', identitySha256, providerId=null, role, model, runtime, files, edges, transforms }={})
+createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', security, providerId=null, role, model, runtime, files, edges, transforms }={})
 ```
 
-This graph API is optional hardening and is used only after explicit
-`secure:true` selection. Ordinary `secure:false` speech does not require a
-graph, digest, per-file byte/SHA metadata, graph status, or preparation receipt.
+`role` is exactly `stt` or `tts`; its model and runtime adapter fields must match
+that role. Files are normalized into one functional path/source inventory, the
+runtime entry and selected ONNX MJS/WASM pair must exist, and TTS voice records
+must identify their selected files. Legal metadata is optional and inert; it is
+never required or interpreted for runtime materialization. `edges` and
+`transforms` remain mutable compatibility metadata and do not gate ordinary
+routing.
 
-`role` is exactly `stt` or `tts`; its model and runtime adapter fields must
-match that role. Every non-entry file must be reachable through the declared
-runtime, model, voice, or edge graph. Files are normalized into one unique
-path/source inventory with exact media types, positive byte lengths, lowercase
-SHA-256 values, immutable revisions, and explicitly admitted runtime routes.
-Unknown graph kinds, roles, adapters, paths, identities, files, edges,
-transforms, runtime routes, or voice policy reject the selected secure graph with a concrete
-`artifact-graph-*` reason.
-
-The result is one frozen
-`arcane-ai-browser-speech-artifact-graph/1` record containing
-`{kind,providerId,role,model,runtime,files,edges,transforms,identitySha256,
-artifactGraphStatus}`. `kind` and `runtime.moduleGraph` are exactly
-`browser-speech-authenticated-artifact-graph`; `artifactGraphStatus` is exactly
-`artifact-graph-descriptor-verified`. The SDK computes `identitySha256` from a
-canonical JSON projection. A supplied `identitySha256` is an assertion and must
-equal that computed value.
+The result is one mutable `arcane-ai-browser-speech-artifact-graph/1` record
+containing `{protocol,kind,providerId,role,model,runtime,files,edges,transforms}`
+and an optional `security` field only when the caller supplies `{secure:true}`.
+The historical `kind` and `runtime.moduleGraph` value is
+`browser-speech-authenticated-artifact-graph`; it activates no authentication,
+admission, or isolation stage. The security field records future intent only
+and must not enable the dormant hardening implementation without a separate
+explicit review with the user.
 
 ### Availability and normalization
 
 **Browser metadata; the ESM subpath is importable in Node.** Construction is
 synchronous and starts no fetch, cache, Worker, provider, or event operation.
-The graph is valid only because it was created and retained by this SDK realm;
-a structurally similar object is rejected in explicit secure mode. Preparing and executing
-the graph requires the selected DBOPFS, Web Locks, Fetch, object URL, and Worker
-capabilities.
+The store and provider accept SDK-created graph records so they can retain the
+associated materialization metadata. Preparing and executing a graph requires
+the selected DBOPFS, Web Locks, Fetch, object URL, and Worker capabilities.
 
 ### Example
 
@@ -6418,14 +6411,14 @@ import {
 } from 'arcane-os/ai/browser-speech';
 
 const graph = createBrowserSpeechArtifactGraph(callerOwnedGraphDescriptor);
-console.log(graph.identitySha256, graph.artifactGraphStatus);
+console.log(graph.protocol, graph.kind);
 ```
 
 ## createBrowserSpeechAuthority()
 
 ### Overview
 
-Validates and freezes one caller-owned Whisper STT or Kokoro TTS model/runtime
+Validates and returns one mutable caller-owned Whisper STT or Kokoro TTS model/runtime
 selection. The application owns every model, runtime, revision, URL, voice, and
 business-policy choice; the SDK supplies no artifact selection.
 
@@ -6437,28 +6430,27 @@ createBrowserSpeechAuthority({ providerId, role, model, runtime, security }={})
 
 `role` is exactly `stt` or `tts`. `model` supplies
 `{id,repository,revision,files}` and, for TTS, `defaultVoice`. `runtime`
-supplies `{adapter,version,revision,entry,files}`; the adapter is exactly
-`transformers-whisper` for STT or `kokoro-js` for TTS. File records use unique
-relative `path`, caller-selected version-pinned HTTPS or same-origin `url`, and
-optional `mediaType`. Ordinary records contain no byte counts, byte limits,
+supplies `{adapter,version,revision,entry,wasmPaths?,files}`; the adapter is
+exactly `transformers-whisper` for STT or `kokoro-js` for TTS. File records use
+unique relative `path`, a caller-selected `url`, and optional `mediaType`.
+Ordinary records contain no byte counts, byte limits,
 hashes, digests, or byte identities. The runtime entry names one JavaScript
 module in the selected runtime.
 
-The result is a frozen `arcane-ai-model-authority/1` record containing the
+The result is a mutable `arcane-ai-model-authority/1` record containing the
 provider/model/role identity, normalized runtime and model file declarations,
-optional default voice, and `{secure:false}` by default. Construction validates
-the descriptor structure without adding an ordinary content gate.
+optional default voice, and no security field when security is omitted or false.
+Construction validates the descriptor structure without adding an ordinary
+content gate.
 
-Security defaults to `{secure:false}` and ordinary loading remains fully
-functional. Optional graph hardening activates only after explicit user
-authorization and an explicit `secure:true` selection; it is separate from this
-ordinary upstream descriptor and never turns byte/hash metadata into a default
-requirement.
+Ordinary loading remains fully functional. An explicit `{secure:true}` value is
+preserved only as future intent; no hardening executes until that implementation
+is separately reviewed with and authorized by the user.
 
 ### Availability and normalization
 
 **Browser descriptor construction; actual use requires the selected provider
-Web APIs.** Credentials, fragments, duplicate identities, mismatched adapters,
+Web APIs.** Credential-bearing URLs, duplicate identities, mismatched adapters,
 and malformed runtime descriptors reject. This function grants no
 publisher authenticity or license rights.
 
@@ -6499,8 +6491,9 @@ const authority = createBrowserSpeechAuthority({
 
 Adapts an existing DBOPFS instance into a complete caller-selected speech
 runtime/model store. It serializes each selected model with an exclusive Web
-Lock, removes malformed partial state after failure, and commits the
-completion manifest only after every declared file succeeds.
+Lock, removes partial state after failure, stores ordinary mutable selection
+metadata before content, and treats a changed file inventory or source mapping
+as a cache miss that is downloaded again.
 
 ### Signature and result
 
@@ -6508,23 +6501,25 @@ completion manifest only after every declared file succeeds.
 createDbopfsSpeechArtifactStore({ dbopfs, tableName='arcane_ai_browser_speech', fetchImpl=null, objectUrlFactory=null }={})
 ```
 
-The frozen result is `{protocol,tableName,prepare,remove}`.
+The mutable result is `{protocol,tableName,prepare,remove}`.
 `prepare(authority,{signal,onProgress,offline=false,security})` uses a complete
-compatible cache or downloads every declared file with omitted credentials,
-preserves complete content without byte/hash/digest gates in ordinary mode,
+compatible cache or downloads every declared file, preserves complete content
+without byte/hash/digest gates,
 materializes object URLs, and returns
 `{cache,runtime,model,release}`. Call `release()` when the Worker no longer
 needs those URLs. `offline:true` never fetches and rejects a miss with
 `ARCANE_AI_ARTIFACT_OFFLINE_MISS`. `remove(authority)` deletes that exact
-authority's files and manifest.
+authority's files and selection metadata. `onProgress` remains an optional
+provider-interface callback, but the current store publishes no progress
+records. `security` is an intent-only seam and performs no hardening work.
 
 ### Availability and normalization
 
 **Browser with a ready DBOPFS instance, OPFS, Web Locks, Fetch or an injected
 fetch function, File/Blob, and object URLs.** An unavailable authority lock
 fails as `ARCANE_AI_STORAGE_BUSY`; download, malformed cache, graph, and storage
-failures remain observable `ARCANE_AI_*` errors. Completion metadata is not
-transferable authority or publisher proof.
+failures remain observable `ARCANE_AI_*` errors. Cache selection metadata is
+neither a completion/integrity receipt nor publisher proof.
 
 ### Example
 
@@ -6560,8 +6555,9 @@ createBrowserWhisperProvider(options={})
 ```
 
 The recognized options are
-`{id='arcane-browser-whisper',localOnly=true,model,runtime,appSecurity,
-security,store,offline=false}`. The frozen result is
+`{id='arcane-browser-whisper',localOnly=true,graph,model,runtime,appSecurity,
+security,store,offline=false}`. `graph` is mutually exclusive with `model` and
+`runtime`. The mutable result is
 `{protocol:'arcane-ai-provider/2',role:'stt',id,localOnly:true,catalog,inspect,
 status,load,request,unload,dispose}`. The only request operation is
 `transcribe`; its payload is `{audio:Float32Array,sampleRate:16000}`. The
@@ -6569,7 +6565,9 @@ Worker-transferred result is a structured `{text}` record; the client does not
 re-freeze the cloned record.
 
 `status()` returns
-`{role,providerId,modelId,state,loaded,busy,generation,errorCode,cache}`.
+`{role,providerId,modelId,state,lifecycleStatus,lifecycleReason,activeOperation,
+loaded,busy,generation,errorCode,cache,warnings}` and includes `security` only
+for an explicit secure intent.
 States are `unloaded`, `loading`, `ready`, `unloading`, `error`, and
 `disposed`. Compatible concurrent loads coalesce; concurrent requests fail as
 `ARCANE_AI_PROVIDER_BUSY`. Cancellation after the Worker request begins
@@ -6590,8 +6588,8 @@ and accessors are rejected before Worker use.
 ### Availability and normalization
 
 **Browser with Workers, object URLs, and a caller-selected
-`transformers-whisper` runtime/model. Explicit secure graph mode additionally
-requires DBOPFS and Web Locks.** The subpath is
+`transformers-whisper` runtime/model plus the required DBOPFS store and Web
+Locks.** The subpath is
 importable in Node, but no Node storage, Worker, audio-decoder, or speech
 execution adapter is published. No Core speech call, model/runtime download
 authority, or automatic provider fallback is added. Provider objects are not event targets; register them with
@@ -6611,8 +6609,7 @@ async function transcribeAfterUserChoice(audioBlob) {
             providerId:whisper.id,
             modelId:whisper.catalog()[0].id,
             localOnly:true
-        },
-        progress() {}
+        }
     });
     const transcript = await whisper.request({
         role:'stt',
@@ -6642,20 +6639,21 @@ createBrowserKokoroProvider(options={})
 ```
 
 The recognized options are
-`{id='arcane-browser-kokoro',localOnly=true,model,runtime,appSecurity,security,
-store,offline=false}`. The frozen result is
+`{id='arcane-browser-kokoro',localOnly=true,graph,model,runtime,appSecurity,
+security,store,offline=false}`. `graph` is mutually exclusive with `model` and
+`runtime`. The mutable result is
 `{protocol:'arcane-ai-provider/2',role:'tts',id,localOnly:true,catalog,inspect,
 status,load,request,unload,dispose}`. The only request operation is
 `synthesize`; its payload is `{text,voice?,speed=1}`. Omitted `voice` uses the
-caller-supplied `model.defaultVoice`; `speed` is greater than zero and at most
-four. The Worker-transferred result is a structured
+caller-supplied `model.defaultVoice`; `speed` is any finite number greater than
+zero. The Worker-transferred result is a structured
 `{audio:Float32Array,sampleRate:24000,voice}` record; the client does not
 re-freeze the cloned record.
 
 The shared AI request form is
 `{model,input,responseFormat,voice?,speed?}`. It requires the exact model,
 accepts only `responseFormat:'wav'`, maps the complete `input` to provider-native text, and
-returns frozen `{audio:Uint8Array,contentType:'audio/wav'}` containing 24 kHz
+returns mutable `{audio:Uint8Array,contentType:'audio/wav'}` containing 24 kHz
 mono 16-bit PCM. Unsupported formats fail
 `ARCANE_AI_UNSUPPORTED_RESPONSE_FORMAT`; malformed adapter audio fails
 `ARCANE_AI_INVALID_PROVIDER_RESULT`. Unknown fields and accessors reject as malformed.
@@ -6671,9 +6669,9 @@ provider stays ready. Stable failures include
 
 ### Availability and normalization
 
-**Browser with Workers, object URLs, and a caller-selected
-`kokoro-js` runtime/model/voice selection. Explicit secure graph mode
-additionally requires DBOPFS and Web Locks.** The subpath is
+**Browser with Workers, object URLs, and a caller-selected `kokoro-js`
+runtime/model/voice selection plus the required DBOPFS store and Web Locks.**
+The subpath is
 importable in Node, but no Node storage, Worker, or speech execution adapter is
 published. No Core speech call, model/runtime/voice authority, or automatic provider fallback is
 added. Provider objects are not event targets; managed `AIProviderRuntime` and
@@ -6692,8 +6690,7 @@ async function synthesizeAfterUserChoice() {
             providerId:kokoro.id,
             modelId:kokoro.catalog()[0].id,
             localOnly:true
-        },
-        progress() {}
+        }
     });
     const speech = await kokoro.request({
         role:'tts',

@@ -683,6 +683,14 @@ test('the exact npm artifact exposes the supported installed capability contract
     assert.equal(installedPackage.name,verified.manifest.name);
     assert.equal(installedPackage.version,verified.manifest.version);
     assert.equal(installedPackage.exports['./mail'],'./src/mail-api.mjs');
+    assert.equal(
+        installedPackage.exports['./preference-store'],
+        './runtime/arcane/modules/PreferenceStore.js'
+    );
+    assert.equal(
+        installedPackage.exports['./speech-playback'],
+        './runtime/arcane/modules/SpeechPlayback.js'
+    );
     const browserRuntimeReceipt=JSON.parse(await readFile(
         path.join(installedRoot,'browser-runtime','ARCANE_SDK_BROWSER_RELEASE.json'),
         'utf8'
@@ -703,30 +711,6 @@ test('the exact npm artifact exposes the supported installed capability contract
     assert.equal(browserAiComponents.runtimePolicy.modelWeightsPacked,false);
     assert.equal(browserAiComponents.runtimePolicy.remoteModelHelpers,false);
     assert.equal(browserAiComponents.runtimePolicy.toolCalls,'structural-only-never-executed');
-    const browserSpeechComponents=JSON.parse(await readFile(
-        path.join(
-            installedRoot,'browser-runtime','ai','ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json'
-        ),
-        'utf8'
-    ));
-    assert.equal(browserSpeechComponents.packageExport,'arcane-os/ai/browser-speech');
-    assert.equal(
-        browserSpeechComponents.closureStatus,
-        'browser-speech-runtime-resolved-from-upstream-packages-and-provider-downloads'
-    );
-    assert.equal(
-        browserSpeechComponents.publicationStatus,
-        'browser-speech-public-runtime-ready-warn-first-secure-opt-in'
-    );
-    assert.equal(browserSpeechComponents.runtimeBytesPacked,false);
-    assert.equal(browserSpeechComponents.modelWeightsPacked,false);
-    assert.equal(browserSpeechComponents.voiceBytesPacked,false);
-    assert.equal(browserSpeechComponents.materializedLegalCorpus,false);
-    assert.deepEqual(browserSpeechComponents.publicationBlocks,[]);
-    assert.ok(browserSpeechComponents.legalEvidence.every(evidence=>
-        Number.isSafeInteger(evidence.bytes)
-        &&/^[a-f0-9]{64}$/u.test(evidence.sha256)
-    ));
     const componentFiles=browserAiComponents.components.flatMap(component=>component.files);
     const projectedWllamaModule=componentFiles.find(file=>file.role==='runtime-module');
     const projectedWllamaWasm=componentFiles.find(file=>file.role==='runtime-wasm');
@@ -755,12 +739,30 @@ import test from 'arcane-os/testing';
 import * as browserSpeech from 'arcane-os/ai/browser-speech';
 import * as browserWasm from 'arcane-os/ai/browser-wasm';
 import * as mail from 'arcane-os/mail';
+import PreferenceStore,{
+    PREFERENCE_STORE_ERROR_CODES,
+    Preference,
+    preferenceSchema
+} from 'arcane-os/preference-store';
+import SpeechPlayback,{
+    MAX_SPEECH_INPUT,
+    SpeechPlayback as NamedSpeechPlayback,
+    splitSpeechText
+} from 'arcane-os/speech-playback';
 
 test('installed public SDK capabilities are coherent',async()=>{
     assert.equal(SDK_VERSION,${JSON.stringify(verified.manifest.version)});
     assert.equal(runtimeRelease.sdkVersion,SDK_VERSION);
     assert.equal(runtimeRelease.source.protocol,'arcane/1');
     assert.ok(runtimeRelease.fileCount>0);
+
+    assert.equal(typeof PreferenceStore,'function');
+    assert.equal(typeof PREFERENCE_STORE_ERROR_CODES,'object');
+    assert.equal(typeof Preference,'function');
+    assert.equal(typeof preferenceSchema,'function');
+    assert.equal(SpeechPlayback,NamedSpeechPlayback);
+    assert.equal(MAX_SPEECH_INPUT,3900);
+    assert.deepEqual(splitSpeechText('ready'),['ready']);
 
     const targets=listTargets();
     assert.equal(targets.find(target=>target.id==='browser')?.status,'available');
@@ -775,12 +777,10 @@ test('installed public SDK capabilities are coherent',async()=>{
 
     assert.deepEqual(Object.keys(mail).sort(),[
         'DEFAULT_MAIL_REQUEST_TIMEOUT_MS',
-        'MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES',
         'MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS',
         'MAIL_OUTBOX_PROTOCOL',
         'MAIL_OUTBOX_STATES',
         'MAIL_OUTBOX_TABLE',
-        'MAX_MAIL_RESPONSE_BYTES',
         'Mail',
         'MailOutbox',
         'MailTransportError',
@@ -825,8 +825,6 @@ test('installed public SDK capabilities are coherent',async()=>{
     const speechProvider=browserSpeech.createBrowserWhisperProvider({
         id:'installed-smoke-whisper',
         store:speechStore,
-        appSecurity:{secure:false},
-        security:{secure:false},
         runtime:{
             adapter:'transformers-whisper',
             version:'3.5.1',
@@ -841,31 +839,29 @@ test('installed public SDK capabilities are coherent',async()=>{
         model:{
             id:'installed-smoke-whisper',
             repository:'Xenova/whisper-small',
-            revision:'provider-selected-revision'
+            revision:'provider-selected-revision',
+            dtype:' q8 '
         }
     });
     const speechStatus=speechProvider.status();
     assert.equal(speechStatus.state,'unloaded');
-    assert.deepEqual(
-        speechStatus.security,
-        {secure:false,checks:{byteLength:false,sha256:false}}
-    );
-    assert.equal(speechStatus.integrity.state,'unchecked');
-    assert.deepEqual(
-        speechStatus.warnings,
-        ['browser-speech-warn-first-secure-mode-disabled']
-    );
-    assert.equal(speechStatus.artifactGraphAdmission,null);
+    assert.equal(Object.hasOwn(speechStatus,'security'),false);
+    assert.equal(Object.hasOwn(speechStatus,'integrity'),false);
+    assert.deepEqual(speechStatus.warnings,[]);
+    assert.equal(Object.hasOwn(speechStatus,'artifactGraphAdmission'),false);
     assert.deepEqual(
         speechProvider.catalog().map(({id})=>id),
         ['installed-smoke-whisper']
     );
-    assert.equal(speechProvider.inspect({
+    assert.equal(speechProvider.catalog()[0].dtype,'q8');
+    const speechInspection=speechProvider.inspect({
         role:'stt',
         providerId:'installed-smoke-whisper',
         modelId:'installed-smoke-whisper',
         localOnly:true
-    }).authority.admitted,true);
+    });
+    assert.equal(Object.hasOwn(speechInspection.authority,'admitted'),false);
+    assert.equal(speechInspection.authority.dtype,'q8');
 
     assert.deepEqual(Object.keys(browserWasm).sort(),[
         'BROWSER_WASM_RUNTIME_AUTHORITY',

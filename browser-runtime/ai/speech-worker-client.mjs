@@ -4,8 +4,8 @@ import {
   SPEECH_WORKER_PROTOCOL,
 } from "./speech-worker-runtime.mjs";
 
-const ARTIFACT_GRAPH_MODULE_GRAPH =
-  "browser-speech-authenticated-artifact-graph";
+const completeValue = (value) => value;
+
 const PUBLIC_WORKER_OPERATIONS = new Set([
   "load",
   "use",
@@ -42,46 +42,11 @@ function abortError(signal, role, op) {
   );
 }
 
-function validProgress(role, progress) {
-  if (!progress || typeof progress !== "object" || Array.isArray(progress)) return false;
-  const keys = Object.keys(progress).sort().join(",");
-  if (keys !== "completed,heartbeat,phase,total,unit") return false;
-  const phases = new Set([
-    `${role}-runtime-import-started`,
-    `${role}-model-load-started`,
-    `${role}-model-load-progress`,
-    `${role}-provider-ready`,
-  ]);
-  return phases.has(progress.phase)
-    && Number.isFinite(progress.completed)
-    && progress.completed >= 0
-    && (progress.total === null || (Number.isFinite(progress.total) && progress.total >= 0))
-    && (progress.unit === "bytes" || progress.unit === "items")
-    && progress.heartbeat === true;
-}
-
 function validateWorker(worker) {
   if (!worker || typeof worker.postMessage !== "function" || typeof worker.terminate !== "function") {
     throw new TypeError("The packaged speech worker did not create a Worker.");
   }
   return worker;
-}
-
-function validateMessagePort(port) {
-  if (
-    !port
-    || typeof port.postMessage !== "function"
-    || typeof port.addEventListener !== "function"
-    || typeof port.close !== "function"
-  ) {
-    throw clientError(
-      "ARCANE_AI_WORKER_MESSAGE_ERROR",
-      "The browser did not create a usable private speech Worker MessagePort.",
-      undefined,
-      "artifact-graph-private-message-port-unavailable",
-    );
-  }
-  return port;
 }
 
 const WORKER_CLIENTS = new WeakSet();
@@ -95,8 +60,6 @@ class SpeechWorkerClient {
   #createWorker;
   #worker = null;
   #transport = null;
-  #transportMode = null;
-  #privatePorts = null;
   #pending = new Map();
   #nextId = 1;
   #listeners = [];
@@ -140,7 +103,6 @@ class SpeechWorkerClient {
     const worker = validateWorker(this.#createWorker());
     this.#worker = worker;
     this.#listen(worker, "message", (event) => {
-      if (this.#transportMode === "private-message-port") return;
       this.#handleMessage(event.data);
     });
     this.#listen(worker, "messageerror", (event) => {
@@ -162,44 +124,6 @@ class SpeechWorkerClient {
     return worker;
   }
 
-  #establishPrivateTransport() {
-    if (this.#transportMode === "private-message-port") return null;
-    if (this.#transportMode !== null) {
-      throw clientError(
-        "ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH",
-        "The speech Worker already uses the legacy global message transport.",
-        undefined,
-        "artifact-graph-private-message-port-established-too-late",
-      );
-    }
-    const MessageChannelConstructor = globalThis.MessageChannel;
-    if (typeof MessageChannelConstructor !== "function") {
-      throw clientError(
-        "ARCANE_AI_WORKER_MESSAGE_ERROR",
-        "Strict artifact graph loading requires MessageChannel.",
-        undefined,
-        "artifact-graph-private-message-channel-unavailable",
-      );
-    }
-    const channel = new MessageChannelConstructor();
-    const clientPort = validateMessagePort(channel.port1);
-    const workerPort = validateMessagePort(channel.port2);
-    this.#privatePorts = Object.freeze({ clientPort, workerPort });
-    this.#transport = clientPort;
-    this.#transportMode = "private-message-port";
-    this.#listen(clientPort, "message", (event) => this.#handleMessage(event.data));
-    this.#listen(clientPort, "messageerror", (event) => {
-      void this.terminate(clientError(
-        "ARCANE_AI_WORKER_MESSAGE_ERROR",
-        "The private speech Worker MessagePort returned an unreadable message.",
-        event,
-        `${this.#role}-worker-private-message-rejected`,
-      ), { intentional: false }).catch(() => undefined);
-    });
-    clientPort.start?.();
-    return workerPort;
-  }
-
   #handleMessage(message) {
     if (message?.protocol !== SPEECH_WORKER_PROTOCOL) {
       void this.terminate(clientError(
@@ -208,30 +132,6 @@ class SpeechWorkerClient {
         undefined,
         `${this.#role}-worker-protocol-mismatch`,
       ), { intentional: false }).catch(() => undefined);
-      return;
-    }
-    if (message.event === "progress") {
-      const pending = this.#pending.get(message.requestId);
-      if (!pending) return;
-      if (!validProgress(this.#role, message.progress)) {
-        void this.terminate(clientError(
-          "ARCANE_AI_WORKER_MESSAGE_ERROR",
-          "The speech Worker progress envelope was rejected.",
-          undefined,
-          `${this.#role}-worker-progress-envelope-rejected`,
-        ), { intentional: false }).catch(() => undefined);
-        return;
-      }
-      try {
-        pending.progress(message.progress);
-      } catch (error) {
-        void this.terminate(clientError(
-          "ARCANE_AI_PROGRESS_CALLBACK_THREW",
-          "The speech load progress callback threw an exception.",
-          error,
-          `${this.#role}-load-progress-callback-threw`,
-        ), { intentional: false }).catch(() => undefined);
-      }
       return;
     }
     if (!Number.isSafeInteger(message.id) || typeof message.ok !== "boolean") {
@@ -270,12 +170,12 @@ class SpeechWorkerClient {
     pending.reject(clientError(
       admitted.code,
       admitted.message,
-      undefined,
+      admitted.cause,
       admitted.reason,
     ));
   }
 
-  request(op, payload, { signal = null, progress = () => undefined } = {}) {
+  request(op, payload, { signal = null } = {}) {
     if (!PUBLIC_WORKER_OPERATIONS.has(op)) {
       return Promise.reject(clientError(
         "ARCANE_AI_INVALID_REQUEST",
@@ -285,33 +185,10 @@ class SpeechWorkerClient {
       ));
     }
     if (signal?.aborted) return Promise.reject(abortError(signal, this.#role, op));
-    if (typeof progress !== "function") {
-      return Promise.reject(new TypeError("Speech Worker progress must be a function."));
-    }
     let worker;
-    let initialPrivatePort = null;
     try {
       worker = this.#start();
-      const graphLoad = op === "load"
-        && payload?.configuration?.runtime?.moduleGraph === ARTIFACT_GRAPH_MODULE_GRAPH;
-      const strictGraphLoad = graphLoad
-        && payload?.configuration?.security?.secure === true;
-      if (strictGraphLoad) {
-        initialPrivatePort = this.#establishPrivateTransport();
-      } else if (this.#transportMode === null) {
-        this.#transportMode = "worker-global-message";
-        this.#transport = worker;
-      }
-      if (op === "load"
-        && !strictGraphLoad
-        && this.#transportMode === "private-message-port") {
-        throw clientError(
-          "ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH",
-          "A private strict artifact graph Worker cannot load an ordinary runtime descriptor.",
-          undefined,
-          `${this.#role}-worker-runtime-transport-mode-mismatch`,
-        );
-      }
+      this.#transport = worker;
     } catch (error) {
       return Promise.reject(error);
     }
@@ -332,7 +209,7 @@ class SpeechWorkerClient {
         ).catch(() => undefined);
       };
       signal?.addEventListener?.("abort", onAbort, { once: true });
-      this.#pending.set(id, { resolve, reject, progress, cleanup, op });
+      this.#pending.set(id, { resolve, reject, cleanup, op });
       const message = {
         protocol: SPEECH_WORKER_PROTOCOL,
         id,
@@ -340,14 +217,8 @@ class SpeechWorkerClient {
         payload,
       };
       const transfers = collectSpeechTransferables(payload);
-      let destination = this.#transport;
-      if (initialPrivatePort) {
-        message.privatePort = initialPrivatePort;
-        transfers.push(initialPrivatePort);
-        destination = worker;
-      }
       try {
-        destination.postMessage(message, transfers);
+        this.#transport.postMessage(message, transfers);
       } catch (error) {
         this.#pending.delete(id);
         cleanup();
@@ -390,23 +261,12 @@ class SpeechWorkerClient {
     for (const pending of pendingOperations) pending.cleanup();
     this.#pending.clear();
     try {
-      for (const port of [
-        this.#privatePorts?.clientPort,
-        this.#privatePorts?.workerPort,
-      ]) {
-        try {
-          port?.close();
-        } catch {
-          // Worker termination remains the authoritative cancellation boundary.
-        }
-      }
-      this.#privatePorts = null;
       this.#transport = null;
       const termination = worker?.terminate();
       if (termination && typeof termination.then === "function") await termination;
     } finally {
       for (const pending of pendingOperations) pending.reject(terminationReason);
-      this.#onTermination(Object.freeze({ reason: terminationReason, intentional }));
+      this.#onTermination(completeValue({ reason: terminationReason, intentional }));
     }
   }
 }

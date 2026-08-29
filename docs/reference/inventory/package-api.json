@@ -3160,7 +3160,7 @@
       "summary": "Normalizes one complete caller-owned browser speech materialization graph without computing byte identities.",
       "availability": "Browser metadata; construction starts no fetch, cache, Worker, provider, or event operation",
       "protocol": "arcane-ai-browser-speech-artifact-graph/1",
-      "normalization": "Returns one mutable graph with normalized file/model/runtime facts; edge, transform, negative-route, and security metadata are compatibility-only and do not gate ordinary routing"
+      "normalization": "Returns one mutable graph with normalized file/model/runtime facts; legal metadata is optional and inert, while edge, transform, negative-route, and security metadata remain compatibility-only and do not gate ordinary routing"
     },
     {
       "id": "browser-speech:createBrowserSpeechAuthority",
@@ -3207,8 +3207,8 @@
       "group": "Browser speech providers",
       "summary": "Adapts an existing DBOPFS instance into a caller-scoped speech runtime/model artifact store and ordinary module router.",
       "availability": "Browser with a ready DBOPFS instance, Web Locks, Fetch or an explicit fetch implementation, File/Blob, and object URLs",
-      "protocol": "arcane.ai.browser-speech.assets.v1 completion manifests under arcane-ai-browser-speech-artifacts/1",
-      "normalization": "Serializes complete caller-selected content, routes known materialized imports/fetches/Workers/cache reads, falls back to native browser behavior for unmapped operations, and keeps secure intent dormant"
+      "protocol": "arcane-ai-browser-speech-artifacts/1 ordinary DBOPFS storage and module routing",
+      "normalization": "Serializes complete caller-selected content, invalidates stale cache selections without byte identities, routes known materialized imports/fetches/Workers/cache reads, falls back to native browser behavior for unmapped operations, and keeps secure intent dormant"
     },
     {
       "id": "mail:DEFAULT_MAIL_REQUEST_TIMEOUT_MS",

@@ -328,24 +328,27 @@ silent switch to native/Core/cloud inference.
 The browser-speech package contains plain-JavaScript authority, DBOPFS store,
 provider, client, and Worker machinery. It redistributes no Whisper, Kokoro,
 ONNX, model, voice, third-party license, or corresponding-source payload.
-Default warn-first integrations use `createBrowserSpeechAuthority()` with a
+Default upstream integrations use `createBrowserSpeechAuthority()` with a
 version-pinned npm/package runtime entry and optional upstream `wasmPaths`;
 the selected runtime then downloads models and voices through its normal
 provider fetch and browser cache behavior after explicit `load()`.
 
-`createBrowserSpeechArtifactGraph()` remains an optional hardening seam only.
-The SDK default is `secure:false`; ordinary speech uses the caller-selected
-upstream runtime, model, voice, Fetch, cache, and Worker behavior without a
-restrictive graph gate. Optional graph hardening activates only from an explicit
-`secure:true` selection and must not impose byte counts, byte limits, hashes,
-digests, or content-identity receipts. Credential omission, HTTPS/CORS behavior,
-genuinely malformed input rejection, and browser platform safety remain in
-effect.
+`createBrowserSpeechArtifactGraph()` is an ordinary materialization descriptor;
+the historical authenticated-graph discriminator does not activate admission
+or isolation. The SDK default is `secure:false`, and ordinary speech uses the
+caller-selected upstream runtime, model, voice, Fetch, cache, and Worker
+behavior without a restrictive graph gate. A supplied `secure:true` value
+records intent only. It activates no hardening until the user separately
+reviews and authorizes an implementation.
 
-The speech Worker establishes a private `MessageChannel` on its first load and
-routes subsequent request, progress, and cancellation settlement through that
-port. Default operation preserves ordinary upstream browser capabilities; no
-dormant hardening option may disable the functional path.
+Ordinary module routing preserves bare import specifiers for native import-map
+resolution and leaves bare `fetch`, `caches`, and `Worker` calls unchanged when
+the module declares a shadowing binding with the same name. Explicit
+`globalThis` or `self` calls continue through the materialized-file router.
+
+The speech Worker uses its ordinary global Worker message boundary directly for
+requests, results, errors, and cancellation. It creates no private
+`MessageChannel` and publishes no Worker progress transport.
 
 Worker operations use `arcane-ai-speech-worker/1`. The public Worker client
 supports `load`, `use`, `status`, `unload`, and `dispose`; the transport host
@@ -354,23 +357,23 @@ rejects with code `ARCANE_AI_INVALID_REQUEST`, message
 `The speech worker operation is not part of its protocol.`, and role-specific
 reason `stt-worker-operation-unknown` or `tts-worker-operation-unknown`.
 Failures use the separate
-`arcane-ai-speech-worker-error/1` envelope. Its exact own-key set is
-`code,message,protocol,reason`, all four must be data properties, and its
-registered code, fixed message, reason, role, and operation must agree. A
-foreign, incomplete, extra-keyed, accessor-bearing, cross-role, or
-cross-operation error envelope is rejected and terminates that role Worker.
+`arcane-ai-speech-worker-error/1` envelope. The legacy form has the four data
+properties `code,message,protocol,reason`; the current form may add one `cause`
+data property containing the complete serialized diagnostic, including cycles.
+The protocol, registered code, nonempty message, reason, role, and operation
+must agree. A foreign, incomplete, extra-keyed, accessor-bearing, cross-role,
+or cross-operation error envelope is rejected and terminates that role Worker.
 Nested module Workers use
 `arcane-ai-browser-speech-artifact-module-worker/1` and report bootstrap
 rejection only as `artifact-module-worker-bootstrap-rejected`.
 
-The exact redirect and source-media error registry is published in the
-[browser-speech reference](ai/browser-speech.md#graph-reasoncode-rule); graph
-errors retain the mechanical exact code pairing
-`ARCANE_AI_` plus the uppercased, underscore-normalized reason.
+If the platform cannot clone an exotic `cause`, the Worker keeps the complete
+raw failure in its console diagnostics and retries settlement with the legacy
+four-field envelope. Nested Workers are terminated during role teardown.
 
 Kokoro is configured through `namespace.env.wasmPaths`; Transformers is
-configured through `namespace.env.backends.onnx.wasm.wasmPaths`. Warn-first
-mode may use a caller-selected version-pinned upstream directory and preserves
+configured through `namespace.env.backends.onnx.wasm.wasmPaths`. Ordinary mode
+may use a caller-selected version-pinned upstream directory and preserves
 the runtime's browser cache. Optional `numThreads` is caller-owned and
 Transformers-STT-only; a Kokoro declaration rejects with
 `ARCANE_AI_KOKORO_ENV_NUM_THREADS_FIELD_NOT_EXPOSED` /
@@ -382,9 +385,9 @@ rate, TTS output sample rate, default voice, and the complete voice inventory;
 the SDK selects no hardware default, runtime, model, or fallback.
 
 The SDK is not the distributor of the selected upstream speech packages or
-provider assets and does not republish their legal/source payloads. The
-component record at `browser-runtime/ai/ARCANE_AI_BROWSER_SPEECH_COMPONENTS.json`
-documents resolution only; it is not an execution or publication gate.
+provider assets and does not republish their legal/source payloads. Package,
+model, voice, and version selection belongs to each consuming application, not
+to a shared SDK component ledger or execution/publication gate.
 
 Whisper `stt` and Kokoro `tts` each own catalog, inspect, status, load, request,
 unload, and dispose state. They load, cancel, unload, fail, and recover
@@ -394,11 +397,10 @@ a later use must load it again. If shared STT `Blob` decoding is cancelled
 before Worker use, the request rejects while the loaded provider remains ready.
 Speech failure neither disables text chat nor retries through another local,
 native, or cloud provider. The provider/Worker layer is event-neutral: it
-exposes promises, `AbortSignal`, precise lifecycle/status records, and one
-caller progress callback, but owns no event bus or listener registry. Progress
-is the provider-neutral record
-`{phase,completed,total,unit,heartbeat}`; role is encoded in Worker phase names,
-not added as a second field.
+exposes promises, `AbortSignal`, and precise lifecycle/status records, but owns
+no event bus or listener registry. The provider/2 load context accepts an
+optional progress callback for interface compatibility; the current
+browser-speech artifact and Worker transport publishes no progress records.
 
 ### Persistent chat and document context
 

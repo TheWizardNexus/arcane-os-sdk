@@ -292,9 +292,10 @@ speech artifact API, `security` is optional and ordinary behavior defaults to
 `secure:false`, and
 `offline` is boolean. The direct form forwards its
 caller-selected model, runtime, and optional security descriptors to the shared
-provider. In warn-first mode it may use an empty `model.files` inventory and a
-version-pinned upstream `runtime.wasmPaths`. Optional hardening is activated only
-when the caller explicitly supplies `security:{secure:true}`. The application
+provider. In ordinary mode it may use an empty `model.files` inventory and a
+caller-selected upstream `runtime.wasmPaths`. A supplied
+`security:{secure:true}` value records intent only; no hardening runs until that
+implementation is separately reviewed with and authorized by the user. The application
 chooses every artifact, graph or direct model/runtime authority, provider ID, offline policy,
 sample rate, and TTS default voice. `configureBrowserSpeech()` imports the shared
 browser-speech module, creates one DBOPFS store, constructs and registers the

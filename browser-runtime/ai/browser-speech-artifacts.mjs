@@ -1,8 +1,8 @@
-import { createStreamingSha256 } from "./internal/sha256.mjs";
 import {
   normalizeModelSecurity,
-  resolveModelSecurity,
 } from "./model-controller.mjs";
+
+const completeValue = (value) => value;
 
 export const BROWSER_SPEECH_ARTIFACT_PROTOCOL =
   "arcane-ai-browser-speech-artifacts/1";
@@ -10,14 +10,11 @@ export const BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL =
   "arcane-ai-browser-speech-artifact-graph/1";
 
 const MODEL_AUTHORITY_PROTOCOL = "arcane-ai-model-authority/1";
-const MANIFEST_SCHEMA = "arcane.ai.browser-speech.assets.v1";
-const ARTIFACT_GRAPH_MANIFEST_SCHEMA =
-  "arcane.ai.browser-speech.authenticated-artifact-graph.v1";
 const ARTIFACT_GRAPH_KIND = "browser-speech-authenticated-artifact-graph";
 const ARTIFACT_GRAPH_MODULE_KIND =
   "browser-speech-authenticated-artifact-graph";
 const ARTIFACT_GRAPH_GUARDS = "__arcaneBrowserSpeechArtifactGraphGuardsV1";
-const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
+const ARTIFACT_MODULE_ROUTER = "__arcaneBrowserSpeechModuleRouterV1";
 const MUTABLE_PATH_PATTERN = /\/(?:resolve\/)?(?:main|master|latest)(?:\/|$)/iu;
 const ARTIFACT_GRAPH_MUTABLE_SOURCE_PATTERN =
   /\/(?:refs\/heads\/(?:main|master)|resolve\/(?:main|master)|(?:main|master|latest))(?:\/|$)|@(?:latest|next)(?:\/|$)/iu;
@@ -33,10 +30,7 @@ const PLATFORM_CREATE_OBJECT_URL = typeof globalThis.URL?.createObjectURL === "f
 const PLATFORM_REVOKE_OBJECT_URL = typeof globalThis.URL?.revokeObjectURL === "function"
   ? globalThis.URL.revokeObjectURL.bind(globalThis.URL)
   : null;
-const PLATFORM_FETCH = typeof globalThis.fetch === "function"
-  ? globalThis.fetch.bind(globalThis)
-  : null;
-const LEGACY_ARTIFACT_ERROR_REASONS = Object.freeze({
+const LEGACY_ARTIFACT_ERROR_REASONS = completeValue({
   ARCANE_AI_REQUEST_ABORTED: "browser-speech-artifact-preparation-cancelled",
   ARCANE_AI_STORAGE_BUSY: "browser-speech-artifact-dbopfs-write-lock-unavailable",
   ARCANE_AI_STORAGE_UNAVAILABLE: "browser-speech-artifact-dbopfs-table-unavailable",
@@ -47,8 +41,6 @@ const LEGACY_ARTIFACT_ERROR_REASONS = Object.freeze({
   ARCANE_AI_ARTIFACT_SOURCE_UNAVAILABLE: "browser-speech-artifact-fetch-unavailable",
   ARCANE_AI_ARTIFACT_DOWNLOAD_FAILED: "browser-speech-artifact-fetch-rejected",
   ARCANE_AI_ARTIFACT_SOURCE_CHANGED: "browser-speech-artifact-source-redirected",
-  ARCANE_AI_ARTIFACT_SIZE_MISMATCH: "browser-speech-artifact-byte-length-mismatch",
-  ARCANE_AI_ARTIFACT_DIGEST_MISMATCH: "browser-speech-artifact-sha256-mismatch",
   ARCANE_AI_ARTIFACT_CACHE_REJECTED: "browser-speech-artifact-dbopfs-cache-rejected",
   ARCANE_AI_ARTIFACT_OFFLINE_MISS: "browser-speech-artifact-offline-cache-miss",
 });
@@ -131,11 +123,7 @@ function requiredText(value, label) {
 }
 
 function identifier(value, label) {
-  const result = requiredText(value, label);
-  if (result.length > 128) {
-    throw new TypeError(`${label} must not exceed 128 characters.`);
-  }
-  return result;
+  return requiredText(value, label);
 }
 
 function artifactGraphText(value, label, reason = "artifact-graph-field-text-required") {
@@ -151,11 +139,20 @@ function artifactGraphIdentifier(
   missingReason = "artifact-graph-identifier-missing",
   lengthReason = "artifact-graph-identifier-length-exceeded",
 ) {
-  const result = artifactGraphText(value, label, missingReason);
-  if (result.length > 128) {
-    throw artifactGraphTypeError(lengthReason, `${label} must not exceed 128 characters.`);
+  return artifactGraphText(value, label, missingReason);
+}
+
+function ordinarySourceUrl(value, label) {
+  let result;
+  try {
+    result = new URL(value, globalThis.location?.href);
+  } catch {
+    throw new TypeError(`${label} must be a valid URL.`);
   }
-  return result;
+  if (result.username || result.password) {
+    throw new TypeError(`${label} must not contain credentials.`);
+  }
+  return result.href;
 }
 
 function immutableUrl(value, label) {
@@ -207,26 +204,6 @@ function canonicalArtifactPath(
     );
   }
   return path;
-}
-
-function graphSha256(
-  value,
-  label,
-  missingReason = "artifact-graph-file-sha256-missing",
-  formatReason = "artifact-graph-file-sha256-format-mismatch",
-) {
-  const sha256 = artifactGraphText(
-    value,
-    label,
-    missingReason,
-  );
-  if (sha256 !== value || !SHA256_PATTERN.test(sha256)) {
-    throw artifactGraphTypeError(
-      formatReason,
-      `${label} must contain exactly 64 lowercase hexadecimal characters.`,
-    );
-  }
-  return sha256;
 }
 
 function graphPositiveInteger(
@@ -306,14 +283,8 @@ function graphRuntimeRequestUrl(value, label) {
   } catch (error) {
     throw artifactGraphTypeError(
       "artifact-graph-runtime-request-url-not-absolute",
-      `${label} must be an absolute HTTPS URL.`,
+      `${label} must be an absolute URL.`,
       error,
-    );
-  }
-  if (result.protocol !== "https:") {
-    throw artifactGraphTypeError(
-      "artifact-graph-runtime-request-url-protocol-not-https",
-      `${label} must use HTTPS.`,
     );
   }
   if (result.username || result.password) {
@@ -349,14 +320,8 @@ function graphRedirectFinalOrigin(value, label) {
   } catch (error) {
     throw artifactGraphTypeError(
       "artifact-graph-source-redirect-final-origin-not-absolute",
-      `${label} must be an absolute HTTPS origin.`,
+      `${label} must be an absolute origin.`,
       error,
-    );
-  }
-  if (result.protocol !== "https:") {
-    throw artifactGraphTypeError(
-      "artifact-graph-source-redirect-final-origin-protocol-not-https",
-      `${label} must use HTTPS.`,
     );
   }
   if (result.username || result.password) {
@@ -387,7 +352,7 @@ function graphRedirectFinalOrigin(value, label) {
 }
 
 function normalizeGraphRedirectFinalOrigins(value, path) {
-  if (value === undefined) return Object.freeze([]);
+  if (value === undefined) return completeValue([]);
   if (!Array.isArray(value)) {
     throw artifactGraphTypeError(
       "artifact-graph-source-redirect-final-origins-not-array",
@@ -411,10 +376,10 @@ function normalizeGraphRedirectFinalOrigins(value, path) {
       `Artifact graph file ${path} redirectFinalOrigins must be unique after canonicalization.`,
     );
   }
-  return Object.freeze([...origins].sort(lexicalCompare));
+  return completeValue([...origins].sort(lexicalCompare));
 }
 
-function graphImmutableUrl(value, label, revision, sha256) {
+function graphImmutableUrl(value, label, revision) {
   let url;
   try {
     url = immutableUrl(
@@ -433,47 +398,41 @@ function graphImmutableUrl(value, label, revision, sha256) {
       error,
     );
   }
-  const identityUrl = url.toLowerCase();
   if (ARTIFACT_GRAPH_MUTABLE_SOURCE_PATTERN.test(new URL(url).pathname)) {
     throw artifactGraphTypeError(
       "artifact-graph-source-url-mutable",
       `${label} names a mutable branch, channel, or release alias.`,
     );
   }
-  if (
-    !identityUrl.includes(revision.toLowerCase())
-    && !identityUrl.includes(sha256)
-  ) {
+  if (!url.toLowerCase().includes(revision.toLowerCase())) {
     throw artifactGraphTypeError(
       "artifact-graph-source-revision-unbound",
-      `${label} must contain the file revision or SHA-256 identity.`,
+      `${label} must contain the file revision.`,
     );
   }
   return url;
-}
-
-function canonicalJson(value) {
-  if (Array.isArray(value)) {
-    return `[${value.map(canonicalJson).join(",")}]`;
-  }
-  if (value && typeof value === "object") {
-    return `{${Object.keys(value).sort().map((key) =>
-      `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
-  }
-  return JSON.stringify(value);
 }
 
 function lexicalCompare(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-function sha256Text(value) {
-  const digest = createStreamingSha256();
-  digest.update(new TextEncoder().encode(value));
-  return digest.digestHex();
+// Structural comparison for dormant authenticated-graph compatibility
+// normalizers only. Ordinary graph creation treats edges and transforms as
+// inert metadata and never calls these helpers. Do not enable them, including
+// for secure mode, without an explicit review with the user.
+function compatibilityRecordKey(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map(compatibilityRecordKey).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) =>
+      `${JSON.stringify(key)}:${compatibilityRecordKey(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 
-function normalizeFile(value, kind, index, revision) {
+function normalizeFile(value, kind, index, revision, secure) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new TypeError(`${kind} file ${String(index)} must be an object.`);
   }
@@ -485,37 +444,19 @@ function normalizeFile(value, kind, index, revision) {
   ) {
     throw new TypeError(`${kind} file path must be a normalized relative path.`);
   }
-  const url = immutableUrl(value.url, `${kind} file url`);
-  let bytes = null;
-  if (value.bytes !== undefined) {
-    if (!Number.isSafeInteger(value.bytes) || value.bytes < 1) {
-      throw new TypeError(`${kind} file bytes must be a positive safe integer.`);
-    }
-    bytes = value.bytes;
-  }
-  let sha256 = null;
-  if (value.sha256 !== undefined) {
-    sha256 = requiredText(value.sha256, `${kind} file sha256`).toLowerCase();
-    if (!SHA256_PATTERN.test(sha256)) {
-      throw new TypeError(`${kind} file sha256 must be 64 lowercase hexadecimal characters.`);
-    }
-  }
-  const identityUrl = url.toLowerCase();
-  if (
-    !identityUrl.includes(revision.toLowerCase())
-    && (sha256 === null || !identityUrl.includes(sha256))
-  ) {
+  const url = secure
+    ? immutableUrl(value.url, `${kind} file url`)
+    : ordinarySourceUrl(value.url, `${kind} file url`);
+  if (secure && !url.toLowerCase().includes(revision.toLowerCase())) {
     throw new TypeError(
-      `${kind} file URL must contain its caller-supplied revision or SHA-256 identity.`,
+      `${kind} file URL must contain its caller-supplied revision.`,
     );
   }
-  return Object.freeze({
+  return completeValue({
     kind,
     index,
     path,
     url,
-    bytes,
-    sha256,
     mediaType: typeof value.mediaType === "string" && value.mediaType.trim()
       ? value.mediaType.trim()
       : kind === "runtime" && /\.(?:m?js)$/iu.test(path)
@@ -524,7 +465,10 @@ function normalizeFile(value, kind, index, revision) {
   });
 }
 
-function uniqueFiles(files, label, kind, revision, { allowEmpty = false } = {}) {
+function uniqueFiles(files, label, kind, revision, {
+  allowEmpty = false,
+  secure = false,
+} = {}) {
   if (!Array.isArray(files) || (!allowEmpty && files.length < 1)) {
     throw new TypeError(
       allowEmpty
@@ -534,8 +478,8 @@ function uniqueFiles(files, label, kind, revision, { allowEmpty = false } = {}) 
   }
   const paths = new Set();
   const urls = new Set();
-  return Object.freeze(files.map((value, index) => {
-    const file = normalizeFile(value, kind, index, revision);
+  return completeValue(files.map((value, index) => {
+    const file = normalizeFile(value, kind, index, revision, secure);
     if (paths.has(file.path) || urls.has(file.url)) {
       throw new TypeError(`${label} file paths and URLs must be unique.`);
     }
@@ -551,12 +495,10 @@ function publicFile(file) {
     url: file.url,
     mediaType: file.mediaType,
   };
-  if (file.bytes !== null) result.bytes = file.bytes;
-  if (file.sha256 !== null) result.sha256 = file.sha256;
-  return Object.freeze(result);
+  return completeValue(result);
 }
 
-function normalizeArtifactGraphFile(value, index) {
+function normalizeArtifactGraphFile(value, index, secure = false) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw artifactGraphTypeError(
       "artifact-graph-file-descriptor-not-object",
@@ -584,54 +526,24 @@ function normalizeArtifactGraphFile(value, index) {
     "artifact-graph-file-revision-missing",
     "artifact-graph-file-revision-length-exceeded",
   );
-  const bytes = graphPositiveInteger(
-    value.bytes,
-    `Artifact graph file ${path} bytes`,
-    "artifact-graph-file-byte-length-positive-safe-integer-required",
-  );
-  const sha256 = graphSha256(
-    value.sha256,
-    `Artifact graph file ${path} sha256`,
-  );
-  const sourceUrl = graphImmutableUrl(
-    value.sourceUrl ?? value.url,
-    `Artifact graph file ${path} sourceUrl`,
-    revision,
-    sha256,
-  );
+  const sourceUrl = secure
+    ? graphImmutableUrl(
+      value.sourceUrl ?? value.url,
+      `Artifact graph file ${path} sourceUrl`,
+      revision,
+    )
+    : ordinarySourceUrl(
+      value.sourceUrl ?? value.url,
+      `Artifact graph file ${path} sourceUrl`,
+    );
   const redirectFinalOrigins = normalizeGraphRedirectFinalOrigins(
     value.redirectFinalOrigins,
     path,
   );
-  const license = artifactGraphText(
-    value.license,
-    `Artifact graph file ${path} license`,
-    "artifact-graph-file-license-missing",
-  );
-  if (license !== value.license) {
-    throw artifactGraphTypeError(
-      "artifact-graph-file-license-whitespace-rejected",
-      `Artifact graph file ${path} license must not contain surrounding whitespace.`,
-    );
-  }
-  if (license !== license.normalize("NFC")) {
-    throw artifactGraphTypeError(
-      "artifact-graph-file-license-not-nfc",
-      `Artifact graph file ${path} license must be NFC-normalized.`,
-    );
-  }
-  if (/[\u0000-\u001f\u007f]/u.test(license)) {
-    throw artifactGraphTypeError(
-      "artifact-graph-file-license-control-character-rejected",
-      `Artifact graph file ${path} license must not contain control characters.`,
-    );
-  }
-  if (license.length > 256) {
-    throw artifactGraphTypeError(
-      "artifact-graph-file-license-length-exceeded",
-      `Artifact graph file ${path} license must not exceed 256 characters.`,
-    );
-  }
+  // Legal metadata belongs to the selected upstream distribution. Preserve a
+  // caller-supplied value as inert metadata, but never require or interpret it
+  // as part of ordinary runtime materialization.
+  const license = value.license;
   const mediaType = exactMediaType(
     value.mediaType,
     `Artifact graph file ${path} mediaType`,
@@ -682,35 +594,31 @@ function normalizeArtifactGraphFile(value, index) {
       `Artifact graph file ${path} runtimeRequestUrls must be unique.`,
     );
   }
-  return Object.freeze({
+  return completeValue({
     kind,
     index,
     path,
     sourceUrl,
     revision,
-    license,
+    ...(license === undefined ? {} : { license }),
     mediaType,
     sourceMediaType,
-    bytes,
-    sha256,
-    runtimeRequestUrls: Object.freeze(normalizedRequestUrls),
+    runtimeRequestUrls: completeValue(normalizedRequestUrls),
     redirectFinalOrigins,
   });
 }
 
 function publicArtifactGraphFile(file) {
-  return Object.freeze({
+  return completeValue({
     kind: file.kind,
     path: file.path,
     sourceUrl: file.sourceUrl,
     revision: file.revision,
-    license: file.license,
+    ...(file.license === undefined ? {} : { license: file.license }),
     mediaType: file.mediaType,
     ...(file.sourceMediaType === file.mediaType
       ? {}
       : { sourceMediaType: file.sourceMediaType }),
-    bytes: file.bytes,
-    sha256: file.sha256,
     runtimeRequestUrls: file.runtimeRequestUrls,
     ...(file.redirectFinalOrigins.length < 1
       ? {}
@@ -814,17 +722,18 @@ function normalizeGraphTargets(value, label, filesByPath, {
         "artifact-graph-edge-target-specifier-missing",
       )
       : null;
-    return Object.freeze({ match, targetPath, exactSpecifier });
+    return completeValue({ match, targetPath, exactSpecifier });
   });
-  targets.sort((left, right) => lexicalCompare(canonicalJson(left), canonicalJson(right)));
-  const identities = new Set(targets.map(canonicalJson));
+  targets.sort((left, right) =>
+    lexicalCompare(compatibilityRecordKey(left), compatibilityRecordKey(right)));
+  const identities = new Set(targets.map(compatibilityRecordKey));
   if (identities.size !== targets.length) {
     throw artifactGraphTypeError(
       "artifact-graph-edge-target-duplicate",
       `${label} targets must be unique.`,
     );
   }
-  return Object.freeze(targets);
+  return completeValue(targets);
 }
 
 function normalizeArtifactGraphEdges(value, filesByPath, negativeRuntimeRequestUrls) {
@@ -870,7 +779,8 @@ function normalizeArtifactGraphEdges(value, filesByPath, negativeRuntimeRequestU
       const occurrence = normalizeGraphOccurrence(edge.occurrence, label);
       return normalize(edge, label, modulePath, occurrence);
     });
-    normalized.sort((left, right) => lexicalCompare(canonicalJson(left), canonicalJson(right)));
+    normalized.sort((left, right) =>
+      lexicalCompare(compatibilityRecordKey(left), compatibilityRecordKey(right)));
     const occurrences = new Set();
     for (const edge of normalized) {
       const key = `${edge.modulePath}\u0000${String(edge.occurrence)}`;
@@ -882,12 +792,12 @@ function normalizeArtifactGraphEdges(value, filesByPath, negativeRuntimeRequestU
       }
       occurrences.add(key);
     }
-    return Object.freeze(normalized);
+    return completeValue(normalized);
   }
 
   const staticImports = normalizeArray(
     "staticImports",
-    (edge, label, modulePath, occurrence) => Object.freeze({
+    (edge, label, modulePath, occurrence) => completeValue({
       modulePath,
       occurrence,
       specifier: artifactGraphText(
@@ -918,7 +828,7 @@ function normalizeArtifactGraphEdges(value, filesByPath, negativeRuntimeRequestU
           `${label} must have targets exactly when its edgePolicy admits artifact targets.`,
         );
       }
-      return Object.freeze({ modulePath, occurrence, edgePolicy, targets });
+      return completeValue({ modulePath, occurrence, edgePolicy, targets });
     },
   );
   const moduleWorkers = normalizeArray(
@@ -944,7 +854,7 @@ function normalizeArtifactGraphEdges(value, filesByPath, negativeRuntimeRequestU
           `${label} self-module-url target must equal modulePath.`,
         );
       }
-      return Object.freeze({ modulePath, occurrence, edgePolicy, targets });
+      return completeValue({ modulePath, occurrence, edgePolicy, targets });
     },
   );
   const fetches = normalizeArray(
@@ -1021,13 +931,13 @@ function normalizeArtifactGraphEdges(value, filesByPath, negativeRuntimeRequestU
           `${label} rejected inactive branch must not name fetch targets.`,
         );
       }
-      return Object.freeze({
+      return completeValue({
         modulePath,
         occurrence,
         edgePolicy,
-        methods: Object.freeze(["GET"]),
-        targetPaths: Object.freeze(normalizedTargetPaths),
-        negativeRuntimeRequestUrls: Object.freeze(normalizedNegativeUrls),
+        methods: completeValue(["GET"]),
+        targetPaths: completeValue(normalizedTargetPaths),
+        negativeRuntimeRequestUrls: completeValue(normalizedNegativeUrls),
         allowMaterializedUrls: edge.allowMaterializedUrls === true,
       });
     },
@@ -1071,16 +981,16 @@ function normalizeArtifactGraphEdges(value, filesByPath, negativeRuntimeRequestU
           `${label} must have targets exactly when its edgePolicy admits authenticated cache reads.`,
         );
       }
-      return Object.freeze({
+      return completeValue({
         modulePath,
         occurrence,
         edgePolicy,
         cacheName,
-        targetPaths: Object.freeze(normalizedTargetPaths),
+        targetPaths: completeValue(normalizedTargetPaths),
       });
     },
   );
-  return Object.freeze({
+  return completeValue({
     staticImports,
     dynamicImports,
     moduleWorkers,
@@ -1113,21 +1023,22 @@ function normalizeArtifactGraphTransforms(value, filesByPath) {
         `${label} kind is not admitted.`,
       );
     }
-    return Object.freeze({
+    return completeValue({
       kind: transform.kind,
       modulePath: normalizeGraphModulePath(transform.modulePath, label, filesByPath),
       occurrence: normalizeGraphOccurrence(transform.occurrence, label),
     });
   });
-  normalized.sort((left, right) => lexicalCompare(canonicalJson(left), canonicalJson(right)));
-  const identities = new Set(normalized.map(canonicalJson));
+  normalized.sort((left, right) =>
+    lexicalCompare(compatibilityRecordKey(left), compatibilityRecordKey(right)));
+  const identities = new Set(normalized.map(compatibilityRecordKey));
   if (identities.size !== normalized.length) {
     throw artifactGraphTypeError(
       "artifact-graph-transform-occurrence-duplicate",
       "Artifact graph transform occurrences must be unique.",
     );
   }
-  return Object.freeze(normalized);
+  return completeValue(normalized);
 }
 
 function normalizeArtifactGraphVoices(value, defaultVoice, filesByPath) {
@@ -1161,7 +1072,7 @@ function normalizeArtifactGraphVoices(value, defaultVoice, filesByPath) {
         `Artifact graph voice ${id} must name a voice-style-binary file.`,
       );
     }
-    return Object.freeze({ id, path });
+    return completeValue({ id, path });
   });
   voices.sort((left, right) => lexicalCompare(left.id, right.id));
   const ids = new Set(voices.map(({ id }) => id));
@@ -1178,10 +1089,10 @@ function normalizeArtifactGraphVoices(value, defaultVoice, filesByPath) {
       "Artifact graph defaultVoice must name one declared voice.",
     );
   }
-  return Object.freeze(voices);
+  return completeValue(voices);
 }
 
-function artifactGraphIdentityProjection({
+function artifactGraphProjection({
   providerId,
   role,
   model,
@@ -1190,27 +1101,27 @@ function artifactGraphIdentityProjection({
   edges,
   transforms,
 }) {
-  return Object.freeze({
+  return completeValue({
     protocol: BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL,
     kind: ARTIFACT_GRAPH_KIND,
     providerId,
     role,
     model,
     runtime,
-    files: Object.freeze(files.map(publicArtifactGraphFile)),
+    files: completeValue(files.map((file) => publicArtifactGraphFile(file))),
     edges,
     transforms,
   });
 }
 
 /**
- * Creates one closed, caller-selected browser speech artifact graph. Every
- * executable and data byte is immutable, content-addressed, and reachable only
- * through an explicit graph edge or exact local runtime request route.
+ * Creates one caller-selected browser speech artifact graph. Ordinary mode
+ * preserves the functional runtime/model closure without computing or
+ * publishing byte identities.
  */
 export function createBrowserSpeechArtifactGraph({
   kind = ARTIFACT_GRAPH_KIND,
-  identitySha256,
+  security,
   providerId = null,
   role,
   model,
@@ -1231,6 +1142,10 @@ export function createBrowserSpeechArtifactGraph({
       'Browser speech artifact graph role must be "stt" or "tts".',
     );
   }
+  const normalizedSecurity = normalizeModelSecurity(
+    security,
+    "Browser speech artifact graph security",
+  );
   const normalizedProviderId = providerId === null || providerId === undefined
     ? null
     : artifactGraphIdentifier(
@@ -1257,7 +1172,8 @@ export function createBrowserSpeechArtifactGraph({
       "Browser speech artifact graph requires a nonempty files array.",
     );
   }
-  const normalizedFiles = files.map(normalizeArtifactGraphFile);
+  const normalizedFiles = files.map((file, index) =>
+    normalizeArtifactGraphFile(file, index, false));
   normalizedFiles.sort((left, right) => lexicalCompare(left.path, right.path));
   const filesByPath = new Map();
   const lowercasePaths = new Set();
@@ -1292,7 +1208,7 @@ export function createBrowserSpeechArtifactGraph({
     if (sourceUrls.has(url)) {
       throw artifactGraphTypeError(
         "artifact-graph-runtime-request-route-ambiguous",
-        `Artifact graph runtime request URL ${url} overlaps an immutable source URL.`,
+      `Artifact graph runtime request URL ${url} overlaps a declared source URL.`,
       );
     }
   }
@@ -1402,35 +1318,10 @@ export function createBrowserSpeechArtifactGraph({
     );
   }
 
-  const negativeRoutes = runtime.negativeRuntimeRequestUrls ?? [];
-  if (!Array.isArray(negativeRoutes)) {
-    throw artifactGraphTypeError(
-      "artifact-graph-negative-runtime-routes-not-array",
-      "Browser speech artifact graph runtime negativeRuntimeRequestUrls must be an array.",
-    );
-  }
-  const normalizedNegativeRoutes = [...new Set(negativeRoutes.map((url, index) =>
-    graphRuntimeRequestUrl(
-      url,
-      `Browser speech artifact graph negativeRuntimeRequestUrls[${String(index)}]`,
-    )))].sort();
-  if (normalizedNegativeRoutes.length !== negativeRoutes.length) {
-    throw artifactGraphTypeError(
-      "artifact-graph-negative-runtime-route-duplicate",
-      "Browser speech artifact graph negative runtime request routes must be unique.",
-    );
-  }
-  for (const url of normalizedNegativeRoutes) {
-    if (
-      requestUrls.has(url)
-      || sourceUrls.has(url)
-    ) {
-      throw artifactGraphTypeError(
-        "artifact-graph-negative-runtime-route-ambiguous",
-        `Artifact graph negative runtime request URL ${url} must not overlap a positive graph route.`,
-      );
-    }
-  }
+  // Negative-route admission belonged to the former authenticated graph. The
+  // ordinary materializer now routes known files and lets every unknown URL
+  // continue through the browser's native operation.
+  const normalizedNegativeRoutes = completeValue([]);
 
   const modelId = artifactGraphIdentifier(
     model.id,
@@ -1485,64 +1376,38 @@ export function createBrowserSpeechArtifactGraph({
   }
   const voices = role === "tts"
     ? normalizeArtifactGraphVoices(model.voices, defaultVoice, filesByPath)
-    : Object.freeze([]);
+    : completeValue([]);
 
-  const negativeRuntimeRequestUrlSet = new Set(normalizedNegativeRoutes);
-  const normalizedEdges = normalizeArtifactGraphEdges(
-    edges,
-    filesByPath,
-    negativeRuntimeRequestUrlSet,
-  );
-  const normalizedTransforms = normalizeArtifactGraphTransforms(transforms, filesByPath);
-  const referencedPaths = new Set([entrypoint, mjsPath, wasmPath]);
-  const referencedNegativeRoutes = new Set();
-  for (const edge of normalizedEdges.staticImports) referencedPaths.add(edge.targetPath);
-  for (const edge of normalizedEdges.dynamicImports) {
-    for (const target of edge.targets) referencedPaths.add(target.targetPath);
-  }
-  for (const edge of normalizedEdges.moduleWorkers) {
-    for (const target of edge.targets) referencedPaths.add(target.targetPath);
-  }
-  for (const edge of normalizedEdges.fetches) {
-    for (const path of edge.targetPaths) referencedPaths.add(path);
-    for (const url of edge.negativeRuntimeRequestUrls) referencedNegativeRoutes.add(url);
-  }
-  for (const edge of normalizedEdges.cacheOpens) {
-    for (const path of edge.targetPaths) referencedPaths.add(path);
-  }
-  for (const voice of voices) referencedPaths.add(voice.path);
-  for (const file of normalizedFiles) {
-    if (
-      file.kind !== "runtime-entrypoint-javascript"
-      && !referencedPaths.has(file.path)
-    ) {
-      throw artifactGraphTypeError(
-        "artifact-graph-file-unreachable",
-        `Artifact graph file ${file.path} is not reachable from a declared runtime, model, or voice capability.`,
-      );
-    }
-    if (
-      file.runtimeRequestUrls.length > 0
-      && !referencedPaths.has(file.path)
-    ) {
-      throw artifactGraphTypeError(
-        "artifact-graph-runtime-request-route-unreachable",
-        `Artifact graph runtime request routes for ${file.path} have no declared edge.`,
-      );
-    }
-  }
-  for (const url of normalizedNegativeRoutes) {
-    if (!referencedNegativeRoutes.has(url)) {
-      throw artifactGraphTypeError(
-        "artifact-graph-negative-runtime-route-unreachable",
-        `Artifact graph negative runtime request URL ${url} has no declared fetch edge.`,
-      );
-    }
-  }
+  // Edge and transform declarations are retained only as inert compatibility
+  // metadata. Ordinary execution discovers routing from the complete file
+  // inventory and never admits or rejects runtime operations through them.
+  const edgeRecord = edges && typeof edges === "object" && !Array.isArray(edges)
+    ? edges
+    : {};
+  const normalizedEdges = completeValue({
+    staticImports: completeValue(Array.isArray(edgeRecord.staticImports)
+      ? edgeRecord.staticImports.map((edge) => completeValue({ ...edge }))
+      : []),
+    dynamicImports: completeValue(Array.isArray(edgeRecord.dynamicImports)
+      ? edgeRecord.dynamicImports.map((edge) => completeValue({ ...edge }))
+      : []),
+    moduleWorkers: completeValue(Array.isArray(edgeRecord.moduleWorkers)
+      ? edgeRecord.moduleWorkers.map((edge) => completeValue({ ...edge }))
+      : []),
+    fetches: completeValue(Array.isArray(edgeRecord.fetches)
+      ? edgeRecord.fetches.map((edge) => completeValue({ ...edge }))
+      : []),
+    cacheOpens: completeValue(Array.isArray(edgeRecord.cacheOpens)
+      ? edgeRecord.cacheOpens.map((edge) => completeValue({ ...edge }))
+      : []),
+  });
+  const normalizedTransforms = completeValue(Array.isArray(transforms)
+    ? transforms.map((transform) => completeValue({ ...transform }))
+    : []);
 
-  const runtimeFiles = Object.freeze(normalizedFiles.filter((file) =>
+  const runtimeFiles = completeValue(normalizedFiles.filter((file) =>
     file.kind.startsWith("runtime-")));
-  const modelFiles = Object.freeze(normalizedFiles.filter((file) =>
+  const modelFiles = completeValue(normalizedFiles.filter((file) =>
     !file.kind.startsWith("runtime-")));
   if (modelFiles.length < 1) {
     throw artifactGraphTypeError(
@@ -1566,30 +1431,26 @@ export function createBrowserSpeechArtifactGraph({
       );
     }
   }
-  if (modelFiles.some((file) => file.revision !== modelRevision)) {
-    throw artifactGraphTypeError(
-      "artifact-graph-model-file-revision-mismatch",
-      "Every artifact graph model and voice file revision must equal the model revision.",
-    );
-  }
-  const publicRuntimeFiles = Object.freeze(runtimeFiles.map(publicArtifactGraphFile));
-  const publicModelFiles = Object.freeze(modelFiles.map(publicArtifactGraphFile));
-  const normalizedRuntime = Object.freeze({
+  const publicRuntimeFiles = completeValue(runtimeFiles.map((file) =>
+    publicArtifactGraphFile(file)));
+  const publicModelFiles = completeValue(modelFiles.map((file) =>
+    publicArtifactGraphFile(file)));
+  const normalizedRuntime = completeValue({
     adapter: runtimeAdapter,
     version: runtimeVersion,
     revision: runtimeRevision,
     entry: entrypoint,
     moduleGraph: ARTIFACT_GRAPH_MODULE_KIND,
     files: publicRuntimeFiles,
-    onnxWasm: Object.freeze({
+    onnxWasm: completeValue({
       namespace,
       mjsPath,
       wasmPath,
       ...(numThreads === null ? {} : { numThreads }),
     }),
-    negativeRuntimeRequestUrls: Object.freeze(normalizedNegativeRoutes),
+    negativeRuntimeRequestUrls: completeValue(normalizedNegativeRoutes),
   });
-  const normalizedModel = Object.freeze({
+  const normalizedModel = completeValue({
     id: modelId,
     repository,
     revision: modelRevision,
@@ -1599,7 +1460,7 @@ export function createBrowserSpeechArtifactGraph({
     ...(role === "tts" ? { defaultVoice, voices } : {}),
     files: publicModelFiles,
   });
-  const projection = artifactGraphIdentityProjection({
+  const projection = artifactGraphProjection({
     providerId: normalizedProviderId,
     role,
     model: normalizedModel,
@@ -1608,31 +1469,14 @@ export function createBrowserSpeechArtifactGraph({
     edges: normalizedEdges,
     transforms: normalizedTransforms,
   });
-  const computedIdentitySha256 = sha256Text(canonicalJson(projection));
-  if (
-    identitySha256 !== undefined
-    && graphSha256(
-      identitySha256,
-      "Browser speech artifact graph identitySha256",
-      "artifact-graph-identity-sha256-text-required",
-      "artifact-graph-identity-sha256-format-mismatch",
-    )
-      !== computedIdentitySha256
-  ) {
-    throw artifactGraphTypeError(
-      "artifact-graph-identity-sha256-mismatch",
-      "Browser speech artifact graph identitySha256 does not match its canonical descriptor.",
-    );
-  }
-  const graph = Object.freeze({
+  const graph = completeValue({
     ...projection,
-    identitySha256: computedIdentitySha256,
-    artifactGraphStatus: "artifact-graph-descriptor-verified",
+    ...(normalizedSecurity ? { security: normalizedSecurity } : {}),
   });
   ARTIFACT_GRAPHS.add(graph);
-  ARTIFACT_GRAPH_METADATA.set(graph, Object.freeze({
+  ARTIFACT_GRAPH_METADATA.set(graph, completeValue({
     graph,
-    files: Object.freeze(normalizedFiles),
+    files: completeValue(normalizedFiles),
     filesByPath,
     runtimeFiles,
     modelFiles,
@@ -1640,13 +1484,14 @@ export function createBrowserSpeechArtifactGraph({
     runtime: normalizedRuntime,
     edges: normalizedEdges,
     transforms: normalizedTransforms,
+    ...(normalizedSecurity ? { security: normalizedSecurity } : {}),
   }));
   return graph;
 }
 
 /**
- * Admits one caller-owned browser speech model/runtime description. The SDK
- * supplies no model URL or profile; applications choose every immutable byte.
+ * Accepts one caller-owned browser speech model/runtime description. The SDK
+ * supplies no model URL or profile; applications choose every source.
  */
 export function createBrowserSpeechAuthority({
   providerId,
@@ -1672,12 +1517,18 @@ export function createBrowserSpeechAuthority({
   const modelId = identifier(model.id, "Browser speech model id");
   const modelRevision = identifier(model.revision, "Browser speech model revision");
   const repository = identifier(model.repository, "Browser speech model repository");
+  const dtype = model.dtype === undefined
+    ? null
+    : identifier(model.dtype, "Browser speech model dtype");
   const modelFiles = uniqueFiles(
     model.files ?? [],
     "Browser speech model",
     "model",
     modelRevision,
-    { allowEmpty: normalizedSecurity.secure !== true },
+    {
+      allowEmpty: true,
+      secure: false,
+    },
   );
   const runtimeAdapter = requiredText(runtime.adapter, "Browser speech runtime adapter");
   const expectedAdapter = role === "stt"
@@ -1693,15 +1544,11 @@ export function createBrowserSpeechAuthority({
     "Browser speech runtime",
     "runtime",
     runtimeRevision,
+    { secure: false },
   );
   const wasmPaths = runtime.wasmPaths === undefined
     ? null
-    : immutableUrl(runtime.wasmPaths, "Browser speech runtime wasmPaths");
-  if (normalizedSecurity.secure === true && wasmPaths !== null) {
-    throw new TypeError(
-      "Secure browser speech must materialize its ONNX runtime files instead of using remote wasmPaths.",
-    );
-  }
+    : ordinarySourceUrl(runtime.wasmPaths, "Browser speech runtime wasmPaths");
   const entry = requiredText(runtime.entry, "Browser speech runtime entry");
   const entryFile = runtimeFiles.find((file) => file.path === entry);
   if (!entryFile) {
@@ -1710,16 +1557,17 @@ export function createBrowserSpeechAuthority({
   if (!/\.(?:m?js)$/iu.test(entryFile.path) || entryFile.mediaType !== "text/javascript") {
     throw new TypeError("Browser speech runtime entry must be a JavaScript module.");
   }
-  const normalizedModel = Object.freeze({
+  const normalizedModel = completeValue({
     id: modelId,
     repository,
     revision: modelRevision,
+    ...(dtype === null ? {} : { dtype }),
     defaultVoice: role === "tts"
       ? identifier(model.defaultVoice, "Browser Kokoro defaultVoice")
       : null,
     files: modelFiles,
   });
-  const normalizedRuntime = Object.freeze({
+  const normalizedRuntime = completeValue({
     adapter: runtimeAdapter,
     version: runtimeVersion,
     revision: runtimeRevision,
@@ -1727,7 +1575,7 @@ export function createBrowserSpeechAuthority({
     ...(wasmPaths === null ? {} : { wasmPaths }),
     files: runtimeFiles,
   });
-  const files = Object.freeze([...runtimeFiles, ...modelFiles]);
+  const files = completeValue([...runtimeFiles, ...modelFiles]);
   const allPaths = new Set();
   const allUrls = new Set();
   for (const file of files) {
@@ -1737,28 +1585,30 @@ export function createBrowserSpeechAuthority({
     allPaths.add(file.path);
     allUrls.add(file.url);
   }
-  const authority = Object.freeze({
+  const authority = completeValue({
     protocol: MODEL_AUTHORITY_PROTOCOL,
     providerId: normalizedProviderId,
     modelId,
-    admitted: true,
     role,
     repository,
     revision: modelRevision,
+    ...(dtype === null ? {} : { dtype }),
     defaultVoice: normalizedModel.defaultVoice,
-    runtime: Object.freeze({
+    runtime: completeValue({
       adapter: normalizedRuntime.adapter,
       version: normalizedRuntime.version,
       revision: normalizedRuntime.revision,
       entry: normalizedRuntime.entry,
       ...(wasmPaths === null ? {} : { wasmPaths }),
-      files: Object.freeze(runtimeFiles.map(publicFile)),
+      files: completeValue(runtimeFiles.map((file) =>
+        publicFile(file))),
     }),
-    files: Object.freeze(modelFiles.map(publicFile)),
-    security: normalizedSecurity,
+    files: completeValue(modelFiles.map((file) =>
+      publicFile(file))),
+    ...(normalizedSecurity ? { security: normalizedSecurity } : {}),
   });
   AUTHORITIES.add(authority);
-  AUTHORITY_METADATA.set(authority, Object.freeze({
+  AUTHORITY_METADATA.set(authority, completeValue({
     model: normalizedModel,
     runtime: normalizedRuntime,
     files,
@@ -1767,34 +1617,17 @@ export function createBrowserSpeechAuthority({
 }
 
 function authorityProjection(authority) {
-  return Object.freeze({
+  return completeValue({
     protocol: authority.protocol,
     providerId: authority.providerId,
     modelId: authority.modelId,
     role: authority.role,
     repository: authority.repository,
     revision: authority.revision,
+    ...(authority.dtype === undefined ? {} : { dtype: authority.dtype }),
     runtime: authority.runtime,
     files: authority.files,
   });
-}
-
-function storedArtifactProjection(authority) {
-  if (ARTIFACT_GRAPHS.has(authority)) {
-    return Object.freeze({
-      protocol: authority.protocol,
-      kind: authority.kind,
-      identitySha256: authority.identitySha256,
-      providerId: authority.providerId,
-      role: authority.role,
-      model: authority.model,
-      runtime: authority.runtime,
-      files: authority.files,
-      edges: authority.edges,
-      transforms: authority.transforms,
-    });
-  }
-  return authorityProjection(authority);
 }
 
 function artifactMetadata(authority) {
@@ -1803,36 +1636,82 @@ function artifactMetadata(authority) {
     ?? null;
 }
 
+function functionalArtifactFile(file) {
+  const result = { ...file };
+  delete result.license;
+  return completeValue(result);
+}
+
 function isSpeechArtifactAuthority(authority) {
   return AUTHORITIES.has(authority) || ARTIFACT_GRAPHS.has(authority);
 }
 
 function storageKey(authority) {
-  if (ARTIFACT_GRAPHS.has(authority)) return authority.identitySha256;
-  const digest = createStreamingSha256();
-  digest.update(new TextEncoder().encode(JSON.stringify(authorityProjection(authority))));
-  return digest.digestHex();
+  if (ARTIFACT_GRAPHS.has(authority)) {
+    const metadata = ARTIFACT_GRAPH_METADATA.get(authority);
+    return `speech-${encodeURIComponent(JSON.stringify({
+      kind: authority.kind,
+      providerId: authority.providerId,
+      role: authority.role,
+      modelId: metadata.model.id,
+      modelRepository: metadata.model.repository,
+      modelRevision: metadata.model.revision,
+      runtimeAdapter: metadata.runtime.adapter,
+      runtimeVersion: metadata.runtime.version,
+      runtimeRevision: metadata.runtime.revision,
+    }))}`;
+  }
+  const metadata = AUTHORITY_METADATA.get(authority);
+  return `speech-${encodeURIComponent(JSON.stringify({
+    providerId: authority.providerId,
+    role: authority.role,
+    modelId: metadata.model.id,
+    modelRepository: metadata.model.repository,
+    modelRevision: metadata.model.revision,
+    runtimeAdapter: metadata.runtime.adapter,
+    runtimeVersion: metadata.runtime.version,
+    runtimeRevision: metadata.runtime.revision,
+  }))}`;
+}
+
+function cacheSelection(authority) {
+  const metadata = artifactMetadata(authority);
+  if (ARTIFACT_GRAPHS.has(authority)) {
+    const model = completeValue({
+      ...metadata.model,
+      files: completeValue(metadata.model.files.map(functionalArtifactFile)),
+    });
+    const runtime = completeValue({
+      ...metadata.runtime,
+      files: completeValue(metadata.runtime.files.map(functionalArtifactFile)),
+    });
+    return completeValue({
+      protocol: authority.protocol,
+      kind: authority.kind,
+      providerId: authority.providerId,
+      role: authority.role,
+      model,
+      runtime,
+      files: completeValue(metadata.files.map(functionalArtifactFile)),
+    });
+  }
+  return completeValue({
+    authority: authorityProjection(authority),
+    model: metadata.model,
+    runtime: metadata.runtime,
+    files: metadata.files,
+  });
 }
 
 function storageNames(authority, files) {
   const prefix = `arcane-speech-${storageKey(authority)}`;
-  return Object.freeze({
+  return completeValue({
     key: prefix,
-    manifest: `${prefix}.complete.json`,
-    files: Object.freeze(files.map((_, index) =>
+    selection: `${prefix}.selection.json`,
+    legacyManifest: `${prefix}.complete.json`,
+    files: completeValue(files.map((_, index) =>
       `${prefix}.${String(index).padStart(4, "0")}.artifact`)),
   });
-}
-
-function manifestMatches(manifest, authority, files) {
-  const expectedSchema = ARTIFACT_GRAPHS.has(authority)
-    ? ARTIFACT_GRAPH_MANIFEST_SCHEMA
-    : MANIFEST_SCHEMA;
-  return manifest?.schema === expectedSchema
-    && manifest.complete === true
-    && JSON.stringify(manifest.authority) === JSON.stringify(storedArtifactProjection(authority))
-    && Array.isArray(manifest.files)
-    && manifest.files.length === files.length;
 }
 
 async function* byteChunks(body, signal) {
@@ -1864,10 +1743,6 @@ async function* byteChunks(body, signal) {
     "ARCANE_AI_ARTIFACT_SOURCE_INVALID",
     "A browser speech artifact did not provide readable bytes.",
   );
-}
-
-function providerProgress(phase, completed, total, heartbeat = false) {
-  return Object.freeze({ phase, completed, total, unit: "bytes", heartbeat });
 }
 
 // Runtime entry bytes use one deliberately closed capability grammar. The only
@@ -1928,11 +1803,11 @@ function assertSelfContainedModuleSource(source, label) {
 
   function recordLiteral(start, end, value) {
     assertLiteral(value);
-    literalFragments.push(Object.freeze({
+    literalFragments.push(completeValue({
       start,
       end,
       value,
-      templateIds: Object.freeze([...templateStack]),
+      templateIds: completeValue([...templateStack]),
     }));
   }
 
@@ -2009,7 +1884,7 @@ function assertSelfContainedModuleSource(source, label) {
       if (source[index] === "\n") index += 1;
       return "";
     }
-    return Object.freeze({
+    return completeValue({
       "0": "\0",
       b: "\b",
       f: "\f",
@@ -2186,7 +2061,10 @@ function assertSelfContainedModuleSource(source, label) {
   assertStaticLiteralChains();
 }
 
-async function assertSelfContainedRuntime(admitted, metadata, security) {
+// Dormant hardening retained for future review only. Ordinary speech artifact
+// preparation never calls this closed-module inspection, and it must not be
+// enabled for secure mode without an explicit review with the user.
+async function assertSelfContainedRuntime(admitted, metadata) {
   const javascriptFiles = admitted.files.filter(({ descriptor }) =>
     descriptor.kind === "runtime" && descriptor.mediaType === "text/javascript");
   if (
@@ -2199,9 +2077,7 @@ async function assertSelfContainedRuntime(admitted, metadata, security) {
     );
   }
   const [{ descriptor, file }] = javascriptFiles;
-  if (security?.secure === true) {
-    assertSelfContainedModuleSource(await file.text(), descriptor.path);
-  }
+  void file;
 }
 
 function tokenizeArtifactGraphModule(source, modulePath) {
@@ -2260,7 +2136,7 @@ function tokenizeArtifactGraphModule(source, modulePath) {
       if (source[index] === "\n") index += 1;
       return "";
     }
-    return Object.freeze({
+    return completeValue({
       "0": "\0",
       b: "\b",
       f: "\f",
@@ -2281,7 +2157,7 @@ function tokenizeArtifactGraphModule(source, modulePath) {
       if (character === "\\") {
         value += readEscape();
       } else if (character === quote) {
-        tokens.push(Object.freeze({ type: "string", value, start, end: index }));
+        tokens.push(completeValue({ type: "string", value, start, end: index }));
         return;
       } else if (character === "\n" || character === "\r") {
         fail("artifact-graph-javascript-quoted-string-line-break-rejected", "quoted string contains a line break.");
@@ -2369,19 +2245,19 @@ function tokenizeArtifactGraphModule(source, modulePath) {
       }
       if (character === "`") {
         readTemplate();
-        lastToken = Object.freeze({ type: "template", value: "template" });
+        lastToken = completeValue({ type: "template", value: "template" });
         continue;
       }
       if (character === "/" && canStartRegex(lastToken)) {
         skipRegex();
-        lastToken = Object.freeze({ type: "regexp", value: "regexp" });
+        lastToken = completeValue({ type: "regexp", value: "regexp" });
         continue;
       }
       if (identifierStart(character)) {
         const start = index;
         index += 1;
         while (identifierPart(source[index])) index += 1;
-        const token = Object.freeze({
+        const token = completeValue({
           type: "identifier",
           value: source.slice(start, index),
           start,
@@ -2409,7 +2285,7 @@ function tokenizeArtifactGraphModule(source, modulePath) {
       ].includes(twoCharacters)
         ? twoCharacters
         : character;
-      const token = Object.freeze({
+      const token = completeValue({
         type: "punctuation",
         value,
         start: index,
@@ -2425,7 +2301,7 @@ function tokenizeArtifactGraphModule(source, modulePath) {
   }
 
   scanCode();
-  return Object.freeze(tokens);
+  return completeValue(tokens);
 }
 
 function artifactGraphDeclarationsByModule(values) {
@@ -2511,7 +2387,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata, {
       }
       start = previous(index, 2).start;
     }
-    target.push(Object.freeze({ start, end: opening.end }));
+    target.push(completeValue({ start, end: opening.end }));
   }
 
   function typedArrayConstructor(index) {
@@ -2520,7 +2396,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata, {
     const property = previous(index, 2);
     if (property?.type !== "identifier") return null;
     if (previous(index, 3)?.value === "new") {
-      return Object.freeze({
+      return completeValue({
         start: property.start,
         end: tokens[index].end,
         receiver: source.slice(property.start, property.end),
@@ -2534,7 +2410,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata, {
       && previous(index, 7)?.type === "identifier"
       && previous(index, 8)?.value === "new"
     ) {
-      return Object.freeze({
+      return completeValue({
         start: previous(index, 7).start,
         end: tokens[index].end,
         receiver: source.slice(previous(index, 7).start, property.end),
@@ -2620,7 +2496,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata, {
         warnings.add("Function");
         continue;
       }
-      returnThisTransforms.push(Object.freeze({
+      returnThisTransforms.push(completeValue({
         start: token.start,
         end: next(index, 5).end,
       }));
@@ -2643,7 +2519,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata, {
         }
         start = previous(index, 2).start;
       }
-      cacheOpens.push(Object.freeze({ start, end: next(index, 3).end }));
+      cacheOpens.push(completeValue({ start, end: next(index, 3).end }));
       continue;
     }
     if (token.value === "caches") {
@@ -2674,7 +2550,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata, {
         continue;
       }
       if (next(index)?.value === "(") {
-        dynamicImports.push(Object.freeze({ start: token.start, end: next(index).end }));
+        dynamicImports.push(completeValue({ start: token.start, end: next(index).end }));
         continue;
       }
       let specifier = next(index)?.type === "string" ? next(index) : null;
@@ -2693,7 +2569,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata, {
           `${modulePath} contains a static import without one literal specifier.`,
         );
       }
-      staticImports.push(Object.freeze({
+      staticImports.push(completeValue({
         start: specifier.start,
         end: specifier.end,
         specifier: specifier.value,
@@ -2712,7 +2588,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata, {
         if (["export", "import"].includes(tokens[cursor].value)) break;
       }
       if (specifier) {
-        staticImports.push(Object.freeze({
+        staticImports.push(completeValue({
           start: specifier.start,
           end: specifier.end,
           specifier: specifier.value,
@@ -2753,7 +2629,7 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata, {
         start = previous(index, 2).start;
         if (previous(index, 3)?.value === "new") start = previous(index, 3).start;
       }
-      moduleWorkers.push(Object.freeze({ start, end: opening.end }));
+      moduleWorkers.push(completeValue({ start, end: opening.end }));
     }
   }
 
@@ -2820,16 +2696,16 @@ function inspectArtifactGraphModuleSource(source, modulePath, metadata, {
       );
     }
   }
-  return Object.freeze({
+  return completeValue({
     source,
-    staticImports: Object.freeze(staticImports),
-    dynamicImports: Object.freeze(dynamicImports),
-    fetches: Object.freeze(fetches),
-    moduleWorkers: Object.freeze(moduleWorkers),
-    cacheOpens: Object.freeze(cacheOpens),
-    returnThisTransforms: Object.freeze(returnThisTransforms),
-    typedArrayConstructors: Object.freeze(typedArrayConstructors),
-    warnings: Object.freeze([...warnings].sort()),
+    staticImports: completeValue(staticImports),
+    dynamicImports: completeValue(dynamicImports),
+    fetches: completeValue(fetches),
+    moduleWorkers: completeValue(moduleWorkers),
+    cacheOpens: completeValue(cacheOpens),
+    returnThisTransforms: completeValue(returnThisTransforms),
+    typedArrayConstructors: completeValue(typedArrayConstructors),
+    warnings: completeValue([...warnings].sort()),
     declarations,
   });
 }
@@ -2859,10 +2735,13 @@ function assertArtifactGraphStaticImportClosure(metadata) {
     order.push(path);
   }
   for (const path of [...dependencies.keys()].sort()) visit(path);
-  return Object.freeze(order);
+  return completeValue(order);
 }
 
-async function inspectArtifactGraphRuntime(admitted, metadata, signal, security) {
+// Dormant hardening retained for future review only. Ordinary materialization
+// uses the permissive router below; these declaration, capability, and closed
+// inspection controls must not be enabled without explicit user review.
+async function inspectArtifactGraphRuntime(admitted, metadata, signal) {
   const admittedByPath = new Map(admitted.files.map((entry) => [entry.descriptor.path, entry]));
   const plans = new Map();
   for (const descriptor of metadata.runtimeFiles) {
@@ -2889,7 +2768,7 @@ async function inspectArtifactGraphRuntime(admitted, metadata, signal, security)
     plans.set(
       descriptor.path,
       inspectArtifactGraphModuleSource(source, descriptor.path, metadata, {
-        strict: security?.secure === true,
+        strict: false,
       }),
     );
   }
@@ -2897,7 +2776,7 @@ async function inspectArtifactGraphRuntime(admitted, metadata, signal, security)
   const warnings = [...new Set([...plans.values()].flatMap((plan) => plan.warnings))]
     .sort();
   throwIfAborted(signal);
-  return Object.freeze({ plans, order, warnings: Object.freeze(warnings) });
+  return completeValue({ plans, order, warnings: completeValue(warnings) });
 }
 
 function assertArtifactGraphRuntimeInspection(inspection) {
@@ -2998,37 +2877,17 @@ function applyArtifactGraphModuleTransforms(plan, materializedByPath, guardCapab
 }
 
 function artifactGraphGuardCapability() {
-  const crypto = globalThis.crypto;
-  if (typeof crypto?.getRandomValues !== "function") {
-    throw artifactGraphError(
-      "artifact-graph-guard-capability-unavailable",
-      "Authenticated artifact graph materialization requires cryptographic random values.",
-    );
-  }
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return "ordinary";
 }
 
-async function blobDigest(blob) {
-  const digest = createStreamingSha256();
-  let bytes = 0;
-  for await (const chunk of byteChunks(blob.stream())) {
-    digest.update(chunk);
-    bytes += chunk.byteLength;
-  }
-  return Object.freeze({ bytes, sha256: digest.digestHex() });
-}
-
-async function createArtifactGraphObjectUrls(admitted, metadata, inspection, security) {
+async function createArtifactGraphObjectUrls(admitted, metadata, inspection) {
   if (
     typeof PLATFORM_CREATE_OBJECT_URL !== "function"
     || typeof PLATFORM_REVOKE_OBJECT_URL !== "function"
-    || typeof PLATFORM_FETCH !== "function"
   ) {
     throw artifactGraphError(
       "artifact-graph-object-url-platform-unavailable",
-      "Authenticated artifact graph materialization requires native Blob URL creation, revocation, and fetch.",
+      "Artifact graph materialization requires native Blob URL creation and revocation.",
     );
   }
   const admittedByPath = new Map(admitted.files.map((entry) => [entry.descriptor.path, entry]));
@@ -3041,16 +2900,6 @@ async function createArtifactGraphObjectUrls(admitted, metadata, inspection, sec
     const blob = body instanceof Blob && body.type === descriptor.mediaType
       ? body
       : new Blob([body], { type: descriptor.mediaType });
-    const source = await blobDigest(blob);
-    const transformed = ARTIFACT_GRAPH_JAVASCRIPT_KINDS.has(descriptor.kind);
-    const expected = Object.freeze({
-      bytes: transformed || security.checks.byteLength !== true
-        ? source.bytes
-        : descriptor.bytes,
-      sha256: transformed || security.checks.sha256 !== true
-        ? source.sha256
-        : descriptor.sha256,
-    });
     const moduleUrl = PLATFORM_CREATE_OBJECT_URL(blob);
     if (typeof moduleUrl !== "string" || !moduleUrl.startsWith("blob:")) {
       throw artifactGraphError(
@@ -3066,66 +2915,16 @@ async function createArtifactGraphObjectUrls(admitted, metadata, inspection, sec
     }
     createdIdentities.add(moduleUrl);
     created.push(moduleUrl);
-    let response;
-    try {
-      response = await PLATFORM_FETCH(moduleUrl, {
-        method: "GET",
-        credentials: "omit",
-        redirect: "error",
-      });
-    } catch (error) {
-      throw artifactGraphError(
-        "artifact-graph-object-url-readback-unavailable",
-        `Materialized artifact graph file ${descriptor.path} could not be read back from its Blob URL.`,
-        error,
-      );
-    }
-    if (!response.ok) {
-      throw artifactGraphError(
-        "artifact-graph-object-url-readback-http-status-rejected",
-        `Materialized artifact graph file ${descriptor.path} returned a non-success Blob URL response.`,
-      );
-    }
-    if (response.redirected || response.url !== moduleUrl) {
-      throw artifactGraphError(
-        "artifact-graph-object-url-readback-identity-mismatch",
-        `Materialized artifact graph file ${descriptor.path} did not retain its exact Blob URL identity.`,
-      );
-    }
-    const observedMediaType = response.headers.get("content-type")?.split(";", 1)[0].trim() ?? "";
-    if (observedMediaType !== descriptor.mediaType) {
-      throw artifactGraphError(
-        "artifact-graph-object-url-media-type-mismatch",
-        `Materialized artifact graph file ${descriptor.path} did not retain its declared media type.`,
-      );
-    }
-    const observedBlob = await response.blob();
-    const observed = await blobDigest(observedBlob);
-    if (observed.bytes !== expected.bytes) {
-      throw artifactGraphError(
-        "artifact-graph-object-url-byte-length-mismatch",
-        `Materialized artifact graph file ${descriptor.path} did not retain its exact byte length.`,
-      );
-    }
-    if (observed.sha256 !== expected.sha256) {
-      throw artifactGraphError(
-        "artifact-graph-object-url-sha256-mismatch",
-        `Materialized artifact graph file ${descriptor.path} did not retain its exact bytes.`,
-      );
-    }
-    materializedByPath.set(descriptor.path, Object.freeze({
+    materializedByPath.set(descriptor.path, completeValue({
       kind: descriptor.kind,
       path: descriptor.path,
       sourceUrl: descriptor.sourceUrl,
       revision: descriptor.revision,
-      license: descriptor.license,
       moduleUrl,
       mediaType: descriptor.mediaType,
       ...(descriptor.sourceMediaType === descriptor.mediaType
         ? {}
         : { sourceMediaType: descriptor.sourceMediaType }),
-      bytes: descriptor.bytes,
-      sha256: descriptor.sha256,
       runtimeRequestUrls: descriptor.runtimeRequestUrls,
       ...(descriptor.redirectFinalOrigins.length < 1
         ? {}
@@ -3168,9 +2967,9 @@ async function createArtifactGraphObjectUrls(admitted, metadata, inspection, sec
       }
       return materialized;
     });
-    return Object.freeze({
+    return completeValue({
       guardCapability,
-      files: Object.freeze(files),
+      files: completeValue(files),
       release() {
         for (const url of created.splice(0).reverse()) {
           try {
@@ -3193,18 +2992,443 @@ async function createArtifactGraphObjectUrls(admitted, metadata, inspection, sec
   }
 }
 
-function artifactGraphAdmissionStatus(cache, offline, security) {
-  const verification = security.checks.byteLength && security.checks.sha256
-    ? "verified"
-    : security.checks.byteLength || security.checks.sha256
-      ? "partially-checked"
-      : "unchecked";
-  const source = cache === "installed"
-    ? "network-dbopfs"
-    : offline
-      ? "offline-dbopfs-cache"
-      : "dbopfs-cache";
-  return `artifact-graph-${source}-${verification}`;
+function ordinaryArtifactUrl(value, base) {
+  try {
+    return new URL(value, base).href;
+  } catch {
+    return null;
+  }
+}
+
+function isBareModuleSpecifier(value) {
+  return typeof value === "string"
+    && !value.startsWith("./")
+    && !value.startsWith("../")
+    && !value.startsWith("/")
+    && !/^[A-Za-z][A-Za-z\d+.-]*:/u.test(value);
+}
+
+function ordinaryArtifactRoutes(metadata) {
+  const byUrl = new Map();
+  const ambiguous = new Set();
+  function add(value, descriptor) {
+    const url = ordinaryArtifactUrl(value, descriptor.sourceUrl);
+    if (!url || ambiguous.has(url)) return;
+    const existing = byUrl.get(url);
+    if (existing && existing.path !== descriptor.path) {
+      byUrl.delete(url);
+      ambiguous.add(url);
+      return;
+    }
+    byUrl.set(url, descriptor);
+  }
+  for (const descriptor of metadata.files) {
+    add(descriptor.sourceUrl, descriptor);
+    for (const route of descriptor.runtimeRequestUrls ?? []) add(route, descriptor);
+  }
+  return completeValue({ byUrl, ambiguous });
+}
+
+function resolveOrdinaryArtifactRoute(routes, value, sourceDescriptor) {
+  const url = ordinaryArtifactUrl(value, sourceDescriptor?.sourceUrl);
+  return url && !routes.ambiguous.has(url)
+    ? completeValue({ descriptor: routes.byUrl.get(url) ?? null, url })
+    : null;
+}
+
+function scanOrdinaryModuleRouting(source, modulePath) {
+  let tokens;
+  try {
+    tokens = tokenizeArtifactGraphModule(source, modulePath);
+  } catch {
+    // Routing discovery is best effort. A scanner limitation must never become
+    // an ordinary runtime admission gate; unchanged source uses native URLs.
+    return completeValue({
+      source,
+      staticImports: completeValue([]),
+      dynamicImports: completeValue([]),
+      fetches: completeValue([]),
+      moduleWorkers: completeValue([]),
+      cacheOpens: completeValue([]),
+    });
+  }
+  const staticImports = [];
+  const dynamicImports = [];
+  const fetches = [];
+  const moduleWorkers = [];
+  const cacheOpens = [];
+  const next = (index, offset = 1) => tokens[index + offset] ?? null;
+  const previous = (index, offset = 1) => tokens[index - offset] ?? null;
+  const shadowedGlobals = new Set();
+  const routableGlobals = new Set(["fetch", "caches", "Worker"]);
+
+  function closingParenthesis(opening) {
+    let depth = 0;
+    for (let cursor = opening; cursor < tokens.length; cursor += 1) {
+      if (tokens[cursor].value === "(") depth += 1;
+      if (tokens[cursor].value !== ")") continue;
+      depth -= 1;
+      if (depth === 0) return cursor;
+    }
+    return -1;
+  }
+
+  function markBindings(start, end) {
+    for (let cursor = start; cursor < end; cursor += 1) {
+      if (routableGlobals.has(tokens[cursor].value)) {
+        shadowedGlobals.add(tokens[cursor].value);
+      }
+    }
+  }
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (routableGlobals.has(token.value) && next(index)?.value === "=>") {
+      shadowedGlobals.add(token.value);
+      continue;
+    }
+    if (token.value === "import") {
+      for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
+        const candidate = tokens[cursor];
+        if (candidate.value === "from" || candidate.type === "string"
+          || candidate.value === ";") break;
+        if (routableGlobals.has(candidate.value)) {
+          shadowedGlobals.add(candidate.value);
+        }
+      }
+      continue;
+    }
+    if (["function", "catch"].includes(token.value)) {
+      let opening = index + 1;
+      while (opening < tokens.length && tokens[opening].value !== "(") {
+        if (routableGlobals.has(tokens[opening].value)) {
+          shadowedGlobals.add(tokens[opening].value);
+        }
+        opening += 1;
+      }
+      const closing = opening < tokens.length ? closingParenthesis(opening) : -1;
+      if (closing > opening) markBindings(opening + 1, closing);
+      continue;
+    }
+    if (token.value === "class" && routableGlobals.has(next(index)?.value)) {
+      shadowedGlobals.add(next(index).value);
+      continue;
+    }
+    if (!["const", "let", "var"].includes(token.value)) continue;
+    let binding = true;
+    let round = 0;
+    let square = 0;
+    let curly = 0;
+    for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
+      const candidate = tokens[cursor];
+      const topLevel = round === 0 && square === 0 && curly === 0;
+      if (topLevel && candidate.value === ";") break;
+      if (topLevel && candidate.value === ",") {
+        binding = true;
+        continue;
+      }
+      if (topLevel && ["=", "in", "of"].includes(candidate.value)) {
+        binding = false;
+        continue;
+      }
+      if (binding && routableGlobals.has(candidate.value)) {
+        shadowedGlobals.add(candidate.value);
+      }
+      if (candidate.value === "(") round += 1;
+      else if (candidate.value === ")") round = Math.max(0, round - 1);
+      else if (candidate.value === "[") square += 1;
+      else if (candidate.value === "]") square = Math.max(0, square - 1);
+      else if (candidate.value === "{") curly += 1;
+      else if (candidate.value === "}") curly = Math.max(0, curly - 1);
+    }
+  }
+
+  const controlParentheses = new Set(["catch", "for", "if", "switch", "while", "with"]);
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (tokens[index].value !== "(") continue;
+    const closing = closingParenthesis(index);
+    const nextToken = closing < 0 ? null : next(closing);
+    const owner = previous(index)?.value;
+    const callable = nextToken?.value === "=>"
+      || (nextToken?.value === "{" && !controlParentheses.has(owner));
+    if (callable) markBindings(index + 1, closing);
+  }
+
+  function directCall(target, index) {
+    const opening = next(index);
+    if (opening?.value !== "(") return false;
+    let start = tokens[index].start;
+    if (previous(index)?.value === ".") {
+      if (!["globalThis", "self"].includes(previous(index, 2)?.value)) return false;
+      start = previous(index, 2).start;
+    }
+    target.push(completeValue({ start, end: opening.end }));
+    return true;
+  }
+
+  function isExplicitGlobal(index) {
+    return previous(index)?.value === "."
+      && ["globalThis", "self"].includes(previous(index, 2)?.value);
+  }
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (token.type !== "identifier") continue;
+    if (token.value === "import") {
+      if (next(index)?.value === "." && next(index, 2)?.value === "meta") {
+        index += 2;
+        continue;
+      }
+      if (next(index)?.value === "(") {
+        dynamicImports.push(completeValue({ start: token.start, end: next(index).end }));
+        continue;
+      }
+      let specifier = next(index)?.type === "string" ? next(index) : null;
+      if (!specifier) {
+        for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
+          if (tokens[cursor].value === ";") break;
+          if (tokens[cursor].value === "from" && next(cursor)?.type === "string") {
+            specifier = next(cursor);
+            break;
+          }
+        }
+      }
+      if (specifier) staticImports.push(completeValue({
+        start: specifier.start,
+        end: specifier.end,
+        specifier: specifier.value,
+      }));
+      continue;
+    }
+    if (token.value === "export" && ["*", "{"].includes(next(index)?.value)) {
+      for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
+        if (tokens[cursor].value === ";") break;
+        if (tokens[cursor].value === "from" && next(cursor)?.type === "string") {
+          const specifier = next(cursor);
+          staticImports.push(completeValue({
+            start: specifier.start,
+            end: specifier.end,
+            specifier: specifier.value,
+          }));
+          break;
+        }
+      }
+      continue;
+    }
+    if (
+      token.value === "fetch"
+      && (isExplicitGlobal(index) || !shadowedGlobals.has("fetch"))
+    ) {
+      directCall(fetches, index);
+      continue;
+    }
+    if (
+      token.value === "caches"
+      && (isExplicitGlobal(index) || !shadowedGlobals.has("caches"))
+      && next(index)?.value === "."
+      && next(index, 2)?.value === "open"
+      && next(index, 3)?.value === "("
+    ) {
+      let start = token.start;
+      if (previous(index)?.value === "."
+        && ["globalThis", "self"].includes(previous(index, 2)?.value)) {
+        start = previous(index, 2).start;
+      }
+      cacheOpens.push(completeValue({ start, end: next(index, 3).end }));
+      continue;
+    }
+    if (
+      token.value === "Worker"
+      && (isExplicitGlobal(index) || !shadowedGlobals.has("Worker"))
+      && next(index)?.value === "("
+    ) {
+      let start = token.start;
+      if (previous(index)?.value === "new") {
+        start = previous(index).start;
+      } else if (previous(index)?.value === ".") {
+        if (!["globalThis", "self"].includes(previous(index, 2)?.value)) continue;
+        start = previous(index, 2).start;
+        if (previous(index, 3)?.value === "new") start = previous(index, 3).start;
+      }
+      moduleWorkers.push(completeValue({ start, end: next(index).end }));
+    }
+  }
+  return completeValue({
+    source,
+    staticImports: completeValue(staticImports),
+    dynamicImports: completeValue(dynamicImports),
+    fetches: completeValue(fetches),
+    moduleWorkers: completeValue(moduleWorkers),
+    cacheOpens: completeValue(cacheOpens),
+  });
+}
+
+async function planOrdinaryMaterializedRuntime(admitted, metadata, signal) {
+  const admittedByPath = new Map(admitted.files.map((entry) => [entry.descriptor.path, entry]));
+  const routes = ordinaryArtifactRoutes(metadata);
+  const plans = new Map();
+  for (const descriptor of metadata.runtimeFiles) {
+    if (!ARTIFACT_GRAPH_JAVASCRIPT_KINDS.has(descriptor.kind)) continue;
+    throwIfAborted(signal);
+    const file = admittedByPath.get(descriptor.path)?.file;
+    if (!file) continue;
+    const source = await file.text();
+    plans.set(descriptor.path, scanOrdinaryModuleRouting(source, descriptor.path));
+  }
+  const visiting = new Set();
+  const visited = new Set();
+  const order = [];
+  function visit(path) {
+    if (visited.has(path) || visiting.has(path)) return;
+    visiting.add(path);
+    const descriptor = metadata.filesByPath.get(path);
+    const plan = plans.get(path);
+    for (const observed of plan?.staticImports ?? []) {
+      if (isBareModuleSpecifier(observed.specifier)) continue;
+      const target = resolveOrdinaryArtifactRoute(routes, observed.specifier, descriptor)?.descriptor;
+      if (target && plans.has(target.path)) visit(target.path);
+    }
+    visiting.delete(path);
+    visited.add(path);
+    order.push(path);
+  }
+  for (const path of plans.keys()) visit(path);
+  return completeValue({ order: completeValue(order), plans, routes });
+}
+
+function applyOrdinaryModuleRouting(plan, sourceDescriptor, materializedByPath, routes) {
+  const replacements = [];
+  for (const observed of plan.staticImports) {
+    if (isBareModuleSpecifier(observed.specifier)) continue;
+    const resolution = resolveOrdinaryArtifactRoute(routes, observed.specifier, sourceDescriptor);
+    const mapped = resolution?.descriptor
+      ? materializedByPath.get(resolution.descriptor.path)?.moduleUrl
+      : null;
+    const target = mapped ?? resolution?.url;
+    if (target) replacements.push({
+      start: observed.start,
+      end: observed.end,
+      value: JSON.stringify(target),
+    });
+  }
+  for (const observed of plan.dynamicImports) replacements.push({
+    start: observed.start,
+    end: observed.end,
+    value: `globalThis.${ARTIFACT_MODULE_ROUTER}.dynamicImport(${JSON.stringify(sourceDescriptor.path)},`,
+  });
+  for (const observed of plan.fetches) replacements.push({
+    start: observed.start,
+    end: observed.end,
+    value: `globalThis.${ARTIFACT_MODULE_ROUTER}.fetch(${JSON.stringify(sourceDescriptor.path)},`,
+  });
+  for (const observed of plan.moduleWorkers) replacements.push({
+    start: observed.start,
+    end: observed.end,
+    value: `globalThis.${ARTIFACT_MODULE_ROUTER}.createWorker(${JSON.stringify(sourceDescriptor.path)},`,
+  });
+  for (const observed of plan.cacheOpens) replacements.push({
+    start: observed.start,
+    end: observed.end,
+    value: `globalThis.${ARTIFACT_MODULE_ROUTER}.openCache(${JSON.stringify(sourceDescriptor.path)},`,
+  });
+  replacements.sort((left, right) => right.start - left.start);
+  let source = plan.source;
+  let previousStart = source.length;
+  for (const replacement of replacements) {
+    if (replacement.end > previousStart) continue;
+    source = `${source.slice(0, replacement.start)}${replacement.value}${source.slice(replacement.end)}`;
+    previousStart = replacement.start;
+  }
+  return source;
+}
+
+async function createOrdinaryArtifactObjectUrls(
+  admitted,
+  metadata,
+  routing,
+  objectUrlFactory,
+) {
+  const create = objectUrlFactory?.create ?? PLATFORM_CREATE_OBJECT_URL;
+  const revoke = objectUrlFactory?.revoke ?? PLATFORM_REVOKE_OBJECT_URL;
+  if (typeof create !== "function" || typeof revoke !== "function") {
+    throw artifactGraphError(
+      "artifact-graph-object-url-platform-unavailable",
+      "Artifact materialization requires native Blob URL creation and revocation.",
+    );
+  }
+  const admittedByPath = new Map(admitted.files.map((entry) => [entry.descriptor.path, entry]));
+  const materializedByPath = new Map();
+  const created = [];
+  async function materialize(descriptor, body) {
+    const blob = body instanceof Blob && body.type === descriptor.mediaType
+      ? body
+      : new Blob([body], { type: descriptor.mediaType });
+    const moduleUrl = create(blob);
+    if (typeof moduleUrl !== "string") {
+      throw artifactGraphError(
+        "artifact-graph-object-url-platform-unavailable",
+        `Artifact file ${descriptor.path} did not produce an object URL.`,
+      );
+    }
+    created.push(moduleUrl);
+    materializedByPath.set(descriptor.path, completeValue({
+      kind: descriptor.kind,
+      path: descriptor.path,
+      sourceUrl: descriptor.sourceUrl,
+      revision: descriptor.revision,
+      moduleUrl,
+      mediaType: descriptor.mediaType,
+      ...(descriptor.sourceMediaType === descriptor.mediaType
+        ? {}
+        : { sourceMediaType: descriptor.sourceMediaType }),
+      runtimeRequestUrls: descriptor.runtimeRequestUrls,
+      ...(descriptor.redirectFinalOrigins.length < 1
+        ? {}
+        : { redirectFinalOrigins: descriptor.redirectFinalOrigins }),
+    }));
+  }
+  try {
+    for (const descriptor of metadata.files) {
+      if (ARTIFACT_GRAPH_JAVASCRIPT_KINDS.has(descriptor.kind)) continue;
+      const file = admittedByPath.get(descriptor.path)?.file;
+      if (file) await materialize(descriptor, file);
+    }
+    for (const path of routing.order) {
+      const descriptor = metadata.filesByPath.get(path);
+      const plan = routing.plans.get(path);
+      if (!descriptor || !plan) continue;
+      await materialize(
+        descriptor,
+        applyOrdinaryModuleRouting(plan, descriptor, materializedByPath, routing.routes),
+      );
+    }
+    for (const descriptor of metadata.files) {
+      if (materializedByPath.has(descriptor.path)) continue;
+      const file = admittedByPath.get(descriptor.path)?.file;
+      if (file) await materialize(descriptor, file);
+    }
+    return completeValue({
+      files: completeValue(metadata.files.map((descriptor) => materializedByPath.get(descriptor.path))),
+      release() {
+        for (const url of created.splice(0).reverse()) {
+          try {
+            revoke(url);
+          } catch {
+            // Object URL revocation follows Worker termination and is best effort.
+          }
+        }
+      },
+    });
+  } catch (error) {
+    for (const url of created.splice(0).reverse()) {
+      try {
+        revoke(url);
+      } catch {
+        // Preserve the functional materialization failure.
+      }
+    }
+    throw error;
+  }
 }
 
 function createObjectUrls(files, factory) {
@@ -3221,17 +3445,16 @@ function createObjectUrls(files, factory) {
         : new Blob([file], { type: descriptor.mediaType });
       const url = create(blob);
       created.push(url);
-      return Object.freeze({
+      return completeValue({
         kind: descriptor.kind,
         path: descriptor.path,
         sourceUrl: descriptor.url,
         moduleUrl: url,
         mediaType: descriptor.mediaType,
-        bytes: file.size,
       });
     });
-    return Object.freeze({
-      files: Object.freeze(materialized),
+    return completeValue({
+      files: completeValue(materialized),
       release() {
         for (const url of created.splice(0).reverse()) {
           try {
@@ -3255,8 +3478,8 @@ function createObjectUrls(files, factory) {
 }
 
 /**
- * Stores an authority's complete runtime/model closure in an existing DBOPFS
- * table. The completion manifest is always the final mutation.
+ * Stores an authority's runtime/model files in an existing DBOPFS table.
+ * Ordinary cache reuse creates no receipt, manifest, or byte identity.
  */
 export function createDbopfsSpeechArtifactStore({
   dbopfs,
@@ -3333,20 +3556,27 @@ export function createDbopfsSpeechArtifactStore({
     }
   }
 
-  async function writeFile(name, body, { signal, onChunk } = {}) {
+  async function readJsonFile(name) {
+    const file = await readFile(name);
+    if (!file) return null;
+    try {
+      return JSON.parse(await file.text());
+    } catch {
+      return null;
+    }
+  }
+
+  async function writeFile(name, body, { signal } = {}) {
     const directory = await table();
     const handle = await directory.getFileHandle(name, { create: true });
     const writable = await handle.createWritable();
-    let written = 0;
     try {
       for await (const chunk of byteChunks(body, signal)) {
         await writable.write(chunk);
-        written += chunk.byteLength;
-        onChunk?.(chunk, written);
       }
       throwIfAborted(signal);
       await writable.close();
-      return written;
+      return undefined;
     } catch (error) {
       await writable.abort?.(error).catch(() => undefined);
       await directory.removeEntry(name).catch(() => undefined);
@@ -3360,38 +3590,22 @@ export function createDbopfsSpeechArtifactStore({
     }
     const metadata = artifactMetadata(authority);
     const names = storageNames(authority, metadata.files);
+    const priorSelection = await readJsonFile(names.selection);
+    const legacySelection = await readJsonFile(names.legacyManifest);
+    const priorCount = Math.max(
+      Array.isArray(priorSelection?.files) ? priorSelection.files.length : 0,
+      Array.isArray(legacySelection?.files) ? legacySelection.files.length : 0,
+    );
+    const fileNames = Array.from(
+      { length: Math.max(names.files.length, priorCount) },
+      (_, index) => `${names.key}.${String(index).padStart(4, "0")}.artifact`,
+    );
     const results = await Promise.all([
-      removeEntry(names.manifest),
-      ...names.files.map(removeEntry),
+      removeEntry(names.selection),
+      removeEntry(names.legacyManifest),
+      ...fileNames.map(removeEntry),
     ]);
     return results.some(Boolean);
-  }
-
-  async function readManifest(name) {
-    const file = await readFile(name);
-    if (!file) return null;
-    try {
-      return JSON.parse(await file.text());
-    } catch {
-      await removeEntry(name);
-      return null;
-    }
-  }
-
-  async function verifyFile(file, descriptor, security, signal, onProgress, phase) {
-    if (security.checks.byteLength && file.size !== descriptor.bytes) return false;
-    if (!security.checks.sha256) {
-      onProgress?.(providerProgress(phase, file.size, file.size));
-      return true;
-    }
-    const digest = createStreamingSha256();
-    let completed = 0;
-    for await (const chunk of byteChunks(file.stream(), signal)) {
-      digest.update(chunk);
-      completed += chunk.byteLength;
-      onProgress?.(providerProgress(phase, completed, file.size));
-    }
-    return completed === file.size && digest.digestHex() === descriptor.sha256;
   }
 
   function graphFileReason(descriptor, boundary) {
@@ -3405,27 +3619,12 @@ export function createDbopfsSpeechArtifactStore({
     return artifactGraphError(graphFileReason(descriptor, boundary), message);
   }
 
-  function assertSecurityDescriptors(files, security) {
-    for (const descriptor of files) {
-      if (security.checks.byteLength && descriptor.bytes === null) {
-        throw new TypeError(
-          `${descriptor.kind} file ${descriptor.path} requires bytes under the effective security policy.`,
-        );
-      }
-      if (security.checks.sha256 && descriptor.sha256 === null) {
-        throw new TypeError(
-          `${descriptor.kind} file ${descriptor.path} requires sha256 under the effective security policy.`,
-        );
-      }
-    }
-  }
-
-  async function openCached(authority, { signal, onProgress, security } = {}) {
+  async function openCached(authority, { signal, onProgress } = {}) {
     const graph = ARTIFACT_GRAPHS.has(authority);
     const metadata = artifactMetadata(authority);
     const names = storageNames(authority, metadata.files);
-    const manifest = await readManifest(names.manifest);
-    if (!manifestMatches(manifest, authority, metadata.files)) {
+    const storedSelection = await readJsonFile(names.selection);
+    if (JSON.stringify(storedSelection) !== JSON.stringify(cacheSelection(authority))) {
       await removeUnlocked(authority);
       return null;
     }
@@ -3434,42 +3633,21 @@ export function createDbopfsSpeechArtifactStore({
       throwIfAborted(signal);
       const descriptor = metadata.files[index];
       const file = await readFile(names.files[index]);
-      const observed = manifest.files[index];
-      if (
-        !file
-        || observed?.path !== descriptor.path
-        || observed?.bytes !== file.size
-        || (graph && observed?.sha256 !== descriptor.sha256)
-      ) {
-        await removeUnlocked(authority);
-        return null;
-      }
-      if (!await verifyFile(
-        file,
-        descriptor,
-        security,
-        signal,
-        onProgress,
-        graph
-          ? security.checks.sha256
-            ? "artifact-graph-dbopfs-cache-rehash"
-            : "artifact-graph-dbopfs-cache-readback"
-          : "verify-cache",
-      )) {
+      if (!file) {
         await removeUnlocked(authority);
         return null;
       }
       files.push({ descriptor, file });
     }
     try {
-      const inspection = graph
-        ? await inspectArtifactGraphRuntime({ files }, metadata, signal, security)
-        : (await assertSelfContainedRuntime({ files }, metadata, security), null);
+      const routing = graph
+        ? await planOrdinaryMaterializedRuntime({ files }, metadata, signal)
+        : null;
       throwIfAborted(signal);
-      return Object.freeze({
-        files: Object.freeze(files),
+      return completeValue({
+        files: completeValue(files),
         cache: "cached",
-        inspection,
+        routing,
       });
     } catch (error) {
       await removeUnlocked(authority);
@@ -3477,7 +3655,7 @@ export function createDbopfsSpeechArtifactStore({
     }
   }
 
-  async function install(authority, { signal, onProgress, security } = {}) {
+  async function install(authority, { signal, onProgress } = {}) {
     const graph = ARTIFACT_GRAPHS.has(authority);
     const metadata = artifactMetadata(authority);
     const names = storageNames(authority, metadata.files);
@@ -3488,21 +3666,22 @@ export function createDbopfsSpeechArtifactStore({
     await removeUnlocked(authority);
     const installed = [];
     try {
+      // This mutable cache selection is written before content. It is only an
+      // invalidation record, never a completion, byte-identity, or integrity receipt.
+      await writeFile(
+        names.selection,
+        new TextEncoder().encode(`${JSON.stringify(cacheSelection(authority))}\n`),
+        { signal },
+      );
       for (let index = 0; index < metadata.files.length; index += 1) {
         throwIfAborted(signal);
         const descriptor = metadata.files[index];
         const sourceUrl = graph ? descriptor.sourceUrl : descriptor.url;
-        const redirectFinalOrigins = graph
-          ? descriptor.redirectFinalOrigins
-          : Object.freeze([]);
         let response;
         try {
           response = await fetchFunction(sourceUrl, {
             cache: "no-store",
-            credentials: "omit",
-            mode: "cors",
-            redirect: redirectFinalOrigins.length < 1 ? "error" : "follow",
-            referrerPolicy: "no-referrer",
+            redirect: "follow",
             signal,
           });
         } catch (error) {
@@ -3517,28 +3696,18 @@ export function createDbopfsSpeechArtifactStore({
           throw speechError("ARCANE_AI_ARTIFACT_DOWNLOAD_FAILED", "A speech artifact source fetch was rejected.", error);
         }
         let responseBody;
-        let responseHeaders;
         let responseOk;
-        let responseRedirected;
         let responseStatus;
-        let responseUrl;
         try {
           if (!response || typeof response !== "object") {
             throw new TypeError("The artifact fetch result is not an object.");
           }
           responseBody = response.body;
-          responseHeaders = response.headers;
           responseOk = response.ok;
-          responseRedirected = response.redirected;
           responseStatus = response.status;
-          responseUrl = response.url;
           if (
             typeof responseOk !== "boolean"
-            || typeof responseRedirected !== "boolean"
             || !Number.isInteger(responseStatus)
-            || typeof responseUrl !== "string"
-            || !responseHeaders
-            || typeof responseHeaders.get !== "function"
             || (responseBody !== null && typeof responseBody?.getReader !== "function")
           ) {
             throw new TypeError("The artifact fetch result is not a readable Fetch Response.");
@@ -3557,81 +3726,6 @@ export function createDbopfsSpeechArtifactStore({
             error,
           );
         }
-        let finalUrl = null;
-        let finalUrlRecord = null;
-        try {
-          finalUrlRecord = responseUrl
-            ? new URL(responseUrl)
-            : null;
-          finalUrl = finalUrlRecord?.href ?? null;
-        } catch {
-          finalUrlRecord = null;
-          finalUrl = null;
-        }
-        if (graph && responseRedirected && !finalUrlRecord) {
-          await responseBody?.cancel?.().catch(() => undefined);
-          throw artifactGraphError(
-            "artifact-graph-source-response-url-unreadable",
-            `Artifact graph redirected source response for ${descriptor.path} did not expose a readable final URL.`,
-          );
-        }
-        if (graph && responseRedirected && redirectFinalOrigins.length < 1) {
-          await responseBody?.cancel?.().catch(() => undefined);
-          throw artifactGraphError(
-            "artifact-graph-source-redirected",
-            `Artifact graph source response for ${descriptor.path} did not match its immutable URL.`,
-          );
-        }
-        if (graph && responseRedirected && finalUrlRecord.protocol !== "https:") {
-          await responseBody?.cancel?.().catch(() => undefined);
-          throw artifactGraphError(
-            "artifact-graph-source-response-url-protocol-not-https",
-            `Artifact graph redirected source response for ${descriptor.path} did not end at HTTPS.`,
-          );
-        }
-        if (
-          graph
-          && responseRedirected
-          && (finalUrlRecord.username || finalUrlRecord.password)
-        ) {
-          await responseBody?.cancel?.().catch(() => undefined);
-          throw artifactGraphError(
-            "artifact-graph-source-response-url-credentials-rejected",
-            `Artifact graph redirected source response for ${descriptor.path} exposed credentials in its final URL.`,
-          );
-        }
-        if (graph && responseRedirected && finalUrlRecord.hash) {
-          await responseBody?.cancel?.().catch(() => undefined);
-          throw artifactGraphError(
-            "artifact-graph-source-response-url-fragment-rejected",
-            `Artifact graph redirected source response for ${descriptor.path} exposed a fragment in its final URL.`,
-          );
-        }
-        if (
-          graph
-          && responseRedirected
-          && !redirectFinalOrigins.includes(finalUrlRecord.origin)
-        ) {
-          await responseBody?.cancel?.().catch(() => undefined);
-          throw artifactGraphError(
-            "artifact-graph-source-redirect-final-origin-mismatch",
-            `Artifact graph redirected source response for ${descriptor.path} ended at an undeclared final origin.`,
-          );
-        }
-        if (graph && !responseRedirected && finalUrl !== sourceUrl) {
-          await responseBody?.cancel?.().catch(() => undefined);
-          throw artifactGraphError(
-            "artifact-graph-source-response-url-mismatch",
-            `Artifact graph non-redirected source response for ${descriptor.path} did not retain its immutable URL.`,
-          );
-        }
-        if (!graph && (responseRedirected || finalUrl !== sourceUrl)) {
-          await responseBody?.cancel?.().catch(() => undefined);
-          throw speechError(
-            "ARCANE_AI_ARTIFACT_SOURCE_CHANGED",
-            "A speech artifact response did not match its admitted URL.",
-          );
-        }
         if (!responseOk || !responseBody) {
           await responseBody?.cancel?.().catch(() => undefined);
           if (graph) {
@@ -3645,140 +3739,28 @@ export function createDbopfsSpeechArtifactStore({
             `A speech artifact server returned HTTP ${String(responseStatus)}.`,
           );
         }
-        const header = responseHeaders.get("content-length");
-        const reportedBytes = header ? Number(header) : null;
-        const contentEncoding = responseHeaders.get("content-encoding")?.trim() ?? "";
-        if (graph) {
-          const reportedMediaType = responseHeaders.get("content-type")
-            ?.split(";", 1)[0]
-            ?.trim()
-            ?.toLowerCase() ?? null;
-          if (reportedMediaType !== descriptor.sourceMediaType) {
-            await responseBody.cancel?.().catch(() => undefined);
-            throw graphVerificationError(
-              descriptor,
-              descriptor.sourceMediaType === descriptor.mediaType
-                ? "media-type-mismatch"
-                : "source-media-type-mismatch",
-              `Artifact graph source media type for ${descriptor.path} did not match ${descriptor.sourceMediaType}.`,
-            );
-          }
-        }
-        if (
-          security.checks.byteLength
-          && Number.isSafeInteger(reportedBytes)
-          && (!graph || !contentEncoding)
-          && reportedBytes !== descriptor.bytes
-        ) {
-          await responseBody.cancel?.().catch(() => undefined);
-          if (graph) {
-            throw graphVerificationError(
-              descriptor,
-              "byte-length-mismatch",
-              `Artifact graph source Content-Length for ${descriptor.path} changed.`,
-            );
-          }
-          throw speechError("ARCANE_AI_ARTIFACT_SIZE_MISMATCH", "Speech artifact Content-Length changed.");
-        }
-        const digest = security.checks.sha256
-          ? createStreamingSha256()
-          : null;
-        const written = await writeFile(names.files[index], responseBody, {
-          signal,
-          onChunk(chunk, completed) {
-            digest?.update(chunk);
-            if (security.checks.byteLength && completed > descriptor.bytes) {
-              if (graph) {
-                throw graphVerificationError(
-                  descriptor,
-                  "byte-length-mismatch",
-                  `Artifact graph source ${descriptor.path} exceeded its declared byte length.`,
-                );
-              }
-              throw speechError("ARCANE_AI_ARTIFACT_SIZE_MISMATCH", "A speech artifact exceeded its expected size.");
-            }
-            onProgress?.(providerProgress(
-              graph ? "artifact-graph-network-download" : "download",
-              completed,
-              security.checks.byteLength ? descriptor.bytes : null,
-            ));
-          },
-        });
-        if (security.checks.byteLength && written !== descriptor.bytes) {
-          if (graph) {
-            throw graphVerificationError(
-              descriptor,
-              "byte-length-mismatch",
-              `Artifact graph source ${descriptor.path} byte length changed.`,
-            );
-          }
-          throw speechError("ARCANE_AI_ARTIFACT_SIZE_MISMATCH", "A speech artifact byte count changed.");
-        }
-        if (digest && digest.digestHex() !== descriptor.sha256) {
-          if (graph) {
-            throw graphVerificationError(
-              descriptor,
-              "sha256-mismatch",
-              `Artifact graph source ${descriptor.path} SHA-256 changed.`,
-            );
-          }
-          throw speechError("ARCANE_AI_ARTIFACT_DIGEST_MISMATCH", "A speech artifact SHA-256 changed.");
-        }
+        await writeFile(names.files[index], responseBody, { signal });
         const file = await readFile(names.files[index]);
-        if (!file || file.size !== written) {
+        if (!file) {
           if (graph) {
             throw graphVerificationError(
               descriptor,
-              "dbopfs-persisted-byte-length-mismatch",
+              "dbopfs-persisted-file-missing",
               `DBOPFS did not preserve artifact graph file ${descriptor.path}.`,
             );
           }
           throw speechError("ARCANE_AI_ARTIFACT_CACHE_REJECTED", "DBOPFS did not preserve a speech artifact.");
         }
-        if (!await verifyFile(
-          file,
-          descriptor,
-          security,
-          signal,
-          onProgress,
-          graph
-            ? security.checks.sha256
-              ? "artifact-graph-dbopfs-persisted-rehash"
-              : "artifact-graph-dbopfs-persisted-readback"
-            : "verify-cache",
-        )) {
-          if (graph) {
-            throw graphVerificationError(
-              descriptor,
-              "dbopfs-persisted-sha256-mismatch",
-              `DBOPFS persisted bytes for artifact graph file ${descriptor.path} were rejected during re-verification.`,
-            );
-          }
-          throw speechError("ARCANE_AI_ARTIFACT_CACHE_REJECTED", "DBOPFS persisted bytes were rejected during verification.");
-        }
         installed.push({ descriptor, file });
       }
-      const inspection = graph
-        ? await inspectArtifactGraphRuntime({ files: installed }, metadata, signal, security)
-        : (await assertSelfContainedRuntime({ files: installed }, metadata, security), null);
+      const routing = graph
+        ? await planOrdinaryMaterializedRuntime({ files: installed }, metadata, signal)
+        : null;
       throwIfAborted(signal);
-      const manifest = Object.freeze({
-        schema: graph ? ARTIFACT_GRAPH_MANIFEST_SCHEMA : MANIFEST_SCHEMA,
-        complete: true,
-        authority: storedArtifactProjection(authority),
-        files: Object.freeze(installed.map(({ descriptor, file }) => Object.freeze({
-          path: descriptor.path,
-          bytes: file.size,
-          ...(graph ? { sha256: descriptor.sha256 } : {}),
-        }))),
-        completedAt: new Date().toISOString(),
-      });
-      const encoded = new TextEncoder().encode(`${JSON.stringify(manifest)}\n`);
-      await writeFile(names.manifest, encoded, { signal });
-      return Object.freeze({
-        files: Object.freeze(installed),
+      return completeValue({
+        files: completeValue(installed),
         cache: "installed",
-        inspection,
+        routing,
       });
     } catch (error) {
       await removeUnlocked(authority).catch(() => undefined);
@@ -3797,75 +3779,52 @@ export function createDbopfsSpeechArtifactStore({
     }
     throwIfAborted(signal);
     const graph = ARTIFACT_GRAPHS.has(authority);
-    let effectiveSecurity;
-    try {
-      effectiveSecurity = resolveModelSecurity({ load: security });
-    } catch (error) {
-      if (graph) {
-        throw artifactGraphTypeError(
-          "artifact-graph-load-security-contract-rejected",
-          "Browser speech artifact graph load security does not satisfy the required contract.",
-          error,
-        );
-      }
-      throw error;
-    }
+    void security;
+    // Security is an intent-only seam. Artifact checks remain disabled until
+    // secure mode is explicitly reviewed with the user and implemented.
     const metadata = artifactMetadata(authority);
-    assertSecurityDescriptors(metadata.files, effectiveSecurity);
     const cached = await openCached(authority, {
       signal,
       onProgress,
-      security: effectiveSecurity,
     });
     const admitted = cached ?? (offline
       ? null
       : await install(authority, {
         signal,
         onProgress,
-        security: effectiveSecurity,
       }));
     if (!admitted) {
       if (graph) {
         throw artifactGraphError(
           "artifact-graph-offline-cache-miss",
-          "No complete admitted offline artifact graph cache is available.",
+          "No cached offline artifact graph is available.",
         );
       }
-      throw speechError("ARCANE_AI_ARTIFACT_OFFLINE_MISS", "No admitted offline speech cache is available.");
+      throw speechError("ARCANE_AI_ARTIFACT_OFFLINE_MISS", "No cached offline speech artifacts are available.");
     }
     if (graph) {
-      const artifactGraphAdmission = artifactGraphAdmissionStatus(
-        admitted.cache,
-        offline,
-        effectiveSecurity,
-      );
-      const materialized = await createArtifactGraphObjectUrls(
+      const materialized = await createOrdinaryArtifactObjectUrls(
         admitted,
         metadata,
-        admitted.inspection,
-        effectiveSecurity,
+        admitted.routing,
+        objectUrlFactory,
       );
-      const runtimeFiles = Object.freeze(materialized.files.filter((file) =>
+      const runtimeFiles = completeValue(materialized.files.filter((file) =>
         file.kind.startsWith("runtime-")));
-      const modelFiles = Object.freeze(materialized.files.filter((file) =>
+      const modelFiles = completeValue(materialized.files.filter((file) =>
         !file.kind.startsWith("runtime-")));
-      return Object.freeze({
-        cache: artifactGraphAdmission,
-        artifactGraphId: authority.identitySha256,
-        artifactGraphAdmission,
-        warnings: admitted.inspection.warnings,
-        security: effectiveSecurity,
-        runtime: Object.freeze({
-          ...metadata.runtime,
+      return completeValue({
+        cache: admitted.cache,
+        runtime: completeValue({
+          adapter: metadata.runtime.adapter,
+          version: metadata.runtime.version,
+          revision: metadata.runtime.revision,
+          entry: metadata.runtime.entry,
+          moduleGraph: metadata.runtime.moduleGraph,
+          onnxWasm: metadata.runtime.onnxWasm,
           files: runtimeFiles,
-          edges: metadata.edges,
-          transforms: metadata.transforms,
-          warnings: admitted.inspection.warnings,
-          guardCapability: materialized.guardCapability,
-          artifactGraphId: authority.identitySha256,
-          artifactGraphAdmission,
         }),
-        model: Object.freeze({
+        model: completeValue({
           ...metadata.model,
           files: modelFiles,
         }),
@@ -3875,9 +3834,9 @@ export function createDbopfsSpeechArtifactStore({
     const materialized = createObjectUrls(admitted.files, objectUrlFactory);
     const runtimeFiles = materialized.files.filter((file) => file.kind === "runtime");
     const modelFiles = materialized.files.filter((file) => file.kind === "model");
-    return Object.freeze({
+    return completeValue({
       cache: admitted.cache,
-      runtime: Object.freeze({
+      runtime: completeValue({
         adapter: metadata.runtime.adapter,
         version: metadata.runtime.version,
         revision: metadata.runtime.revision,
@@ -3886,14 +3845,15 @@ export function createDbopfsSpeechArtifactStore({
           ? {}
           : { wasmPaths: metadata.runtime.wasmPaths }),
         moduleGraph: "self-contained",
-        files: Object.freeze(runtimeFiles),
+        files: completeValue(runtimeFiles),
       }),
-      model: Object.freeze({
+      model: completeValue({
         id: metadata.model.id,
         repository: metadata.model.repository,
         revision: metadata.model.revision,
+        ...(metadata.model.dtype === undefined ? {} : { dtype: metadata.model.dtype }),
         defaultVoice: metadata.model.defaultVoice,
-        files: Object.freeze(modelFiles),
+        files: completeValue(modelFiles),
       }),
       release: materialized.release,
     });
@@ -3932,7 +3892,7 @@ export function createDbopfsSpeechArtifactStore({
     return serializeAuthority(authority, () => removeUnlocked(authority));
   }
 
-  const store = Object.freeze({
+  const store = completeValue({
     protocol: BROWSER_SPEECH_ARTIFACT_PROTOCOL,
     tableName,
     prepare,

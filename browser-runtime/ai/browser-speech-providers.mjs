@@ -5,11 +5,8 @@ import {
   isBrowserSpeechAuthority,
   isDbopfsSpeechArtifactStore,
 } from "./browser-speech-artifacts.mjs";
-import {
-  normalizeModelSecurity,
-  resolveModelSecurity,
-  sameModelSecurity,
-} from "./model-controller.mjs";
+
+const completeValue = (value) => value;
 import {
   createSpeechWorkerClient,
   isSpeechWorkerClient,
@@ -18,18 +15,16 @@ import {
 
 const AI_PROVIDER_PROTOCOL = "arcane-ai-provider/2";
 const AI_MODEL_AUTHORITY_PROTOCOL = "arcane-ai-model-authority/1";
-const ROLE_OPERATION = Object.freeze({ stt: "transcribe", tts: "synthesize" });
+const ROLE_OPERATION = completeValue({ stt: "transcribe", tts: "synthesize" });
 const STT_SAMPLE_RATE = 16_000;
 const TTS_SAMPLE_RATE = 24_000;
 const TTS_RESPONSE_FORMAT = "wav";
-const ROLE_REQUEST_REASON = Object.freeze({
+const ROLE_REQUEST_REASON = completeValue({
   stt: "stt-transcription-cancelled",
   tts: "tts-synthesis-cancelled",
 });
 const UNMAPPED_PROVIDER_REASON = "browser-speech-provider-error-reason-unmapped";
-const WARN_FIRST_WARNING = "browser-speech-warn-first-secure-mode-disabled";
-const NO_PROVIDER_WARNINGS = Object.freeze([]);
-const WARN_FIRST_PROVIDER_WARNINGS = Object.freeze([WARN_FIRST_WARNING]);
+const NO_PROVIDER_WARNINGS = completeValue([]);
 const WORKER_FAILURE_CODES = new Set([
   "ARCANE_AI_WORKER_CRASHED",
   "ARCANE_AI_WORKER_MESSAGE_ERROR",
@@ -69,7 +64,9 @@ function trustedLoadFailure(error, role) {
   if (isTrustedSpeechError(error)) return error;
   return providerError(
     "ARCANE_AI_PROVIDER_LOAD_FAILED",
-    `The browser ${role} provider load was rejected.`,
+    typeof error?.message === "string" && error.message
+      ? error.message
+      : `The browser ${role} provider load was rejected.`,
     error,
     `${role}-provider-load-rejected`,
   );
@@ -79,7 +76,9 @@ function trustedRequestFailure(error, role) {
   if (isTrustedSpeechError(error)) return error;
   return providerError(
     "ARCANE_AI_PROVIDER_REQUEST_FAILED",
-    `The browser ${role} engine operation was rejected.`,
+    typeof error?.message === "string" && error.message
+      ? error.message
+      : `The browser ${role} engine operation was rejected.`,
     error,
     role === "stt"
       ? "stt-transcription-engine-operation-rejected"
@@ -91,7 +90,9 @@ function trustedWorkerFailure(error, role) {
   if (isTrustedSpeechError(error)) return error;
   return providerError(
     "ARCANE_AI_WORKER_MESSAGE_REJECTED",
-    `The browser ${role} Worker returned an untrusted error envelope.`,
+    typeof error?.message === "string" && error.message
+      ? error.message
+      : `The browser ${role} Worker returned an unreadable error envelope.`,
     error,
     `${role}-worker-error-envelope-rejected`,
   );
@@ -101,7 +102,9 @@ function trustedLifecycleFailure(error, role, operation) {
   if (isTrustedSpeechError(error)) return error;
   return providerError(
     "ARCANE_AI_INVALID_REQUEST",
-    `The browser ${role} ${operation} context could not be read.`,
+    typeof error?.message === "string" && error.message
+      ? error.message
+      : `The browser ${role} ${operation} context could not be read.`,
     error,
     `${role}-provider-${operation}-context-read-rejected`,
   );
@@ -132,8 +135,8 @@ function workerFailureCode(error) {
 }
 
 function requiredIdentifier(value, label) {
-  if (typeof value !== "string" || !value.trim() || value.trim().length > 128) {
-    throw new TypeError(`${label} must be a trimmed 1-128 character string.`);
+  if (typeof value !== "string" || !value.trim()) {
+    throw new TypeError(`${label} must be a nonempty trimmed string.`);
   }
   return value.trim();
 }
@@ -144,7 +147,6 @@ function createProviderAuthority({
   graph,
   model,
   runtime,
-  security,
 }) {
   if (graph !== undefined) {
     if (model !== undefined || runtime !== undefined) {
@@ -161,9 +163,8 @@ function createProviderAuthority({
       && graph.providerId !== providerId) {
       throw new TypeError("Browser speech graph providerId must match the provider id.");
     }
-    return Object.freeze({
+    return completeValue({
       protocol: AI_MODEL_AUTHORITY_PROTOCOL,
-      admitted: true,
       graph,
       artifactGraphProtocol: graph.protocol,
       providerId,
@@ -173,13 +174,11 @@ function createProviderAuthority({
       revision: graph.model.revision,
       dtype: graph.model.dtype,
       defaultVoice: graph.model.defaultVoice,
-      voices: graph.model.voices ?? Object.freeze([]),
+      voices: graph.model.voices ?? completeValue([]),
       inputSampleRate: graph.model.inputSampleRate,
       outputSampleRate: graph.model.outputSampleRate,
       runtime: graph.runtime,
       files: graph.files,
-      security,
-      artifactGraphId: graph.identitySha256,
     });
   }
   const authority = createBrowserSpeechAuthority({
@@ -187,7 +186,6 @@ function createProviderAuthority({
     role,
     model,
     runtime,
-    security,
   });
   if (!isBrowserSpeechAuthority(authority)) {
     throw new TypeError("Browser speech authority construction did not return an SDK authority.");
@@ -210,7 +208,7 @@ function linkSignal(signal) {
   const forwardExternalAbort = () => controller.abort(signal?.reason);
   if (signal?.aborted) forwardExternalAbort();
   else signal?.addEventListener?.("abort", forwardExternalAbort, { once: true });
-  return Object.freeze({
+  return completeValue({
     controller,
     abort(reason, code = "ARCANE_AI_REQUEST_ABORTED") {
       if (controller.signal.aborted) return;
@@ -268,7 +266,7 @@ function isAbortSignal(value) {
 }
 
 function providerContext(context, role, operation) {
-  if (context === undefined) return Object.freeze({ signal: null });
+  if (context === undefined) return completeValue({ signal: null });
   if (!context || typeof context !== "object" || Array.isArray(context)) {
     throw providerError(
       "ARCANE_AI_INVALID_REQUEST",
@@ -294,39 +292,25 @@ function providerContext(context, role, operation) {
       `${role}-provider-${operation}-signal-not-abort-signal`,
     );
   }
-  return Object.freeze({ context, signal });
+  return completeValue({ context, signal });
 }
 
-function graphSecurity(scope, label) {
-  return normalizeModelSecurity(scope, label);
-}
-
-function providerIntegrity(security, outcome = "pending") {
-  const enabledCount = Number(security.checks.byteLength)
-    + Number(security.checks.sha256);
-  const state = enabledCount === 0 ? "unchecked" : outcome;
-  if (!["unchecked", "pending", "verified", "failed"].includes(state)) {
-    throw new TypeError("Browser speech integrity outcome is invalid.");
+function reportedSecureIntent(...scopes) {
+  for (const scope of scopes) {
+    try {
+      if (scope?.secure === true) return completeValue({ secure: true });
+    } catch {
+      // Intent reporting never turns a security-shaped value into an ordinary
+      // provider admission check. Future hardening requires user review.
+    }
   }
-  return Object.freeze({
-    state,
-    byteLength: Object.freeze({
-      enabled: security.checks.byteLength,
-      state: security.checks.byteLength ? state : "unchecked",
-    }),
-    sha256: Object.freeze({
-      enabled: security.checks.sha256,
-      state: security.checks.sha256 ? state : "unchecked",
-    }),
-  });
+  return null;
 }
 
-function providerWarnings(security, runtimeWarnings = NO_PROVIDER_WARNINGS) {
-  const warnings = security.secure === true
-    ? runtimeWarnings
-    : [...WARN_FIRST_PROVIDER_WARNINGS, ...runtimeWarnings];
+function providerWarnings(runtimeWarnings = NO_PROVIDER_WARNINGS) {
+  const warnings = runtimeWarnings;
   if (warnings.length === 0) return NO_PROVIDER_WARNINGS;
-  return Object.freeze([...new Set(warnings)]);
+  return completeValue([...new Set(warnings)]);
 }
 
 function publicStatus({
@@ -340,12 +324,10 @@ function publicStatus({
   cache,
   lifecycleReason,
   activeOperation,
-  artifactGraphAdmission,
-  security,
-  integrity,
+  secureIntent,
   warnings,
 }) {
-  return Object.freeze({
+  return completeValue({
     role,
     providerId: id,
     modelId: authority.modelId,
@@ -358,11 +340,8 @@ function publicStatus({
     generation,
     errorCode,
     cache,
-    security,
-    integrity,
+    ...(secureIntent ? { security: secureIntent } : {}),
     warnings,
-    artifactGraphId: authority.artifactGraphId ?? null,
-    artifactGraphAdmission,
   });
 }
 
@@ -542,9 +521,9 @@ function observeLoadOperation(record, { signal, progress }, role) {
       settle(reject, abortError(signal, `${role}-load-cancelled`));
       abandonIfUnobserved(`${role}-load-cancelled`);
     };
-    const observer = Object.freeze({
+    const observer = completeValue({
       progress(value) {
-        if (settled) return;
+        if (settled || typeof progress !== "function") return;
         try {
           progress(value);
         } catch (error) {
@@ -578,7 +557,6 @@ function observeLoadOperation(record, { signal, progress }, role) {
       );
       return;
     }
-    if (record.hasProgress) observer.progress(record.latestProgress);
   });
 }
 
@@ -797,8 +775,8 @@ async function decodeSharedTranscriptionPayload(
     mono[index] = sample;
   }
   throwIfAborted(signal, cancellationReason);
-  return Object.freeze({
-    payload: Object.freeze({ audio: mono, sampleRate }),
+  return completeValue({
+    payload: completeValue({ audio: mono, sampleRate }),
     shared: true,
   });
 }
@@ -847,8 +825,8 @@ function cloneNativeTranscriptionPayload(payload, authority) {
       );
     }
   }
-  return Object.freeze({
-    payload: Object.freeze({
+  return completeValue({
+    payload: completeValue({
       audio: new Float32Array(descriptors.audio.value),
       sampleRate,
     }),
@@ -892,15 +870,13 @@ function normalizeSynthesisPayload(payload, authority) {
     assertPayloadModel(payload, authority, { operationSubject: "tts-synthesis" });
     textValue = descriptors.text.value;
   }
-  const text = typeof textValue === "string" ? textValue.trim() : "";
+  const text = typeof textValue === "string" ? textValue : "";
   const voiceValue = Object.hasOwn(descriptors, "voice")
     ? descriptors.voice.value
     : authority.defaultVoice;
-  const voice = typeof voiceValue === "string"
-    ? voiceValue.trim()
-    : "";
+  const voice = typeof voiceValue === "string" ? voiceValue : "";
   const speed = Object.hasOwn(descriptors, "speed") ? descriptors.speed.value : 1;
-  if (!text) {
+  if (!text.trim()) {
     throw providerError(
       "ARCANE_AI_INVALID_REQUEST",
       "Kokoro requires nonempty text.",
@@ -908,7 +884,7 @@ function normalizeSynthesisPayload(payload, authority) {
       "tts-synthesis-text-empty",
     );
   }
-  if (!voice) {
+  if (!voice.trim()) {
     throw providerError(
       "ARCANE_AI_INVALID_REQUEST",
       "Kokoro requires a nonempty voice id.",
@@ -916,12 +892,12 @@ function normalizeSynthesisPayload(payload, authority) {
       "tts-synthesis-voice-empty",
     );
   }
-  if (!Number.isFinite(speed) || speed <= 0 || speed > 4) {
+  if (!Number.isFinite(speed) || speed <= 0) {
     throw providerError(
       "ARCANE_AI_INVALID_REQUEST",
-      "Kokoro speed must be greater than 0 and at most 4.",
+      "Kokoro speed must be greater than 0.",
       undefined,
-      "tts-synthesis-speed-out-of-range",
+      "tts-synthesis-speed-not-positive",
     );
   }
   if (authority.graph
@@ -933,8 +909,8 @@ function normalizeSynthesisPayload(payload, authority) {
       "tts-synthesis-voice-not-declared",
     );
   }
-  return Object.freeze({
-    payload: Object.freeze({ text, voice, speed }),
+  return completeValue({
+    payload: completeValue({ text, voice, speed }),
     shared,
   });
 }
@@ -1054,7 +1030,7 @@ function encodeSharedSynthesisResult(result, authority) {
       true,
     );
   }
-  return Object.freeze({ audio: bytes, contentType: "audio/wav" });
+  return completeValue({ audio: bytes, contentType: "audio/wav" });
 }
 
 function createBrowserSpeechProvider({
@@ -1079,35 +1055,23 @@ function createBrowserSpeechProvider({
   if (!isDbopfsSpeechArtifactStore(store)) {
     throw new TypeError("Browser speech providers require an SDK-created DBOPFS artifact store.");
   }
-  const configuredAppSecurity = normalizeModelSecurity(
-    appSecurity,
-    "Browser speech app security",
-  );
-  const configuredProviderSecurity = normalizeModelSecurity(
-    security,
-    "Browser speech provider security",
-  );
   const authority = createProviderAuthority({
     providerId,
     role,
     graph,
     model,
     runtime,
-    security: configuredProviderSecurity,
   });
-  const defaultSecurity = resolveModelSecurity({
-    app: configuredAppSecurity,
-    binding: configuredProviderSecurity,
-  });
+  const defaultSecureIntent = reportedSecureIntent(appSecurity, security);
   const operation = ROLE_OPERATION[role];
   const speech = role === "stt"
-    ? Object.freeze({ inputSampleRate: inputSampleRate(authority) })
-    : Object.freeze({
+    ? completeValue({ inputSampleRate: inputSampleRate(authority) })
+    : completeValue({
       outputSampleRate: outputSampleRate(authority),
-      responseFormats: Object.freeze([TTS_RESPONSE_FORMAT]),
+      responseFormats: completeValue([TTS_RESPONSE_FORMAT]),
       defaultResponseFormat: TTS_RESPONSE_FORMAT,
     });
-  const catalogEntry = Object.freeze({
+  const catalogEntry = completeValue({
     id: authority.modelId,
     providerId,
     role,
@@ -1119,7 +1083,6 @@ function createBrowserSpeechProvider({
     runtime: authority.runtime,
     files: authority.files,
     ...(authority.graph ? {
-      artifactGraphId: authority.artifactGraphId,
       voices: authority.voices,
     } : {}),
     speech,
@@ -1127,7 +1090,6 @@ function createBrowserSpeechProvider({
   let state = "unloaded";
   let errorCode = null;
   let cache = null;
-  let artifactGraphAdmission = null;
   let lifecycleReason = `${role}-provider-created`;
   let activeOperation = null;
   let generation = 0;
@@ -1137,18 +1099,9 @@ function createBrowserSpeechProvider({
   let disposeOperation = null;
   let requestOperation = null;
   let lastWarnings = NO_PROVIDER_WARNINGS;
-  let lastIntegrity = Object.freeze({
-    security: defaultSecurity,
-    integrity: providerIntegrity(defaultSecurity),
-  });
+  let secureIntent = defaultSecureIntent;
 
   function status() {
-    const effectiveSecurity = active?.security
-      ?? loadOperation?.security
-      ?? lastIntegrity.security;
-    const integrity = active?.integrity
-      ?? loadOperation?.integrity
-      ?? lastIntegrity.integrity;
     const runtimeWarnings = active?.warnings
       ?? loadOperation?.warnings
       ?? lastWarnings;
@@ -1163,10 +1116,8 @@ function createBrowserSpeechProvider({
       cache,
       lifecycleReason,
       activeOperation,
-      artifactGraphAdmission,
-      security: effectiveSecurity,
-      integrity,
-      warnings: providerWarnings(effectiveSecurity, runtimeWarnings),
+      secureIntent,
+      warnings: providerWarnings(runtimeWarnings),
     });
   }
 
@@ -1207,7 +1158,7 @@ function createBrowserSpeechProvider({
     localOnly: true,
 
     catalog() {
-      return Object.freeze([catalogEntry]);
+      return completeValue([catalogEntry]);
     },
 
     inspect(selection, context = {}) {
@@ -1219,14 +1170,14 @@ function createBrowserSpeechProvider({
         && (!Object.hasOwn(selection ?? {}, "role") || selection.role === role)
         && selection?.localOnly !== false;
       if (!available) {
-        return Object.freeze({
+        return completeValue({
           available: false,
           code: "ARCANE_AI_MODEL_AUTHORITY_REQUIRED",
           message: "The selected browser speech model does not match this provider authority.",
           reason: `${role}-provider-inspection-selection-authority-mismatch`,
         });
       }
-      return Object.freeze({ available: true, authority });
+      return completeValue({ available: true, authority });
     },
 
     status,
@@ -1285,10 +1236,10 @@ function createBrowserSpeechProvider({
       } catch (error) {
         return Promise.reject(trustedLoadFailure(error, role));
       }
-      if (typeof loadProgress !== "function") {
+      if (loadProgress !== undefined && typeof loadProgress !== "function") {
         return Promise.reject(providerError(
           "ARCANE_AI_INVALID_REQUEST",
-          "Browser speech load progress must be a function.",
+          "Browser speech load progress must be a function when supplied.",
           undefined,
           `${role}-load-progress-callback-not-function`,
         ));
@@ -1304,54 +1255,20 @@ function createBrowserSpeechProvider({
           `${role}-load-selection-authority-mismatch`,
         ));
       }
-      let effectiveSecurity;
+      secureIntent = reportedSecureIntent(appSecurity, security, context.security);
       try {
-        if (authority.graph) {
-          effectiveSecurity = resolveModelSecurity({
-            app: graphSecurity(
-              configuredAppSecurity,
-              "Browser speech graph app security",
-            ),
-            binding: graphSecurity(
-              configuredProviderSecurity,
-              "Browser speech graph provider security",
-            ),
-            load: graphSecurity(
-              context.security,
-              "Browser speech graph load security",
-            ),
-          });
-        } else {
-          effectiveSecurity = resolveModelSecurity({
-            app: configuredAppSecurity,
-            binding: configuredProviderSecurity,
-            load: context.security,
-          });
-        }
         throwIfAborted(loadSignal, `${role}-load-cancelled`);
       } catch (error) {
         return Promise.reject(trustedLoadFailure(error, role));
       }
       if (state === "ready" && active) {
-        if (sameModelSecurity(active.security, effectiveSecurity)) {
-          return Promise.resolve(status());
-        }
-        lifecycleReason = `${role}-load-superseded-by-security-change`;
-        return provider.unload().then(() => provider.load(context));
+        return Promise.resolve(status());
       }
       if (loadOperation) {
-        if (sameModelSecurity(loadOperation.security, effectiveSecurity)) {
-          return observeLoadOperation(loadOperation, {
-            signal: loadSignal,
-            progress: loadProgress,
-          }, role);
-        }
-        lifecycleReason = `${role}-load-superseded-by-security-change`;
-        loadOperation.abort(
-          `${role}-load-superseded-by-security-change`,
-          "ARCANE_AI_OPERATION_SUPERSEDED",
-        );
-        return loadOperation.promise.catch(() => undefined).then(() => provider.load(context));
+        return observeLoadOperation(loadOperation, {
+          signal: loadSignal,
+          progress: loadProgress,
+        }, role);
       }
       generation += 1;
       const operationGeneration = generation;
@@ -1362,27 +1279,14 @@ function createBrowserSpeechProvider({
       errorCode = null;
       const record = {
         promise: null,
-        security: effectiveSecurity,
-        integrity: providerIntegrity(effectiveSecurity),
         warnings: NO_PROVIDER_WARNINGS,
         observers: new Set(),
         settled: false,
-        hasProgress: false,
-        latestProgress: null,
         abort: (
           reason = `${role}-load-cancelled`,
           code = "ARCANE_AI_REQUEST_ABORTED",
         ) => linked.abort(reason, code),
-        publishProgress(progress) {
-          record.latestProgress = progress;
-          record.hasProgress = true;
-          for (const observer of [...record.observers]) observer.progress(progress);
-        },
       };
-      lastIntegrity = Object.freeze({
-        security: effectiveSecurity,
-        integrity: record.integrity,
-      });
       lastWarnings = NO_PROVIDER_WARNINGS;
       const promise = Promise.resolve().then(async () => {
         let prepared = null;
@@ -1390,18 +1294,11 @@ function createBrowserSpeechProvider({
         try {
           prepared = await store.prepare(authority.graph ?? authority, {
             signal: linked.controller.signal,
-            onProgress: record.publishProgress,
             offline,
-            security: effectiveSecurity,
           });
-          record.integrity = providerIntegrity(effectiveSecurity, "verified");
           record.warnings = Array.isArray(prepared.warnings)
-            ? Object.freeze([...prepared.warnings])
+            ? completeValue([...prepared.warnings])
             : NO_PROVIDER_WARNINGS;
-          lastIntegrity = Object.freeze({
-            security: effectiveSecurity,
-            integrity: record.integrity,
-          });
           lastWarnings = record.warnings;
           throwIfAborted(
             linked.controller.signal,
@@ -1412,17 +1309,13 @@ function createBrowserSpeechProvider({
               "ARCANE_AI_OPERATION_SUPERSEDED",
               "Browser speech loading was superseded.",
               undefined,
-              lifecycleReason === `${role}-load-superseded-by-security-change`
-                ? lifecycleReason
-                : `${role}-load-superseded-by-unload`,
+              `${role}-load-superseded-by-unload`,
             );
           }
           slot = {
             prepared,
             released: false,
             client: null,
-            security: effectiveSecurity,
-            integrity: record.integrity,
             warnings: record.warnings,
           };
           slot.client = createSpeechWorkerClient({
@@ -1443,7 +1336,6 @@ function createBrowserSpeechProvider({
                         ? `${role}-worker-protocol-mismatch`
                         : `${role}-worker-crashed`);
                   activeOperation = null;
-                  artifactGraphAdmission = null;
                 }
                 try {
                   releaseSlot(slot);
@@ -1454,7 +1346,6 @@ function createBrowserSpeechProvider({
                     errorCode = releaseFailure.code;
                     lifecycleReason = releaseFailure.reason;
                     activeOperation = null;
-                    artifactGraphAdmission = null;
                   }
                   throw releaseFailure;
                 }
@@ -1469,19 +1360,16 @@ function createBrowserSpeechProvider({
               `${role}-worker-client-authority-mismatch`,
             );
           }
-          const configuration = Object.freeze({
+          const configuration = completeValue({
             role,
             runtime: prepared.runtime,
             model: prepared.model,
-            security: effectiveSecurity,
             ...(authority.graph ? {
-              artifactGraphId: authority.artifactGraphId,
               artifactGraphProtocol: authority.graph.protocol,
             } : {}),
           });
           await slot.client.request("load", { configuration }, {
             signal: linked.controller.signal,
-            progress: record.publishProgress,
           });
           throwIfAborted(
             linked.controller.signal,
@@ -1492,14 +1380,11 @@ function createBrowserSpeechProvider({
               "ARCANE_AI_OPERATION_SUPERSEDED",
               "Browser speech loading was superseded.",
               undefined,
-              lifecycleReason === `${role}-load-superseded-by-security-change`
-                ? lifecycleReason
-                : `${role}-load-superseded-by-unload`,
+              `${role}-load-superseded-by-unload`,
             );
           }
           active = slot;
           cache = prepared.cache;
-          artifactGraphAdmission = prepared.artifactGraphAdmission ?? null;
           state = "ready";
           lifecycleReason = `${role}-load-completed`;
           activeOperation = null;
@@ -1508,13 +1393,6 @@ function createBrowserSpeechProvider({
           let failure = linked.controller.signal.aborted
             ? linkedAbortFailure(linked, `${role}-load-cancelled`)
             : trustedLoadFailure(error, role);
-          if (!linked.controller.signal.aborted && prepared === null) {
-            record.integrity = providerIntegrity(effectiveSecurity, "failed");
-            lastIntegrity = Object.freeze({
-              security: effectiveSecurity,
-              integrity: record.integrity,
-            });
-          }
           try {
             if (slot) await terminateSlot(slot, failure);
             else prepared?.release();
@@ -1644,7 +1522,7 @@ function createBrowserSpeechProvider({
           ? encodeSharedSynthesisResult(result, authority)
           : result;
       })();
-      requestOperation = Object.freeze({
+      requestOperation = completeValue({
         promise,
         abort: (
           reason = ROLE_REQUEST_REASON[role],
@@ -1673,7 +1551,6 @@ function createBrowserSpeechProvider({
             failure = trustedWorkerFailure(cleanupError, role);
           }
           state = "unloaded";
-          artifactGraphAdmission = null;
         }
         lifecycleReason = failure?.reason
           ?? (failure?.code === "ARCANE_AI_REQUEST_ABORTED"
@@ -1746,7 +1623,6 @@ function createBrowserSpeechProvider({
           `${role}-worker-terminated-by-unload`,
         ));
         cache = null;
-        artifactGraphAdmission = null;
         state = "unloaded";
         lifecycleReason = `${role}-unload-completed`;
         activeOperation = null;
@@ -1813,7 +1689,7 @@ function createBrowserSpeechProvider({
       );
     },
   };
-  return Object.freeze(provider);
+  return completeValue(provider);
 }
 
 export function createBrowserWhisperProvider(options = {}) {

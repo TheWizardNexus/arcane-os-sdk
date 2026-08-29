@@ -7,8 +7,6 @@ export function createSpeechWorkerContract({
 } = {}) {
   const listeners = new Map();
   let terminated = false;
-  let privatePort = null;
-  let privatePortTransferred = false;
   let configuration = null;
   const posted = [];
 
@@ -70,46 +68,23 @@ export function createSpeechWorkerContract({
     removeEventListener(type, listener) {
       listeners.get(type)?.delete(listener);
     },
-    postMessage(message, transfers = []) {
-      if (message.privatePort) {
-        if (!Array.isArray(transfers) || !transfers.includes(message.privatePort)) {
-          throw new TypeError("The private speech MessagePort was not transferred.");
-        }
-        privatePortTransferred = true;
-        privatePort = message.privatePort;
-        privatePort.addEventListener("message", (event) => {
-          handleMessage(event.data, (response) => privatePort.postMessage(response));
-        });
-        privatePort.start?.();
-        const { privatePort: ignored, ...request } = message;
-        void ignored;
-        handleMessage(request, (response) => privatePort.postMessage(response));
-        return;
-      }
+    postMessage(message) {
       handleMessage(message, (response) => emit("message", response));
     },
     terminate() {
       terminated = true;
-      privatePort?.close();
-      privatePort = null;
     },
   };
 
-  return Object.freeze({
+  return {
     worker,
     posted,
     get terminated() {
       return terminated;
     },
-    get privateTransport() {
-      return privatePort !== null;
-    },
-    get privatePortTransferred() {
-      return privatePortTransferred;
-    },
     crash() {
       if (terminated) return;
       emitEvent("error", { message: "synthetic speech Worker crash" });
     },
-  });
+  };
 }
