@@ -1,10 +1,23 @@
-# Arcane Hello World development instructions
+# Arcane Hello World example instructions
 
 - Use plain JavaScript, HTML, and CSS; do not introduce TypeScript or TSX.
-- Keep reusable mechanisms in Arcane OS and app-specific behavior under `apps/hello-world/`.
-- Keep `arcane/css/theme.css` before app styles and import `arcane/ThemeBootstrap` before app code runs.
+- Keep reusable mechanisms in the Arcane SDK. This example owns only its model
+  selections and the minimal configuration needed to bind the shared chat.
+- Keep the example flat under `examples/hello-world/`; do not turn it into an
+  application workspace, package, generated SDK projection, or release fixture.
+- Load the current SDK theme before example styles and import
+  `arcane/ThemeBootstrap` before configuration runs.
 - Use `rgb(...)` or `rgba(...)` for new CSS colors.
-- Build one named app and one explicit target at a time.
+- Serve the canonical SDK checkout with a generic static server so the example
+  consumes current `/runtime`, `/browser-runtime`, and `/src` source directly.
+- Preserve complete application, model, message, document, diagnostic, and tool
+  content. Do not truncate, clip, elide, tail, or add character, token, file-size,
+  or byte-count gates.
+- Do not add byte identities, hashes, digests, byte progress, integrity receipts,
+  or admission checks to the ordinary application path.
+- Optional hardening is inactive unless the user expressly selects
+  `secure: true` for that exact scope. The ordinary path must remain fully
+  functional without empty security or permission scaffolding.
 - Do not run `npm run check` or any other test or check before committing unless
   the user explicitly requests it or the selected work builds, verifies, or
   releases a `dist`, package, artifact, or other release output.

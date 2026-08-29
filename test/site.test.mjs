@@ -24,7 +24,6 @@ import {
     normalizeModuleSearch
 } from '../site/reference/reference.js';
 import {repositoryRoot} from './helpers.mjs';
-import '../examples/hello-world/apps/hello-world/test/app.test.mjs';
 
 const siteRoot=path.join(repositoryRoot,'site');
 const exampleRoot=path.join(repositoryRoot,'examples','hello-world');
@@ -1593,346 +1592,50 @@ test('site interaction is bounded, copyable, and accessibility-aware',async t=>{
     });
 });
 
-test('maintained Hello World example matches current SDK contracts',async t=>{
-    const appRoot=path.join(exampleRoot,'apps','hello-world');
-    const requiredFiles=[
-        '.gitattributes',
-        '.gitignore',
-        'AGENTS.md',
-        'README.md',
-        'package.json',
-        'package-lock.json',
-        'arcane-packager.json',
-        'arcane.lock.json',
-        '.github/workflows/check.yml',
-        'apps/hello-world/arcane-app.json',
-        'apps/hello-world/arcane-package.json',
-        'apps/hello-world/manifest.json',
-        'apps/hello-world/index.html',
-        'apps/hello-world/hello-world.css',
-        'apps/hello-world/modules/App.js',
-        'apps/hello-world/modules/SpeechAuthorities.js',
-        'apps/hello-world/modules/arcane.importmap.json',
-        'apps/hello-world/test/app.test.mjs',
-        'apps/hello-world/img/icon.png'
-    ];
-    for(const relative of requiredFiles){
-        assert.equal((await stat(path.join(exampleRoot,...relative.split('/')))).isFile(),true,relative);
-    }
+test('maintained Hello World example is a flat current-source chat',async t=>{
+    const requiredFiles=['AGENTS.md','App.js','README.md','index.html'];
+    const entries=(await readdir(exampleRoot,{withFileTypes:true}))
+        .map(entry=>entry.name)
+        .sort();
+    assert.deepEqual(entries,[...requiredFiles].sort());
 
-    const [rootPackage,examplePackage,packageLock,lock,runtimeRelease,browserRelease,authoredDescriptor,packageManifest,packager]=await Promise.all([
-        readJson(path.join(repositoryRoot,'package.json')),
-        readJson(path.join(exampleRoot,'package.json')),
-        readJson(path.join(exampleRoot,'package-lock.json')),
-        readJson(path.join(exampleRoot,'arcane.lock.json')),
-        readJson(path.join(repositoryRoot,'runtime','ARCANE_RUNTIME_RELEASE.json')),
-        readJson(path.join(repositoryRoot,'browser-runtime','ARCANE_SDK_BROWSER_RELEASE.json')),
-        readJson(path.join(appRoot,'arcane-app.json')),
-        readJson(path.join(appRoot,'arcane-package.json')),
-        readJson(path.join(exampleRoot,'arcane-packager.json'))
+    const [html,script,readme,tutorial]=await Promise.all([
+        readFile(path.join(exampleRoot,'index.html'),'utf8'),
+        readFile(path.join(exampleRoot,'App.js'),'utf8'),
+        readFile(path.join(exampleRoot,'README.md'),'utf8'),
+        readSiteFile('examples/index.html')
     ]);
-    await t.test('pins the current npm and runtime identities',()=>{
-        assert.equal(rootPackage.version,'0.3.1');
-        assert.equal(examplePackage.devDependencies['arcane-os'],'0.3.1');
-        assert.equal(examplePackage.engines.node,'>=22.23.2');
-        assert.equal(packageLock.lockfileVersion,3);
-        assert.equal(packageLock.requires,true);
-        assert.equal(packageLock.packages[''].devDependencies['arcane-os'],'0.3.1');
-        assert.equal(packageLock.packages[''].engines.node,'>=22.23.2');
-        const installedSdk=packageLock.packages['node_modules/arcane-os'];
-        assert.deepEqual(
-            {
-                version:installedSdk.version,
-                resolved:installedSdk.resolved,
-                integrity:installedSdk.integrity,
-                dev:installedSdk.dev,
-                license:installedSdk.license,
-                node:installedSdk.engines.node
-            },
-            {
-                version:'0.3.1',
-                resolved:'https://registry.npmjs.org/arcane-os/-/arcane-os-0.3.1.tgz',
-                integrity:'sha512-g9C0cXK6Xim4Mu8D7zLKn3XErIo8UZEjIaGUA1fwnU6nVbB8XXgLD6/AjaVln+na6ihIHLzsHGgyTeic4yNggg==',
-                dev:true,
-                license:'AGPL-3.0-only',
-                node:'>=22.23.2'
-            }
-        );
-        assert.equal(lock.sdk.version,'0.3.1');
-        assert.equal(lock.runtime.contentSha256,runtimeRelease.contentSha256);
-        assert.equal(lock.runtime.upstreamCommit,runtimeRelease.source.legacyProjection.commit);
-        assert.equal(lock.protocols.arcane,runtimeRelease.source.protocol);
-    });
-    await t.test('maps and inventories the documented Arcane runtime exactly',async()=>{
-        const runtimePayload=packager.sharedPayloads['browser-runtime']
-            .find(payload=>payload.destination==='arcane');
-        assert.deepEqual(runtimePayload,{
-            source:'arcane',
-            destination:'arcane',
-            include:['components','css','dependencies','entities','img','modules','sdk','security'],
-            exclude:[]
-        });
 
-        const expectedRecords=[
-            ...runtimeRelease.files.map(file=>({
-                ...file,
-                path:file.path.startsWith('arcane/')
-                    ?file.path.slice('arcane/'.length)
-                    :`dependencies/${file.path}`
-            })),
-            ...browserRelease.files.map(file=>({...file,path:`sdk/${file.path}`}))
-        ].sort((left,right)=>left.path<right.path?-1:left.path>right.path?1:0);
-        const expectedPaths=expectedRecords.map(file=>file.path);
-        const physicalPaths=[];
-        async function visit(directory,relativeRoot=''){
-            for(const entry of await readdir(directory,{withFileTypes:true})){
-                const relative=relativeRoot?`${relativeRoot}/${entry.name}`:entry.name;
-                const absolute=path.join(directory,entry.name);
-                const info=await lstat(absolute);
-                assert.equal(info.isSymbolicLink(),false,relative);
-                if(info.isDirectory())await visit(absolute,relative);
-                else{
-                    assert.equal(info.isFile(),true,relative);
-                    physicalPaths.push(relative);
-                }
-            }
-        }
-        await visit(path.join(exampleRoot,'arcane'));
-        physicalPaths.sort();
-        assert.equal(physicalPaths.length,expectedPaths.length);
-        assert.deepEqual(physicalPaths,expectedPaths);
-        for(const file of expectedRecords){
-            const bytes=await readFile(path.join(exampleRoot,'arcane',...file.path.split('/')));
-            assert.equal(bytes.length,file.bytes,file.path);
-            assert.equal(
-                createHash('sha256').update(bytes).digest('hex'),
-                file.sha256,
-                file.path
-            );
-        }
+    await t.test('loads current SDK source without app or package scaffolding',()=>{
+        assert.match(html,/href="\/runtime\/arcane\/css\/theme[.]css"/u);
+        assert.match(html,/href="\/runtime\/arcane\/components\/chat[.]html[?]v=2"/u);
+        assert.match(html,/src="[.]\/App[.]js[?]v=1"/u);
+        assert.match(html,/"arcane-os\/ai\/browser-wasm": "\/browser-runtime\/ai\/browser-wasm[.]mjs"/u);
+        assert.match(html,/"arcane-os\/event-manager": "\/src\/event-manager[.]mjs"/u);
+        assert.doesNotMatch(html,/apps\/hello-world|arcane-packager|arcane[.]lock[.]json/u);
+    });
 
-        const artifact=await readFile(
-            path.join(appRoot,'modules','arcane.importmap.json'),
-            'utf8'
-        );
-        const importMap=JSON.parse(artifact);
-        assert.deepEqual(Object.keys(importMap),['imports']);
-        assert.ok(Object.keys(importMap.imports).length>0);
-        assert.equal(
-            importMap.imports['arcane-os/ai/browser-wasm'],
-            './arcane/sdk/ai/browser-wasm.mjs'
-        );
-        assert.equal(
-            importMap.imports['arcane-os/ai/browser-speech'],
-            './arcane/sdk/ai/browser-speech.mjs'
-        );
-        const generated=await buildImportMap({
-            files:expectedPaths,
-            readFile:relative=>readFile(path.join(
-                exampleRoot,'arcane',...relative.split('/')
-            ))
-        });
-        assert.equal(generated.entryCount,Object.keys(generated.imports).length);
-        assert.deepEqual(importMap.imports,generated.imports);
-        const expectedPathSet=new Set(expectedPaths);
-        for(const [specifier,target] of Object.entries(importMap.imports)){
-            assert.match(target,/^[.]\/arcane\//u,specifier);
-            assert.equal(
-                expectedPathSet.has(target.slice('./arcane/'.length)),
-                true,
-                `${specifier} targets missing ${target}.`
-            );
-        }
-        const entry=await readFile(path.join(appRoot,'index.html'),'utf8');
-        const inline=entry.match(
-            /<script type="importmap" data-arcane-import-map>\r?\n([\s\S]*?)<\/script>/u
-        );
-        assert.ok(inline);
-        assert.equal(inline[1],artifact);
+    await t.test('keeps behavior in shared SDK contracts',()=>{
+        assert.match(script,/createBrowserWasmLlmProvider/u);
+        assert.match(script,/createDbopfsModelStore/u);
+        assert.match(script,/configureBrowserSpeech/u);
+        assert.match(script,/chat[.]bindSession/u);
+        assert.match(script,/loadExisting:true/u);
+        assert.match(script,/request:\{localOnly:true\}/u);
+        assert.doesNotMatch(script,/@wllama\/wllama|createChatCompletion|data:text\/javascript/iu);
+        assert.doesNotMatch(script,/addEventListener\(['"](?:click|submit)|innerHTML\s*=|insertAdjacentHTML/iu);
+    });
 
-        const browserManifestBytes=await readFile(
-            path.join(repositoryRoot,'browser-runtime','ARCANE_SDK_BROWSER_RELEASE.json')
-        );
-        assert.deepEqual(lock.sdkBrowserRuntime,{
-            manifest:'node_modules/arcane-os/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json',
-            manifestSha256:createHash('sha256').update(browserManifestBytes).digest('hex'),
-            contentSha256:browserRelease.contentSha256,
-            builder:browserRelease.builder,
-            sdkVersion:browserRelease.sdkVersion,
-            source:browserRelease.source
-        });
-    });
-    await t.test('descriptor validates and projects exactly',()=>{
-        const descriptor=validateAppDescriptor(authoredDescriptor,{appId:'hello-world'});
-        assert.deepEqual(projectPackageManifest(descriptor),packageManifest);
-        assert.deepEqual(descriptor.permissions,{
-            capabilities:[],
-            methods:[]
-        });
-        assert.deepEqual(descriptor.targets,['browser']);
-    });
-    await t.test('icon is the maintained scaffold asset',async()=>{
-        const [exampleIcon,templateIcon]=await Promise.all([
-            readFile(path.join(appRoot,'img','icon.png')),
-            readFile(path.join(repositoryRoot,'src','templates','assets','app-icon.png'))
-        ]);
-        assert.equal(createHash('sha256').update(exampleIcon).digest('hex'),createHash('sha256').update(templateIcon).digest('hex'));
-    });
-    await t.test('source uses the generated map before named app behavior',async()=>{
-        const [html,style,script,speechAuthoritySource,readme,workflow,tutorial,compatibilityAlias]=await Promise.all([
-            readFile(path.join(appRoot,'index.html'),'utf8'),
-            readFile(path.join(appRoot,'hello-world.css'),'utf8'),
-            readFile(path.join(appRoot,'modules','App.js'),'utf8'),
-            readFile(path.join(appRoot,'modules','SpeechAuthorities.js'),'utf8'),
-            readFile(path.join(exampleRoot,'README.md'),'utf8'),
-            readFile(path.join(exampleRoot,'.github','workflows','check.yml'),'utf8'),
-            readSiteFile('examples/index.html'),
-            readSiteFile('examples/hello-world/index.html')
-        ]);
-        const base=html.indexOf('<base href="../../">');
-        const managedMap=html.indexOf('<script type="importmap" data-arcane-import-map>');
-        const theme=html.indexOf('./arcane/css/theme.css');
-        const primitives=html.indexOf('./arcane/css/primitives.css');
-        const appStyle=html.indexOf('./apps/hello-world/hello-world.css');
-        const appModule=html.indexOf('./apps/hello-world/modules/App.js');
-        assert.ok(
-            base>=0&&managedMap>base&&theme>managedMap&&primitives>theme
-            &&appStyle>primitives&&appModule>appStyle
-        );
-        const htmlRuntimeReferences=[...html.matchAll(
-            /(?:href|src)="[.]\/(arcane\/[^"?]+)(?:[?][^"]*)?"/gu
-        )].map(match=>match[1]).sort();
-        const scriptRuntimeImports=[...script.matchAll(
-            /from\s+['"](arcane(?:-os)?\/[^'"]+)['"]/gu
-        )].map(match=>match[1]).sort();
-        assert.deepEqual(htmlRuntimeReferences,[
-            'arcane/css/primitives.css',
-            'arcane/css/theme.css'
-        ]);
-        assert.deepEqual(scriptRuntimeImports,[
-            'arcane-os/ai/browser-wasm',
-            'arcane/AI',
-            'arcane/AIRuntimeState',
-            'arcane/AppDataScope',
-            'arcane/DBOPFS',
-            'arcane/ThemeBootstrap'
-        ]);
-        assert.match(script,/function sayHello\(\)/u);
-        assert.match(script,/Hello from Arcane OS!/u);
-        assert.match(script,/resolveApplicationId\(\)/u);
-        assert.match(script,/resolveApplicationLocalStorageKey\('hello-count',\{applicationId:appId\}\)/u);
-        for(const modelAuthority of [
-            "id:'ibm-granite-4.1-3b-q4-k-s'",
-            "url:'https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/ab4701481089b58a082ef63cc1cee738887293ff/granite-4.1-3b-Q4_K_S.gguf'",
-            'bytes:1_998_371_424',
-            "sha256:'ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a'"
-        ])assert.equal(script.includes(modelAuthority),true,modelAuthority);
-        assert.match(html,/Full SDK AI lifecycle/u);
-        assert.match(html,/No external AI model or adapter artifact downloads at import time/u);
-        assert.match(html,/Speech authority required/u);
-        for(const role of ['ai','tts','stt']){
-            assert.match(html,new RegExp(`id="${role}-(?:load|load-offline|cancel|unload)"`,'u'));
-        }
-        assert.match(html,/id="tts-audio"[\s\S]*controls[\s\S]*preload="none"/u);
-        assert.match(html,/id="stt-file"[\s\S]*type="file"[\s\S]*accept="audio\/[*]"/u);
-        assert.doesNotMatch(html,/autoplay/iu);
-        assert.match(html,/Proposed tool calls/u);
-        assert.match(script,/new DBOPFS\(\{applicationId:appId\}\)/u);
-        assert.match(script,/await dbopfs[.]readyPromise/u);
-        assert.match(script,/dbopfs[.]applicationId!==appId/u);
-        assert.match(script,/AI_SECURITY=Object[.]freeze\(\{secure:false\}\)/u);
-        assert.match(script,/createArcaneAI\(\{[\s\S]*provider,[\s\S]*loadPolicy:'manual',[\s\S]*security:AI_SECURITY[\s\S]*\}\)/u);
-        assert.match(script,/renderLlmProgress\(event[.]detail[?][.]progress\)/u);
-        assert.match(script,/local[.]load\(\{signal:controller[.]signal,offline\}\)/u);
-        assert.match(script,/local[.]streamRequest\(\{[\s\S]*localOnly:true,[\s\S]*signal:controller[.]signal,[\s\S]*tools:\[SHOW_GREETING_TOOL\]/u);
-        assert.match(script,/roleOperations=\{[\s\S]*llm:\{controller:null[\s\S]*stt:\{controller:null[\s\S]*tts:\{controller:null/u);
-        assert.match(script,/operation[.]controller[?][.]abort\('Cancelled by the application user[.]'\)/u);
-        assert.match(script,/await local[.]unload\(\)/u);
-        assert.match(script,/AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL/u);
-        assert.match(script,/runtime[.]configureSpeech\(Object[.]freeze\(next\)\)/u);
-        assert.match(script,/localOnly:null/u);
-        assert.match(script,/owner[.]configureBrowserSpeech/u);
-        assert.match(script,/subscribeAIRuntimeState\(handleAIRuntimeState,\{signal:pageController[.]signal\}\)/u);
-        assert.match(script,/renderSpeechProgress\(role,roleState[.]progress\)/u);
-        assert.match(script,/security:AI_SECURITY/u);
-        assert.doesNotMatch(script,/createBrowserWhisperProvider|createBrowserKokoroProvider|createDbopfsSpeechArtifactStore|createBrowserSpeechAuthority/u);
-        assert.doesNotMatch(script,/providerRuntime[.]inspect/u);
-        assert.match(script,/offline/u);
-        assert.match(script,/owner[.]providerRuntime[.]unload\(role,\{signal:controller[.]signal\}\)/u);
-        assert.match(script,/owner[.]fetchSTT/u);
-        assert.match(script,/owner[.]fetchTTS/u);
-        assert.match(script,/responseFormat:'wav'/u);
-        assert.match(script,/result instanceof Blob/u);
-        assert.match(script,/pageController[.]abort\('The page is closing[.]'\)/u);
-        assert.match(script,/disposeBrowserSpeech\(\)/u);
-        assert.match(script,/globalThis[.]URL[?][.]revokeObjectURL/u);
-        assert.match(script,/HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED/u);
-        assert.match(script,/MAX_LLM_PROMPT_LENGTH=2000/u);
-        assert.match(script,/MAX_TTS_TEXT_LENGTH=500/u);
-        assert.match(script,/MAX_STT_FILE_BYTES=8[*]1024[*]1024/u);
-        assert.match(script,/reloadAfterBackForwardCache/u);
-        assert.match(script,/event[?][.]persisted===true/u);
-        assert.match(speechAuthoritySource,/stt:null,[\s\S]*tts:null/u);
-        assert.match(speechAuthoritySource,/transformers-whisper/u);
-        assert.match(speechAuthoritySource,/kokoro-js/u);
-        assert.doesNotMatch(speechAuthoritySource,/https?:\/\//u);
-        assert.doesNotMatch(`${html}\n${script}`,/getUserMedia|mediaDevices|autoplay/iu);
-        assert.match(script,/Any admitted DBOPFS cache remains; interrupted downloads are discarded/u);
-        assert.match(script,/without a model-source request/u);
-        assert.match(script,/same-origin Wllama\/WASM assets may still load/u);
-        assert.doesNotMatch(
-            script,
-            /(?:[.][.]\/)+arcane\/|DirectoryPicker|globalThis[.]Arcane|toolHandlers|executeTools|keepCache|Date[.]now|SDK update|partial bytes were removed/iu
-        );
-        const renderedTutorial=decodeReferenceHtml(tutorial);
-        const renderedAlias=decodeReferenceHtml(compatibilityAlias);
-        for(const source of [html,style,speechAuthoritySource,script]){
-            assert.equal(renderedTutorial.includes(source.trim()),true);
-            assert.equal(renderedAlias.includes(source.trim()),false);
-        }
-        assert.match(readme,/npx arcane-os@0[.]3[.]1 new[\s\S]*npm install/u);
-        assert.match(readme,/generated project pins `arcane-os` exactly[\s\S]*project-local CLI/u);
-        assert.match(readme,/npm install --global arcane-os@0[.]3[.]1/u);
-        assert.match(readme,/## Source shape[\s\S]*same physical runtime paths[\s\S]*arcane[.]importmap[.]json/u);
-        assert.match(
-            readme,
-            /[.]\/node_modules\/strong-type\/index[.]js[\s\S]*[.]\/arcane\/dependencies\/strong-type\/index[.]js/u
-        );
-        assert.match(readme,/representative paths rather than freezing an inventory\s+count/u);
-        assert.doesNotMatch(readme,/authenticated `arcane\/` projection contains \d+ files|generated map\s+contains \d+ entries/u);
-        assert.match(readme,/`load\(\{offline:true\}\)`\s+makes no model-source request/u);
-        assert.match(readme,/ARCANE_AI_[*][\s\S]*APP_DATA_[*]/u);
-        assert.match(readme,/SpeechAuthorities[.]js[\s\S]*HELLO_WORLD_SPEECH_AUTHORITY_REQUIRED/u);
-        assert.match(readme,/File[\s\S]*does not open a microphone/iu);
-        assert.match(readme,/WAV[\s\S]*does not autoplay/iu);
-        assert.match(readme,/2,000 characters[\s\S]*tokenization remains bounded/u);
-        assert.match(readme,/500 characters[\s\S]*synthesis[\s\S]*bounded/u);
-        assert.match(readme,/8 MiB[\s\S]*before the SDK reads or\s+decodes/u);
-        assert.match(readme,/does not redistribute model weights[\s\S]*third-party legal corpora/u);
-        assert.match(readme,/selected-but-unregistered[\s\S]*localOnly:null/u);
-        assert.match(readme,/secure:false[\s\S]*unchecked/u);
-        assert.match(readme,/directly fetchable[\s\S]*non-redirecting/u);
-        assert.match(
-            readme,
-            /initial Hugging Face origin[\s\S]*provider-controlled HTTPS redirect[\s\S]*without pinning an unstable[\s\S]*regional CDN hostname/u
-        );
-        assert.match(readme,/dist\/hello-world\/[\s\S]*arcane\//u);
-        assert.match(readme,/arcane\/AppDataScope/u);
-        assert.match(readme,/arcane\/ThemeBootstrap/u);
-        assert.match(readme,/arcane-os\/event-manager/u);
-        assert.match(readme,/npm run dev/u);
-        assert.match(readme,/npm run package/u);
-        assert.match(readme,/npm run build/u);
-        assert.match(readme,/does not create a\s+standalone native executable/u);
-        assert.doesNotMatch(readme,/build\/windows-x64\/hello-world\/ArcaneApp-hello-world[.]exe/u);
-        assert.doesNotMatch(
-            readme,
-            /not yet published|after publication|pack:local|[.]tgz|0[.]1[.]0-dev|exactly 152|CI shape|--arcane-root|source sync|Arcane Ollama|prebuilt Arcane Core/iu
-        );
-        assert.match(workflow,/npm ci --ignore-scripts/u);
+    await t.test('documents the same flat source boundary',()=>{
+        assert.match(readme,/source example, not an application workspace or release package/u);
+        assert.match(readme,/https:\/\/localhost:8444\/examples\/hello-world\//u);
+        assert.match(readme,/does not use a copied `arcane\/` runtime/u);
+        assert.match(tutorial,/Four maintained files/u);
+        assert.match(tutorial,/There is no nested app workspace/u);
+        assert.match(tutorial,/https:\/\/localhost:8444\/examples\/hello-world\//u);
+        assert.doesNotMatch(tutorial,/apps\/hello-world|arcane[.]lock[.]json|byte-identical/u);
     });
 });
-
 test('Pages assets retain exact brand identities',async t=>{
     const [header,sigil]=await Promise.all([
         readSiteFile('assets/arcane-os-sdk-readme-header.png',null),

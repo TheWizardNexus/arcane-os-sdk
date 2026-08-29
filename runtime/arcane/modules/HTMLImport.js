@@ -12,6 +12,59 @@ globalThis[htmlImportHostRegistryKey]=htmlImportHostRegistry;
 
 let htmlImportScriptId=0;
 
+function componentRuntimeRoot(resolvedHref){
+  const componentURL=new URL(resolvedHref);
+  const componentMarker='/arcane/components/';
+  const componentIndex=componentURL.pathname.lastIndexOf(componentMarker);
+  if(componentIndex<0)return null;
+  const runtimePath=componentURL.pathname.slice(
+    0,
+    componentIndex+'/arcane/'.length
+  );
+  return new URL(runtimePath,componentURL.origin);
+}
+
+function resolveComponentResource(value,runtimeRoot){
+  if(!runtimeRoot||typeof value!=='string'||!value.startsWith('./arcane/')){
+    return value;
+  }
+  return new URL(value.slice('./arcane/'.length),runtimeRoot).href;
+}
+
+function resolveComponentStyleResources(styleText,runtimeRoot){
+  if(!runtimeRoot)return styleText;
+  return styleText.replace(
+    /url\(\s*(['"]?)\.\/arcane\/([^)'"\s]+)\1\s*\)/gu,
+    function resolveStyleURL(_match,quote,resourcePath){
+      const resolved=new URL(resourcePath,runtimeRoot).href;
+      return `url(${quote}${resolved}${quote})`;
+    }
+  );
+}
+
+function createComponentFragment(html,resolvedHref){
+  const template=document.createElement('template');
+  template.innerHTML=html;
+  const runtimeRoot=componentRuntimeRoot(resolvedHref);
+  if(!runtimeRoot)return template.content;
+
+  for(const element of template.content.querySelectorAll('[href],[src]')){
+    for(const attribute of ['href','src']){
+      if(!element.hasAttribute(attribute))continue;
+      const value=element.getAttribute(attribute);
+      const resolved=resolveComponentResource(value,runtimeRoot);
+      if(resolved!==value)element.setAttribute(attribute,resolved);
+    }
+  }
+  for(const style of template.content.querySelectorAll('style')){
+    style.textContent=resolveComponentStyleResources(
+      style.textContent||'',
+      runtimeRoot
+    );
+  }
+  return template.content;
+}
+
 function samePropertyDescriptor(left,right){
   if(!left||!right)return left===right;
   return left.configurable===right.configurable
@@ -219,7 +272,7 @@ class HTMLImport extends HTMLElement {
     if(!this.#isCurrentConnection(generation,controller))return false;
     await this.#destroyImportedHost();
     if(!this.#isCurrentConnection(generation,controller))return false;
-    this.shadowRoot.innerHTML = html;
+    this.shadowRoot.replaceChildren(createComponentFragment(html,resolvedHref));
 
     await this.#executeScripts();
     if(!this.#isCurrentConnection(generation,controller)){

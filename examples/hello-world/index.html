@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="arcane-app-id" content="hello-world">
-    <script type="importmap" data-arcane-import-map>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Arcane Hello World</title>
+    <script type="importmap">
 {
   "imports": {
     "/runtime/node_modules/strong-type/index.js": "/node_modules/strong-type/index.js",
@@ -18,24 +19,37 @@
     "event-pubsub": "/node_modules/event-pubsub/index.js"
   }
 }
-</script>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="rgb(23, 34, 56)">
-    <title>Arcane Hello World</title>
-    <link rel="manifest" href="./manifest.json">
-    <link rel="stylesheet" href="/runtime/arcane/css/theme.css?v=1">
-    <link rel="stylesheet" href="/runtime/arcane/css/primitives.css?v=1">
-    <link rel="stylesheet" href="./hello-world.css?v=1">
+    </script>
+    <link rel="stylesheet" href="/runtime/arcane/css/theme.css">
+    <link rel="stylesheet" href="/runtime/arcane/css/primitives.css">
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--background, rgb(13, 18, 32));
+            color: var(--text-color, rgb(235, 241, 255));
+        }
+
+        main {
+            box-sizing: border-box;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+
+        h1 {
+            margin: 0 0 1rem;
+        }
+    </style>
 </head>
 <body>
-    <main class="app-shell">
-        <h1 id="app-title">Hello, Arcane World!</h1>
+    <main>
+        <h1>Hello, Arcane World!</h1>
         <html-import
             id="hello-world-chat"
-            href="/runtime/arcane/components/chat.html?v=1"
+            href="/runtime/arcane/components/chat.html?v=2"
             presentation="basic">
         </html-import>
     </main>
-    <script type="module" src="./modules/App.js?v=1"></script>
+    <script type="module" src="./App.js?v=1"></script>
 </body>
 </html>
