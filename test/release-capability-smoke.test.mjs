@@ -108,7 +108,7 @@ test('the selected npm tarball installs and exposes the public SDK',{
                 {
                     source:'arcane',
                     destination:'arcane',
-                    include:['components','css','dependencies','entities','img','modules','sdk'],
+                    include:['components','css','dependencies','entities','img','modules','sdk','security'],
                     exclude:[]
                 },
                 {
