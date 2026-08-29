@@ -1380,7 +1380,7 @@
     function stop() {
         recordingRequested = false;
         clearSilenceTimer();
-        if (captureSession?.recorder.state !== 'inactive') {
+        if (captureSession && captureSession.recorder.state !== 'inactive') {
             captureSession.recorder.stop();
         }
         return true;
