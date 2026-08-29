@@ -2,40 +2,40 @@ import {createArcaneEventSource} from 'arcane-os/event-manager';
 import ApiModelDatabase from './ApiModelDatabase.js';
 import {WeatherDay,WeatherLocation,WeatherObservation,WeatherSnapshot} from '../entities/Weather.js';
 
-export const OPEN_METEO_ENDPOINTS=Object.freeze({
+export const OPEN_METEO_ENDPOINTS={
     geocoding:'https://geocoding-api.open-meteo.com/v1/search',
     forecast:'https://api.open-meteo.com/v1/forecast'
-});
+};
 
-export const OPEN_METEO_WEATHER_EVENTS=Object.freeze({
+export const OPEN_METEO_WEATHER_EVENTS={
     requestStarted:'weather-request',
     requestFailed:'weather-error',
     locationSearchSucceeded:'weather-locations',
     forecastLoadSucceeded:'weather-weather'
-});
+};
 
-const WEATHER_EVENT_TYPES=Object.freeze(Object.values(OPEN_METEO_WEATHER_EVENTS));
+const WEATHER_EVENT_TYPES=Object.values(OPEN_METEO_WEATHER_EVENTS);
 
-export const OPEN_METEO_WEATHER_ERRORS=Object.freeze({
-    providerDisposed:Object.freeze({code:'ARCANE_OPEN_METEO_WEATHER_PROVIDER_DISPOSED',reason:'open-meteo-weather-provider-disposed'}),
-    weatherEventTypeInvalid:Object.freeze({code:'ARCANE_OPEN_METEO_WEATHER_EVENT_TYPE_INVALID',reason:'weather-event-type-invalid'}),
-    weatherLocationInvalid:Object.freeze({code:'ARCANE_OPEN_METEO_WEATHER_LOCATION_INVALID',reason:'weather-location-invalid'}),
-    weatherOperationOptionsInvalid:Object.freeze({code:'ARCANE_OPEN_METEO_WEATHER_OPERATION_OPTIONS_INVALID',reason:'weather-operation-options-invalid'}),
-    weatherLocationQueryInvalid:Object.freeze({code:'ARCANE_OPEN_METEO_WEATHER_LOCATION_QUERY_INVALID',reason:'weather-location-query-invalid'}),
-    locationSearchAborted:Object.freeze({code:'ARCANE_OPEN_METEO_WEATHER_LOCATION_SEARCH_ABORTED',reason:'weather-location-search-aborted'}),
-    locationSearchFailed:Object.freeze({code:'ARCANE_OPEN_METEO_WEATHER_LOCATION_SEARCH_FAILED',reason:'weather-location-search-rejected'}),
-    locationSearchSuperseded:Object.freeze({code:'ARCANE_OPEN_METEO_WEATHER_LOCATION_SEARCH_SUPERSEDED',reason:'weather-location-search-superseded'}),
-    forecastLoadAborted:Object.freeze({code:'ARCANE_OPEN_METEO_WEATHER_FORECAST_LOAD_ABORTED',reason:'weather-forecast-load-aborted'}),
-    forecastLoadFailed:Object.freeze({code:'ARCANE_OPEN_METEO_WEATHER_FORECAST_LOAD_FAILED',reason:'weather-forecast-load-rejected'}),
-    forecastLoadSuperseded:Object.freeze({code:'ARCANE_OPEN_METEO_WEATHER_FORECAST_LOAD_SUPERSEDED',reason:'weather-forecast-load-superseded'})
-});
+export const OPEN_METEO_WEATHER_ERRORS={
+    providerDisposed:{code:'ARCANE_OPEN_METEO_WEATHER_PROVIDER_DISPOSED',reason:'open-meteo-weather-provider-disposed'},
+    weatherEventTypeInvalid:{code:'ARCANE_OPEN_METEO_WEATHER_EVENT_TYPE_INVALID',reason:'weather-event-type-invalid'},
+    weatherLocationInvalid:{code:'ARCANE_OPEN_METEO_WEATHER_LOCATION_INVALID',reason:'weather-location-invalid'},
+    weatherOperationOptionsInvalid:{code:'ARCANE_OPEN_METEO_WEATHER_OPERATION_OPTIONS_INVALID',reason:'weather-operation-options-invalid'},
+    weatherLocationQueryInvalid:{code:'ARCANE_OPEN_METEO_WEATHER_LOCATION_QUERY_INVALID',reason:'weather-location-query-invalid'},
+    locationSearchAborted:{code:'ARCANE_OPEN_METEO_WEATHER_LOCATION_SEARCH_ABORTED',reason:'weather-location-search-aborted'},
+    locationSearchFailed:{code:'ARCANE_OPEN_METEO_WEATHER_LOCATION_SEARCH_FAILED',reason:'weather-location-search-rejected'},
+    locationSearchSuperseded:{code:'ARCANE_OPEN_METEO_WEATHER_LOCATION_SEARCH_SUPERSEDED',reason:'weather-location-search-superseded'},
+    forecastLoadAborted:{code:'ARCANE_OPEN_METEO_WEATHER_FORECAST_LOAD_ABORTED',reason:'weather-forecast-load-aborted'},
+    forecastLoadFailed:{code:'ARCANE_OPEN_METEO_WEATHER_FORECAST_LOAD_FAILED',reason:'weather-forecast-load-rejected'},
+    forecastLoadSuperseded:{code:'ARCANE_OPEN_METEO_WEATHER_FORECAST_LOAD_SUPERSEDED',reason:'weather-forecast-load-superseded'}
+};
 
-const WEATHER_EVENT_NAMES=Object.freeze({
+const WEATHER_EVENT_NAMES={
     error:OPEN_METEO_WEATHER_EVENTS.requestFailed,
     locations:OPEN_METEO_WEATHER_EVENTS.locationSearchSucceeded,
     request:OPEN_METEO_WEATHER_EVENTS.requestStarted,
     weather:OPEN_METEO_WEATHER_EVENTS.forecastLoadSucceeded
-});
+};
 
 function signalLike(value){
     return value===undefined
@@ -110,7 +110,7 @@ function normalizedOperationError(error,record){
 }
 
 function operationOptions(value){
-    if(value===undefined)return Object.freeze({signal:null});
+    if(value===undefined)return {signal:null};
     if(!value||typeof value!=='object'||Array.isArray(value)){
         throw invalidOptionsError('Open-Meteo operation options must be an object.');
     }
@@ -152,14 +152,10 @@ function parseLocations(raw){
 function parseForecast(raw,{context}){return mapForecast(raw,context.location);}
 
 export default class OpenMeteoWeatherProvider extends EventTarget{
-    #activeLoad=null;
-    #activeSearch=null;
     #disposed=false;
     #events;
-    #loadGeneration=0;
     #operationSequence=0;
     #operations=new Map();
-    #searchGeneration=0;
     #unsubscribe=[];
 
     constructor({
@@ -210,12 +206,6 @@ export default class OpenMeteoWeatherProvider extends EventTarget{
         }
     }
 
-    #currentOperation(record){
-        return record.kind==='location-search'
-            ?this.#activeSearch===record&&this.#searchGeneration===record.generation
-            :this.#activeLoad===record&&this.#loadGeneration===record.generation;
-    }
-
     #releaseSignal(record){
         if(!Array.isArray(record.cleanup))return;
         for(const remove of record.cleanup.splice(0))remove();
@@ -225,8 +215,6 @@ export default class OpenMeteoWeatherProvider extends EventTarget{
         if(record.settled)return;
         record.settled=true;
         this.#releaseSignal(record);
-        if(record.kind==='location-search'&&this.#activeSearch===record)this.#activeSearch=null;
-        if(record.kind==='forecast-load'&&this.#activeLoad===record)this.#activeLoad=null;
     }
 
     #finishOperation(record){
@@ -243,30 +231,8 @@ export default class OpenMeteoWeatherProvider extends EventTarget{
                 'The weather event type is invalid.'
             );
         }
-        const compatibilityDetail=Object.freeze({...detail,operationId});
-        const operation=typeof detail?.operation==='string'?detail.operation:null;
-        let publicDetail;
-        if(type==='request'){
-            publicDetail=Object.freeze(operation?{operation}:{});
-        }else if(type==='error'){
-            publicDetail=Object.freeze({
-                ...(operation?{operation}:{}),
-                ...(typeof detail?.error?.code==='string'?{code:detail.error.code}:{}),
-                ...(typeof detail?.error?.reason==='string'?{reason:detail.error.reason}:{})
-            });
-        }else if(type==='locations'){
-            publicDetail=Object.freeze({
-                ...(operation?{operation}:{}),
-                count:Array.isArray(detail?.locations)?detail.locations.length:0
-            });
-        }else{
-            publicDetail=Object.freeze({
-                ...(operation?{operation}:{}),
-                ...(typeof detail?.weather?.location?.id==='string'
-                    ?{locationId:detail.weather.location.id}
-                    :{})
-            });
-        }
+        const compatibilityDetail={...detail,operationId};
+        const publicDetail={...compatibilityDetail};
         return this.#events.dispatch(eventType,compatibilityDetail,{operationId,publicDetail});
     }
 
@@ -309,16 +275,12 @@ export default class OpenMeteoWeatherProvider extends EventTarget{
                 operationMessage(kind,'aborted')
             );
         }
-        const generation=kind==='location-search'
-            ?++this.#searchGeneration
-            :++this.#loadGeneration;
         const operationId=`${this.#events.instanceId}:${kind}:${(++this.#operationSequence).toString(36)}`;
         const controller=new AbortController();
         const record={
             cleanup:[],
             controller,
             errorPublished:false,
-            generation,
             kind,
             operationId,
             publicError:null,
@@ -326,20 +288,7 @@ export default class OpenMeteoWeatherProvider extends EventTarget{
             terminalError:null
         };
         linkAbortSignal(signal??null,controller,record.cleanup);
-        const previous=kind==='location-search'?this.#activeSearch:this.#activeLoad;
-        if(kind==='location-search')this.#activeSearch=record;
-        else this.#activeLoad=record;
         this.#operations.set(operationId,record);
-        if(previous){
-            this.#terminateOperation(
-                previous,
-                defineWeatherError(
-                    new Error(operationMessage(kind,'superseded')),
-                    operationContract(kind,'superseded'),
-                    operationMessage(kind,'superseded')
-                )
-            );
-        }
         return record;
     }
 
@@ -348,7 +297,6 @@ export default class OpenMeteoWeatherProvider extends EventTarget{
         const operationId=event?.operationId??event?.detail?.requestId;
         if(typeof operationId!=='string'||!operationId)return;
         const record=this.#operations.get(operationId);
-        if(record&&!this.#currentOperation(record))return;
         this.#dispatch(
             'request',
             {...(event.detail||{}),operation:record?.kind??kind},
@@ -383,37 +331,30 @@ export default class OpenMeteoWeatherProvider extends EventTarget{
         this.#assertOpen();
         if(geocoding)this.geocoder.setEndpoint(geocoding);
         if(forecast)this.forecast.setEndpoint(forecast);
-        return Object.freeze({
+        return {
             geocoding:this.geocoder.endpoint,
             forecast:this.forecast.endpoint
-        });
+        };
     }
 
     async search(query,optionsValue={}){
         this.#assertOpen();
-        const name=String(query||'').trim();
-        if(name.length<2){
+        const name=String(query??'');
+        if(!name.trim()){
             throw defineWeatherError(
-                new TypeError('Enter at least two characters for a location search.'),
+                new TypeError('Enter a location to search.'),
                 OPEN_METEO_WEATHER_ERRORS.weatherLocationQueryInvalid,
-                'Enter at least two characters for a location search.'
+                'Enter a location to search.'
             );
         }
         const options=operationOptions(optionsValue);
         const record=this.#startOperation('location-search',options.signal??null);
         try{
             const result=await this.geocoder.fetch(
-                {name,count:8,language:'en',format:'json'},
+                {name,language:'en',format:'json'},
                 {},
                 {signal:record.controller.signal,operationId:record.operationId}
             );
-            if(!this.#currentOperation(record)){
-                throw record.terminalError??defineWeatherError(
-                    new Error(operationMessage(record.kind,'superseded')),
-                    operationContract(record.kind,'superseded'),
-                    operationMessage(record.kind,'superseded')
-                );
-            }
             this.#finishOperation(record);
             this.#dispatch(
                 'locations',
@@ -450,8 +391,12 @@ export default class OpenMeteoWeatherProvider extends EventTarget{
         const {
             temperatureUnit='fahrenheit',
             windSpeedUnit='mph',
-            precipitationUnit='inch'
+            precipitationUnit='inch',
+            forecastDays
         }=options;
+        if(forecastDays!==undefined&&(!Number.isSafeInteger(forecastDays)||forecastDays<=0)){
+            throw invalidOptionsError('Open-Meteo forecastDays must be a positive integer when provided.');
+        }
         const record=this.#startOperation('forecast-load',options.signal??null);
         try{
             const result=await this.forecast.fetch(
@@ -459,7 +404,7 @@ export default class OpenMeteoWeatherProvider extends EventTarget{
                     latitude:place.latitude,
                     longitude:place.longitude,
                     timezone:'auto',
-                    forecast_days:7,
+                    ...(forecastDays===undefined?{}:{forecast_days:forecastDays}),
                     temperature_unit:temperatureUnit,
                     wind_speed_unit:windSpeedUnit,
                     precipitation_unit:precipitationUnit,
@@ -484,13 +429,6 @@ export default class OpenMeteoWeatherProvider extends EventTarget{
                 {location:place},
                 {signal:record.controller.signal,operationId:record.operationId}
             );
-            if(!this.#currentOperation(record)){
-                throw record.terminalError??defineWeatherError(
-                    new Error(operationMessage(record.kind,'superseded')),
-                    operationContract(record.kind,'superseded'),
-                    operationMessage(record.kind,'superseded')
-                );
-            }
             this.#finishOperation(record);
             this.#dispatch(
                 'weather',

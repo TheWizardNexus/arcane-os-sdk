@@ -3,7 +3,7 @@ export const DOM_MUTATION_EVENT='arcane.dom.mutation';
 export const DOM_OBSERVATION_STARTED_EVENT='arcane.dom.observation.started';
 export const DOM_OBSERVATION_STOPPED_EVENT='arcane.dom.observation.stopped';
 
-export const DEFAULT_DOM_EVENT_TYPES=Object.freeze([
+export const DEFAULT_DOM_EVENT_TYPES=[
     'auxclick','beforeinput','blur','change','click','compositionend',
     'compositionstart','compositionupdate','contextmenu','copy','cut','dblclick',
     'drag','dragend','dragenter','dragleave','dragover','dragstart','drop','focus',
@@ -11,24 +11,17 @@ export const DEFAULT_DOM_EVENT_TYPES=Object.freeze([
     'pointerdown','pointerenter','pointerleave','pointermove','pointerout','pointerover',
     'pointerup','reset','scroll','selectionchange','submit','touchcancel','touchend',
     'touchmove','touchstart','wheel'
-]);
+];
 
-const EVENT_FIELDS=Object.freeze([
+const EVENT_FIELDS=[
     'altKey','button','buttons','charCode','clientX','clientY','code','ctrlKey','data',
     'deltaMode','deltaX','deltaY','deltaZ','detail','inputType','key','keyCode',
     'location','metaKey','movementX','movementY','offsetX','offsetY','pageX','pageY',
     'pointerId','pointerType','repeat','screenX','screenY','shiftKey','which'
-]);
+];
 
-const TEXT_ENTRY_EVENT_PATTERN=/^(?:beforeinput|composition(?:end|start|update)|input|key(?:down|press|up))$/u;
-const LEGACY_CHARACTER_CODE_PATTERN=/^(?:charCode|keyCode|which)$/u;
-const URL_IDENTIFIER_PATTERN=/\b(?:blob|data|file|ftp|ftps|http|https|ws|wss):/iu;
-const URL_ATTRIBUTE_PATTERN=/^(?:action|cite|data|formaction|href|poster|src|srcset)$/iu;
-const SENSITIVE_ATTRIBUTE_PATTERN=/(?:authorization|cookie|credential|password|secret|session|srcdoc|style|token|value|api[-_]?key)/iu;
-
-function boundedString(value,maximum){
-    const text=String(value??'');
-    return text.length<=maximum?text:`${text.slice(0,maximum)}…`;
+function capturedString(value){
+    return String(value??'');
 }
 
 function cssEscape(value){
@@ -41,14 +34,6 @@ function readAttribute(target,name){
         return typeof target?.getAttribute==='function'?target.getAttribute(name):null;
     }catch{
         return null;
-    }
-}
-
-function hasAttribute(target,name){
-    try{
-        return typeof target?.hasAttribute==='function'&&target.hasAttribute(name);
-    }catch{
-        return false;
     }
 }
 
@@ -71,16 +56,10 @@ function siblingIndex(target){
 
 function selectorSegment(target){
     const id=String(target?.id??readAttribute(target,'id')??'');
-    if(id){
-        return URL_IDENTIFIER_PATTERN.test(id)?`${elementName(target)}[id]`:`#${cssEscape(id)}`;
-    }
+    if(id)return `#${cssEscape(id)}`;
     for(const attribute of ['data-arcane-id','data-testid']){
         const value=readAttribute(target,attribute);
-        if(value){
-            return URL_IDENTIFIER_PATTERN.test(value)
-                ?`[${attribute}]`
-                :`[${attribute}="${cssEscape(value)}"]`;
-        }
+        if(value)return `[${attribute}="${cssEscape(value)}"]`;
     }
     const name=elementName(target);
     const index=siblingIndex(target);
@@ -131,51 +110,29 @@ export function domSelector(target,root){
     return groups.join(' >>> ')||selectorSegment(target);
 }
 
-function privateElement(target){
-    let current=target?.nodeType===3?target.parentElement??target.parentNode:target;
-    const visited=new Set();
-    while(current&&typeof current==='object'&&!visited.has(current)){
-        visited.add(current);
-        const type=String(current.type??readAttribute(current,'type')??'').toLowerCase();
-        const autocomplete=String(readAttribute(current,'autocomplete')??'').toLowerCase();
-        if(type==='password'||hasAttribute(current,'data-arcane-private')
-            ||autocomplete.includes('password')){
-            return true;
-        }
-        if(current.parentElement){
-            current=current.parentElement;
-            continue;
-        }
-        let currentRoot=null;
-        try{currentRoot=current.getRootNode?.()??null;}catch{}
-        current=currentRoot?.host??null;
-    }
-    return false;
-}
-
 export function describeDOMTarget(target,root){
     if(!target||typeof target!=='object')return null;
     if(target.nodeType===9){
-        return Object.freeze({kind:'document',selector:':document'});
+        return {kind:'document',selector:':document'};
     }
     if(target.nodeType===11){
-        return Object.freeze({
+        return {
             kind:'shadow-root',
             selector:domSelector(target.host,root),
             host:target.host?describeDOMTarget(target.host,root):null
-        });
+        };
     }
     if(target.nodeType===3){
-        return Object.freeze({
+        return {
             kind:'text',
             selector:domSelector(target,root),
-            private:privateElement(target)
-        });
+            content:String(target.data??target.textContent??'')
+        };
     }
     if(target.nodeType!==1&&target.localName===undefined&&target.tagName===undefined){
-        return Object.freeze({kind:target===globalThis?'global':'event-target',selector:null});
+        return {kind:target===globalThis?'global':'event-target',selector:null};
     }
-    return Object.freeze({
+    return {
         kind:'element',
         selector:domSelector(target,root),
         tagName:elementName(target),
@@ -183,60 +140,44 @@ export function describeDOMTarget(target,root){
         role:readAttribute(target,'role'),
         name:readAttribute(target,'name'),
         type:String(target.type??readAttribute(target,'type')??'')||null,
-        private:privateElement(target)
-    });
+        content:String(target.outerHTML??target.textContent??'')
+    };
 }
 
-function targetValue(target,{captureInputValues,maxValueLength}){
-    if(!captureInputValues||!target||typeof target!=='object')return undefined;
-    if(privateElement(target))return '[REDACTED]';
+function targetValue(target){
+    if(!target||typeof target!=='object')return undefined;
     const type=String(target.type??'').toLowerCase();
     if(type==='checkbox'||type==='radio')return Boolean(target.checked);
     if(type==='file'){
-        return Array.from(target.files??[],file=>({name:String(file?.name??''),size:Number(file?.size??0)}));
+        return Array.from(target.files??[]);
     }
     if(!('value' in target))return undefined;
-    const value=String(target.value??'');
-    if(value.length<=maxValueLength)return value;
-    return `${value.slice(0,maxValueLength)}…`;
+    return String(target.value??'');
 }
 
-function safeEventDetail(field,value,{captureEventDetails,maxValueLength},isPrivate,eventType){
-    if(isPrivate&&(field==='code'||field==='data'||field==='detail'||field==='key')){
-        return '[REDACTED]';
-    }
-    if(field==='data'||field==='detail'){
-        if(!captureEventDetails)return value===null?null:'[REDACTED]';
-    }
-    if(field==='key'||field==='code'){
-        const text=String(value??'');
-        const sensitive=TEXT_ENTRY_EVENT_PATTERN.test(eventType)
-            &&(field==='code'||text.length===1||text==='Unidentified');
-        if(sensitive&&!captureEventDetails)return '[REDACTED]';
-    }
-    if(LEGACY_CHARACTER_CODE_PATTERN.test(field)
-        &&(isPrivate||(TEXT_ENTRY_EVENT_PATTERN.test(eventType)&&!captureEventDetails))){
-        return '[REDACTED]';
-    }
-    if(typeof value==='string')return boundedString(value,maxValueLength);
+function safeEventDetail(value){
+    if(typeof value==='string')return capturedString(value);
     if(value===null||typeof value==='number'||typeof value==='boolean')return value;
-    return captureEventDetails?'[UNSERIALIZED EVENT DETAIL]':'[REDACTED]';
+    return value;
 }
 
-function interactionRecord(event,root,options){
+function interactionRecord(event,root){
     const path=typeof event?.composedPath==='function'?event.composedPath():[event?.target];
     const target=path.find(item=>item&&typeof item==='object')??event?.target??null;
-    const isPrivate=privateElement(target);
     const eventType=String(event?.type??'');
     const details={};
-    for(const field of EVENT_FIELDS){
+    const fields=new Set([
+        ...EVENT_FIELDS,
+        ...Reflect.ownKeys(event??{}).filter(field=>typeof field==='string')
+    ]);
+    for(const field of fields){
         let value;
         try{value=event?.[field];}catch{continue;}
         if(value!==undefined&&typeof value!=='function'){
-            details[field]=safeEventDetail(field,value,options,isPrivate,eventType);
+            details[field]=safeEventDetail(value);
         }
     }
-    const value=targetValue(target,options);
+    const value=targetValue(target);
     return {
         eventType,
         target:describeDOMTarget(target,root),
@@ -251,31 +192,20 @@ function interactionRecord(event,root,options){
     };
 }
 
-function serializeNode(node,root,{captureNodeMarkup,maxSerializedNodeLength},privateContext=false){
+function serializeNode(node,root){
     const descriptor=describeDOMTarget(node,root);
-    if(privateContext||privateElement(node)){
-        return {target:descriptor,content:'[REDACTED]',truncated:false};
-    }
-    if(!captureNodeMarkup)return {target:descriptor,content:'[CONTENT OMITTED]',truncated:false};
     let content='';
     if(node?.nodeType===3||node?.nodeType===8)content=String(node.data??node.textContent??'');
     else content=String(node?.outerHTML??node?.textContent??'');
-    const truncated=content.length>maxSerializedNodeLength;
-    return {
-        target:descriptor,
-        content:truncated?`${content.slice(0,maxSerializedNodeLength)}…`:content,
-        truncated
-    };
+    return {target:descriptor,content};
 }
 
-function attributeValue(value,attributeName,target,options){
+function attributeValue(value){
     if(value===null||value===undefined)return null;
-    if(privateElement(target)||SENSITIVE_ATTRIBUTE_PATTERN.test(attributeName))return '[REDACTED]';
-    if(URL_ATTRIBUTE_PATTERN.test(attributeName))return '[REDACTED URL]';
-    return boundedString(value,options.maxValueLength);
+    return capturedString(value);
 }
 
-function mutationRecord(record,root,options){
+function mutationRecord(record,root){
     const target=describeDOMTarget(record?.target,root);
     if(record?.type==='attributes'){
         const attributeName=String(record.attributeName??'');
@@ -283,39 +213,37 @@ function mutationRecord(record,root,options){
         return {
             mutationType:'attributes',target,attributeName,
             namespace:record.attributeNamespace??null,
-            before:attributeValue(record.oldValue,attributeName,record.target,options),
-            after:attributeValue(current,attributeName,record.target,options)
+            before:attributeValue(record.oldValue),
+            after:attributeValue(current)
         };
     }
     if(record?.type==='characterData'){
-        const redacted=privateElement(record.target)||!options.captureNodeMarkup;
         return {
             mutationType:'characterData',target,
-            before:redacted?'[REDACTED]':record.oldValue??null,
-            after:redacted?'[REDACTED]':String(record.target?.data??record.target?.textContent??'')
+            before:record.oldValue??null,
+            after:String(record.target?.data??record.target?.textContent??'')
         };
     }
-    const privateContext=privateElement(record?.target);
     return {
         mutationType:'childList',target,
         previousSibling:describeDOMTarget(record?.previousSibling,root),
         nextSibling:describeDOMTarget(record?.nextSibling,root),
         added:Array.from(
-            record?.addedNodes??[],node=>serializeNode(node,root,options,privateContext)
+            record?.addedNodes??[],node=>serializeNode(node,root)
         ),
         removed:Array.from(
-            record?.removedNodes??[],node=>serializeNode(node,root,options,privateContext)
+            record?.removedNodes??[],node=>serializeNode(node,root)
         )
     };
 }
 
-function rootDescription(root,{captureNodeMarkup=false,maxValueLength=10_000}={}){
+function rootDescription(root){
     if(root?.nodeType===9){
         const title=String(root.title??'');
         return {
             kind:'document',
-            url:root.location?.href?'[REDACTED URL]':null,
-            title:title?(captureNodeMarkup?boundedString(title,maxValueLength):'[CONTENT OMITTED]'):null,
+            url:root.location?.href?capturedString(root.location.href):null,
+            title:title?capturedString(title):null,
             root:describeDOMTarget(root.documentElement,root)
         };
     }
@@ -339,12 +267,7 @@ export function createDOMInstrumentation({
     root=globalThis.document,
     eventTypes=DEFAULT_DOM_EVENT_TYPES,
     MutationObserver:MutationObserverImpl=globalThis.MutationObserver,
-    captureEventDetails=false,
-    captureInputValues=false,
-    captureNodeMarkup=false,
     captureMutations=true,
-    maxValueLength=10_000,
-    maxSerializedNodeLength=100_000,
     observeOpenShadowRoots=true
 }={}){
     if(!eventManager||typeof eventManager.emit!=='function'){
@@ -356,22 +279,10 @@ export function createDOMInstrumentation({
     if(!Array.isArray(eventTypes)||eventTypes.some(type=>typeof type!=='string'||!type)){
         throw new TypeError('DOM event types must be non-empty strings.');
     }
-    eventTypes=Object.freeze([...new Set(eventTypes)]);
-    if(!Number.isSafeInteger(maxValueLength)||maxValueLength<0
-        ||!Number.isSafeInteger(maxSerializedNodeLength)||maxSerializedNodeLength<0){
-        throw new RangeError('DOM capture length limits must be non-negative safe integers.');
-    }
-
-    for(const [name,value] of Object.entries({
-        captureEventDetails,captureInputValues,captureNodeMarkup,captureMutations,observeOpenShadowRoots
-    })){
+    eventTypes=[...new Set(eventTypes)];
+    for(const [name,value] of Object.entries({captureMutations,observeOpenShadowRoots})){
         if(typeof value!=='boolean')throw new TypeError(`${name} must be boolean.`);
     }
-
-    const options={
-        captureEventDetails,captureInputValues,captureNodeMarkup,
-        maxValueLength,maxSerializedNodeLength
-    };
     const observedRoots=new Set();
     const listenerRegistrations=new Map();
     let observer=null;
@@ -465,7 +376,7 @@ export function createDOMInstrumentation({
         }
         const record=publish(
             DOM_INTERACTION_EVENT,
-            interactionRecord(event,root,options),
+            interactionRecord(event,root),
             {category:'interaction'}
         );
         if(record?.id){
@@ -515,7 +426,7 @@ export function createDOMInstrumentation({
 
     const mutations=records=>{
         for(const record of records){
-            publish(DOM_MUTATION_EVENT,mutationRecord(record,root,options),{
+            publish(DOM_MUTATION_EVENT,mutationRecord(record,root),{
                 category:'mutation',
                 ...(pendingCausationId?{causationId:pendingCausationId}: {})
             });
@@ -547,11 +458,8 @@ export function createDOMInstrumentation({
             active=true;
             cleanupPending=false;
             publish(DOM_OBSERVATION_STARTED_EVENT,{
-                root:rootDescription(root,options),
+                root:rootDescription(root),
                 eventTypes:[...eventTypes],
-                captureEventDetails,
-                captureInputValues,
-                captureNodeMarkup,
                 captureMutations,
                 observeOpenShadowRoots
             },{category:'lifecycle'});
@@ -575,20 +483,20 @@ export function createDOMInstrumentation({
         if(shouldEmitLifecycle){
             publish(
                 DOM_OBSERVATION_STOPPED_EVENT,
-                {root:rootDescription(root,options)},
+                {root:rootDescription(root)},
                 {category:'lifecycle'}
             );
         }
         return api;
     }
 
-    const api=Object.freeze({
+    const api={
         root,
         start,
         stop,
         get active(){return active;},
         get cleanupPending(){return cleanupPending;},
         get observedRootCount(){return observedRoots.size;}
-    });
+    };
     return api;
 }

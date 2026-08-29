@@ -7,29 +7,24 @@ import {
 
 let userInstance=null;
 
-const MAX_SUBJECT_LENGTH=160;
-const MAX_MESSAGE_BYTES=25*1024*1024;
-const MAX_NATIVE_REPORT_BYTES=768*1024;
+function completeResult(value){return value;}
+
 const MAIL_TYPES=new Set(['error','report','crisis_detected']);
-const MAIL_OUTBOX_EVENTS=Object.freeze([
+const MAIL_OUTBOX_EVENTS=completeResult([
     'mail-outbox-state',
     'mail-outbox-delivery',
     'mail-outbox-drain'
 ]);
 const PENDING_OUTBOX_STATES=new Set(['queued','sending','retry_wait']);
-const NATIVE_MAIL_RESPONSE_STATUS_CODES=Object.freeze({
+const NATIVE_MAIL_RESPONSE_STATUS_CODES=completeResult({
     accepted:202,
     delivery_uncertain:207,
     partially_accepted:207
 });
-const NATIVE_MAIL_RESULT_KEYS=Object.freeze([
-    'partial','requestId','sent','status','statusCode','uncertain'
-]);
-const NATIVE_MAIL_REQUEST_ID_PATTERN=/^[A-Za-z0-9-]{8,128}$/;
+const NATIVE_MAIL_REQUEST_ID_PATTERN=/^[A-Za-z0-9-]+$/;
 const NATIVE_MAIL_UNCERTAIN_ERROR_CODES=new Set([
     'ARCANE_REQUEST_TIMEOUT',
     'MAIL_GATEWAY_RESPONSE_INVALID',
-    'MAIL_GATEWAY_RESPONSE_TOO_LARGE',
     'MAIL_GATEWAY_UNAVAILABLE',
     'MAIL_NATIVE_RESULT_INVALID',
     'MAIL_SEND_TIMEOUT',
@@ -74,10 +69,10 @@ function linkedMailSignal(primary,secondary){
         if(signal&&!signals.includes(signal)) signals.push(signal);
     }
     if(signals.length===0){
-        return Object.freeze({signal:null,dispose:function disposeEmptyMailSignal(){}});
+        return completeResult({signal:null,dispose:function disposeEmptyMailSignal(){}});
     }
     if(signals.length===1){
-        return Object.freeze({signal:signals[0],dispose:function disposeSingleMailSignal(){}});
+        return completeResult({signal:signals[0],dispose:function disposeSingleMailSignal(){}});
     }
     const controller=new AbortController();
     const listeners=[];
@@ -89,7 +84,7 @@ function linkedMailSignal(primary,secondary){
         if(signal.aborted) listener();
         else signal.addEventListener('abort',listener,{once:true});
     }
-    return Object.freeze({
+    return completeResult({
         signal:controller.signal,
         dispose:function disposeLinkedMailSignal(){
             for(const entry of listeners){
@@ -129,7 +124,6 @@ function waitForMailOperation(operation,signal){
 
 function exactNativeMailResult(value){
     if(!value||typeof value!=='object'||Array.isArray(value)
-        ||Object.keys(value).sort().join(',')!==[...NATIVE_MAIL_RESULT_KEYS].sort().join(',')
         ||typeof value.requestId!=='string'
         ||!NATIVE_MAIL_REQUEST_ID_PATTERN.test(value.requestId)
         ||!Object.hasOwn(NATIVE_MAIL_RESPONSE_STATUS_CODES,value.status)
@@ -157,12 +151,15 @@ function normalizedNativeMailError(error){
     const retryable=uncertain||NATIVE_MAIL_RETRYABLE_ERROR_CODES.has(error?.code);
     if(!retryable) return error;
     const normalized=new Error(
-        uncertain
-            ?'Native Arcane mail delivery has an uncertain outcome.'
-            :'Native Arcane mail transport is temporarily unavailable.',
+        typeof error?.message==='string'&&error.message
+            ?error.message
+            :uncertain
+                ?'Native Arcane mail delivery has an uncertain outcome.'
+                :'Native Arcane mail transport is temporarily unavailable.',
         {cause:error}
     );
-    normalized.code=error.code;
+    Object.assign(normalized,error);
+    normalized.code=error?.code;
     normalized.retryable=true;
     normalized.uncertain=uncertain;
     const statusCode=Number(error?.statusCode??error?.status);
@@ -253,7 +250,7 @@ export function resolveMailConfig(
     const appName=typeof supplied.appName==='string'&&supplied.appName.trim()
         ? supplied.appName.trim()
         : declaredApplicationId(document);
-    return Object.freeze({
+    return completeResult({
         appName:ARCANE_APP_ID_PATTERN.test(appName) ? appName:'',
         appKey:typeof supplied.appKey==='string' ? supplied.appKey:'',
         endpoint:typeof supplied.endpoint==='string'&&supplied.endpoint.trim()
@@ -274,10 +271,6 @@ function escapeHtml(value){
         .replaceAll("'",'&#39;');
 }
 
-function utf8ByteLength(value){
-    return new TextEncoder().encode(value).byteLength;
-}
-
 function clonePayload(value){
     if(typeof globalThis.structuredClone==='function'){
         return globalThis.structuredClone(value);
@@ -288,28 +281,18 @@ function clonePayload(value){
 function serializePayload(value){
     try{
         return JSON.stringify(value,null,2);
-    }catch{
-        return '[The structured payload could not be serialized.]';
+    }catch(error){
+        const failure=codedError(
+            'Mail payload must be completely JSON serializable.',
+            'MAIL_PAYLOAD_NOT_SERIALIZABLE',
+            TypeError
+        );
+        failure.cause=error;
+        throw failure;
     }
 }
 
-function assertMessageSize(report){
-    const messageBytes=['text','html'].reduce(
-        function sumMessageBytes(total,key){
-            return total+utf8ByteLength(report[key]||'');
-        },
-        0
-    );
-    if(messageBytes>MAX_MESSAGE_BYTES){
-        throw new Error('Generated report email content exceeds the 25 MiB limit');
-    }
-}
-
-function assertNativeReportSize(serializedReport){
-    if(utf8ByteLength(serializedReport)>MAX_NATIVE_REPORT_BYTES){
-        throw new RangeError('Native Arcane mail reports cannot exceed 786,432 serialized bytes');
-    }
-}
+let reportNonceSequence=0;
 
 function randomReportNonce(cryptoProvider){
     if(typeof cryptoProvider?.randomUUID==='function'){
@@ -320,19 +303,8 @@ function randomReportNonce(cryptoProvider){
             }
         }catch{}
     }
-    if(typeof cryptoProvider?.getRandomValues==='function'){
-        try{
-            const bytes=new Uint8Array(16);
-            cryptoProvider.getRandomValues(bytes);
-            return [...bytes].map(function reportNonceByte(value){
-                return value.toString(16).padStart(2,'0');
-            }).join('');
-        }catch{}
-    }
-    throw codedError(
-        'Mail requires Web Crypto to create a durable idempotency key.',
-        'MAIL_CRYPTO_UNAVAILABLE'
-    );
+    reportNonceSequence+=1;
+    return `${Date.now().toString(36)}-${reportNonceSequence.toString(36)}`;
 }
 
 function createReportKey(timestamp,cryptoProvider){
@@ -343,13 +315,8 @@ function normalizeRecipients(values){
     if(!Array.isArray(values)){
         throw new TypeError('Mail recipients must be an array');
     }
-    if(values.length>50){
-        throw new TypeError('Mail supports no more than 50 recipients');
-    }
-
     const recipients=[];
     for(const value of values){
-        if(!value) continue;
         if(typeof value!=='string'){
             throw new TypeError('Every mail recipient must be an email address');
         }
@@ -357,7 +324,7 @@ function normalizeRecipients(values){
         if(address.length>254||!EMAIL_PATTERN.test(address)){
             throw new TypeError('Mail contains an invalid recipient address');
         }
-        if(!recipients.includes(address)) recipients.push(address);
+        recipients.push(address);
     }
     return recipients;
 }
@@ -401,7 +368,9 @@ function normalizedDeliveryResult(value){
 
 function publicSendResult(record){
     return {
+        ...record,
         ...(record.result||{}),
+        report:JSON.parse(record.serializedReport),
         reportKey:record.reportKey,
         state:record.state,
         status:record.result?.status||record.state,
@@ -413,15 +382,11 @@ function publicSendResult(record){
 }
 
 function safeDrainDetail(summary){
-    return Object.freeze({
-        reason:summary.reason,
-        online:summary.online,
-        considered:summary.considered,
-        attempted:summary.attempted,
-        invalidRecords:summary.invalidRecords,
-        bounded:summary.bounded,
-        pending:summary.pending,
-        states:Object.freeze({...summary.states})
+    return completeResult({
+        ...summary,
+        records:[...summary.records],
+        invalidRecords:[...summary.invalidRecords],
+        states:completeResult({...summary.states})
     });
 }
 
@@ -468,13 +433,7 @@ function normalizeMailOptions(options){
         isOnline,
         onlineTarget,
         outboxOptions:{
-            ...(options.maxAttemptsPerDrain===undefined
-                ?{}:{maxAttemptsPerDrain:options.maxAttemptsPerDrain}),
-            ...(options.maxInvalidRecords===undefined
-                ?{}:{maxInvalidRecords:options.maxInvalidRecords}),
-            ...(options.maxRecords===undefined?{}:{maxRecords:options.maxRecords}),
             ...(options.lockManager===undefined?{}:{lockManager:options.lockManager}),
-            maxReportBytes:options.maxReportBytes??MAX_MESSAGE_BYTES,
         },
         storage:options.storage,
         storageInjected:Object.hasOwn(options,'storage'),
@@ -563,7 +522,7 @@ class Mail {
     get disposed(){return this.#disposed;}
     get events(){return this.#events;}
     get invalidOutboxRecords(){
-        return this.#outbox?.invalidRecords??Object.freeze([]);
+        return this.#outbox?.invalidRecords??[];
     }
     get lastBackgroundError(){return this.#backgroundError;}
 
@@ -607,16 +566,14 @@ class Mail {
     }
 
     #publishState(detail,operationId=null){
-        this.#publish('mail-outbox-state',Object.freeze({...detail}),operationId);
+        this.#publish('mail-outbox-state',{...detail},operationId);
     }
 
     #publishRecord(record){
-        const stateDetail=Object.freeze({
-            reportKey:record.reportKey,
-            state:record.state,
-            attempts:record.attempts,
+        const stateDetail={
+            ...record,
             pending:PENDING_OUTBOX_STATES.has(record.state)
-        });
+        };
         this.#publish('mail-outbox-state',stateDetail,record.reportKey);
         if(record.attempts<1||record.state==='queued'||record.state==='sending') return;
         const outcome={
@@ -626,12 +583,11 @@ class Mail {
             reconciliation_required:'reconciliation_required'
         }[record.state];
         if(!outcome) return;
-        this.#publish('mail-outbox-delivery',Object.freeze({
-            reportKey:record.reportKey,
-            state:record.state,
+        this.#publish('mail-outbox-delivery',{
+            ...record,
             outcome,
             uncertain:record.failure?.uncertain===true
-        }),record.reportKey);
+        },record.reportKey);
     }
 
     #handleOutboxRecord(record){
@@ -652,7 +608,6 @@ class Mail {
                 ...(request.signal?{signal:request.signal}:{})
             });
         }
-        assertNativeReportSize(request.serializedReport);
         try{
             const result=await globalThis.Arcane.mail.send({
                 report:request.report,
@@ -821,8 +776,8 @@ class Mail {
         return (await this.#getOutbox()).repairInvalid(fileName,replacement);
     }
 
-    async quarantineInvalidOutbox(options){
-        return (await this.#getOutbox()).quarantineInvalid(options);
+    async quarantineInvalidOutbox(){
+        return (await this.#getOutbox()).quarantineInvalid();
     }
 
     stop(){
@@ -857,10 +812,10 @@ class Mail {
 
     async send(to=[], subject='', payload={}, messageStyle='', messageType='') {
         this.#assertActive();
-        const normalizedSubject=typeof subject==='string' ? subject.trim():'';
-        if(!normalizedSubject||normalizedSubject.length>MAX_SUBJECT_LENGTH||/[\u0000-\u001f\u007f]/.test(normalizedSubject)){
-            throw new TypeError(`Mail subject must contain 1-${MAX_SUBJECT_LENGTH} characters without line breaks`);
+        if(typeof subject!=='string'){
+            throw new TypeError('Mail subject must be a string');
         }
+        const normalizedSubject=subject;
         if(!payload||typeof payload!=='object'||Array.isArray(payload)){
             throw new TypeError('Mail payload must be an object');
         }
@@ -904,7 +859,6 @@ class Mail {
                 to:recipients,
                 type:messageType,
             };
-            assertMessageSize(reportPayload.report);
             const record=await outbox.enqueue(
                 {report:reportPayload.report,reportKey},
                 {signal}
@@ -933,14 +887,9 @@ class Mail {
             ? `<pre>${escapeHtml(serialized)}</pre>`
             : serialized;
 
-        const sourceUser=String(reportPayload.source_user||'')
-            .replace(/[\u0000-\u001f\u007f]/g,' ')
-            .trim()
-            .slice(0,80);
-        const subjectSuffix=sourceUser ? ` - ${sourceUser}`:'';
-        const deliverySubject=normalizedSubject.length+subjectSuffix.length<=MAX_SUBJECT_LENGTH
-            ? `${normalizedSubject}${subjectSuffix}`
-            : normalizedSubject;
+        const sourceUser=String(reportPayload.source_user||'');
+        const subjectSuffix=sourceUser?` - ${sourceUser}`:'';
+        const deliverySubject=`${normalizedSubject}${subjectSuffix}`;
 
         reportPayload.report = {
             subject:deliverySubject,
@@ -960,7 +909,6 @@ Email: ${profile.email || 'not provided'}`
                 :generatedMessage;
         }
 
-        assertMessageSize(reportPayload.report);
         throwIfMailAborted(signal);
         const record=await outbox.enqueue(
             {report:reportPayload.report,reportKey},

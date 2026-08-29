@@ -1,4 +1,4 @@
-const KEY_PATTERN=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const KEY_PATTERN=/^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 const TYPES=new Set(['boolean','number','select','text']);
 
 function copy(value){
@@ -25,8 +25,6 @@ export default class Preference{
         if(type==='select'&&!this.options.some(option=>Object.is(option.value,this.defaultValue))){
             throw new TypeError(`Preference ${key} has a default value outside its options.`);
         }
-        Object.freeze(this.options);
-        Object.freeze(this);
     }
 
     normalizeOptions(options=[]){
@@ -35,7 +33,7 @@ export default class Preference{
             const normalized=typeof option==='object'&&option!==null
                 ?{label:String(option.label??option.value),value:this.normalize(option.value)}
                 :{label:String(option),value:this.normalize(option)};
-            return Object.freeze(normalized);
+            return normalized;
         });
     }
 
@@ -79,5 +77,5 @@ export default class Preference{
 export function preferenceSchema(definitions=[]){
     const schema=definitions.map(definition=>definition instanceof Preference?definition:new Preference(definition));
     if(new Set(schema.map(item=>item.key)).size!==schema.length) throw new TypeError('Preference schema keys must be unique.');
-    return Object.freeze(schema);
+    return schema;
 }

@@ -1,6 +1,5 @@
 import path from 'node:path';
 import {readdir,lstat,realpath} from 'node:fs/promises';
-import {fileURLToPath} from 'node:url';
 import {createWorkspace,initWorkspace} from './scaffold.mjs';
 import {
     discoverApps as discoverWorkspaceApps,
@@ -11,26 +10,16 @@ import {
 } from './workspace.mjs';
 import {loadArcaneIntegratedProvider} from './integrated-provider-loader.mjs';
 import {startDevServer} from './dev-server.mjs';
-import {authenticateRuntimeReceipt,verifyRuntime} from './runtime.mjs';
-import {
-    authenticateSdkBrowserRuntimeReceipt,
-    verifySdkBrowserRuntime
-} from './sdk-browser-runtime.mjs';
-import {
-    authenticateWorkspaceRuntimeReceipt,
-    verifyWorkspaceRuntime
-} from './workspace-runtime.mjs';
 import {generateImportMap} from './import-map.mjs';
 import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
 import {
-    authenticateSharedPayloadSnapshot,
+    inspectApp as inspectPackagedApp,
     packageApp,
-    prepareSharedPayloadSnapshot,
     verifyApp
 } from './packager/core.mjs';
-import {assertNativeToolchainCompatibility} from './native-plan.mjs';
 import {runDoctor} from './doctor.mjs';
 import {runProcess} from './process.mjs';
+import {runApplicationTests} from './application-tests.mjs';
 import {
     buildTarget,
     createNativeTargetAdapter,
@@ -50,132 +39,34 @@ import {
     verifyAppReleaseBundle
 } from './release-bundle.mjs';
 
-const TEST_RUNNER_PATH=fileURLToPath(new URL('../bin/arcane-test.mjs',import.meta.url));
-const MAX_TEST_FAILURE_STREAM_BYTES=32*1024;
-const MAX_TEST_FAILURE_AGGREGATE_BYTES=256*1024;
-const MAX_TEST_FAILURE_MESSAGE_BYTES=24*1024;
-const TEST_OUTPUT_TRUNCATION_NOTICE='[... earlier test output omitted ...]\n';
-
-function normalizedTestOutput(value){
-    return typeof value==='string'?value.trim():'';
-}
-
-function boundedTestOutputTail(value,maxBytes){
-    const source=normalizedTestOutput(value);
-    const sourceBytes=Buffer.byteLength(source,'utf8');
-    if(sourceBytes<=maxBytes){
-        return {text:source,bytes:sourceBytes,truncated:false};
-    }
-    const noticeBytes=Buffer.byteLength(TEST_OUTPUT_TRUNCATION_NOTICE,'utf8');
-    if(maxBytes<noticeBytes){
-        return {text:'',bytes:0,truncated:sourceBytes>0};
-    }
-    const buffer=Buffer.from(source,'utf8');
-    let start=buffer.length-(maxBytes-noticeBytes);
-    while(start<buffer.length&&(buffer[start]&0xc0)===0x80){
-        start+=1;
-    }
-    const text=`${TEST_OUTPUT_TRUNCATION_NOTICE}${buffer.subarray(start).toString('utf8')}`;
-    return {text,bytes:Buffer.byteLength(text,'utf8'),truncated:true};
-}
-
-function failedTestOutputBudgets(stderr,stdout,maxBytes){
-    const desiredStderr=Math.min(
-        MAX_TEST_FAILURE_STREAM_BYTES,
-        Buffer.byteLength(normalizedTestOutput(stderr),'utf8')
-    );
-    const desiredStdout=Math.min(
-        MAX_TEST_FAILURE_STREAM_BYTES,
-        Buffer.byteLength(normalizedTestOutput(stdout),'utf8')
-    );
-    if(desiredStderr+desiredStdout<=maxBytes){
-        return {stderr:desiredStderr,stdout:desiredStdout};
-    }
-    const shared=Math.floor(maxBytes/2);
-    let stderrBudget=Math.min(desiredStderr,shared);
-    let stdoutBudget=Math.min(desiredStdout,shared);
-    let remaining=maxBytes-stderrBudget-stdoutBudget;
-    const additionalStderr=Math.min(remaining,desiredStderr-stderrBudget);
-    stderrBudget+=additionalStderr;
-    remaining-=additionalStderr;
-    stdoutBudget+=Math.min(remaining,desiredStdout-stdoutBudget);
-    return {stderr:stderrBudget,stdout:stdoutBudget};
-}
-
-function captureFailedTest(testFile,result,workspaceRoot,maxBytes){
-    const budgets=failedTestOutputBudgets(result.stderr,result.stdout,maxBytes);
-    const stderr=boundedTestOutputTail(result.stderr,budgets.stderr);
-    const stdout=boundedTestOutputTail(result.stdout,budgets.stdout);
-    return {
-        failure:Object.freeze({
-            testFile:path.relative(workspaceRoot,testFile).replaceAll('\\','/'),
-            exitCode:result.code,
-            signal:result.signal,
-            stdout:stdout.text,
-            stderr:stderr.text,
-            stdoutTruncated:stdout.truncated,
-            stderrTruncated:stderr.truncated
-        }),
-        bytes:stdout.bytes+stderr.bytes
-    };
-}
-
-function failedTestMessage(failures){
-    const summary=`${String(failures.length)} isolated test file${failures.length===1?'':'s'} failed.`;
-    const actionable=failures.find(failure=>failure.stderr||failure.stdout);
-    if(!actionable){
-        return summary;
-    }
-    const heading=`\n\n${actionable.testFile}:\n`;
-    const available=Math.max(
-        0,
-        MAX_TEST_FAILURE_MESSAGE_BYTES-Buffer.byteLength(`${summary}${heading}`,'utf8')
-    );
-    const diagnostic=boundedTestOutputTail(
-        actionable.stderr||actionable.stdout,
-        available
-    ).text;
-    return diagnostic?`${summary}${heading}${diagnostic}`:summary;
-}
-
 async function emit(onEvent,event){
     await onEvent?.(event);
 }
 
-function nativeArtifactReceipt(result){
-    return result?.artifactReceipt??result?.built?.artifactReceipt??null;
-}
-
 function withEventDeliveryFailure(result,error){
-    const eventDelivery=Object.freeze({
+    const eventDelivery={
         status:'degraded',
         errorCode:'ARCANE_EVENT_DELIVERY_FAILED',
         message:String(error?.message??error)
-    });
-    if(result?.built?.artifactReceipt){
+    };
+    if(result?.built?.artifact){
         return {...result,built:{...result.built,eventDelivery}};
     }
     return {...result,eventDelivery};
 }
 
 function isOuterCommitEvent(label,event){
-    if(label==='build')return event?.type==='native.build.committed';
-    return label==='bundle'&&event?.type==='bundle.committed'
+    if(label==='build')return event?.type==='native.build.completed';
+    return label==='bundle'&&event?.type==='bundle.completed'
         &&event?.phase==='publish'&&event?.status==='completed';
 }
 
-function isAppReleaseReceipt(value){
-    return value?.kind==='arcane-app-release-verification'
-        &&typeof value?.contentSha256==='string';
-}
-
-function hasAuthenticatedOuterResult(label,result){
+function hasCommittedOuterResult(label,result){
     if(label==='import-map')return result?.committed===true;
-    if(label==='package')return isAppReleaseReceipt(result?.receipt);
-    if(label==='bundle')return result?.artifactReceipt?.kind
-        ==='arcane-app-release-bundle-artifact';
+    if(label==='package')return typeof result?.outputRoot==='string';
+    if(label==='bundle')return typeof result?.bundlePath==='string';
     if(label!=='build')return false;
-    return nativeArtifactReceipt(result)!=null||isAppReleaseReceipt(result?.release?.receipt);
+    return result?.artifact!=null||typeof result?.release?.outputRoot==='string';
 }
 
 async function ownedWork(label,work,{
@@ -247,7 +138,7 @@ async function ownedWork(label,work,{
                 onEvent:forwardEvent
             },execute)
             :await execute();
-        if(hasAuthenticatedOuterResult(label,result))committed=true;
+        if(hasCommittedOuterResult(label,result))committed=true;
         stopProducers();
         if(!committed||label==='run')throwIfAborted(controller.signal);
         try{
@@ -273,33 +164,6 @@ async function ownedWork(label,work,{
         throw error;
     }finally{
         stopProducers();
-    }
-}
-
-async function collectTests(root,files,signal){
-    let entries;
-    try{
-        entries=await readdir(root,{withFileTypes:true});
-    }catch(error){
-        if(error?.code==='ENOENT'){
-            return;
-        }
-        throw error;
-    }
-    for(const entry of entries.sort((left,right)=>left.name.localeCompare(right.name,'en'))){
-        throwIfAborted(signal);
-        const absolute=path.join(root,entry.name);
-        if(entry.isSymbolicLink()){
-            continue;
-        }
-        if(entry.isDirectory()){
-            await collectTests(absolute,files,signal);
-        }else if(entry.isFile()&&/\.test\.(?:mjs|cjs|js)$/u.test(entry.name)){
-            const info=await lstat(absolute);
-            if(info.isFile()&&!info.isSymbolicLink()){
-                files.add(absolute);
-            }
-        }
     }
 }
 
@@ -360,13 +224,12 @@ async function executeIntegratedSharedOperation(operation,options){
                 signal,
                 onEvent
             });
-            return Object.freeze({
+            return {
                 scope:'shared',
                 workspaceMode:'integrated',
                 workspaceRoot:profile.workspaceRoot,
-                providerGeneration:provider.providerGeneration,
                 result
-            });
+            };
         },
         options
     );
@@ -386,7 +249,7 @@ async function preparedWorkspace(options){
         ||typeof workspace.sdkInstallation.browserRuntimeRoot!=='string')){
         throw new ArcaneError(
             ERROR_CODES.workspaceInvalid,
-            'Validated external workspace is missing its bound SDK installation authority.'
+            'Validated external workspace is missing its SDK runtime directories.'
         );
     }
     const runtimeRoot=external
@@ -395,39 +258,7 @@ async function preparedWorkspace(options){
     const browserRuntimeRoot=external
         ?workspace.sdkInstallation.browserRuntimeRoot
         :null;
-    const runtimeReceipt=external&&!options.deferRuntimeVerification
-        ?await verifyRuntime({
-            runtimeRoot,
-            signal:options.signal,
-            onEvent:options.onEvent
-        })
-        :null;
-    const sdkBrowserRuntimeReceipt=external&&!options.deferRuntimeVerification
-        ?await verifySdkBrowserRuntime({
-            browserRuntimeRoot,
-            signal:options.signal,
-            onEvent:options.onEvent
-        })
-        :null;
-    const workspaceRuntimeReceipt=external&&!options.deferRuntimeVerification
-        ?await verifyWorkspaceRuntime({
-            workspaceRoot:workspace.workspaceRoot,
-            runtimeRoot,
-            runtimeReceipt,
-            browserRuntimeRoot,
-            sdkBrowserRuntimeReceipt,
-            signal:options.signal,
-            onEvent:options.onEvent
-        })
-        :null;
-    const runtimeVerificationState=external&&!options.deferRuntimeVerification
-        ?Object.freeze({runtimeReceipt,sdkBrowserRuntimeReceipt,workspaceRuntimeReceipt})
-        :null;
     return {
-        runtimeReceipt,
-        sdkBrowserRuntimeReceipt,
-        workspaceRuntimeReceipt,
-        runtimeVerificationState,
         runtimeRoot,
         browserRuntimeRoot,
         workspaceMode:workspace.workspaceMode,
@@ -440,146 +271,14 @@ async function preparedWorkspace(options){
     };
 }
 
-function forwardedRuntimeVerificationState(options,prepared){
-    return Object.hasOwn(options,'runtimeVerificationState')
-        ?options.runtimeVerificationState
-        :prepared.runtimeVerificationState??undefined;
-}
-
-function compareRuntimeInventory(left,right){
-    return left.path.localeCompare(right.path,'en');
-}
-
-async function externalRuntimeSnapshotReceipt(prepared,sharedPayloadSnapshot,sharedPayloadIds,{signal,onEvent}={}){
-    throwIfAborted(signal);
-    await authenticateSharedPayloadSnapshot(sharedPayloadSnapshot,{
-        workspaceRoot:prepared.workspaceRoot,
-        sharedPayloadIds,
-        signal
-    });
-    const runtimeReceipt=await verifyRuntime({
-        runtimeRoot:prepared.runtimeRoot,
-        signal,
-        onEvent
-    });
-    const sdkBrowserRuntimeReceipt=await verifySdkBrowserRuntime({
-        browserRuntimeRoot:prepared.browserRuntimeRoot,
-        signal,
-        onEvent
-    });
-    const workspaceRuntimeReceipt=await verifyWorkspaceRuntime({
-        workspaceRoot:prepared.workspaceRoot,
-        runtimeRoot:prepared.runtimeRoot,
-        runtimeReceipt,
-        browserRuntimeRoot:prepared.browserRuntimeRoot,
-        sdkBrowserRuntimeReceipt,
-        signal,
-        onEvent
-    });
-    const retained=sharedPayloadSnapshot.files
-        .filter(file=>file.source.startsWith('arcane/'))
-        .map(file=>Object.freeze({
-            path:file.source.slice('arcane/'.length),
-            bytes:file.bytes,
-            sha256:file.sha256
-        }))
-        .sort(compareRuntimeInventory);
-    const upstreamFiles=runtimeReceipt.files.map(file=>Object.freeze({
-        path:file.path.startsWith('arcane/')
-            ?file.path.slice('arcane/'.length)
-            :`dependencies/strong-type/${file.path.slice('strong-type/'.length)}`,
-        sourcePath:file.path,
-        bytes:file.bytes,
-        sha256:file.sha256
-    })).sort(compareRuntimeInventory);
-    const sdkFiles=sdkBrowserRuntimeReceipt.files.map(file=>Object.freeze({
-        path:`sdk/${file.path}`,
-        sourcePath:file.path,
-        bytes:file.bytes,
-        sha256:file.sha256
-    })).sort(compareRuntimeInventory);
-    const expected=[...upstreamFiles,...sdkFiles]
-        .map(file=>Object.freeze({path:file.path,bytes:file.bytes,sha256:file.sha256}))
-        .sort(compareRuntimeInventory);
-    if(JSON.stringify(retained)!==JSON.stringify(expected)){
-        throw new ArcaneError(
-            ERROR_CODES.integrityFailed,
-            'The retained shared payload does not match the composed Arcane and SDK browser runtime receipts.'
-        );
-    }
-    const receipt=Object.freeze({
-        schemaVersion:1,
-        kind:'arcane-sdk-runtime-shared-payload',
-        canonicalLocation:prepared.runtimeRoot,
-        source:Object.freeze({...runtimeReceipt.source}),
-        sources:Object.freeze({
-            arcane:Object.freeze({
-                manifestSha256:runtimeReceipt.manifestSha256,
-                contentSha256:runtimeReceipt.contentSha256,
-                source:runtimeReceipt.source
-            }),
-            sdkBrowser:Object.freeze({
-                manifestSha256:sdkBrowserRuntimeReceipt.manifestSha256,
-                contentSha256:sdkBrowserRuntimeReceipt.contentSha256,
-                source:sdkBrowserRuntimeReceipt.source
-            })
-        }),
-        files:Object.freeze(runtimeReceipt.files.map(file=>Object.freeze({...file}))),
-        fileCount:runtimeReceipt.fileCount,
-        totalBytes:runtimeReceipt.totalBytes,
-        contentSha256:runtimeReceipt.contentSha256,
-        browserFiles:Object.freeze(sdkBrowserRuntimeReceipt.files.map(
-            file=>Object.freeze({...file})
-        )),
-        browserFileCount:sdkBrowserRuntimeReceipt.fileCount,
-        browserTotalBytes:sdkBrowserRuntimeReceipt.totalBytes,
-        browserContentSha256:sdkBrowserRuntimeReceipt.contentSha256,
-        sharedFiles:Object.freeze(retained),
-        sharedFileCount:retained.length,
-        sharedTotalBytes:retained.reduce((total,file)=>total+file.bytes,0),
-        sharedPayloadContentSha256:sharedPayloadSnapshot.contentSha256
-    });
-    await emit(onEvent,{
-        type:'runtime.snapshot.verified',
-        contentSha256:receipt.contentSha256,
-        fileCount:receipt.fileCount,
-        totalBytes:receipt.totalBytes,
-        browserContentSha256:receipt.browserContentSha256,
-        browserFileCount:receipt.browserFileCount,
-        browserTotalBytes:receipt.browserTotalBytes
-    });
-    return Object.freeze({
-        receipt,
-        runtimeVerificationState:Object.freeze({
-            runtimeReceipt,
-            sdkBrowserRuntimeReceipt,
-            workspaceRuntimeReceipt
-        })
-    });
-}
-
 async function validatePreparedRuntime(prepared,{signal}={}){
-    if(prepared.workspaceMode==='external'){
-        await authenticateRuntimeReceipt(prepared.runtimeReceipt,{
-            runtimeRoot:prepared.runtimeRoot,
-            signal
-        });
-        await authenticateSdkBrowserRuntimeReceipt(prepared.sdkBrowserRuntimeReceipt,{
-            browserRuntimeRoot:prepared.browserRuntimeRoot,
-            signal
-        });
-        return authenticateWorkspaceRuntimeReceipt(prepared.workspaceRuntimeReceipt,{
-            workspaceRoot:prepared.workspaceRoot,
-            signal
-        });
-    }
     const validation=await validateWorkspace({
         workspaceRoot:prepared.workspaceRoot,
         appId:prepared.appId,
         signal
     });
-    if(validation.workspaceMode!=='integrated'){
-        throw new ArcaneError(ERROR_CODES.workspaceInvalid,'The integrated Arcane workspace profile changed during the operation.');
+    if(validation.workspaceMode!==prepared.workspaceMode){
+        throw new ArcaneError(ERROR_CODES.workspaceInvalid,'The Arcane workspace profile changed during the operation.');
     }
     return validation;
 }
@@ -587,21 +286,35 @@ async function validatePreparedRuntime(prepared,{signal}={}){
 async function refreshPreparedImportMap(prepared,{signal,onEvent,workspaceOperationLease}={}){
     if(prepared.workspaceMode==='integrated'
         &&prepared.validation.config.browserRuntimeLayout==='integrated-legacy'){
-        const receipt=Object.freeze({
+        const result={
             appId:prepared.appId,
             skipped:true,
             compatibility:'integrated-legacy',
             reason:'The canonical integrated Arcane OS root retains its physical two-route browser runtime.'
-        });
-        await emit(onEvent,{type:'import-map.compatibility.skipped',...receipt});
-        return receipt;
+        };
+        await emit(onEvent,{type:'import-map.compatibility.skipped',...result});
+        return result;
+    }
+    const manifest=prepared.validation.app.manifest;
+    const inspected=await inspectPackagedApp({
+        workspaceRoot:prepared.workspaceRoot,
+        appId:prepared.appId,
+        signal
+    });
+    if(inspected.entry!==manifest.entry
+        ||JSON.stringify(inspected.include)!==JSON.stringify(manifest.include)
+        ||JSON.stringify(inspected.exclude)!==JSON.stringify(manifest.exclude)){
+        throw new ArcaneError(
+            ERROR_CODES.workspaceInvalid,
+            'The selected application package descriptor changed before import-map refresh.'
+        );
     }
     return generateImportMap({
         workspaceRoot:prepared.workspaceRoot,
         appId:prepared.appId,
         appRoot:prepared.appRoot,
-        entry:prepared.validation.app.manifest.entry,
-        workspaceRuntimeReceipt:prepared.workspaceRuntimeReceipt,
+        entry:manifest.entry,
+        documents:inspected.browserDocuments,
         workspaceOperationLease,
         signal,
         onEvent
@@ -633,6 +346,33 @@ export async function initializeApplication(options={}){
     return initWorkspace(options);
 }
 
+export async function upgradeApplication(options={}){
+    assertApplicationScope(options,'Workspace upgrade');
+    const selected=await resolveWorkspace({
+        workspaceRoot:options.workspaceRoot,
+        appId:options.appId
+    });
+    if(selected.config.workspaceMode!=='external'){
+        throw new ArcaneError(
+            ERROR_CODES.policyDenied,
+            'Workspace upgrade is available only to installed-SDK external workspaces.'
+        );
+    }
+    const result=await runProcess('npm',['upgrade'],{
+        cwd:selected.workspaceRoot,
+        signal:options.signal,
+        onEvent:options.onEvent
+    });
+    return {
+        schemaVersion:1,
+        kind:'arcane-application-upgrade',
+        workspaceRoot:selected.workspaceRoot,
+        workspaceMode:selected.config.workspaceMode,
+        appId:selected.appId,
+        ...result
+    };
+}
+
 export async function doctorApplication(options={}){
     const result=await runDoctor(options);
     if(!result.ok){
@@ -643,6 +383,18 @@ export async function doctorApplication(options={}){
         );
     }
     return result;
+}
+
+async function runPreparedApplicationTests(prepared,options={}){
+    throwIfAborted(options.signal);
+    return runApplicationTests({
+        workspaceRoot:prepared.workspaceRoot,
+        workspaceMode:prepared.workspaceMode,
+        appId:prepared.appId,
+        appRoot:prepared.appRoot,
+        signal:options.signal,
+        onEvent:options.onEvent
+    });
 }
 
 export async function testApplication(options={}){
@@ -656,96 +408,8 @@ export async function testApplication(options={}){
         }
         return executeIntegratedSharedOperation('focused-test',options);
     }
-    const workspace=options.workspaceRoot&&options.appId&&options.appRoot
-        ?{
-            workspaceRoot:options.workspaceRoot,
-            workspaceMode:options.workspaceMode
-                ??(await inspectWorkspaceProfile(options.workspaceRoot)).workspaceMode,
-            appId:options.appId,
-            appRoot:options.appRoot
-        }
-        :await selectedWorkspace(options);
-    const files=new Set();
-    if(workspace.workspaceMode==='external'){
-        await collectTests(path.join(workspace.workspaceRoot,'test'),files,options.signal);
-    }
-    if(workspace.appRoot){
-        await collectTests(path.join(workspace.appRoot,'test'),files,options.signal);
-    }
-    const testFiles=[...files].sort();
-    if(testFiles.length===0){
-        await emit(options.onEvent,{
-            type:'test.skipped',
-            message:'No JavaScript test files were found.',
-            data:{workspaceRoot:workspace.workspaceRoot,appId:workspace.appId}
-        });
-        return {...workspace,passed:true,skipped:true,testFiles:[]};
-    }
-    const outputs=[];
-    const failures=[];
-    let failureOutputBytes=0;
-    const perFileFailureOutputBytes=Math.min(
-        MAX_TEST_FAILURE_STREAM_BYTES*2,
-        Math.floor(MAX_TEST_FAILURE_AGGREGATE_BYTES/testFiles.length)
-    );
-    for(const testFile of testFiles){
-        throwIfAborted(options.signal);
-        const result=await runProcess(
-            process.execPath,
-            [TEST_RUNNER_PATH,testFile],
-            {
-                cwd:workspace.workspaceRoot,
-                signal:options.signal,
-                onEvent:options.onEvent,
-                allowNonzero:true
-            }
-        );
-        if(result.code===0){
-            if(result.stdout.trim())outputs.push(result.stdout.trim());
-        }else if(result.code===1){
-            const captured=captureFailedTest(
-                testFile,
-                result,
-                workspace.workspaceRoot,
-                Math.min(
-                    perFileFailureOutputBytes,
-                    MAX_TEST_FAILURE_AGGREGATE_BYTES-failureOutputBytes
-                )
-            );
-            failures.push(captured.failure);
-            failureOutputBytes+=captured.bytes;
-        }else if(result.code!==0){
-            throw new ArcaneError(
-                ERROR_CODES.operationFailed,
-                `The isolated test runner exited with code ${String(result.code)} for ${path.basename(testFile)}.`,
-                {details:{testFile,result}}
-            );
-        }
-    }
-    if(failures.length>0){
-        throw new ArcaneError(
-            ERROR_CODES.operationFailed,
-            failedTestMessage(failures),
-            {
-                details:{
-                    testFiles:failures.map(failure=>failure.testFile),
-                    failures,
-                    outputBytes:failureOutputBytes,
-                    outputLimitBytes:MAX_TEST_FAILURE_AGGREGATE_BYTES,
-                    outputTruncated:failures.some(
-                        failure=>failure.stdoutTruncated||failure.stderrTruncated
-                    )
-                }
-            }
-        );
-    }
-    return {
-        ...workspace,
-        passed:true,
-        skipped:false,
-        testFiles:testFiles.map(file=>path.relative(workspace.workspaceRoot,file).replaceAll('\\','/')),
-        output:outputs.join('\n')
-    };
+    const prepared=await preparedWorkspace({...options,allowMissingManagedImportMap:true});
+    return runPreparedApplicationTests(prepared,options);
 }
 
 export async function checkApplication(options={}){
@@ -755,10 +419,15 @@ export async function checkApplication(options={}){
         }
         return executeIntegratedSharedOperation('development-check',options);
     }
-    const prepared=await preparedWorkspace(options);
+    const prepared=await preparedWorkspace({...options,allowMissingManagedImportMap:true});
     const tests=options.skipTests
-        ?{passed:true,skipped:true,testFiles:[]}
-        :await testApplication({...options,...prepared});
+        ?{
+            passed:true,
+            skipped:true,
+            testFiles:[],
+            output:''
+        }
+        :await runPreparedApplicationTests(prepared,options);
     await validatePreparedRuntime(prepared,{signal:options.signal});
     return {
         ok:true,
@@ -766,17 +435,10 @@ export async function checkApplication(options={}){
         workspaceRoot:prepared.workspaceRoot,
         appId:prepared.appId,
         descriptorSource:prepared.descriptorSource,
-        runtime:prepared.runtimeReceipt
-            ?{
-                mode:'sdk',
-                manifestSha256:prepared.runtimeReceipt.manifestSha256,
-                contentSha256:prepared.runtimeReceipt.contentSha256,
-                fileCount:prepared.runtimeReceipt.fileCount
-            }
-            :{
-                mode:'workspace',
-                sourceRoot:'arcane'
-            },
+        runtime:{
+            mode:prepared.workspaceMode==='external'?'sdk':'workspace',
+            sourceRoot:'arcane'
+        },
         checks:prepared.validation.checks,
         tests
     };
@@ -798,7 +460,6 @@ export async function developApplication(options={}){
         workspaceRoot:prepared.workspaceRoot,
         appId:prepared.appId,
         mode:'source',
-        workspaceRuntimeReceipt:prepared.workspaceRuntimeReceipt,
         workspaceMode:prepared.workspaceMode,
         ...(options.sdkRuntimeSourceRoot===undefined?{}:{
             sdkRuntimeSourceRoot:options.sdkRuntimeSourceRoot
@@ -819,23 +480,22 @@ export async function packageApplication(options={}){
     });
     const release=await ownedWork(
         'package',
-        ({signal,onEvent,workspaceOperationLease})=>packageApp({
+        async({signal,onEvent,workspaceOperationLease})=>{
+            return packageApp({
                 workspaceRoot:prepared.workspaceRoot,
                 appId:prepared.appId,
                 dryRun:Boolean(options.dryRun),
                 signal,
                 onEvent,
-                workspaceOperationLease,
-                runtimeVerificationState:forwardedRuntimeVerificationState(options,prepared),
-                validateSourceState:({signal}={})=>validatePreparedRuntime(prepared,{signal})
-            }),
+                workspaceOperationLease
+            });
+        },
         {...options,workspaceRoot:prepared.workspaceRoot}
     );
     return {
         workspaceRoot:prepared.workspaceRoot,
         workspaceMode:prepared.workspaceMode,
         appId:prepared.appId,
-        runtimeContentSha256:prepared.runtimeReceipt?.contentSha256??null,
         release
     };
 }
@@ -848,7 +508,6 @@ export async function verifyApplication(options={}){
         ({signal,onEvent})=>verifyApp({
             workspaceRoot:prepared.workspaceRoot,
             appId:prepared.appId,
-            runtimeVerificationState:forwardedRuntimeVerificationState(options,prepared),
             signal,
             onEvent
         }),
@@ -859,7 +518,6 @@ export async function verifyApplication(options={}){
         workspaceRoot:prepared.workspaceRoot,
         workspaceMode:prepared.workspaceMode,
         appId:prepared.appId,
-        runtimeContentSha256:prepared.runtimeReceipt?.contentSha256??null,
         release
     };
 }
@@ -876,19 +534,18 @@ export async function bundleApplication(options={}){
             const verified=await verifyApp({
                 workspaceRoot:prepared.workspaceRoot,
                 appId:prepared.appId,
-                runtimeVerificationState:forwardedRuntimeVerificationState(options,prepared),
                 signal,
                 onEvent
             });
             await validatePreparedRuntime(prepared,{signal});
-            const releaseRoot=verified.receipt.canonicalLocation;
+            const releaseRoot=verified.outputRoot;
             const outputPath=options.artifactPath??path.join(
                 path.dirname(releaseRoot),
                 `${prepared.appId}-${verified.version}${APP_BUNDLE_EXTENSION}`
             );
             return createAppReleaseBundle({
-                receipt:verified.receipt,
                 releaseRoot,
+                appDescriptor:prepared.descriptor,
                 outputPath,
                 overwrite:options.overwrite,
                 signal,
@@ -901,7 +558,6 @@ export async function bundleApplication(options={}){
         workspaceRoot:prepared.workspaceRoot,
         workspaceMode:prepared.workspaceMode,
         appId:prepared.appId,
-        runtimeContentSha256:prepared.runtimeReceipt?.contentSha256??null,
         bundle
     };
 }
@@ -1059,19 +715,6 @@ export function assertIntegratedPortableToolchain(options={}){
     return assertIntegratedNativeToolchain({...options,target:'portable'});
 }
 
-export function assertNativeApplicationToolchainCompatibility({prepared,toolchainReceipt}={}){
-    return assertNativeToolchainCompatibility({
-        appDescriptor:prepared?.descriptor,
-        toolchainReceipt,
-        minimumCoreVersion:prepared?.runtimeReceipt?.source?.bundleVersion
-            ??ARCANE_MACHINE_BUNDLE_VERSION
-    });
-}
-
-export function assertPortableToolchainCompatibility(options={}){
-    return assertNativeApplicationToolchainCompatibility(options);
-}
-
 export async function verifyNativeArtifact(options={}){
     const {target,adapter}=targetSelection(options);
     const targetDescription=await adapter.describe();
@@ -1106,7 +749,7 @@ async function nativeDependencyClosure(prepared,{target,signal,onEvent}={}){
     if(JSON.stringify(selected.descriptor)!==JSON.stringify(prepared.descriptor)){
         nativeDependencyError(
             `The selected app ${prepared.appId} descriptor changed during native build preflight.`,
-            ERROR_CODES.integrityFailed
+            ERROR_CODES.workspaceInvalid
         );
     }
     if(!prepared.descriptor.targets.includes(target)){
@@ -1118,7 +761,6 @@ async function nativeDependencyClosure(prepared,{target,signal,onEvent}={}){
 
     const visiting=new Set([prepared.appId]);
     const visited=new Set();
-    const discovered=new Set();
     const dependencies=[];
     function visit(descriptor){
         for(const dependencyId of descriptor.native.bundledApps){
@@ -1138,10 +780,6 @@ async function nativeDependencyClosure(prepared,{target,signal,onEvent}={}){
                     ERROR_CODES.targetUnavailable
                 );
             }
-            if(discovered.size>=64){
-                nativeDependencyError('A native app dependency closure may contain at most 64 apps.');
-            }
-            discovered.add(dependencyId);
             visiting.add(dependencyId);
             visit(dependency.descriptor);
             visiting.delete(dependencyId);
@@ -1162,13 +800,13 @@ async function nativeDependencyClosure(prepared,{target,signal,onEvent}={}){
             signal,
             onEvent
         });
-        validated.push(Object.freeze({
+        validated.push({
             ...dependency,
             descriptor:validation.app.descriptor,
             validation
-        }));
+        });
     }
-    return Object.freeze(validated);
+    return validated;
 }
 
 async function externalWorkspaceProtectedRoots(prepared,{signal}={}){
@@ -1222,45 +860,28 @@ function pathsOverlap(left,right){
 }
 
 async function packageNativeRelease(prepared,app,{
-    sharedPayloadSnapshot,
     workspaceOperationLease,
     signal,
     onEvent
 }={}){
-    const sourceState={
-        ...prepared,
-        appId:app.appId,
-        appRoot:app.appRoot,
-        descriptor:app.descriptor,
-        validation:app.validation??prepared.validation
-    };
     const release=await packageApp({
         workspaceRoot:prepared.workspaceRoot,
         appId:app.appId,
-        sharedPayloadSnapshot,
-        runtimeVerificationState:prepared.runtimeVerificationState??undefined,
         workspaceOperationLease,
         signal,
-        onEvent,
-        validateSourceState:({signal:validationSignal}={})=>validateDiscoveredApplication({
-            workspaceRoot:sourceState.workspaceRoot,
-            workspaceMode:sourceState.workspaceMode,
-            workspaceConfig:prepared.validation.config,
-            app,
-            signal:validationSignal
-        })
+        onEvent
     });
-    return Object.freeze({
+    return {
         appId:app.appId,
         appRoot:app.appRoot,
         descriptor:app.descriptor,
         release,
-        nativeInput:Object.freeze({
+        nativeInput:{
             appDescriptor:app.descriptor,
-            appReleaseRoot:path.resolve(prepared.workspaceRoot,release.output),
-            appReleaseReceipt:release.receipt
-        })
-    });
+            appReleaseRoot:release.outputRoot??path.resolve(prepared.workspaceRoot,release.output),
+            release:{manifest:release.manifest,files:[...release.files]}
+        }
+    };
 }
 
 async function executePairedNativeBuild(options,adapter,{
@@ -1269,12 +890,7 @@ async function executePairedNativeBuild(options,adapter,{
     workspaceOperationLease
 }={}){
     const target=options.target??options.targetRequest?.target;
-    const initialPrepared=await preparedWorkspace({
-        ...options,
-        deferRuntimeVerification:true,
-        signal,
-        onEvent
-    });
+    const initialPrepared=await preparedWorkspace({...options,signal,onEvent});
     assertIntegratedNativeToolchain({
         target,
         workspaceMode:initialPrepared.workspaceMode,
@@ -1284,7 +900,7 @@ async function executePairedNativeBuild(options,adapter,{
     if(options.dryRun){
         throw new ArcaneError(
             ERROR_CODES.usage,
-            `${target} native build does not support --dry-run because verified app release receipts are required.`
+            `${target} native build does not support --dry-run because the native provider needs materialized app files.`
         );
     }
     const requestedOutputRoot=resolveNativeBuildOutputRoot({
@@ -1302,31 +918,7 @@ async function executePairedNativeBuild(options,adapter,{
         );
     }
     const dependencyApps=await nativeDependencyClosure(initialPrepared,{target,signal,onEvent});
-    const sharedPayloadIds=[...new Set([
-        ...initialPrepared.validation.app.manifest.shared,
-        ...dependencyApps.flatMap(app=>app.manifest.shared)
-    ])].sort((left,right)=>left.localeCompare(right,'en'));
-    const sharedPayloadSnapshot=await prepareSharedPayloadSnapshot({
-        workspaceRoot:initialPrepared.workspaceRoot,
-        sharedPayloadIds,
-        signal,
-        onEvent
-    });
-    const externalRuntimeState=initialPrepared.workspaceMode==='external'
-        ?await externalRuntimeSnapshotReceipt(
-            initialPrepared,
-            sharedPayloadSnapshot,
-            sharedPayloadIds,
-            {signal,onEvent}
-        )
-        :null;
-    const prepared={
-        ...initialPrepared,
-        runtimeReceipt:externalRuntimeState?.receipt??null,
-        runtimeVerificationState:externalRuntimeState?.runtimeVerificationState??null,
-        workspaceRuntimeReceipt:
-            externalRuntimeState?.runtimeVerificationState.workspaceRuntimeReceipt??null
-    };
+    const prepared=initialPrepared;
     const selectedRelease=await packageNativeRelease(prepared,{
         appId:prepared.appId,
         appRoot:prepared.appRoot,
@@ -1335,16 +927,16 @@ async function executePairedNativeBuild(options,adapter,{
         descriptorSource:prepared.validation.app.descriptorSource,
         descriptorPath:prepared.validation.app.descriptorPath,
         validation:prepared.validation
-    },{sharedPayloadSnapshot,workspaceOperationLease,signal,onEvent});
+    },{workspaceOperationLease,signal,onEvent});
     const dependencyReleases=[];
     for(const dependency of dependencyApps){
         dependencyReleases.push(await packageNativeRelease(
             prepared,
             dependency,
-            {sharedPayloadSnapshot,workspaceOperationLease,signal,onEvent}
+            {workspaceOperationLease,signal,onEvent}
         ));
     }
-    const toolchainReceipt=await adapter.prepare({
+    const toolchain=await adapter.prepare({
         toolchainRoot:options.toolchainRoot,
         targetRequest:options.targetRequest,
         signal,
@@ -1354,26 +946,24 @@ async function executePairedNativeBuild(options,adapter,{
     const built=await adapter.build({
         nativeBuilder:options.nativeBuilder,
         toolchainRoot:options.toolchainRoot,
-        toolchainReceipt,
+        toolchain,
         ...selectedRelease.nativeInput,
         dependencyReleases:dependencyReleases.map(item=>item.nativeInput),
-        providerGeneration:options.providerGeneration??options.nativeBuilder?.providerGeneration,
-        minimumCoreVersion:prepared.runtimeReceipt?.source?.bundleVersion
-            ??ARCANE_MACHINE_BUNDLE_VERSION,
+        minimumCoreVersion:ARCANE_MACHINE_BUNDLE_VERSION,
         protectedRoots,
         outputRoot,
         targetRequest:options.targetRequest,
         signal,
         onEvent
     });
-    return Object.freeze({
+    return {
         prepared,
         outputRoot,
-        toolchainReceipt,
+        toolchain,
         selectedRelease,
-        dependencyReleases:Object.freeze(dependencyReleases),
+        dependencyReleases,
         built
-    });
+    };
 }
 
 function nativeBuildResult(assembly){
@@ -1383,9 +973,8 @@ function nativeBuildResult(assembly){
         workspaceRoot:prepared.workspaceRoot,
         workspaceMode:prepared.workspaceMode,
         appId:prepared.appId,
-        runtimeContentSha256:prepared.runtimeReceipt?.contentSha256??null,
         release:assembly.selectedRelease.release,
-        dependencyReleases:assembly.dependencyReleases.map(item=>Object.freeze({
+        dependencyReleases:assembly.dependencyReleases.map(item=>({
             appId:item.appId,
             release:item.release
         }))
@@ -1395,7 +984,7 @@ function nativeBuildResult(assembly){
 function usesWorkspaceNativeAssembly(options){
     return options.nativeBuilder!=null
         &&typeof options.workspaceRoot==='string'
-        &&options.appReleaseReceipt==null
+        &&options.release==null
         &&options.appReleaseRoot==null
         &&options.appDescriptor==null;
 }
@@ -1431,18 +1020,15 @@ export async function buildApplication(options={}){
         ({signal,onEvent,workspaceOperationLease})=>buildTarget({
                 ...options,
                 ...prepared,
-                runtimeVerificationState:forwardedRuntimeVerificationState(options,prepared),
                 signal,
                 onEvent,
-                workspaceOperationLease,
-                validateSourceState:({signal}={})=>validatePreparedRuntime(prepared,{signal})
+                workspaceOperationLease
             }),
         {...options,workspaceRoot:prepared.workspaceRoot}
     );
     return {
         ...result,
-        workspaceMode:prepared.workspaceMode,
-        runtimeContentSha256:prepared.runtimeReceipt?.contentSha256??null
+        workspaceMode:prepared.workspaceMode
     };
 }
 
@@ -1463,15 +1049,15 @@ export async function runApplication(options={}){
         return adapter.run({...selectedOptions,target});
     }
     if(target!=='browser'){
-        if(usesWorkspaceNativeAssembly(selectedOptions)&&selectedOptions.artifactReceipt==null){
+        if(usesWorkspaceNativeAssembly(selectedOptions)&&selectedOptions.artifact==null){
             return ownedWork(
                 'run',
                 async context=>{
                     const assembly=await executePairedNativeBuild(selectedOptions,adapter,context);
                     const launched=await adapter.run({
                         toolchainRoot:selectedOptions.toolchainRoot,
-                        toolchainReceipt:assembly.toolchainReceipt,
-                        artifactReceipt:assembly.built.artifactReceipt,
+                        toolchain:assembly.toolchain,
+                        artifact:assembly.built.artifact,
                         targetRequest:selectedOptions.targetRequest,
                         signal:context.signal,
                         onEvent:context.onEvent
@@ -1491,7 +1077,6 @@ export async function runApplication(options={}){
     return runTarget({
         ...selectedOptions,
         ...prepared,
-        runtimeVerificationState:forwardedRuntimeVerificationState(selectedOptions,prepared),
         target
     });
 }
@@ -1527,6 +1112,7 @@ export async function executeOperation(command,options={}){
     const operations={
         new:createApplication,
         init:initializeApplication,
+        upgrade:upgradeApplication,
         doctor:doctorApplication,
         'import-map':importMapApplication,
         dev:developApplication,
@@ -1555,10 +1141,11 @@ export async function executeOperation(command,options={}){
 }
 
 export function createToolchain(defaults={}){
-    return Object.freeze({
+    return {
         execute:(command,options={})=>executeOperation(command,{...defaults,...options}),
         create:options=>createApplication({...defaults,...options}),
         init:options=>initializeApplication({...defaults,...options}),
+        upgrade:options=>upgradeApplication({...defaults,...options}),
         doctor:options=>doctorApplication({...defaults,...options}),
         importMap:options=>importMapApplication({...defaults,...options}),
         dev:options=>developApplication({...defaults,...options}),
@@ -1578,5 +1165,5 @@ export function createToolchain(defaults={}){
         mail:options=>executeMailCommand({...defaults,...options}),
         targets:options=>describeTargets({...defaults,...options}),
         repository:options=>repositoryApplication({...defaults,...options})
-    });
+    };
 }

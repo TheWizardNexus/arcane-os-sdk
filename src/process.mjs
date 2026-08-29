@@ -3,7 +3,6 @@ import path from 'node:path';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 import {createEventQueue} from './event-queue.mjs';
 
-const MAX_CAPTURE_BYTES=4*1024*1024;
 const DEFAULT_TERMINATION_GRACE_MS=1500;
 
 export function platformCommand(command,platform=process.platform){
@@ -31,12 +30,8 @@ function platformArguments(command,args,platform=process.platform){
     return [cliPath,...args];
 }
 
-function appendBounded(current,chunk){
-    const next=current+chunk.toString('utf8');
-    if(Buffer.byteLength(next,'utf8')<=MAX_CAPTURE_BYTES){
-        return next;
-    }
-    return next.slice(next.length-MAX_CAPTURE_BYTES);
+function appendOutput(current,chunk){
+    return current+chunk.toString('utf8');
 }
 
 async function emitLines(events,type,text){
@@ -266,11 +261,11 @@ export async function runProcess(command,args=[],{
         }
 
         child.stdout.on('data',chunk=>{
-            stdout=appendBounded(stdout,chunk);
+            stdout=appendOutput(stdout,chunk);
             ownDelivery(child.stdout,'process.stdout',chunk);
         });
         child.stderr.on('data',chunk=>{
-            stderr=appendBounded(stderr,chunk);
+            stderr=appendOutput(stderr,chunk);
             ownDelivery(child.stderr,'process.stderr',chunk);
         });
         child.on('error',error=>{
@@ -330,7 +325,7 @@ export async function runProcess(command,args=[],{
                 if(result.code!==0&&!allowNonzero){
                     finish(reject,new ArcaneError(
                         ERROR_CODES.operationFailed,
-                        `${command} exited with code ${String(result.code)}${stderr.trim()?`: ${stderr.trim()}`:''}`,
+                        `${command} exited with code ${String(result.code)}${stderr?`: ${stderr}`:''}`,
                         {details:result}
                     ));
                     return;

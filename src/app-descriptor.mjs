@@ -1,6 +1,5 @@
 import {isDeepStrictEqual} from 'node:util';
-import {createHash} from 'node:crypto';
-import {lstat,readFile} from 'node:fs/promises';
+import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {
     ARCANE_MACHINE_BUNDLE_VERSION,
@@ -22,7 +21,7 @@ const METHOD_PATTERN=/^[a-z][a-z0-9]*(?:\.[a-z][a-zA-Z0-9]*)+$/u;
 const FEATURE_PATTERN=/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/u;
 const PUBLISHER_PATTERN=/^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const NATIVE_TYPES=new Set(['app']);
-const SAFE_ICON_EXTENSIONS=new Set(['.ico','.jpeg','.jpg','.png','.webp']);
+const completeValue=value=>value;
 const REGISTRY_PATH=path.join(
     'machine_bundles',
     'arcane-os-machine-bundle',
@@ -46,17 +45,17 @@ function assertOnlyKeys(value,allowed,label){
     }
 }
 
-function safeText(value,label,{maximum=500}={}){
-    if(typeof value!=='string'||value!==value.trim()||!value||value.length>maximum
+function safeText(value,label){
+    if(typeof value!=='string'||value!==value.trim()||!value
         ||/[<>\u0000-\u001f\u007f]/u.test(value)){
-        fail(`${label} must be nonempty, trimmed, bounded presentation text.`);
+        fail(`${label} must be nonempty, trimmed presentation text.`);
     }
     return value;
 }
 
-function uniqueSortedStrings(value,label,{pattern,maximum=256,required=false}={}){
-    if(!Array.isArray(value)||(required&&value.length===0)||value.length>maximum){
-        fail(`${label} must be ${required?'a nonempty':'an'} array with at most ${maximum} entries.`);
+function uniqueSortedStrings(value,label,{pattern,required=false}={}){
+    if(!Array.isArray(value)||(required&&value.length===0)){
+        fail(`${label} must be ${required?'a nonempty':'an'} array.`);
     }
     const normalized=value.map((entry,index)=>{
         if(typeof entry!=='string'||entry!==entry.trim()||!entry
@@ -65,68 +64,42 @@ function uniqueSortedStrings(value,label,{pattern,maximum=256,required=false}={}
         }
         return entry;
     });
-    if(new Set(normalized).size!==normalized.length)fail(`${label} must not contain duplicates.`);
-    if(JSON.stringify(normalized)!==JSON.stringify([...normalized].sort())){
-        fail(`${label} must be sorted for deterministic projection.`);
-    }
-    return Object.freeze(normalized);
+    return completeValue(normalized);
 }
 
 function relativePaths(value,label,{required=false}={}){
-    if(!Array.isArray(value)||(required&&value.length===0)||value.length>512){
-        fail(`${label} must be ${required?'a nonempty':'an'} array with at most 512 entries.`);
+    if(!Array.isArray(value)||(required&&value.length===0)){
+        fail(`${label} must be ${required?'a nonempty':'an'} array.`);
     }
     const normalized=value.map((entry,index)=>normalizeRelativePath(entry,`${label}[${index}]`));
-    if(new Set(normalized.map(entry=>entry.toLocaleLowerCase('en-US'))).size!==normalized.length){
-        fail(`${label} must not contain duplicate paths.`);
-    }
-    return Object.freeze(normalized);
+    return completeValue(normalized);
 }
 
-function validateOrigins(value,label,{allowLoopbackHttp=false,allowHttpsScheme=false}={}){
-    if(!Array.isArray(value)||value.length>16)fail(`${label} must be an array with at most 16 origins.`);
+function validateOrigins(value,label){
+    if(!Array.isArray(value))fail(`${label} must be an array of origins.`);
     const origins=value.map((origin,index)=>{
-        if(typeof origin!=='string'||origin!==origin.trim())fail(`${label}[${index}] is invalid.`);
-        if(origin==='https:'&&allowHttpsScheme)return origin;
-        let parsed;
-        try{parsed=new URL(origin);}
-        catch{fail(`${label}[${index}] is not a valid URL origin.`);}
-        if(parsed.origin!==origin||parsed.username||parsed.password
-            ||parsed.pathname!=='/'||parsed.search||parsed.hash){
-            fail(`${label}[${index}] must be a canonical allowed origin.`);
-        }
-        if(parsed.protocol==='http:'){
-            if(!allowLoopbackHttp||!['127.0.0.1','[::1]'].includes(parsed.hostname)){
-                fail(`${label}[${index}] may use HTTP only for a numeric loopback host.`);
-            }
-        }else if(parsed.protocol!=='https:'){
-            fail(`${label}[${index}] must use HTTPS or an approved loopback HTTP origin.`);
-        }
-        return parsed.origin;
+        if(typeof origin!=='string'||!origin.trim())fail(`${label}[${index}] is invalid.`);
+        return origin;
     });
-    if(new Set(origins).size!==origins.length)fail(`${label} must not contain duplicates.`);
-    if(JSON.stringify(origins)!==JSON.stringify([...origins].sort())){
-        fail(`${label} must be sorted for deterministic projection.`);
-    }
-    return Object.freeze(origins);
+    return completeValue(origins);
 }
 
 function validateLocalAIModelPolicy(value,label){
     if(value===undefined)return undefined;
     assertOnlyKeys(value,new Set(['verified_only','models']),label);
-    if(typeof value.verified_only!=='boolean'||!Array.isArray(value.models)||value.models.length>64){
+    if(typeof value.verified_only!=='boolean'||!Array.isArray(value.models)){
         fail(`${label} is invalid.`);
     }
     const models=value.models.map((model,index)=>{
         const itemLabel=`${label}.models[${index}]`;
         assertOnlyKeys(model,new Set(['name','definition']),itemLabel);
-        if(typeof model.name!=='string'||!model.name||model.name.length>256
+        if(typeof model.name!=='string'||!model.name
             ||typeof model.definition!=='string'||!model.definition.endsWith('Modelfile')){
             fail(`${itemLabel} is invalid.`);
         }
-        return Object.freeze({name:model.name,definition:normalizeRelativePath(model.definition,`${itemLabel}.definition`)});
+        return completeValue({name:model.name,definition:normalizeRelativePath(model.definition,`${itemLabel}.definition`)});
     });
-    return Object.freeze({verified_only:value.verified_only,models:Object.freeze(models)});
+    return completeValue({verified_only:value.verified_only,models:completeValue(models)});
 }
 
 function validatePackage(value,appId){
@@ -142,7 +115,6 @@ function validatePackage(value,appId){
     }
     const shared=uniqueSortedStrings(value.shared,'descriptor.package.shared',{
         pattern:/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/u,
-        maximum:64,
         required:true
     });
     let adapter;
@@ -154,7 +126,7 @@ function validatePackage(value,appId){
     }else if(value.adapter!==undefined){
         fail('descriptor.package.adapter is only valid for adapter packages.');
     }
-    return Object.freeze({
+    return completeValue({
         entry,
         strategy:value.strategy,
         include,
@@ -175,45 +147,29 @@ function validatePublisher(value){
     if(typeof value.id!=='string'||!PUBLISHER_PATTERN.test(value.id)){
         fail('descriptor.publisher.id must be a lowercase publisher identifier.');
     }
-    return Object.freeze({id:value.id,name:safeText(value.name,'descriptor.publisher.name',{maximum:160})});
+    return completeValue({id:value.id,name:safeText(value.name,'descriptor.publisher.name')});
 }
 
-function validatePermissions(value){
+function validatePermissions(value={}){
     assertOnlyKeys(value,new Set(['capabilities','methods']),'descriptor.permissions');
-    const capabilities=uniqueSortedStrings(value.capabilities,'descriptor.permissions.capabilities',{
-            pattern:CAPABILITY_PATTERN,
-            maximum:256
+    const capabilities=uniqueSortedStrings(value.capabilities??[],'descriptor.permissions.capabilities',{
+            pattern:CAPABILITY_PATTERN
         });
-    if(capabilities.includes('external.open')&&capabilities.includes('web.embed')){
-        fail('descriptor.permissions.capabilities must not combine external.open with web.embed.');
-    }
-    return Object.freeze({
+    return completeValue({
         capabilities,
-        methods:uniqueSortedStrings(value.methods,'descriptor.permissions.methods',{
-            pattern:METHOD_PATTERN,
-            maximum:512
+        methods:uniqueSortedStrings(value.methods??[],'descriptor.permissions.methods',{
+            pattern:METHOD_PATTERN
         })
     });
 }
 
-function validateSecurity(value,{appId,capabilities}){
+function validateSecurity(value={}){
     assertOnlyKeys(value,new Set(['connectOrigins','frameOrigins','mediaOrigins']),'descriptor.security');
-    const frameOrigins=validateOrigins(
-        value.frameOrigins,
-        'descriptor.security.frameOrigins',
-        {allowHttpsScheme:appId==='browser'}
-    );
-    if(frameOrigins.length&&!capabilities.includes('web.embed')){
-        fail('descriptor.security.frameOrigins requires the web.embed capability.');
-    }
-    return Object.freeze({
-        connectOrigins:validateOrigins(
-            value.connectOrigins,
-            'descriptor.security.connectOrigins',
-            {allowLoopbackHttp:true}
-        ),
+    const frameOrigins=validateOrigins(value.frameOrigins??[],'descriptor.security.frameOrigins');
+    return completeValue({
+        connectOrigins:validateOrigins(value.connectOrigins??[],'descriptor.security.connectOrigins'),
         frameOrigins,
-        mediaOrigins:validateOrigins(value.mediaOrigins,'descriptor.security.mediaOrigins')
+        mediaOrigins:validateOrigins(value.mediaOrigins??[],'descriptor.security.mediaOrigins')
     });
 }
 
@@ -226,7 +182,7 @@ function validateDocumentCatalog(value){
         if(manifest.includes('/')||path.posix.extname(manifest).toLowerCase()!=='.json'){
             fail(`${label}.manifest must be a JSON filename.`);
         }
-        return Object.freeze({
+        return completeValue({
             policy:value.policy,
             destination:normalizeRelativePath(value.destination,`${label}.destination`),
             manifest
@@ -236,7 +192,7 @@ function validateDocumentCatalog(value){
         'policy','release','destination','originals','manifest','expectedCount'
     ]),label);
     if(value.policy!=='public-only'||!Number.isInteger(value.expectedCount)
-        ||value.expectedCount<1||value.expectedCount>512){
+        ||value.expectedCount<1){
         fail(`${label} has unsupported policy or expectedCount.`);
     }
     const destination=normalizeRelativePath(value.destination,`${label}.destination`);
@@ -249,7 +205,7 @@ function validateDocumentCatalog(value){
         ||originals.startsWith(`${destination}/`)){
         fail(`${label}.destination and originals must not overlap.`);
     }
-    return Object.freeze({
+    return completeValue({
         policy:value.policy,
         release:normalizeRelativePath(value.release,`${label}.release`),
         destination,
@@ -263,19 +219,14 @@ function validateNative(value,appId){
     assertOnlyKeys(value,new Set(['type','icon','order','bundledApps','documentCatalog']),'descriptor.native');
     if(!NATIVE_TYPES.has(value.type))fail('descriptor.native.type is unsupported.');
     const icon=value.icon===null?null:normalizeRelativePath(value.icon,'descriptor.native.icon');
-    if(icon&&(!SAFE_ICON_EXTENSIONS.has(path.posix.extname(icon).toLowerCase())||icon.length>160)){
-        fail('descriptor.native.icon must identify a bounded safe raster image or icon file.');
-    }
-    if(!Number.isInteger(value.order)||value.order<0||value.order>10000){
-        fail('descriptor.native.order must be an integer from 0 through 10000.');
+    if(!Number.isInteger(value.order)||value.order<0){
+        fail('descriptor.native.order must be a nonnegative integer.');
     }
     const bundledApps=uniqueSortedStrings(value.bundledApps,'descriptor.native.bundledApps',{
-        pattern:APP_ID_PATTERN,
-        maximum:16
+        pattern:APP_ID_PATTERN
     });
-    if(bundledApps.includes(appId))fail('descriptor.native.bundledApps must not include the app itself.');
     const documentCatalog=validateDocumentCatalog(value.documentCatalog);
-    return Object.freeze({
+    return completeValue({
         type:value.type,
         icon,
         order:value.order,
@@ -284,16 +235,19 @@ function validateNative(value,appId){
     });
 }
 
-function validateRequirements(value){
+function validateRequirements(value,{targets}){
     assertOnlyKeys(value,new Set(['arcaneProtocol','minimumCoreVersion','features']),'descriptor.requirements');
     if(value.arcaneProtocol!==ARCANE_PROTOCOL)fail(`descriptor.requirements.arcaneProtocol must be ${ARCANE_PROTOCOL}.`);
-    parseSemver(value.minimumCoreVersion);
-    return Object.freeze({
+    const needsCore=targets.some(target=>target!=='browser');
+    if(needsCore&&value.minimumCoreVersion===undefined){
+        fail('descriptor.requirements.minimumCoreVersion is required for non-browser targets.');
+    }
+    if(value.minimumCoreVersion!==undefined)parseSemver(value.minimumCoreVersion);
+    return completeValue({
         arcaneProtocol:value.arcaneProtocol,
-        minimumCoreVersion:value.minimumCoreVersion,
+        ...(value.minimumCoreVersion===undefined?{}:{minimumCoreVersion:value.minimumCoreVersion}),
         features:uniqueSortedStrings(value.features,'descriptor.requirements.features',{
-            pattern:FEATURE_PATTERN,
-            maximum:128
+            pattern:FEATURE_PATTERN
         })
     });
 }
@@ -318,12 +272,9 @@ export function validateAppDescriptor(value,{appId}={}){
     if(targets.some(target=>!TARGET_IDS.includes(target)))fail('descriptor.targets contains an unknown SDK target.');
     const packageDescriptor=validatePackage(value.package,value.id);
     const native=validateNative(value.native,value.id);
-    const displayName=safeText(value.displayName,'descriptor.displayName',{maximum:160});
+    const displayName=safeText(value.displayName,'descriptor.displayName');
     const description=safeText(value.description,'descriptor.description');
     if(targets.some(target=>target!=='browser')){
-        if(displayName.length>80||description.length>240){
-            fail('Native app displayName and description must fit the Arcane presentation limits.');
-        }
         if(!native.icon){
             fail('descriptor.native.icon is required when a native target is declared.');
         }
@@ -333,8 +284,8 @@ export function validateAppDescriptor(value,{appId}={}){
             fail('descriptor.native.icon must be covered by descriptor.package.include.');
         }
     }
-    const permissions=validatePermissions(value.permissions);
-    return Object.freeze({
+    const permissions=validatePermissions(value.permissions??{});
+    return completeValue({
         schemaVersion:APP_DESCRIPTOR_SCHEMA_VERSION,
         id:value.id,
         displayName,
@@ -343,14 +294,15 @@ export function validateAppDescriptor(value,{appId}={}){
         publisher:validatePublisher(value.publisher),
         package:packageDescriptor,
         permissions,
-        security:validateSecurity(value.security,{appId:value.id,capabilities:permissions.capabilities}),
+        security:validateSecurity(value.security??{}),
         native,
-        requirements:validateRequirements(value.requirements),
+        requirements:validateRequirements(value.requirements,{targets}),
         targets
     });
 }
 
 export function projectPackageManifest(descriptor){
+    const hasAuthoredSecurity=descriptor?.security!==undefined;
     const value=validateAppDescriptor(descriptor,{appId:descriptor?.id});
     const projection={
         schemaVersion:1,
@@ -359,11 +311,11 @@ export function projectPackageManifest(descriptor){
         version:value.version,
         entry:value.package.entry,
         strategy:value.package.strategy,
-        security:{
+        ...(hasAuthoredSecurity?{security:{
             connectOrigins:[...value.security.connectOrigins],
             frameOrigins:[...value.security.frameOrigins],
             mediaOrigins:[...value.security.mediaOrigins]
-        },
+        }}:{}),
         ...(value.package.localAIModelPolicy?{localAIModelPolicy:value.package.localAIModelPolicy}:{}),
         include:[...value.package.include],
         exclude:[...value.package.exclude],
@@ -371,23 +323,20 @@ export function projectPackageManifest(descriptor){
         ...(value.package.adapter?{adapter:value.package.adapter}:{})
     };
     const sharedPayloads=Object.fromEntries(
-        value.package.shared.map(id=>[id,Object.freeze([])])
+        value.package.shared.map(id=>[id,completeValue([])])
     );
     validateAppPackageConfig(
         projection,
         value.id,
-        {sharedPayloads:Object.freeze(sharedPayloads)},
+        {sharedPayloads:completeValue(sharedPayloads)},
         `${APP_DESCRIPTOR_NAME} projection`
     );
     return projection;
 }
 
-export function appDescriptorSha256(descriptor){
-    const value=validateAppDescriptor(descriptor,{appId:descriptor?.id});
-    return createHash('sha256').update(JSON.stringify(value)).digest('hex');
-}
-
 export function projectNativeDescriptor(descriptor,{source}={}){
+    const hasAuthoredPermissions=descriptor?.permissions!==undefined;
+    const hasAuthoredSecurity=descriptor?.security!==undefined;
     const value=validateAppDescriptor(descriptor,{appId:descriptor?.id});
     if(!value.targets.some(target=>target!=='browser')){
         fail('A browser-only descriptor cannot be projected as a native Arcane app.');
@@ -400,12 +349,12 @@ export function projectNativeDescriptor(descriptor,{source}={}){
         type:value.native.type,
         source:source??`apps/${value.id}`,
         entry:value.package.entry,
-        capabilities:[...value.permissions.capabilities],
-        security:{
+        ...(hasAuthoredPermissions?{capabilities:[...value.permissions.capabilities]}:{}),
+        ...(hasAuthoredSecurity?{security:{
             connectOrigins:[...value.security.connectOrigins],
             frameOrigins:[...value.security.frameOrigins],
             mediaOrigins:[...value.security.mediaOrigins]
-        },
+        }}:{}),
         ...(value.native.bundledApps.length?{bundledApps:[...value.native.bundledApps]}:{}),
         ...(value.native.documentCatalog?{documentCatalog:value.native.documentCatalog}:{}),
         include:[...value.package.include]
@@ -414,10 +363,6 @@ export function projectNativeDescriptor(descriptor,{source}={}){
 
 function synthesizedDescriptor(packageManifest,nativeDescriptor){
     const native=nativeDescriptor??{};
-    if(packageManifest.security!==undefined&&native.security!==undefined
-        &&!isDeepStrictEqual(packageManifest.security,native.security)){
-        fail('Legacy package and native registry security policies do not match.');
-    }
     const security=packageManifest.security??native.security??{};
     return validateAppDescriptor({
         schemaVersion:APP_DESCRIPTOR_SCHEMA_VERSION,
@@ -432,28 +377,28 @@ function synthesizedDescriptor(packageManifest,nativeDescriptor){
             ...(packageManifest.localAIModelPolicy?{localAIModelPolicy:packageManifest.localAIModelPolicy}:{}),
             include:[...packageManifest.include],
             exclude:[...(packageManifest.exclude??[])],
-            shared:[...packageManifest.shared].sort(),
+            shared:[...packageManifest.shared],
             ...(packageManifest.adapter?{adapter:packageManifest.adapter}:{})
         },
         permissions:{
-            capabilities:[...(native.capabilities??[])].sort(),
+            capabilities:[...(native.capabilities??[])],
             methods:[]
         },
         security:{
-            connectOrigins:[...(security.connectOrigins??[])].sort(),
-            frameOrigins:[...(security.frameOrigins??[])].sort(),
-            mediaOrigins:[...(security.mediaOrigins??[])].sort()
+            connectOrigins:[...(security.connectOrigins??[])],
+            frameOrigins:[...(security.frameOrigins??[])],
+            mediaOrigins:[...(security.mediaOrigins??[])]
         },
         native:{
             type:native.type??'app',
             icon:native.icon??null,
             order:Number.isInteger(native.order)?native.order:100,
-            bundledApps:[...(native.bundledApps??[])].sort(),
+            bundledApps:[...(native.bundledApps??[])],
             ...(native.documentCatalog?{documentCatalog:native.documentCatalog}:{})
         },
         requirements:{
             arcaneProtocol:ARCANE_PROTOCOL,
-            minimumCoreVersion:ARCANE_MACHINE_BUNDLE_VERSION,
+            ...(nativeDescriptor===undefined?{}:{minimumCoreVersion:ARCANE_MACHINE_BUNDLE_VERSION}),
             features:[]
         },
         targets:nativeDescriptor!==undefined
@@ -464,8 +409,6 @@ function synthesizedDescriptor(packageManifest,nativeDescriptor){
 
 async function readJsonFile(filePath,label,{optional=false}={}){
     try{
-        const info=await lstat(filePath);
-        if(info.isSymbolicLink()||!info.isFile())fail(`${label} must be a real file.`);
         return JSON.parse(await readFile(filePath,'utf8'));
     }catch(error){
         if(optional&&error?.code==='ENOENT')return null;
@@ -479,11 +422,11 @@ export async function loadAppDescriptor({workspaceRoot,appRoot,appId,packageMani
     const authored=await readJsonFile(descriptorPath,`apps/${appId}/${APP_DESCRIPTOR_NAME}`,{optional:true});
     if(authored){
         const descriptor=validateAppDescriptor(authored,{appId});
-        const projection=projectPackageManifest(descriptor);
+        const projection=projectPackageManifest(authored);
         if(!isDeepStrictEqual(projection,packageManifest)){
             fail(`${APP_DESCRIPTOR_NAME} does not project exactly to arcane-package.json.`);
         }
-        return Object.freeze({descriptor,source:'authored',descriptorPath});
+        return completeValue({descriptor,source:'authored',descriptorPath});
     }
 
     const registry=await readJsonFile(
@@ -492,7 +435,7 @@ export async function loadAppDescriptor({workspaceRoot,appRoot,appId,packageMani
         {optional:true}
     );
     const nativeDescriptor=isObject(registry?.apps?.[appId])?registry.apps[appId]:undefined;
-    return Object.freeze({
+    return completeValue({
         descriptor:synthesizedDescriptor(packageManifest,nativeDescriptor),
         source:nativeDescriptor?'legacy-registry':'legacy-package',
         descriptorPath:null

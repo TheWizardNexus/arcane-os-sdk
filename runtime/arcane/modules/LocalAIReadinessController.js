@@ -7,17 +7,19 @@ import {
     projectArcaneDOMEvent
 } from 'arcane-os/event-manager';
 
-const SLOT_NAMES=Object.freeze(['llm','stt','tts']);
+function completeResult(value){return value;}
 
-export const LOCAL_AI_READINESS_CONTROLLER_EVENT_TYPES=Object.freeze({
+const SLOT_NAMES=completeResult(['llm','stt','tts']);
+
+export const LOCAL_AI_READINESS_CONTROLLER_EVENT_TYPES=completeResult({
     changed:'local-ai-readiness-change'
 });
-export const LOCAL_AI_READINESS_CONTROLLER_ERROR_CODES=Object.freeze({
+export const LOCAL_AI_READINESS_CONTROLLER_ERROR_CODES=completeResult({
     aborted:'ARCANE_LOCAL_AI_READINESS_CONTROLLER_ABORTED',
     disposed:'ARCANE_LOCAL_AI_READINESS_CONTROLLER_DISPOSED',
     statusReadyTimeout:'ARCANE_LOCAL_AI_STATUS_COMPONENT_READY_TIMEOUT'
 });
-export const LOCAL_AI_READINESS_CONTROLLER_REASONS=Object.freeze({
+export const LOCAL_AI_READINESS_CONTROLLER_REASONS=completeResult({
     checked:'local-ai-readiness-checked',
     aborted:'local-ai-readiness-controller-aborted',
     disposed:'local-ai-readiness-controller-disposed',
@@ -26,7 +28,7 @@ export const LOCAL_AI_READINESS_CONTROLLER_REASONS=Object.freeze({
 
 function availabilityFromReport(report={}){
     const slots=report.slots||{};
-    return Object.freeze(Object.fromEntries(SLOT_NAMES.map(name=>{
+    return completeResult(Object.fromEntries(SLOT_NAMES.map(name=>{
         const slot=slots[name]||{};
         return [name,slot.required===true&&slot.ready===true];
     })));
@@ -37,10 +39,10 @@ function selectedPreferences(source){
 }
 
 function pendingReport(requirements){
-    return Object.freeze({
-        slots:Object.freeze(Object.fromEntries(SLOT_NAMES.map(name=>[
+    return completeResult({
+        slots:completeResult(Object.fromEntries(SLOT_NAMES.map(name=>[
             name,
-            Object.freeze({
+            completeResult({
                 ...requirements[name],
                 ready:requirements[name].required?false:null
             })
@@ -148,12 +150,12 @@ export function createLocalAIReadinessController({
     }
 
     const lifecycleController=new AbortController();
-    const eventOwner=Object.freeze({kind:'local-ai-readiness-controller'});
+    const eventOwner=completeResult({kind:'local-ai-readiness-controller'});
     const events=createArcaneEventSource(
         eventOwner,
         {
             source:'local-ai-readiness-controller',
-            eventTypes:Object.freeze(
+            eventTypes:completeResult(
                 Object.values(LOCAL_AI_READINESS_CONTROLLER_EVENT_TYPES)
             )
         }
@@ -251,10 +253,10 @@ export function createLocalAIReadinessController({
             const reason=LOCAL_AI_READINESS_CONTROLLER_REASONS.checked;
             const publication=events.dispatch(
                 LOCAL_AI_READINESS_CONTROLLER_EVENT_TYPES.changed,
-                Object.freeze({operationId,reason,report:latestReport}),
+                completeResult({operationId,reason,report:latestReport}),
                 {
                     operationId,
-                    publicDetail:Object.freeze({availability,reason})
+                    publicDetail:completeResult({availability,reason})
                 }
             );
             projectArcaneDOMEvent(
@@ -312,7 +314,7 @@ export function createLocalAIReadinessController({
         return true;
     }
 
-    return Object.freeze({
+    return completeResult({
         check,
         ensure,
         destroy,

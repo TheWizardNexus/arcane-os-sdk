@@ -1,62 +1,26 @@
-import {createHash,randomUUID} from 'node:crypto';
-import {constants as FS_CONSTANTS} from 'node:fs';
-import {lstat,mkdir,open,readdir,realpath,rename,rm} from 'node:fs/promises';
+import {lstat,mkdir,readFile as readFileFromDisk,readdir,realpath,writeFile} from 'node:fs/promises';
 import path from 'node:path';
-import {
-    authenticateWorkspaceRuntimeReceipt,
-    readVerifiedWorkspaceRuntimeFile
-} from './workspace-runtime.mjs';
-import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
+import {pathToFileURL} from 'node:url';
 
 export const IMPORT_MAP_RELATIVE_PATH='modules/arcane.importmap.json';
 export const MANAGED_IMPORT_MAP_ATTRIBUTE='data-arcane-import-map';
 
 const JAVASCRIPT_EXTENSION=/\.(?:js|mjs)$/u;
 const NODE_ONLY_MODULE='modules/CaseEvidenceIndexer.js';
-const RUNTIME_STRONG_TYPE_IMPORT='../../node_modules/strong-type/index.js';
 const PERSISTENT_CHAT_IMPORT='#arcane/persistent-ai-chat-session';
 const PERSISTENT_CHAT_MODULE='modules/PersistentAIChatSession.js';
 const SDK_BROWSER_ENTRY='sdk/event-manager.mjs';
 const SDK_BROWSER_AI_ENTRY='sdk/ai/browser-wasm.mjs';
 const SDK_BROWSER_SPEECH_ENTRY='sdk/ai/browser-speech.mjs';
-const SDK_BROWSER_SPEECH_WORKER_RUNTIME='sdk/ai/speech-worker-runtime.mjs';
+const STATIC_RUNTIME_PACKAGE_IMPORTS=new Map([
+    ['arcane-os/preference-store','modules/PreferenceStore.js'],
+    ['arcane-os/speech-playback','modules/SpeechPlayback.js']
+]);
 const SDK_BROWSER_SELF_IMPORTS=new Map([
     ['arcane-os/event-manager',SDK_BROWSER_ENTRY],
     ['arcane-os/ai/browser-wasm',SDK_BROWSER_AI_ENTRY],
     ['arcane-os/ai/browser-speech',SDK_BROWSER_SPEECH_ENTRY]
 ]);
-const SDK_BROWSER_FILES=Object.freeze([
-    'sdk/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json',
-    'sdk/ai/browser-kokoro-worker.mjs',
-    'sdk/ai/browser-speech-artifacts.mjs',
-    'sdk/ai/browser-speech-providers.mjs',
-    SDK_BROWSER_SPEECH_ENTRY,
-    'sdk/ai/browser-wasm-llm-provider.mjs',
-    SDK_BROWSER_AI_ENTRY,
-    'sdk/ai/browser-whisper-worker.mjs',
-    'sdk/ai/browser-wllama-runtime.mjs',
-    'sdk/ai/internal/sha256.mjs',
-    'sdk/ai/model-controller.mjs',
-    'sdk/ai/speech-worker-client.mjs',
-    SDK_BROWSER_SPEECH_WORKER_RUNTIME,
-    'sdk/ai/wllama/LICENCE',
-    'sdk/ai/wllama/index.mjs',
-    'sdk/ai/wllama/llama.cpp-LICENSE',
-    'sdk/ai/wllama/wllama.wasm',
-    SDK_BROWSER_ENTRY,
-    'sdk/dom-event-instrumentation.mjs',
-    'sdk/dependencies/event-pubsub/index.js',
-    'sdk/dependencies/event-pubsub/licence',
-    'sdk/dependencies/event-pubsub/package.json',
-    'sdk/dependencies/strong-type/index.js',
-    'sdk/dependencies/strong-type/licence',
-    'sdk/dependencies/strong-type/package.json'
-]);
-const READ_ONLY_NO_FOLLOW=FS_CONSTANTS.O_RDONLY|(FS_CONSTANTS.O_NOFOLLOW??0);
-const WRITE_NEW_NO_FOLLOW=FS_CONSTANTS.O_CREAT|FS_CONSTANTS.O_EXCL
-    |FS_CONSTANTS.O_WRONLY|(FS_CONSTANTS.O_NOFOLLOW??0);
-const SAFE_APP_ID=/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/u;
-
 function fail(message,code='ARCANE_IMPORT_MAP_INVALID'){
     const error=new Error(message);
     error.code=code;
@@ -71,15 +35,21 @@ function throwIfAborted(signal){
 }
 
 async function emit(onEvent,event){
-    if(typeof onEvent==='function')await onEvent(Object.freeze(event));
+    if(typeof onEvent!=='function')return null;
+    try{
+        await onEvent(event);
+        return null;
+    }catch(error){
+        return error;
+    }
 }
 
-function compareUtf8(left,right){
-    return Buffer.compare(Buffer.from(String(left),'utf8'),Buffer.from(String(right),'utf8'));
-}
-
-function collisionKey(value){
-    return value.normalize('NFC').toLowerCase();
+function compareText(left,right){
+    const leftText=String(left);
+    const rightText=String(right);
+    if(leftText<rightText)return -1;
+    if(leftText>rightText)return 1;
+    return 0;
 }
 
 function safeRelativePath(value,label='path'){
@@ -92,32 +62,22 @@ function safeRelativePath(value,label='path'){
 }
 
 function normalizedDocumentPaths(entry,documents){
-    if(documents===undefined)return Object.freeze([entry]);
+    if(documents===undefined)return [entry];
     if(!Array.isArray(documents)||documents.length===0){
         fail('Import-map documents must be a non-empty array of application-relative paths.');
     }
     const normalized=[];
-    const identities=new Map();
     for(const [index,value] of documents.entries()){
         const relative=safeRelativePath(value,`documents[${String(index)}]`);
-        const key=collisionKey(relative);
-        const prior=identities.get(key);
-        if(prior!==undefined){
-            fail(
-                `Import-map documents contain a duplicate or portable path collision: `
-                +`${prior} and ${relative}.`
-            );
-        }
-        identities.set(key,relative);
-        normalized.push(relative);
+        if(!normalized.includes(relative))normalized.push(relative);
     }
     if(!normalized.includes(entry)){
         fail(`Import-map documents must include the configured application entry: ${entry}.`);
     }
-    return Object.freeze([
+    return [
         entry,
-        ...normalized.filter(relative=>relative!==entry).sort(compareUtf8)
-    ]);
+        ...normalized.filter(relative=>relative!==entry).sort(compareText)
+    ];
 }
 
 function decodedEscape(source,index){
@@ -608,12 +568,6 @@ function tokenize(source){
             index=end;
             continue;
         }
-        if(character==='\\'){
-            fail(
-                `Import-map scan found an escaped JavaScript identifier at offset ${String(index)}. `
-                +'Escaped identifiers are outside the deterministic import scanner subset.'
-            );
-        }
         if(/[0-9]/u.test(character)){
             let end=index+1;
             while(/[A-Za-z0-9_.]/u.test(source[end]??''))end+=1;
@@ -753,23 +707,7 @@ function topLevelCommas(tokens,start,end){
 }
 
 function importRecord(kind,token){
-    return Object.freeze({kind,specifier:token.value,offset:token.start});
-}
-
-function nonliteralDynamic(importer,offset){
-    fail(
-        `Import-map scan found a nonliteral dynamic import in "${importer}" at offset ${String(offset)}. `
-        +'Replace import(expression) with a literal shipped specifier, then rerun arcane import-map.',
-        'ARCANE_IMPORT_MAP_UNRESOLVED'
-    );
-}
-
-function isAuthorizedSpeechRuntimeImport(tokens,index,close,importer){
-    if(importer!==SDK_BROWSER_SPEECH_WORKER_RUNTIME||close!==index+5)return false;
-    const [binding,dot,moduleUrl]=tokens.slice(index+2,close);
-    return binding?.type==='identifier'&&['entry','target'].includes(binding.value)
-        &&dot?.value==='.'
-        &&moduleUrl?.type==='identifier'&&moduleUrl.value==='moduleUrl';
+    return {kind,specifier:token.value,offset:token.start};
 }
 
 export function scanModuleImports(source,{importer='<module>'}={}){
@@ -789,8 +727,9 @@ export function scanModuleImports(source,{importer='<module>'}={}){
             }
             if(next?.value==='('){
                 if(importIsMethodDefinition(tokens,index))continue;
+                hasModuleSyntax=true;
                 const close=matchingToken(tokens,index+1,'(',')');
-                if(close<0)nonliteralDynamic(importer,current.start);
+                if(close<0)continue;
                 const argument=tokens[index+2];
                 const commas=topLevelCommas(tokens,index+2,close);
                 const firstBoundary=commas[0]??close;
@@ -798,14 +737,9 @@ export function scanModuleImports(source,{importer='<module>'}={}){
                     ||commas.length>2
                     ||(commas.length===2
                         &&(commas[1]!==close-1||commas[1]===commas[0]+1))){
-                    if(isAuthorizedSpeechRuntimeImport(tokens,index,close,importer)){
-                        hasModuleSyntax=true;
-                        index=close;
-                        continue;
-                    }
-                    nonliteralDynamic(importer,current.start);
+                    index=close;
+                    continue;
                 }
-                hasModuleSyntax=true;
                 imports.push(importRecord('dynamic',argument));
                 continue;
             }
@@ -845,319 +779,85 @@ export function scanModuleImports(source,{importer='<module>'}={}){
             }
         }
     }
-    return Object.freeze({
+    return {
         hasModuleSyntax,
-        imports:Object.freeze(imports)
-    });
-}
-
-function stripQueryAndHash(specifier){
-    const query=specifier.indexOf('?');
-    const hash=specifier.indexOf('#');
-    const end=Math.min(query<0?specifier.length:query,hash<0?specifier.length:hash);
-    return specifier.slice(0,end);
-}
-
-function unresolved(importer,specifier,normalizedTarget,reason='is not in the shipped workspace runtime'){
-    fail(
-        `Import-map scan could not resolve "${specifier}" imported by "${importer}". `
-        +`Normalized target: "${normalizedTarget}" ${reason}. `
-        +'Materialize the authenticated dependency beneath workspace arcane/ or update the import '
-        +'to a shipped JavaScript file, then rerun arcane import-map.',
-        'ARCANE_IMPORT_MAP_UNRESOLVED'
-    );
-}
-
-function resolveImport(importer,specifier,files){
-    if(specifier===PERSISTENT_CHAT_IMPORT){
-        if(!files.has(PERSISTENT_CHAT_MODULE)){
-            unresolved(importer,specifier,PERSISTENT_CHAT_MODULE);
-        }
-        return {target:PERSISTENT_CHAT_MODULE,persistentChat:true};
-    }
-    if(specifier.startsWith(PERSISTENT_CHAT_IMPORT)){
-        unresolved(
-            importer,
-            specifier,
-            PERSISTENT_CHAT_MODULE,
-            'does not match the exact browser import-map key'
-        );
-    }
-    const reachableSpecifier=stripQueryAndHash(specifier);
-    if(!reachableSpecifier)unresolved(importer,specifier,'<empty>');
-    if(reachableSpecifier.includes('%')){
-        unresolved(
-            importer,
-            specifier,
-            reachableSpecifier,
-            'contains percent-encoded path bytes whose browser URL normalization is outside the '
-                +'deterministic shipped-runtime subset'
-        );
-    }
-    const sdkBrowserTarget=SDK_BROWSER_SELF_IMPORTS.get(reachableSpecifier);
-    if(sdkBrowserTarget){
-        if(reachableSpecifier!==specifier){
-            unresolved(
-                importer,
-                specifier,
-                sdkBrowserTarget,
-                'uses a query or fragment that cannot match its exact browser import-map key'
-            );
-        }
-        if(!files.has(sdkBrowserTarget))unresolved(importer,specifier,sdkBrowserTarget);
-        return {target:sdkBrowserTarget};
-    }
-    if(reachableSpecifier===RUNTIME_STRONG_TYPE_IMPORT){
-        const target='dependencies/strong-type/index.js';
-        if(reachableSpecifier!==specifier){
-            unresolved(
-                importer,
-                specifier,
-                target,
-                'uses a query or fragment that cannot match its exact browser import-map key'
-            );
-        }
-        if(!files.has(target))unresolved(importer,specifier,target);
-        return {target,runtimeStrongType:true};
-    }
-    if(reachableSpecifier==='event-pubsub'){
-        const target='sdk/dependencies/event-pubsub/index.js';
-        if(reachableSpecifier!==specifier){
-            unresolved(
-                importer,
-                specifier,
-                target,
-                'uses a query or fragment that cannot match its exact browser import-map key'
-            );
-        }
-        if(!files.has(target))unresolved(importer,specifier,target);
-        return {target,eventPubSub:true};
-    }
-    if(/[\u0000-\u0020\u007f\\]/u.test(reachableSpecifier)||reachableSpecifier.includes('//')){
-        unresolved(
-            importer,
-            specifier,
-            reachableSpecifier,
-            'contains browser-preprocessed control/space/backslash bytes or an empty path segment'
-        );
-    }
-    if(!reachableSpecifier.startsWith('./')&&!reachableSpecifier.startsWith('../')){
-        unresolved(importer,specifier,reachableSpecifier,'is not a supported shipped bare specifier');
-    }
-    const runtimePrefix='/__arcane_runtime__/';
-    const runtimeOrigin='https://arcane.invalid';
-    let resolved;
-    try{
-        resolved=new URL(
-            reachableSpecifier,
-            `${runtimeOrigin}${runtimePrefix}${importer}`
-        );
-    }catch{
-        unresolved(importer,specifier,reachableSpecifier,'is not a valid browser-relative URL');
-    }
-    if(resolved.origin!==runtimeOrigin||!resolved.pathname.startsWith(runtimePrefix)){
-        unresolved(importer,specifier,resolved.pathname,'escapes the shipped workspace runtime');
-    }
-    let target;
-    try{target=decodeURIComponent(resolved.pathname.slice(runtimePrefix.length));}
-    catch{
-        unresolved(importer,specifier,resolved.pathname,'does not have a deterministic decoded URL path');
-    }
-    if(target==='.'||target.startsWith('../')||path.posix.isAbsolute(target)){
-        unresolved(importer,specifier,target,'escapes the shipped workspace runtime');
-    }
-    if(!files.has(target))unresolved(importer,specifier,target);
-    if(!JAVASCRIPT_EXTENSION.test(target)){
-        unresolved(importer,specifier,target,'is not a JavaScript module');
-    }
-    return {target,strongType:false};
+        imports
+    };
 }
 
 function registerSpecifier(registry,specifier,target){
-    const key=collisionKey(specifier);
-    const existing=registry.get(key);
-    if(existing&&existing.specifier!==specifier||existing&&existing.target!==target){
-        fail(
-            `Import-map specifier collision: "${specifier}" (${target}) and `
-            +`"${existing.specifier}" (${existing.target}) normalize to the same case/NFC key. `
-            +'Rename one shipped module so every extensionless named specifier is unique.',
-            'ARCANE_IMPORT_MAP_COLLISION'
-        );
-    }
-    registry.set(key,{specifier,target});
+    registry.set(specifier,{specifier,target});
 }
 
 function validateInventory(files){
     if(!Array.isArray(files))throw new TypeError('buildImportMap files must be an array.');
     const exact=new Set();
-    const normalized=new Map();
-    for(const value of [...files].sort(compareUtf8)){
+    for(const value of [...files].sort(compareText)){
         const relative=safeRelativePath(value,'runtime inventory path');
-        if(/[%?#\u0000-\u0020\u007f]/u.test(relative)||relative.includes('//')){
-            fail(
-                `Import-map runtime inventory path is not browser-URL-safe: ${relative}. `
-                +'Percent/delimiter bytes, control/space bytes, and empty path segments are not '
-                +'allowed in authenticated runtime filenames.'
-            );
-        }
-        if(exact.has(relative))fail(`Import-map runtime inventory repeats ${relative}.`);
         exact.add(relative);
-        const key=collisionKey(relative);
-        const prior=normalized.get(key);
-        if(prior&&prior!==relative){
-            fail(
-                `Import-map runtime path collision: "${prior}" and "${relative}" normalize to `
-                +'the same case/NFC path. Rename one shipped file before regenerating the map.',
-                'ARCANE_IMPORT_MAP_COLLISION'
-            );
-        }
-        normalized.set(key,relative);
     }
     return exact;
 }
 
-export async function buildImportMap({files,readFile,signal}={}){
-    if(typeof readFile!=='function')throw new TypeError('buildImportMap readFile must be a function.');
+export async function buildImportMap({files,signal}={}){
     throwIfAborted(signal);
     const inventory=validateInventory(files);
-    const candidates=[...inventory]
+    const modules=[...inventory]
         .filter(relative=>relative.startsWith('modules/')
             &&!relative.slice('modules/'.length).includes('/')
             &&JAVASCRIPT_EXTENSION.test(relative))
-        .sort(compareUtf8);
-    const scans=new Map();
-    async function scan(relative){
-        throwIfAborted(signal);
-        if(scans.has(relative))return scans.get(relative);
-        const bytes=await readFile(relative);
-        throwIfAborted(signal);
-        const source=Buffer.isBuffer(bytes)||bytes instanceof Uint8Array
-            ?Buffer.from(bytes).toString('utf8'):String(bytes);
-        const result=scanModuleImports(source,{importer:relative});
-        scans.set(relative,result);
-        return result;
-    }
-
-    const roots=[];
+        .sort(compareText);
+    const namedRegistry=new Map();
     const excludedModules=[];
-    for(const relative of candidates){
-        const result=await scan(relative);
-        if(!result.hasModuleSyntax)continue;
+    for(const relative of modules){
+        throwIfAborted(signal);
         if(relative===NODE_ONLY_MODULE){
             excludedModules.push(relative);
             continue;
         }
-        roots.push(relative);
-    }
-    const hasSdkBrowserGraph=inventory.has(SDK_BROWSER_ENTRY);
-    const hasSdkAiGraph=inventory.has(SDK_BROWSER_AI_ENTRY);
-    const hasSdkSpeechGraph=inventory.has(SDK_BROWSER_SPEECH_ENTRY);
-    if(hasSdkAiGraph&&!hasSdkBrowserGraph){
-        unresolved(SDK_BROWSER_AI_ENTRY,'<authenticated SDK browser closure>',SDK_BROWSER_ENTRY);
-    }
-    if(hasSdkSpeechGraph&&!hasSdkAiGraph){
-        unresolved(SDK_BROWSER_SPEECH_ENTRY,'<authenticated SDK browser closure>',SDK_BROWSER_AI_ENTRY);
-    }
-    if(hasSdkBrowserGraph){
-        for(const required of SDK_BROWSER_FILES){
-            if(!inventory.has(required)){
-                unresolved(SDK_BROWSER_ENTRY,'<authenticated SDK browser closure>',required);
-            }
-        }
-        for(const [packagePath,expectedName,expectedVersion] of [
-            ['dependencies/strong-type/package.json','strong-type','1.1.0'],
-            ['sdk/dependencies/event-pubsub/package.json','event-pubsub','6.1.0'],
-            ['sdk/dependencies/strong-type/package.json','strong-type','2.0.0']
-        ]){
-            if(!inventory.has(packagePath)){
-                unresolved(SDK_BROWSER_ENTRY,'<authenticated dependency identity>',packagePath);
-            }
-            let document;
-            try{document=JSON.parse(Buffer.from(await readFile(packagePath)).toString('utf8'));}
-            catch{
-                unresolved(SDK_BROWSER_ENTRY,'<authenticated dependency identity>',packagePath,'is not valid package JSON');
-            }
-            if(document?.name!==expectedName||document?.version!==expectedVersion){
-                unresolved(
-                    SDK_BROWSER_ENTRY,
-                    '<authenticated dependency identity>',
-                    packagePath,
-                    `must identify exactly as ${expectedName}@${expectedVersion}`
-                );
-            }
-        }
-    }
-
-    const namedRegistry=new Map();
-    for(const relative of roots){
         const name=path.posix.basename(relative).replace(JAVASCRIPT_EXTENSION,'');
         registerSpecifier(namedRegistry,`arcane/${name}`,`./arcane/${relative}`);
     }
-    if(hasSdkBrowserGraph){
-        registerSpecifier(
-            namedRegistry,
-            'arcane-os/event-manager',
-            './arcane/sdk/event-manager.mjs'
-        );
-        if(hasSdkAiGraph){
-            registerSpecifier(
-                namedRegistry,
-                'arcane-os/ai/browser-wasm',
-                './arcane/sdk/ai/browser-wasm.mjs'
-            );
-            registerSpecifier(
-                namedRegistry,
-                'arcane-os/ai/browser-speech',
-                './arcane/sdk/ai/browser-speech.mjs'
-            );
-        }
-    }
-
-    const sdkRoots=hasSdkBrowserGraph
-        ?[
-            SDK_BROWSER_ENTRY,
-            ...(hasSdkAiGraph?[SDK_BROWSER_AI_ENTRY]:[]),
-            ...(hasSdkSpeechGraph?[SDK_BROWSER_SPEECH_ENTRY]:[]),
-        ]:[];
-    const queue=[...roots,...sdkRoots];
-    const reached=new Set();
-    const entities=new Set();
-    let usesRuntimeStrongType=false;
-    let usesEventPubSub=false;
-    while(queue.length>0){
+    const entities=[...inventory].filter(relative=>relative.startsWith('entities/')
+        &&!relative.slice('entities/'.length).includes('/')
+        &&JAVASCRIPT_EXTENSION.test(relative)).sort(compareText);
+    for(const relative of entities){
         throwIfAborted(signal);
-        const importer=queue.shift();
-        if(reached.has(importer))continue;
-        reached.add(importer);
-        const result=await scan(importer);
-        for(const imported of result.imports){
-            const resolution=resolveImport(importer,imported.specifier,inventory);
-            if(resolution.runtimeStrongType)usesRuntimeStrongType=true;
-            if(resolution.eventPubSub)usesEventPubSub=true;
-            if(resolution.persistentChat){
-                registerSpecifier(
-                    namedRegistry,
-                    PERSISTENT_CHAT_IMPORT,
-                    './arcane/modules/PersistentAIChatSession.js'
-                );
-            }
-            if(resolution.target.startsWith('entities/'))entities.add(resolution.target);
-            if(!reached.has(resolution.target))queue.push(resolution.target);
-        }
-    }
-
-    for(const relative of [...entities].sort(compareUtf8)){
         const name=path.posix.basename(relative).replace(JAVASCRIPT_EXTENSION,'');
         registerSpecifier(namedRegistry,`arcane/entities/${name}`,`./arcane/${relative}`);
     }
-    if(usesRuntimeStrongType){
+    for(const [specifier,relative] of STATIC_RUNTIME_PACKAGE_IMPORTS){
+        if(inventory.has(relative)){
+            registerSpecifier(namedRegistry,specifier,`./arcane/${relative}`);
+        }
+    }
+    for(const [specifier,relative] of SDK_BROWSER_SELF_IMPORTS){
+        if(inventory.has(relative)){
+            registerSpecifier(namedRegistry,specifier,`./arcane/${relative}`);
+        }
+    }
+    if(inventory.has('sdk/dom-event-instrumentation.mjs')){
+        registerSpecifier(
+            namedRegistry,
+            'arcane-os/dom-event-instrumentation',
+            './arcane/sdk/dom-event-instrumentation.mjs'
+        );
+    }
+    if(inventory.has(PERSISTENT_CHAT_MODULE)){
+        registerSpecifier(
+            namedRegistry,
+            PERSISTENT_CHAT_IMPORT,
+            './arcane/modules/PersistentAIChatSession.js'
+        );
+    }
+    if(inventory.has('dependencies/strong-type/index.js')){
         registerSpecifier(
             namedRegistry,
             './node_modules/strong-type/index.js',
             './arcane/dependencies/strong-type/index.js'
         );
     }
-    if(usesEventPubSub){
+    if(inventory.has('sdk/dependencies/event-pubsub/index.js')){
         registerSpecifier(
             namedRegistry,
             'event-pubsub',
@@ -1165,34 +865,24 @@ export async function buildImportMap({files,readFile,signal}={}){
         );
     }
     const imports={};
-    for(const entry of [...namedRegistry.values()].sort((left,right)=>compareUtf8(left.specifier,right.specifier))){
+    for(const entry of [...namedRegistry.values()].sort((left,right)=>compareText(left.specifier,right.specifier))){
         imports[entry.specifier]=entry.target;
     }
-    return Object.freeze({
-        imports:Object.freeze(imports),
-        entryCount:Object.keys(imports).length,
-        excludedModules:Object.freeze(excludedModules.sort(compareUtf8)),
-        reachedFiles:Object.freeze([...reached].sort(compareUtf8))
-    });
-}
-
-function sameFileIdentity(left,right){
-    return left.dev===right.dev&&left.ino===right.ino&&left.size===right.size
-        &&left.mtimeNs===right.mtimeNs&&left.ctimeNs===right.ctimeNs
-        &&left.nlink===right.nlink;
-}
-
-function sameFileLocation(left,right){
-    return left.dev===right.dev&&left.ino===right.ino;
-}
-
-function sha256(bytes){
-    return createHash('sha256').update(bytes).digest('hex');
+    return {
+        imports,
+        excludedModules:excludedModules.sort(compareText)
+    };
 }
 
 function pathInside(root,target){
     const relative=path.relative(root,target);
     return relative===''||(!relative.startsWith('..')&&!path.isAbsolute(relative));
+}
+
+function samePath(left,right){
+    const a=path.resolve(left);
+    const b=path.resolve(right);
+    return process.platform==='win32'?a.toLowerCase()===b.toLowerCase():a===b;
 }
 
 async function physicalRuntime(workspaceRoot,signal){
@@ -1207,11 +897,14 @@ async function physicalRuntime(workspaceRoot,signal){
         fail('Workspace Arcane runtime must be a real directory, not a symbolic link or junction.');
     }
     const canonicalRoot=await realpath(requestedRoot);
+    if(!samePath(requestedRoot,canonicalRoot)){
+        fail('Workspace Arcane runtime must stay inside its physical workspace directory.');
+    }
     const files=[];
     async function visit(directory,relativeRoot=''){
         throwIfAborted(signal);
         const entries=await readdir(directory,{withFileTypes:true});
-        entries.sort((left,right)=>compareUtf8(left.name,right.name));
+        entries.sort((left,right)=>compareText(left.name,right.name));
         for(const entry of entries){
             throwIfAborted(signal);
             const relative=relativeRoot?`${relativeRoot}/${entry.name}`:entry.name;
@@ -1226,43 +919,14 @@ async function physicalRuntime(workspaceRoot,signal){
         }
     }
     await visit(canonicalRoot);
-    return {
-        files,
-        async readFile(relative){
-            throwIfAborted(signal);
-            safeRelativePath(relative,'runtime read path');
-            const absolute=path.resolve(canonicalRoot,...relative.split('/'));
-            if(!pathInside(canonicalRoot,absolute))fail(`Import-map runtime read escapes arcane/: ${relative}.`);
-            const before=await lstat(absolute,{bigint:true});
-            if(before.isSymbolicLink()||!before.isFile()){
-                fail(`Workspace Arcane runtime module is not a real file: ${relative}.`);
-            }
-            let handle;
-            try{handle=await open(absolute,READ_ONLY_NO_FOLLOW);}
-            catch(error){
-                if(error?.code==='ELOOP')fail(`Workspace Arcane runtime module became a symlink: ${relative}.`);
-                throw error;
-            }
-            try{
-                const opened=await handle.stat({bigint:true});
-                if(!sameFileIdentity(before,opened)){
-                    fail(`Workspace Arcane runtime module changed while opening: ${relative}.`);
-                }
-                const bytes=await handle.readFile();
-                const after=await handle.stat({bigint:true});
-                if(!sameFileIdentity(opened,after)){
-                    fail(`Workspace Arcane runtime module changed while reading: ${relative}.`);
-                }
-                const canonicalFile=await realpath(absolute);
-                if(!pathInside(canonicalRoot,canonicalFile)){
-                    fail(`Workspace Arcane runtime module left its root: ${relative}.`);
-                }
-                return bytes;
-            }finally{
-                await handle.close();
-            }
-        }
-    };
+    return {files};
+}
+
+async function managedImportMapBuild(resolvedWorkspace,signal){
+    const runtime=await physicalRuntime(resolvedWorkspace,signal);
+    const built=await buildImportMap({files:runtime.files,signal});
+    const json=`${JSON.stringify({imports:built.imports},null,2).replaceAll('<','\\u003c')}\n`;
+    return {built,json};
 }
 
 function asciiLower(value){
@@ -1421,7 +1085,7 @@ function htmlTagEnd(html,start){
     fail('Application HTML contains a tag that reaches end of file before ">".');
 }
 
-const RAW_TEXT_ELEMENTS=new Set(['iframe','noembed','noframes','script','style','xmp']);
+const RAW_TEXT_ELEMENTS=new Set(['iframe','noembed','noframes','noscript','script','style','xmp']);
 const RCDATA_ELEMENTS=new Set(['textarea','title']);
 const TEXT_ELEMENTS=new Set([...RAW_TEXT_ELEMENTS,...RCDATA_ELEMENTS]);
 
@@ -1429,15 +1093,6 @@ function rawElementEnd(html,tag,openEnd){
     const closePattern=new RegExp(`<\\/${tag}(?=[\\t\\n\\f\\r />]|$)`,'gi');
     closePattern.lastIndex=openEnd;
     const close=closePattern.exec(html);
-    if(tag==='script'){
-        const escapedStart=html.indexOf('<!--',openEnd);
-        if(escapedStart>=0&&(!close||escapedStart<close.index)){
-            fail(
-                'Application HTML contains legacy escaped script syntax, which is outside the '
-                +'deterministic import-map HTML subset.'
-            );
-        }
-    }
     if(!close)return {end:html.length,closed:false};
     const end=htmlTagEnd(html,close.index+close[0].length);
     const closeTag=html.slice(close.index,end);
@@ -1448,9 +1103,8 @@ function rawElementEnd(html,tag,openEnd){
 }
 
 function commentEnd(html,start){
-    if(html.startsWith('<!-->',start)||html.startsWith('<!--->',start)){
-        fail('Application HTML contains an abrupt comment close outside the deterministic subset.');
-    }
+    if(html.startsWith('<!-->',start))return start+5;
+    if(html.startsWith('<!--->',start))return start+6;
     const canonical=html.indexOf('-->',start+4);
     const bang=html.indexOf('--!>',start+4);
     const close=canonical<0?bang:bang<0?canonical:Math.min(canonical,bang);
@@ -1469,78 +1123,10 @@ function validateEndTag(source,name){
     }
 }
 
-function rejectDeclarativeShadowTemplate(open){
-    const attributes=parseTagAttributes(open);
-    if(!attributes.has('shadowrootmode'))return;
-    structuralAttribute(attributes,'shadowrootmode','template');
-    fail(
-        'Application HTML contains declarative shadow DOM, whose connected module loads are '
-        +'outside the deterministic import-map HTML subset.'
-    );
-}
-
 function selectElementEnd(html,openEnd){
-    let cursor=openEnd;
-    const elements=[];
-    while(cursor<html.length){
-        const start=html.indexOf('<',cursor);
-        if(start<0){
-            fail('Application HTML contains an unterminated <select> element.');
-        }
-        if(html.startsWith('<!--',start)){
-            cursor=commentEnd(html,start);
-            continue;
-        }
-        if(html.startsWith('<!',start)||html.startsWith('<?',start)){
-            fail('Application HTML select contains an unsupported declaration or processing instruction.');
-        }
-        const head=htmlTagHead(html,start);
-        if(!head){
-            if(html.startsWith('</',start)||/^<[A-Za-z]/u.test(html.slice(start))){
-                fail('Application HTML select contains a malformed tag.');
-            }
-            cursor=start+1;
-            continue;
-        }
-        const name=htmlTagName(head[1]);
-        const end=htmlTagEnd(html,start+head[0].length);
-        const closing=html[start+1]==='/';
-        if(closing)validateEndTag(html.slice(start,end),name);
-        if(name==='frame'||name==='frameset'){
-            fail(`Application HTML contains unsupported structural element <${name}>.`);
-        }
-        if(name==='select'){
-            if(!closing){
-                fail('Application HTML contains a nested <select> element.');
-            }
-            if(elements.length>0){
-                fail(`Application HTML closes <select> before </${elements.at(-1)}> is present.`);
-            }
-            return end;
-        }
-        if(name!=='option'&&name!=='optgroup'){
-            fail(
-                `Application HTML select contains unsupported <${closing?'/':''}${name}> markup. `
-                +'Only text, comments, option, and optgroup are accepted inside select.'
-            );
-        }
-        if(closing){
-            if(elements.at(-1)!==name){
-                fail(`Application HTML select contains an unmatched </${name}> end tag.`);
-            }
-            elements.pop();
-        }else{
-            if(name==='optgroup'&&elements.length>0){
-                fail('Application HTML select contains a nested or option-contained <optgroup>.');
-            }
-            if(name==='option'&&elements.at(-1)==='option'){
-                fail('Application HTML select contains nested <option> elements.');
-            }
-            elements.push(name);
-        }
-        cursor=end;
-    }
-    fail('Application HTML contains an unterminated <select> element.');
+    const selected=rawElementEnd(html,'select',openEnd);
+    if(!selected.closed)fail('Application HTML contains an unterminated <select> element.');
+    return selected.end;
 }
 
 function nestedTemplateEnd(html,openEnd){
@@ -1554,7 +1140,8 @@ function nestedTemplateEnd(html,openEnd){
             continue;
         }
         if(html.startsWith('<!',start)||html.startsWith('<?',start)){
-            fail('Application HTML template contains an unsupported declaration or processing instruction.');
+            cursor=htmlTagEnd(html,start+2);
+            continue;
         }
         const head=htmlTagHead(html,start);
         if(!head){
@@ -1568,19 +1155,13 @@ function nestedTemplateEnd(html,openEnd){
         const end=htmlTagEnd(html,start+head[0].length);
         const closing=html[start+1]==='/';
         if(closing)validateEndTag(html.slice(start,end),name);
-        if(name==='frame'||name==='frameset'){
-            fail(`Application HTML contains unsupported structural element <${name}>.`);
-        }
         if(name==='select'){
-            if(closing)fail('Application HTML contains an unmatched </select> end tag.');
+            if(closing){
+                cursor=end;
+                continue;
+            }
             cursor=selectElementEnd(html,end);
             continue;
-        }
-        if(name==='svg'||name==='math'){
-            fail(`Application HTML contains unsupported foreign-content element <${name}>.`);
-        }
-        if(!closing&&name==='noscript'){
-            fail('Application HTML contains <noscript>, whose active parsing depends on browser mode.');
         }
         if(!closing&&name==='plaintext')return html.length;
         if(!closing&&TEXT_ELEMENTS.has(name)){
@@ -1591,7 +1172,6 @@ function nestedTemplateEnd(html,openEnd){
             cursor=end;
             continue;
         }
-        if(!closing)rejectDeclarativeShadowTemplate(html.slice(start,end));
         if(closing)depth-=1;
         else depth+=1;
         cursor=end;
@@ -1608,7 +1188,6 @@ function scanHtmlStructure(html){
     let headClose=-1;
     let bodyClose=-1;
     let cursor=0;
-    let sawDoctype=false;
     while(cursor<html.length){
         const start=html.indexOf('<',cursor);
         if(start<0)break;
@@ -1618,18 +1197,12 @@ function scanHtmlStructure(html){
         }
         if(html.startsWith('<!',start)){
             const end=htmlTagEnd(html,start+2);
-            const declaration=html.slice(start,end);
-            if(!/^<!doctype[\t\n\f\r ]+html[\t\n\f\r ]*>$/i.test(declaration)
-                ||sawDoctype
-                ||!/^(?:\ufeff)?[\t\n\f\r ]*$/u.test(html.slice(0,start))){
-                fail('Application HTML contains an unsupported or misplaced declaration.');
-            }
-            sawDoctype=true;
             cursor=end;
             continue;
         }
         if(html.startsWith('<?',start)){
-            fail('Application HTML contains an unsupported processing instruction.');
+            cursor=htmlTagEnd(html,start+2);
+            continue;
         }
         const head=htmlTagHead(html,start);
         if(!head){
@@ -1643,16 +1216,13 @@ function scanHtmlStructure(html){
         const closing=html[start+1]==='/';
         const openEnd=htmlTagEnd(html,start+head[0].length);
         const open=html.slice(start,openEnd);
-        if(tag==='frame'||tag==='frameset'){
-            fail(`Application HTML contains unsupported structural element <${tag}>.`);
-        }
         if(tag==='select'){
-            if(closing)fail('Application HTML contains an unmatched </select> end tag.');
+            if(closing){
+                cursor=openEnd;
+                continue;
+            }
             cursor=selectElementEnd(html,openEnd);
             continue;
-        }
-        if(tag==='svg'||tag==='math'){
-            fail(`Application HTML contains unsupported foreign-content element <${tag}>.`);
         }
         if(closing){
             validateEndTag(open,tag);
@@ -1677,12 +1247,8 @@ function scanHtmlStructure(html){
             continue;
         }
         if(tag==='template'){
-            rejectDeclarativeShadowTemplate(open);
             cursor=nestedTemplateEnd(html,openEnd);
             continue;
-        }
-        if(tag==='noscript'){
-            fail('Application HTML contains <noscript>, whose active parsing depends on browser mode.');
         }
         if(tag==='plaintext'){
             cursor=html.length;
@@ -1759,7 +1325,7 @@ function firstBlockingLoadPosition(html,{skipManaged=false}={}){
 export function inspectImportMapHtml(html){
     const source=String(html);
     const structure=scanHtmlStructure(source);
-    const bases=structure.bases.map(base=>Object.freeze({
+    const bases=structure.bases.map(base=>({
         start:base.start,
         end:base.end,
         href:structuralAttribute(parseTagAttributes(base.open),'href','base')
@@ -1768,43 +1334,43 @@ export function inspectImportMapHtml(html){
         const attributes=parseTagAttributes(script.open);
         return attributes.has(MANAGED_IMPORT_MAP_ATTRIBUTE)
             &&scriptType(attributes)==='importmap';
-    }).map(script=>Object.freeze({start:script.start,end:script.end}));
+    }).map(script=>({start:script.start,end:script.end}));
     const scripts=structure.scripts.map(script=>{
         const attributes=parseTagAttributes(script.open);
-        return Object.freeze({
+        return {
             start:script.start,
             end:script.end,
             type:scriptType(attributes),
             src:structuralAttribute(attributes,'src','script'),
             managed:attributes.has(MANAGED_IMPORT_MAP_ATTRIBUTE)
-        });
+        };
     });
     const links=structure.links.map(link=>{
         const attributes=parseTagAttributes(link.open);
-        return Object.freeze({
+        return {
             start:link.start,
             end:link.end,
             rel:canonicalHtmlToken(structuralAttribute(attributes,'rel','link')),
             href:structuralAttribute(attributes,'href','link')
-        });
+        };
     });
     const metas=structure.metas.map(meta=>{
         const attributes=parseTagAttributes(meta.open);
-        return Object.freeze({
+        return {
             start:meta.start,
             end:meta.end,
             name:canonicalHtmlToken(structuralAttribute(attributes,'name','meta')),
             content:structuralAttribute(attributes,'content','meta')
-        });
+        };
     });
-    return Object.freeze({
-        bases:Object.freeze(bases),
-        managedMaps:Object.freeze(managedMaps),
-        scripts:Object.freeze(scripts),
-        links:Object.freeze(links),
-        metas:Object.freeze(metas),
+    return {
+        bases,
+        managedMaps,
+        scripts,
+        links,
+        metas,
         firstModulePosition:firstModulePosition(source)
-    });
+    };
 }
 
 function documentBaseHref(relative){
@@ -1826,22 +1392,12 @@ function renderManagedHtml(html,json,baseHref='../../'){
     for(const script of structure.scripts){
         const attributes=parseTagAttributes(script.open);
         if(attributes.has(MANAGED_IMPORT_MAP_ATTRIBUTE)){
-            if(scriptType(attributes)!=='importmap'){
-                fail(`Managed ${MANAGED_IMPORT_MAP_ATTRIBUTE} script must use type="importmap".`);
-            }
+            if(scriptType(attributes)!=='importmap')continue;
             if(!script.closed){
                 fail(`Application HTML contains an unterminated ${MANAGED_IMPORT_MAP_ATTRIBUTE} script.`);
             }
             complete.push({start:script.start,end:script.end});
-        }else if(scriptType(attributes)==='importmap'){
-            fail(
-                `Application HTML already contains an unmanaged import map. Remove it or add `
-                +`${MANAGED_IMPORT_MAP_ATTRIBUTE}, then rerun arcane import-map.`
-            );
         }
-    }
-    if(complete.length>1){
-        fail(`Application HTML contains multiple ${MANAGED_IMPORT_MAP_ATTRIBUTE} scripts.`);
     }
     const withoutManaged=removeManagedBlocks(html,complete);
     const cleanedStructure=scanHtmlStructure(withoutManaged);
@@ -1890,405 +1446,166 @@ function renderManagedHtml(html,json,baseHref='../../'){
     return rendered;
 }
 
-async function readRealFile(filePath,label){
-    const state=await readRealFileState(filePath,label);
-    return state.bytes;
-}
-
-async function readRealFileState(filePath,label,{optional=false}={}){
-    let info;
-    try{info=await lstat(filePath,{bigint:true});}
-    catch(error){
-        if(optional&&error?.code==='ENOENT')return {exists:false,filePath};
-        throw error;
-    }
-    if(info.isSymbolicLink()||!info.isFile())fail(`${label} must be a real file: ${filePath}.`);
-    const handle=await open(filePath,READ_ONLY_NO_FOLLOW);
-    try{
-        const opened=await handle.stat({bigint:true});
-        if(!sameFileIdentity(info,opened))fail(`${label} changed while opening: ${filePath}.`);
-        const bytes=await handle.readFile();
-        const after=await handle.stat({bigint:true});
-        if(!sameFileIdentity(opened,after))fail(`${label} changed while reading: ${filePath}.`);
-        return {exists:true,filePath,bytes,identity:after};
-    }finally{
-        await handle.close();
-    }
-}
-
-async function captureDirectoryState(root,directory,{create=false}={}){
+async function physicalDirectory(root,directory,{create=false}={}){
     const resolvedRoot=path.resolve(root);
     const resolvedDirectory=path.resolve(directory);
     if(!pathInside(resolvedRoot,resolvedDirectory)){
         fail(`Import-map directory escapes its application root: ${resolvedDirectory}.`);
     }
-    const rootInfo=await lstat(resolvedRoot,{bigint:true});
+    const rootInfo=await lstat(resolvedRoot);
     if(rootInfo.isSymbolicLink()||!rootInfo.isDirectory()){
         fail(`Import-map application root must be a real directory: ${resolvedRoot}.`);
     }
     const canonicalRoot=await realpath(resolvedRoot);
-    const canonicalRootInfo=await lstat(canonicalRoot,{bigint:true});
-    if(canonicalRootInfo.isSymbolicLink()||!canonicalRootInfo.isDirectory()
-        ||!sameDirectoryIdentity(rootInfo,canonicalRootInfo)){
-        fail(`Import-map application root changed while authenticating: ${resolvedRoot}.`);
+    if(!samePath(resolvedRoot,canonicalRoot)){
+        fail(`Import-map application root must be one physical directory: ${resolvedRoot}.`);
     }
-    const entries=[{location:resolvedRoot,identity:canonicalRootInfo,canonical:canonicalRoot}];
     const relative=path.relative(resolvedRoot,resolvedDirectory);
     let current=resolvedRoot;
-    let parent=entries[0];
     for(const part of relative.split(path.sep).filter(Boolean)){
-        const parentBefore=await lstat(parent.location,{bigint:true});
-        if(parentBefore.isSymbolicLink()||!parentBefore.isDirectory()
-            ||!sameDirectoryIdentity(parentBefore,parent.identity)
-            ||await realpath(parent.location)!==parent.canonical){
-            fail(`Import-map directory changed before creating a child: ${parent.location}.`);
-        }
         const child=path.join(current,part);
         if(create){
             try{await mkdir(child);}
             catch(error){if(error?.code!=='EEXIST')throw error;}
         }
-        const info=await lstat(child,{bigint:true});
+        const info=await lstat(child);
         if(info.isSymbolicLink()||!info.isDirectory()){
             fail(`Import-map directory must be a real directory: ${child}.`);
         }
         const canonical=await realpath(child);
-        if(!pathInside(canonicalRoot,canonical)||path.dirname(canonical)!==parent.canonical){
+        if(!pathInside(canonicalRoot,canonical)){
             fail(`Import-map directory resolves outside its application root: ${child}.`);
         }
-        const parentAfter=await lstat(parent.location,{bigint:true});
-        if(parentAfter.isSymbolicLink()||!parentAfter.isDirectory()
-            ||!sameDirectoryIdentity(parentAfter,parent.identity)
-            ||await realpath(parent.location)!==parent.canonical){
-            fail(`Import-map directory changed while creating a child: ${parent.location}.`);
-        }
-        const entry={location:child,identity:info,canonical};
-        entries.push(entry);
         current=child;
-        parent=entry;
     }
-    return {root:resolvedRoot,directory:resolvedDirectory,entries};
+    return {root:resolvedRoot,canonicalRoot,directory:resolvedDirectory};
 }
 
-function sameDirectoryIdentity(left,right){
-    return left.isDirectory()&&right.isDirectory()&&left.dev===right.dev&&left.ino===right.ino;
-}
-
-async function assertDirectoryState(state){
-    for(const entry of state.entries){
-        const info=await lstat(entry.location,{bigint:true});
-        if(info.isSymbolicLink()||!info.isDirectory()
-            ||!sameDirectoryIdentity(info,entry.identity)
-            ||await realpath(entry.location)!==entry.canonical){
-            fail(`Import-map directory changed during generation: ${entry.location}.`);
-        }
+async function readPhysicalTextFile(root,filePath,label){
+    const directory=await physicalDirectory(root,path.dirname(filePath));
+    const info=await lstat(filePath);
+    if(info.isSymbolicLink()||!info.isFile()){
+        fail(`${label} must be a real file: ${filePath}.`);
     }
+    const canonicalFile=await realpath(filePath);
+    if(!pathInside(directory.canonicalRoot,canonicalFile)){
+        fail(`${label} must stay inside its application root: ${filePath}.`);
+    }
+    return readFileFromDisk(filePath,'utf8');
 }
 
-async function stageSibling(filePath,bytes,directoryState){
-    await assertDirectoryState(directoryState);
-    const staged=path.join(
-        path.dirname(filePath),
-        `.${path.basename(filePath)}.arcane-stage-${String(process.pid)}-${randomUUID()}`
-    );
-    const content=Buffer.from(bytes);
-    let handle;
-    let ownedIdentity;
+async function assertPhysicalTextDestination(root,filePath,label,{createParent=false}={}){
+    const directory=await physicalDirectory(root,path.dirname(filePath),{create:createParent});
     try{
-        handle=await open(staged,WRITE_NEW_NO_FOLLOW,0o644);
-        ownedIdentity=await handle.stat({bigint:true});
-        await assertDirectoryState(directoryState);
-        await handle.writeFile(content);
-        await handle.sync();
-        await handle.close();
-        handle=null;
-        await assertDirectoryState(directoryState);
-        const identity=await lstat(staged,{bigint:true});
-        if(identity.isSymbolicLink()||!identity.isFile()
-            ||!sameFileLocation(identity,ownedIdentity)){
-            fail(`Import-map staged file changed while it was written: ${staged}.`);
+        const info=await lstat(filePath);
+        if(info.isSymbolicLink()||!info.isFile()){
+            fail(`${label} destination must be a real file when present.`);
         }
-        return {
-            path:staged,
-            identity,
-            directoryState,
-            byteLength:content.length,
-            hash:sha256(content)
-        };
+        const canonicalFile=await realpath(filePath);
+        if(!pathInside(directory.canonicalRoot,canonicalFile)){
+            fail(`${label} destination must stay inside its application root.`);
+        }
     }catch(error){
-        try{await handle?.close();}
-        catch(cleanupError){error.cleanupError??=cleanupError;}
-        if(ownedIdentity){
-            try{
-                const removed=await removeOwnedPath(staged,ownedIdentity,directoryState);
-                if(!removed)fail(`Import-map staged file could not be safely cleaned: ${staged}.`);
-            }catch(cleanupError){error.cleanupError??=cleanupError;}
-        }
-        throw error;
+        if(error?.code!=='ENOENT')throw error;
     }
 }
 
-async function removeOwnedPath(filePath,identity,directoryState){
-    try{await assertDirectoryState(directoryState);}
-    catch{return false;}
-    let current;
-    try{current=await lstat(filePath,{bigint:true});}
-    catch(error){
-        if(error?.code==='ENOENT')return true;
-        throw error;
-    }
-    if(current.isSymbolicLink()||!current.isFile()||!sameFileLocation(current,identity))return false;
-    await rm(filePath);
-    return true;
-}
-
-async function verifiedFileAt(filePath,expected,label,{strictIdentity=true}={}){
-    await assertDirectoryState(expected.directoryState);
-    const before=await lstat(filePath,{bigint:true});
-    if(before.isSymbolicLink()||!before.isFile()
-        ||!sameFileLocation(before,expected.identity)
-        ||strictIdentity&&!sameFileIdentity(before,expected.identity)){
-        fail(`${label} changed before promotion.`);
-    }
-    let handle;
-    try{handle=await open(filePath,READ_ONLY_NO_FOLLOW);}
-    catch(error){
-        if(error?.code==='ELOOP')fail(`${label} became a symbolic link before promotion.`);
-        throw error;
-    }
-    let after;
-    try{
-        const opened=await handle.stat({bigint:true});
-        if(!sameFileIdentity(before,opened))fail(`${label} changed while opening.`);
-        const bytes=await handle.readFile();
-        after=await handle.stat({bigint:true});
-        if(!sameFileIdentity(opened,after)||bytes.length!==expected.byteLength
-            ||sha256(bytes)!==expected.hash){
-            fail(`${label} failed its identity or content check before promotion.`);
-        }
-    }finally{
-        await handle.close();
-    }
-    const current=await lstat(filePath,{bigint:true});
-    if(current.isSymbolicLink()||!current.isFile()||!sameFileIdentity(current,after)){
-        fail(`${label} changed after verification.`);
-    }
-    await assertDirectoryState(expected.directoryState);
-    return current;
-}
-
-function originalDescriptor(state){
-    return {
-        identity:state.identity,
-        directoryState:state.directoryState,
-        byteLength:state.bytes.length,
-        hash:sha256(state.bytes)
-    };
-}
-
-async function pathIsAbsent(filePath){
-    try{
-        await lstat(filePath);
-        return false;
-    }catch(error){
-        if(error?.code==='ENOENT')return true;
-        throw error;
-    }
-}
-
-async function restoreBackup(state,backup,label){
-    const expected=originalDescriptor(state);
-    await assertDirectoryState(state.directoryState);
-    if(!await pathIsAbsent(state.filePath)){
-        fail(`${label} changed before its import-map backup could be restored.`);
-    }
-    await verifiedFileAt(backup,expected,`${label} backup`,{strictIdentity:false});
-    await rename(backup,state.filePath);
-    await verifiedFileAt(state.filePath,expected,`${label} restored file`,{strictIdentity:false});
-}
-
-async function pathStateUnchanged(state,label){
-    if(!state.exists){
-        try{
-            await lstat(state.filePath);
-            fail(`${label} appeared while the import map was being generated.`);
-        }catch(error){
-            if(error?.code!=='ENOENT')throw error;
-        }
-        return;
-    }
-    const current=await lstat(state.filePath,{bigint:true});
-    if(current.isSymbolicLink()||!current.isFile()||!sameFileIdentity(current,state.identity)){
-        fail(`${label} changed while the import map was being generated.`);
-    }
-}
-
-async function installStagedFile(state,staged,label){
-    const backup=path.join(
-        path.dirname(state.filePath),
-        `.${path.basename(state.filePath)}.arcane-backup-${String(process.pid)}-${randomUUID()}`
-    );
-    let backedUp=false;
-    let promoted=false;
-    let installedIdentity=null;
-    try{
-        await assertDirectoryState(staged.directoryState);
-        await pathStateUnchanged(state,label);
-        await verifiedFileAt(staged.path,staged,`${label} staged file`);
-        if(state.exists){
-            await rename(state.filePath,backup);
-            backedUp=true;
-            await verifiedFileAt(
-                backup,
-                originalDescriptor(state),
-                `${label} backup`,
-                {strictIdentity:false}
-            );
-        }
-        await verifiedFileAt(staged.path,staged,`${label} staged file`);
-        await rename(staged.path,state.filePath);
-        promoted=true;
-        installedIdentity=await verifiedFileAt(
-            state.filePath,
-            staged,
-            `${label} installed file`,
-            {strictIdentity:false}
+async function writeGeneratedFiles({root,files,signal,onEvent}){
+    for(const file of files){
+        throwIfAborted(signal);
+        await assertPhysicalTextDestination(
+            root,
+            file.filePath,
+            file.label,
+            {createParent:file.createParent===true}
         );
-        await assertDirectoryState(staged.directoryState);
-    }catch(error){
-        if(promoted){
-            try{
-                const removed=await removeOwnedPath(
-                    state.filePath,
-                    installedIdentity??staged.identity,
-                    staged.directoryState
-                );
-                if(!removed)fail(`${label} changed before its failed promotion could be removed.`);
-            }catch(rollbackError){error.rollbackError??=rollbackError;}
-        }
-        if(backedUp){
-            try{await restoreBackup(state,backup,label);}
-            catch(rollbackError){error.rollbackError??=rollbackError;}
-        }
-        throw error;
     }
-    return {
-        async verify(){
-            if(!installedIdentity)fail(`${label} was not installed before pair verification.`);
-            return verifiedFileAt(
-                state.filePath,
-                {
-                    identity:installedIdentity,
-                    directoryState:staged.directoryState,
-                    byteLength:staged.byteLength,
-                    hash:staged.hash
-                },
-                `${label} committed file`
-            );
-        },
-        async commit(){
-            if(!backedUp)return;
-            const removed=await removeOwnedPath(backup,state.identity,staged.directoryState);
-            if(!removed)fail(`${label} backup changed before transaction cleanup.`);
-        },
-        async rollback(){
-            await assertDirectoryState(staged.directoryState);
-            if(!await pathIsAbsent(state.filePath)){
-                const removed=await removeOwnedPath(
-                    state.filePath,
-                    installedIdentity,
-                    staged.directoryState
-                );
-                if(!removed){
-                    fail(`${label} changed before its import-map transaction could roll back.`);
-                }
-            }
-            if(backedUp)await restoreBackup(state,backup,label);
-        }
-    };
-}
-
-async function commitGeneratedFiles({
-    files,
-    signal,
-    onEvent
-}){
-    const staged=[];
-    const installed=[];
-    let failure;
-    try{
-        for(const file of files){
-            throwIfAborted(signal);
-            staged.push(await stageSibling(
-                file.state.filePath,
-                file.bytes,
-                file.state.directoryState
-            ));
-        }
-        await emit(onEvent,{type:'import-map.commit.staged'});
+    const paths=[];
+    let eventError=null;
+    for(const file of files){
         throwIfAborted(signal);
-        for(const [index,file] of files.entries()){
-            installed.push(await installStagedFile(file.state,staged[index],file.label));
-            throwIfAborted(signal);
-        }
-        for(const transaction of installed)await transaction.verify();
-        await emit(onEvent,{
-            type:'import-map.commit.progress',
-            paths:Object.freeze(files.map(file=>file.state.filePath))
+        await writeFile(file.filePath,file.content,'utf8');
+        paths.push(file.filePath);
+        const currentEventError=await emit(onEvent,{
+            type:'import-map.write.progress',
+            paths:[...paths]
         });
-        throwIfAborted(signal);
-        for(const transaction of installed)await transaction.verify();
-    }catch(error){
-        for(const transaction of [...installed].reverse()){
-            await transaction.rollback().catch(rollback=>{error.rollbackError??=rollback;});
-        }
-        failure=error;
+        eventError??=currentEventError;
     }
-    const cleanupErrors=[];
-    for(const [index,stage] of staged.entries()){
-        if(index<installed.length)continue;
-        try{
-            const removed=await removeOwnedPath(
-                stage.path,
-                stage.identity,
-                stage.directoryState
-            );
-            if(!removed){
-                fail(`${files[index].label} stage could not be safely cleaned: ${stage.path}.`);
-            }
-        }catch(error){cleanupErrors.push(error);}
-    }
-    if(failure){
-        if(cleanupErrors.length>0){
-            failure.cleanupError??=cleanupErrors.length===1
-                ?cleanupErrors[0]
-                :new AggregateError(cleanupErrors,'Import-map transaction cleanup failed.');
-        }
-        throw failure;
-    }
-    if(cleanupErrors.length>0){
-        throw new AggregateError(cleanupErrors,'Import-map transaction cleanup failed.');
-    }
-
-    const cleanupWarnings=[];
-    for(const transaction of [...installed].reverse()){
-        try{await transaction.commit();}
-        catch(error){cleanupWarnings.push(error);}
-    }
-    for(const transaction of installed)await transaction.verify();
-    if(cleanupWarnings.length>0){
-        return Object.freeze(cleanupWarnings.map(error=>String(error?.message??error)));
-    }
-    return Object.freeze([]);
+    return eventError;
 }
 
 function resolvedAppRoot(workspaceRoot,appId,appRoot){
-    if(!SAFE_APP_ID.test(appId??'')){
-        fail(`Import-map app id must use lowercase letters, digits, and internal hyphens: ${String(appId)}.`);
+    if(typeof appId!=='string'||appId.trim()===''){
+        throw new TypeError('Import-map app id must be a nonempty string.');
     }
     const resolved=path.resolve(appRoot??path.join(workspaceRoot,'apps',appId));
     if(!pathInside(workspaceRoot,resolved))fail('Import-map application root must stay inside the workspace.');
     return resolved;
+}
+
+export async function createApplicationTestImportMapContext({
+    applicationRoot,
+    boundary='source',
+    imports={},
+    signal
+}={}){
+    if(typeof applicationRoot!=='string'||applicationRoot.trim()===''){
+        throw new TypeError('applicationRoot must be a nonempty string.');
+    }
+    if(!['source','dist','test'].includes(boundary)){
+        throw new TypeError('boundary must be source, dist, or test.');
+    }
+    if(imports===null||typeof imports!=='object'||Array.isArray(imports)){
+        throw new TypeError('imports must be a plain object.');
+    }
+    throwIfAborted(signal);
+    const requestedApplicationRoot=path.resolve(applicationRoot);
+    const applicationInfo=await lstat(requestedApplicationRoot);
+    const canonicalApplicationRoot=await realpath(requestedApplicationRoot);
+    if(applicationInfo.isSymbolicLink()||!applicationInfo.isDirectory()
+        ||!samePath(requestedApplicationRoot,canonicalApplicationRoot)){
+        fail('Application test import-map root must be one physical application directory.');
+    }
+    const requestedBase=boundary==='source'
+        ?canonicalApplicationRoot
+        :path.join(canonicalApplicationRoot,boundary);
+    const baseInfo=await lstat(requestedBase);
+    const canonicalBase=await realpath(requestedBase);
+    if(baseInfo.isSymbolicLink()||!baseInfo.isDirectory()
+        ||!samePath(requestedBase,canonicalBase)
+        ||!pathInside(canonicalApplicationRoot,canonicalBase)){
+        fail(`Application ${boundary} import-map base must be one physical app-owned directory.`);
+    }
+    const selectedImports={};
+    for(const [specifier,target] of Object.entries(imports)){
+        throwIfAborted(signal);
+        if(typeof specifier!=='string'||specifier===''||typeof target!=='string'
+            ||!target.startsWith('./')){
+            fail(`Application test import-map entry is invalid: ${String(specifier)}.`);
+        }
+        const relative=safeRelativePath(
+            target.slice(2),
+            `application test import-map target for ${specifier}`
+        );
+        if(boundary==='source'&&/^(?:dist|test)\//u.test(relative)){
+            fail(`Source import-map target selects another application boundary: ${specifier}.`);
+        }
+        const candidate=path.resolve(canonicalBase,...relative.split('/'));
+        const targetInfo=await lstat(candidate);
+        const canonicalTarget=await realpath(candidate);
+        if(targetInfo.isSymbolicLink()||!targetInfo.isFile()
+            ||!samePath(candidate,canonicalTarget)||!pathInside(canonicalBase,canonicalTarget)){
+            fail(`Application test import-map target leaves its physical ${boundary} directory: ${specifier}.`);
+        }
+        selectedImports[specifier]=target;
+    }
+    return {
+        protocol:'arcane-test-import-map/1',
+        boundary,
+        baseURL:pathToFileURL(`${canonicalBase}${path.sep}`).href,
+        imports:selectedImports
+    };
 }
 
 async function generateImportMapUnlocked({
@@ -2297,7 +1614,6 @@ async function generateImportMapUnlocked({
     appRoot,
     entry='index.html',
     documents,
-    workspaceRuntimeReceipt,
     signal,
     onEvent
 }={}){
@@ -2307,24 +1623,24 @@ async function generateImportMapUnlocked({
     throwIfAborted(signal);
     const resolvedWorkspace=path.resolve(workspaceRoot);
     const resolvedApp=resolvedAppRoot(resolvedWorkspace,appId,appRoot);
+    await physicalDirectory(resolvedWorkspace,resolvedApp);
     const safeEntry=safeRelativePath(entry,'application entry');
     const safeDocuments=normalizedDocumentPaths(safeEntry,documents);
-    const documentPaths=Object.freeze(safeDocuments.map(relative=>{
+    const documentPaths=safeDocuments.map(relative=>{
         const documentPath=path.resolve(resolvedApp,...relative.split('/'));
         if(!pathInside(resolvedApp,documentPath)){
             fail(`Import-map application document escapes its app root: ${relative}.`);
         }
         return documentPath;
-    }));
+    });
     const entryPath=documentPaths[0];
     const artifactPath=path.join(resolvedApp,...IMPORT_MAP_RELATIVE_PATH.split('/'));
-    await emit(onEvent,{
+    let eventError=await emit(onEvent,{
         type:'import-map.started',
         appId,
         artifactPath,
         entryPath,
-        documentPaths,
-        documentCount:documentPaths.length
+        documentPaths
     });
 
     const documentStates=[];
@@ -2333,94 +1649,40 @@ async function generateImportMapUnlocked({
         const label=index===0
             ?'Import-map application entry'
             :`Import-map application document ${safeDocuments[index]}`;
-        const directoryState=await captureDirectoryState(
-            resolvedWorkspace,
-            path.dirname(documentPath)
-        );
-        const state=await readRealFileState(documentPath,label);
+        const html=await readPhysicalTextFile(resolvedApp,documentPath,label);
         throwIfAborted(signal);
-        state.directoryState=directoryState;
-        const html=state.bytes.toString('utf8');
-        // Reject malformed application structure before traversing the substantially larger
-        // runtime graph. The real generated map is rendered and revalidated before commit.
+        // Reject malformed application structure before traversing the runtime inventory.
         const baseHref=documentBaseHref(safeDocuments[index]);
         renderManagedHtml(html,'{"imports":{}}\n',baseHref);
-        documentStates.push({state,html,label,baseHref});
+        documentStates.push({filePath:documentPath,html,label,baseHref});
     }
-    let runtime;
-    if(workspaceRuntimeReceipt){
-        await authenticateWorkspaceRuntimeReceipt(workspaceRuntimeReceipt,{
-            workspaceRoot:resolvedWorkspace,
-            signal
-        });
-        runtime={
-            files:workspaceRuntimeReceipt.files.map(file=>file.path),
-            readFile:relativePath=>readVerifiedWorkspaceRuntimeFile(workspaceRuntimeReceipt,{
-                workspaceRoot:resolvedWorkspace,
-                relativePath,
-                signal
-            })
-        };
-    }else{
-        runtime=await physicalRuntime(resolvedWorkspace,signal);
-    }
-    for(const required of SDK_BROWSER_FILES){
-        if(!runtime.files.includes(required)){
-            fail(
-                `Workspace Arcane runtime is missing the authenticated SDK browser file `
-                +`"${required}". Materialize the current SDK runtime, then rerun arcane import-map.`,
-                'ARCANE_IMPORT_MAP_UNRESOLVED'
-            );
-        }
-    }
-    const built=await buildImportMap({files:runtime.files,readFile:runtime.readFile,signal});
-    const document={imports:built.imports};
-    const json=`${JSON.stringify(document,null,2).replaceAll('<','\\u003c')}\n`;
-    const renderedDocuments=documentStates.map(item=>Object.freeze({
+    const {built,json}=await managedImportMapBuild(resolvedWorkspace,signal);
+    const renderedDocuments=documentStates.map(item=>({
         ...item,
-        bytes:Buffer.from(renderManagedHtml(item.html,json,item.baseHref),'utf8')
+        content:renderManagedHtml(item.html,json,item.baseHref)
     }));
 
     throwIfAborted(signal);
-    const artifactDirectoryState=await captureDirectoryState(
-        resolvedWorkspace,
-        path.dirname(artifactPath),
-        {create:true}
-    );
-    const artifactState=await readRealFileState(
-        artifactPath,
-        'Import-map artifact',
-        {optional:true}
-    );
-    artifactState.directoryState=artifactDirectoryState;
-    const artifactBytes=Buffer.from(json,'utf8');
-    const cleanupWarnings=await commitGeneratedFiles({
+    const writeEventError=await writeGeneratedFiles({
+        root:resolvedApp,
         files:[
-            {state:artifactState,bytes:artifactBytes,label:'Import-map artifact'},
+            {
+                filePath:artifactPath,
+                content:json,
+                label:'Import-map artifact',
+                createParent:true
+            },
             ...renderedDocuments.map(item=>({
-                state:item.state,
-                bytes:item.bytes,
+                filePath:item.filePath,
+                content:item.content,
                 label:item.label
             }))
         ],
         signal,
         onEvent
     });
-    const committedFiles=Object.freeze([
-        Object.freeze({
-            role:'artifact',
-            path:path.relative(resolvedWorkspace,artifactPath).split(path.sep).join('/'),
-            bytes:artifactBytes.length,
-            sha256:sha256(artifactBytes)
-        }),
-        ...renderedDocuments.map((item,index)=>Object.freeze({
-            role:index===0?'entry':'document',
-            path:path.relative(resolvedWorkspace,item.state.filePath).split(path.sep).join('/'),
-            bytes:item.bytes.length,
-            sha256:sha256(item.bytes)
-        }))
-    ]);
-    const receipt=Object.freeze({
+    eventError??=writeEventError;
+    const result={
         appId,
         artifactPath,
         artifactRelativePath:path.relative(resolvedWorkspace,artifactPath).split(path.sep).join('/'),
@@ -2428,52 +1690,35 @@ async function generateImportMapUnlocked({
         documentPaths,
         documentCount:documentPaths.length,
         imports:built.imports,
-        entryCount:built.entryCount,
         excludedModules:built.excludedModules,
-        files:committedFiles,
-        cleanupWarnings,
+        committed:true
+    };
+    const completedEventError=await emit(onEvent,{
+        type:'import-map.completed',
+        appId,
+        artifactPath,
+        entryPath,
+        documentPaths,
         committed:true
     });
-    try{
-        await emit(onEvent,{
-            type:'import-map.completed',
-            appId,
-            artifactPath,
-            entryPath,
-            documentPaths,
-            documentCount:receipt.documentCount,
-            entryCount:receipt.entryCount,
-            cleanupWarnings:receipt.cleanupWarnings,
-            committed:true
-        });
-    }catch(error){
-        return Object.freeze({
-            ...receipt,
-            eventDelivery:Object.freeze({
+    eventError??=completedEventError;
+    if(eventError){
+        return {
+            ...result,
+            eventDelivery:{
                 status:'degraded',
                 errorCode:'ARCANE_EVENT_DELIVERY_FAILED',
-                message:String(error?.message??error)
-            })
-        });
+                message:String(eventError?.message??eventError)
+            }
+        };
     }
-    return receipt;
+    return result;
 }
 
 export async function generateImportMap(options={}){
-    const {
-        workspaceRoot,
-        signal,
-        onEvent,
-        workspaceOperationLease
-    }=options??{};
+    const {workspaceRoot}=options??{};
     if(typeof workspaceRoot!=='string'||workspaceRoot.trim()===''){
         throw new TypeError('generateImportMap workspaceRoot must be a nonempty string.');
     }
-    return withWorkspaceOperationLock({
-        workspaceRoot,
-        operation:'import-map',
-        signal,
-        onEvent,
-        workspaceOperationLease
-    },()=>generateImportMapUnlocked(options));
+    return generateImportMapUnlocked(options);
 }

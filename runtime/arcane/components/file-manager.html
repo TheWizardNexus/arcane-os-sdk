@@ -13,9 +13,6 @@
         list-style:none;
         padding:1em;
         margin:0;
-        max-height: 1em;
-        overflow: hidden;
-        transition: max-height 250ms ease-out;
     }
 
     .directory.open{
@@ -314,15 +311,13 @@
 
     .tree-entry-name{
         min-width:0;
-        overflow:hidden;
-        text-overflow:ellipsis;
-        white-space:nowrap;
+        overflow-wrap:anywhere;
     }
 
     .tree-file-count{
         color:var(--platinum,var(--text-color));
         font-size:.75em;
-        white-space:nowrap;
+        overflow-wrap:anywhere;
     }
 
     .tree-empty,
@@ -512,24 +507,8 @@
         return `${events.descriptor.instanceId}:${action}:${operationSequence}`;
     }
 
-    function publicEventDetail(name,detail={}){
-        if(name==='file-manager-action'){
-            const publicDetail={action:String(detail.action||''),kind:String(detail.entry?.kind||''),hasEntry:Boolean(detail.path)};
-            if(detail.code){
-                publicDetail.code=String(detail.code);
-            }
-            if(detail.reason){
-                publicDetail.reason=String(detail.reason);
-            }
-            return publicDetail;
-        }
-        if(name==='file-manager-open'){
-            return {trigger:String(detail.trigger||''),kind:String(detail.entry?.kind||''),hasEntry:Boolean(detail.path)};
-        }
-        if(name==='file-manager-select'){
-            return {selected:Boolean(detail.path),kind:String(detail.entry?.kind||'')};
-        }
-        return {};
+    function publicEventDetail(_name,detail={}){
+        return detail;
     }
 
     function emit(name,detail={},cancelable=false,operationId=null){
@@ -1467,31 +1446,11 @@
 
             status.remove();
 
-            if(fileRef.size<1){
-                const empty=document.createElement('h2');
-
-                if(!layout){
-                    await dbopfs.delete(directory,fileName);
-                    if(destroyed||generation!==fileOpenGeneration){
-                        return false;
-                    }
-                    await loadAll();
-                    if(destroyed||generation!==fileOpenGeneration){
-                        return false;
-                    }
-                    empty.innerText='File was empty and has been deleted';
-                }else{
-                    empty.innerText='File is empty';
-                }
-
-                content.append(empty);
-            }else{
-                const rendered=await renderFile(fileRef,{directory,fileName});
-                if(destroyed||generation!==fileOpenGeneration){
-                    return false;
-                }
-                content.append(rendered);
+            const rendered=await renderFile(fileRef,{directory,fileName});
+            if(destroyed||generation!==fileOpenGeneration){
+                return false;
             }
+            content.append(rendered);
             return true;
         }catch(error){
             if(!destroyed&&generation===fileOpenGeneration){
@@ -1551,13 +1510,11 @@
         ){
             preview=await host.previewTransform(
                 preview,
-                Object.freeze(
-                    {
-                        directory:String(context.directory||''),
-                        extension:String(fileRef.ext||''),
-                        fileName:String(context.fileName||fileRef.name||'')
-                    }
-                )
+                {
+                    directory:String(context.directory||''),
+                    extension:String(fileRef.ext||''),
+                    fileName:String(context.fileName||fileRef.name||'')
+                }
             );
         }
 

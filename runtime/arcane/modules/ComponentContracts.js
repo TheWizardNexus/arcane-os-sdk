@@ -3,14 +3,16 @@ import {
     projectArcaneDOMEvent
 } from 'arcane-os/event-manager';
 
+const completeValue=(value)=>value;
+
 const own=(value,key)=>Object.prototype.hasOwnProperty.call(value,key);
 
-const STT_ACTIVATION_EVENT_TYPES=Object.freeze({
+const STT_ACTIVATION_EVENT_TYPES=completeValue({
     error:'speech-stt-activation-error',
     request:'speech-stt-activation-request'
 });
 
-const STT_ACTIVATION_ERROR_CODES=Object.freeze({
+const STT_ACTIVATION_ERROR_CODES=completeValue({
     buttonInvalid:'ARCANE_STT_ACTIVATION_BUTTON_INVALID',
     buttonListenerFailed:'ARCANE_STT_ACTIVATION_BUTTON_LISTENER_FAILED',
     domProjectionUnavailable:'ARCANE_STT_ACTIVATION_DOM_PROJECTION_UNAVAILABLE',
@@ -22,7 +24,7 @@ const STT_ACTIVATION_ERROR_CODES=Object.freeze({
     requestRejected:'ARCANE_STT_ACTIVATION_REQUEST_REJECTED'
 });
 
-const STT_ACTIVATION_REASONS=Object.freeze({
+const STT_ACTIVATION_REASONS=completeValue({
     explicitRequest:'explicit-request',
     presentationCallbackThrew:'activation-presentation-callback-threw',
     requestRejected:'activation-request-rejected'
@@ -152,7 +154,7 @@ function stringRecord(value,defaults,label){
     return normalized;
 }
 
-const CHART_LABELS=Object.freeze({
+const CHART_LABELS=completeValue({
     empty:'No data yet.',
     hover:'Point under cursor',
     keyboard:'Keyboard-selected point',
@@ -335,7 +337,7 @@ function normalizeDashboardDefinitions(values=[]){
     );
 }
 
-const DASHBOARD_LABELS=Object.freeze({
+const DASHBOARD_LABELS=completeValue({
     description:'Choose which charts appear on your dashboard.',
     empty:'No dashboard items are available.',
     heading:'Configure Dashboard',
@@ -469,9 +471,9 @@ function createSTTActivationController({
 
     function visibleError(error,fallback){
         const message=typeof error?.message==='string'
-            ?error.message.trim()
+            ?error.message
             :'';
-        return (message||fallback).slice(0,240);
+        return message||fallback;
     }
 
     function cancellation(error){
@@ -541,11 +543,7 @@ function createSTTActivationController({
         if(!progress){
             return fallback;
         }
-        const amount=progress.total===null
-            ?`${progress.completed} ${progress.unit}`
-            :`${progress.completed} of ${progress.total} ${progress.unit}`;
-        const heartbeat=progress.heartbeat?', active heartbeat':'';
-        return `${progress.phase}, ${amount}${heartbeat}`;
+        return progress.phase;
     }
 
     function status(){
@@ -588,14 +586,14 @@ function createSTTActivationController({
         }
         const generation=++requestGeneration;
         requestError='';
-        const intent=Object.freeze(
+        const intent=completeValue(
             {
                 role:'stt',
                 action:nextAction,
                 reason:'user'
             }
         );
-        const activationRequest=Object.freeze({intent,state:role});
+        const activationRequest=completeValue({intent,state:role});
         const operationId=
             `${events.instanceId}:stt-activation:${(++operationSequence).toString(36)}`;
         let requestInvoked=false;
@@ -668,7 +666,7 @@ function createSTTActivationController({
                 :STT_ACTIVATION_REASONS.presentationCallbackThrew;
             const errorPublication=events.dispatch(
                 STT_ACTIVATION_EVENT_TYPES.error,
-                Object.freeze(
+                completeValue(
                     {
                         request:activationRequest,
                         error,
@@ -774,7 +772,7 @@ function createSTTActivationController({
             error
         );
     }
-    return Object.freeze(
+    return completeValue(
         {
             get action(){return action();},
             get error(){return requestError;},
@@ -791,7 +789,7 @@ function createSTTActivationController({
     );
 }
 
-const VOICE_LABELS=Object.freeze({
+const VOICE_LABELS=completeValue({
     complete:'Complete Transcription',
     description:'Record one or more segments. Each segment is transcribed after you press Stop.',
     empty:'Your transcription will appear here after you stop recording.',
@@ -800,7 +798,7 @@ const VOICE_LABELS=Object.freeze({
     transcription:'Voice transcription'
 });
 
-const VOICE_MESSAGES=Object.freeze({
+const VOICE_MESSAGES=completeValue({
     cancelled:'Transcription canceled.',
     complete:'Complete.',
     completeError:'Unable to complete this transcription.',
@@ -893,26 +891,26 @@ function normalizeVoiceOptions(input={},previous={}){
 }
 
 function appendTranscription(current='',segment='',separator='\n\n'){
-    current=text(current,'',true).trim();
-    segment=text(segment,'',true).trim();
-    if(!segment){
+    current=text(current,'',true);
+    segment=text(segment,'',true);
+    if(segment.length===0){
         return current;
     }
-    return current?`${current}${separator}${segment}`:segment;
+    return current.length>0?`${current}${separator}${segment}`:segment;
 }
 
-const MARKDOWN_FORMATS=Object.freeze([
-    Object.freeze({id:'heading',label:'Heading',title:'Heading',prefix:'## ',placeholder:'Heading'}),
-    Object.freeze({id:'bold',label:'B',title:'Bold',before:'**',after:'**',placeholder:'bold text'}),
-    Object.freeze({id:'italic',label:'I',title:'Italic',before:'_',after:'_',placeholder:'italic text'}),
-    Object.freeze({id:'strike',label:'S',title:'Strikethrough',before:'~~',after:'~~',placeholder:'strikethrough text'}),
-    Object.freeze({id:'code',label:'Code',title:'Inline code',before:'`',after:'`',placeholder:'code'}),
-    Object.freeze({id:'link',label:'Link',title:'Link',before:'[',after:'](https://)',placeholder:'link text'}),
-    Object.freeze({id:'quote',label:'Quote',title:'Quote',prefix:'> ',placeholder:'Quote'}),
-    Object.freeze({id:'list',label:'List',title:'Bulleted list',prefix:'- ',placeholder:'List item'})
+const MARKDOWN_FORMATS=completeValue([
+    completeValue({id:'heading',label:'Heading',title:'Heading',prefix:'## ',placeholder:'Heading'}),
+    completeValue({id:'bold',label:'B',title:'Bold',before:'**',after:'**',placeholder:'bold text'}),
+    completeValue({id:'italic',label:'I',title:'Italic',before:'_',after:'_',placeholder:'italic text'}),
+    completeValue({id:'strike',label:'S',title:'Strikethrough',before:'~~',after:'~~',placeholder:'strikethrough text'}),
+    completeValue({id:'code',label:'Code',title:'Inline code',before:'`',after:'`',placeholder:'code'}),
+    completeValue({id:'link',label:'Link',title:'Link',before:'[',after:'](https://)',placeholder:'link text'}),
+    completeValue({id:'quote',label:'Quote',title:'Quote',prefix:'> ',placeholder:'Quote'}),
+    completeValue({id:'list',label:'List',title:'Bulleted list',prefix:'- ',placeholder:'List item'})
 ]);
 
-const MARKDOWN_LABELS=Object.freeze({
+const MARKDOWN_LABELS=completeValue({
     bodyPlaceholder:'Write in Markdown...',
     emptyError:'Write content before saving.',
     preview:'Markdown preview',

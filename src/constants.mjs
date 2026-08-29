@@ -14,18 +14,17 @@ export const ARCANE_PROTOCOL='arcane/1';
 export const CLI_EVENT_PROTOCOL='arcane-cli-events/1';
 export const TARGET_ADAPTER_PROTOCOL='arcane-target-adapter/1';
 export const ARCANE_MACHINE_BUNDLE_VERSION='0.8.12';
-export const ARCANE_UPSTREAM_COMMIT='c540014afe69f14cf5ae60493b7295f36dbcec64';
 export const ARCANE_UPSTREAM_REPOSITORY='https://github.com/TheWizardNexus/ARCANE-OS.git';
 
 export const SDK_ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 export const RUNTIME_ROOT=path.join(SDK_ROOT,'runtime');
 
-export const OUTPUT_MODES=Object.freeze(['human','json','ndjson']);
-export const TARGET_IDS=Object.freeze([
+export const OUTPUT_MODES=['human','json','ndjson'];
+export const TARGET_IDS=[
     'browser',
     'portable',
     'windows-x64',
     'linux-x64',
     'linux-arm64',
     'android-arm64'
-]);
+];

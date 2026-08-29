@@ -6,13 +6,11 @@ import {
 } from './CoreLocalModelCatalog.js';
 import {normalizeOllamaModelIdentifier} from './OllamaModelIdentifier.js';
 
-export const LOCAL_AI_BROWSER_ENDPOINTS=Object.freeze({
+export const LOCAL_AI_BROWSER_ENDPOINTS={
     speech:'http://127.0.0.1:8011/health'
-});
+};
 
 const DEFAULT_TIMEOUT_MS=3000;
-const MAX_TIMEOUT_MS=10000;
-const MAX_HEALTH_RESPONSE_CHARACTERS=64*1024;
 const LOCAL_SPEECH_PROVIDERS=new Set([
     'LOCAL',
     'LOCAL_SPEACH',
@@ -31,21 +29,11 @@ function token(value,{uppercase=false}={}){
 
 function errorCode(error,fallback){
     const code=token(error?.code,{uppercase:true});
-    return code&&code.length<=128
-        ?code
-        :fallback;
+    return code||fallback;
 }
 
-function freeze(value){
-    if(!value||typeof value!=='object'||Object.isFrozen(value)){
-        return value;
-    }
-
-    for(const child of Object.values(value)){
-        freeze(child);
-    }
-
-    return Object.freeze(value);
+function completeResult(value){
+    return value;
 }
 
 function positiveSafeInteger(value){
@@ -89,7 +77,7 @@ export function deriveLocalAIRequirements(preferences){
     const ttsModel=preferenceSlot(preferences,4);
     const sttModel=preferenceSlot(preferences,5);
 
-    return freeze({
+    return completeResult({
         llm:{
             slot:'llm',
             provider:llmProvider,
@@ -137,7 +125,7 @@ function healthText(status,names){
         const value=token(status[name]);
 
         if(value){
-            return value.slice(0,128);
+            return value;
         }
     }
 
@@ -151,7 +139,7 @@ function healthText(status,names){
  */
 export function evaluateLocalSpeechHealth(status){
     if(!status||typeof status!=='object'||Array.isArray(status)){
-        return freeze({
+        return completeResult({
             reachable:false,
             ready:false,
             status:'unavailable',
@@ -218,7 +206,7 @@ export function evaluateLocalSpeechHealth(status){
         &&ttsEngine?.toLowerCase()==='kokoro-onnx'
         &&(synthesisAvailable??(kokoro&&voices));
 
-    return freeze({
+    return completeResult({
         reachable:true,
         ready:sttReady&&ttsReady,
         status:serviceStatus,
@@ -244,18 +232,14 @@ function normalizedTimeout(value){
         return DEFAULT_TIMEOUT_MS;
     }
 
-    if(!Number.isSafeInteger(value)||value<1||value>MAX_TIMEOUT_MS){
-        throw new RangeError(
-            'Local AI readiness timeout must be between 1 and '
-            +MAX_TIMEOUT_MS
-            +' milliseconds.'
-        );
+    if(!Number.isSafeInteger(value)||value<1){
+        throw new RangeError('Local AI readiness timeout must be a positive integer.');
     }
 
     return value;
 }
 
-async function boundedFetchJSON(fetchImpl,url,timeoutMs){
+async function fetchJSON(fetchImpl,url,timeoutMs){
     if(typeof fetchImpl!=='function'){
         const error=new Error('Browser fetch is unavailable.');
         error.code='BROWSER_FETCH_UNAVAILABLE';
@@ -299,12 +283,8 @@ async function boundedFetchJSON(fetchImpl,url,timeoutMs){
 
         const text=await response.text();
 
-        if(
-            typeof text!=='string'
-            ||!text
-            ||text.length>MAX_HEALTH_RESPONSE_CHARACTERS
-        ){
-            const error=new Error('The local readiness response was outside Arcane limits.');
+        if(typeof text!=='string'||!text){
+            const error=new Error('The local readiness endpoint returned an invalid response.');
             error.code='LOCAL_AI_HEALTH_INVALID_RESPONSE';
             throw error;
         }
@@ -337,7 +317,7 @@ async function boundedFetchJSON(fetchImpl,url,timeoutMs){
 
 async function probeNativeOllama(arcane,selectedModel){
     if(typeof arcane?.localAI?.status!=='function'){
-        return freeze({
+        return completeResult({
             ready:false,
             model:null,
             errorCode:'ARCANE_LOCAL_AI_STATUS_UNAVAILABLE'
@@ -347,7 +327,7 @@ async function probeNativeOllama(arcane,selectedModel){
     const model=normalizeOllamaModelIdentifier(selectedModel);
 
     if(!model){
-        return freeze({
+        return completeResult({
             ready:false,
             model:null,
             errorCode:'OLLAMA_MODEL_INVALID'
@@ -361,7 +341,7 @@ async function probeNativeOllama(arcane,selectedModel){
         );
 
         if(status?.ollama?.available===false){
-            return freeze({
+            return completeResult({
                 ready:false,
                 model,
                 ...(activeParallelRequests===null
@@ -379,7 +359,7 @@ async function probeNativeOllama(arcane,selectedModel){
             return entry.modelId===model;
         });
 
-        return freeze({
+        return completeResult({
             ready:available,
             model,
             ...(activeParallelRequests===null
@@ -388,7 +368,7 @@ async function probeNativeOllama(arcane,selectedModel){
             errorCode:available?null:'OLLAMA_MODEL_UNAVAILABLE'
         });
     }catch(error){
-        return freeze({
+        return completeResult({
             ready:false,
             model,
             errorCode:errorCode(error,'ARCANE_LOCAL_AI_STATUS_INVALID')
@@ -398,7 +378,7 @@ async function probeNativeOllama(arcane,selectedModel){
 
 async function probeUserManagedLoopbackOllama(arcane,selectedModel){
     if(typeof arcane?.localAI?.status!=='function'){
-        return freeze({
+        return completeResult({
             ready:false,
             model:null,
             providerMode:USER_MANAGED_LOOPBACK_PROVIDER_MODE,
@@ -410,7 +390,7 @@ async function probeUserManagedLoopbackOllama(arcane,selectedModel){
     const model=normalizeOllamaModelIdentifier(selectedModel);
 
     if(!model){
-        return freeze({
+        return completeResult({
             ready:false,
             model:null,
             providerMode:USER_MANAGED_LOOPBACK_PROVIDER_MODE,
@@ -423,7 +403,7 @@ async function probeUserManagedLoopbackOllama(arcane,selectedModel){
         const status=await arcane.localAI.status();
 
         if(!isUserManagedLoopbackLocalAIStatus(status)){
-            return freeze({
+            return completeResult({
                 ready:false,
                 model,
                 providerMode:USER_MANAGED_LOOPBACK_PROVIDER_MODE,
@@ -433,7 +413,7 @@ async function probeUserManagedLoopbackOllama(arcane,selectedModel){
         }
 
         if(status?.ollama?.available!==true){
-            return freeze({
+            return completeResult({
                 ready:false,
                 model,
                 providerMode:USER_MANAGED_LOOPBACK_PROVIDER_MODE,
@@ -450,7 +430,7 @@ async function probeUserManagedLoopbackOllama(arcane,selectedModel){
             return entry.modelId===model;
         });
 
-        return freeze({
+        return completeResult({
             ready:available,
             model,
             providerMode:USER_MANAGED_LOOPBACK_PROVIDER_MODE,
@@ -458,7 +438,7 @@ async function probeUserManagedLoopbackOllama(arcane,selectedModel){
             errorCode:available?null:'OLLAMA_MODEL_UNAVAILABLE'
         });
     }catch(error){
-        return freeze({
+        return completeResult({
             ready:false,
             model,
             providerMode:USER_MANAGED_LOOPBACK_PROVIDER_MODE,
@@ -469,7 +449,7 @@ async function probeUserManagedLoopbackOllama(arcane,selectedModel){
 }
 
 function unavailableBrowserOllama(){
-    return freeze({
+    return completeResult({
         ready:false,
         model:null,
         errorCode:'ARCANE_CORE_REQUIRED'
@@ -478,19 +458,19 @@ function unavailableBrowserOllama(){
 
 async function probeNativeSpeech(arcane){
     if(typeof arcane?.speech?.status!=='function'){
-        return freeze({
+        return completeResult({
             ...evaluateLocalSpeechHealth(null),
             errorCode:'ARCANE_SPEECH_UNAVAILABLE'
         });
     }
 
     try{
-        return freeze({
+        return completeResult({
             ...evaluateLocalSpeechHealth(await arcane.speech.status()),
             errorCode:null
         });
     }catch(error){
-        return freeze({
+        return completeResult({
             ...evaluateLocalSpeechHealth(null),
             errorCode:errorCode(error,'LOCAL_SPEECH_UNAVAILABLE')
         });
@@ -499,9 +479,9 @@ async function probeNativeSpeech(arcane){
 
 async function probeBrowserSpeech(fetchImpl,timeoutMs){
     try{
-        return freeze({
+        return completeResult({
             ...evaluateLocalSpeechHealth(
-                await boundedFetchJSON(
+                await fetchJSON(
                     fetchImpl,
                     LOCAL_AI_BROWSER_ENDPOINTS.speech,
                     timeoutMs
@@ -510,7 +490,7 @@ async function probeBrowserSpeech(fetchImpl,timeoutMs){
             errorCode:null
         });
     }catch(error){
-        return freeze({
+        return completeResult({
             ...evaluateLocalSpeechHealth(null),
             errorCode:errorCode(error,'LOCAL_SPEECH_UNAVAILABLE')
         });
@@ -583,7 +563,7 @@ async function probeRequiredServices({
             :null
     ]);
 
-    return freeze({ollama,speech});
+    return completeResult({ollama,speech});
 }
 
 function slotResults(requirements,services){
@@ -591,7 +571,7 @@ function slotResults(requirements,services){
         services.ollama?.activeParallelRequests
     );
 
-    return freeze({
+    return completeResult({
         llm:{
             ...requirements.llm,
             ...(activeParallelRequests===null
@@ -690,17 +670,17 @@ function preserveRecoveryFailure(
             ?failedServices
             :[];
 
-    return freeze({
+    return completeResult({
         ollama:targets.includes('ollama')
             &&services.ollama?.ready!==true
-            ?freeze({...services.ollama,errorCode:recoveryErrorCode})
+            ?completeResult({...services.ollama,errorCode:recoveryErrorCode})
             :services.ollama,
         speech:targets.includes('speech')
             &&(
                 services.speech?.stt?.ready!==true
                 ||services.speech?.tts?.ready!==true
             )
-            ?freeze({...services.speech,errorCode:recoveryErrorCode})
+            ?completeResult({...services.speech,errorCode:recoveryErrorCode})
             :services.speech
     });
 }
@@ -746,7 +726,7 @@ function guidance(mode,slots){
                 +' Arcane does not install, start, repair, pull, or otherwise manage this service or its models. Alternatively, switch the affected Profile setting to OpenAI. Arcane will not switch providers automatically.'
             :'Arcane could not recover the selected local AI service. Retry or review Local AI in Arcane Settings. Arcane will not switch providers automatically.';
 
-    return freeze({
+    return completeResult({
         mode,
         affectedSlots,
         services,
@@ -779,7 +759,7 @@ function report({
     const slots=slotResults(requirements,services);
     const unavailable=unavailableSlots(slots);
 
-    return freeze({
+    return completeResult({
         ready:unavailable.length===0,
         mode,
         requirements,
@@ -865,6 +845,6 @@ export async function checkLocalAIReadiness({
         mode,
         requirements,
         services,
-        recovery:freeze(recovery)
+        recovery:completeResult(recovery)
     });
 }

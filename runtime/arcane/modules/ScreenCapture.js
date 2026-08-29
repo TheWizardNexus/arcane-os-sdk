@@ -1,142 +1,142 @@
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 import GifEncoder from './GifEncoder.js';
 
-export const SCREEN_CAPTURE_EVENT_TYPES=Object.freeze({
+export const SCREEN_CAPTURE_EVENT_TYPES={
     displaySelectionRequested:'capture-requesting',
     captureStarted:'capture-start',
     captureCompleted:'capture-result',
     captureFailed:'capture-error',
     captureStopped:'capture-stop'
-});
+};
 
-export const SCREEN_CAPTURE_STATUSES=Object.freeze({
+export const SCREEN_CAPTURE_STATUSES={
     selectingDisplay:'selecting-display',
     recording:'recording',
     captureReady:'capture-ready',
     captureRejected:'capture-rejected',
     captureStopped:'capture-stopped'
-});
+};
 
-export const SCREEN_CAPTURE_IMAGE_TYPE_FALLBACK=Object.freeze({
+export const SCREEN_CAPTURE_IMAGE_TYPE_FALLBACK={
     when:'blob-type-unreported',
     mimeType:'image/png',
     extension:'png'
-});
+};
 
-export const SCREEN_CAPTURE_ERRORS=Object.freeze({
-    active:Object.freeze({
+export const SCREEN_CAPTURE_ERRORS={
+    active:{
         code:'ARCANE_SCREEN_CAPTURE_OPERATION_ACTIVE',
         reason:'screen-capture-operation-active'
-    }),
-    disposed:Object.freeze({
+    },
+    disposed:{
         code:'ARCANE_SCREEN_CAPTURE_DISPOSED',
         reason:'screen-capture-disposed'
-    }),
-    optionsRecordRejected:Object.freeze({
+    },
+    optionsRecordRejected:{
         code:'ARCANE_SCREEN_CAPTURE_OPTIONS_RECORD_REJECTED',
         reason:'screen-capture-options-record-rejected'
-    }),
-    abortSignalRejected:Object.freeze({
+    },
+    abortSignalRejected:{
         code:'ARCANE_SCREEN_CAPTURE_ABORT_SIGNAL_REJECTED',
         reason:'screen-capture-abort-signal-rejected'
-    }),
-    operationIdRejected:Object.freeze({
+    },
+    operationIdRejected:{
         code:'ARCANE_SCREEN_CAPTURE_OPERATION_ID_REJECTED',
         reason:'screen-capture-operation-id-rejected'
-    }),
-    cleanupRejected:Object.freeze({
+    },
+    cleanupRejected:{
         code:'ARCANE_SCREEN_CAPTURE_CLEANUP_REJECTED',
         reason:'screen-capture-cleanup-rejected'
-    }),
-    displayUnavailable:Object.freeze({
+    },
+    displayUnavailable:{
         code:'ARCANE_SCREEN_CAPTURE_DISPLAY_UNAVAILABLE',
         reason:'screen-capture-display-unavailable'
-    }),
-    displayMetadataRejected:Object.freeze({
+    },
+    displayMetadataRejected:{
         code:'ARCANE_SCREEN_CAPTURE_DISPLAY_METADATA_REJECTED',
         reason:'screen-capture-display-metadata-rejected'
-    }),
-    displayPlaybackRejected:Object.freeze({
+    },
+    displayPlaybackRejected:{
         code:'ARCANE_SCREEN_CAPTURE_DISPLAY_PLAYBACK_REJECTED',
         reason:'screen-capture-display-playback-rejected'
-    }),
-    displaySelectionCancelled:Object.freeze({
+    },
+    displaySelectionCancelled:{
         code:'ARCANE_SCREEN_CAPTURE_DISPLAY_SELECTION_CANCELLED',
         reason:'screen-capture-display-selection-cancelled'
-    }),
-    displaySelectionRejected:Object.freeze({
+    },
+    displaySelectionRejected:{
         code:'ARCANE_SCREEN_CAPTURE_DISPLAY_SELECTION_REJECTED',
         reason:'screen-capture-display-selection-rejected'
-    }),
-    displayTrackEndedBeforeRecording:Object.freeze({
+    },
+    displayTrackEndedBeforeRecording:{
         code:'ARCANE_SCREEN_CAPTURE_DISPLAY_TRACK_ENDED_BEFORE_RECORDING',
         reason:'screen-capture-display-track-ended-before-recording'
-    }),
-    eventTypeUndeclared:Object.freeze({
+    },
+    eventTypeUndeclared:{
         code:'ARCANE_SCREEN_CAPTURE_EVENT_TYPE_UNDECLARED',
         reason:'screen-capture-event-type-undeclared'
-    }),
-    gifEncodingRejected:Object.freeze({
+    },
+    gifEncodingRejected:{
         code:'ARCANE_SCREEN_CAPTURE_GIF_ENCODING_REJECTED',
         reason:'screen-capture-gif-encoding-rejected'
-    }),
-    gifFrameReadRejected:Object.freeze({
+    },
+    gifFrameReadRejected:{
         code:'ARCANE_SCREEN_CAPTURE_GIF_FRAME_READ_REJECTED',
         reason:'screen-capture-gif-frame-read-rejected'
-    }),
-    imageCanvasUnavailable:Object.freeze({
+    },
+    imageCanvasUnavailable:{
         code:'ARCANE_SCREEN_CAPTURE_IMAGE_CANVAS_UNAVAILABLE',
         reason:'screen-capture-image-canvas-unavailable'
-    }),
-    imageDrawRejected:Object.freeze({
+    },
+    imageDrawRejected:{
         code:'ARCANE_SCREEN_CAPTURE_IMAGE_DRAW_REJECTED',
         reason:'screen-capture-image-draw-rejected'
-    }),
-    imageEncodingRejected:Object.freeze({
+    },
+    imageEncodingRejected:{
         code:'ARCANE_SCREEN_CAPTURE_IMAGE_ENCODING_REJECTED',
         reason:'screen-capture-image-encoding-rejected'
-    }),
-    recorderConstructionRejected:Object.freeze({
+    },
+    recorderConstructionRejected:{
         code:'ARCANE_SCREEN_CAPTURE_RECORDER_CONSTRUCTION_REJECTED',
         reason:'screen-capture-recorder-construction-rejected'
-    }),
-    recorderErrorReceived:Object.freeze({
+    },
+    recorderErrorReceived:{
         code:'ARCANE_SCREEN_CAPTURE_RECORDER_ERROR_RECEIVED',
         reason:'screen-capture-recorder-error-received'
-    }),
-    recorderStartRejected:Object.freeze({
+    },
+    recorderStartRejected:{
         code:'ARCANE_SCREEN_CAPTURE_RECORDER_START_REJECTED',
         reason:'screen-capture-recorder-start-rejected'
-    }),
-    recorderStopRejected:Object.freeze({
+    },
+    recorderStopRejected:{
         code:'ARCANE_SCREEN_CAPTURE_RECORDER_STOP_REJECTED',
         reason:'screen-capture-recorder-stop-rejected'
-    }),
-    recorderUnavailable:Object.freeze({
+    },
+    recorderUnavailable:{
         code:'ARCANE_SCREEN_CAPTURE_RECORDER_UNAVAILABLE',
         reason:'screen-capture-recorder-unavailable'
-    }),
-    operationAborted:Object.freeze({
+    },
+    operationAborted:{
         code:'ARCANE_SCREEN_CAPTURE_OPERATION_ABORTED',
         reason:'screen-capture-operation-aborted'
-    }),
-    operationStopped:Object.freeze({
+    },
+    operationStopped:{
         code:'ARCANE_SCREEN_CAPTURE_OPERATION_STOPPED',
         reason:'screen-capture-operation-stopped'
-    }),
-    reset:Object.freeze({
+    },
+    reset:{
         code:'ARCANE_SCREEN_CAPTURE_OPERATION_RESET',
         reason:'screen-capture-reset'
-    })
-});
+    }
+};
 
-export const SCREEN_CAPTURE_ERROR_CODES=Object.freeze(Object.fromEntries(
+export const SCREEN_CAPTURE_ERROR_CODES=Object.fromEntries(
     Object.entries(SCREEN_CAPTURE_ERRORS).map(function mapScreenCaptureCode(entry){
         return [entry[0],entry[1].code];
     })
-));
+);
 
-export const SCREEN_CAPTURE_REASONS=Object.freeze({
+export const SCREEN_CAPTURE_REASONS={
     displaySelectionRequested:'screen-capture-display-selection-requested',
     gifCompleted:'screen-capture-gif-completed',
     gifRecordingStarted:'screen-capture-gif-recording-started',
@@ -148,15 +148,15 @@ export const SCREEN_CAPTURE_REASONS=Object.freeze({
     ...Object.fromEntries(Object.entries(SCREEN_CAPTURE_ERRORS).map(
         function mapScreenCaptureReason(entry){return [entry[0],entry[1].reason];}
     ))
-});
+};
 
-const EVENT_NAMES=Object.freeze({
+const EVENT_NAMES={
     requesting:SCREEN_CAPTURE_EVENT_TYPES.displaySelectionRequested,
     start:SCREEN_CAPTURE_EVENT_TYPES.captureStarted,
     result:SCREEN_CAPTURE_EVENT_TYPES.captureCompleted,
     error:SCREEN_CAPTURE_EVENT_TYPES.captureFailed,
     stop:SCREEN_CAPTURE_EVENT_TYPES.captureStopped
-});
+};
 
 function signalLike(value){
     return value===undefined
@@ -212,20 +212,15 @@ function admittedOperationId(value){
     if(value===undefined||value===null)return null;
     if(typeof value!=='string'
         ||value.trim()!==value
-        ||value.length<1
-        ||value.length>256){
+        ||!value){
         throw captureError(
             SCREEN_CAPTURE_ERRORS.operationIdRejected,
-            'Screen capture operationId must contain 1-256 non-edge-whitespace characters.',
+            'Screen capture operationId must be a non-empty string without edge whitespace.',
             undefined,
             TypeError
         );
     }
     return value;
-}
-
-function normalizedWidth(value,fallback){
-    return Math.max(1,Number(value)||fallback);
 }
 
 function imageResultType(blob){
@@ -240,7 +235,7 @@ function imageResultType(blob){
         :/^[a-z0-9][a-z0-9.-]*$/u.test(canonicalSubtype)
             ?canonicalSubtype
             :'bin';
-    return Object.freeze({mimeType:reported,extension});
+    return {mimeType:reported,extension};
 }
 
 function supportedRecorderType(Recorder){
@@ -258,6 +253,10 @@ function supportedRecorderType(Recorder){
 function reportDetachedError(error){
     if(typeof globalThis.reportError==='function')globalThis.reportError(error);
     else globalThis.console?.error?.(error);
+}
+
+function monotonicNow(){
+    return globalThis.performance?.now?.()??Date.now();
 }
 
 export default class ScreenCapture extends EventTarget{
@@ -289,7 +288,7 @@ export default class ScreenCapture extends EventTarget{
         this.gifDelay=0;
         this.#events=createArcaneEventSource(this,{
             source:'screen-capture',
-            eventTypes:Object.freeze(Object.values(SCREEN_CAPTURE_EVENT_TYPES))
+            eventTypes:Object.values(SCREEN_CAPTURE_EVENT_TYPES)
         });
     }
 
@@ -360,7 +359,7 @@ export default class ScreenCapture extends EventTarget{
         let pending;
         try{
             pending=Promise.resolve(this.mediaDevices.getDisplayMedia({
-                video:{frameRate:{ideal:15,max:30}},
+                video:true,
                 audio:Boolean(options.audio)
             }));
         }catch(cause){
@@ -424,30 +423,23 @@ export default class ScreenCapture extends EventTarget{
     }
 
     #publicDetail(detail,{code=null,reason,status}){
-        const blob=detail?.blob;
-        return Object.freeze({
-            ...(typeof detail?.mode==='string'?{mode:detail.mode}:{}),
-            ...(typeof detail?.mimeType==='string'?{mimeType:detail.mimeType}:{}),
-            ...(typeof detail?.extension==='string'?{extension:detail.extension}:{}),
-            ...(Number.isFinite(detail?.duration)?{duration:Math.max(0,detail.duration)}:{}),
-            ...(Number.isSafeInteger(detail?.width)?{width:detail.width}:{}),
-            ...(Number.isSafeInteger(detail?.height)?{height:detail.height}:{}),
-            ...(Number.isSafeInteger(blob?.size)?{byteCount:blob.size}:{}),
+        return {
+            ...detail,
             ...(code?{code}:{}),
             reason,
             status
-        });
+        };
     }
 
     #publish(operation,type,detail,{code=null,reason,status,cancelable=false}={}){
         if(this.#events.disposed)return null;
-        const compatibilityDetail=Object.freeze({
+        const compatibilityDetail={
             ...detail,
             mode:typeof detail?.mode==='string'?detail.mode:operation.mode,
             operationId:operation.id,
             reason,
             ...(code?{code}:{})
-        });
+        };
         return this.#events.dispatch(
             EVENT_NAMES[type],
             compatibilityDetail,
@@ -465,6 +457,7 @@ export default class ScreenCapture extends EventTarget{
         const controller=new AbortController();
         const operation={
             abortPublishesError:true,
+            cancelFrameSampling:null,
             cleanup:[],
             completed:false,
             controller,
@@ -493,7 +486,7 @@ export default class ScreenCapture extends EventTarget{
         const publication=this.#publish(
             operation,
             'requesting',
-            Object.freeze({mode}),
+            {mode},
             {
                 reason:SCREEN_CAPTURE_REASONS.displaySelectionRequested,
                 status:SCREEN_CAPTURE_STATUSES.selectingDisplay,
@@ -577,6 +570,15 @@ export default class ScreenCapture extends EventTarget{
         for(const remove of operation.recorderCleanup.splice(0))remove();
     }
 
+    #cancelFrameSampling(operation){
+        let error=null;
+        try{operation.cancelFrameSampling?.();}catch(cause){error=cause;}
+        operation.cancelFrameSampling=null;
+        operation.timer=0;
+        this.timer=0;
+        return error;
+    }
+
     #settleRecorder(operation,outcome){
         if(!operation.resolveRecorderOutcome)return false;
         const resolve=operation.resolveRecorderOutcome;
@@ -589,10 +591,8 @@ export default class ScreenCapture extends EventTarget{
     #cleanupResources(operation,{settleRecorderError=null}={}){
         let firstError=null;
         function remember(error){firstError??=error;}
-        clearInterval(operation.timer??0);
-        clearInterval(this.timer);
-        operation.timer=0;
-        this.timer=0;
+        const frameSamplingError=this.#cancelFrameSampling(operation);
+        if(frameSamplingError)remember(frameSamplingError);
         if(settleRecorderError)this.#settleRecorder(operation,{error:settleRecorderError});
         const recorder=operation.recorder??this.recorder;
         if(recorder&&recorder.state!=='inactive'){
@@ -633,7 +633,7 @@ export default class ScreenCapture extends EventTarget{
         this.#publish(
             operation,
             'error',
-            Object.freeze({error,mode:operation.mode}),
+            {error,mode:operation.mode},
             {
                 code:error.code,
                 reason:error.reason,
@@ -649,7 +649,7 @@ export default class ScreenCapture extends EventTarget{
         this.#publish(
             operation,
             'stop',
-            Object.freeze({mode:operation.mode}),
+            {mode:operation.mode},
             {code,reason,status:SCREEN_CAPTURE_STATUSES.captureStopped}
         );
         return true;
@@ -761,7 +761,6 @@ export default class ScreenCapture extends EventTarget{
             stage='display-preparation';
             const prepared=await this.prepare(
                 stream,
-                normalizedWidth(options.maxWidth,1920),
                 {signal:operation.controller.signal}
             );
             this.#setPreparedSurface(operation,prepared);
@@ -833,7 +832,7 @@ export default class ScreenCapture extends EventTarget{
         this.stopPromise=operation.stopPromise;
         const owner=this;
         function receiveRecordedData(event){
-            if(event.data?.size)chunks.push(event.data);
+            if(event.data)chunks.push(event.data);
         }
         function receiveRecorderStop(){
             let outcome;
@@ -844,7 +843,7 @@ export default class ScreenCapture extends EventTarget{
                         blob:new Blob(chunks,{type}),
                         mimeType:type,
                         extension:type.includes('mp4')?'mp4':'webm',
-                        duration:Math.max(0,Date.now()-operation.startedAt)
+                        duration:Date.now()-operation.startedAt
                     }
                 };
             }catch(cause){
@@ -956,7 +955,7 @@ export default class ScreenCapture extends EventTarget{
             this.#publish(
                 operation,
                 'start',
-                Object.freeze({mode:'video'}),
+                {mode:'video'},
                 {
                     reason:SCREEN_CAPTURE_REASONS.videoRecordingStarted,
                     status:SCREEN_CAPTURE_STATUSES.recording
@@ -970,7 +969,7 @@ export default class ScreenCapture extends EventTarget{
         }
     }
 
-    #sampleGifFrame(operation,context){
+    #sampleGifFrame(operation,context,capturedAt=monotonicNow()){
         context.drawImage(
             operation.video,
             0,
@@ -984,7 +983,59 @@ export default class ScreenCapture extends EventTarget{
             operation.canvas.width,
             operation.canvas.height
         ));
+        operation.frameTimes.push(capturedAt);
         this.frames=operation.frames;
+    }
+
+    #startGifFrameSampling(operation,context,frameDelay){
+        const requestedDelay=Number(frameDelay);
+        const explicitDelay=Number.isFinite(requestedDelay)&&requestedDelay>0
+            ?requestedDelay
+            :null;
+        let active=true;
+        let frameHandle=0;
+        let requestFrame;
+        let cancelFrame;
+        if(explicitDelay!==null){
+            requestFrame=callback=>setTimeout(()=>callback(monotonicNow()),explicitDelay);
+            cancelFrame=handle=>clearTimeout(handle);
+        }else if(typeof operation.video?.requestVideoFrameCallback==='function'){
+            requestFrame=callback=>operation.video.requestVideoFrameCallback(callback);
+            cancelFrame=handle=>operation.video.cancelVideoFrameCallback?.(handle);
+        }else if(typeof globalThis.requestAnimationFrame==='function'){
+            requestFrame=callback=>globalThis.requestAnimationFrame(callback);
+            cancelFrame=handle=>globalThis.cancelAnimationFrame?.(handle);
+        }else{
+            throw captureError(
+                SCREEN_CAPTURE_ERRORS.gifFrameReadRejected,
+                'The browser does not expose a display-frame callback for GIF capture.'
+            );
+        }
+        const owner=this;
+        function schedule(){
+            if(!active||!owner.#isCurrent(operation)||operation.phase!=='recording')return;
+            frameHandle=requestFrame(sampleDisplayFrame);
+            operation.timer=frameHandle;
+            owner.timer=frameHandle;
+        }
+        function sampleDisplayFrame(now){
+            if(!active||!owner.#isCurrent(operation)||operation.phase!=='recording')return;
+            try{owner.#sampleGifFrame(operation,context,now);}
+            catch(cause){
+                owner.#failOperation(
+                    operation,
+                    owner.#operationError(cause,operation,'gif-frame-read')
+                );
+                return;
+            }
+            schedule();
+        }
+        operation.cancelFrameSampling=function cancelGifFrameSampling(){
+            if(!active)return;
+            active=false;
+            cancelFrame(frameHandle);
+        };
+        schedule();
     }
 
     async startGif(optionsValue={}){
@@ -1000,7 +1051,6 @@ export default class ScreenCapture extends EventTarget{
             stage='display-preparation';
             const prepared=await this.prepare(
                 stream,
-                normalizedWidth(options.maxWidth,640),
                 {signal:operation.controller.signal}
             );
             this.#setPreparedSurface(operation,prepared);
@@ -1012,7 +1062,11 @@ export default class ScreenCapture extends EventTarget{
                 );
             }
             operation.frames=[];
-            operation.gifDelay=Math.max(100,Number(options.frameDelay)||250);
+            operation.frameTimes=[];
+            const requestedDelay=Number(options.frameDelay);
+            operation.gifDelay=Number.isFinite(requestedDelay)&&requestedDelay>0
+                ?requestedDelay
+                :0;
             operation.startedAt=Date.now();
             this.frames=operation.frames;
             this.gifDelay=operation.gifDelay;
@@ -1020,23 +1074,11 @@ export default class ScreenCapture extends EventTarget{
             stage='gif-frame-read';
             this.#sampleGifFrame(operation,context);
             operation.phase='recording';
-            const owner=this;
-            function sampleScreenCaptureGifFrame(){
-                if(!owner.#isCurrent(operation)||operation.phase!=='recording')return;
-                try{owner.#sampleGifFrame(operation,context);}
-                catch(cause){
-                    owner.#failOperation(
-                        operation,
-                        owner.#operationError(cause,operation,'gif-frame-read')
-                    );
-                }
-            }
-            operation.timer=setInterval(sampleScreenCaptureGifFrame,operation.gifDelay);
-            this.timer=operation.timer;
+            this.#startGifFrameSampling(operation,context,options.frameDelay);
             this.#publish(
                 operation,
                 'start',
-                Object.freeze({mode:'gif'}),
+                {mode:'gif'},
                 {
                     reason:SCREEN_CAPTURE_REASONS.gifRecordingStarted,
                     status:SCREEN_CAPTURE_STATUSES.recording
@@ -1095,18 +1137,23 @@ export default class ScreenCapture extends EventTarget{
                     );
                 }
             }else{
-                clearInterval(operation.timer);
-                operation.timer=0;
-                this.timer=0;
+                const frameSamplingError=this.#cancelFrameSampling(operation);
+                if(frameSamplingError)throw frameSamplingError;
+                const stoppedAt=monotonicNow();
                 const encoder=new GifEncoder(operation.canvas.width,operation.canvas.height);
-                for(const frame of operation.frames){
-                    encoder.addFrame(frame,{delay:operation.gifDelay});
+                for(let index=0;index<operation.frames.length;index++){
+                    const capturedAt=operation.frameTimes[index];
+                    const nextCapturedAt=operation.frameTimes[index+1]??stoppedAt;
+                    encoder.addFrame(
+                        operation.frames[index],
+                        {delay:Math.max(0,nextCapturedAt-capturedAt)}
+                    );
                 }
                 result={
                     blob:encoder.encode(),
                     mimeType:'image/gif',
                     extension:'gif',
-                    duration:Math.max(0,Date.now()-operation.startedAt),
+                    duration:Date.now()-operation.startedAt,
                     width:operation.canvas.width,
                     height:operation.canvas.height
                 };
@@ -1150,9 +1197,11 @@ export default class ScreenCapture extends EventTarget{
         return operation.stopCallPromise;
     }
 
-    async prepare(stream,maxWidth,optionsValue={}){
+    async prepare(stream,optionsValue={},legacyOptionsValue={}){
         this.#assertOpen();
-        const options=optionsRecord(optionsValue,'Screen capture display options');
+        const options=typeof optionsValue==='number'
+            ?optionsRecord(legacyOptionsValue,'Screen capture display options')
+            :optionsRecord(optionsValue,'Screen capture display options');
         if(options.signal?.aborted)throw abortError(options.signal.reason);
         let video;
         try{
@@ -1219,10 +1268,9 @@ export default class ScreenCapture extends EventTarget{
                     'The selected display reported invalid frame dimensions.'
                 );
             }
-            const scale=Math.min(1,normalizedWidth(maxWidth,1920)/width);
             const canvas=this.document.createElement('canvas');
-            canvas.width=Math.max(1,Math.round(width*scale));
-            canvas.height=Math.max(1,Math.round(height*scale));
+            canvas.width=width;
+            canvas.height=height;
             return {video,canvas};
         }catch(error){
             let cleanupFailure=null;
@@ -1378,7 +1426,6 @@ export default class ScreenCapture extends EventTarget{
             cleanupFailure=operation.terminalError?.cleanupCause??null;
         }else{
             try{this.stopTracks(this.stream);}catch(error){cleanupFailure=error;}
-            clearInterval(this.timer);
         }
         for(const acquisition of this.#acquisitions){
             if(!acquisition.controller.signal.aborted){

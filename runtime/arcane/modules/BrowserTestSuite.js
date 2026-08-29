@@ -1,27 +1,21 @@
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 
-const DEFAULT_MAX_TESTS=64;
-const HARD_MAX_TESTS=256;
-const DEFAULT_TIMEOUT_MS=5000;
-const HARD_TIMEOUT_MS=60000;
-const MAX_MESSAGE_CHARACTERS=1000;
-const CONTROL_CHARACTERS=/[\u0000-\u001f\u007f]/;
-const TEST_ID_PATTERN=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const RESULT_STATUSES=new Set(['fail','pass','skip']);
 
-export const BROWSER_TEST_SUITE_EVENT_TYPES=Object.freeze({
+export const BROWSER_TEST_SUITE_EVENT_TYPES={
     runCompleted:'browser-test-suite-complete',
     runStarted:'browser-test-suite-start',
     testCompleted:'browser-test-result',
     testStarted:'browser-test-start'
-});
+};
 
-export const BROWSER_TEST_SUITE_ERROR_CODES=Object.freeze({
+export const BROWSER_TEST_SUITE_ERROR_CODES={
     assertion:'BROWSER_TEST_ASSERTION',
     busy:'BROWSER_TEST_BUSY',
     callbackRejectedLegacy:'BROWSER_TEST_ERROR',
     clockInvalid:'BROWSER_TEST_INVALID_CLOCK',
     descriptorCaseCollision:'BROWSER_TEST_CASE_COLLISION',
+    descriptorDuplicate:'BROWSER_TEST_CASE_COLLISION',
     descriptorInvalid:'BROWSER_TEST_INVALID_DESCRIPTOR',
     disposed:'BROWSER_TEST_SUITE_DISPOSED',
     limitExceeded:'BROWSER_TEST_LIMIT',
@@ -31,9 +25,9 @@ export const BROWSER_TEST_SUITE_ERROR_CODES=Object.freeze({
     runAborted:'BROWSER_TEST_ABORTED',
     skipped:'BROWSER_TEST_SKIP',
     timedOut:'BROWSER_TEST_TIMEOUT'
-});
+};
 
-export const BROWSER_TEST_SUITE_REASONS=Object.freeze({
+export const BROWSER_TEST_SUITE_REASONS={
     runAborted:'browser-test-run-aborted',
     runCompleted:'browser-test-run-completed',
     runFailed:'browser-test-run-failed',
@@ -46,7 +40,7 @@ export const BROWSER_TEST_SUITE_REASONS=Object.freeze({
     testSkipped:'browser-test-skipped',
     testStarted:'browser-test-started',
     testTimedOut:'browser-test-timed-out'
-});
+};
 
 function isPlainRecord(value){
     return Boolean(value)
@@ -64,56 +58,34 @@ function fail(message,code,ErrorType=TypeError){
     throw coded(new ErrorType(message),code);
 }
 
-function knownKeys(value,allowed,label,code='BROWSER_TEST_INVALID_OPTIONS'){
-    const unknown=Object.keys(value).find(key=>!allowed.has(key));
-    if(unknown) fail(`${label} contains an unsupported field: ${unknown}.`,code);
-}
-
-function boundedInteger(value,label,{minimum,maximum}){
-    if(!Number.isSafeInteger(value)||value<minimum||value>maximum){
-        fail(`${label} must be an integer from ${minimum} through ${maximum}.`,'BROWSER_TEST_INVALID_LIMIT',RangeError);
-    }
-    return value;
-}
-
-function descriptorText(value,label,maximum){
+function descriptorText(value,label){
     if(typeof value!=='string') fail(`${label} must be a string.`,'BROWSER_TEST_INVALID_DESCRIPTOR');
-    const normalized=value.trim();
-    if(!normalized) fail(`${label} cannot be empty.`,'BROWSER_TEST_INVALID_DESCRIPTOR');
-    if(normalized.length>maximum) fail(`${label} exceeds ${maximum} characters.`,'BROWSER_TEST_INVALID_DESCRIPTOR',RangeError);
-    if(CONTROL_CHARACTERS.test(normalized)) fail(`${label} cannot contain control characters.`,'BROWSER_TEST_INVALID_DESCRIPTOR');
-    if(normalized!==normalized.normalize('NFC')) fail(`${label} must use Unicode NFC normalization.`,'BROWSER_TEST_INVALID_DESCRIPTOR');
-    return normalized;
+    if(!value.trim()) fail(`${label} cannot be empty.`,'BROWSER_TEST_INVALID_DESCRIPTOR');
+    return value;
 }
 
 function resultMessage(value,fallback){
     if(value===undefined||value===null||value==='') return fallback;
-    const message=String(value)
-        .replace(/[\u0000-\u001f\u007f]+/g,' ')
-        .trim();
-    return (message||fallback).slice(0,MAX_MESSAGE_CHARACTERS);
+    const message=String(value);
+    return message.trim()?message:fallback;
 }
 
-function normalizeTests(value,{maxTests,timeoutMs}){
+function normalizeTests(value){
     if(!Array.isArray(value)) fail('tests must be an array.','BROWSER_TEST_INVALID_OPTIONS');
-    if(value.length>maxTests) fail(`Test suite exceeds the ${maxTests}-test limit.`,'BROWSER_TEST_LIMIT',RangeError);
     const seen=new Set();
-    return Object.freeze(value.map((item,index)=>{
+    return value.map((item,index)=>{
         if(!isPlainRecord(item)) fail(`Test descriptor ${index+1} must be a plain object.`,'BROWSER_TEST_INVALID_DESCRIPTOR');
-        knownKeys(item,new Set(['id','name','run','timeoutMs']),`Test descriptor ${index+1}`,'BROWSER_TEST_INVALID_DESCRIPTOR');
-        const id=descriptorText(item.id,`Test descriptor ${index+1} id`,128);
-        if(!TEST_ID_PATTERN.test(id)) fail(`Test descriptor ${index+1} has an invalid id.`,'BROWSER_TEST_INVALID_DESCRIPTOR');
-        const key=id.toLowerCase();
-        if(seen.has(key)) fail(`Test descriptors contain a case-colliding id: ${id}.`,'BROWSER_TEST_CASE_COLLISION');
-        seen.add(key);
+        const id=descriptorText(item.id,`Test descriptor ${index+1} id`);
+        if(seen.has(id)) fail(`Test descriptors contain a duplicate id: ${id}.`,'BROWSER_TEST_CASE_COLLISION');
+        seen.add(id);
         if(typeof item.run!=='function') fail(`Test descriptor ${index+1} run must be a function.`,'BROWSER_TEST_INVALID_DESCRIPTOR');
-        return Object.freeze({
+        return {
+            ...item,
             id,
-            name:descriptorText(item.name,`Test descriptor ${index+1} name`,256),
+            name:descriptorText(item.name,`Test descriptor ${index+1} name`),
             run:item.run,
-            timeoutMs:boundedInteger(item.timeoutMs??timeoutMs,`Test descriptor ${index+1} timeoutMs`,{minimum:10,maximum:timeoutMs}),
-        });
-    }));
+        };
+    });
 }
 
 function defaultNow(){
@@ -122,22 +94,16 @@ function defaultNow(){
 
 function normalizeOptions(input){
     if(!isPlainRecord(input)) fail('Browser test suite options must be a plain object.','BROWSER_TEST_INVALID_OPTIONS');
-    knownKeys(input,new Set(['maxTests','now','tests','timeoutMs']),'Browser test suite options');
-    const maxTests=boundedInteger(input.maxTests??DEFAULT_MAX_TESTS,'maxTests',{minimum:1,maximum:HARD_MAX_TESTS});
-    const timeoutMs=boundedInteger(input.timeoutMs??DEFAULT_TIMEOUT_MS,'timeoutMs',{minimum:10,maximum:HARD_TIMEOUT_MS});
     const now=input.now??defaultNow;
     if(typeof now!=='function') fail('now must be a function.','BROWSER_TEST_INVALID_OPTIONS');
-    return Object.freeze({
-        maxTests,
+    return {
         now,
-        tests:normalizeTests(input.tests??[],{maxTests,timeoutMs}),
-        timeoutMs,
-    });
+        tests:normalizeTests(input.tests??[]),
+    };
 }
 
 function normalizeRunOptions(input){
     if(!isPlainRecord(input)) fail('Test run options must be a plain object.','BROWSER_TEST_INVALID_OPTIONS');
-    knownKeys(input,new Set(['context','signal']),'Test run options');
     const signal=input.signal??null;
     if(signal!==null&&(
         typeof signal!=='object'
@@ -145,13 +111,13 @@ function normalizeRunOptions(input){
         ||typeof signal.addEventListener!=='function'
         ||typeof signal.removeEventListener!=='function'
     )) fail('signal must be an AbortSignal.','BROWSER_TEST_INVALID_OPTIONS');
-    return Object.freeze({context:input.context,signal});
+    return {context:input.context,signal};
 }
 
 function elapsed(now,start){
     const end=Number(now());
     if(!Number.isFinite(end)) fail('now() must return a finite number.','BROWSER_TEST_INVALID_CLOCK');
-    return Math.round(Math.max(0,end-start)*1000)/1000;
+    return Math.max(0,end-start);
 }
 
 function startTime(now){
@@ -183,14 +149,7 @@ function abortError(cause){
     return error;
 }
 
-function timeoutError(milliseconds){
-    const error=coded(new Error(`The check exceeded ${milliseconds} milliseconds.`),'BROWSER_TEST_TIMEOUT');
-    error.name='BrowserTestTimeoutError';
-    error.reason=BROWSER_TEST_SUITE_REASONS.testTimedOut;
-    return error;
-}
-
-function runWithTimeout(callback,{signal,timeoutMs}){
+function runWithCancellation(callback,{signal}){
     if(signal?.aborted) return Promise.reject(abortError(signal.reason));
     const controller=new AbortController();
     return new Promise((resolve,reject)=>{
@@ -198,7 +157,6 @@ function runWithTimeout(callback,{signal,timeoutMs}){
         const finish=(handler,value)=>{
             if(settled) return;
             settled=true;
-            clearTimeout(timer);
             signal?.removeEventListener('abort',onAbort);
             handler(value);
         };
@@ -206,10 +164,6 @@ function runWithTimeout(callback,{signal,timeoutMs}){
             controller.abort(signal.reason);
             finish(reject,abortError(signal.reason));
         };
-        const timer=setTimeout(()=>{
-            controller.abort();
-            finish(reject,timeoutError(timeoutMs));
-        },timeoutMs);
         signal?.addEventListener('abort',onAbort,{once:true});
         Promise.resolve()
             .then(()=>callback(controller.signal))
@@ -219,51 +173,54 @@ function runWithTimeout(callback,{signal,timeoutMs}){
 
 function normalizedOutcome(value){
     if(value===undefined||value===true){
-        return Object.freeze({status:'pass',message:'Passed.'});
+        return {status:'pass',message:'Passed.'};
     }
     if(value===false){
-        return Object.freeze({status:'fail',message:'The check returned false.',code:'BROWSER_TEST_ASSERTION'});
+        return {status:'fail',message:'The check returned false.',code:'BROWSER_TEST_ASSERTION'};
     }
     if(!isPlainRecord(value)){
-        return Object.freeze({status:'fail',message:'The check returned an invalid result.',code:'BROWSER_TEST_INVALID_RESULT'});
+        return {status:'fail',message:'The check returned an invalid result.',code:'BROWSER_TEST_INVALID_RESULT'};
     }
-    const unknown=Object.keys(value).find(key=>!new Set(['message','status']).has(key));
-    if(unknown||!RESULT_STATUSES.has(value.status)){
-        return Object.freeze({status:'fail',message:'The check returned an invalid result.',code:'BROWSER_TEST_INVALID_RESULT'});
+    if(!RESULT_STATUSES.has(value.status)){
+        return {status:'fail',message:'The check returned an invalid result.',code:'BROWSER_TEST_INVALID_RESULT'};
     }
     const fallback=value.status==='pass'?'Passed.':value.status==='skip'?'Skipped.':'Failed.';
-    return Object.freeze({status:value.status,message:resultMessage(value.message,fallback)});
+    return {...value,status:value.status,message:resultMessage(value.message,fallback)};
 }
 
 function outcomeFromError(error){
     if(error?.code==='BROWSER_TEST_SKIP'){
-        return Object.freeze({status:'skip',message:resultMessage(error.message,'Skipped.'),code:error.code});
+        return {status:'skip',message:resultMessage(error.message,'Skipped.'),code:error.code,error};
     }
     if(error?.code===BROWSER_TEST_SUITE_ERROR_CODES.runAborted){
-        return Object.freeze({status:'skip',message:resultMessage(error.message,'The run was aborted.'),code:error.code});
+        return {status:'skip',message:resultMessage(error.message,'The run was aborted.'),code:error.code,error};
     }
-    return Object.freeze({
+    return {
         status:'fail',
         message:resultMessage(error?.message,'The check failed.'),
-        code:typeof error?.code==='string'?error.code.slice(0,64):'BROWSER_TEST_ERROR',
-        errorName:resultMessage(error?.name,'Error').slice(0,128),
-    });
+        code:typeof error?.code==='string'?error.code:'BROWSER_TEST_ERROR',
+        errorName:resultMessage(error?.name,'Error'),
+        error
+    };
 }
 
 function resultRecord(test,outcome,durationMs){
-    return Object.freeze({
+    return {
+        ...outcome,
         id:test.id,
         name:test.name,
-        status:outcome.status,
-        message:outcome.message,
-        ...(outcome.code?{code:outcome.code}:{}),
-        ...(outcome.errorName?{errorName:outcome.errorName}:{}),
+        outcome,
         durationMs,
-    });
+    };
 }
 
 function skippedResult(test,message,code='BROWSER_TEST_ABORTED'){
     return resultRecord(test,{status:'skip',message,code},0);
+}
+
+function publicTestDescriptor(test){
+    const {run,...detail}=test;
+    return {...detail};
 }
 
 function browserTestResultReason(result){
@@ -290,28 +247,31 @@ function browserTestPublicDetail(type,detail){
             ?detail.totals.total
             :null;
     if(type===BROWSER_TEST_SUITE_EVENT_TYPES.runStarted){
-        return Object.freeze({
+        return {
+            ...detail,
             reason:BROWSER_TEST_SUITE_REASONS.runStarted,
             testCount
-        });
+        };
     }
     if(type===BROWSER_TEST_SUITE_EVENT_TYPES.testStarted){
-        return Object.freeze({
+        return {
+            ...detail,
             reason:BROWSER_TEST_SUITE_REASONS.testStarted,
             testId:test.id,
             testIndex:detail.index,
             testCount
-        });
+        };
     }
     if(type===BROWSER_TEST_SUITE_EVENT_TYPES.testCompleted){
-        return Object.freeze({
+        return {
+            ...detail,
             reason:browserTestResultReason(result),
             testId:result.id,
             testIndex:detail.index,
             testCount,
             status:result.status,
             ...(typeof result.code==='string'?{code:result.code}:{})
-        });
+        };
     }
     const reason=detail.status==='aborted'
         ?BROWSER_TEST_SUITE_REASONS.runAborted
@@ -320,14 +280,15 @@ function browserTestPublicDetail(type,detail){
             :detail.status==='skip'
                 ?BROWSER_TEST_SUITE_REASONS.runWithoutPassesCompleted
                 :BROWSER_TEST_SUITE_REASONS.runCompleted;
-    return Object.freeze({
+    return {
+        ...detail,
         reason,
         status:detail.status,
         testCount,
         passedTestCount:detail.totals.pass,
         failedTestCount:detail.totals.fail,
         skippedTestCount:detail.totals.skip
-    });
+    };
 }
 
 function disposedError(){
@@ -344,9 +305,9 @@ function disposedError(){
  *
  * Test callbacks are trusted executable code supplied by the parent. This
  * module never accepts source text, evaluates code, persists results, or
- * selects application policy. Per-test abort signals and timeout races bound
- * cooperative asynchronous orchestration; callbacks must still avoid blocking
- * the page and stop work they started after their abort signal fires.
+ * selects application policy. Caller abort signals cancel cooperative
+ * asynchronous orchestration; callbacks must still stop work they started
+ * after their abort signal fires.
  */
 export default class BrowserTestSuite extends EventTarget{
     #activeRun=null;
@@ -364,7 +325,7 @@ export default class BrowserTestSuite extends EventTarget{
         this.#tests=normalized.tests;
         this.#events=createArcaneEventSource(this,{
             source:'browser-test-suite',
-            eventTypes:Object.freeze(Object.values(BROWSER_TEST_SUITE_EVENT_TYPES))
+            eventTypes:Object.values(BROWSER_TEST_SUITE_EVENT_TYPES)
         });
     }
 
@@ -376,19 +337,14 @@ export default class BrowserTestSuite extends EventTarget{
     get running(){return this.#running;}
 
     list(){
-        return Object.freeze(this.#tests.map(test=>Object.freeze({
-            id:test.id,
-            name:test.name,
-            timeoutMs:test.timeoutMs,
-        })));
+        return this.#tests.map(publicTestDescriptor);
     }
 
     #emit(type,detail,operationId){
         if(this.#disposed)return false;
-        const compatibilityDetail=Object.freeze(detail);
-        return this.#events.dispatch(type,compatibilityDetail,{
+        return this.#events.dispatch(type,detail,{
             operationId,
-            publicDetail:browserTestPublicDetail(type,compatibilityDetail)
+            publicDetail:browserTestPublicDetail(type,detail)
         });
     }
 
@@ -410,7 +366,7 @@ export default class BrowserTestSuite extends EventTarget{
             };
             if(settings.signal.aborted)abortBrowserTestRun();
         }
-        const runRecord=Object.freeze({controller,operationId});
+        const runRecord={controller,operationId};
         this.#activeRun=runRecord;
         const results=[];
         let aborted=controller.signal.aborted;
@@ -439,7 +395,7 @@ export default class BrowserTestSuite extends EventTarget{
                     BROWSER_TEST_SUITE_EVENT_TYPES.testStarted,
                     {
                         index,
-                        test:Object.freeze({id:descriptor.id,name:descriptor.name,timeoutMs:descriptor.timeoutMs}),
+                        test:publicTestDescriptor(descriptor),
                         total:this.#tests.length,
                     },
                     testOperationId
@@ -447,12 +403,12 @@ export default class BrowserTestSuite extends EventTarget{
                 const testStart=startTime(this.#now);
                 let outcome;
                 try{
-                    const value=await runWithTimeout(signal=>descriptor.run(Object.freeze({
+                    const value=await runWithCancellation(signal=>descriptor.run({
                         assert(condition,message){if(!condition) throw assertionError(message);},
                         context:settings.context,
                         signal,
                         skip(message){throw skipError(message);},
-                    })),{signal:controller.signal,timeoutMs:descriptor.timeoutMs});
+                    }),{signal:controller.signal});
                     outcome=normalizedOutcome(value);
                 }catch(error){
                     outcome=outcomeFromError(error);
@@ -471,19 +427,19 @@ export default class BrowserTestSuite extends EventTarget{
             removeAbortListener?.();
             if(this.#activeRun===runRecord)this.#activeRun=null;
         }
-        const totals=Object.freeze({
+        const totals={
             total:results.length,
             pass:results.filter(result=>result.status==='pass').length,
             fail:results.filter(result=>result.status==='fail').length,
             skip:results.filter(result=>result.status==='skip').length,
-        });
+        };
         const status=aborted?'aborted':totals.fail?'fail':totals.pass?'pass':'skip';
-        const summary=Object.freeze({
+        const summary={
             status,
             totals,
             durationMs:elapsed(this.#now,suiteStart),
-            results:Object.freeze(results),
-        });
+            results,
+        };
         this.#emit(BROWSER_TEST_SUITE_EVENT_TYPES.runCompleted,summary,operationId);
         return summary;
     }

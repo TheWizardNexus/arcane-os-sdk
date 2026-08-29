@@ -5,9 +5,7 @@ import {SDK_NAME,SDK_VERSION} from './constants.mjs';
 export const SDK_UPDATE_REGISTRY='https://registry.npmjs.org/';
 export const SDK_UPDATE_TIMEOUT_MS=2500;
 
-const MAX_RESPONSE_BYTES=32*1024;
-const MAX_DIST_TAGS=64;
-const DIST_TAG_PATTERN=/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
+const DIST_TAG_PATTERN=/^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
 const FORBIDDEN_DIST_TAG_KEYS=new Set(['__proto__','constructor','prototype']);
 
 function updateFailure(message,{cause,details}={}){
@@ -25,25 +23,15 @@ function canonicalPackageName(value){
     return value;
 }
 
-export function validateUpdateRegistry(value,{
-    allowedHosts=new Set(['registry.npmjs.org'])
-}={}){
+export function validateUpdateRegistry(value){
     let registry;
     try{
         registry=new URL(value);
     }catch(error){
         throw updateFailure('The SDK update registry URL is invalid.',{cause:error});
     }
-    if(registry.protocol!=='https:'
-        ||registry.username||registry.password
-        ||registry.search||registry.hash
-        ||registry.pathname!=='/'
-        ||(registry.port&&registry.port!=='443')
-        ||!allowedHosts.has(registry.hostname.toLowerCase())){
-        throw updateFailure(
-            'The SDK update registry must be an approved credential-free HTTPS origin.',
-            {details:{registryOrigin:registry.origin}}
-        );
+    if(!['http:','https:'].includes(registry.protocol)){
+        throw updateFailure('The SDK update registry must use HTTP or HTTPS.');
     }
     return registry;
 }
@@ -53,8 +41,8 @@ function registryEndpoint(registry,packageName){
 }
 
 function validateTimeout(value){
-    if(!Number.isSafeInteger(value)||value<100||value>10_000){
-        throw updateFailure('The SDK update timeout must be between 100 and 10000 milliseconds.');
+    if(!Number.isSafeInteger(value)||value<1){
+        throw updateFailure('The SDK update timeout must be a positive integer of milliseconds.');
     }
     return value;
 }
@@ -83,51 +71,34 @@ function linkedAbortSignal(signal,timeoutMs,{schedule=setTimeout,cancel=clearTim
     };
 }
 
-async function boundedResponseBytes(response){
+async function responseText(response){
     const contentType=response.headers?.get?.('content-type')??'';
     if(!/^(?:application\/json|application\/[A-Za-z0-9.+-]+\+json)(?:\s*;|$)/iu.test(contentType)){
         throw updateFailure('The npm registry returned a non-JSON update response.');
-    }
-    const declared=response.headers?.get?.('content-length');
-    if(declared!==null&&declared!==undefined&&declared!==''){
-        if(!/^\d+$/u.test(declared)||Number(declared)>MAX_RESPONSE_BYTES){
-            throw updateFailure('The npm registry update response exceeded the byte limit.');
-        }
     }
     if(!response.body||typeof response.body.getReader!=='function'){
         throw updateFailure('The npm registry returned no readable update response.');
     }
     const reader=response.body.getReader();
-    const chunks=[];
-    let total=0;
+    const decoder=new TextDecoder('utf-8',{fatal:true});
+    let text='';
     try{
         while(true){
             const {done,value}=await reader.read();
             if(done)break;
             if(!(value instanceof Uint8Array)){
                 await reader.cancel();
-                throw updateFailure('The npm registry update response was not a byte stream.');
+                throw updateFailure('The npm registry update response was not a readable stream.');
             }
-            total+=value.byteLength;
-            if(total>MAX_RESPONSE_BYTES){
-                await reader.cancel();
-                throw updateFailure('The npm registry update response exceeded the byte limit.');
-            }
-            chunks.push(value);
+            text+=decoder.decode(value,{stream:true});
         }
+        text+=decoder.decode();
+        return text;
+    }catch(error){
+        if(error instanceof ArcaneError)throw error;
+        throw updateFailure('The npm registry update response was not valid UTF-8.',{cause:error});
     }finally{
         reader.releaseLock?.();
-    }
-    const bytes=new Uint8Array(total);
-    let offset=0;
-    for(const chunk of chunks){
-        bytes.set(chunk,offset);
-        offset+=chunk.byteLength;
-    }
-    try{
-        return new TextDecoder('utf-8',{fatal:true}).decode(bytes);
-    }catch(error){
-        throw updateFailure('The npm registry update response was not valid UTF-8.',{cause:error});
     }
 }
 
@@ -136,13 +107,13 @@ function canonicalDistTags(value){
         throw updateFailure('The npm registry update response was not a dist-tag object.');
     }
     const entries=Object.entries(value);
-    if(entries.length<1||entries.length>MAX_DIST_TAGS){
+    if(entries.length<1){
         throw updateFailure('The npm registry update response contained an invalid dist-tag count.');
     }
     const tags=Object.create(null);
     for(const [tag,version] of entries){
         if(!DIST_TAG_PATTERN.test(tag)||FORBIDDEN_DIST_TAG_KEYS.has(tag)
-            ||typeof version!=='string'||version.length>128){
+            ||typeof version!=='string'){
             throw updateFailure('The npm registry update response contained an invalid dist-tag.');
         }
         try{
@@ -152,7 +123,7 @@ function canonicalDistTags(value){
         }
         tags[tag]=version;
     }
-    return Object.freeze(tags);
+    return tags;
 }
 
 function comparePrerelease(left,right){
@@ -199,7 +170,6 @@ export async function checkForSdkUpdate({
     packageName=SDK_NAME,
     currentVersion=SDK_VERSION,
     registry=SDK_UPDATE_REGISTRY,
-    allowedRegistryHosts,
     timeoutMs=SDK_UPDATE_TIMEOUT_MS,
     fetchImpl=globalThis.fetch,
     signal,
@@ -208,9 +178,7 @@ export async function checkForSdkUpdate({
 }={}){
     throwIfAborted(signal);
     const selectedPackage=canonicalPackageName(packageName);
-    const selectedRegistry=validateUpdateRegistry(registry,{
-        ...(allowedRegistryHosts===undefined?{}:{allowedHosts:allowedRegistryHosts})
-    });
+    const selectedRegistry=validateUpdateRegistry(registry);
     const selectedTimeout=validateTimeout(timeoutMs);
     if(typeof fetchImpl!=='function'){
         throw updateFailure('The SDK update HTTP client is unavailable.');
@@ -226,18 +194,12 @@ export async function checkForSdkUpdate({
     try{
         const response=await fetchImpl(endpoint,{
             method:'GET',
-            headers:Object.freeze({accept:'application/json'}),
-            redirect:'error',
-            cache:'no-store',
-            credentials:'omit',
-            referrerPolicy:'no-referrer',
+            headers:{accept:'application/json'},
             signal:linked.signal
         });
         throwIfAborted(signal);
-        if(!response||typeof response.status!=='number'
-            ||response.redirected===true
-            ||(response.url&&response.url!==endpoint.href)){
-            throw updateFailure('The npm registry update response changed origin or request identity.');
+        if(!response||typeof response.status!=='number'){
+            throw updateFailure('The npm registry update response is unavailable.');
         }
         if(response.status!==200){
             throw updateFailure(
@@ -245,7 +207,7 @@ export async function checkForSdkUpdate({
                 {details:{status:response.status}}
             );
         }
-        const body=await boundedResponseBytes(response);
+        const body=await responseText(response);
         let document;
         try{
             document=JSON.parse(body);
@@ -265,7 +227,7 @@ export async function checkForSdkUpdate({
             throw updateFailure('The installed or registry SDK version is invalid.',{cause:error});
         }
         const status=comparison<0?'update-available':comparison===0?'current':'ahead';
-        const result=Object.freeze({
+        const result={
             packageName:selectedPackage,
             currentVersion,
             registryVersion,
@@ -274,7 +236,7 @@ export async function checkForSdkUpdate({
             updateAvailable:status==='update-available',
             registry:selectedRegistry.origin,
             checkedAt:clock().toISOString()
-        });
+        };
         await onEvent?.({
             type:'update.check.completed',
             message:status==='update-available'

@@ -1,8 +1,4 @@
 import {SDK_NAME,SDK_VERSION} from '../constants.mjs';
-import {
-    SDK_BROWSER_RUNTIME_CONTENT_SHA256,
-    SDK_BROWSER_RUNTIME_MANIFEST_SHA256
-} from '../sdk-browser-runtime.mjs';
 
 const NPM_PACKAGE_NAME_PATTERN=/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/u;
 const LOCAL_TARBALL_PATTERN=/^file:.+\.tgz$/iu;
@@ -29,8 +25,6 @@ function titleCase(appId){
 export function workspaceTemplate({
     appId,
     displayName,
-    runtimeRelease,
-    sdkBrowserRuntimeRelease,
     sdkDependencyName=SDK_NAME,
     sdkDependencySpecifier=SDK_VERSION,
     sdkPackageSource=`node_modules/${sdkDependencyName}`,
@@ -65,31 +59,6 @@ export function workspaceTemplate({
     }
     const name=displayName||`Arcane ${titleCase(appId)}`;
     const packageName=`arcane-${appId}`;
-    const runtimeContentSha256=runtimeRelease?.contentSha256;
-    const upstreamCommit=runtimeRelease?.source?.legacyProjection?.commit;
-    const browserManifestSha256=sdkBrowserRuntimeRelease?.manifestSha256;
-    const browserContentSha256=sdkBrowserRuntimeRelease?.contentSha256;
-    const browserSource=sdkBrowserRuntimeRelease?.source;
-    const expectedBrowserDependencies=[
-        {
-            name:'event-pubsub',
-            version:'6.1.0',
-            resolved:'https://registry.npmjs.org/event-pubsub/-/event-pubsub-6.1.0.tgz',
-            integrity:'sha512-FEMlhTxwqGM0hztTixG6FhVFXqp7Eq1ltk5mSreK6Mhy3xWWpLAzEUR6OMvMdNqT3jgSxA8JDhnhyAG3X4Xy7Q=='
-        },
-        {
-            name:'strong-type',
-            version:'2.0.0',
-            resolved:'https://registry.npmjs.org/strong-type/-/strong-type-2.0.0.tgz',
-            integrity:'sha512-HHrY9qYC7yn+5mlewiI3k9RQM9gZqGQsqbomZcd10Ks0h4RlX01nnkWbCe4AsVPCI6KaFvpkWm1nHMD+Ykup6g=='
-        },
-        {
-            name:'@wllama/wllama',
-            version:'3.6.0',
-            resolved:'https://registry.npmjs.org/@wllama/wllama/-/wllama-3.6.0.tgz',
-            integrity:'sha512-NN3ZBXqaaUwGXTQubkNvsCaLPjN2XVa0bVS40OYCE8zquYmRc2W3oHYEgwvuSWWDB8aUqTLyMioySCXNkcnD1w=='
-        }
-    ];
     const packageInclude=[`${appId}.css`,'index.html'];
     if(native)packageInclude.push('img/icon.png');
     packageInclude.push('manifest.json','modules');
@@ -113,34 +82,6 @@ The generated \`img/icon.png\` is an Arcane OS SDK template asset governed by
 the SDK's license terms; replace it with your own raster application icon when
 appropriate.
 `:'';
-
-    if(!appOnly&&(typeof runtimeContentSha256!=='string'||!/^[a-f0-9]{64}$/.test(runtimeContentSha256))){
-        throw new Error('The SDK runtime release does not contain a valid contentSha256.');
-    }
-    if(!appOnly&&(typeof upstreamCommit!=='string'||!/^[a-f0-9]{40}$/.test(upstreamCommit))){
-        throw new Error('The SDK runtime release does not contain a valid upstream commit.');
-    }
-    if(!appOnly&&(
-        browserManifestSha256!==SDK_BROWSER_RUNTIME_MANIFEST_SHA256
-        ||browserContentSha256!==SDK_BROWSER_RUNTIME_CONTENT_SHA256
-        ||sdkBrowserRuntimeRelease?.builder!=='arcane-sdk-browser-runtime-v1'
-        ||sdkBrowserRuntimeRelease?.sdkVersion!==SDK_VERSION
-        ||browserSource?.protocol!=='arcane-sdk-browser-runtime/1'
-        ||browserSource?.authority!=='arcane-os-sdk'
-        ||browserSource?.repository!=='https://github.com/TheWizardNexus/arcane-os-sdk.git'
-        ||browserSource?.browserEntry!=='arcane-os/event-manager'
-        ||!Array.isArray(browserSource?.dependencies)
-        ||browserSource.dependencies.length!==expectedBrowserDependencies.length
-        ||browserSource.dependencies.some((actual,index)=>{
-            const expected=expectedBrowserDependencies[index];
-            return !actual||Object.keys(actual).sort().join('\0')
-                    !==['name','version','resolved','integrity'].sort().join('\0')
-                ||actual.name!==expected.name||actual.version!==expected.version
-                ||actual.resolved!==expected.resolved||actual.integrity!==expected.integrity;
-        })
-    )){
-        throw new Error('The SDK browser runtime release does not contain a valid trusted identity.');
-    }
 
     const importMapMarkup=namedImports?`    <script type="importmap" data-arcane-import-map>
 {
@@ -176,28 +117,29 @@ appropriate.
 - Keep \`arcane/css/theme.css\` before app styles and import \`arcane/ThemeBootstrap\` before app code runs.
 - Use \`rgb(...)\` or \`rgba(...)\` for new CSS colors.
 - Build one named app and one explicit target at a time. Native targets may be unavailable until their adapters are installed.
+- Preserve complete application, model, document, message, log, diagnostic, process, and tool content. Do not truncate, clip, tail, elide, or silently discard it.
+- Do not make ordinary application behavior depend on byte counts, byte limits, byte identities, hashes, digests, or byte-based admission.
+- Optional hardening must remain inactive unless the user expressly selects secure: true for the exact operation. The ordinary path must remain fully functional.
 - Run tests and checks only when the user explicitly selects verification or a distribution artifact requires it.
 `);
     files.set('README.md',`# ${name}
 
-This repository contains the portable Arcane application \`${appId}\`. It embeds immutable SDK runtime bytes for distribution and has no runtime dependency on an Arcane OS source checkout.
+This repository contains the portable Arcane application \`${appId}\`. It includes the selected SDK runtime for distribution and has no runtime dependency on an Arcane OS source checkout.
 
 ## Start
 
 \`\`\`sh
 npm install
-npm run doctor
 npm run dev
 \`\`\`
 
-Open the loopback URL printed by the development server. The source server exposes this app and its authenticated physical \`arcane/\` runtime; it does not expose an Ollama HTTP endpoint.
+Open the loopback URL printed by the development server. The source server exposes this app and its physical \`arcane/\` runtime; it does not expose an Ollama HTTP endpoint.
 
 Commit the generated \`package-lock.json\` after dependency installation. CI intentionally uses \`npm ci\` and therefore requires that lock. Before the SDK is published, install a locally packed \`${SDK_NAME}\` \`.tgz\` with \`npm install --save-dev --save-exact <path-to-tarball>\`; keep that tarball at the lock file's relative path for repeatable local \`npm ci\` runs.
 
-## Check and release the browser package
+## Optional browser release commands
 
 \`\`\`sh
-npm run check
 npm run import-map
 npm run package
 npm run verify
@@ -207,12 +149,16 @@ npm run run
 
 The explicit \`import-map\` command refreshes
 \`apps/${appId}/modules/arcane.importmap.json\` and the managed inline browser
-import map in \`index.html\`. Development, package, and build refresh it
-automatically. Named \`arcane/*\` imports resolve against the physical workspace
-\`arcane/\` tree. Packaging copies the same authenticated bytes and specifier map
-to \`dist/${appId}\`, \`verify\` authenticates that directory, \`bundle\` creates
-its distributable archive, and \`run\` launches the verified packaged browser
-release.
+import map in every directly navigable descriptor-admitted \`.html\`/\`.htm\`
+document. HTML component fragments remain package files but do not receive a
+document-level base or managed import map.
+Development, package, and build refresh that shared inventory when the selected operation needs it.
+Named \`arcane/*\` imports resolve against the physical workspace \`arcane/\`
+tree. Packaging copies the complete selected application, runtime, and specifier
+map to \`dist/${appId}\` without running application tests. Run \`verify\` only when
+the user explicitly selects verification or a release artifact that requires it;
+\`bundle\` creates the distributable archive and \`run\` launches the selected
+packaged browser release.
 
 Native targets are provider-supplied and must be scaffolded and selected
 explicitly; this browser workflow does not imply a standalone native executable.
@@ -254,7 +200,7 @@ Every browser release also carries Arcane OS licensing material under \`licenses
                 {
                     source:'arcane',
                     destination:'arcane',
-                    include:['components','css','dependencies','entities','img','modules','sdk','security'],
+                    include:['components','css','dependencies','entities','img','modules','sdk'],
                     exclude:[]
                 },
                 {
@@ -266,54 +212,6 @@ Every browser release also carries Arcane OS licensing material under \`licenses
             ]
         }
     }));
-    files.set('arcane.lock.json',json({
-        schemaVersion:1,
-        sdk:{name:SDK_NAME,version:SDK_VERSION},
-        runtime:{
-            manifest:`${sdkPackageSource}/runtime/ARCANE_RUNTIME_RELEASE.json`,
-            contentSha256:runtimeContentSha256,
-            upstreamCommit
-        },
-        sdkBrowserRuntime:{
-            manifest:`${sdkPackageSource}/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json`,
-            manifestSha256:browserManifestSha256,
-            contentSha256:browserContentSha256,
-            builder:sdkBrowserRuntimeRelease?.builder,
-            sdkVersion:sdkBrowserRuntimeRelease?.sdkVersion,
-            source:sdkBrowserRuntimeRelease?.source
-        },
-        protocols:{
-            arcane:'arcane/1',
-            cliEvents:'arcane-cli-events/1',
-            targetAdapter:'arcane-target-adapter/1'
-        }
-    }));
-    files.set('.github/workflows/check.yml',`name: check
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-
-permissions:
-  contents: read
-
-jobs:
-  check:
-    runs-on: \${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          package-manager-cache: false
-      - run: npm ci --ignore-scripts
-      - run: npm run check
-`);
     files.set(`apps/${appId}/arcane-app.json`,json({
         schemaVersion:2,
         id:appId,
@@ -331,15 +229,6 @@ jobs:
             exclude:[],
             shared:['browser-runtime']
         },
-        permissions:{
-            capabilities:[],
-            methods:[]
-        },
-        security:{
-            connectOrigins:[],
-            frameOrigins:[],
-            mediaOrigins:[]
-        },
         native:{
             type:'app',
             icon:native?'img/icon.png':null,
@@ -348,7 +237,7 @@ jobs:
         },
         requirements:{
             arcaneProtocol:'arcane/1',
-            minimumCoreVersion,
+            ...(native?{minimumCoreVersion}:{}),
             features:[]
         },
         targets:native?['browser',target].sort():['browser']
@@ -360,18 +249,13 @@ jobs:
         version:'0.1.0',
         entry:'index.html',
         strategy:'static',
-        security:{
-            connectOrigins:[],
-            frameOrigins:[],
-            mediaOrigins:[]
-        },
         include:packageInclude,
         exclude:[],
         shared:['browser-runtime']
     }));
     files.set(`apps/${appId}/manifest.json`,json({
         name,
-        short_name:titleCase(appId).slice(0,30),
+        short_name:titleCase(appId),
         start_url:'./index.html',
         display:'standalone',
         background_color:'rgb(13, 18, 32)',

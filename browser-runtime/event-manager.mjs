@@ -23,7 +23,6 @@ export const PLAYBACK_RECORD_EVENT='arcane.time-travel.playback.record';
 export const PLAYBACK_COMPLETED_EVENT='arcane.time-travel.playback.completed';
 export const PLAYBACK_CANCELLED_EVENT='arcane.time-travel.playback.cancelled';
 export const PLAYBACK_FAILED_EVENT='arcane.time-travel.playback.failed';
-export const TIME_TRAVEL_OVERFLOW_EVENT='arcane.time-travel.overflow';
 
 export const ARCANE_EVENT_AUTHORITY_KIND='arcane-event-authority';
 export const ARCANE_EVENT_SOURCE_KIND='arcane-event-source';
@@ -32,18 +31,18 @@ export const ARCANE_EVENT_SOURCE_DISPOSED_EVENT='arcane.event.source.disposed';
 const ARCANE_EVENT_TARGET_COMPATIBILITY_SOURCE='event-target-compatibility';
 const ARCANE_EVENT_NAME_PATTERN=/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/u;
 const ARCANE_EVENT_CHANNEL_PREFIX='arcane.event.authority.internal:';
-const ARCANE_EVENT_PROJECTION_KEYS=Object.freeze([
+const ARCANE_EVENT_PROJECTION_KEYS=[
     'occurrenceId','arcaneSource','instanceId','operationId'
-]);
-const ARCANE_EVENT_REQUIRED_AUTHORITY_API=Object.freeze([
+];
+const ARCANE_EVENT_REQUIRED_AUTHORITY_API=[
     'on','once','off','reset','emit','instrument','forward','subscribe','createSource',
     'projectDOMEvent','isOccurrence','addEventListener','removeEventListener','dispatchEvent'
-]);
+];
 const EVENT_MANAGER_BUS_ON=Symbol('EventManager.busOn');
 const EVENT_MANAGER_BUS_OFF=Symbol('EventManager.busOff');
 const EVENT_MANAGER_DISPATCH=Symbol('EventManager.dispatch');
 
-const ARCANE_EVENT_ERRORS=Object.freeze({
+const ARCANE_EVENT_ERRORS={
     ARCANE_EVENT_AUTHORITY_ACCESSOR_COLLISION:
         'globalThis.arcaneEvents must be an own data property.',
     ARCANE_EVENT_AUTHORITY_VALUE_COLLISION:
@@ -65,7 +64,7 @@ const ARCANE_EVENT_ERRORS=Object.freeze({
     ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED:
         'The Arcane event source cannot publish an undeclared event type.',
     ARCANE_EVENT_COMPATIBILITY_DETAIL_INVALID:
-        'Arcane event compatibility detail must be immutable or safely shallow-copyable.',
+        'Arcane event compatibility detail must be safely shallow-copyable.',
     ARCANE_EVENT_OCCURRENCE_INVALID:
         'The Arcane event occurrence value or creation options are invalid.',
     ARCANE_EVENT_OCCURRENCE_SEQUENCE_EXHAUSTED:
@@ -90,30 +89,21 @@ const ARCANE_EVENT_ERRORS=Object.freeze({
         'Arcane event subscription signal must be an AbortSignal.',
     ARCANE_EVENT_DISPATCH_EVENT_INVALID:
         'arcaneEvents.dispatchEvent requires an Event-like object with a valid type and data detail.'
-});
-export const ARCANE_EVENT_ERROR_CODES=Object.freeze(Object.fromEntries(
+};
+export const ARCANE_EVENT_ERROR_CODES=Object.fromEntries(
     Object.keys(ARCANE_EVENT_ERRORS).map(code=>[code,code])
-));
+);
 
-const SENSITIVE_KEY_PATTERN=/(?:authorization|cookie|credential|pass(?:word|phrase)?|private.?key|secret|session.?token|token|api.?key)/iu;
-const PRIVATE_CONTENT_KEY_PATTERN=/^(?:data|detail|key)$/iu;
-const INTERNAL_STACK_PATTERN=/(?:EventManager\.|#dispatch|event-manager\.mjs)/u;
-const URL_PATTERN=/\b(?:blob|data|file|ftp|ftps|http|https|ws|wss):[^\s<>'"\])}]+/giu;
-const DEFAULT_MAX_EVENTS=10_000;
-const DEFAULT_MAX_SNAPSHOT_DEPTH=50;
-const DEFAULT_MAX_SNAPSHOT_ENTRIES=1_000;
-const DEFAULT_MAX_SNAPSHOT_STRING_LENGTH=10_000;
-const MIN_SNAPSHOT_STRING_LENGTH=64;
-const DOCUMENT_KEYS=Object.freeze(['protocol','sessionId','createdAt','events']);
-const RECORD_KEYS=Object.freeze([
+const DOCUMENT_KEYS=['protocol','sessionId','createdAt','events'];
+const RECORD_KEYS=[
     'protocol','sessionId','id','sequence','timestamp','monotonicMs','type','source',
     'category','correlationId','causationId','parentSequence','depth','stack','payload',
     'metadata','status','completedAt','durationMs','error'
-]);
+];
 const EVENT_STATUSES=new Set(['dispatching','completed','failed']);
 const DATE_TO_ISO=Date.prototype.toISOString;
 const REGEXP_SOURCE_GETTER=Object.getOwnPropertyDescriptor(RegExp.prototype,'source')?.get;
-const REGEXP_FLAG_GETTERS=Object.freeze([
+const REGEXP_FLAG_GETTERS=[
     ['d',Object.getOwnPropertyDescriptor(RegExp.prototype,'hasIndices')?.get],
     ['g',Object.getOwnPropertyDescriptor(RegExp.prototype,'global')?.get],
     ['i',Object.getOwnPropertyDescriptor(RegExp.prototype,'ignoreCase')?.get],
@@ -122,7 +112,7 @@ const REGEXP_FLAG_GETTERS=Object.freeze([
     ['u',Object.getOwnPropertyDescriptor(RegExp.prototype,'unicode')?.get],
     ['v',Object.getOwnPropertyDescriptor(RegExp.prototype,'unicodeSets')?.get],
     ['y',Object.getOwnPropertyDescriptor(RegExp.prototype,'sticky')?.get]
-]);
+];
 const MAP_ENTRIES=Map.prototype.entries;
 const MAP_SIZE_GETTER=Object.getOwnPropertyDescriptor(Map.prototype,'size')?.get;
 const SET_VALUES=Set.prototype.values;
@@ -134,10 +124,6 @@ const TYPED_ARRAY_VALUES=TYPED_ARRAY_PROTOTYPE.values;
 const TYPED_ARRAY_TAG_GETTER=
     Object.getOwnPropertyDescriptor(TYPED_ARRAY_PROTOTYPE,Symbol.toStringTag)?.get;
 const DATA_VIEW_BUFFER_GETTER=Object.getOwnPropertyDescriptor(DataView.prototype,'buffer')?.get;
-const DATA_VIEW_BYTE_LENGTH_GETTER=
-    Object.getOwnPropertyDescriptor(DataView.prototype,'byteLength')?.get;
-const DATA_VIEW_BYTE_OFFSET_GETTER=
-    Object.getOwnPropertyDescriptor(DataView.prototype,'byteOffset')?.get;
 
 function dataObject(entries=[]){
     const result=Object.create(null);
@@ -169,26 +155,10 @@ function taggedSnapshot(type,entries=[]){
     return snapshotObject([['$type',type],...entries]);
 }
 
-function dataProperty(value,key,{inherited=false}={}){
-    let current=value;
-    while(current!==null&&(typeof current==='object'||typeof current==='function')){
-        const descriptor=Object.getOwnPropertyDescriptor(current,key);
-        if(descriptor){
-            return 'value' in descriptor
-                ?{found:true,readable:true,value:descriptor.value}
-                :{found:true,readable:false,value:undefined};
-        }
-        if(!inherited)break;
-        current=Object.getPrototypeOf(current);
-    }
-    return {found:false,readable:false,value:undefined};
-}
-
-function safeDataString(value,key,{fallback='',inherited=false}={}){
+function safeDataString(value,key,{fallback=''}={}){
     try{
-        const property=dataProperty(value,key,{inherited});
-        if(property.found&&!property.readable)return '[UNREADABLE]';
-        if(property.readable&&typeof property.value==='string')return property.value;
+        const current=Reflect.get(value,key);
+        if(typeof current==='string')return current;
     }catch{}
     return fallback;
 }
@@ -201,13 +171,11 @@ function regexpFlags(value){
     return result;
 }
 
-function boundedString(value,maxLength,{redactSensitive=true}={}){
-    let result=String(value);
-    if(redactSensitive)result=result.replace(URL_PATTERN,'[REDACTED URL]');
-    return result.length<=maxLength?result:`${result.slice(0,maxLength)}…`;
+function safeString(value){
+    return String(value);
 }
 
-function safeErrorText(error,maxLength,{redactSensitive=true}={}){
+function safeErrorText(error){
     let text='Snapshot capture failed.';
     try{
         if(error!==null&&(typeof error==='object'||typeof error==='function')){
@@ -217,7 +185,7 @@ function safeErrorText(error,maxLength,{redactSensitive=true}={}){
             text=String(error);
         }
     }catch{}
-    try{return boundedString(text,maxLength,{redactSensitive});}
+    try{return safeString(text);}
     catch{return 'Snapshot capture failed.';}
 }
 
@@ -249,75 +217,56 @@ function defaultMonotonicClock(){
 
 function sourceStack(){
     const stack=new Error('Arcane event source').stack;
-    if(typeof stack!=='string')return null;
-    const lines=stack.split(/\r?\n/u);
-    const filtered=[lines[0],...lines.slice(1).filter(line=>!INTERNAL_STACK_PATTERN.test(line))];
-    return filtered.join('\n');
+    return typeof stack==='string'?stack:null;
 }
 
 function snapshot(value,{
-    redactSensitive=true,
-    captureStacks=false,
-    maxDepth=DEFAULT_MAX_SNAPSHOT_DEPTH,
-    maxEntries=DEFAULT_MAX_SNAPSHOT_ENTRIES,
-    maxStringLength=DEFAULT_MAX_SNAPSHOT_STRING_LENGTH,
     key='',
     path='$',
     depth=0,
     seen=new Map()
 }={}){
-    if(redactSensitive&&key
-        &&(SENSITIVE_KEY_PATTERN.test(key)||PRIVATE_CONTENT_KEY_PATTERN.test(key))){
-        return '[REDACTED]';
-    }
     if(value===null||value===undefined||typeof value==='boolean')return value;
-    if(typeof value==='string')return boundedString(value,maxStringLength,{redactSensitive});
+    if(typeof value==='string')return safeString(value);
     if(typeof value==='number')return Number.isFinite(value)
         ?value
         :taggedSnapshot('number',[['value',String(value)]]);
     if(typeof value==='bigint')return taggedSnapshot('bigint',[[
-        'value',boundedString(value.toString(),maxStringLength,{redactSensitive})
+        'value',safeString(value.toString())
     ]]);
     if(typeof value==='symbol')return taggedSnapshot('symbol',[[
         'value',value.description===undefined
             ?null
-            :boundedString(value.description,maxStringLength,{redactSensitive})
+            :safeString(value.description)
     ]]);
     if(typeof value==='function'){
         const name=safeDataString(value,'name');
         return taggedSnapshot('function',[[
-            'name',name?boundedString(name,maxStringLength,{redactSensitive}):null
+            'name',name?safeString(name):null
         ]]);
     }
-    if(depth>=maxDepth)return taggedSnapshot('depth-limit',[[
-        'path',boundedString(path,maxStringLength,{redactSensitive})
-    ]]);
     if(seen.has(value))return snapshotObject([[
-        '$ref',boundedString(seen.get(value),maxStringLength,{redactSensitive})
+        '$ref',safeString(seen.get(value))
     ]]);
     seen.set(value,path);
 
     const next=(item,itemKey,itemPath)=>{
         try{
             return snapshot(item,{
-                redactSensitive,captureStacks,maxDepth,maxEntries,maxStringLength,
                 key:itemKey,
-                path:boundedString(itemPath,maxStringLength,{redactSensitive}),
+                path:safeString(itemPath),
                 depth:depth+1,
                 seen
             });
         }catch(error){
             return snapshotFailure(error,{
-                redactSensitive,maxStringLength,
                 path:itemPath
             });
         }
     };
     if(value instanceof Date)return taggedSnapshot('date',[['value',DATE_TO_ISO.call(value)]]);
     if(value instanceof RegExp)return taggedSnapshot('regexp',[
-        ['source',boundedString(
-            REGEXP_SOURCE_GETTER.call(value),maxStringLength,{redactSensitive}
-        )],
+        ['source',safeString(REGEXP_SOURCE_GETTER.call(value))],
         ['flags',regexpFlags(value)]
     ]);
     if(value instanceof Error){
@@ -325,35 +274,27 @@ function snapshot(value,{
         const message=safeDataString(value,'message');
         const stack=safeDataString(value,'stack');
         const entries=[
-            ['name',boundedString(name||'Error',maxStringLength,{redactSensitive})],
-            ['message',boundedString(message,maxStringLength,{redactSensitive})],
-            ['stack',captureStacks&&stack
-                ?boundedString(stack,maxStringLength,{redactSensitive})
-                :null]
+            ['name',safeString(name||'Error')],
+            ['message',safeString(message)],
+            ['stack',stack?safeString(stack):null]
         ];
         let causeDescriptor;
         try{causeDescriptor=Object.getOwnPropertyDescriptor(value,'cause');}catch{}
         if(causeDescriptor){
-            entries.push(['cause','value' in causeDescriptor
-                ?next(causeDescriptor.value,'cause',`${path}.cause`)
-                :taggedSnapshot('unreadable',[['error','Accessor properties are not evaluated.']])]);
+            let cause;
+            try{cause=Reflect.get(value,'cause');}
+            catch(error){cause=snapshotFailure(error,{path:`${path}.cause`});}
+            entries.push(['cause',next(cause,'cause',`${path}.cause`)]);
         }
         return taggedSnapshot('error',entries);
     }
     if(Array.isArray(value)){
         const result=[];
-        const limit=Math.min(value.length,maxEntries);
-        for(let index=0;index<limit;index+=1){
-            const descriptor=Object.getOwnPropertyDescriptor(value,String(index));
-            const item=descriptor&&'value' in descriptor
-                ?descriptor.value
-                :taggedSnapshot('unreadable',[['error','Accessor properties are not evaluated.']]);
+        for(let index=0;index<value.length;index+=1){
+            let item;
+            try{item=Reflect.get(value,String(index));}
+            catch(error){item=snapshotFailure(error,{path:`${path}[${index}]`});}
             result.push(next(item,String(index),`${path}[${index}]`));
-        }
-        if(value.length>maxEntries){
-            result.push(taggedSnapshot('entries-truncated',[
-                ['omitted',value.length-maxEntries]
-            ]));
         }
         return result;
     }
@@ -361,65 +302,47 @@ function snapshot(value,{
         const entries=[];
         let index=0;
         for(const [mapKey,item] of MAP_ENTRIES.call(value)){
-            if(index>=maxEntries)break;
             entries.push([
                 next(mapKey,'mapKey',`${path}.entries[${index}].key`),
                 next(item,'value',`${path}.entries[${index}].value`)
             ]);
             index+=1;
         }
-        const size=MAP_SIZE_GETTER.call(value);
-        return taggedSnapshot('map',[
-            ['entries',entries],
-            ...(size>index?[['omitted',size-index]]:[])
-        ]);
+        return taggedSnapshot('map',[['entries',entries]]);
     }
     if(value instanceof Set){
         const values=[];
         let index=0;
         for(const item of SET_VALUES.call(value)){
-            if(index>=maxEntries)break;
             values.push(next(item,String(index),`${path}.values[${index}]`));
             index+=1;
         }
-        const size=SET_SIZE_GETTER.call(value);
-        return taggedSnapshot('set',[
-            ['values',values],
-            ...(size>index?[['omitted',size-index]]:[])
-        ]);
+        return taggedSnapshot('set',[['values',values]]);
     }
     if(ArrayBuffer.isView(value)){
         const dataView=value instanceof DataView;
-        const length=dataView
-            ?DATA_VIEW_BYTE_LENGTH_GETTER.call(value)
-            :TYPED_ARRAY_LENGTH_GETTER.call(value);
         let values;
         let type='DataView';
         if(dataView){
             const buffer=DATA_VIEW_BUFFER_GETTER.call(value);
-            const byteOffset=DATA_VIEW_BYTE_OFFSET_GETTER.call(value);
-            values=Array.from(new Uint8Array(buffer,byteOffset,Math.min(length,maxEntries)));
+            values=Array.from(new Uint8Array(buffer));
         }else{
+            const length=TYPED_ARRAY_LENGTH_GETTER.call(value);
             type=TYPED_ARRAY_TAG_GETTER.call(value)??'TypedArray';
             values=[];
             const iterator=TYPED_ARRAY_VALUES.call(value);
-            while(values.length<Math.min(length,maxEntries)){
+            while(values.length<length){
                 const step=iterator.next();
                 if(step.done)break;
                 values.push(step.value);
             }
         }
-        return taggedSnapshot(type,[
-            ['values',values],
-            ...(length>maxEntries?[['omitted',length-maxEntries]]:[])
-        ]);
+        return taggedSnapshot(type,[['values',values]]);
     }
     if(value instanceof ArrayBuffer){
-        const bytes=new Uint8Array(value);
-        return taggedSnapshot('ArrayBuffer',[
-            ['values',Array.from(bytes.subarray(0,maxEntries))],
-            ...(bytes.length>maxEntries?[['omitted',bytes.length-maxEntries]]:[])
-        ]);
+        return taggedSnapshot('ArrayBuffer',[[
+            'values',Array.from(new Uint8Array(value))
+        ]]);
     }
 
     const result=snapshotObject();
@@ -428,13 +351,12 @@ function snapshot(value,{
         const descriptor=Object.getOwnPropertyDescriptor(value,property);
         return descriptor?.enumerable===true;
     });
-    for(let index=0;index<Math.min(properties.length,maxEntries);index+=1){
+    for(let index=0;index<properties.length;index+=1){
         const property=properties[index];
-        const descriptor=Object.getOwnPropertyDescriptor(value,property);
-        const item=descriptor&&'value' in descriptor
-            ?descriptor.value
-            :taggedSnapshot('unreadable',[['error','Accessor properties are not evaluated.']]);
-        let outputKey=boundedString(property,maxStringLength,{redactSensitive:false});
+        let item;
+        try{item=Reflect.get(value,property);}
+        catch(error){item=snapshotFailure(error,{path:`${path}.${property}`});}
+        let outputKey=safeString(property);
         if(Object.hasOwn(result,outputKey))outputKey=`$arcaneCollision:${String(index)}`;
         Object.defineProperty(result,outputKey,{
             value:next(item,property,`${path}.${property}`),
@@ -443,49 +365,27 @@ function snapshot(value,{
             writable:true
         });
     }
-    if(properties.length>maxEntries){
-        Object.defineProperty(result,'$arcaneTruncated',{
-            value:snapshotObject([['omitted',properties.length-maxEntries]]),
-            enumerable:true,
-            configurable:true,
-            writable:true
-        });
-    }
     return result;
 }
 
-function snapshotFailure(error,{
-    redactSensitive=true,
-    maxStringLength=DEFAULT_MAX_SNAPSHOT_STRING_LENGTH,
-    path='$'
-}={}){
+function snapshotFailure(error,{path='$'}={}){
     const name=safeDataString(error,'name',{fallback:'Error',inherited:true})||'Error';
     return taggedSnapshot('snapshot-failed',[
-        ['name',boundedString(name,maxStringLength,{redactSensitive})],
-        ['message',safeErrorText(error,maxStringLength,{redactSensitive})],
-        ['path',boundedString(path,maxStringLength,{redactSensitive})]
+        ['name',safeString(name)],
+        ['message',safeErrorText(error)],
+        ['path',safeString(path)]
     ]);
 }
 
-function deepFreeze(value,seen=new WeakSet()){
-    if(!value||typeof value!=='object'||seen.has(value))return value;
-    seen.add(value);
-    for(const property of Reflect.ownKeys(value)){
-        const descriptor=Object.getOwnPropertyDescriptor(value,property);
-        if(descriptor&&'value' in descriptor)deepFreeze(descriptor.value,seen);
-    }
-    return Object.freeze(value);
+function completeSnapshot(value,options){
+    try{return snapshot(value,options);}
+    catch(error){return snapshotFailure(error,options);}
 }
 
-function frozenSnapshot(value,options){
-    try{return deepFreeze(snapshot(value,options));}
-    catch(error){return deepFreeze(snapshotFailure(error,options));}
-}
-
-function frozenErrorSnapshot(value,options){
-    const captured=frozenSnapshot(value,options);
+function completeErrorSnapshot(value,options){
+    const captured=completeSnapshot(value,options);
     if(captured&&typeof captured==='object'&&!Array.isArray(captured))return captured;
-    return deepFreeze(taggedSnapshot('thrown',[['value',captured]]));
+    return taggedSnapshot('thrown',[['value',captured]]);
 }
 
 function normalizeMetadata(metadata){
@@ -559,12 +459,11 @@ function exactDataObject(value,expectedKeys,label){
     }
 }
 
-function denseArrayValues(value,label,{maxLength}={}){
+function denseArrayValues(value,label){
     try{
         if(!Array.isArray(value)||!Number.isSafeInteger(value.length)||value.length<0){
             invalidStack(label);
         }
-        if(maxLength!==undefined&&value.length>maxLength)invalidStack(label);
         const keys=Reflect.ownKeys(value);
         if(keys.some(key=>typeof key!=='string'))invalidStack(label);
         const expected=new Set(['length']);
@@ -586,9 +485,6 @@ function denseArrayValues(value,label,{maxLength}={}){
 }
 
 function cloneImportedValue(value,{
-    maxDepth,
-    maxEntries,
-    maxStringLength,
     path='$',
     depth=0,
     seen=new WeakSet()
@@ -598,23 +494,14 @@ function cloneImportedValue(value,{
         if(!Number.isFinite(value))invalidStack(`Event stack value at ${path}`);
         return value;
     }
-    if(typeof value==='string'){
-        if(value.length>maxStringLength+1
-            ||(value.length===maxStringLength+1&&!value.endsWith('…'))){
-            invalidStack(`Event stack value at ${path}`);
-        }
-        return value;
-    }
+    if(typeof value==='string')return value;
     if(!value||typeof value!=='object')invalidStack(`Event stack value at ${path}`);
-    if(depth>maxDepth||seen.has(value))invalidStack(`Event stack value at ${path}`);
+    if(seen.has(value))invalidStack(`Event stack value at ${path}`);
     seen.add(value);
 
     if(Array.isArray(value)){
-        const items=denseArrayValues(value,`Event stack array at ${path}`,{
-            maxLength:maxEntries+1
-        });
+        const items=denseArrayValues(value,`Event stack array at ${path}`);
         return items.map((item,index)=>cloneImportedValue(item,{
-            maxDepth,maxEntries,maxStringLength,
             path:`${path}[${String(index)}]`,
             depth:depth+1,
             seen
@@ -630,16 +517,11 @@ function cloneImportedValue(value,{
         throw new TypeError(`Event stack value at ${path} is invalid.`,{cause:error});
     }
     if((prototype!==Object.prototype&&prototype!==null)
-        ||keys.some(key=>typeof key!=='string')
-        ||keys.length>maxEntries+1){
+        ||keys.some(key=>typeof key!=='string')){
         invalidStack(`Event stack value at ${path}`);
     }
     const result=dataObject();
     for(const key of keys){
-        if(key.length>maxStringLength+1
-            ||(key.length===maxStringLength+1&&!key.endsWith('…'))){
-            invalidStack(`Event stack value at ${path}`);
-        }
         let descriptor;
         try{descriptor=Object.getOwnPropertyDescriptor(value,key);}catch(error){
             throw new TypeError(`Event stack value at ${path} is invalid.`,{cause:error});
@@ -649,7 +531,6 @@ function cloneImportedValue(value,{
         }
         Object.defineProperty(result,key,{
             value:cloneImportedValue(descriptor.value,{
-                maxDepth,maxEntries,maxStringLength,
                 path:`${path}.${key}`,
                 depth:depth+1,
                 seen
@@ -671,21 +552,16 @@ function canonicalTimestamp(value,label){
     return milliseconds;
 }
 
-function boundedRecordString(value,label,maxStringLength,{nullable=false,empty=true}={}){
+function recordString(value,label,{nullable=false,empty=true}={}){
     if(nullable&&value===null)return null;
-    if(typeof value!=='string'||(!empty&&!value)
-        ||value.length>maxStringLength+1
-        ||(value.length===maxStringLength+1&&!value.endsWith('…'))){
+    if(typeof value!=='string'||(!empty&&!value)){
         invalidStack(label);
     }
     return value;
 }
 
 function validateRecord(record,index,{
-    sessionId,
-    maxDepth,
-    maxEntries,
-    maxStringLength
+    sessionId
 }){
     const label=`Event stack record ${String(index)}`;
     const fields=exactDataObject(record,RECORD_KEYS,label);
@@ -701,15 +577,15 @@ function validateRecord(record,index,{
         ||fields.monotonicMs<0){
         invalidStack(`${label} monotonic timing`);
     }
-    boundedRecordString(fields.type,`${label} type`,maxStringLength);
-    boundedRecordString(fields.source,`${label} source`,maxStringLength,{empty:false});
-    boundedRecordString(fields.category,`${label} category`,maxStringLength,{
+    recordString(fields.type,`${label} type`);
+    recordString(fields.source,`${label} source`,{empty:false});
+    recordString(fields.category,`${label} category`,{
         nullable:true,empty:false
     });
-    boundedRecordString(fields.correlationId,`${label} correlation`,maxStringLength,{
+    recordString(fields.correlationId,`${label} correlation`,{
         nullable:true,empty:false
     });
-    boundedRecordString(fields.causationId,`${label} causation`,maxStringLength,{
+    recordString(fields.causationId,`${label} causation`,{
         nullable:true,empty:false
     });
     if(fields.parentSequence!==null
@@ -721,20 +597,16 @@ function validateRecord(record,index,{
         ||(fields.parentSequence===null)!==(fields.depth===0)){
         invalidStack(`${label} depth`);
     }
-    boundedRecordString(fields.stack,`${label} stack`,maxStringLength,{nullable:true});
+    recordString(fields.stack,`${label} stack`,{nullable:true});
     if(!EVENT_STATUSES.has(fields.status))invalidStack(`${label} status`);
 
-    const payloadValues=denseArrayValues(fields.payload,`${label} payload`,{
-        maxLength:maxEntries+1
-    });
+    const payloadValues=denseArrayValues(fields.payload,`${label} payload`);
     const payload=payloadValues.map((item,payloadIndex)=>cloneImportedValue(item,{
-        maxDepth,maxEntries,maxStringLength,
         path:`$.events[${String(index)}].payload[${String(payloadIndex)}]`,
         depth:1,
         seen:new WeakSet()
     }));
     const metadata=cloneImportedValue(fields.metadata,{
-        maxDepth,maxEntries,maxStringLength,
         path:`$.events[${String(index)}].metadata`,
         depth:0,
         seen:new WeakSet()
@@ -763,7 +635,6 @@ function validateRecord(record,index,{
             if(fields.error!==null)invalidStack(`${label} error`);
         }else{
             error=cloneImportedValue(fields.error,{
-                maxDepth,maxEntries,maxStringLength,
                 path:`$.events[${String(index)}].error`,
                 depth:0,
                 seen:new WeakSet()
@@ -798,21 +669,7 @@ function validateRecord(record,index,{
     ]);
 }
 
-export function parseEventStack(source,{
-    maxEvents=DEFAULT_MAX_EVENTS,
-    maxSnapshotDepth=DEFAULT_MAX_SNAPSHOT_DEPTH,
-    maxSnapshotEntries=DEFAULT_MAX_SNAPSHOT_ENTRIES,
-    maxSnapshotStringLength=DEFAULT_MAX_SNAPSHOT_STRING_LENGTH
-}={}){
-    if(!Number.isSafeInteger(maxEvents)||maxEvents<1
-        ||!Number.isSafeInteger(maxSnapshotDepth)||maxSnapshotDepth<1
-        ||!Number.isSafeInteger(maxSnapshotEntries)||maxSnapshotEntries<1
-        ||!Number.isSafeInteger(maxSnapshotStringLength)
-        ||maxSnapshotStringLength<MIN_SNAPSHOT_STRING_LENGTH){
-        throw new RangeError(
-            'Event stack import limits must be positive safe integers and the string limit must be at least 64.'
-        );
-    }
+export function parseEventStack(source){
     let document=source;
     if(typeof source==='string'){
         try{document=JSON.parse(source);}catch(error){
@@ -821,23 +678,15 @@ export function parseEventStack(source,{
     }
     const fields=exactDataObject(document,DOCUMENT_KEYS,'The event stack document');
     if(fields.protocol!==ARCANE_EVENT_STACK_PROTOCOL
-        ||typeof fields.sessionId!=='string'||!fields.sessionId
-        ||fields.sessionId.length>256){
+        ||typeof fields.sessionId!=='string'||!fields.sessionId){
         invalidStack('The event stack document');
     }
     canonicalTimestamp(fields.createdAt,'The event stack creation timestamp');
-    const sourceEvents=denseArrayValues(fields.events,'The event stack events',{
-        maxLength:maxEvents+1
-    });
+    const sourceEvents=denseArrayValues(fields.events,'The event stack events');
     let previous=0;
     const bySequence=new Map();
     const events=sourceEvents.map((record,index)=>{
-        const validated=validateRecord(record,index,{
-            sessionId:fields.sessionId,
-            maxDepth:maxSnapshotDepth,
-            maxEntries:maxSnapshotEntries,
-            maxStringLength:maxSnapshotStringLength
-        });
+        const validated=validateRecord(record,index,{sessionId:fields.sessionId});
         if(validated.sequence<=previous){
             throw new TypeError('Event stack sequences must be strictly increasing.');
         }
@@ -851,67 +700,22 @@ export function parseEventStack(source,{
         bySequence.set(validated.sequence,validated);
         return validated;
     });
-    const overflowIndexes=[];
-    for(let index=0;index<events.length;index+=1){
-        if(events[index].type===TIME_TRAVEL_OVERFLOW_EVENT)overflowIndexes.push(index);
-    }
-    if(overflowIndexes.length>1
-        ||(overflowIndexes.length===1&&overflowIndexes[0]!==events.length-1)
-        ||(events.length>maxEvents
-            &&(events.length!==maxEvents+1||overflowIndexes[0]!==events.length-1))){
-        invalidStack('The event stack overflow history');
-    }
-    if(overflowIndexes.length===1){
-        const overflow=events.at(-1);
-        const payload=denseArrayValues(
-            overflow.payload,'The event stack overflow payload',{maxLength:1}
-        );
-        if(payload.length!==1)invalidStack('The event stack overflow payload');
-        const counts=exactDataObject(
-            payload[0],['maxEvents','retainedEvents'],'The event stack overflow payload counts'
-        );
-        const metadata=exactDataObject(
-            overflow.metadata,['maxEvents'],'The event stack overflow metadata'
-        );
-        const retainedEvents=events.length-1;
-        if(overflow.source!=='event-manager'||overflow.category!=='overflow'
-            ||overflow.correlationId!==null||overflow.causationId!==null
-            ||overflow.parentSequence!==null||overflow.depth!==0||overflow.stack!==null
-            ||overflow.status!=='completed'||overflow.completedAt!==overflow.timestamp
-            ||overflow.durationMs!==0||overflow.error!==null
-            ||!Number.isSafeInteger(counts.maxEvents)||counts.maxEvents<1
-            ||!Number.isSafeInteger(counts.retainedEvents)||counts.retainedEvents<1
-            ||counts.maxEvents!==counts.retainedEvents
-            ||metadata.maxEvents!==counts.maxEvents
-            ||retainedEvents!==counts.retainedEvents
-            ||overflow.sequence!==retainedEvents+1
-            ||counts.maxEvents>maxEvents){
-            invalidStack('The event stack overflow record');
-        }
-    }
-    return deepFreeze(dataObject([
+    return dataObject([
         ['protocol',ARCANE_EVENT_STACK_PROTOCOL],
         ['sessionId',fields.sessionId],
         ['createdAt',fields.createdAt],
         ['events',events]
-    ]));
+    ]);
 }
 
 export class EventManager{
     #activeDispatch=[];
     #bus=new EventPubSub();
-    #captureStacks;
     #clock;
     #cursor=0;
     #domInstrumentation=null;
     #history=[];
-    #maxEvents;
-    #maxSnapshotDepth;
-    #maxSnapshotEntries;
-    #maxSnapshotStringLength;
     #now;
-    #overflowed=false;
-    #redactSensitive;
     #replaying=false;
     #sequence=0;
     #sessionId;
@@ -920,41 +724,19 @@ export class EventManager{
     constructor({
         timeTravel=false,
         dom=null,
-        captureStacks=false,
-        redactSensitive=true,
-        maxEvents=DEFAULT_MAX_EVENTS,
-        maxSnapshotDepth=DEFAULT_MAX_SNAPSHOT_DEPTH,
-        maxSnapshotEntries=DEFAULT_MAX_SNAPSHOT_ENTRIES,
-        maxSnapshotStringLength=DEFAULT_MAX_SNAPSHOT_STRING_LENGTH,
         clock=()=>new Date(),
         now=defaultMonotonicClock,
         sessionId=sessionIdentifier()
     }={}){
-        if(typeof timeTravel!=='boolean'||typeof captureStacks!=='boolean'
-            ||typeof redactSensitive!=='boolean'){
+        if(typeof timeTravel!=='boolean'){
             throw new TypeError('EventManager flags must be boolean values.');
         }
         if(typeof clock!=='function'||typeof now!=='function'){
             throw new TypeError('EventManager clocks must be functions.');
         }
-        if(!Number.isSafeInteger(maxEvents)||maxEvents<1
-            ||!Number.isSafeInteger(maxSnapshotDepth)||maxSnapshotDepth<1
-            ||!Number.isSafeInteger(maxSnapshotEntries)||maxSnapshotEntries<1
-            ||!Number.isSafeInteger(maxSnapshotStringLength)
-            ||maxSnapshotStringLength<MIN_SNAPSHOT_STRING_LENGTH){
-            throw new RangeError(
-                'EventManager retention limits must be positive safe integers and the string limit must be at least 64.'
-            );
-        }
-        if(typeof sessionId!=='string'||!sessionId||sessionId.length>256){
+        if(typeof sessionId!=='string'||!sessionId){
             throw new TypeError('EventManager sessionId must be a non-empty string.');
         }
-        this.#captureStacks=captureStacks;
-        this.#redactSensitive=redactSensitive;
-        this.#maxEvents=maxEvents;
-        this.#maxSnapshotDepth=maxSnapshotDepth;
-        this.#maxSnapshotEntries=maxSnapshotEntries;
-        this.#maxSnapshotStringLength=maxSnapshotStringLength;
         this.#clock=clock;
         this.#now=now;
         this.#sessionId=sessionId;
@@ -968,9 +750,7 @@ export class EventManager{
     get replaying(){return this.#replaying;}
     get cursor(){return this.#cursor;}
     get eventCount(){return this.#history.length;}
-    get maxEvents(){return this.#maxEvents;}
-    get overflowed(){return this.#overflowed;}
-    get history(){return Object.freeze([...this.#history]);}
+    get history(){return [...this.#history];}
     get domInstrumentation(){return this.#domInstrumentation;}
 
     [EVENT_MANAGER_BUS_ON](type,handler,once=false){
@@ -1028,25 +808,14 @@ export class EventManager{
             return this;
         }
         let recording=this.#timeTravelEnabled&&!this.#replaying;
-        if(recording&&this.#history.length>=this.#maxEvents){
-            this.#recordOverflow();
-            recording=false;
-        }
         let draft=null;
         let startedMonotonic=null;
         if(recording){
             try{
                 const timestamp=clockDate(this.#clock).toISOString();
                 startedMonotonic=monotonicValue(this.#now);
-                const snapshotOptions={
-                    redactSensitive:this.#redactSensitive,
-                    captureStacks:this.#captureStacks,
-                    maxDepth:this.#maxSnapshotDepth,
-                    maxEntries:this.#maxSnapshotEntries,
-                    maxStringLength:this.#maxSnapshotStringLength
-                };
-                const payloadSnapshot=frozenSnapshot(payload,snapshotOptions);
-                const metadataSnapshot=frozenSnapshot(metadata,snapshotOptions);
+                const payloadSnapshot=completeSnapshot(payload);
+                const metadataSnapshot=completeSnapshot(metadata);
                 const safeMetadata=metadataSnapshot&&typeof metadataSnapshot==='object'
                     &&!Array.isArray(metadataSnapshot)
                     ?metadataSnapshot
@@ -1054,14 +823,10 @@ export class EventManager{
                 const sequence=this.#sequence+1;
                 const parentSequence=this.#activeDispatch.at(-1)??null;
                 let stack=null;
-                if(this.#captureStacks){
-                    try{
-                        stack=boundedString(sourceStack()??'',this.#maxSnapshotStringLength,{
-                            redactSensitive:this.#redactSensitive
-                        });
-                    }catch{
-                        stack='[STACK CAPTURE FAILED]';
-                    }
+                try{
+                    stack=safeString(sourceStack()??'');
+                }catch{
+                    stack='[STACK CAPTURE FAILED]';
                 }
                 draft={
                     protocol:ARCANE_EVENT_STACK_PROTOCOL,
@@ -1070,42 +835,33 @@ export class EventManager{
                     sequence,
                     timestamp,
                     monotonicMs:startedMonotonic,
-                    type:boundedString(type,this.#maxSnapshotStringLength,{
-                        redactSensitive:this.#redactSensitive
-                    }),
+                    type:safeString(type),
                     source:typeof safeMetadata.source==='string'&&safeMetadata.source
-                        ?boundedString(safeMetadata.source,this.#maxSnapshotStringLength,{
-                            redactSensitive:this.#redactSensitive
-                        })
+                        ?safeString(safeMetadata.source)
                         :'application',
                     category:typeof safeMetadata.category==='string'&&safeMetadata.category
-                        ?boundedString(safeMetadata.category,this.#maxSnapshotStringLength,{
-                            redactSensitive:this.#redactSensitive
-                        })
+                        ?safeString(safeMetadata.category)
                         :null,
                     correlationId:typeof safeMetadata.correlationId==='string'
                         &&safeMetadata.correlationId
-                        ?boundedString(safeMetadata.correlationId,this.#maxSnapshotStringLength,{
-                            redactSensitive:this.#redactSensitive
-                        }):null,
+                        ?safeString(safeMetadata.correlationId):null,
                     causationId:typeof safeMetadata.causationId==='string'
                         &&safeMetadata.causationId
-                        ?boundedString(safeMetadata.causationId,this.#maxSnapshotStringLength,{
-                            redactSensitive:this.#redactSensitive
-                        }):(parentSequence===null?null:`${this.#sessionId}:${parentSequence}`),
+                        ?safeString(safeMetadata.causationId)
+                        :(parentSequence===null?null:`${this.#sessionId}:${parentSequence}`),
                     parentSequence,
                     depth:this.#activeDispatch.length,
                     stack,
                     payload:Array.isArray(payloadSnapshot)
                         ?payloadSnapshot
-                        :deepFreeze([payloadSnapshot]),
+                        :[payloadSnapshot],
                     metadata:safeMetadata,
                     status:'dispatching',
                     completedAt:null,
                     durationMs:null,
                     error:null
                 };
-                this.#history.push(deepFreeze({...draft}));
+                this.#history.push({...draft});
                 this.#sequence=sequence;
                 this.#cursor=sequence;
                 this.#activeDispatch.push(sequence);
@@ -1137,47 +893,6 @@ export class EventManager{
         return this;
     }
 
-    #recordOverflow(){
-        this.#overflowed=true;
-        this.#timeTravelEnabled=false;
-        try{this.#domInstrumentation?.stop({emitLifecycle:false});}catch{}
-        let timestamp;
-        let monotonicMs;
-        try{timestamp=clockDate(this.#clock).toISOString();}
-        catch{timestamp=new Date().toISOString();}
-        try{monotonicMs=monotonicValue(this.#now);}
-        catch{monotonicMs=Math.max(0,Number(this.#history.at(-1)?.monotonicMs??0));}
-        const sequence=++this.#sequence;
-        const payload=deepFreeze([snapshotObject([
-            ['maxEvents',this.#maxEvents],
-            ['retainedEvents',this.#history.length]
-        ])]);
-        const record=deepFreeze({
-            protocol:ARCANE_EVENT_STACK_PROTOCOL,
-            sessionId:this.#sessionId,
-            id:`${this.#sessionId}:${sequence}`,
-            sequence,
-            timestamp,
-            monotonicMs,
-            type:TIME_TRAVEL_OVERFLOW_EVENT,
-            source:'event-manager',
-            category:'overflow',
-            correlationId:null,
-            causationId:null,
-            parentSequence:null,
-            depth:0,
-            stack:null,
-            payload,
-            metadata:deepFreeze(snapshotObject([['maxEvents',this.#maxEvents]])),
-            status:'completed',
-            completedAt:timestamp,
-            durationMs:0,
-            error:null
-        });
-        this.#history.push(record);
-        this.#cursor=sequence;
-    }
-
     #finalize(draft,startedMonotonic,status,error){
         try{
             const index=this.#history.findIndex(record=>record.sequence===draft.sequence);
@@ -1193,26 +908,17 @@ export class EventManager{
             try{
                 durationMs=Math.max(0,monotonicValue(this.#now)-startedMonotonic);
             }catch{}
-            this.#history[index]=deepFreeze({
+            this.#history[index]={
                 ...draft,
                 status,
                 completedAt,
                 durationMs,
-                error:error===null?null:frozenErrorSnapshot(error,{
-                    redactSensitive:this.#redactSensitive,
-                    captureStacks:this.#captureStacks,
-                    maxDepth:this.#maxSnapshotDepth,
-                    maxEntries:this.#maxSnapshotEntries,
-                    maxStringLength:this.#maxSnapshotStringLength
-                })
-            });
+                error:error===null?null:completeErrorSnapshot(error)
+            };
         }catch{}
     }
 
     enableTimeTravel({dom}={}){
-        if(this.#overflowed){
-            throw new Error('Clear the overflowed event history before enabling time travel again.');
-        }
         const wasEnabled=this.#timeTravelEnabled;
         this.#timeTravelEnabled=true;
         try{
@@ -1243,7 +949,7 @@ export class EventManager{
         }
         try{
             if(this.#timeTravelEnabled)replacement.start();
-            if(!this.#timeTravelEnabled||this.#overflowed){
+            if(!this.#timeTravelEnabled){
                 replacement.stop({emitLifecycle:false});
             }
         }catch(error){
@@ -1287,7 +993,6 @@ export class EventManager{
         this.#sequence=0;
         this.#cursor=0;
         this.#activeDispatch=[];
-        this.#overflowed=false;
         if(newSession)this.#sessionId=sessionIdentifier();
         return this;
     }
@@ -1298,10 +1003,10 @@ export class EventManager{
             ||(type!==null&&typeof type!=='string')){
             throw new TypeError('The event stack range is invalid.');
         }
-        return Object.freeze(this.#history.filter(record=>
+        return this.#history.filter(record=>
             record.sequence>=fromSequence&&record.sequence<=toSequence
                 &&(type===null||record.type===type)
-        ));
+        );
     }
 
     exportStack({space=2}={}){
@@ -1351,12 +1056,7 @@ export class EventManager{
         if(this.#replaying)throw new Error('Event playback is already active.');
         const document=stack===null
             ?{protocol:ARCANE_EVENT_STACK_PROTOCOL,sessionId:this.#sessionId,events:this.#history}
-            :parseEventStack(stack,{
-                maxEvents:this.#maxEvents,
-                maxSnapshotDepth:this.#maxSnapshotDepth,
-                maxSnapshotEntries:this.#maxSnapshotEntries,
-                maxSnapshotStringLength:this.#maxSnapshotStringLength
-            });
+            :parseEventStack(stack);
         const records=document.events.filter(record=>
             record.sequence>=fromSequence&&record.sequence<=toSequence
         );
@@ -1393,29 +1093,23 @@ export class EventManager{
                 this.#cursor=record.sequence;
                 delivered+=1;
             }
-            const result=Object.freeze({
+            const result={
                 sessionId:document.sessionId,
                 delivered,
                 cursor:this.#cursor,
                 completed:true
-            });
+            };
             this.#bus.emit(PLAYBACK_COMPLETED_EVENT,result);
             return result;
         }catch(error){
             const cancelled=signal?.aborted||error?.name==='AbortError';
-            this.#bus.emit(cancelled?PLAYBACK_CANCELLED_EVENT:PLAYBACK_FAILED_EVENT,Object.freeze({
+            this.#bus.emit(cancelled?PLAYBACK_CANCELLED_EVENT:PLAYBACK_FAILED_EVENT,{
                 sessionId:document.sessionId,
                 delivered,
                 cursor:this.#cursor,
                 completed:false,
-                error:frozenSnapshot(error,{
-                    redactSensitive:this.#redactSensitive,
-                    captureStacks:this.#captureStacks,
-                    maxDepth:this.#maxSnapshotDepth,
-                    maxEntries:this.#maxSnapshotEntries,
-                    maxStringLength:this.#maxSnapshotStringLength
-                })
-            }));
+                error:completeSnapshot(error)
+            });
             throw error;
         }finally{
             this.#replaying=false;
@@ -1440,7 +1134,6 @@ function eventName(value,code='ARCANE_EVENT_SUBSCRIPTION_TYPE_INVALID'){
     if(typeof value!=='string'
         ||value.trim()!==value
         ||value.length<1
-        ||value.length>128
         ||!ARCANE_EVENT_NAME_PATTERN.test(value)){
         throw eventAuthorityError(code,undefined,TypeError);
     }
@@ -1488,16 +1181,16 @@ function eventSignal(value){
 
 function eventListener(value){
     if(typeof value==='function'){
-        return Object.freeze({
+        return {
             identity:value,
             invoke(event,thisArg,...rest){return value.call(thisArg,event,...rest);}
-        });
+        };
     }
     if(value&&typeof value==='object'&&typeof value.handleEvent==='function'){
-        return Object.freeze({
+        return {
             identity:value,
             invoke(event){return value.handleEvent(event);}
-        });
+        };
     }
     throw eventAuthorityError(
         'ARCANE_EVENT_SUBSCRIPTION_HANDLER_INVALID',
@@ -1508,50 +1201,46 @@ function eventListener(value){
 
 function eventTargetListener(value){
     if(typeof value==='function'){
-        return Object.freeze({
+        return {
             identity:value,
             invoke(event,thisArg,...rest){return value.call(thisArg,event,...rest);}
-        });
+        };
     }
     if(value&&typeof value==='object'&&typeof value.handleEvent==='function'){
-        return Object.freeze({
+        return {
             identity:value,
             invoke(event){return value.handleEvent(event);}
-        });
+        };
     }
     return null;
 }
 
 function compatibilityDetail(value){
     if(value===null||(typeof value!=='object'&&typeof value!=='function'))return value;
-    if(Object.isFrozen(value))return value;
-    if(Array.isArray(value))return Object.freeze(value.slice());
+    if(Array.isArray(value))return value.slice();
     const prototype=Object.getPrototypeOf(value);
     if(prototype!==Object.prototype&&prototype!==null)return value;
     const copy=prototype===null?Object.create(null):{};
     for(const key of Reflect.ownKeys(value)){
         const descriptor=Object.getOwnPropertyDescriptor(value,key);
-        if(!descriptor||!('value' in descriptor)){
-            throw eventAuthorityError(
-                'ARCANE_EVENT_COMPATIBILITY_DETAIL_INVALID',
-                undefined,
-                TypeError
-            );
-        }
+        if(!descriptor)continue;
+        let item;
+        try{item=Reflect.get(value,key);}
+        catch(error){item=snapshotFailure(error,{path:`$.${String(key)}`});}
         Object.defineProperty(copy,key,{
-            value:descriptor.value,
+            value:item,
             enumerable:descriptor.enumerable,
-            configurable:false,
-            writable:false
+            configurable:true,
+            writable:true
         });
     }
-    return Object.freeze(copy);
+    return copy;
 }
 
 function eventTargetOptions(value){
-    if(value===undefined)return Object.freeze({capture:false,once:false,signal:null});
+    if(value===undefined)return {capture:false,once:false,signal:null};
     if(typeof value==='boolean'){
-        return Object.freeze({capture:value,once:false,signal:null});
+        return {capture:value,once:false,signal:null};
     }
     const options=eventDataOptions(
         value,
@@ -1567,11 +1256,11 @@ function eventTargetOptions(value){
             );
         }
     }
-    return Object.freeze({
+    return {
         capture:options.capture===true,
         once:options.once===true,
         signal:eventSignal(options.signal)
-    });
+    };
 }
 
 function subscriptionOptions(value){
@@ -1587,18 +1276,18 @@ function subscriptionOptions(value){
             TypeError
         );
     }
-    return Object.freeze({
+    return {
         once:options.once===true,
         signal:eventSignal(options.signal)
-    });
+    };
 }
 
 function defineDisposable(unsubscribe){
     Object.defineProperty(unsubscribe,'dispose',{
         value:unsubscribe,
         enumerable:false,
-        configurable:false,
-        writable:false
+        configurable:true,
+        writable:true
     });
     return unsubscribe;
 }
@@ -1663,11 +1352,11 @@ function createArcaneEventAuthority(){
     let canonicalDispatchDepth=0;
     const pendingChannelRemovals=[];
 
-    const descriptor=Object.freeze({
+    const descriptor={
         kind:ARCANE_EVENT_AUTHORITY_KIND,
         protocol:ARCANE_EVENT_AUTHORITY_PROTOCOL,
         realm:'current'
-    });
+    };
 
     function nextOccurrenceId(){
         if(occurrenceSequence===Number.MAX_SAFE_INTEGER){
@@ -1697,13 +1386,17 @@ function createArcaneEventAuthority(){
     }
 
     function publicEventDetail(value){
-        return frozenSnapshot(value??{}, {
-            redactSensitive:true,
-            captureStacks:false,
-            maxDepth:16,
-            maxEntries:256,
-            maxStringLength:2_048
-        });
+        return completeSnapshot(value??{});
+    }
+
+    function completeEventDetail(compatibility,publicDetail){
+        if(publicDetail===undefined)return compatibility??{};
+        const compatibilityRecord=compatibility&&typeof compatibility==='object'
+            &&!Array.isArray(compatibility);
+        const publicRecord=publicDetail&&typeof publicDetail==='object'
+            &&!Array.isArray(publicDetail);
+        if(compatibilityRecord&&publicRecord)return {...compatibility,...publicDetail};
+        return {compatibility,publicDetail};
     }
 
     function canonicalOccurrence({
@@ -1718,23 +1411,24 @@ function createArcaneEventAuthority(){
         let prevented=cancelable&&defaultPrevented;
         const occurrence={};
         Object.defineProperties(occurrence,{
-            protocol:{value:ARCANE_EVENT_OCCURRENCE_PROTOCOL,enumerable:true},
-            occurrenceId:{value:nextOccurrenceId(),enumerable:true},
-            type:{value:type,enumerable:true},
-            source:{value:source,enumerable:true},
-            instanceId:{value:instanceId,enumerable:true},
-            operationId:{value:operationId,enumerable:true},
-            detail:{value:detail,enumerable:true},
-            cancelable:{value:cancelable,enumerable:true},
-            defaultPrevented:{get(){return prevented;},enumerable:true},
+            protocol:{value:ARCANE_EVENT_OCCURRENCE_PROTOCOL,enumerable:true,writable:true,configurable:true},
+            occurrenceId:{value:nextOccurrenceId(),enumerable:true,writable:true,configurable:true},
+            type:{value:type,enumerable:true,writable:true,configurable:true},
+            source:{value:source,enumerable:true,writable:true,configurable:true},
+            instanceId:{value:instanceId,enumerable:true,writable:true,configurable:true},
+            operationId:{value:operationId,enumerable:true,writable:true,configurable:true},
+            detail:{value:detail,enumerable:true,writable:true,configurable:true},
+            cancelable:{value:cancelable,enumerable:true,writable:true,configurable:true},
+            defaultPrevented:{get(){return prevented;},enumerable:true,configurable:true},
             preventDefault:{
                 value:function preventArcaneEventDefault(){
                     if(cancelable)prevented=true;
                 },
-                enumerable:true
+                enumerable:true,
+                writable:true,
+                configurable:true
             }
         });
-        Object.freeze(occurrence);
         occurrences.add(occurrence);
         return occurrence;
     }
@@ -1742,27 +1436,26 @@ function createArcaneEventAuthority(){
     function compatibilityView(occurrence,detail,target=null){
         const view={};
         Object.defineProperties(view,{
-            protocol:{value:occurrence.protocol,enumerable:true},
-            occurrenceId:{value:occurrence.occurrenceId,enumerable:true},
-            type:{value:occurrence.type,enumerable:true},
-            source:{value:occurrence.source,enumerable:true},
-            instanceId:{value:occurrence.instanceId,enumerable:true},
-            operationId:{value:occurrence.operationId,enumerable:true},
-            detail:{value:detail,enumerable:true},
-            target:{value:target,enumerable:true},
-            currentTarget:{value:target,enumerable:true},
-            cancelable:{value:occurrence.cancelable,enumerable:true},
-            defaultPrevented:{get(){return occurrence.defaultPrevented;},enumerable:true},
-            preventDefault:{value:()=>occurrence.preventDefault(),enumerable:true}
+            protocol:{value:occurrence.protocol,enumerable:true,writable:true,configurable:true},
+            occurrenceId:{value:occurrence.occurrenceId,enumerable:true,writable:true,configurable:true},
+            type:{value:occurrence.type,enumerable:true,writable:true,configurable:true},
+            source:{value:occurrence.source,enumerable:true,writable:true,configurable:true},
+            instanceId:{value:occurrence.instanceId,enumerable:true,writable:true,configurable:true},
+            operationId:{value:occurrence.operationId,enumerable:true,writable:true,configurable:true},
+            detail:{value:detail,enumerable:true,writable:true,configurable:true},
+            target:{value:target,enumerable:true,writable:true,configurable:true},
+            currentTarget:{value:target,enumerable:true,writable:true,configurable:true},
+            cancelable:{value:occurrence.cancelable,enumerable:true,writable:true,configurable:true},
+            defaultPrevented:{get(){return occurrence.defaultPrevented;},enumerable:true,configurable:true},
+            preventDefault:{value:()=>occurrence.preventDefault(),enumerable:true,writable:true,configurable:true}
         });
-        Object.freeze(view);
         canonicalByView.set(view,occurrence);
         return view;
     }
 
     function removeChannelListener(channel,handler){
         if(canonicalDispatchDepth>0){
-            pendingChannelRemovals.push(Object.freeze({channel,handler}));
+            pendingChannelRemovals.push({channel,handler});
             return;
         }
         manager[EVENT_MANAGER_BUS_OFF](channel,handler);
@@ -1837,15 +1530,16 @@ function createArcaneEventAuthority(){
         reportingListenerError=true;
         let errorOccurrence=null;
         try{
-            const detail=Object.freeze({
+            const detail={
                 code:'ARCANE_EVENT_LISTENER_CALLBACK_FAILED',
                 reason:'listener-threw',
                 eventType:occurrence?.type??null,
                 occurrenceId:occurrence?.occurrenceId??null,
                 source:occurrence?.source??ownerRecord?.source??'event-authority',
                 instanceId:occurrence?.instanceId??ownerRecord?.instanceId??null,
-                operationId:occurrence?.operationId??null
-            });
+                operationId:occurrence?.operationId??null,
+                error
+            };
             errorOccurrence=dispatchOccurrence({
                 type:ARCANE_EVENT_LISTENER_ERROR_EVENT,
                 sourceRecord:null,
@@ -1888,7 +1582,7 @@ function createArcaneEventAuthority(){
             source,
             instanceId,
             operationId,
-            detail:publicEventDetail(publicDetail),
+            detail:publicEventDetail(completeEventDetail(compatibility,publicDetail)),
             cancelable,
             defaultPrevented
         });
@@ -1910,7 +1604,7 @@ function createArcaneEventAuthority(){
                 {source,category:'semantic',correlationId:operationId}
             );
         }
-        return Object.freeze({occurrence,accepted:!occurrence.defaultPrevented});
+        return {occurrence,accepted:!occurrence.defaultPrevented};
     }
 
     function subscribe(type,handler,options){
@@ -2008,8 +1702,7 @@ function createArcaneEventAuthority(){
         );
         const source=eventName(admitted.source,'ARCANE_EVENT_SOURCE_INVALID');
         if(!Array.isArray(admitted.eventTypes)
-            ||admitted.eventTypes.length<1
-            ||admitted.eventTypes.length>256){
+            ||admitted.eventTypes.length<1){
             throw eventAuthorityError('ARCANE_EVENT_SOURCE_INVALID',undefined,TypeError);
         }
         const eventTypes=[];
@@ -2082,8 +1775,7 @@ function createArcaneEventAuthority(){
             const operationId=normalized.operationId??null;
             if(operationId!==null&&(typeof operationId!=='string'
                 ||operationId.trim()!==operationId
-                ||operationId.length<1
-                ||operationId.length>256)){
+                ||operationId.length<1)){
                 throw eventAuthorityError('ARCANE_EVENT_OCCURRENCE_INVALID',undefined,TypeError);
             }
             if(normalized.cancelable!==undefined&&typeof normalized.cancelable!=='boolean'){
@@ -2095,7 +1787,7 @@ function createArcaneEventAuthority(){
                 source:record.source,
                 instanceId:record.instanceId,
                 compatibility:detail,
-                publicDetail:normalized.publicDetail??{},
+                publicDetail:normalized.publicDetail,
                 operationId,
                 cancelable:normalized.cancelable===true
             });
@@ -2109,12 +1801,12 @@ function createArcaneEventAuthority(){
                     sourceRecord:record,
                     source:record.source,
                     instanceId:record.instanceId,
-                    compatibility:Object.freeze({
+                    compatibility:{
                         source:record.source,
                         instanceId:record.instanceId,
                         reason:'source-disposed'
-                    }),
-                    publicDetail:Object.freeze({reason:'source-disposed'}),
+                    },
+                    publicDetail:{reason:'source-disposed'},
                     operationId:null,
                     cancelable:false
                 });
@@ -2127,13 +1819,13 @@ function createArcaneEventAuthority(){
                 record.disposing=false;
             }
         }
-        const sourceDescriptor=Object.freeze({
+        const sourceDescriptor={
             kind:ARCANE_EVENT_SOURCE_KIND,
             protocol:ARCANE_EVENT_SOURCE_PROTOCOL,
             source,
             instanceId:record.instanceId,
-            eventTypes:Object.freeze([...eventTypes,ARCANE_EVENT_SOURCE_DISPOSED_EVENT])
-        });
+            eventTypes:[...eventTypes,ARCANE_EVENT_SOURCE_DISPOSED_EVENT]
+        };
         const handle={
             protocol:ARCANE_EVENT_SOURCE_PROTOCOL,
             descriptor:sourceDescriptor,
@@ -2172,7 +1864,7 @@ function createArcaneEventAuthority(){
             get(){return record.disposing||record.disposed;},
             enumerable:true
         });
-        record.handle=Object.freeze(handle);
+        record.handle=handle;
         sourceByOwner.set(owner,record);
         return record.handle;
     }
@@ -2210,14 +1902,15 @@ function createArcaneEventAuthority(){
             detail={};
             for(const key of Reflect.ownKeys(compatibility)){
                 const descriptor=Object.getOwnPropertyDescriptor(compatibility,key);
-                if(!descriptor||!('value' in descriptor)){
-                    throw eventAuthorityError('ARCANE_EVENT_COMPATIBILITY_DETAIL_INVALID');
-                }
+                if(!descriptor)continue;
+                let item;
+                try{item=Reflect.get(compatibility,key);}
+                catch(error){item=snapshotFailure(error,{path:`$.${String(key)}`});}
                 Object.defineProperty(detail,key,{
-                    value:descriptor.value,
+                    value:item,
                     enumerable:descriptor.enumerable,
-                    configurable:false,
-                    writable:false
+                    configurable:true,
+                    writable:true
                 });
             }
         }else{
@@ -2233,22 +1926,11 @@ function createArcaneEventAuthority(){
             if(Object.hasOwn(detail,key)&&detail[key]!==metadata[key]){
                 throw eventAuthorityError('ARCANE_EVENT_DOM_DETAIL_COLLISION');
             }
-            Object.defineProperty(detail,key,{
-                value:metadata[key],
-                enumerable:true,
-                configurable:false,
-                writable:false
-            });
+            detail[key]=metadata[key];
         }
         if(!Object.hasOwn(detail,'source')){
-            Object.defineProperty(detail,'source',{
-                value:metadata.arcaneSource,
-                enumerable:true,
-                configurable:false,
-                writable:false
-            });
+            detail.source=metadata.arcaneSource;
         }
-        Object.freeze(detail);
         const cancelable=admitted.cancelable??occurrence.cancelable;
         const event=new CustomEvent(type,{
             detail,
@@ -2301,126 +1983,59 @@ function createArcaneEventAuthority(){
         return manager;
     }
 
-    Object.defineProperties(manager,{
-        [ARCANE_EVENT_AUTHORITY_BRAND]:{
-            value:ARCANE_EVENT_AUTHORITY_PROTOCOL,
-            enumerable:false,
-            configurable:false,
-            writable:false
+    Object.assign(manager,{
+        [ARCANE_EVENT_AUTHORITY_BRAND]:ARCANE_EVENT_AUTHORITY_PROTOCOL,
+        protocol:ARCANE_EVENT_AUTHORITY_PROTOCOL,
+        descriptor,
+        on:safeLegacyOn,
+        once:(type,handler)=>safeLegacyOn(type,handler,true),
+        off:safeLegacyOff,
+        reset:safeLegacyReset,
+        subscribe,
+        createSource,
+        projectDOMEvent,
+        isOccurrence:value=>occurrences.has(value)||canonicalByView.has(value),
+        addEventListener(type,handler,options){
+            addEventTargetListener(
+                authorityTargetListeners,
+                type,
+                handler,
+                options,
+                subscribe,
+                manager
+            );
         },
-        protocol:{value:ARCANE_EVENT_AUTHORITY_PROTOCOL,enumerable:true},
-        descriptor:{value:descriptor,enumerable:true},
-        on:{value:safeLegacyOn},
-        once:{value:(type,handler)=>safeLegacyOn(type,handler,true)},
-        off:{value:safeLegacyOff},
-        reset:{value:safeLegacyReset},
-        subscribe:{value:subscribe,enumerable:true},
-        createSource:{value:createSource,enumerable:true},
-        projectDOMEvent:{value:projectDOMEvent,enumerable:true},
-        isOccurrence:{
-            value:value=>occurrences.has(value)||canonicalByView.has(value),
-            enumerable:true
+        removeEventListener(type,handler,options){
+            removeEventTargetListener(authorityTargetListeners,type,handler,options);
         },
-        addEventListener:{
-            value(type,handler,options){
-                addEventTargetListener(
-                    authorityTargetListeners,
-                    type,
-                    handler,
-                    options,
-                    subscribe,
-                    manager
-                );
-            },
-            enumerable:true
-        },
-        removeEventListener:{
-            value(type,handler,options){
-                removeEventTargetListener(authorityTargetListeners,type,handler,options);
-            },
-            enumerable:true
-        },
-        dispatchEvent:{value:value=>dispatchEventLike(value),enumerable:true}
+        dispatchEvent:value=>dispatchEventLike(value)
     });
-    return Object.freeze(manager);
+    return manager;
 }
 
-function validateInstalledArcaneEventAuthority(value,descriptor){
-    if(!descriptor||!('value' in descriptor)){
-        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_ACCESSOR_COLLISION');
-    }
-    if(descriptor.enumerable!==false
-        ||descriptor.writable!==false
-        ||descriptor.configurable!==false){
-        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH');
-    }
-    if(!value||(typeof value!=='object'&&typeof value!=='function')){
-        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_VALUE_COLLISION');
-    }
-    const brand=Object.getOwnPropertyDescriptor(value,ARCANE_EVENT_AUTHORITY_BRAND);
-    if(!brand||!('value' in brand)){
-        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_VALUE_COLLISION');
-    }
-    if(brand.enumerable!==false
-        ||brand.writable!==false
-        ||brand.configurable!==false){
-        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH');
-    }
-    const protocol=Object.getOwnPropertyDescriptor(value,'protocol');
-    if(!protocol||!('value' in protocol)){
-        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_API_MISMATCH');
-    }
-    if(brand.value!==ARCANE_EVENT_AUTHORITY_PROTOCOL
-        ||protocol.value!==ARCANE_EVENT_AUTHORITY_PROTOCOL){
-        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_PROTOCOL_MISMATCH');
-    }
-    let current=value;
-    const callables=new Map();
-    try{
-        while(current!==null&&callables.size<ARCANE_EVENT_REQUIRED_AUTHORITY_API.length){
-            for(const name of ARCANE_EVENT_REQUIRED_AUTHORITY_API){
-                if(callables.has(name))continue;
-                const method=Object.getOwnPropertyDescriptor(current,name);
-                if(method)callables.set(name,method);
-            }
-            current=Object.getPrototypeOf(current);
-        }
-    }catch(error){
-        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_API_MISMATCH',error);
-    }
-    if(ARCANE_EVENT_REQUIRED_AUTHORITY_API.some(name=>{
-        const method=callables.get(name);
-        return !method||!('value' in method)||typeof method.value!=='function';
-    })){
-        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_API_MISMATCH');
-    }
-    if(protocol.enumerable!==true
-        ||protocol.writable!==false
-        ||protocol.configurable!==false){
-        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH');
-    }
-    return value;
+function usableArcaneEventAuthority(value){
+    return Boolean(value)
+        &&(typeof value==='object'||typeof value==='function')
+        &&value.protocol===ARCANE_EVENT_AUTHORITY_PROTOCOL
+        &&ARCANE_EVENT_REQUIRED_AUTHORITY_API.every(name=>typeof value[name]==='function');
 }
 
 function installArcaneEventAuthority(){
-    const own=Object.getOwnPropertyDescriptor(globalThis,'arcaneEvents');
-    if(own)return validateInstalledArcaneEventAuthority(own.value,own);
-    if('arcaneEvents' in globalThis){
-        throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_VALUE_COLLISION');
-    }
+    let existing=null;
+    try{existing=globalThis.arcaneEvents??null;}catch{}
+    if(usableArcaneEventAuthority(existing))return existing;
     const authority=createArcaneEventAuthority();
     try{
         Object.defineProperty(globalThis,'arcaneEvents',{
             value:authority,
             enumerable:false,
-            configurable:false,
-            writable:false
+            configurable:true,
+            writable:true
         });
     }catch(error){
         throw eventAuthorityError('ARCANE_EVENT_AUTHORITY_INSTALL_FAILED',error);
     }
-    const installed=Object.getOwnPropertyDescriptor(globalThis,'arcaneEvents');
-    return validateInstalledArcaneEventAuthority(installed?.value,installed);
+    return authority;
 }
 
 export const arcaneEvents=installArcaneEventAuthority();

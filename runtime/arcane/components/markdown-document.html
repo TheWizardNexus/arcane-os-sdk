@@ -232,47 +232,6 @@
     const contentElement=host.shadowRoot.querySelector('#content');
 
     // BEGIN MARKDOWN_DOCUMENT_POLICY
-    const MARKDOWN_DOCUMENT_ALLOWED_ELEMENTS=Object.freeze([
-        'A','ABBR','BLOCKQUOTE','BR','CODE','DEL','EM',
-        'H1','H2','H3','H4','H5','H6','HR','IMG','KBD','LI',
-        'OL','P','PRE','S','STRONG','SUB','SUP','TABLE','TBODY',
-        'TD','TFOOT','TH','THEAD','TR','UL'
-    ]);
-    const MARKDOWN_DOCUMENT_ALLOWED_ATTRIBUTES=Object.freeze(
-        {
-            A:Object.freeze(['href','title']),
-            ABBR:Object.freeze(['title']),
-            CODE:Object.freeze(['class']),
-            IMG:Object.freeze(['alt','src','title']),
-            LI:Object.freeze(['value']),
-            OL:Object.freeze(['start']),
-            TD:Object.freeze(['colspan','rowspan']),
-            TH:Object.freeze(['colspan','rowspan','scope'])
-        }
-    );
-    const MARKDOWN_DOCUMENT_LINK_PROTOCOLS=new Set(['http:','https:','mailto:']);
-    const MARKDOWN_DOCUMENT_ASSET_PROTOCOLS=new Set(['http:','https:']);
-
-    function markdownDocumentElementAllowed(name=''){
-        return MARKDOWN_DOCUMENT_ALLOWED_ELEMENTS.includes(
-            String(name||'').toUpperCase()
-        );
-    }
-
-    function markdownDocumentAllowedAttributes(name=''){
-        return MARKDOWN_DOCUMENT_ALLOWED_ATTRIBUTES[
-            String(name||'').toUpperCase()
-        ]||Object.freeze([]);
-    }
-
-    function markdownDocumentCleanURLInput(value=''){
-        const input=String(value??'').trim();
-        if(!input||/[\u0000-\u001F\u007F]/.test(input)){
-            return '';
-        }
-        return input;
-    }
-
     function markdownDocumentDecodeFragment(value=''){
         try{
             return decodeURIComponent(String(value||''));
@@ -281,106 +240,58 @@
         }
     }
 
-    function markdownDocumentSourceURL(value='',baseURL='',pageOrigin=''){
+    function markdownDocumentSourceURL(value='',baseURL=''){
         const fallback=baseURL||document.baseURI;
-        const expectedOrigin=pageOrigin
-            ||globalThis.location?.origin
-            ||new URL(fallback).origin;
-        const input=markdownDocumentCleanURLInput(value||fallback);
-        if(!input){
-            return '';
-        }
-
         try{
-            const url=new URL(input,fallback);
-            if(
-                !MARKDOWN_DOCUMENT_ASSET_PROTOCOLS.has(url.protocol)
-                ||url.origin!==expectedOrigin
-                ||url.username
-                ||url.password
-            ){
-                return '';
-            }
-            return url.href;
+            return new URL(String(value||fallback),fallback).href;
         }catch{
             return '';
         }
     }
 
-    function markdownDocumentLinkPolicy(value='',sourceURL='',pageOrigin=''){
-        const input=markdownDocumentCleanURLInput(value);
+    function markdownDocumentLinkPolicy(value='',sourceURL=''){
+        const input=String(value??'');
         if(!input){
             return null;
         }
 
-        const expectedOrigin=pageOrigin
-            ||globalThis.location?.origin
-            ||new URL(sourceURL).origin;
-
         if(input.startsWith('#')){
-            const fragment=markdownDocumentDecodeFragment(input.slice(1))
-                .replace(/[\u0000-\u001F\u007F]/g,'')
-                .slice(0,256);
+            const fragment=markdownDocumentDecodeFragment(input.substring(1));
             if(!fragment){
                 return null;
             }
-            return Object.freeze(
-                {
-                    external:false,
-                    fragment,
-                    href:`#${encodeURIComponent(fragment)}`,
-                    kind:'fragment',
-                    targetURL:new URL(`#${encodeURIComponent(fragment)}`,sourceURL).href
-                }
-            );
+            return {
+                external:false,
+                fragment,
+                href:input,
+                kind:'fragment',
+                targetURL:new URL(input,sourceURL).href
+            };
         }
 
         try{
             const url=new URL(input,sourceURL);
-            if(
-                !MARKDOWN_DOCUMENT_LINK_PROTOCOLS.has(url.protocol)
-                ||url.username
-                ||url.password
-            ){
-                return null;
-            }
-
-            const sameOrigin=url.origin===expectedOrigin;
+            const sameOrigin=url.origin===new URL(sourceURL).origin;
             const markdown=sameOrigin&&/\.(?:md|markdown)$/i.test(url.pathname);
-            return Object.freeze(
-                {
-                    external:!sameOrigin,
-                    fragment:markdownDocumentDecodeFragment(url.hash.slice(1)).slice(0,256),
-                    href:url.href,
-                    kind:markdown?'markdown':'link',
-                    targetURL:url.href
-                }
-            );
+            return {
+                external:!sameOrigin,
+                fragment:markdownDocumentDecodeFragment(url.hash.substring(1)),
+                href:url.href,
+                kind:markdown?'markdown':'link',
+                targetURL:url.href
+            };
         }catch{
             return null;
         }
     }
 
-    function markdownDocumentAssetURL(value='',sourceURL='',pageOrigin=''){
-        const input=markdownDocumentCleanURLInput(value);
+    function markdownDocumentAssetURL(value='',sourceURL=''){
+        const input=String(value??'');
         if(!input){
             return '';
         }
-
-        const expectedOrigin=pageOrigin
-            ||globalThis.location?.origin
-            ||new URL(sourceURL).origin;
         try{
-            const url=new URL(input,sourceURL);
-            if(
-                !MARKDOWN_DOCUMENT_ASSET_PROTOCOLS.has(url.protocol)
-                ||url.origin!==expectedOrigin
-                ||url.username
-                ||url.password
-            ){
-                return '';
-            }
-            return url.href;
+            return new URL(input,sourceURL).href;
         }catch{
             return '';
         }
@@ -393,8 +304,7 @@
             .toLowerCase()
             .replace(/&/g,' and ')
             .replace(/[^a-z0-9]+/g,'-')
-            .replace(/^-+|-+$/g,'')
-            .slice(0,80);
+            .replace(/^-+|-+$/g,'');
         return identifier||'section';
     }
 
@@ -416,22 +326,18 @@
         document.baseURI,
         pageOrigin
     );
-    const defaultOptions=Object.freeze(
-        {
-            labels:Object.freeze(
-                {
-                    content:'Document content',
-                    empty:'No document content is available.',
-                    error:'Unable to display this document.',
-                    loading:'Loading document…',
-                    tableOfContents:'On this page'
-                }
-            ),
-            onNavigate:null,
-            showTableOfContents:true,
-            sourceURL:defaultSourceURL
-        }
-    );
+    const defaultOptions={
+        labels:{
+            content:'Document content',
+            empty:'No document content is available.',
+            error:'Unable to display this document.',
+            loading:'Loading document…',
+            tableOfContents:'On this page'
+        },
+        onNavigate:null,
+        showTableOfContents:true,
+        sourceURL:defaultSourceURL
+    };
 
     let currentMarkdown='';
     let currentSourceURL=defaultSourceURL;
@@ -503,7 +409,7 @@
             pageOrigin
         );
         if(!sourceURL){
-            throw new TypeError('Markdown document sourceURL must resolve to a same-origin HTTP(S) URL.');
+            throw new TypeError('Markdown document sourceURL must resolve to a valid URL.');
         }
 
         const onNavigate=input.onNavigate===undefined
@@ -520,14 +426,12 @@
             throw new TypeError('Markdown document showTableOfContents must be boolean.');
         }
 
-        return Object.freeze(
-            {
-                labels:Object.freeze(labels),
-                onNavigate,
-                showTableOfContents,
-                sourceURL
-            }
-        );
+        return {
+            labels,
+            onNavigate,
+            showTableOfContents,
+            sourceURL
+        };
     }
 
     function getOptions(){
@@ -712,11 +616,10 @@
             return true;
         }
 
-        // MD.safeRendered is the shared first pass. The detached template used
-        // below is inert while the stricter positive policy removes anything
-        // that the shared sanitizer intentionally leaves available.
+        // MD.safeRendered owns Markdown rendering. The detached template keeps
+        // source-relative links and images coherent before insertion.
         const safeRendered=new MD(markdown).safeRendered;
-        const fragment=strictMarkdownFragment(safeRendered,sourceURL);
+        const fragment=renderedMarkdownFragment(safeRendered,sourceURL);
         const meaningful=Boolean(
             fragment.textContent?.trim()
             ||fragment.querySelector('img,hr,table')
@@ -741,134 +644,36 @@
         return true;
     }
 
-    function strictMarkdownFragment(html='',sourceURL=options.sourceURL){
+    function renderedMarkdownFragment(html='',sourceURL=options.sourceURL){
         const template=document.createElement('template');
         template.innerHTML=html;
 
-        const elements=Array.from(template.content.querySelectorAll('*'));
-        for(const element of elements){
-            const name=element.tagName.toUpperCase();
-            if(!markdownDocumentElementAllowed(name)){
-                // Removing the complete subtree rejects custom elements such as
-                // html-import rather than preserving executable descendants.
-                element.remove();
+        for(const link of template.content.querySelectorAll('a[href]')){
+            const originalHref=link.getAttribute('href')||'';
+            const policy=markdownDocumentLinkPolicy(originalHref,sourceURL,pageOrigin);
+            if(!policy){
                 continue;
             }
-
-            const allowedAttributes=new Set(markdownDocumentAllowedAttributes(name));
-            for(const attribute of Array.from(element.attributes)){
-                if(!allowedAttributes.has(attribute.name.toLowerCase())){
-                    element.removeAttribute(attribute.name);
-                }
-            }
-
-            sanitizeAllowedAttributeValues(element,name);
-            if(name==='A'){
-                sanitizeLink(element,sourceURL);
-            }else if(name==='IMG'){
-                sanitizeImage(element,sourceURL);
-            }
+            link.setAttribute('href',policy.href);
+            link.dataset.markdownKind=policy.kind;
+            link.dataset.markdownOriginalHref=originalHref;
+            link.dataset.markdownTargetUrl=policy.targetURL;
+            link.dataset.markdownFragment=policy.fragment;
         }
 
-        const comments=[];
-        const commentWalker=document.createTreeWalker(
-            template.content,
-            globalThis.NodeFilter?.SHOW_COMMENT||128
-        );
-        while(commentWalker.nextNode()){
-            comments.push(commentWalker.currentNode);
+        for(const image of template.content.querySelectorAll('img[src]')){
+            const resolved=markdownDocumentAssetURL(
+                image.getAttribute('src')||'',
+                sourceURL,
+                pageOrigin
+            );
+            if(resolved){
+                image.setAttribute('src',resolved);
+            }
+            image.alt=image.getAttribute('alt')||'';
         }
-        comments.forEach(comment=>comment.remove());
+
         return template.content;
-    }
-
-    function sanitizeAllowedAttributeValues(element,name){
-        for(const attribute of Array.from(element.attributes)){
-            if(attribute.value.length>2048){
-                element.setAttribute(attribute.name,attribute.value.slice(0,2048));
-            }
-        }
-
-        if(name==='CODE'&&element.hasAttribute('class')){
-            const className=element.getAttribute('class').trim();
-            if(!/^language-[a-z0-9][a-z0-9_+-]{0,63}$/i.test(className)){
-                element.removeAttribute('class');
-            }
-        }
-
-        for(const attribute of ['colspan','rowspan']){
-            if(element.hasAttribute(attribute)){
-                sanitizeIntegerAttribute(element,attribute,1,100);
-            }
-        }
-        if(name==='OL'&&element.hasAttribute('start')){
-            sanitizeIntegerAttribute(element,'start',-100000,100000);
-        }
-        if(name==='LI'&&element.hasAttribute('value')){
-            sanitizeIntegerAttribute(element,'value',-100000,100000);
-        }
-        if(name==='TH'&&element.hasAttribute('scope')){
-            const scope=element.getAttribute('scope').toLowerCase();
-            if(!['col','colgroup','row','rowgroup'].includes(scope)){
-                element.removeAttribute('scope');
-            }else{
-                element.setAttribute('scope',scope);
-            }
-        }
-    }
-
-    function sanitizeIntegerAttribute(element,name,min,max){
-        const value=Number(element.getAttribute(name));
-        if(!Number.isSafeInteger(value)||value<min||value>max){
-            element.removeAttribute(name);
-            return;
-        }
-        element.setAttribute(name,String(value));
-    }
-
-    function sanitizeLink(link,sourceURL){
-        const originalHref=link.getAttribute('href')||'';
-        const policy=markdownDocumentLinkPolicy(
-            originalHref,
-            sourceURL,
-            pageOrigin
-        );
-        if(!policy){
-            link.removeAttribute('href');
-            return;
-        }
-
-        link.setAttribute('href',policy.href);
-        link.dataset.markdownKind=policy.kind;
-        link.dataset.markdownOriginalHref=originalHref.slice(0,2048);
-        link.dataset.markdownTargetUrl=policy.targetURL;
-        link.dataset.markdownFragment=policy.fragment;
-
-        if(
-            policy.external
-            &&/^https?:$/i.test(new URL(policy.targetURL).protocol)
-        ){
-            link.target='_blank';
-            link.rel='noopener noreferrer';
-            link.referrerPolicy='no-referrer';
-        }
-    }
-
-    function sanitizeImage(image,sourceURL){
-        const resolved=markdownDocumentAssetURL(
-            image.getAttribute('src')||'',
-            sourceURL,
-            pageOrigin
-        );
-        if(resolved){
-            image.setAttribute('src',resolved);
-        }else{
-            image.removeAttribute('src');
-        }
-        image.alt=image.getAttribute('alt')||'';
-        image.loading='lazy';
-        image.decoding='async';
-        image.referrerPolicy='no-referrer';
     }
 
     function decorateHeadings(fragment){
@@ -884,7 +689,7 @@
                     const level=Number(heading.tagName.slice(1));
                     heading.id=id;
                     heading.tabIndex=-1;
-                    return Object.freeze({id,level,text});
+                    return {id,level,text};
                 }
             );
     }
@@ -904,7 +709,7 @@
                 const label=headingText?`${prefix}: ${headingText}`:prefix;
 
                 table.tabIndex=0;
-                table.setAttribute('aria-label',label.slice(0,256));
+                table.setAttribute('aria-label',label);
             }
         );
     }
@@ -963,7 +768,7 @@
             :String(error||options.labels.error);
         const code=String(error?.code||'ARCANE_MARKDOWN_DOCUMENT_RENDER_FAILED');
         const reason=String(error?.reason||'markdown-document-render-failed');
-        transition('error',{message:message.slice(0,2048),code,reason},operationId);
+        transition('error',{message,code,reason},operationId);
         return false;
     }
 
@@ -974,13 +779,11 @@
         state=nextState;
         updateStateDOM();
 
-        const eventDetail=Object.freeze(
-            {
-                ...detail,
-                sourceURL:currentSourceURL,
-                state
-            }
-        );
+        const eventDetail={
+            ...detail,
+            sourceURL:currentSourceURL,
+            state
+        };
         const publicDetail={
             characters:Number(detail.characters||currentMarkdown.length||0),
             headingCount:Array.isArray(detail.headings)?detail.headings.length:tableOfContents.length,
@@ -1055,15 +858,13 @@
             return;
         }
 
-        const detail=Object.freeze(
-            {
-                fragment:link.dataset.markdownFragment||'',
-                href:link.dataset.markdownOriginalHref||link.getAttribute('href'),
-                kind:link.dataset.markdownKind||'link',
-                sourceURL:currentSourceURL,
-                targetURL:link.dataset.markdownTargetUrl||link.href
-            }
-        );
+        const detail={
+            fragment:link.dataset.markdownFragment||'',
+            href:link.dataset.markdownOriginalHref||link.getAttribute('href'),
+            kind:link.dataset.markdownKind||'link',
+            sourceURL:currentSourceURL,
+            targetURL:link.dataset.markdownTargetUrl||link.href
+        };
         operationSequence+=1;
         const operationId=`${events.descriptor.instanceId}:navigate:${operationSequence}`;
         const publication=events.dispatch('markdown-document-navigate',detail,{

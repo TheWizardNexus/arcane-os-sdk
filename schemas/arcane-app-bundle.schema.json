@@ -2,9 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/TheWizardNexus/arcane-os-sdk/schemas/arcane-app-bundle.schema.json",
   "title": "Arcane external application release bundle",
-  "description": "Deterministic USTAR+gzip envelope binding one authored schema-2 descriptor to one verified Arcane browser release.",
+  "description": "Structural manifest for one complete USTAR+gzip application bundle.",
   "type": "object",
-  "additionalProperties": false,
   "required": [
     "schemaVersion",
     "kind",
@@ -13,7 +12,7 @@
     "app",
     "descriptor",
     "release",
-    "payload"
+    "files"
   ],
   "properties": {
     "schemaVersion": { "const": 1 },
@@ -21,7 +20,6 @@
     "format": { "const": "ustar+gzip" },
     "sdk": {
       "type": "object",
-      "additionalProperties": false,
       "required": ["name", "version"],
       "properties": {
         "name": { "const": "arcane-os" },
@@ -30,96 +28,33 @@
     },
     "app": {
       "type": "object",
-      "additionalProperties": false,
       "required": ["id", "version"],
       "properties": {
         "id": { "$ref": "#/$defs/appId" },
         "version": { "$ref": "#/$defs/semver" }
       }
     },
-    "descriptor": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "path",
-        "schemaVersion",
-        "canonicalSha256",
-        "packageSha256",
-        "fileSha256",
-        "bytes"
-      ],
-      "properties": {
-        "path": { "const": "arcane-app.json" },
-        "schemaVersion": { "const": 2 },
-        "canonicalSha256": { "$ref": "#/$defs/sha256" },
-        "packageSha256": { "$ref": "#/$defs/sha256" },
-        "fileSha256": { "$ref": "#/$defs/sha256" },
-        "bytes": { "type": "integer", "minimum": 1, "maximum": 4194304 }
-      }
-    },
-    "release": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "path",
-        "schemaVersion",
-        "builder",
-        "policySha256",
-        "manifestSha256",
-        "contentSha256",
-        "fileCount",
-        "totalBytes"
-      ],
-      "properties": {
-        "path": { "const": "payload/ARCANE_APP_RELEASE.json" },
-        "schemaVersion": { "const": 1 },
-        "builder": { "const": "arcane-app-packager-v1" },
-        "policySha256": { "$ref": "#/$defs/sha256" },
-        "manifestSha256": { "$ref": "#/$defs/sha256" },
-        "contentSha256": { "$ref": "#/$defs/sha256" },
-        "fileCount": { "type": "integer", "minimum": 1, "maximum": 16381 },
-        "totalBytes": { "type": "integer", "minimum": 1, "maximum": 1073741824 }
-      }
-    },
-    "payload": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["root", "fileCount", "totalBytes", "files"],
-      "properties": {
-        "root": { "const": "payload" },
-        "fileCount": { "type": "integer", "minimum": 1, "maximum": 16381 },
-        "totalBytes": { "type": "integer", "minimum": 1, "maximum": 1073741824 },
-        "files": {
-          "type": "array",
-          "minItems": 1,
-          "maxItems": 16381,
-          "items": { "$ref": "#/$defs/file" }
-        }
-      }
+    "descriptor": { "const": "arcane-app.json" },
+    "release": { "const": "payload/ARCANE_APP_RELEASE.json" },
+    "files": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/relativePath" }
     }
   },
   "$defs": {
-    "appId": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+    "appId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    },
     "semver": {
       "type": "string",
       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
     },
-    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "relativePath": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 256,
-      "pattern": "^(?!.*\\\\)(?!.*:)(?!.*[<>\"|?*])(?!.*(?:^|/)(?:\\.{1,2}|(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Ll][Oo][Cc][Kk]\\$|[Cc][Oo][Nn][Ii][Nn]\\$|[Cc][Oo][Nn][Oo][Uu][Tt]\\$|[Cc][Oo][Mm][1-9¹²³]|[Ll][Pp][Tt][1-9¹²³])(?:\\.[^/]*)?)(?:/|$))(?!.*[. ](?:/|$))[^/\\u0000-\\u001f\\u007f]+(?:/[^/\\u0000-\\u001f\\u007f]+)*$"
-    },
-    "file": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["path", "bytes", "sha256"],
-      "properties": {
-        "path": { "$ref": "#/$defs/relativePath" },
-        "bytes": { "type": "integer", "minimum": 0, "maximum": 536870912 },
-        "sha256": { "$ref": "#/$defs/sha256" }
-      }
+      "pattern": "^(?![A-Za-z]:)(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)[^\\u0000]+$"
     }
   }
 }

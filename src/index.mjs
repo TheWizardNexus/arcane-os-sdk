@@ -1,7 +1,6 @@
 export {
     ARCANE_MACHINE_BUNDLE_VERSION,
     ARCANE_PROTOCOL,
-    ARCANE_UPSTREAM_COMMIT,
     ARCANE_UPSTREAM_REPOSITORY,
     CLI_EVENT_PROTOCOL,
     CLI_NAME,
@@ -63,7 +62,6 @@ export {
     PLAYBACK_RECORD_EVENT,
     PLAYBACK_STARTED_EVENT,
     projectArcaneDOMEvent,
-    TIME_TRAVEL_OVERFLOW_EVENT,
     TIME_TRAVEL_SEEK_EVENT
 } from './event-manager.mjs';
 export {runProcess} from './process.mjs';
@@ -102,8 +100,6 @@ export {
 export {
     assertIntegratedNativeToolchain,
     assertIntegratedPortableToolchain,
-    assertNativeApplicationToolchainCompatibility,
-    assertPortableToolchainCompatibility,
     buildApplication,
     bundleApplication,
     checkApplication,
@@ -116,6 +112,7 @@ export {
     doctorNativeTarget,
     executeOperation,
     initializeApplication,
+    upgradeApplication,
     packageApplication,
     planApplication,
     prepareNativeTarget,
@@ -130,12 +127,21 @@ export {
 } from './toolchain.mjs';
 export {createWorkspace,initWorkspace} from './scaffold.mjs';
 export {
-    authenticateRuntimeReceipt,
     getSdkRoot,
+    listRuntimeFiles,
     loadRuntimeRelease,
-    readVerifiedRuntimeFile,
-    verifyRuntime
+    readRuntimeFile
 } from './runtime.mjs';
+export {
+    getSdkBrowserRuntimeRoot,
+    listSdkBrowserRuntimeFiles,
+    loadSdkBrowserRuntimeRelease,
+    readSdkBrowserRuntimeFile
+} from './sdk-browser-runtime.mjs';
+export {
+    materializeWorkspaceRuntime,
+    materializeWorkspaceRuntimeContent
+} from './workspace-runtime.mjs';
 export {
     discoverApps,
     inspectWorkspaceProfile,
@@ -149,8 +155,6 @@ export {startSourceExampleServer} from './source-server.mjs';
 export {
     NATIVE_BUILD_PLAN_PROTOCOL,
     NATIVE_BUILDER_PROTOCOL,
-    assertNativeToolchainCompatibility,
-    authenticateNativeBuildPlan,
     createNativeBuildPlan,
     executeNativeBuildPlan,
     validateNativeBuilder
@@ -158,21 +162,15 @@ export {
 export {
     APP_DESCRIPTOR_NAME,
     APP_DESCRIPTOR_SCHEMA_VERSION,
-    appDescriptorSha256,
     loadAppDescriptor,
     projectNativeDescriptor,
     projectPackageManifest,
     validateAppDescriptor
 } from './app-descriptor.mjs';
 export {
-    authenticateAppReleaseAuthority,
-    authenticateAppReleaseReceipt,
-    authenticateSharedPayloadSnapshot,
     discoverApps as discoverPackagerApps,
     inspectApp,
     packageApp,
-    prepareSharedPayloadSnapshot,
-    readVerifiedAppReleaseFile,
     verifyApp
 } from './packager/core.mjs';
 export {
@@ -180,7 +178,6 @@ export {
     APP_BUNDLE_EXTENSION,
     APP_BUNDLE_FORMAT,
     APP_BUNDLE_KIND,
-    APP_BUNDLE_LIMITS,
     APP_BUNDLE_MANIFEST_NAME,
     APP_BUNDLE_RELEASE_PATH,
     APP_BUNDLE_SCHEMA_VERSION,

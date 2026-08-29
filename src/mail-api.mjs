@@ -4,7 +4,6 @@ export {
     resolveMailConfig
 } from '../runtime/arcane/modules/Mail.js';
 export {
-    MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES,
     MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS,
     MAIL_OUTBOX_PROTOCOL,
     MAIL_OUTBOX_STATES,
@@ -14,7 +13,6 @@ export {
 } from '../runtime/arcane/modules/MailOutbox.mjs';
 export {
     DEFAULT_MAIL_REQUEST_TIMEOUT_MS,
-    MAX_MAIL_RESPONSE_BYTES,
     MailTransportError,
     normalizeMailEndpoint,
     sendMailReport,

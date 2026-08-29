@@ -2,172 +2,169 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/TheWizardNexus/arcane-os-sdk/schemas/native-build-plan.schema.json",
   "title": "Arcane native build plan",
+  "description": "Direct structural inputs for one selected native build.",
   "type": "object",
-  "additionalProperties": false,
-  "required": ["protocol", "generation", "toolchain", "minimumCoreVersion", "app", "dependencies", "targetRequest", "outputRoot", "operations"],
+  "required": [
+    "protocol",
+    "nativeBuilder",
+    "toolchainRoot",
+    "toolchain",
+    "appDescriptor",
+    "application",
+    "dependencies",
+    "minimumCoreVersion",
+    "protectedRoots",
+    "outputRoot",
+    "targetRequest"
+  ],
   "properties": {
     "protocol": { "const": "arcane-native-build-plan/1" },
-    "generation": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
-    "providerGeneration": { "$ref": "#/$defs/providerGeneration" },
-    "toolchain": { "$ref": "#/$defs/toolchain" },
-    "minimumCoreVersion": { "$ref": "#/$defs/semver" },
-    "app": { "$ref": "#/$defs/app" },
+    "nativeBuilder": { "$ref": "#/$defs/nativeBuilder" },
+    "toolchainRoot": { "type": "string", "minLength": 1 },
+    "toolchain": { "type": "object" },
+    "appDescriptor": { "type": "object" },
+    "application": { "$ref": "#/$defs/releaseSelection" },
     "dependencies": {
       "type": "array",
-      "maxItems": 64,
-      "items": { "$ref": "#/$defs/app" }
+      "items": { "$ref": "#/$defs/dependencySelection" }
     },
-    "targetRequest": { "$ref": "#/$defs/targetRequest" },
+    "minimumCoreVersion": {
+      "type": ["string", "null"]
+    },
+    "protectedRoots": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
     "outputRoot": { "type": "string", "minLength": 1 },
-    "operations": {
-      "const": [
-        "authenticate-toolchain",
-        "authenticate-app-release",
-        "authenticate-dependency-releases",
-        "build-selected-target",
-        "verify-native-artifact"
-      ]
-    }
+    "targetRequest": { "$ref": "#/$defs/targetRequest" }
   },
   "$defs": {
-    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-    "semver": {
-      "type": "string",
-      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
-    },
-    "providerGeneration": {
+    "nativeBuilder": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["kind", "generationSha256", "contentSha256", "moduleCount"],
+      "required": ["protocol", "describe", "doctor", "prepare", "build", "verify", "run"],
       "properties": {
-        "kind": { "const": "arcane-native-provider-generation" },
-        "generationSha256": { "$ref": "#/$defs/sha256" },
-        "contentSha256": { "$ref": "#/$defs/sha256" },
-        "moduleCount": { "type": "integer", "minimum": 1, "maximum": 128 }
+        "protocol": { "const": "arcane-native-builder/1" },
+        "describe": {},
+        "doctor": {},
+        "prepare": {},
+        "build": {},
+        "verify": {},
+        "run": {}
       }
-    },
-    "toolchain": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["kind", "version", "protocolVersion", "features", "supportedCapabilities", "supportedMethods", "canonicalLocation", "contentSha256"],
-      "properties": {
-        "kind": { "type": "string", "minLength": 1 },
-        "version": { "$ref": "#/$defs/semver" },
-        "protocolVersion": { "type": "string", "pattern": "^arcane/[1-9][0-9]*$" },
-        "features": { "$ref": "#/$defs/contractList" },
-        "supportedCapabilities": { "$ref": "#/$defs/contractList" },
-        "supportedMethods": { "$ref": "#/$defs/contractList" },
-        "canonicalLocation": { "type": "string", "minLength": 1 },
-        "contentSha256": { "$ref": "#/$defs/sha256" }
-      }
-    },
-    "contractList": {
-      "type": "array",
-      "maxItems": 4096,
-      "uniqueItems": true,
-      "items": { "type": "string", "minLength": 1 }
     },
     "release": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["canonicalLocation", "policySha256", "contentSha256", "fileCount", "totalBytes"],
+      "required": ["files"],
       "properties": {
-        "canonicalLocation": { "type": "string", "minLength": 1 },
-        "policySha256": { "$ref": "#/$defs/sha256" },
-        "contentSha256": { "$ref": "#/$defs/sha256" },
-        "fileCount": { "type": "integer", "minimum": 1 },
-        "totalBytes": { "type": "integer", "minimum": 1 }
+        "files": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/relativePath" }
+        }
       }
     },
-    "app": {
+    "releaseSelection": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "version", "descriptorSha256", "release"],
+      "required": ["root", "release", "readFile"],
       "properties": {
-        "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
-        "version": { "type": "string", "minLength": 1 },
-        "descriptorSha256": { "$ref": "#/$defs/sha256" },
-        "release": { "$ref": "#/$defs/release" }
+        "root": { "type": "string", "minLength": 1 },
+        "release": { "$ref": "#/$defs/release" },
+        "readFile": {}
       }
     },
-    "unsignedLocalSigning": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["mode", "profileId"],
-      "properties": {
-        "mode": { "const": "unsigned-local-test" },
-        "profileId": { "type": "null" }
-      }
+    "dependencySelection": {
+      "allOf": [
+        { "$ref": "#/$defs/releaseSelection" },
+        {
+          "type": "object",
+          "required": ["appId"],
+          "properties": {
+            "appId": { "$ref": "#/$defs/appId" }
+          }
+        }
+      ]
     },
-    "androidDevelopmentSigning": {
+    "appId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?![A-Za-z]:)(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+    },
+    "unsignedTargetRequest": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["mode", "profileId"],
+      "required": ["target", "platform", "architecture", "format", "signing", "signingProfileId"],
       "properties": {
-        "mode": { "const": "development" },
-        "profileId": { "const": "arcane-android-development-v1" }
+        "signing": { "const": "unsigned-local-test" },
+        "signingProfileId": { "type": "null" }
       }
     },
     "targetRequest": {
       "oneOf": [
         {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["target", "platform", "architecture", "format", "signing"],
-          "properties": {
-            "target": { "const": "portable" },
-            "platform": { "enum": ["windows", "linux"] },
-            "architecture": { "enum": ["x64", "arm64"] },
-            "format": { "const": "portable" },
-            "signing": { "$ref": "#/$defs/unsignedLocalSigning" }
-          }
+          "allOf": [
+            { "$ref": "#/$defs/unsignedTargetRequest" },
+            {
+              "properties": {
+                "target": { "const": "portable" },
+                "platform": { "enum": ["windows", "linux"] },
+                "architecture": { "enum": ["x64", "arm64"] },
+                "format": { "const": "portable" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/unsignedTargetRequest" },
+            {
+              "properties": {
+                "target": { "const": "windows-x64" },
+                "platform": { "const": "windows" },
+                "architecture": { "const": "x64" },
+                "format": { "const": "exe" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/unsignedTargetRequest" },
+            {
+              "properties": {
+                "target": { "const": "linux-x64" },
+                "platform": { "const": "linux" },
+                "architecture": { "const": "x64" },
+                "format": { "const": "deb" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/unsignedTargetRequest" },
+            {
+              "properties": {
+                "target": { "const": "linux-arm64" },
+                "platform": { "const": "linux" },
+                "architecture": { "const": "arm64" },
+                "format": { "const": "deb" }
+              }
+            }
+          ]
         },
         {
           "type": "object",
-          "additionalProperties": false,
-          "required": ["target", "platform", "architecture", "format", "signing"],
-          "properties": {
-            "target": { "const": "windows-x64" },
-            "platform": { "const": "windows" },
-            "architecture": { "const": "x64" },
-            "format": { "const": "exe" },
-            "signing": { "$ref": "#/$defs/unsignedLocalSigning" }
-          }
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["target", "platform", "architecture", "format", "signing"],
-          "properties": {
-            "target": { "const": "linux-x64" },
-            "platform": { "const": "linux" },
-            "architecture": { "const": "x64" },
-            "format": { "const": "deb" },
-            "signing": { "$ref": "#/$defs/unsignedLocalSigning" }
-          }
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["target", "platform", "architecture", "format", "signing"],
-          "properties": {
-            "target": { "const": "linux-arm64" },
-            "platform": { "const": "linux" },
-            "architecture": { "const": "arm64" },
-            "format": { "const": "deb" },
-            "signing": { "$ref": "#/$defs/unsignedLocalSigning" }
-          }
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["target", "platform", "architecture", "format", "signing"],
+          "required": ["target", "platform", "architecture", "format", "signing", "signingProfileId"],
           "properties": {
             "target": { "const": "android-arm64" },
             "platform": { "const": "android" },
             "architecture": { "const": "arm64" },
             "format": { "const": "apk" },
-            "signing": { "$ref": "#/$defs/androidDevelopmentSigning" }
+            "signing": { "const": "development" },
+            "signingProfileId": { "const": "arcane-android-development-v1" }
           }
         }
       ]

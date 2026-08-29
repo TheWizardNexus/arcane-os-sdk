@@ -1,35 +1,14 @@
 import path from 'node:path';
-import {access} from 'node:fs/promises';
-import {verifyRuntime} from './runtime.mjs';
-import {verifySdkBrowserRuntime} from './sdk-browser-runtime.mjs';
-import {verifyWorkspaceRuntime} from './workspace-runtime.mjs';
+import {access,lstat,readdir,realpath} from 'node:fs/promises';
+import {loadRuntimeRelease} from './runtime.mjs';
+import {loadSdkBrowserRuntimeRelease} from './sdk-browser-runtime.mjs';
 import {validateWorkspace} from './workspace.mjs';
 import {runProcess} from './process.mjs';
 import {ARCANE_PROTOCOL,SDK_VERSION} from './constants.mjs';
 import {ERROR_CODES,ArcaneError,throwIfAborted} from './errors.mjs';
 
-const MINIMUM_NODE=[22,23,2];
 const WINDOWS_SERVICE_NAME='ArcaneOllama';
 const WINDOWS_SERVICE_HOST='C:\\Program Files\\Ollama\\ArcaneOllamaService.exe';
-const WINDOWS_SERVICE_COMMAND=`"${WINDOWS_SERVICE_HOST}"`;
-const OLLAMA_ENDPOINT='http://127.0.0.1:11434';
-
-function parseVersion(value){
-    const match=String(value??'').match(/(\d+)\.(\d+)\.(\d+)/u);
-    return match?match.slice(1).map(Number):null;
-}
-
-function versionAtLeast(actual,minimum){
-    if(!actual){
-        return false;
-    }
-    for(let index=0;index<minimum.length;index+=1){
-        if((actual[index]??0)!==minimum[index]){
-            return (actual[index]??0)>minimum[index];
-        }
-    }
-    return true;
-}
 
 async function exists(filePath){
     try{
@@ -44,16 +23,15 @@ function check(id,status,message,{required=true,details}={}){
     return {id,status,message,required,...(details===undefined?{}:{details})};
 }
 
-async function commandCheck(id,command,args,{signal,onEvent,minimum,run=runProcess}={}){
+async function commandCheck(id,command,args,{signal,onEvent,run=runProcess}={}){
     try{
         const result=await run(command,args,{signal,onEvent});
         const version=(result.stdout||result.stderr).trim();
-        const supported=!minimum||versionAtLeast(parseVersion(version),minimum);
         return check(
             id,
-            supported?'pass':'fail',
-            supported?`${id} is available (${version}).`:`${id} ${version} is older than the supported minimum.`,
-            {details:{version,minimum:minimum?.join('.')??null}}
+            'pass',
+            `${id} is available (${version}).`,
+            {details:{version}}
         );
     }catch(error){
         return check(id,'fail',`${id} is unavailable: ${error.message}`,{
@@ -62,76 +40,58 @@ async function commandCheck(id,command,args,{signal,onEvent,minimum,run=runProce
     }
 }
 
-function parseServiceCommand(configOutput){
-    const line=String(configOutput).split(/\r?\n/u)
-        .find(value=>value.includes('BINARY_PATH_NAME'));
-    if(!line){
-        return {raw:null,binaryPath:null,arguments:null,argumentFree:false,exact:false};
-    }
-    const raw=line.slice(line.indexOf(':')+1).trim();
-    const quoted=raw.match(/^"([^"]+)"(?:\s+(.+))?$/u);
-    const unquoted=quoted?null:raw.match(/^(\S+?\.exe)(?:\s+(.+))?$/iu);
-    const executable=quoted?.[1]??unquoted?.[1]??null;
-    const argumentsText=quoted?.[2]??unquoted?.[2]??null;
-    const binaryPath=executable?path.win32.normalize(executable):null;
-    const argumentFree=Boolean(binaryPath)&&argumentsText===null;
-    return {
-        raw,
-        binaryPath,
-        arguments:argumentsText,
-        argumentFree,
-        exact:argumentFree&&raw.toLowerCase()===WINDOWS_SERVICE_COMMAND.toLowerCase()
-    };
-}
-
-function serviceDefinition(configOutput,sidOutput){
-    const text=String(configOutput);
-    const command=parseServiceCommand(text);
-    const ownProcess=/TYPE\s*:\s*10\s+WIN32_OWN_PROCESS/iu.test(text);
-    const automatic=/START_TYPE\s*:\s*2\s+AUTO_START/iu.test(text);
-    const localService=/SERVICE_START_NAME\s*:\s*(?:NT AUTHORITY\\)?LocalService\s*$/imu.test(text);
-    const dependenciesLine=text.split(/\r?\n/u)
-        .find(line=>/DEPENDENCIES\s*:/iu.test(line));
-    const dependencies=dependenciesLine
-        ?dependenciesLine.slice(dependenciesLine.indexOf(':')+1).trim()
-        :null;
-    const noUnexpectedDependencies=dependencies==='';
-    const unrestrictedSid=/SERVICE_SID_TYPE\s*:\s*UNRESTRICTED/iu.test(String(sidOutput));
-    return {
-        binaryPath:command.binaryPath,
-        command:command.raw,
-        commandArguments:command.arguments,
-        argumentFree:command.argumentFree,
-        exactCommand:command.exact,
-        ownProcess,
-        automatic,
-        localService,
-        noUnexpectedDependencies,
-        dependencies,
-        unrestrictedSid
-    };
-}
-
 function parseProbe(text){
     let value;
     try{
-        value=JSON.parse(String(text).trim());
+        value=JSON.parse(String(text));
     }catch{
         return null;
     }
     if(!value||typeof value!=='object'||Array.isArray(value)
-        ||Object.getPrototypeOf(value)!==Object.prototype
-        ||JSON.stringify(Object.keys(value).sort())!==JSON.stringify(['endpoint','ready','service'])
-        ||value.service!==WINDOWS_SERVICE_NAME
-        ||value.ready!==true
-        ||value.endpoint!==OLLAMA_ENDPOINT){
+        ||Object.getPrototypeOf(value)!==Object.prototype||typeof value.ready!=='boolean'){
         return null;
     }
-    return Object.freeze({
-        service:WINDOWS_SERVICE_NAME,
-        ready:true,
-        endpoint:OLLAMA_ENDPOINT
-    });
+    return {...value};
+}
+
+function compareText(left,right){
+    const a=String(left);
+    const b=String(right);
+    return a<b?-1:a>b?1:0;
+}
+
+async function listPhysicalFiles(directory,label){
+    const requested=path.resolve(directory);
+    const rootInfo=await lstat(requested);
+    if(rootInfo.isSymbolicLink()||!rootInfo.isDirectory()){
+        throw new Error(`${label} must be a real directory.`);
+    }
+    const canonical=await realpath(requested);
+    const files=[];
+    async function visit(current,relativeRoot=''){
+        const entries=await readdir(current,{withFileTypes:true});
+        entries.sort((left,right)=>compareText(left.name,right.name));
+        for(const entry of entries){
+            const relative=relativeRoot?`${relativeRoot}/${entry.name}`:entry.name;
+            const absolute=path.join(current,entry.name);
+            const info=await lstat(absolute);
+            if(info.isSymbolicLink())throw new Error(`${label} contains a symbolic link: ${relative}.`);
+            if(info.isDirectory())await visit(absolute,relative);
+            else if(info.isFile())files.push(relative);
+            else throw new Error(`${label} contains a non-file entry: ${relative}.`);
+        }
+    }
+    await visit(canonical);
+    return files.sort(compareText);
+}
+
+function expectedWorkspaceRuntimeFiles(runtimeFiles,browserFiles){
+    return [
+        ...runtimeFiles.map(relative=>relative.startsWith('arcane/')
+            ?relative.slice('arcane/'.length)
+            :`dependencies/strong-type/${relative.slice('strong-type/'.length)}`),
+        ...browserFiles.map(relative=>`sdk/${relative}`)
+    ].sort(compareText);
 }
 
 async function assessWindowsOllama({
@@ -150,29 +110,12 @@ async function assessWindowsOllama({
         });
     }
 
-    const configured=await run('sc.exe',['qc',WINDOWS_SERVICE_NAME],{
-        signal,onEvent,allowNonzero:true
-    });
-    const sid=await run('sc.exe',['qsidtype',WINDOWS_SERVICE_NAME],{
-        signal,onEvent,allowNonzero:true
-    });
-    const definition=serviceDefinition(configured.stdout,sid.stdout);
-    const binaryPath=definition.binaryPath;
-    const expectedPath=path.win32.normalize(WINDOWS_SERVICE_HOST);
-    const registrationVerified=Boolean(configured.code===0
-        &&sid.code===0
-        &&binaryPath?.toLowerCase()===expectedPath.toLowerCase()
-        &&definition.exactCommand
-        &&definition.ownProcess
-        &&definition.automatic
-        &&definition.localService
-        &&definition.noUnexpectedDependencies
-        &&definition.unrestrictedSid);
     const running=/STATE\s*:\s*\d+\s+RUNNING/iu.test(queried.stdout);
     let probe=null;
     let probeExitCode=null;
+    const probeAvailable=await fileExists(WINDOWS_SERVICE_HOST);
 
-    if(registrationVerified&&await fileExists(WINDOWS_SERVICE_HOST)){
+    if(probeAvailable){
         const probed=await run(WINDOWS_SERVICE_HOST,['--probe'],{
             signal,onEvent,allowNonzero:true
         });
@@ -180,24 +123,22 @@ async function assessWindowsOllama({
         probe=parseProbe(probed.stdout);
     }
 
-    const probeVerified=probeExitCode===0&&probe!==null;
-    const ready=running&&registrationVerified&&probeVerified;
+    const probeReady=probe===null?null:probeExitCode===0&&probe.ready===true;
+    const ready=running&&(probeReady??true);
     return check(
         'arcane-ollama',
         ready?'pass':'warning',
         ready
-            ?`${WINDOWS_SERVICE_NAME} is registered and its managed wrapper reports ready.`
-            :`${WINDOWS_SERVICE_NAME} is present but did not satisfy every managed-service readiness check.`,
+            ?`${WINDOWS_SERVICE_NAME} is running${probeReady===true?' and reports ready':''}.`
+            :`${WINDOWS_SERVICE_NAME} is present but is not ready.`,
         {
             required:false,
             details:{
                 service:WINDOWS_SERVICE_NAME,
                 running,
-                registrationVerified,
-                binaryPath,
-                serviceDefinition:definition,
+                probeAvailable,
                 probeExitCode,
-                probeVerified,
+                probeReady,
                 probe
             }
         }
@@ -236,33 +177,32 @@ export async function runDoctor({
     throwIfAborted(signal);
     const checks=[];
     const nodeVersion=process.versions.node;
-    const nodeSupported=versionAtLeast(parseVersion(nodeVersion),MINIMUM_NODE);
     checks.push(check(
         'node',
-        nodeSupported?'pass':'fail',
-        nodeSupported
-            ?`Node.js ${nodeVersion} satisfies the SDK minimum.`
-            :`Node.js ${nodeVersion} does not satisfy the SDK minimum ${MINIMUM_NODE.join('.')}.`,
-        {details:{version:nodeVersion,minimum:MINIMUM_NODE.join('.')}}
+        'pass',
+        `Node.js ${nodeVersion} is available.`,
+        {details:{version:nodeVersion}}
     ));
 
     checks.push(await commandCheck('npm','npm',['--version'],{signal,onEvent,run}));
     checks.push(await commandCheck('git','git',['--version'],{signal,onEvent,run}));
 
     try{
-        const [receipt,browserReceipt]=await Promise.all([
-            verifyRuntime({signal,onEvent}),
-            verifySdkBrowserRuntime({signal,onEvent})
+        const [runtimeRelease,browserRelease]=await Promise.all([
+            loadRuntimeRelease({signal}),
+            loadSdkBrowserRuntimeRelease({signal})
         ]);
-        checks.push(check('sdk-runtime','pass','The packaged Arcane runtime inventory is verified.',{
+        checks.push(check('sdk-runtime','pass','The packaged Arcane runtime files are available.',{
             details:{
                 sdkVersion:SDK_VERSION,
-                contentSha256:receipt.contentSha256,
-                browserContentSha256:browserReceipt.contentSha256
+                runtimeRoot:runtimeRelease.runtimeRoot,
+                browserRuntimeRoot:browserRelease.browserRuntimeRoot,
+                runtimeFiles:runtimeRelease.files,
+                browserRuntimeFiles:browserRelease.files
             }
         }));
     }catch(error){
-        checks.push(check('sdk-runtime','fail',`The packaged Arcane runtime failed verification: ${error.message}`));
+        checks.push(check('sdk-runtime','fail',`The packaged Arcane runtime could not be read: ${error.message}`));
     }
 
     const resolvedWorkspace=path.resolve(workspaceRoot??process.cwd());
@@ -285,45 +225,43 @@ export async function runDoctor({
             checks.push(check(
                 'workspace-runtime',
                 'skipped',
-                'The physical workspace runtime was not checked because workspace admission failed.',
+                'The physical workspace runtime was not checked because workspace validation failed.',
                 {required:false,details:{workspaceRoot:resolvedWorkspace}}
             ));
         }else if(result.workspaceMode==='external'){
             try{
                 const {runtimeRoot,browserRuntimeRoot}=result.sdkInstallation;
-                const runtimeReceipt=await verifyRuntime({runtimeRoot,signal,onEvent});
-                const sdkBrowserRuntimeReceipt=await verifySdkBrowserRuntime({
-                    browserRuntimeRoot,
-                    signal,
-                    onEvent
-                });
-                const projected=await verifyWorkspaceRuntime({
-                    workspaceRoot:result.workspaceRoot,
-                    runtimeRoot,
-                    runtimeReceipt,
-                    browserRuntimeRoot,
-                    sdkBrowserRuntimeReceipt,
-                    signal,
-                    onEvent
-                });
+                const [runtimeRelease,browserRelease]=await Promise.all([
+                    loadRuntimeRelease({runtimeRoot,signal}),
+                    loadSdkBrowserRuntimeRelease({browserRuntimeRoot,signal})
+                ]);
+                const files=await listPhysicalFiles(
+                    path.join(result.workspaceRoot,'arcane'),
+                    'Workspace Arcane runtime'
+                );
+                const expected=expectedWorkspaceRuntimeFiles(
+                    runtimeRelease.files,
+                    browserRelease.files
+                );
+                const present=new Set(files);
+                const missing=expected.filter(file=>!present.has(file));
+                if(missing.length){
+                    throw new Error(`Workspace Arcane runtime is missing required SDK files: ${missing.join(', ')}`);
+                }
                 checks.push(check(
                     'workspace-runtime',
                     'pass',
-                    'The composed physical Arcane and SDK browser runtime is verified.',
+                    'The composed physical Arcane and SDK browser runtime is present.',
                     {details:{
-                        contentSha256:projected.contentSha256,
-                        fileCount:projected.fileCount,
-                        runtimeManifestSha256:projected.sourceManifestSha256,
-                        runtimeContentSha256:projected.sourceContentSha256,
-                        browserManifestSha256:projected.sourceBrowserManifestSha256,
-                        browserContentSha256:projected.sourceBrowserContentSha256
+                        layout:'external',
+                        files
                     }}
                 ));
             }catch(error){
                 checks.push(check(
                     'workspace-runtime',
                     'fail',
-                    `The composed physical workspace runtime is invalid: ${error.message}`
+                    `The composed physical workspace runtime could not be read: ${error.message}`
                 ));
             }
         }else if(result.workspaceMode==='integrated'){

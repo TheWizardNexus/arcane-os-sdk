@@ -1,8 +1,6 @@
-import {lstat,readFile,realpath} from 'node:fs/promises';
+import {readFile,realpath,stat} from 'node:fs/promises';
 import path from 'node:path';
-import {verifyRuntime} from './runtime.mjs';
-import {verifySdkBrowserRuntime} from './sdk-browser-runtime.mjs';
-import {materializeWorkspaceRuntime} from './workspace-runtime.mjs';
+import {materializeWorkspaceRuntimeContent} from './workspace-runtime.mjs';
 import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
 import {
     resolveInstalledSdkInstallation,
@@ -22,53 +20,41 @@ function throwIfAborted(signal){
     throw error;
 }
 
-function samePath(left,right){
-    const normalize=value=>path.resolve(value).replaceAll('\\','/');
-    const a=normalize(left);
-    const b=normalize(right);
-    return process.platform==='win32'?a.toLowerCase()===b.toLowerCase():a===b;
-}
-
 async function canonicalWorkspaceRoot(workspaceRoot){
     if(typeof workspaceRoot!=='string'||!workspaceRoot.trim()){
         fail('workspaceRoot is required to materialize an installed SDK runtime.');
     }
     const requested=path.resolve(workspaceRoot);
     let info;
-    try{info=await lstat(requested);}
+    try{info=await stat(requested);}
     catch(error){
         if(error?.code==='ENOENT')fail(`Workspace root does not exist: ${requested}.`);
         throw error;
     }
-    if(info.isSymbolicLink()||!info.isDirectory()){
-        fail(`Workspace root must be a real directory: ${requested}.`);
-    }
-    const canonical=await realpath(requested);
-    if(!samePath(requested,canonical)){
-        fail(`Workspace root must not resolve through another path: ${requested}.`);
-    }
-    return canonical;
+    if(!info.isDirectory())fail(`Workspace root must be a directory: ${requested}.`);
+    return realpath(requested);
 }
 
 async function readRootPackage(workspaceRoot){
     const packagePath=path.join(workspaceRoot,'package.json');
-    let info;
-    try{info=await lstat(packagePath);}
+    let document;
+    try{document=JSON.parse(await readFile(packagePath,'utf8'));}
     catch(error){
         if(error?.code==='ENOENT')fail(`Workspace package.json is missing: ${packagePath}.`);
-        throw error;
+        fail(`Workspace package.json is not valid JSON: ${error.message}`);
     }
-    if(info.isSymbolicLink()||!info.isFile()){
-        fail('Workspace package.json must be a real file.');
-    }
-    try{return JSON.parse(await readFile(packagePath,'utf8'));}
-    catch(error){fail(`Workspace package.json is not valid JSON: ${error.message}`);}
+    return document;
 }
 
-/**
- * Resolves the workspace's one exact installed Arcane SDK declaration, verifies
- * both physical runtime receipts, and materializes their dynamic inventories.
- */
+async function installedSdkAuthority(canonicalRoot,{sdkPackageSource}={}){
+    const declaration=resolveSdkPackageDeclaration(
+        await readRootPackage(canonicalRoot),
+        sdkPackageSource===undefined?{}:{packageSource:sdkPackageSource}
+    );
+    const installation=await resolveInstalledSdkInstallation(canonicalRoot,declaration);
+    return {declaration,installation};
+}
+
 export async function materializeInstalledSdkRuntime({
     workspaceRoot,
     sdkPackageSource,
@@ -85,46 +71,20 @@ export async function materializeInstalledSdkRuntime({
         onEvent,
         workspaceOperationLease
     },async()=>{
-        throwIfAborted(signal);
-        const rootPackage=await readRootPackage(canonicalRoot);
-        const declaration=resolveSdkPackageDeclaration(rootPackage,
-            sdkPackageSource===undefined?{}:{packageSource:sdkPackageSource});
-        const installation=await resolveInstalledSdkInstallation(canonicalRoot,declaration);
-        const [runtimeReceipt,sdkBrowserRuntimeReceipt]=await Promise.all([
-            verifyRuntime({
-                runtimeRoot:installation.runtimeRoot,
-                signal,
-                onEvent
-            }),
-            verifySdkBrowserRuntime({
-                browserRuntimeRoot:installation.browserRuntimeRoot,
-                signal,
-                onEvent
-            })
-        ]);
-        const workspaceRuntimeReceipt=await materializeWorkspaceRuntime({
+        const authority=await installedSdkAuthority(canonicalRoot,{sdkPackageSource});
+        const workspaceRuntime=await materializeWorkspaceRuntimeContent({
             workspaceRoot:canonicalRoot,
-            runtimeRoot:installation.runtimeRoot,
-            runtimeReceipt,
-            browserRuntimeRoot:installation.browserRuntimeRoot,
-            sdkBrowserRuntimeReceipt,
-            installedSdkAuthority:Object.freeze({declaration,installation}),
+            runtimeRoot:authority.installation.runtimeRoot,
+            browserRuntimeRoot:authority.installation.browserRuntimeRoot,
             signal,
             onEvent
         });
-        const materialization=workspaceRuntimeReceipt.materialization;
-        return Object.freeze({
+        return {
             schemaVersion:1,
             kind:'arcane-installed-sdk-runtime-materialization',
-            status:materialization.status,
-            generation:materialization.generation,
-            receiptPath:materialization.receiptPath,
-            persistentReceipt:materialization.persistentReceipt,
-            cleanupWarnings:materialization.cleanupWarnings,
-            installation,
-            runtimeReceipt,
-            sdkBrowserRuntimeReceipt,
-            workspaceRuntimeReceipt
-        });
+            status:'materialized',
+            installation:authority.installation,
+            workspaceRuntime
+        };
     });
 }

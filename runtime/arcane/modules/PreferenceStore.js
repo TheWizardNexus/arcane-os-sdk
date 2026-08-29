@@ -2,9 +2,7 @@ import {createArcaneEventSource} from 'arcane-os/event-manager';
 import Preference,{preferenceSchema} from '../entities/Preference.js';
 import {resolveApplicationLocalStorageKey} from './AppDataScope.js';
 
-const MAXIMUM_ATOMIC_PREFERENCE_BATCH_ENTRIES=32;
-
-export const PREFERENCE_STORE_ERROR_CODES=Object.freeze({
+export const PREFERENCE_STORE_ERROR_CODES={
     adapterInvalid:'ARCANE_PREFERENCE_STORE_ADAPTER_INVALID',
     disposed:'ARCANE_PREFERENCE_STORE_DISPOSED',
     eventDetailInvalid:'ARCANE_PREFERENCE_EVENT_DETAIL_INVALID',
@@ -12,13 +10,13 @@ export const PREFERENCE_STORE_ERROR_CODES=Object.freeze({
     operationAborted:'ARCANE_PREFERENCE_STORE_OPERATION_ABORTED',
     operationOptionsInvalid:'ARCANE_PREFERENCE_STORE_OPERATION_OPTIONS_INVALID',
     valuesInvalid:'ARCANE_PREFERENCE_VALUES_INVALID'
-});
+};
 
-export const PREFERENCE_STORE_EVENT_TYPES=Object.freeze({
+export const PREFERENCE_STORE_EVENT_TYPES={
     change:'preference-change',
     load:'preference-load',
     reset:'preference-reset'
-});
+};
 
 function preferenceStoreError(code,reason,message,ErrorType=Error,cause){
     const error=new ErrorType(message);
@@ -91,7 +89,7 @@ function normalizeOperationOptions(value={}){
             TypeError
         );
     }
-    return Object.freeze({signal});
+    return {signal};
 }
 
 function setDataProperty(target,key,value){
@@ -102,10 +100,10 @@ function setDataProperty(target,key,value){
     );
 }
 
-function frozenPreferenceValues(values){
+function completePreferenceValues(values){
     const copy={};
     for(const [key,value] of Object.entries(values)) setDataProperty(copy,key,value);
-    return Object.freeze(copy);
+    return copy;
 }
 
 function validateAdapter(adapter){
@@ -209,7 +207,7 @@ export default class PreferenceStore extends EventTarget{
             this,
             {
                 source:'preference-store',
-                eventTypes:Object.freeze(Object.values(PREFERENCE_STORE_EVENT_TYPES))
+                eventTypes:Object.values(PREFERENCE_STORE_EVENT_TYPES)
             }
         );
     }
@@ -224,7 +222,7 @@ export default class PreferenceStore extends EventTarget{
         for(const definition of this.schema){
             setDataProperty(values,definition.key,definition.defaultValue);
         }
-        return frozenPreferenceValues(values);
+        return completePreferenceValues(values);
     }
 
     storageKey(key){return `${this.namespace}.${key}`;}
@@ -254,7 +252,7 @@ export default class PreferenceStore extends EventTarget{
                 for(const definition of store.schema){
                     const result=await store.adapter.get(
                         store.storageKey(definition.key),
-                        Object.freeze({operationId,signal:operation.signal})
+                        {operationId,signal:operation.signal}
                     );
                     store.#assertOperationActive(operation.signal);
                     setDataProperty(
@@ -265,9 +263,9 @@ export default class PreferenceStore extends EventTarget{
                             :definition.defaultValue
                     );
                 }
-                store.values=frozenPreferenceValues(values);
+                store.values=completePreferenceValues(values);
                 store.#publish(PREFERENCE_STORE_EVENT_TYPES.load,{},operationId);
-                return frozenPreferenceValues(store.values);
+                return completePreferenceValues(store.values);
             },
             operation.signal
         );
@@ -284,10 +282,10 @@ export default class PreferenceStore extends EventTarget{
                 await store.adapter.set(
                     store.storageKey(key),
                     normalized,
-                    Object.freeze({operationId,signal:operation.signal})
+                    {operationId,signal:operation.signal}
                 );
                 store.#assertOperationActive(operation.signal);
-                store.values=frozenPreferenceValues({...store.values,[key]:normalized});
+                store.values=completePreferenceValues({...store.values,[key]:normalized});
                 store.#publish(
                     PREFERENCE_STORE_EVENT_TYPES.change,
                     {key,value:normalized},
@@ -312,35 +310,34 @@ export default class PreferenceStore extends EventTarget{
         const selected=[];
         for(const definition of this.schema){
             if(Object.prototype.hasOwnProperty.call(values,definition.key)){
-                selected.push(Object.freeze({
+                selected.push({
                     key:definition.key,
                     storageKey:this.storageKey(definition.key),
                     value:definition.value(values[definition.key])
-                }));
+                });
             }
         }
         if(selected.length===0){
             this.#assertOperationActive(operation.signal);
-            return frozenPreferenceValues(this.values);
+            return completePreferenceValues(this.values);
         }
         const operationId=this.#nextOperationId('set-all');
         const store=this;
-        const entries=Object.freeze(selected);
+        const entries=selected;
         return this.#enqueueOperation(
             async function setAllPreferences(commitPreferenceOperation){
-                const context=Object.freeze({operationId,signal:operation.signal});
-                if(typeof store.adapter.setMany==='function'
-                    &&entries.length<=MAXIMUM_ATOMIC_PREFERENCE_BATCH_ENTRIES){
+                const context={operationId,signal:operation.signal};
+                if(typeof store.adapter.setMany==='function'){
                     const batch={};
                     for(const entry of entries){
                         setDataProperty(batch,entry.storageKey,entry.value);
                     }
-                    await store.adapter.setMany(Object.freeze(batch),context);
+                    await store.adapter.setMany(batch,context);
                     store.#assertOperationActive(operation.signal);
                     commitPreferenceOperation();
                     const next={...store.values};
                     for(const entry of entries) setDataProperty(next,entry.key,entry.value);
-                    store.values=frozenPreferenceValues(next);
+                    store.values=completePreferenceValues(next);
                     for(const entry of entries){
                         store.#publish(
                             PREFERENCE_STORE_EVENT_TYPES.change,
@@ -348,12 +345,12 @@ export default class PreferenceStore extends EventTarget{
                             operationId
                         );
                     }
-                    return frozenPreferenceValues(store.values);
+                    return completePreferenceValues(store.values);
                 }
                 for(const entry of entries){
                     await store.adapter.set(entry.storageKey,entry.value,context);
                     store.#assertOperationActive(operation.signal);
-                    store.values=frozenPreferenceValues({
+                    store.values=completePreferenceValues({
                         ...store.values,
                         [entry.key]:entry.value
                     });
@@ -364,7 +361,7 @@ export default class PreferenceStore extends EventTarget{
                     );
                     store.#assertOperationActive(operation.signal);
                 }
-                return frozenPreferenceValues(store.values);
+                return completePreferenceValues(store.values);
             },
             operation.signal
         );
@@ -379,13 +376,13 @@ export default class PreferenceStore extends EventTarget{
                 for(const definition of store.schema){
                     await store.adapter.delete(
                         store.storageKey(definition.key),
-                        Object.freeze({operationId,signal:operation.signal})
+                        {operationId,signal:operation.signal}
                     );
                     store.#assertOperationActive(operation.signal);
                 }
                 store.values=store.defaults();
                 store.#publish(PREFERENCE_STORE_EVENT_TYPES.reset,{},operationId);
-                return frozenPreferenceValues(store.values);
+                return completePreferenceValues(store.values);
             },
             operation.signal
         );
@@ -431,19 +428,19 @@ export default class PreferenceStore extends EventTarget{
     }
 
     #publish(type,detail,operationId){
-        const values=frozenPreferenceValues(this.values);
-        const compatibilityDetail=Object.freeze({
+        const values=completePreferenceValues(this.values);
+        const compatibilityDetail={
             ...detail,
             namespace:this.namespace,
             values
-        });
-        const publicDetail=Object.freeze({
+        };
+        const publicDetail={
             namespace:this.namespace,
             values,
             ...(typeof detail.key==='string'
                 ?{preferenceId:detail.key,value:detail.value}
                 :{})
-        });
+        };
         this.#events.dispatch(
             type,
             compatibilityDetail,

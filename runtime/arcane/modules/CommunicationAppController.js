@@ -7,9 +7,9 @@ import {
     unavailableMessageInspection
 } from './MessageAdvisory.js?v=3';
 
-export const COMMUNICATION_APP_CONTROLLER_ERROR_CODES=Object.freeze({
+export const COMMUNICATION_APP_CONTROLLER_ERROR_CODES={
     destroyed:'ARCANE_COMMUNICATION_APP_CONTROLLER_DESTROYED'
-});
+};
 
 function communicationAbortError(reason){
     if(
@@ -570,11 +570,7 @@ export default class CommunicationAppController{
             return;
         }
         if(service.externalUrl){
-            const opened=globalThis.open(
-                service.externalUrl,
-                '_blank',
-                'noopener,noreferrer'
-            );
+            const opened=globalThis.open(service.externalUrl,'_blank');
             if(!opened){
                 this.elements.settings.setStatus(
                     `Open ${service.externalUrl} to continue.`

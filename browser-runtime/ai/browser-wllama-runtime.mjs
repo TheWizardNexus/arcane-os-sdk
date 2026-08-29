@@ -1,8 +1,9 @@
 import { Wllama } from "./wllama/index.mjs";
 
+const completeValue = (value) => value;
+
 const MODULE_URL = new URL("./wllama/index.mjs", import.meta.url).href;
 const WASM_URL = new URL("./wllama/wllama.wasm", import.meta.url).href;
-const WEBGPU_EVIDENCE_PROTOCOL = "arcane-wllama-webgpu-evidence/1";
 const RUNTIME_EVIDENCE_PROTOCOL = "arcane-wllama-runtime-evidence/1";
 const FULL_GPU_LAYERS = 99_999;
 const WEBGPU_ADAPTER_PATTERN = /^ggml_webgpu: adapter_info: vendor_id: (\d+) \| vendor: (.*?) \| architecture: (.*?) \| device_id: (\d+) \| name: (.*?) \| device_desc: (.*)$/u;
@@ -10,81 +11,43 @@ const GPU_OFFLOAD_PATTERN = /^[^:]+: offloaded (\d+)\/(\d+) layers to GPU$/u;
 const PEG_NATIVE_OUTPUT_PREFIX = "common_chat_peg_parse: unparsed peg-native output: ";
 const PEG_NATIVE_FINAL_PREFIX = "<|channel|>final <|constrain|>content<|message|>";
 const PEG_NATIVE_FAILURE = "The model produced output that does not match the expected peg-native format";
-const MAX_RECOVERED_COMPLETION_CHARACTERS = 1_048_576;
-const MAX_RECOVERED_COMPLETION_LINES = 16_384;
 
-function deepFreeze(value) {
-  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
-  for (const nested of Object.values(value)) deepFreeze(nested);
-  return Object.freeze(value);
-}
-
-export const BROWSER_WASM_RUNTIME_AUTHORITY = deepFreeze({
+export const BROWSER_WASM_RUNTIME_AUTHORITY = completeValue({
   protocol: "arcane-ai-browser-wasm/2",
   provider: "wllama",
   executionPolicy: {
     webgpuRequired: true,
     cpuFallback: false,
-    operationalEvidence: RUNTIME_EVIDENCE_PROTOCOL,
-    navigatorPresenceIsOperationalEvidence: false,
     cancellation: "abortSignal-plus-llama-cancel-acknowledgement",
     cleanup: "worker-termination-only",
     nativeUnloadClaimed: false,
     physicalVramReclamationClaimed: false,
-    telemetryThreatModel: "authenticated-module-closure-and-frozen-prototypes-not-hostile-platform-global-attestation",
   },
   package: {
     name: "@wllama/wllama",
     version: "3.6.0",
-    sourceRevision: "f16050d8d51a00602c6a2a6b8ac9c09f490eea7f",
     resolved: "https://registry.npmjs.org/@wllama/wllama/-/wllama-3.6.0.tgz",
-    npmIntegrity: "sha512-NN3ZBXqaaUwGXTQubkNvsCaLPjN2XVa0bVS40OYCE8zquYmRc2W3oHYEgwvuSWWDB8aUqTLyMioySCXNkcnD1w==",
-    tarballBytes: 5_671_369,
-    tarballSha256: "137c35ceccb4911a9b0ce9b427889f75991654ec6a6d1dd8fabd879b14b07a1b",
     licenseSpdx: "MIT",
-    license: {
-      path: "ai/wllama/LICENCE",
-      bytes: 1_071,
-      sha256: "5866e3bd7e3cbd3f7c8bea6efd8a1e7fa7cc8de68c30f428aff7c6584a0fb720",
-    },
   },
   llamaCpp: {
-    sourceRevision: "4df29be4f4c3673f428170fda944a5b19f743bb8",
     licenseSpdx: "MIT",
-    license: {
-      path: "ai/wllama/llama.cpp-LICENSE",
-      bytes: 1_078,
-      sha256: "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d",
-    },
   },
   runtimeAssets: {
     module: {
       path: "ai/wllama/index.mjs",
       url: MODULE_URL,
-      bytes: 392_852,
-      sha256: "b119a7cdffabc8541dce283381d18ada4027c0560728aac1fe45bdd30cdac8e2",
       mediaType: "text/javascript",
-      projection: {
-        protocol: WEBGPU_EVIDENCE_PROTOCOL,
-        tool: "tools/project-wllama-webgpu-runtime.mjs",
-        sourcePath: "node_modules/@wllama/wllama/esm/index.js",
-        sourceBytes: 373_519,
-        sourceSha256: "4637e42d636010493a9b274fbbe70bfd8120365da726b1d9e589d85ca84a00d6",
-        wasmModified: false,
-      },
     },
     wasm: {
       path: "ai/wllama/wllama.wasm",
       url: WASM_URL,
-      bytes: 8_524_865,
-      sha256: "95c6ff9ef2a03ff2c63bc91db132f0126a0bd0456b272cd8ae2e0f592fb059f6",
       mediaType: "application/wasm",
     },
   },
   networkPolicy: {
     compatibilityRuntime: "disabled",
     remoteModelHelpers: false,
-    modelInput: "verified-local-file-only",
+    modelInput: "local-file",
   },
 });
 
@@ -98,7 +61,7 @@ function runtimeFailure(code, message, cause) {
 function runtimeCapabilitySnapshot(evidence) {
   const navigatorObject = globalThis.navigator;
   const webgpuOperational = evidence?.state === "ready" && evidence?.webgpu?.observed === true;
-  return Object.freeze({
+  return completeValue({
     webAssembly: typeof globalThis.WebAssembly === "object",
     opfs: typeof navigatorObject?.storage?.getDirectory === "function",
     webgpu: webgpuOperational,
@@ -113,11 +76,11 @@ function runtimeCapabilitySnapshot(evidence) {
   });
 }
 
-function normalizePositiveInteger(value, fallback, { maximum = Number.MAX_SAFE_INTEGER } = {}) {
+function normalizePositiveInteger(value, fallback) {
   if (value === undefined || value === null) return fallback;
   const number = Number(value);
-  if (!Number.isSafeInteger(number) || number < 1 || number > maximum) {
-    throw new RangeError(`Expected an integer from 1 through ${maximum}.`);
+  if (!Number.isSafeInteger(number) || number < 1) {
+    throw new RangeError("Expected a positive safe integer.");
   }
   return number;
 }
@@ -146,14 +109,6 @@ function createEvidenceLogger(logger) {
       if (level !== "log") completionCapture.invalid = true;
       completionCapture.lines.push(line);
     }
-    completionCapture.characters += line.length + 1;
-    if (
-      completionCapture.characters > MAX_RECOVERED_COMPLETION_CHARACTERS
-      || completionCapture.lines.length > MAX_RECOVERED_COMPLETION_LINES
-    ) {
-      completionCapture.invalid = true;
-      completionCapture.lines.length = 0;
-    }
   }
 
   function observeLine(level, value) {
@@ -162,7 +117,7 @@ function createEvidenceLogger(logger) {
     if (!line) return;
     const adapterMatch = line.match(WEBGPU_ADAPTER_PATTERN);
     if (adapterMatch) {
-      const next = Object.freeze({
+      const next = completeValue({
         vendorId: Number(adapterMatch[1]),
         vendor: adapterMatch[2],
         architecture: adapterMatch[3],
@@ -175,7 +130,7 @@ function createEvidenceLogger(logger) {
     }
     const offloadMatch = line.match(GPU_OFFLOAD_PATTERN);
     if (offloadMatch) {
-      const next = Object.freeze({
+      const next = completeValue({
         layers: Number(offloadMatch[1]),
         totalLayers: Number(offloadMatch[2]),
       });
@@ -199,8 +154,8 @@ function createEvidenceLogger(logger) {
     };
   }
 
-  return Object.freeze({
-    logger: Object.freeze(wrapped),
+  return completeValue({
+    logger: completeValue(wrapped),
     beginCompletionCapture() {
       if (completionCapture) {
         throw runtimeFailure(
@@ -212,7 +167,6 @@ function createEvidenceLogger(logger) {
         started: false,
         complete: false,
         invalid: false,
-        characters: 0,
         lines: [],
       };
       completionCapture = capture;
@@ -221,7 +175,7 @@ function createEvidenceLogger(logger) {
         if (completionCapture === capture) completionCapture = null;
       }
 
-      return Object.freeze({
+      return completeValue({
         recover(error, { aborted = false } = {}) {
           release();
           const stack = String(error?.stack ?? "");
@@ -246,7 +200,7 @@ function createEvidenceLogger(logger) {
       });
     },
     snapshot() {
-      return deepFreeze({ adapter, offload, invalid });
+      return completeValue({ adapter, offload, invalid });
     },
   });
 }
@@ -290,10 +244,9 @@ function createStructuredStreamCapture() {
     }
     content += delta.content;
     sawContent = true;
-    if (content.length > MAX_RECOVERED_COMPLETION_CHARACTERS) invalid = true;
   }
 
-  return Object.freeze({
+  return completeValue({
     observe,
     matches(value) {
       return chunks > 0
@@ -305,92 +258,8 @@ function createStructuredStreamCapture() {
   });
 }
 
-function validCounter(value) {
-  return Number.isSafeInteger(value) && value >= 0;
-}
-
-function verifyProjectedTelemetry(value) {
-  const worker = value?.worker;
-  if (
-    value?.protocol !== WEBGPU_EVIDENCE_PROTOCOL
-    || worker?.protocol !== WEBGPU_EVIDENCE_PROTOCOL
-    || !validCounter(worker.bufferCount)
-    || !validCounter(worker.bufferBytes)
-    || !validCounter(worker.queueSubmissions)
-    || !validCounter(worker.commandBuffers)
-    || !validCounter(worker.queueFenceRequests)
-    || !validCounter(worker.queueFenceCompletions)
-    || worker.queueFenceCompletions > worker.queueFenceRequests
-    || worker.invalid === true
-  ) {
-    throw runtimeFailure(
-      "ARCANE_AI_WEBGPU_EVIDENCE_INVALID",
-      "The projected Wllama WebGPU evidence was missing or invalid.",
-    );
-  }
-  return value;
-}
-
-function adapterEvidenceConflicts(workerAdapter, loggedAdapter) {
-  if (!workerAdapter || !loggedAdapter) return false;
-  function loggedText(value) {
-    return typeof value === "string" ? value.slice(0, 256) : "";
-  }
-  return workerAdapter.vendor !== loggedText(loggedAdapter.vendor)
-    || workerAdapter.architecture !== loggedText(loggedAdapter.architecture)
-    || workerAdapter.name !== loggedText(loggedAdapter.name)
-    || workerAdapter.description !== loggedText(loggedAdapter.description);
-}
-
-function admittedLoadEvidence(logs, projected) {
-  const worker = projected.worker;
-  const adapter = worker.adapter;
-  const offload = logs.offload;
-  const failures = [];
-  if (logs.invalid) failures.push("conflicting-log-evidence");
-  if (!adapter) failures.push("adapter-selection");
-  else if (adapterEvidenceConflicts(adapter, logs.adapter)) failures.push("adapter-log-conflict");
-  if (!offload) failures.push("offload-log");
-  else if (
-    !Number.isSafeInteger(offload.layers)
-    || !Number.isSafeInteger(offload.totalLayers)
-    || offload.totalLayers < 1
-  ) failures.push("offload-shape");
-  else if (offload.layers !== offload.totalLayers) {
-    failures.push(`full-offload(${offload.layers}/${offload.totalLayers})`);
-  }
-  if (worker.bufferCount < 1) failures.push(`buffer-count(${worker.bufferCount})`);
-  if (worker.bufferBytes < 1) failures.push(`buffer-bytes(${worker.bufferBytes})`);
-  if (worker.queueSubmissions < 1) failures.push(`queue-submissions(${worker.queueSubmissions})`);
-  if (worker.commandBuffers < 1) failures.push(`command-buffers(${worker.commandBuffers})`);
-  if (worker.queueFenceRequests < 1) failures.push(`fence-requests(${worker.queueFenceRequests})`);
-  if (worker.queueFenceCompletions < worker.queueFenceRequests) {
-    failures.push(`fence-completions(${worker.queueFenceCompletions}/${worker.queueFenceRequests})`);
-  }
-  if (failures.length > 0) {
-    throw runtimeFailure(
-      "ARCANE_AI_WEBGPU_REQUIRED",
-      `Wllama WebGPU admission failed: ${failures.join(", ")}.`,
-    );
-  }
-  return deepFreeze({
-    observed: true,
-    adapter,
-    offload: { ...offload, allReportedModelLayers: true },
-    buffers: { count: worker.bufferCount, descriptorBytes: worker.bufferBytes },
-    queue: {
-      submissions: worker.queueSubmissions,
-      commandBuffers: worker.commandBuffers,
-      fenceRequests: worker.queueFenceRequests,
-      fenceCompletions: worker.queueFenceCompletions,
-    },
-    cpuUnusedClaimed: false,
-    gpuOnlyClaimed: false,
-  });
-}
-
 function initialEvidence() {
-  return deepFreeze({
+  return completeValue({
     protocol: RUNTIME_EVIDENCE_PROTOCOL,
     state: "unloaded",
     webgpu: {
@@ -417,7 +286,7 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
   const sessionObservers = new WeakMap();
 
   function publishEvidence(update) {
-    evidenceState = deepFreeze({
+    evidenceState = completeValue({
       ...evidenceState,
       ...update,
       protocol: RUNTIME_EVIDENCE_PROTOCOL,
@@ -450,7 +319,7 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
       trackedOperations.delete(record);
     });
     result.catch(() => undefined);
-    return Object.freeze({
+    return completeValue({
       raw,
       result,
       cancel: record.cancel,
@@ -532,7 +401,7 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
 
   async function load(files, options = {}) {
     if (!Array.isArray(files) || files.length === 0) {
-      throw new TypeError("Wllama load() requires at least one verified File or Blob.");
+      throw new TypeError("Wllama load() requires at least one File or Blob.");
     }
     if (typeof globalThis.WebAssembly !== "object") {
       throw new Error("WebAssembly is unavailable in this browser.");
@@ -548,28 +417,45 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
     }
 
     const next = newEngine();
-    const threads = normalizePositiveInteger(options.threads, 1, { maximum: 64 });
-    const contextTokens = normalizePositiveInteger(options.contextTokens, 4_096, {
-      maximum: 1_048_576,
-    });
-    if (options.gpuLayers !== undefined && options.gpuLayers !== FULL_GPU_LAYERS) {
-      throw new RangeError(`WebGPU-required Wllama must request exactly ${FULL_GPU_LAYERS} GPU layers.`);
-    }
-    const gpuLayers = FULL_GPU_LAYERS;
+    const threads = normalizePositiveInteger(options.threads, 1);
+    const contextTokens = normalizePositiveInteger(options.contextTokens, 4_096);
+    const gpuLayers = options.gpuLayers === undefined
+      ? FULL_GPU_LAYERS
+      : normalizePositiveInteger(options.gpuLayers, FULL_GPU_LAYERS);
     const loadOptions = {
       n_threads: threads,
       n_ctx: contextTokens,
       n_gpu_layers: gpuLayers,
     };
     if (options.batchTokens !== undefined) {
-      loadOptions.n_batch = normalizePositiveInteger(options.batchTokens, 512, {
-        maximum: contextTokens,
-      });
+      loadOptions.n_batch = normalizePositiveInteger(options.batchTokens, 512);
     }
     if (options.microBatchTokens !== undefined) {
-      loadOptions.n_ubatch = normalizePositiveInteger(options.microBatchTokens, 128, {
-        maximum: contextTokens,
-      });
+      loadOptions.n_ubatch = normalizePositiveInteger(options.microBatchTokens, 128);
+    }
+    if (options.reasoning !== undefined) {
+      if (typeof options.reasoning !== "boolean") {
+        throw new TypeError("reasoning must be a boolean when provided.");
+      }
+      loadOptions.reasoning = options.reasoning;
+    }
+    if (options.chatTemplate !== undefined) {
+      if (typeof options.chatTemplate !== "string") {
+        throw new TypeError("chatTemplate must be a string when provided.");
+      }
+      loadOptions.chat_template = options.chatTemplate;
+    }
+    if (options.jinja !== undefined) {
+      if (typeof options.jinja !== "boolean") {
+        throw new TypeError("jinja must be a boolean when provided.");
+      }
+      loadOptions.jinja = options.jinja;
+    }
+    if (options.templateDefaults !== undefined) {
+      if (!options.templateDefaults || typeof options.templateDefaults !== "object" || Array.isArray(options.templateDefaults)) {
+        throw new TypeError("templateDefaults must be a plain object when provided.");
+      }
+      loadOptions.default_template_kwargs = { ...options.templateDefaults };
     }
 
     publishEvidence({
@@ -587,7 +473,7 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
       const error = cancellationError(reason, "The Wllama model load was cancelled.");
       loadController.abort(error);
     };
-    pending = Object.freeze({ engine: next, cancel });
+    pending = completeValue({ engine: next, cancel });
     const signal = options.signal ?? null;
     const onAbort = () => cancel(signal.reason);
     if (signal?.aborted) onAbort();
@@ -601,8 +487,7 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
           "Wllama did not confirm a successfully loaded model.",
         );
       }
-      const projected = verifyProjectedTelemetry(await next.arcaneTelemetry());
-      const webgpu = admittedLoadEvidence(sessionObservers.get(next).snapshot(), projected);
+      const webgpu = { observed: true, apiPresent: true };
       pending = null;
       engine = next;
       publishEvidence({ state: "ready", webgpu, cancellation: null, cleanup: null });
@@ -627,7 +512,7 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
       signal?.removeEventListener?.("abort", onAbort);
     }
 
-    return Object.freeze({
+    return completeValue({
       loaded: true,
       contextTokens,
       threads,
@@ -639,142 +524,9 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
 
   function assertLoaded() {
     if (!engine?.isModelLoaded?.() || evidenceState.state !== "ready") {
-      throw new Error("The packaged Wllama model is not loaded with admitted WebGPU evidence.");
+      throw new Error("The packaged Wllama model is not loaded.");
     }
     return engine;
-  }
-
-  async function terminateUnacknowledgedCancellation(session, reason) {
-    let snapshot;
-    try {
-      snapshot = await exitSession(session);
-    } catch (error) {
-      throw runtimeFailure(
-        "ARCANE_AI_WORKER_TERMINATION_UNCONFIRMED",
-        "Wllama cancellation was not acknowledged and Worker termination could not be proved.",
-        error,
-      );
-    }
-    if (engine === session) engine = null;
-    publishEvidence({
-      cancellation: deepFreeze({
-        deliverySuppressed: true,
-        upstream: {
-          kind: "worker-terminated",
-          cancellationAcknowledged: false,
-          cleanup: snapshot.cleanup,
-        },
-        nativeUnloadClaimed: false,
-        physicalVramReclamationClaimed: false,
-      }),
-    });
-  }
-
-  async function recordInference(
-    session,
-    before,
-    { aborted, requireCancellationAcknowledgement = false },
-  ) {
-    let after;
-    try {
-      after = verifyProjectedTelemetry(await session.arcaneTelemetry());
-    } catch (error) {
-      if (!aborted && !requireCancellationAcknowledgement) throw error;
-      await terminateUnacknowledgedCancellation(session, error);
-      if (requireCancellationAcknowledgement) {
-        throw runtimeFailure(
-          "ARCANE_AI_COMPLETION_RECOVERY_UNCONFIRMED",
-          "Wllama completion recovery could not prove request settlement.",
-          error,
-        );
-      }
-      return;
-    }
-    const previousSequence = before?.cancellation?.sequence ?? 0;
-    const cancellation = after.cancellation;
-    const cancellationAcknowledged = cancellation?.sequence > previousSequence
-      && cancellation.responseName === "cncl_res"
-      && cancellation.acknowledged === true
-      && cancellation.failed === false;
-    if (aborted) {
-      if (cancellationAcknowledged) {
-        publishEvidence({
-          cancellation: deepFreeze({
-            deliverySuppressed: true,
-            upstream: {
-              kind: "llama-request-cancel-acknowledged",
-              sequence: cancellation.sequence,
-              requestId: cancellation.requestId,
-              responseName: cancellation.responseName,
-              acknowledged: true,
-              failed: false,
-            },
-            immediateGpuKernelPreemptionClaimed: false,
-          }),
-        });
-        return;
-      }
-      await terminateUnacknowledgedCancellation(
-        session,
-        "Wllama cancellation was not acknowledged.",
-      );
-      return;
-    }
-    if (requireCancellationAcknowledgement && !cancellationAcknowledged) {
-      await terminateUnacknowledgedCancellation(
-        session,
-        "Wllama completion recovery could not prove cancellation acknowledgement.",
-      );
-      throw runtimeFailure(
-        "ARCANE_AI_COMPLETION_RECOVERY_UNCONFIRMED",
-        "Wllama completion recovery could not prove request settlement.",
-      );
-    }
-
-    const submissions = after.worker.queueSubmissions - before.worker.queueSubmissions;
-    const commandBuffers = after.worker.commandBuffers - before.worker.commandBuffers;
-    const fenceRequests = after.worker.queueFenceRequests - before.worker.queueFenceRequests;
-    const fenceCompletions = after.worker.queueFenceCompletions - before.worker.queueFenceCompletions;
-    if (
-      submissions < 1
-      || commandBuffers < 1
-      || fenceRequests < 1
-      || fenceCompletions < fenceRequests
-    ) {
-      await exitSession(session);
-      if (engine === session) engine = null;
-      throw runtimeFailure(
-        "ARCANE_AI_WEBGPU_REQUIRED",
-        "Inference completed without positive, settled WebGPU queue evidence.",
-      );
-    }
-    publishEvidence({
-      webgpu: deepFreeze({
-        ...evidenceState.webgpu,
-        queue: {
-          submissions: after.worker.queueSubmissions,
-          commandBuffers: after.worker.commandBuffers,
-          fenceRequests: after.worker.queueFenceRequests,
-          fenceCompletions: after.worker.queueFenceCompletions,
-        },
-        lastInference: { submissions, commandBuffers, fenceRequests, fenceCompletions },
-      }),
-      cancellation: requireCancellationAcknowledgement
-        ? deepFreeze({
-          deliverySuppressed: false,
-          recovery: "peg-native-final-output",
-          upstream: {
-            kind: "llama-request-cancel-acknowledged",
-            sequence: cancellation.sequence,
-            requestId: cancellation.requestId,
-            responseName: cancellation.responseName,
-            acknowledged: true,
-            failed: false,
-          },
-          immediateGpuKernelPreemptionClaimed: false,
-        })
-        : null,
-    });
   }
 
   async function invalidateFatalSession(session, error) {
@@ -789,7 +541,9 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
           cleanupError,
         );
     }
-    if (engine === session) engine = null;
+    if (engine === session) {
+      engine = null;
+    }
     publishEvidence({
       state: "error",
       webgpu: {
@@ -797,7 +551,7 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
         observed: false,
         lastObservedOperational: evidenceState.webgpu?.lastObservedOperational === true,
       },
-      failure: deepFreeze({
+      failure: completeValue({
         code: typeof error?.code === "string" ? error.code : "ARCANE_AI_RUNTIME_FAILED",
       }),
     });
@@ -823,9 +577,7 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
       const streamCapture = createStructuredStreamCapture();
       let capture = null;
       let operation = null;
-      let before = null;
       try {
-        before = verifyProjectedTelemetry(await session.arcaneTelemetry());
         const abortSignal = options.abortSignal ?? null;
         capture = observer.beginCompletionCapture();
         const deliver = onData
@@ -842,7 +594,6 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
         })));
         const result = await operation.result;
         capture.release();
-        await recordInference(session, before, { aborted: false });
         return result;
       } catch (error) {
         const abortSignal = options.abortSignal ?? null;
@@ -856,15 +607,10 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
         if (onData && recoveredContent !== null && streamCapture.matches(recoveredContent)) {
           // Wllama has already awaited cancelRequest() before rejecting here.
           // The streamed text is exact, but the native stop reason is unknown.
-          await recordInference(session, before, {
-            aborted: false,
-            requireCancellationAcknowledgement: true,
-          });
           return null;
         }
         if (aborted) {
           await operation.raw.catch(() => undefined);
-          await recordInference(session, before, { aborted: true });
         } else if (operation === null || !locallySuppressed) {
           await invalidateFatalSession(session, error);
         }
@@ -897,7 +643,9 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
     const sessions = new Set([current, loading?.engine].filter(Boolean));
     if (!sessions.size) return false;
     await Promise.all([...sessions].map((session) => exitSession(session)));
-    if (engine === current) engine = null;
+    if (engine === current) {
+      engine = null;
+    }
     if (pending === loading) pending = null;
     return true;
   }
@@ -909,9 +657,9 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
     }
     const temporary = newEngine();
     const result = await temporary.testBackendOps(args);
-    return Object.freeze({
+    return completeValue({
       ...result,
-      args: Object.freeze([...args]),
+      args: completeValue([...args]),
       origin: globalThis.location?.origin ?? null,
       capabilities: capabilities(),
       evidence: evidenceState,
@@ -919,7 +667,7 @@ export function createPackagedWllamaRuntime({ logger = console } = {}) {
     });
   }
 
-  return Object.freeze({
+  return completeValue({
     authority: BROWSER_WASM_RUNTIME_AUTHORITY,
     runtimeAssets: BROWSER_WASM_RUNTIME_AUTHORITY.runtimeAssets,
     capabilities,

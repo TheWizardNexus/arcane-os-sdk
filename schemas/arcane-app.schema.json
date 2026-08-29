@@ -13,8 +13,6 @@
     "version",
     "publisher",
     "package",
-    "permissions",
-    "security",
     "native",
     "requirements",
     "targets"
@@ -47,7 +45,6 @@
         "shared": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 64,
           "uniqueItems": true,
           "items": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" }
         },
@@ -69,7 +66,6 @@
     "permissions": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["capabilities", "methods"],
       "properties": {
         "capabilities": {
           "allOf": [
@@ -90,7 +86,6 @@
     "security": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["connectOrigins", "frameOrigins", "mediaOrigins"],
       "properties": {
         "connectOrigins": { "$ref": "#/$defs/connectOriginList" },
         "frameOrigins": { "$ref": "#/$defs/frameOriginList" },
@@ -107,10 +102,9 @@
           "description": "A safe raster image path. Native targets require a non-null value. Coverage by package.include is enforced by the runtime validator because JSON Schema cannot compare property values or path prefixes.",
           "oneOf": [{ "$ref": "#/$defs/rasterIcon" }, { "type": "null" }]
         },
-        "order": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "order": { "type": "integer", "minimum": 0 },
         "bundledApps": {
           "type": "array",
-          "maxItems": 16,
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/appId" }
         },
@@ -123,7 +117,7 @@
             "destination": { "$ref": "#/$defs/relativePath" },
             "originals": { "$ref": "#/$defs/relativePath" },
             "manifest": { "type": "string", "pattern": "^[^/\\\\]+\\.json$" },
-            "expectedCount": { "type": "integer", "minimum": 1, "maximum": 512 }
+            "expectedCount": { "type": "integer", "minimum": 1 }
           },
           "allOf": [
             {
@@ -141,13 +135,12 @@
     "requirements": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["arcaneProtocol", "minimumCoreVersion", "features"],
+      "required": ["arcaneProtocol", "features"],
       "properties": {
         "arcaneProtocol": { "const": "arcane/1" },
         "minimumCoreVersion": { "$ref": "#/$defs/semver" },
         "features": {
           "type": "array",
-          "maxItems": 128,
           "uniqueItems": true,
           "items": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$" }
         }
@@ -156,7 +149,6 @@
     "targets": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 6,
       "uniqueItems": true,
       "items": {
         "enum": ["android-arm64", "browser", "linux-arm64", "linux-x64", "portable", "windows-x64"]
@@ -178,9 +170,12 @@
               "icon": { "$ref": "#/$defs/rasterIcon" }
             },
             "required": ["icon"]
+          },
+          "requirements": {
+            "required": ["minimumCoreVersion"]
           }
         },
-        "required": ["native"]
+        "required": ["native", "requirements"]
       }
     },
     {
@@ -224,8 +219,7 @@
             },
             "required": ["frameOrigins"]
           }
-        },
-        "required": ["security"]
+        }
       }
     }
   ],
@@ -234,13 +228,11 @@
     "presentationText": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 160,
       "pattern": "^(?=.*\\S)[^<>\\u0000-\\u001f\\u007f]+$"
     },
     "description": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 500,
       "pattern": "^(?=.*\\S)[^<>\\u0000-\\u001f\\u007f]+$"
     },
     "semver": {
@@ -256,14 +248,12 @@
       "allOf": [
         { "$ref": "#/$defs/relativePath" },
         {
-          "maxLength": 160,
           "pattern": "\\.(?:[Ii][Cc][Oo]|[Jj][Pp][Ee]?[Gg]|[Pp][Nn][Gg]|[Ww][Ee][Bb][Pp])$"
         }
       ]
     },
     "pathList": {
       "type": "array",
-      "maxItems": 512,
       "uniqueItems": true,
       "items": { "$ref": "#/$defs/relativePath" }
     },
@@ -272,19 +262,16 @@
     },
     "permissionList": {
       "type": "array",
-      "maxItems": 256,
       "uniqueItems": true,
       "items": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9]*)+$" }
     },
     "methodList": {
       "type": "array",
-      "maxItems": 512,
       "uniqueItems": true,
       "items": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-zA-Z0-9]*)+$" }
     },
     "connectOriginList": {
       "type": "array",
-      "maxItems": 16,
       "uniqueItems": true,
       "items": {
         "type": "string",
@@ -293,13 +280,11 @@
     },
     "httpsOriginList": {
       "type": "array",
-      "maxItems": 16,
       "uniqueItems": true,
       "items": { "type": "string", "pattern": "^https://[^/?#]+$" }
     },
     "frameOriginList": {
       "type": "array",
-      "maxItems": 16,
       "uniqueItems": true,
       "items": { "type": "string", "pattern": "^(?:https:|https://[^/?#]+)$" }
     },
@@ -311,14 +296,13 @@
         "verified_only": { "type": "boolean" },
         "models": {
           "type": "array",
-          "maxItems": 64,
           "uniqueItems": true,
           "items": {
             "type": "object",
             "additionalProperties": false,
             "required": ["name", "definition"],
             "properties": {
-              "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+              "name": { "type": "string", "minLength": 1 },
               "definition": { "$ref": "#/$defs/relativePath" }
             }
           }

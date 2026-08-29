@@ -52,7 +52,7 @@ function definition(name,optionsOrCallback,maybeCallback){
     if(typeof callback!=='function'){
         throw new TypeError(`Test "${name}" requires a callback function.`);
     }
-    return Object.freeze({name,timeoutMs:testTimeout(options),callback});
+    return {name,timeoutMs:testTimeout(options),callback};
 }
 
 export function test(name,optionsOrCallback,maybeCallback){

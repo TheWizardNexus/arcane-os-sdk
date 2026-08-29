@@ -45,7 +45,7 @@ const FLAG_OPTIONS=new Set([
 const REPORTABLE_COMMANDS=new Set([
     'build','bundle','check','dev','doctor','help','import-map','init','mail',
     'native-doctor','native-prepare','new','package','repo','run','targets','test',
-    'update-check','verify','verify-bundle','version'
+    'update-check','upgrade','verify','verify-bundle','version'
 ]);
 
 export const HELP_TEXT=`Arcane OS application SDK ${SDK_VERSION}
@@ -53,6 +53,7 @@ export const HELP_TEXT=`Arcane OS application SDK ${SDK_VERSION}
 Usage:
   ${CLI_NAME} new <id> [--path <directory>] [--display-name <name>] [--target <target>] [--git]
   ${CLI_NAME} init [id] [--workspace <directory>] [--display-name <name>] [--target <target>]
+  ${CLI_NAME} upgrade [--workspace <directory>] [--app <id>]
   ${CLI_NAME} doctor [--workspace <directory>] [--arcane-root <directory>]
   ${CLI_NAME} import-map [--workspace <directory>] [--app <id>]
   ${CLI_NAME} dev [--app <id>] [--host 127.0.0.1] [--port 8000] [--sdk-runtime-source <sdk-root>]
@@ -187,13 +188,10 @@ function readRequestTimeout(value,defaultValue){
     return timeout;
 }
 
-const MAX_MAIL_SECRET_BYTES=8_192;
-const MAX_MAIL_REPORT_BYTES=52*1024*1024;
-
 function normalizedSecret(value){
     const secret=String(value??'').trim();
-    if(!secret||Buffer.byteLength(secret,'utf8')>MAX_MAIL_SECRET_BYTES){
-        usage(`Mail credential input must contain 1-${MAX_MAIL_SECRET_BYTES} UTF-8 bytes.`);
+    if(!secret){
+        usage('Mail credential input must not be empty.');
     }
     return secret;
 }
@@ -201,7 +199,6 @@ function normalizedSecret(value){
 function readPipedMailSecret(input,signal){
     return new Promise((resolve,reject)=>{
         const chunks=[];
-        let byteLength=0;
         let settled=false;
 
         const cleanup=function cleanupMailSecretRead(){
@@ -217,16 +214,7 @@ function readPipedMailSecret(input,signal){
             callback(value);
         };
         const onData=function collectMailSecretChunk(chunk){
-            const bytes=Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk);
-            byteLength+=bytes.byteLength;
-            if(byteLength>MAX_MAIL_SECRET_BYTES+2){
-                finish(reject,new ArcaneError(
-                    ERROR_CODES.usage,
-                    `Mail credential input cannot exceed ${MAX_MAIL_SECRET_BYTES} UTF-8 bytes.`
-                ));
-                return;
-            }
-            chunks.push(bytes);
+            chunks.push(Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk));
         };
         const onEnd=function finishPipedMailSecret(){
             try{
@@ -310,10 +298,7 @@ function readMaskedMailSecret(input,output,signal,label,stdinOption){
                     continue;
                 }
                 if(character>=' '&&character!=='\u007f'){
-                    const candidate=secret+character;
-                    if(Buffer.byteLength(candidate,'utf8')<=MAX_MAIL_SECRET_BYTES){
-                        secret=candidate;
-                    }
+                    secret+=character;
                 }
             }
         };
@@ -340,7 +325,6 @@ export function readMailSecretInput({input=process.stdin,output=process.stderr,
 function readPipedMailReport(input,signal){
     return new Promise((resolve,reject)=>{
         const chunks=[];
-        let byteLength=0;
         let settled=false;
 
         const cleanup=function cleanupMailReportRead(){
@@ -356,16 +340,7 @@ function readPipedMailReport(input,signal){
             callback(value);
         };
         const onData=function collectMailReportChunk(chunk){
-            const bytes=Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk);
-            byteLength+=bytes.byteLength;
-            if(byteLength>MAX_MAIL_REPORT_BYTES){
-                finish(reject,new ArcaneError(
-                    ERROR_CODES.usage,
-                    `Mail report input cannot exceed ${MAX_MAIL_REPORT_BYTES} UTF-8 bytes.`
-                ));
-                return;
-            }
-            chunks.push(bytes);
+            chunks.push(Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk));
         };
         const onEnd=function finishPipedMailReport(){
             try{
@@ -468,6 +443,9 @@ function operationOptions(command,parsed,cwd){
     if(flags.has('overwrite')&&command!=='bundle'){
         usage('--overwrite is supported only by bundle.');
     }
+    if(flags.has('skip-tests')&&command!=='check'){
+        usage('--skip-tests is supported only by check.');
+    }
     const mailOnlyOptions=['profile','from','origin','allow-to','report-key','request-timeout'];
     if(command!=='mail'&&mailOnlyOptions.some(name=>values[name]!==undefined)){
         usage(`Mail options are supported only by the mail command.`);
@@ -512,6 +490,10 @@ function operationOptions(command,parsed,cwd){
         };
     }
     if(command==='import-map'){
+        noExtraPositionals(command,positionals);
+        return common;
+    }
+    if(command==='upgrade'){
         noExtraPositionals(command,positionals);
         return common;
     }
@@ -719,28 +701,28 @@ function operationOptions(command,parsed,cwd){
     usage(`Unknown command. Run ${CLI_NAME} --help for usage.`);
 }
 
-const NATIVE_REQUESTS=Object.freeze({
-    'windows-x64':Object.freeze({
+const NATIVE_REQUESTS={
+    'windows-x64':{
         platform:'windows',architecture:'x64',defaultFormat:'exe',formats:new Set(['exe']),
         defaultSigning:'unsigned-local-test',defaultProfileId:null,
         signingModes:new Set(['unsigned-local-test'])
-    }),
-    'linux-x64':Object.freeze({
+    },
+    'linux-x64':{
         platform:'linux',architecture:'x64',defaultFormat:'deb',formats:new Set(['deb']),
         defaultSigning:'unsigned-local-test',defaultProfileId:null,
         signingModes:new Set(['unsigned-local-test'])
-    }),
-    'linux-arm64':Object.freeze({
+    },
+    'linux-arm64':{
         platform:'linux',architecture:'arm64',defaultFormat:'deb',formats:new Set(['deb']),
         defaultSigning:'unsigned-local-test',defaultProfileId:null,
         signingModes:new Set(['unsigned-local-test'])
-    }),
-    'android-arm64':Object.freeze({
+    },
+    'android-arm64':{
         platform:'android',architecture:'arm64',defaultFormat:'apk',formats:new Set(['apk']),
         defaultSigning:'development',defaultProfileId:'arcane-android-development-v1',
         signingModes:new Set(['development'])
-    })
-});
+    }
+};
 
 function portableRequestDefinition(){
     const platform=process.platform==='win32'?'windows':process.platform;
@@ -781,13 +763,13 @@ export function createNativeTargetRequest({target,format,signing}={}){
             +`Expected ${[...definition.signingModes].join(', ')}.`
         );
     }
-    return Object.freeze({
+    return {
         target,
         platform:definition.platform,
         architecture:definition.architecture,
         format:selectedFormat,
-        signing:Object.freeze({mode:signingMode,profileId:definition.defaultProfileId})
-    });
+        signing:{mode:signingMode,profileId:definition.defaultProfileId}
+    };
 }
 
 async function pairNativeProvider(command,options,loadProvider,{signal,onEvent}={}){
@@ -811,7 +793,6 @@ async function pairNativeProvider(command,options,loadProvider,{signal,onEvent}=
     return {
         ...options,
         nativeBuilder:loaded.nativeBuilder,
-        providerGeneration:loaded.providerGeneration,
         toolchainRoot:loaded.toolchainRoot,
         targetRequest
     };

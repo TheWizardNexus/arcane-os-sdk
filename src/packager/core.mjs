@@ -1,220 +1,68 @@
-import {createHash,randomBytes} from 'node:crypto';
-import {constants as FS_CONSTANTS} from 'node:fs';
 import {
+    copyFile,
     lstat,
     mkdir,
-    open,
     readFile,
     readdir,
     realpath,
     rename,
     rm,
-    stat,
     writeFile
 } from 'node:fs/promises';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {setTimeout as delay} from 'node:timers/promises';
-import {isDeepStrictEqual} from 'node:util';
 import {withWorkspaceOperationLock} from '../workspace-operation-lock.mjs';
-import {generateImportMap} from '../import-map.mjs';
-import {authenticateRuntimeReceipt,verifyRuntime} from '../runtime.mjs';
-import {
-    authenticateSdkBrowserRuntimeReceipt,
-    verifySdkBrowserRuntime
-} from '../sdk-browser-runtime.mjs';
-import {
-    authenticateWorkspaceRuntimeReceipt,
-    verifyWorkspaceRuntime
-} from '../workspace-runtime.mjs';
+import {inspectImportMapHtml} from '../import-map.mjs';
 
 export const ROOT_CONFIG_NAME='arcane-packager.json';
 export const APP_CONFIG_NAME='arcane-package.json';
 export const RELEASE_MANIFEST_NAME='ARCANE_APP_RELEASE.json';
 export const PACKAGER_VERSION='arcane-app-packager-v1';
 
-const RUNTIME_AUTHORITIES_NAME='ARCANE_RUNTIME_AUTHORITIES.json';
-const RUNTIME_PROJECTION_NAME='ARCANE_RUNTIME_PROJECTION.json';
-const RUNTIME_PROJECTION_ERROR='ARCANE_RUNTIME_PROJECTION_INVALID';
-const GENERATED_PACKAGE_ROOT_PATH_KEYS=new Set([
-    RELEASE_MANIFEST_NAME,
-    RUNTIME_AUTHORITIES_NAME,
-    RUNTIME_PROJECTION_NAME,
-    'index.html'
-].map(pathKey));
-
-const RENAME_RETRY_CODES=new Set(['EACCES','EBUSY','EPERM']);
-const RENAME_RETRY_LIMIT=20;
-const RENAME_RETRY_DELAY_MS=250;
-const READ_ONLY_NO_FOLLOW=FS_CONSTANTS.O_RDONLY|(FS_CONSTANTS.O_NOFOLLOW??0);
-const MAX_VERIFIED_APP_FILE_BYTES=64*1024*1024;
-const MAX_SHARED_SNAPSHOT_FILE_COUNT=10000;
-const MAX_SHARED_SNAPSHOT_FILE_BYTES=64*1024*1024;
-const MAX_SHARED_SNAPSHOT_TOTAL_BYTES=64*1024*1024;
-const APP_DESCRIPTOR_NAME='arcane-app.json';
-const LEGACY_APP_REGISTRY_PATH=path.join(
-    'machine_bundles',
-    'arcane-os-machine-bundle',
-    'arcane-apps.json'
-);
-const issuedAppReleaseReceipts=new WeakMap();
-const issuedSharedPayloadSnapshots=new WeakMap();
-let appDescriptorContractsPromise;
-
-function fileIdentity(info){
-    return Object.freeze({
-        device:String(info.dev),
-        inode:String(info.ino),
-        bytes:Number(info.size),
-        modifiedNanoseconds:String(info.mtimeNs),
-        changedNanoseconds:String(info.ctimeNs),
-        links:String(info.nlink)
-    });
-}
-
-function identityMatches(info,identity){
-    return String(info.dev)===identity.device
-        &&String(info.ino)===identity.inode
-        &&Number(info.size)===identity.bytes
-        &&String(info.mtimeNs)===identity.modifiedNanoseconds
-        &&String(info.ctimeNs)===identity.changedNanoseconds
-        &&String(info.nlink)===identity.links;
-}
-
-async function openStableRegularFile(filePath,label,expectedIdentity){
-    const before=await lstat(filePath,{bigint:true});
-    if(before.isSymbolicLink()||!before.isFile()){
-        fail(`${label} must be a regular file, not a link or special entry.`);
-    }
-    if(expectedIdentity&&!identityMatches(before,expectedIdentity)){
-        fail(`${label} changed after its package inventory was selected.`);
-    }
-
-    let handle;
-    try{
-        handle=await open(filePath,READ_ONLY_NO_FOLLOW);
-    }catch(error){
-        if(error?.code==='ELOOP')fail(`${label} became a symbolic link.`);
-        throw error;
-    }
-    try{
-        const opened=await handle.stat({bigint:true});
-        if(!opened.isFile()||!identityMatches(opened,fileIdentity(before))){
-            fail(`${label} changed while it was being opened.`);
-        }
-        return {handle,identity:fileIdentity(opened)};
-    }catch(error){
-        await handle.close().catch(()=>{});
-        throw error;
-    }
-}
-
-async function readStableBytes(filePath,label,expectedIdentity){
-    const opened=await openStableRegularFile(filePath,label,expectedIdentity);
-    try{
-        const bytes=await opened.handle.readFile();
-        const after=await opened.handle.stat({bigint:true});
-        if(!identityMatches(after,opened.identity)){
-            fail(`${label} changed while it was being read.`);
-        }
-        return {bytes,identity:opened.identity};
-    }finally{
-        await opened.handle.close();
-    }
-}
-
-async function renamePackageDirectory(source,destination){
-    for(let attempt=0;;attempt++){
-        try{
-            await rename(source,destination);
-            return;
-        }catch(error){
-            if(!RENAME_RETRY_CODES.has(error?.code)||attempt>=RENAME_RETRY_LIMIT){
-                throw error;
-            }
-
-            await delay(RENAME_RETRY_DELAY_MS);
-        }
-    }
-}
-
-const APP_ID_PATTERN=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
-const SAFE_SHARED_ID_PATTERN=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+const APP_ID_PATTERN=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/u;
+const SAFE_SHARED_ID_PATTERN=APP_ID_PATTERN;
 const WINDOWS_RESERVED_NAME=
     /^(?:con|prn|aux|nul|clock\$|conin\$|conout\$|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$/iu;
-const FORBIDDEN_SEGMENTS=new Set([
-    '.agents',
-    '.codex',
-    '.git',
-    'dist',
-    'local'
-]);
-const TEXT_CONTROL_PATTERN=/[\x00-\x1f\x7f]/;
 const WINDOWS_UNSAFE_FILENAME_CHARACTER_PATTERN=/[<>"|?*]/u;
-const OLLAMA_MODEL_IDENTIFIER=
-    /^[A-Za-z0-9][A-Za-z0-9._/-]{0,191}(?::[A-Za-z0-9][A-Za-z0-9._-]{0,63})?$/;
-const MODEL_DEFINITION_PATTERN=/^(?:Modelfile|[A-Za-z0-9][A-Za-z0-9._-]{0,118}\.Modelfile)$/;
-const MAX_LOCAL_AI_MODELS=64;
-const MAX_MODEL_DEFINITION_BYTES=512*1024;
-const SHA256_PATTERN=/^[a-f0-9]{64}$/u;
+const TEXT_CONTROL_PATTERN=/[\x00-\x1f\x7f]/u;
+const FORBIDDEN_SEGMENTS=new Set(['.agents','.codex','.git','dist','local']);
+const APP_DESCRIPTOR_NAME='arcane-app.json';
 
-function fail(message,code){
+function fail(message,code='ARCANE_PACKAGE_INVALID'){
     const error=new Error(message);
-    if(code)error.code=code;
+    error.code=code;
     throw error;
 }
 
 function throwIfAborted(signal){
-    if(!signal?.aborted){
-        return;
-    }
-
-    const error=signal.reason instanceof Error
-        ?signal.reason
-        :new Error('Arcane package operation cancelled.');
-    if(!error.code){
-        error.code='ARCANE_CANCELLED';
-    }
+    if(!signal?.aborted)return;
+    const error=signal.reason instanceof Error?signal.reason:new Error('Arcane package operation cancelled.');
+    error.code=error.code||'ARCANE_CANCELLED';
     throw error;
 }
 
-async function emitOperation(onEvent,event){
-    if(typeof onEvent==='function'){
-        await onEvent(event);
-    }
-}
-
-function isPlainObject(value){
-    return value!==null
-        &&typeof value==='object'
-        &&Object.getPrototypeOf(value)===Object.prototype;
-}
-
-function immutableJsonCopy(value){
-    if(Array.isArray(value)){
-        return Object.freeze(value.map(item=>immutableJsonCopy(item)));
-    }
-    if(isPlainObject(value)){
-        return Object.freeze(Object.fromEntries(
-            Object.entries(value).map(([key,item])=>[key,immutableJsonCopy(item)])
-        ));
-    }
-    return value;
+async function emit(onEvent,event){
+    if(typeof onEvent==='function')await onEvent(event);
 }
 
 function compareText(left,right){
-    return Buffer.compare(Buffer.from(String(left),'utf8'),Buffer.from(String(right),'utf8'));
+    const a=String(left);
+    const b=String(right);
+    return a<b?-1:a>b?1:0;
+}
+
+function isPlainObject(value){
+    return value!==null&&typeof value==='object'&&!Array.isArray(value);
+}
+
+function copyJson(value){
+    return value===undefined?undefined:JSON.parse(JSON.stringify(value));
 }
 
 function assertOnlyKeys(value,allowed,label){
-    if(!isPlainObject(value)){
-        fail(`${label} must be a JSON object.`);
-    }
-
+    if(!isPlainObject(value))fail(`${label} must be a JSON object.`);
     for(const key of Object.keys(value)){
-        if(!allowed.has(key)){
-            fail(`${label} has an unsupported key: ${key}`);
-        }
+        if(!allowed.has(key))fail(`${label} has an unsupported key: ${key}`);
     }
 }
 
@@ -222,7 +70,6 @@ function normalizeWorkspaceRoot(workspaceRoot){
     if(typeof workspaceRoot!=='string'||!workspaceRoot.trim()){
         fail('workspaceRoot must be a directory path.');
     }
-
     return path.resolve(workspaceRoot);
 }
 
@@ -230,13 +77,8 @@ export function normalizeRelativePath(value,label='path'){
     if(typeof value!=='string'||!value||value.includes('\\')||TEXT_CONTROL_PATTERN.test(value)){
         fail(`Unsafe ${label}: ${String(value)}`);
     }
-
-    if(path.posix.isAbsolute(value)||/^[a-z]:/i.test(value)){
-        fail(`Unsafe ${label}: ${value}`);
-    }
-
+    if(path.posix.isAbsolute(value)||/^[a-z]:/iu.test(value))fail(`Unsafe ${label}: ${value}`);
     const segments=value.split('/');
-
     for(const segment of segments){
         if(!segment||segment==='.'||segment==='..'||segment.includes(':')
             ||WINDOWS_UNSAFE_FILENAME_CHARACTER_PATTERN.test(segment)
@@ -245,92 +87,59 @@ export function normalizeRelativePath(value,label='path'){
             fail(`Unsafe ${label}: ${value}`);
         }
     }
-
     return segments.join('/');
 }
 
 function normalizeRelativeRoot(value,label){
-    if(value==='.'){
-        return '.';
-    }
-
-    return normalizeRelativePath(value,label);
-}
-
-function isInside(root,candidate,{allowEqual=false}={}){
-    const relative=path.relative(path.resolve(root),path.resolve(candidate));
-    return (allowEqual&&relative==='')
-        ||Boolean(relative&&!relative.startsWith('..')&&!path.isAbsolute(relative));
-}
-
-function resolveInside(root,relative,label,{allowRoot=false}={}){
-    const normalized=relative==='.'&&allowRoot
-        ?'.'
-        :normalizeRelativePath(relative,label);
-    const candidate=path.resolve(root,...(normalized==='.'?[]:normalized.split('/')));
-
-    if(!isInside(root,candidate,{allowEqual:allowRoot})){
-        fail(`${label} leaves its allowed root: ${relative}`);
-    }
-
-    return candidate;
+    return value==='.'?'.':normalizeRelativePath(value,label);
 }
 
 function pathKey(relative){
     return relative.toLocaleLowerCase('en-US');
 }
 
-function pathIsSameOrDescendant(candidate,parent){
-    const candidateKey=pathKey(candidate);
-    const parentKey=pathKey(parent);
-    return candidateKey===parentKey||candidateKey.startsWith(`${parentKey}/`);
+function sameOrDescendant(candidate,parent){
+    const selected=pathKey(candidate);
+    const root=pathKey(parent);
+    return selected===root||selected.startsWith(`${root}/`);
+}
+
+function resolveInside(root,relative,label,{allowRoot=false}={}){
+    const normalized=relative==='.'&&allowRoot?'.':normalizeRelativePath(relative,label);
+    const candidate=path.resolve(root,...(normalized==='.'?[]:normalized.split('/')));
+    const fromRoot=path.relative(path.resolve(root),candidate);
+    if((!allowRoot&&fromRoot==='')||fromRoot.startsWith('..')||path.isAbsolute(fromRoot)){
+        fail(`${label} leaves its allowed root: ${relative}`);
+    }
+    return candidate;
 }
 
 function isGlobLike(value){
-    return /[*?\[\]{}]/.test(value);
+    return /[*?\[\]{}]/u.test(value);
 }
 
 function validatePathList(value,label,{required=false}={}){
     if(!Array.isArray(value)||(required&&value.length===0)){
         fail(`${label} must be ${required?'a non-empty':'an'} array of literal relative paths.`);
     }
-
-    if(value.length>512){
-        fail(`${label} is unreasonably large.`);
-    }
-
     const normalized=value.map((entry,index)=>{
         const item=normalizeRelativePath(entry,`${label}[${index}]`);
-
-        if(isGlobLike(item)){
-            fail(`${label}[${index}] must be literal; directories already include descendants.`);
-        }
-
+        if(isGlobLike(item))fail(`${label}[${index}] must be literal; directories include descendants.`);
         return item;
     });
-    const keys=new Set();
-
-    for(const item of normalized){
-        const key=pathKey(item);
-
-        if(keys.has(key)){
-            fail(`${label} contains a duplicate path: ${item}`);
-        }
-
-        keys.add(key);
+    if(new Set(normalized.map(pathKey)).size!==normalized.length){
+        fail(`${label} contains duplicate paths.`);
     }
-
     if(required){
-        for(let left=0;left<normalized.length;left++){
-            for(let right=left+1;right<normalized.length;right++){
-                if(pathIsSameOrDescendant(normalized[left],normalized[right])
-                    ||pathIsSameOrDescendant(normalized[right],normalized[left])){
+        for(let left=0;left<normalized.length;left+=1){
+            for(let right=left+1;right<normalized.length;right+=1){
+                if(sameOrDescendant(normalized[left],normalized[right])
+                    ||sameOrDescendant(normalized[right],normalized[left])){
                     fail(`${label} has overlapping paths: ${normalized[left]} and ${normalized[right]}`);
                 }
             }
         }
     }
-
     return normalized;
 }
 
@@ -347,163 +156,82 @@ function isAppSourceForbidden(relative){
 }
 
 function isExcluded(relative,excludes){
-    return isAlwaysForbidden(relative)
-        ||excludes.some(excluded=>pathIsSameOrDescendant(relative,excluded));
+    return excludes.some(excluded=>sameOrDescendant(relative,excluded));
 }
 
-function assertSafePresentationText(value,label,maximum=160){
-    if(typeof value!=='string'||!value.trim()||value.length>maximum
-        ||TEXT_CONTROL_PATTERN.test(value)||/[<>]/.test(value)){
-        fail(`${label} must be plain text no longer than ${maximum} characters.`);
+function assertPresentationText(value,label){
+    if(typeof value!=='string'||!value.trim()){
+        fail(`${label} must be nonempty text.`);
     }
-
-    return value.trim();
+    return value;
 }
 
 export function parseSemver(value){
-    if(typeof value!=='string'){
-        fail(`Invalid semantic version: ${String(value)}`);
-    }
-
-    const match=/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(value);
-
-    if(!match){
-        fail(`Invalid semantic version: ${value}`);
-    }
-
+    if(typeof value!=='string')fail(`Invalid semantic version: ${String(value)}`);
+    const match=/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/u.exec(value);
+    if(!match)fail(`Invalid semantic version: ${value}`);
     const prerelease=match[4]?match[4].split('.'):[];
-    const build=match[5]?match[5].split('.'):[];
-
     for(const identifier of prerelease){
-        if(/^\d+$/.test(identifier)&&identifier.length>1&&identifier.startsWith('0')){
+        if(/^\d+$/u.test(identifier)&&identifier.length>1&&identifier.startsWith('0')){
             fail(`Invalid semantic version: ${value}`);
         }
     }
-
     const numbers=match.slice(1,4).map(Number);
-
     if(numbers.some(number=>!Number.isSafeInteger(number))){
         fail(`Semantic version component exceeds JavaScript's safe integer range: ${value}`);
     }
-
     return {
         major:numbers[0],
         minor:numbers[1],
         patch:numbers[2],
         prerelease,
-        build
+        build:match[5]?match[5].split('.'):[]
     };
 }
 
 function formatSemver(version){
     let rendered=`${version.major}.${version.minor}.${version.patch}`;
-
-    if(version.prerelease?.length){
-        rendered+=`-${version.prerelease.join('.')}`;
-    }
-
-    if(version.build?.length){
-        rendered+=`+${version.build.join('.')}`;
-    }
-
+    if(version.prerelease?.length)rendered+=`-${version.prerelease.join('.')}`;
+    if(version.build?.length)rendered+=`+${version.build.join('.')}`;
     return rendered;
 }
 
-function validatePreid(preid){
-    const value=preid??'rc';
-
-    if(typeof value!=='string'||!/^[0-9A-Za-z-]+$/.test(value)
-        ||(/^\d+$/.test(value)&&value.length>1&&value.startsWith('0'))){
-        fail(`Invalid prerelease identifier: ${String(value)}`);
-    }
-
-    return value;
-}
-
-export function incrementSemver(value,bump,preid){
+export function incrementSemver(value,bump,preid='rc'){
     const current=parseSemver(value);
-
     if(!['major','minor','patch','prerelease'].includes(bump)){
         fail(`Unsupported semantic version bump: ${String(bump)}`);
     }
-
-    if(bump==='major'){
-        return formatSemver({major:current.major+1,minor:0,patch:0});
+    if(bump==='major')return formatSemver({major:current.major+1,minor:0,patch:0});
+    if(bump==='minor')return formatSemver({major:current.major,minor:current.minor+1,patch:0});
+    if(bump==='patch')return formatSemver({major:current.major,minor:current.minor,patch:current.patch+1});
+    if(typeof preid!=='string'||!/^[0-9A-Za-z-]+$/u.test(preid)){
+        fail(`Invalid prerelease identifier: ${String(preid)}`);
     }
-
-    if(bump==='minor'){
-        return formatSemver({major:current.major,minor:current.minor+1,patch:0});
-    }
-
-    if(bump==='patch'){
-        return formatSemver({major:current.major,minor:current.minor,patch:current.patch+1});
-    }
-
-    const requestedPreid=validatePreid(preid);
-    const next={
-        major:current.major,
-        minor:current.minor,
-        patch:current.patch,
-        prerelease:[]
-    };
-
-    if(!current.prerelease.length){
-        next.patch+=1;
-        next.prerelease=[requestedPreid,'0'];
+    const next={major:current.major,minor:current.minor,patch:current.patch,prerelease:[]};
+    if(current.prerelease[0]!==preid){
+        if(current.prerelease.length===0)next.patch+=1;
+        next.prerelease=[preid,'0'];
         return formatSemver(next);
     }
-
-    if(current.prerelease[0]!==requestedPreid){
-        next.prerelease=[requestedPreid,'0'];
-        return formatSemver(next);
-    }
-
     next.prerelease=[...current.prerelease];
-    let incremented=false;
-
-    for(let index=next.prerelease.length-1;index>=0;index--){
-        if(/^\d+$/.test(next.prerelease[index])){
-            const number=Number(next.prerelease[index]);
-
-            if(!Number.isSafeInteger(number)||number===Number.MAX_SAFE_INTEGER){
-                fail(`Prerelease number is too large to increment: ${value}`);
-            }
-
-            next.prerelease[index]=String(number+1);
-            incremented=true;
-            break;
-        }
-    }
-
-    if(!incremented){
-        next.prerelease.push('0');
-    }
-
+    const numericIndex=next.prerelease.findLastIndex(identifier=>/^\d+$/u.test(identifier));
+    if(numericIndex<0)next.prerelease.push('0');
+    else next.prerelease[numericIndex]=String(Number(next.prerelease[numericIndex])+1);
     return formatSemver(next);
 }
 
-async function readJsonDocument(filePath,label=filePath,{expectedIdentity}={}){
-    let document;
+async function readJson(filePath,label=filePath){
+    let text;
     try{
-        document=await readStableBytes(filePath,label,expectedIdentity);
+        const info=await lstat(filePath);
+        if(info.isSymbolicLink()||!info.isFile())fail(`${label} must be a real file.`);
+        text=await readFile(filePath,'utf8');
     }catch(error){
         if(error?.code==='ENOENT')fail(`${label} does not exist.`);
         throw error;
     }
-
-    try{
-        return {
-            value:JSON.parse(document.bytes.toString('utf8')),
-            bytes:document.bytes,
-            identity:document.identity
-        };
-    }catch(error){
-        fail(`${label} is not valid JSON: ${error.message}`);
-    }
-}
-
-async function readJson(filePath,label=filePath){
-    return (await readJsonDocument(filePath,label)).value;
+    try{return JSON.parse(text);}
+    catch(error){fail(`${label} is not valid JSON: ${error.message}`);}
 }
 
 function validateSharedRoute(route,label){
@@ -512,3030 +240,558 @@ function validateSharedRoute(route,label){
     const destination=normalizeRelativeRoot(route.destination,`${label}.destination`);
     const include=validatePathList(route.include,`${label}.include`,{required:true});
     const exclude=validatePathList(route.exclude??[],`${label}.exclude`);
-
     if(source==='.'||source==='apps'||source.startsWith('apps/')
-        ||source==='dist'||source.startsWith('dist/')
-        ||source==='node_modules'
+        ||source==='dist'||source.startsWith('dist/')||source==='node_modules'
         ||isAlwaysForbidden(source)){
-        fail(`${label}.source is outside the permitted shared-payload boundary: ${source}`);
+        fail(`${label}.source is outside the shared-payload boundary: ${source}`);
     }
-
     if(destination==='apps'||destination.startsWith('apps/')
-        ||GENERATED_PACKAGE_ROOT_PATH_KEYS.has(pathKey(destination))){
+        ||pathKey(destination)===pathKey(RELEASE_MANIFEST_NAME)){
         fail(`${label}.destination overlaps a reserved package path: ${destination}`);
     }
-
-    return Object.freeze({source,destination,include,exclude});
-}
-
-async function loadRootConfigDocument(workspaceRoot){
-    const configPath=path.join(workspaceRoot,ROOT_CONFIG_NAME);
-    const document=await readJsonDocument(configPath,ROOT_CONFIG_NAME);
-    return {
-        ...document,
-        value:validateRootConfig(document.value,configPath),
-        configPath
-    };
-}
-
-async function loadRootConfig(workspaceRoot){
-    return (await loadRootConfigDocument(workspaceRoot)).value;
+    return {source,destination,include,exclude};
 }
 
 export function validateRootConfig(value,configPath=ROOT_CONFIG_NAME){
     assertOnlyKeys(value,new Set(['schemaVersion','appsRoot','distRoot','sharedPayloads']),ROOT_CONFIG_NAME);
-
-    if(value.schemaVersion!==1){
-        fail(`${ROOT_CONFIG_NAME}.schemaVersion must be 1.`);
-    }
-
+    if(value.schemaVersion!==1)fail(`${ROOT_CONFIG_NAME}.schemaVersion must be 1.`);
     if(value.appsRoot!=='apps'||value.distRoot!=='dist'){
         fail(`${ROOT_CONFIG_NAME} must bind appsRoot to "apps" and distRoot to "dist".`);
     }
-
     if(!isPlainObject(value.sharedPayloads)){
         fail(`${ROOT_CONFIG_NAME}.sharedPayloads must be an object.`);
     }
-
     const sharedPayloads={};
-
     for(const [id,routes] of Object.entries(value.sharedPayloads).sort(([left],[right])=>compareText(left,right))){
-        if(!SAFE_SHARED_ID_PATTERN.test(id)){
-            fail(`Unsafe shared payload id: ${id}`);
-        }
-
+        if(!SAFE_SHARED_ID_PATTERN.test(id))fail(`Unsafe shared payload id: ${id}`);
         if(!Array.isArray(routes)||routes.length===0){
             fail(`sharedPayloads.${id} must be a non-empty array.`);
         }
-
-        sharedPayloads[id]=Object.freeze(routes.map((route,index)=>
+        sharedPayloads[id]=routes.map((route,index)=>
             validateSharedRoute(route,`sharedPayloads.${id}[${index}]`)
-        ));
+        );
     }
+    return {schemaVersion:1,appsRoot:'apps',distRoot:'dist',sharedPayloads,configPath};
+}
 
-    return Object.freeze({
-        schemaVersion:1,
-        appsRoot:'apps',
-        distRoot:'dist',
-        sharedPayloads:Object.freeze(sharedPayloads),
-        configPath
-    });
+function normalizeOptionalRecord(value,label){
+    if(value===undefined)return undefined;
+    if(!isPlainObject(value))fail(`${label} must be an object.`);
+    return copyJson(value);
 }
 
 export function validateAppConfig(value,appId,rootConfig,configPath=`apps/${appId}/${APP_CONFIG_NAME}`){
-    assertOnlyKeys(
-        value,
-        new Set([
-            'schemaVersion',
-            'id',
-            'displayName',
-            'version',
-            'entry',
-            'strategy',
-            'security',
-            'localAIModelPolicy',
-            'include',
-            'exclude',
-            'shared',
-            'adapter'
-        ]),
-        `${appId}/${APP_CONFIG_NAME}`
-    );
-
-    if(value.schemaVersion!==1){
-        fail(`${appId}/${APP_CONFIG_NAME}.schemaVersion must be 1.`);
-    }
-
+    assertOnlyKeys(value,new Set([
+        'schemaVersion','id','displayName','version','entry','strategy','security',
+        'localAIModelPolicy','include','exclude','shared','adapter'
+    ]),`${appId}/${APP_CONFIG_NAME}`);
+    if(value.schemaVersion!==1)fail(`${appId}/${APP_CONFIG_NAME}.schemaVersion must be 1.`);
     if(value.id!==appId||!APP_ID_PATTERN.test(value.id)){
         fail(`${appId}/${APP_CONFIG_NAME}.id must exactly match its apps directory.`);
     }
-
-    const displayName=assertSafePresentationText(
-        value.displayName,
-        `${appId}/${APP_CONFIG_NAME}.displayName`
-    );
+    const displayName=assertPresentationText(value.displayName,`${appId}/${APP_CONFIG_NAME}.displayName`);
     parseSemver(value.version);
     const entry=normalizeRelativePath(value.entry,`${appId}/${APP_CONFIG_NAME}.entry`);
     const include=validatePathList(value.include,`${appId}/${APP_CONFIG_NAME}.include`,{required:true});
     const exclude=validatePathList(value.exclude??[],`${appId}/${APP_CONFIG_NAME}.exclude`);
-
-    if(include.some(allowed=>pathIsSameOrDescendant(APP_CONFIG_NAME,allowed))){
+    if(include.some(allowed=>sameOrDescendant(APP_CONFIG_NAME,allowed))){
         fail(`${appId}/${APP_CONFIG_NAME}.include must not expose the authored package configuration.`);
     }
-
-    const localAIModelPolicy=value.localAIModelPolicy===undefined
-        ?Object.freeze({verified_only:true,models:Object.freeze([])})
-        :validateLocalAIModelPolicy(value.localAIModelPolicy,`${appId}/${APP_CONFIG_NAME}.localAIModelPolicy`);
-    const security=validateAppSecurity(value.security,appId);
-
-    for(const model of localAIModelPolicy.models){
-        if(isAlwaysForbidden(model.definition)||isExcluded(model.definition,exclude)
-            ||!include.some(allowed=>pathIsSameOrDescendant(model.definition,allowed))){
-            fail(`${appId}/${APP_CONFIG_NAME}.localAIModelPolicy model definition is not covered by its public include rules: ${model.definition}`);
-        }
-    }
-
-    if(isAlwaysForbidden(entry)||isExcluded(entry,exclude)
-        ||!include.some(allowed=>pathIsSameOrDescendant(entry,allowed))){
+    if(isAppSourceForbidden(entry)||isExcluded(entry,exclude)
+        ||!include.some(allowed=>sameOrDescendant(entry,allowed))){
         fail(`${appId}/${APP_CONFIG_NAME}.entry is not covered by its public include rules.`);
     }
-
     if(!['static','adapter'].includes(value.strategy)){
         fail(`${appId}/${APP_CONFIG_NAME}.strategy must be "static" or "adapter".`);
     }
-
     if(!Array.isArray(value.shared)||new Set(value.shared).size!==value.shared.length){
         fail(`${appId}/${APP_CONFIG_NAME}.shared must be an array of unique shared payload ids.`);
     }
-
-    for(const [index,sharedId] of value.shared.entries()){
-        if(typeof sharedId!=='string'||!Object.hasOwn(rootConfig.sharedPayloads,sharedId)){
-            fail(`${appId}/${APP_CONFIG_NAME}.shared[${index}] references an unknown shared payload: ${String(sharedId)}`);
+    for(const [index,id] of value.shared.entries()){
+        if(typeof id!=='string'||!Object.hasOwn(rootConfig.sharedPayloads,id)){
+            fail(`${appId}/${APP_CONFIG_NAME}.shared[${index}] references an unknown shared payload.`);
         }
     }
-
-    let adapter=null;
-
+    let adapter;
     if(value.strategy==='adapter'){
         adapter=normalizeRelativePath(value.adapter,`${appId}/${APP_CONFIG_NAME}.adapter`);
-
         if(!adapter.startsWith('scripts/')||path.posix.extname(adapter)!=='.mjs'){
             fail(`${appId}/${APP_CONFIG_NAME}.adapter must be an app-local scripts/*.mjs module.`);
         }
     }else if(value.adapter!==undefined){
         fail(`${appId}/${APP_CONFIG_NAME}.adapter is only valid with strategy "adapter".`);
     }
-
-    return Object.freeze({
+    return {
         schemaVersion:1,
         id:appId,
         displayName,
         version:value.version,
         entry,
         strategy:value.strategy,
-        security,
-        localAIModelPolicy,
-        include:Object.freeze(include),
-        exclude:Object.freeze(exclude),
-        shared:Object.freeze([...value.shared]),
-        adapter,
+        ...(value.security===undefined?{}:{security:normalizeOptionalRecord(
+            value.security,
+            `${appId}/${APP_CONFIG_NAME}.security`
+        )}),
+        ...(value.localAIModelPolicy===undefined?{}:{localAIModelPolicy:normalizeOptionalRecord(
+            value.localAIModelPolicy,
+            `${appId}/${APP_CONFIG_NAME}.localAIModelPolicy`
+        )}),
+        include,
+        exclude,
+        shared:[...value.shared],
+        ...(adapter===undefined?{}:{adapter}),
         configPath
-    });
+    };
 }
 
-function validateOriginList(value,label,{allowLoopbackHttp=false,allowHttpsScheme=false}={}){
-    if(!Array.isArray(value)||value.length>16){
-        fail(`${label} must be an array with at most 16 origins.`);
+async function realDirectory(location,label){
+    const requested=path.resolve(location);
+    let info;
+    try{info=await lstat(requested);}
+    catch(error){
+        if(error?.code==='ENOENT')fail(`${label} does not exist: ${requested}.`);
+        throw error;
     }
-    const origins=value.map((origin,index)=>{
-        if(typeof origin!=='string'||origin!==origin.trim()){
-            fail(`${label}[${index}] is invalid.`);
-        }
-        if(origin==='https:'&&allowHttpsScheme)return origin;
-        let parsed;
-        try{
-            parsed=new URL(origin);
-        }catch{
-            fail(`${label}[${index}] is not a valid URL origin.`);
-        }
-        if(parsed.origin!==origin||parsed.hostname.endsWith('.')||parsed.username||parsed.password
-            ||parsed.pathname!=='/'||parsed.search||parsed.hash){
-            fail(`${label}[${index}] must be a canonical allowed origin.`);
-        }
-        if(parsed.protocol==='http:'){
-            if(!allowLoopbackHttp||!['127.0.0.1','[::1]'].includes(parsed.hostname)){
-                fail(`${label}[${index}] may use HTTP only for a numeric loopback host.`);
-            }
-        }else if(parsed.protocol!=='https:'){
-            fail(`${label}[${index}] must use HTTPS or an approved loopback HTTP origin.`);
-        }
-        return parsed.origin;
-    });
-    if(new Set(origins).size!==origins.length)fail(`${label} must not contain duplicates.`);
-    if(JSON.stringify(origins)!==JSON.stringify([...origins].sort(compareText))){
-        fail(`${label} must be sorted for deterministic projection.`);
+    if(info.isSymbolicLink()||!info.isDirectory())fail(`${label} must be a real directory.`);
+    const canonical=await realpath(requested);
+    const canonicalInfo=await lstat(canonical);
+    if(canonicalInfo.isSymbolicLink()||!canonicalInfo.isDirectory()){
+        fail(`${label} must be a real directory.`);
     }
-    return Object.freeze(origins);
+    return canonical;
 }
 
-function validateAppSecurity(value,appId){
-    if(!isPlainObject(value))fail(`${appId}/${APP_CONFIG_NAME}.security must be an object.`);
-    const label=`${appId}/${APP_CONFIG_NAME}.security`;
-    assertOnlyKeys(value,new Set(['connectOrigins','frameOrigins','mediaOrigins']),label);
-    return Object.freeze({
-        connectOrigins:validateOriginList(value.connectOrigins,`${label}.connectOrigins`,{allowLoopbackHttp:true}),
-        frameOrigins:validateOriginList(value.frameOrigins,`${label}.frameOrigins`,{allowHttpsScheme:appId==='browser'}),
-        mediaOrigins:validateOriginList(value.mediaOrigins,`${label}.mediaOrigins`)
-    });
-}
-
-function validateLocalAIModelPolicy(value,label){
-    assertOnlyKeys(value,new Set(['verified_only','models']),label);
-
-    if(typeof value.verified_only!=='boolean'){
-        fail(`${label}.verified_only must be a boolean.`);
-    }
-
-    if(!Array.isArray(value.models)){
-        fail(`${label}.models must be an array.`);
-    }
-
-    if(value.models.length>MAX_LOCAL_AI_MODELS){
-        fail(`${label}.models must contain no more than ${MAX_LOCAL_AI_MODELS} entries.`);
-    }
-
-    const modelNames=new Set();
-    const definitions=new Set();
-    const models=value.models.map((model,index)=>{
-        const modelLabel=`${label}.models[${index}]`;
-        assertOnlyKeys(model,new Set(['name','definition']),modelLabel);
-
-        if(typeof model.name!=='string'||model.name!==model.name.trim()
-            ||!OLLAMA_MODEL_IDENTIFIER.test(model.name)||model.name.toUpperCase()==='OPENAI'){
-            fail(`${modelLabel}.name must be a canonical bounded Ollama model identifier.`);
-        }
-
-        if(typeof model.definition!=='string'||model.definition.length>128
-            ||!MODEL_DEFINITION_PATTERN.test(model.definition)
-            ||normalizeRelativePath(model.definition,`${modelLabel}.definition`)!==model.definition){
-            fail(`${modelLabel}.definition must be a safe app-relative Modelfile basename.`);
-        }
-
-        const canonicalName=model.name.toLocaleLowerCase('en-US');
-        const canonicalAlias=canonicalName.includes(':')?canonicalName:`${canonicalName}:latest`;
-        const definitionKey=pathKey(model.definition);
-
-        if(modelNames.has(canonicalAlias)){
-            fail(`${label}.models contains a duplicate canonical model name: ${model.name}`);
-        }
-        if(definitions.has(definitionKey)){
-            fail(`${label}.models contains a duplicate definition: ${model.definition}`);
-        }
-
-        modelNames.add(canonicalAlias);
-        definitions.add(definitionKey);
-        return Object.freeze({name:model.name,definition:model.definition});
-    });
-
-    return Object.freeze({
-        verified_only:value.verified_only,
-        models:Object.freeze(models)
-    });
-}
-
-async function validateLocalAIModelDefinitions(appRoot,config){
-    for(const [index,model] of config.localAIModelPolicy.models.entries()){
-        const label=`${config.id}/${APP_CONFIG_NAME}.localAIModelPolicy.models[${index}].definition`;
-        const definitionPath=resolveInside(appRoot,model.definition,label);
-        let details;
-
-        try{
-            await assertNoLinks(appRoot,definitionPath,label);
-            details=await lstat(definitionPath);
-        }catch(error){
-            if(error?.code==='ENOENT'){
-                fail(`${label} does not exist: ${model.definition}`);
-            }
-            throw error;
-        }
-
-        if(details.isSymbolicLink()||!details.isFile()||details.size<1
-            ||details.size>MAX_MODEL_DEFINITION_BYTES){
-            fail(`${label} must be a non-empty regular file no larger than 512 KiB.`);
-        }
-    }
-}
-
-async function assertNoLinks(root,candidate,label){
-    const resolvedRoot=path.resolve(root);
-    const resolvedCandidate=path.resolve(candidate);
-
-    if(!isInside(resolvedRoot,resolvedCandidate,{allowEqual:true})){
-        fail(`${label} leaves its allowed root.`);
-    }
-
-    const relative=path.relative(resolvedRoot,resolvedCandidate);
-    let current=resolvedRoot;
-    const rootInfo=await lstat(resolvedRoot);
-
-    if(rootInfo.isSymbolicLink()||!rootInfo.isDirectory()){
-        fail(`${label} root must be a real directory.`);
-    }
-
-    for(const segment of relative.split(path.sep).filter(Boolean)){
+async function assertContainedRealPath(root,candidate,label){
+    const absolute=path.resolve(candidate);
+    const fromRoot=path.relative(path.resolve(root),absolute);
+    if(fromRoot.startsWith('..')||path.isAbsolute(fromRoot))fail(`${label} leaves its allowed root.`);
+    let current=path.resolve(root);
+    for(const segment of fromRoot.split(path.sep).filter(Boolean)){
         current=path.join(current,segment);
         const info=await lstat(current);
-
-        if(info.isSymbolicLink()){
-            fail(`${label} contains a symbolic link or junction: ${current}`);
-        }
+        if(info.isSymbolicLink())fail(`${label} contains a symbolic link or junction.`);
     }
-
-    const [actualRoot,actualCandidate]=await Promise.all([
-        realpath(resolvedRoot),
-        realpath(resolvedCandidate)
-    ]);
-
-    if(!isInside(actualRoot,actualCandidate,{allowEqual:true})){
+    const canonicalRoot=await realpath(root);
+    const canonicalCandidate=await realpath(absolute);
+    const canonicalRelative=path.relative(canonicalRoot,canonicalCandidate);
+    if(canonicalRelative.startsWith('..')||path.isAbsolute(canonicalRelative)){
         fail(`${label} resolves outside its allowed root.`);
     }
 }
 
-async function assertSafeDistBoundary(workspaceRoot,distRoot,{create=false}={}){
-    await assertNoLinks(workspaceRoot,workspaceRoot,'workspace');
-    let details;
-
-    try{
-        details=await lstat(distRoot);
-    }catch(error){
-        if(error?.code!=='ENOENT'){
-            throw error;
-        }
-
-        if(!create){
-            return false;
-        }
-
-        try{
-            await mkdir(distRoot);
-        }catch(createError){
-            if(createError?.code!=='EEXIST'){
-                throw createError;
-            }
-        }
-
-        details=await lstat(distRoot);
-    }
-
-    if(details.isSymbolicLink()||!details.isDirectory()){
-        fail('dist must be a real workspace directory, not a link, junction, or special entry.');
-    }
-
-    await assertNoLinks(workspaceRoot,distRoot,'dist');
-    return true;
-}
-
-async function assertOptionalSafeOutput(distRoot,outputRoot,appId){
-    let details;
-
-    try{
-        details=await lstat(outputRoot);
-    }catch(error){
-        if(error?.code==='ENOENT'){
-            return false;
-        }
-
-        throw error;
-    }
-
-    if(details.isSymbolicLink()||!details.isDirectory()){
-        fail(`dist/${appId} must be a real directory, not a link, junction, or special entry.`);
-    }
-
-    await assertNoLinks(distRoot,outputRoot,`dist/${appId}`);
-    return true;
-}
-
-async function appDescriptorContracts(){
-    appDescriptorContractsPromise??=import('../app-descriptor.mjs');
-    return appDescriptorContractsPromise;
-}
-
-async function optionalRegularFileIdentity(filePath,label){
-    let info;
-    try{
-        info=await lstat(filePath,{bigint:true});
-    }catch(error){
-        if(error?.code==='ENOENT')return null;
-        throw error;
-    }
-    if(info.isSymbolicLink()||!info.isFile()){
-        fail(`${label} must be a regular file, not a link or special entry.`);
-    }
-    return fileIdentity(info);
-}
-
-function recordedIdentityMatches(left,right){
-    if(left===null||right===null)return left===right;
-    return left.device===right.device
-        &&left.inode===right.inode
-        &&left.bytes===right.bytes
-        &&left.modifiedNanoseconds===right.modifiedNanoseconds
-        &&left.changedNanoseconds===right.changedNanoseconds
-        &&left.links===right.links;
-}
-
-async function createAppDescriptorAuthority(context,packageDocument,{signal}={}){
-    throwIfAborted(signal);
-    const contracts=await appDescriptorContracts();
-    const descriptorPath=path.join(context.appRoot,APP_DESCRIPTOR_NAME);
-    const descriptorIdentity=await optionalRegularFileIdentity(
-        descriptorPath,
-        `apps/${context.config.id}/${APP_DESCRIPTOR_NAME}`
-    );
-    let descriptor;
-    let source;
-    let sourcePath;
-    let sourceIdentity;
-
-    if(descriptorIdentity){
-        const descriptorDocument=await readJsonDocument(
-            descriptorPath,
-            `apps/${context.config.id}/${APP_DESCRIPTOR_NAME}`,
-            {expectedIdentity:descriptorIdentity}
-        );
-        descriptor=contracts.validateAppDescriptor(descriptorDocument.value,{
-            appId:context.config.id
-        });
-        if(!isDeepStrictEqual(
-            contracts.projectPackageManifest(descriptor),
-            packageDocument.value
-        )){
-            fail(`${APP_DESCRIPTOR_NAME} does not project exactly to ${APP_CONFIG_NAME}.`);
-        }
-        source='authored';
-        sourcePath=descriptorPath;
-        sourceIdentity=descriptorDocument.identity;
-    }else{
-        const registryPath=path.join(context.workspaceRoot,LEGACY_APP_REGISTRY_PATH);
-        const registryBefore=await optionalRegularFileIdentity(
-            registryPath,
-            'Arcane native app registry'
-        );
-        const loaded=await contracts.loadAppDescriptor({
-            workspaceRoot:context.workspaceRoot,
-            appRoot:context.appRoot,
-            appId:context.config.id,
-            packageManifest:packageDocument.value
-        });
-        const [descriptorAfter,registryAfter]=await Promise.all([
-            optionalRegularFileIdentity(
-                descriptorPath,
-                `apps/${context.config.id}/${APP_DESCRIPTOR_NAME}`
-            ),
-            optionalRegularFileIdentity(registryPath,'Arcane native app registry')
-        ]);
-        if(descriptorAfter!==null||!recordedIdentityMatches(registryBefore,registryAfter)){
-            fail(`The descriptor source for ${context.config.id} changed while it was selected.`);
-        }
-        descriptor=loaded.descriptor;
-        source=loaded.source;
-        sourcePath=registryBefore?registryPath:null;
-        sourceIdentity=registryBefore;
-    }
-
-    const canonicalDescriptor=immutableJsonCopy(descriptor);
-    return Object.freeze({
-        descriptor:canonicalDescriptor,
-        descriptorSha256:contracts.appDescriptorSha256(canonicalDescriptor),
-        source,
-        sourcePath,
-        sourceIdentity,
-        packageConfigPath:context.config.configPath,
-        packageConfigIdentity:packageDocument.identity
-    });
-}
-
-async function assertAppDescriptorAuthorityCurrent(context,{signal}={}){
-    const expected=context.descriptorAuthority;
-    if(!expected)fail('Canonical app descriptor authority is unavailable.');
-    const packageDocument=await readJsonDocument(
-        expected.packageConfigPath,
-        expected.packageConfigPath,
-        {expectedIdentity:expected.packageConfigIdentity}
-    );
-    const config=validateAppConfig(
-        packageDocument.value,
-        context.config.id,
-        context.rootConfig,
-        expected.packageConfigPath
-    );
-    const current=await createAppDescriptorAuthority(
-        {...context,config},
-        packageDocument,
-        {signal}
-    );
-    if(current.descriptorSha256!==expected.descriptorSha256
-        ||current.source!==expected.source
-        ||current.sourcePath!==expected.sourcePath
-        ||!recordedIdentityMatches(current.sourceIdentity,expected.sourceIdentity)
-        ||!recordedIdentityMatches(
-            current.packageConfigIdentity,
-            expected.packageConfigIdentity
-        )){
-        fail(`The canonical descriptor authority for ${context.config.id} changed during packaging.`);
-    }
-    return expected;
-}
-
-async function assertValidatedDescriptorAuthority(validation,descriptorAuthority){
-    if(validation===undefined||validation?.app?.descriptor===undefined)return;
-    const descriptor=validation?.app?.descriptor;
-    const contracts=await appDescriptorContracts();
-    if(contracts.appDescriptorSha256(descriptor)!==descriptorAuthority.descriptorSha256){
-        fail('Source validation returned a different canonical Arcane application descriptor.');
-    }
-}
-
-function packagedRuntimeAuthorities(receipt){
-    const arcane=receipt?.sources?.arcane;
-    const sdkBrowser=receipt?.sources?.sdkBrowser;
-    if(receipt?.kind!=='arcane-workspace-runtime-verification'
-        ||!Number.isSafeInteger(receipt.fileCount)||receipt.fileCount<1
-        ||!Number.isSafeInteger(receipt.totalBytes)||receipt.totalBytes<1
-        ||!SHA256_PATTERN.test(receipt.contentSha256??'')
-        ||!isPlainObject(arcane)||arcane.authority!=='arcane-os-sdk'
-        ||!SHA256_PATTERN.test(arcane.manifestSha256??'')
-        ||!SHA256_PATTERN.test(arcane.contentSha256??'')
-        ||!isPlainObject(arcane.source)
-        ||!isPlainObject(sdkBrowser)||sdkBrowser.authority!=='arcane-os-sdk'
-        ||!SHA256_PATTERN.test(sdkBrowser.manifestSha256??'')
-        ||!SHA256_PATTERN.test(sdkBrowser.contentSha256??'')
-        ||!isPlainObject(sdkBrowser.source)
-        ||!Array.isArray(sdkBrowser.source.dependencies)){
-        fail('The composed workspace runtime receipt is missing its source authorities.');
-    }
-    return immutableJsonCopy({
-        schemaVersion:1,
-        kind:'arcane-app-runtime-authorities',
-        sdkVersion:receipt.sdkVersion,
-        projection:{
-            fileCount:receipt.fileCount,
-            totalBytes:receipt.totalBytes,
-            contentSha256:receipt.contentSha256
-        },
-        sources:{
-            arcane:{
-                authority:arcane.authority,
-                manifestSha256:arcane.manifestSha256,
-                contentSha256:arcane.contentSha256,
-                source:arcane.source
-            },
-            sdkBrowser:{
-                authority:sdkBrowser.authority,
-                manifestSha256:sdkBrowser.manifestSha256,
-                contentSha256:sdkBrowser.contentSha256,
-                source:sdkBrowser.source
-            }
-        }
-    });
-}
-
-function packagedRuntimeProjection(receipt){
-    const authorities=packagedRuntimeAuthorities(receipt);
-    if(!Array.isArray(receipt.files)){
-        fail('The composed workspace runtime receipt is missing its file inventory.',RUNTIME_PROJECTION_ERROR);
-    }
-    const files=[];
-    let previous=null;
-    let totalBytes=0;
-    for(const [index,file] of receipt.files.entries()){
-        if(!isPlainObject(file)){
-            fail(`Workspace runtime projection files[${index}] is invalid.`,RUNTIME_PROJECTION_ERROR);
-        }
-        let relative;
-        try{
-            relative=normalizeRelativePath(file.path,`workspace runtime projection files[${index}].path`);
-        }catch{
-            fail(`Workspace runtime projection files[${index}].path is invalid.`,RUNTIME_PROJECTION_ERROR);
-        }
-        if(relative!==file.path
-            ||!Number.isSafeInteger(file.bytes)||file.bytes<0
-            ||!SHA256_PATTERN.test(file.sha256??'')
-            ||previous!==null&&compareText(previous,relative)>=0){
-            fail(`Workspace runtime projection files[${index}] is invalid.`,RUNTIME_PROJECTION_ERROR);
-        }
-        totalBytes+=file.bytes;
-        if(!Number.isSafeInteger(totalBytes)){
-            fail('Workspace runtime projection byte total is invalid.',RUNTIME_PROJECTION_ERROR);
-        }
-        previous=relative;
-        files.push({path:relative,bytes:file.bytes,sha256:file.sha256});
-    }
-    const contentSha256=createHash('sha256')
-        .update(JSON.stringify(files))
-        .digest('hex');
-    if(files.length!==receipt.fileCount
-        ||totalBytes!==receipt.totalBytes
-        ||contentSha256!==receipt.contentSha256
-        ||files.length!==authorities.projection.fileCount
-        ||totalBytes!==authorities.projection.totalBytes
-        ||contentSha256!==authorities.projection.contentSha256){
-        fail(
-            'The workspace runtime file inventory does not match its admitted projection authority.',
-            RUNTIME_PROJECTION_ERROR
-        );
-    }
-    return immutableJsonCopy({
-        schemaVersion:1,
-        kind:'arcane-app-runtime-projection',
-        sdkVersion:receipt.sdkVersion,
-        pathPrefix:'arcane/',
-        fileCount:files.length,
-        totalBytes,
-        contentSha256,
-        files
-    });
-}
-
-async function hasExternalRuntimeAdmission(context){
-    const lockPath=path.join(context.workspaceRoot,'arcane.lock.json');
-    try{
-        const info=await lstat(lockPath);
-        if(info.isSymbolicLink()||!info.isFile()){
-            fail('arcane.lock.json must be a real file before runtime provenance can be packaged.');
-        }
-        return true;
-    }catch(error){
-        if(error?.code==='ENOENT')return false;
-        throw error;
-    }
-}
-
-async function validateExternalRuntimeAdmission(context,{signal,onEvent}={}){
-    const {validateWorkspace}=await import('../workspace.mjs');
-    const validation=await validateWorkspace({
-        workspaceRoot:context.workspaceRoot,
-        appId:context.config.id,
-        signal,
-        onEvent
-    });
-    if(validation.workspaceMode!=='external'){
-        fail('A workspace with arcane.lock.json must use the external SDK runtime contract.');
-    }
-    return validation;
-}
-
-async function integratedWorkspaceCandidate(context){
-    const packagePath=path.join(context.workspaceRoot,'package.json');
-    let info;
-    try{
-        info=await lstat(packagePath);
-    }catch(error){
-        if(error?.code==='ENOENT')return false;
-        throw error;
-    }
-    if(info.isSymbolicLink()||!info.isFile()){
-        fail('workspace package.json must be a real file.');
-    }
-    const document=await readJsonDocument(packagePath,'workspace package.json');
-    return document.value?.name==='arcane-os'&&document.value?.type==='module';
-}
-
-function packageRuntimeLocations(context,validation){
-    const installation=validation?.sdkInstallation;
-    const licenseRoute=context.rootConfig.sharedPayloads['browser-runtime']?.find(
-        route=>route.destination==='licenses/arcane-os'
-    );
-    if(validation?.workspaceMode!=='external'||!isPlainObject(installation)
-        ||typeof installation.packageSource!=='string'
-        ||typeof installation.canonicalPackageRoot!=='string'
-        ||typeof installation.runtimeRoot!=='string'
-        ||typeof installation.browserRuntimeRoot!=='string'
-        ||licenseRoute?.source!==installation.packageSource
-        ||path.resolve(installation.runtimeRoot)
-            !==path.join(path.resolve(installation.canonicalPackageRoot),'runtime')
-        ||path.resolve(installation.browserRuntimeRoot)
-            !==path.join(path.resolve(installation.canonicalPackageRoot),'browser-runtime')){
-        fail('External workspace validation did not return its bound SDK installation authority.');
-    }
-    return Object.freeze({
-        runtimeRoot:installation.runtimeRoot,
-        browserRuntimeRoot:installation.browserRuntimeRoot
-    });
-}
-
-async function authenticatePackageRuntimeVerificationState(context,state,{signal,validation}={}){
-    assertOnlyKeys(
-        state,
-        new Set(['runtimeReceipt','sdkBrowserRuntimeReceipt','workspaceRuntimeReceipt']),
-        'runtime verification state'
-    );
-    const descriptors=Object.getOwnPropertyDescriptors(state);
-    const required=['runtimeReceipt','sdkBrowserRuntimeReceipt','workspaceRuntimeReceipt'];
-    if(required.some(key=>!Object.hasOwn(descriptors,key)||!Object.hasOwn(descriptors[key],'value'))){
-        fail('The runtime verification state must use fixed receipt references, not accessors.');
-    }
-    const snapshot=Object.freeze({
-        runtimeReceipt:descriptors.runtimeReceipt.value,
-        sdkBrowserRuntimeReceipt:descriptors.sdkBrowserRuntimeReceipt.value,
-        workspaceRuntimeReceipt:descriptors.workspaceRuntimeReceipt.value
-    });
-    if(!snapshot.runtimeReceipt
-        ||!snapshot.sdkBrowserRuntimeReceipt
-        ||!snapshot.workspaceRuntimeReceipt){
-        fail('The runtime verification state must contain all three authenticated receipts.');
-    }
-    const {runtimeRoot,browserRuntimeRoot}=packageRuntimeLocations(context,validation);
-    await authenticateRuntimeReceipt(snapshot.runtimeReceipt,{runtimeRoot,signal});
-    await authenticateSdkBrowserRuntimeReceipt(snapshot.sdkBrowserRuntimeReceipt,{
-        browserRuntimeRoot,
-        signal
-    });
-    await authenticateWorkspaceRuntimeReceipt(snapshot.workspaceRuntimeReceipt,{
-        workspaceRoot:context.workspaceRoot,
-        signal
-    });
-    const workspaceReceipt=snapshot.workspaceRuntimeReceipt;
-    const expectedArcaneSource={
-        authority:'arcane-os-sdk',
-        location:snapshot.runtimeReceipt.canonicalLocation,
-        manifestSha256:snapshot.runtimeReceipt.manifestSha256,
-        contentSha256:snapshot.runtimeReceipt.contentSha256,
-        source:snapshot.runtimeReceipt.source
-    };
-    const expectedBrowserSource={
-        authority:'arcane-os-sdk',
-        location:snapshot.sdkBrowserRuntimeReceipt.canonicalLocation,
-        manifestSha256:snapshot.sdkBrowserRuntimeReceipt.manifestSha256,
-        contentSha256:snapshot.sdkBrowserRuntimeReceipt.contentSha256,
-        source:snapshot.sdkBrowserRuntimeReceipt.source
-    };
-    if(workspaceReceipt.sourceRuntimeLocation!==snapshot.runtimeReceipt.canonicalLocation
-        ||workspaceReceipt.sourceManifestSha256!==snapshot.runtimeReceipt.manifestSha256
-        ||workspaceReceipt.sourceContentSha256!==snapshot.runtimeReceipt.contentSha256
-        ||workspaceReceipt.sourceBrowserRuntimeLocation
-            !==snapshot.sdkBrowserRuntimeReceipt.canonicalLocation
-        ||workspaceReceipt.sourceBrowserManifestSha256
-            !==snapshot.sdkBrowserRuntimeReceipt.manifestSha256
-        ||workspaceReceipt.sourceBrowserContentSha256
-            !==snapshot.sdkBrowserRuntimeReceipt.contentSha256
-        ||workspaceReceipt.sdkVersion!==snapshot.runtimeReceipt.sdkVersion
-        ||workspaceReceipt.sdkVersion!==snapshot.sdkBrowserRuntimeReceipt.sdkVersion
-        ||!isDeepStrictEqual(workspaceReceipt.sources?.arcane,expectedArcaneSource)
-        ||!isDeepStrictEqual(workspaceReceipt.sources?.sdkBrowser,expectedBrowserSource)){
-        fail('The workspace runtime receipt is not bound to the supplied source runtime receipts.');
-    }
-    return snapshot;
-}
-
-async function issuePackageRuntimeVerificationState(context,{signal,onEvent,validation}={}){
-    const {runtimeRoot,browserRuntimeRoot}=packageRuntimeLocations(context,validation);
-    const [runtimeReceipt,sdkBrowserRuntimeReceipt]=await Promise.all([
-        verifyRuntime({runtimeRoot,signal,onEvent}),
-        verifySdkBrowserRuntime({browserRuntimeRoot,signal,onEvent})
-    ]);
-    const workspaceRuntimeReceipt=await verifyWorkspaceRuntime({
-        workspaceRoot:context.workspaceRoot,
-        runtimeRoot,
-        runtimeReceipt,
-        browserRuntimeRoot,
-        sdkBrowserRuntimeReceipt,
-        signal,
-        onEvent
-    });
-    return Object.freeze({runtimeReceipt,sdkBrowserRuntimeReceipt,workspaceRuntimeReceipt});
-}
-
-function orderedBrowserDocumentPaths(entry,paths,label){
-    const selected=new Map();
-    for(const relative of paths){
-        const normalized=normalizeRelativePath(relative,label);
-        const key=pathKey(normalized);
-        const prior=selected.get(key);
-        if(prior!==undefined){
-            fail(`Package destination collision: ${prior} and ${normalized}.`);
-        }
-        selected.set(key,normalized);
-    }
-    const selectedEntry=selected.get(pathKey(entry));
-    if(selectedEntry!==entry){
-        fail(`The configured entry file was not found in the package payload: ${entry}`);
-    }
-    return Object.freeze([
-        entry,
-        ...[...selected.values()]
-            .filter(relative=>relative!==entry
-                &&isHtmlDocument(relative))
-            .sort(compareText)
-    ]);
-}
-
-function isHtmlDocument(relative){
-    const extension=path.posix.extname(relative).toLowerCase();
-    return extension==='.html'||extension==='.htm';
-}
-
-async function packageImportMapDocuments(context,{signal}={}){
-    const {workspaceRoot,appRoot,config}=context;
-    const files=await enumerateRoute({
+async function loadContext(requestedWorkspaceRoot,appId){
+    const workspaceRoot=await realDirectory(normalizeWorkspaceRoot(requestedWorkspaceRoot),'Workspace root');
+    const rootConfigPath=path.join(workspaceRoot,ROOT_CONFIG_NAME);
+    const rootConfig=validateRootConfig(await readJson(rootConfigPath,ROOT_CONFIG_NAME),rootConfigPath);
+    if(typeof appId!=='string'||!APP_ID_PATTERN.test(appId))fail(`Unsafe app id: ${String(appId)}`);
+    const appsRoot=await realDirectory(path.join(workspaceRoot,rootConfig.appsRoot),'Apps root');
+    const appRoot=resolveInside(appsRoot,appId,'app id');
+    await assertContainedRealPath(appsRoot,appRoot,`apps/${appId}`);
+    const configPath=path.join(appRoot,APP_CONFIG_NAME);
+    const config=validateAppConfig(await readJson(configPath,`${appId}/${APP_CONFIG_NAME}`),appId,rootConfig,configPath);
+    return {
         workspaceRoot,
-        sourceRoot:appRoot,
-        destinationRoot:`apps/${config.id}`,
-        include:config.include,
-        exclude:config.exclude,
-        label:`apps.${config.id}`,
-        appPayload:true,
-        signal
-    });
-    return orderedBrowserDocumentPaths(
-        config.entry,
-        files.map(file=>file.sourceRelative),
-        `apps.${config.id} browser document`
-    );
+        rootConfig,
+        appsRoot,
+        appRoot,
+        appId,
+        config,
+        distRoot:path.join(workspaceRoot,rootConfig.distRoot),
+        outputRoot:path.join(workspaceRoot,rootConfig.distRoot,appId)
+    };
 }
 
-async function refreshPackageImportMap(context,{
-    runtimeVerificationState,
-    workspaceOperationLease,
+function destinationJoin(root,relative){
+    return root==='.'?relative:`${root}/${relative}`;
+}
+
+async function collectSelectedPath({
+    sourceRoot,
+    selected,
+    destination,
+    excludes,
+    reject,
+    records,
+    destinations,
     signal,
-    onEvent
-}={}){
-    const external=await hasExternalRuntimeAdmission(context);
-    if(!external&&!await integratedWorkspaceCandidate(context)){
-        if(runtimeVerificationState!==undefined){
-            fail('A runtime verification state cannot be supplied without an external runtime admission.');
+    label
+}){
+    throwIfAborted(signal);
+    if(isExcluded(selected,excludes))return;
+    if(reject(selected))fail(`${label} selects a reserved private or generated path: ${selected}.`);
+    const absolute=resolveInside(sourceRoot,selected,label);
+    let info;
+    try{info=await lstat(absolute);}
+    catch(error){
+        if(error?.code==='ENOENT')fail(`${label} does not exist: ${selected}.`);
+        throw error;
+    }
+    if(info.isSymbolicLink())fail(`${label} contains a symbolic link or junction: ${selected}.`);
+    if(info.isDirectory()){
+        const entries=await readdir(absolute,{withFileTypes:true});
+        entries.sort((left,right)=>compareText(left.name,right.name));
+        for(const entry of entries){
+            const child=`${selected}/${entry.name}`;
+            await collectSelectedPath({
+                sourceRoot,
+                selected:child,
+                destination:`${destination}/${entry.name}`,
+                excludes,
+                reject,
+                records,
+                destinations,
+                signal,
+                label
+            });
         }
-        return Object.freeze({importMapReceipt:null,runtimeVerificationState:null});
+        return;
     }
-    const {validateWorkspace}=await import('../workspace.mjs');
-    const validation=await validateWorkspace({
-        workspaceRoot:context.workspaceRoot,
-        appId:context.config.id,
-        allowMissingManagedImportMap:true,
-        signal,
-        onEvent
-    });
-    if(validation.workspaceMode!=='external'&&runtimeVerificationState!==undefined){
-        fail('A runtime verification state cannot be supplied to an integrated workspace.');
+    if(!info.isFile())fail(`${label} contains a non-file entry: ${selected}.`);
+    const normalizedDestination=normalizeRelativePath(destination,`${label} destination`);
+    if(pathKey(normalizedDestination)===pathKey(RELEASE_MANIFEST_NAME)){
+        fail(`${label} overlaps the generated release manifest.`);
     }
-    if(validation.workspaceMode==='integrated'
-        &&validation.config.browserRuntimeLayout==='integrated-legacy'){
-        return Object.freeze({
-            importMapReceipt:Object.freeze({skipped:true,workspaceMode:'integrated'}),
-            runtimeVerificationState:null
+    const key=pathKey(normalizedDestination);
+    if(destinations.has(key))fail(`Package destination collision: ${normalizedDestination}.`);
+    destinations.add(key);
+    records.push({source:absolute,destination:normalizedDestination});
+}
+
+async function collectPackageRecords(context,{signal}={}){
+    const records=[];
+    const destinations=new Set();
+    for(const selected of context.config.include){
+        await collectSelectedPath({
+            sourceRoot:context.appRoot,
+            selected,
+            destination:selected,
+            excludes:context.config.exclude,
+            reject:isAppSourceForbidden,
+            records,
+            destinations,
+            signal,
+            label:`apps/${context.appId}`
         });
     }
-
-    let workspaceRuntimeReceipt;
-    let authenticatedRuntimeState=null;
-    if(validation.workspaceMode==='external'){
-        authenticatedRuntimeState=runtimeVerificationState===undefined
-            ?await issuePackageRuntimeVerificationState(context,{signal,onEvent,validation})
-            :await authenticatePackageRuntimeVerificationState(
-                context,
-                runtimeVerificationState,
-                {signal,validation}
-            );
-        workspaceRuntimeReceipt=authenticatedRuntimeState.workspaceRuntimeReceipt;
-    }
-    const documents=await packageImportMapDocuments(context,{signal});
-    const importMapReceipt=await generateImportMap({
-        workspaceRoot:context.workspaceRoot,
-        appId:context.config.id,
-        appRoot:context.appRoot,
-        entry:context.config.entry,
-        documents,
-        workspaceRuntimeReceipt,
-        workspaceOperationLease,
-        signal,
-        onEvent
-    });
-    return Object.freeze({importMapReceipt,runtimeVerificationState:authenticatedRuntimeState});
-}
-
-function authenticatedImportMapReceipt(receipt){
-    if(receipt==null||receipt.skipped===true)return receipt;
-    if(receipt.committed!==true||!Array.isArray(receipt.cleanupWarnings)){
-        fail(
-            'The generated import-map receipt is incomplete; the package release was not assembled.'
-        );
-    }
-    if(receipt.cleanupWarnings.length!==0){
-        fail(
-            'The generated import map committed with cleanup warnings; the package release '
-            +`was not assembled: ${receipt.cleanupWarnings.join('; ')}`,
-            'ARCANE_IMPORT_MAP_CLEANUP_FAILED'
-        );
-    }
-    return receipt;
-}
-
-function importMapReceiptFiles(context,receipt){
-    if(receipt==null||receipt.skipped===true)return Object.freeze([]);
-    if(!Array.isArray(receipt.files)||receipt.files.length<2
-        ||!Number.isSafeInteger(receipt.documentCount)||receipt.documentCount<1
-        ||!Array.isArray(receipt.documentPaths)
-        ||receipt.documentPaths.length!==receipt.documentCount
-        ||receipt.files.length!==receipt.documentCount+1){
-        fail('The generated import-map receipt does not bind its committed artifact and browser documents.');
-    }
-    const records=[];
-    const artifact=receipt.files[0];
-    assertOnlyKeys(
-        artifact,
-        new Set(['role','path','bytes','sha256']),
-        'import-map receipt files[0]'
-    );
-    const artifactPath=`apps/${context.config.id}/modules/arcane.importmap.json`;
-    if(artifact.role!=='artifact'
-        ||normalizeRelativePath(artifact.path,'import-map receipt files[0].path')!==artifactPath
-        ||!Number.isSafeInteger(artifact.bytes)||artifact.bytes<1
-        ||!SHA256_PATTERN.test(artifact.sha256??'')){
-        fail('The generated import-map receipt artifact record is invalid.');
-    }
-    records.push(Object.freeze({...artifact}));
-
-    const seen=new Set();
-    let previousDocument=null;
-    for(const [documentIndex,documentPath] of receipt.documentPaths.entries()){
-        const index=documentIndex+1;
-        if(typeof documentPath!=='string'||!path.isAbsolute(documentPath)){
-            fail(
-                `The generated import-map receipt documentPaths[${documentIndex}] is invalid.`
-            );
-        }
-        const resolved=path.resolve(documentPath);
-        if(!isInside(context.appRoot,resolved)){
-            fail(
-                `The generated import-map receipt documentPaths[${documentIndex}] leaves its `
-                +'application root.'
-            );
-        }
-        const relative=normalizeRelativePath(
-            path.relative(context.appRoot,resolved).replaceAll('\\','/'),
-            `import-map receipt documentPaths[${documentIndex}]`
-        );
-        const key=pathKey(relative);
-        if(seen.has(key)){
-            fail(`The generated import-map receipt repeats a browser document: ${relative}.`);
-        }
-        seen.add(key);
-        if(documentIndex===0&&relative!==context.config.entry){
-            fail('The generated import-map receipt does not preserve its configured entry document.');
-        }
-        if(documentIndex>0){
-            if(!isHtmlDocument(relative)
-                ||previousDocument!==null&&compareText(previousDocument,relative)>=0){
-                fail(`The generated import-map receipt browser document order is invalid: ${relative}.`);
+    for(const sharedId of context.config.shared){
+        for(const route of context.rootConfig.sharedPayloads[sharedId]){
+            const sourceRoot=resolveInside(context.workspaceRoot,route.source,`sharedPayloads.${sharedId}.source`);
+            await assertContainedRealPath(context.workspaceRoot,sourceRoot,`sharedPayloads.${sharedId}.source`);
+            for(const selected of route.include){
+                await collectSelectedPath({
+                    sourceRoot,
+                    selected,
+                    destination:destinationJoin(route.destination,selected),
+                    excludes:route.exclude,
+                    reject:isAlwaysForbidden,
+                    records,
+                    destinations,
+                    signal,
+                    label:`sharedPayloads.${sharedId}`
+                });
             }
-            previousDocument=relative;
         }
-        const record=receipt.files[index];
-        assertOnlyKeys(
-            record,
-            new Set(['role','path','bytes','sha256']),
-            `import-map receipt files[${index}]`
-        );
-        const wanted={
-            role:documentIndex===0?'entry':'document',
-            path:`apps/${context.config.id}/${relative}`
-        };
-        if(record.role!==wanted.role
-            ||normalizeRelativePath(record.path,`import-map receipt files[${index}].path`)
-                !==wanted.path
-            ||!Number.isSafeInteger(record.bytes)||record.bytes<1
-            ||!SHA256_PATTERN.test(record.sha256??'')){
-            fail(`The generated import-map receipt ${wanted.role} record is invalid.`);
-        }
-        records.push(Object.freeze({...record}));
     }
-    return Object.freeze(records);
-}
-
-async function authenticateImportMapFiles(context,receipt,{signal}={}){
-    const records=importMapReceiptFiles(context,receipt);
-    for(const record of records){
-        const filePath=resolveInside(
-            context.workspaceRoot,
-            record.path,
-            `import-map receipt ${record.role} path`
-        );
-        let verified;
-        try{
-            verified=await sha256WithIdentity(filePath,{
-                signal,
-                label:`import-map receipt ${record.role}`
-            });
-        }catch(error){
-            fail(
-                `The generated import-map ${record.role} is unavailable after commit: ${error.message}`
-            );
-        }
-        if(verified.identity.bytes!==record.bytes||verified.sha256!==record.sha256){
-            fail(`The generated import-map ${record.role} changed after it was committed.`);
-        }
+    records.sort((left,right)=>compareText(left.destination,right.destination));
+    if(!records.some(record=>pathKey(record.destination)===pathKey(context.config.entry))){
+        fail(`Package entry is missing from the selected files: ${context.config.entry}.`);
     }
     return records;
 }
 
-async function authenticateCollectedImportMapFiles(context,files,records,{signal}={}){
-    if(records.length>0){
-        const appPrefix=`apps/${context.config.id}/`;
-        const expectedDocuments=orderedBrowserDocumentPaths(
-            context.config.entry,
-            files
-                .filter(file=>file.destination.startsWith(appPrefix))
-                .map(file=>file.destination.slice(appPrefix.length)),
-            `apps.${context.config.id} collected browser document`
-        ).map(relative=>`${appPrefix}${relative}`);
-        const committedDocuments=records.slice(1).map(record=>record.path);
-        if(!isDeepStrictEqual(committedDocuments,expectedDocuments)){
-            fail('The generated import-map receipt does not bind every packaged browser document.');
-        }
-    }
+async function browserDocuments(records){
+    const documents=[];
     for(const record of records){
-        const collected=files.find(file=>file.destination===record.path);
-        if(!collected||collected.bytes!==record.bytes){
-            fail(`The package payload does not contain the committed import-map ${record.role}.`);
-        }
-        const verified=await sha256WithIdentity(collected.source,{
-            signal,
-            expectedIdentity:collected.identity,
-            label:`collected import-map ${record.role}`
+        if(path.posix.extname(record.destination).toLocaleLowerCase('en-US')!=='.html')continue;
+        const inspected=inspectImportMapHtml(await readFile(record.source,'utf8'),{
+            documentPath:record.destination
         });
-        if(verified.identity.bytes!==record.bytes||verified.sha256!==record.sha256){
-            fail(`The collected import-map ${record.role} does not match its committed receipt.`);
-        }
+        documents.push({path:record.destination,...copyJson(inspected)});
     }
+    return documents;
 }
 
-function authenticatePackagedImportMapFiles(release,records){
-    for(const record of records){
-        const packaged=release.files.find(file=>file.path===record.path);
-        if(!packaged||packaged.bytes!==record.bytes||packaged.sha256!==record.sha256){
-            fail(`The packaged import-map ${record.role} does not match its committed receipt.`);
-        }
-    }
-}
-
-async function prepareRuntimeAuthorityState(context,{
-    validation,
-    runtimeVerificationState,
-    signal,
-    onEvent
-}={}){
-    if(!await hasExternalRuntimeAdmission(context)){
-        if(runtimeVerificationState!==undefined){
-            fail('A runtime verification state cannot be supplied to an integrated workspace.');
-        }
-        return null;
-    }
-    const workspaceValidation=await validateExternalRuntimeAdmission(context,{signal,onEvent});
-
-    let verificationState=null;
-    let receipt=null;
-    if(runtimeVerificationState!==undefined){
-        verificationState=await authenticatePackageRuntimeVerificationState(
-            context,
-            runtimeVerificationState,
-            {signal,validation:workspaceValidation}
-        );
-        receipt=verificationState.workspaceRuntimeReceipt;
-    }else if(validation?.kind==='arcane-workspace-runtime-verification'){
-        receipt=validation;
-        await authenticateWorkspaceRuntimeReceipt(receipt,{
-            workspaceRoot:context.workspaceRoot,
-            signal
-        });
-    }else{
-        verificationState=await issuePackageRuntimeVerificationState(context,{
-            signal,
-            onEvent,
-            validation:workspaceValidation
-        });
-        receipt=verificationState.workspaceRuntimeReceipt;
-    }
-    return Object.freeze({
-        receipt,
-        document:packagedRuntimeAuthorities(receipt),
-        projectionDocument:packagedRuntimeProjection(receipt),
-        verificationState
-    });
-}
-
-async function authenticateRuntimeAuthorityState(context,state,{signal,onEvent}={}){
-    if(state===null){
-        if(await hasExternalRuntimeAdmission(context)){
-            fail('External runtime authority admission appeared during package verification.');
-        }
-        return;
-    }
-    if(!await hasExternalRuntimeAdmission(context)){
-        fail('External runtime authority admission disappeared during package verification.');
-    }
-    const workspaceValidation=await validateExternalRuntimeAdmission(context,{signal,onEvent});
-    if(state.verificationState){
-        await authenticatePackageRuntimeVerificationState(
-            context,
-            state.verificationState,
-            {signal,validation:workspaceValidation}
-        );
-    }else{
-        await authenticateWorkspaceRuntimeReceipt(state.receipt,{
-            workspaceRoot:context.workspaceRoot,
-            signal
-        });
-    }
-    if(!isDeepStrictEqual(packagedRuntimeAuthorities(state.receipt),state.document)){
-        fail('External runtime source authorities changed during package verification.');
-    }
-    if(!isDeepStrictEqual(packagedRuntimeProjection(state.receipt),state.projectionDocument)){
-        fail(
-            'External runtime projection inventory changed during package verification.',
-            RUNTIME_PROJECTION_ERROR
-        );
-    }
-}
-
-async function getAppContext({
-    workspaceRoot:requestedWorkspaceRoot,
-    appId,
-    bindDescriptorAuthority=false,
-    signal
-}){
-    const workspaceRoot=normalizeWorkspaceRoot(requestedWorkspaceRoot);
-
-    if(typeof appId!=='string'||!APP_ID_PATTERN.test(appId)){
-        fail(`Invalid app id: ${String(appId)}`);
-    }
-
-    const rootConfig=await loadRootConfig(workspaceRoot);
-    const appsRoot=path.join(workspaceRoot,rootConfig.appsRoot);
-    const appRoot=resolveInside(appsRoot,appId,'app id');
-    let appInfo;
-
+async function optionalDescriptor(context){
+    const descriptorPath=path.join(context.appRoot,APP_DESCRIPTOR_NAME);
     try{
-        appInfo=await lstat(appRoot);
+        const info=await lstat(descriptorPath);
+        if(info.isSymbolicLink()||!info.isFile())fail(`${APP_DESCRIPTOR_NAME} must be a real file.`);
+        return await readJson(descriptorPath,APP_DESCRIPTOR_NAME);
     }catch(error){
-        if(error?.code==='ENOENT'){
-            const available=(await readdir(appsRoot,{withFileTypes:true}))
-                .filter(entry=>entry.isDirectory()&&APP_ID_PATTERN.test(entry.name))
-                .map(entry=>entry.name)
-                .sort(compareText);
-            fail(`Unknown app "${appId}". Available apps: ${available.join(', ')||'[none]'}.`);
-        }
-
+        if(error?.code==='ENOENT')return null;
         throw error;
     }
+}
 
-    if(appInfo.isSymbolicLink()||!appInfo.isDirectory()){
-        fail(`apps/${appId} must be a real directory, not a link or special entry.`);
-    }
-
-    await assertNoLinks(appsRoot,appRoot,`apps/${appId}`);
-    const configPath=path.join(appRoot,APP_CONFIG_NAME);
-    const configDocument=await readJsonDocument(
-        configPath,
-        `apps/${appId}/${APP_CONFIG_NAME}`
-    );
-    const config=validateAppConfig(configDocument.value,appId,rootConfig,configPath);
-    await validateLocalAIModelDefinitions(appRoot,config);
-    const distRoot=path.join(workspaceRoot,rootConfig.distRoot);
-    const outputRoot=resolveInside(distRoot,appId,'package output');
-    const distExists=await assertSafeDistBoundary(workspaceRoot,distRoot);
-
-    if(distExists){
-        await assertOptionalSafeOutput(distRoot,outputRoot,appId);
-    }
-
-    const context={workspaceRoot,rootConfig,appsRoot,appRoot,distRoot,outputRoot,config};
-    if(!bindDescriptorAuthority)return context;
+async function inspectContext(context,{signal}={}){
+    const records=await collectPackageRecords(context,{signal});
     return {
-        ...context,
-        descriptorAuthority:await createAppDescriptorAuthority(context,configDocument,{signal})
+        appId:context.appId,
+        displayName:context.config.displayName,
+        version:context.config.version,
+        entry:context.config.entry,
+        strategy:context.config.strategy,
+        include:[...context.config.include],
+        exclude:[...context.config.exclude],
+        shared:[...context.config.shared],
+        ...(context.config.security===undefined?{}:{security:copyJson(context.config.security)}),
+        ...(context.config.localAIModelPolicy===undefined?{}:{
+            localAIModelPolicy:copyJson(context.config.localAIModelPolicy)
+        }),
+        ...(context.config.adapter===undefined?{}:{adapter:context.config.adapter}),
+        descriptor:await optionalDescriptor(context),
+        browserDocuments:await browserDocuments(records),
+        files:records.map(record=>record.destination),
+        output:path.relative(context.workspaceRoot,context.outputRoot).split(path.sep).join('/')
     };
 }
 
-async function enumerateRoute({
-    workspaceRoot,
-    sourceRoot,
-    destinationRoot,
-    include,
-    exclude,
-    label,
-    appPayload=false,
-    signal
-}){
-    throwIfAborted(signal);
-    await assertNoLinks(workspaceRoot,sourceRoot,`${label}.source`);
-    const files=[];
-
-    async function visit(absolute,relative){
-        throwIfAborted(signal);
-        if(isExcluded(relative,exclude)||(appPayload&&isAppSourceForbidden(relative))){
-            return;
-        }
-
-        const info=await lstat(absolute,{bigint:true});
-
-        if(info.isSymbolicLink()){
-            fail(`${label} contains a symbolic link or junction: ${relative}`);
-        }
-
-        if(info.isDirectory()){
-            const entries=await readdir(absolute,{withFileTypes:true});
-
-            for(const entry of entries.sort((left,right)=>compareText(left.name,right.name))){
-                throwIfAborted(signal);
-                const childRelative=`${relative}/${entry.name}`;
-
-                if(isExcluded(childRelative,exclude)
-                    ||(appPayload&&isAppSourceForbidden(childRelative))){
-                    continue;
-                }
-
-                if(entry.isSymbolicLink()){
-                    fail(`${label} contains a symbolic link or junction: ${childRelative}`);
-                }
-
-                await visit(path.join(absolute,entry.name),childRelative);
-            }
-
-            return;
-        }
-
-        if(!info.isFile()){
-            fail(`${label} contains a non-file entry: ${relative}`);
-        }
-
-        const destination=destinationRoot==='.'
-            ?relative
-            :`${destinationRoot}/${relative}`;
-        const bytes=Number(info.size);
-        if(!Number.isSafeInteger(bytes)||bytes<0){
-            fail(`${label} contains a file whose size is not safely representable: ${relative}`);
-        }
-        files.push({
-            source:absolute,
-            sourceRelative:relative,
-            destination:normalizeRelativePath(destination,`${label} destination`),
-            bytes,
-            identity:fileIdentity(info),
-            label
-        });
-    }
-
-    for(const allowed of include){
-        throwIfAborted(signal);
-        if(isExcluded(allowed,exclude)||(appPayload&&isAppSourceForbidden(allowed))){
-            continue;
-        }
-
-        const candidate=resolveInside(sourceRoot,allowed,`${label}.include`);
-
+export async function discoverApps({workspaceRoot:requestedWorkspaceRoot}={}){
+    const workspaceRoot=await realDirectory(normalizeWorkspaceRoot(requestedWorkspaceRoot),'Workspace root');
+    const rootConfig=validateRootConfig(
+        await readJson(path.join(workspaceRoot,ROOT_CONFIG_NAME),ROOT_CONFIG_NAME),
+        path.join(workspaceRoot,ROOT_CONFIG_NAME)
+    );
+    const appsRoot=await realDirectory(path.join(workspaceRoot,rootConfig.appsRoot),'Apps root');
+    const entries=await readdir(appsRoot,{withFileTypes:true});
+    const apps=[];
+    for(const entry of entries.sort((left,right)=>compareText(left.name,right.name))){
+        if(!entry.isDirectory()||!APP_ID_PATTERN.test(entry.name))continue;
+        const configPath=path.join(appsRoot,entry.name,APP_CONFIG_NAME);
         try{
-            await assertNoLinks(sourceRoot,candidate,`${label}.include "${allowed}"`);
+            const info=await lstat(configPath);
+            if(!info.isSymbolicLink()&&info.isFile())apps.push(entry.name);
         }catch(error){
-            if(error?.code==='ENOENT'){
-                fail(`${label}.include does not exist: ${allowed}`);
-            }
-
-            throw error;
-        }
-
-        await visit(candidate,allowed);
-    }
-
-    return files;
-}
-
-function workspaceLocationIdentity(info){
-    return Object.freeze({
-        device:String(info.dev),
-        inode:String(info.ino)
-    });
-}
-
-function workspaceLocationMatches(info,identity){
-    return String(info.dev)===identity.device&&String(info.ino)===identity.inode;
-}
-
-function normalizeSharedPayloadSelection(sharedPayloadIds,rootConfig,{required=false}={}){
-    const selected=sharedPayloadIds===undefined
-        ?Object.keys(rootConfig.sharedPayloads)
-        :sharedPayloadIds;
-
-    if(!Array.isArray(selected)||selected.length>256||(required&&selected.length===0)){
-        fail('sharedPayloadIds must be a non-empty array with at most 256 entries.');
-    }
-
-    const normalized=[];
-    const seen=new Set();
-    for(const [index,id] of selected.entries()){
-        if(typeof id!=='string'||!SAFE_SHARED_ID_PATTERN.test(id)
-            ||!Object.hasOwn(rootConfig.sharedPayloads,id)){
-            fail(`sharedPayloadIds[${index}] references an unknown shared payload: ${String(id)}`);
-        }
-        if(seen.has(id))fail(`sharedPayloadIds contains a duplicate shared payload: ${id}`);
-        seen.add(id);
-        normalized.push(id);
-    }
-    return Object.freeze(normalized.sort(compareText));
-}
-
-function assertSnapshotCoverage(state,requiredIds){
-    for(const id of requiredIds){
-        if(!Object.hasOwn(state.filesBySharedPayload,id)){
-            fail(`Shared payload snapshot does not include the required payload: ${id}`);
+            if(error?.code!=='ENOENT')throw error;
         }
     }
+    return apps;
 }
 
-async function authenticateSharedPayloadSnapshotState(receipt,{
-    workspaceRoot,
-    sharedPayloadIds,
-    signal
-}={}){
+export async function inspectApp({workspaceRoot,appId,signal}={}){
     throwIfAborted(signal);
-    const state=issuedSharedPayloadSnapshots.get(receipt);
-    if(!state)fail('Shared payload snapshot was not issued by this SDK process.');
-    const requested=normalizeWorkspaceRoot(workspaceRoot);
-    let workspaceInfo;
-    let canonicalWorkspaceRoot;
-    try{
-        workspaceInfo=await lstat(requested,{bigint:true});
-        canonicalWorkspaceRoot=await realpath(requested);
-    }catch(error){
-        fail(`Shared payload snapshot workspace is unavailable: ${error.message}`);
-    }
-    if(workspaceInfo.isSymbolicLink()||!workspaceInfo.isDirectory()
-        ||canonicalWorkspaceRoot!==state.canonicalWorkspaceRoot
-        ||receipt.canonicalWorkspaceRoot!==canonicalWorkspaceRoot
-        ||!workspaceLocationMatches(workspaceInfo,state.workspaceIdentity)){
-        fail('Shared payload snapshot belongs to a different workspace identity.');
-    }
-    let configInfo;
-    try{
-        configInfo=await lstat(state.rootConfigPath,{bigint:true});
-    }catch(error){
-        fail(`Shared payload snapshot root configuration changed: ${error.message}`);
-    }
-    if(configInfo.isSymbolicLink()||!configInfo.isFile()
-        ||!identityMatches(configInfo,state.rootConfigIdentity)){
-        fail('Shared payload snapshot root configuration changed after preparation.');
-    }
-    if(sharedPayloadIds!==undefined){
-        if(!Array.isArray(sharedPayloadIds)||sharedPayloadIds.length>256){
-            fail('sharedPayloadIds must be an array with at most 256 entries.');
-        }
-        const seen=new Set();
-        for(const [index,id] of sharedPayloadIds.entries()){
-            if(typeof id!=='string'||!SAFE_SHARED_ID_PATTERN.test(id)||seen.has(id)){
-                fail(`sharedPayloadIds[${index}] is invalid or duplicated.`);
-            }
-            seen.add(id);
-        }
-        assertSnapshotCoverage(state,sharedPayloadIds);
-    }
-    throwIfAborted(signal);
-    return state;
+    const context=await loadContext(workspaceRoot,appId);
+    return inspectContext(context,{signal});
 }
 
-export async function prepareSharedPayloadSnapshot({
-    workspaceRoot:requestedWorkspaceRoot,
-    sharedPayloadIds,
-    signal,
-    onEvent
-}={}){
-    await emitOperation(onEvent,{type:'shared-payload.snapshot.started'});
-    throwIfAborted(signal);
-    const resolvedWorkspaceRoot=normalizeWorkspaceRoot(requestedWorkspaceRoot);
-    const initialWorkspaceInfo=await lstat(resolvedWorkspaceRoot,{bigint:true});
-    if(initialWorkspaceInfo.isSymbolicLink()||!initialWorkspaceInfo.isDirectory()){
-        fail('Shared payload snapshot workspace must be a real directory.');
-    }
-    const canonicalWorkspaceRoot=await realpath(resolvedWorkspaceRoot);
-    await assertNoLinks(canonicalWorkspaceRoot,canonicalWorkspaceRoot,'shared payload snapshot workspace');
-    const rootConfigDocument=await loadRootConfigDocument(canonicalWorkspaceRoot);
-    const selectedIds=normalizeSharedPayloadSelection(
-        sharedPayloadIds,
-        rootConfigDocument.value,
-        {required:true}
-    );
-    const retained=[];
-    const retainedBySharedPayload=Object.fromEntries(selectedIds.map(id=>[id,[]]));
-    let totalBytes=0;
-    let completedFiles=0;
-
-    for(const sharedPayloadId of selectedIds){
-        const routes=rootConfigDocument.value.sharedPayloads[sharedPayloadId];
-        for(const [routeIndex,route] of routes.entries()){
-            throwIfAborted(signal);
-            const sourceRoot=resolveInside(
-                canonicalWorkspaceRoot,
-                route.source,
-                `sharedPayloads.${sharedPayloadId}[${routeIndex}].source`
-            );
-            const files=await enumerateRoute({
-                workspaceRoot:canonicalWorkspaceRoot,
-                sourceRoot,
-                destinationRoot:route.destination,
-                include:route.include,
-                exclude:route.exclude,
-                label:`sharedPayloads.${sharedPayloadId}[${routeIndex}]`,
-                signal
-            });
-            for(const file of files){
-                throwIfAborted(signal);
-                if(retained.length>=MAX_SHARED_SNAPSHOT_FILE_COUNT){
-                    fail(`Shared payload snapshot exceeds ${MAX_SHARED_SNAPSHOT_FILE_COUNT} files.`);
-                }
-                if(file.bytes>MAX_SHARED_SNAPSHOT_FILE_BYTES){
-                    fail(`Shared payload snapshot file exceeds ${MAX_SHARED_SNAPSHOT_FILE_BYTES} bytes: ${file.sourceRelative}`);
-                }
-                if(totalBytes+file.bytes>MAX_SHARED_SNAPSHOT_TOTAL_BYTES){
-                    fail(`Shared payload snapshot exceeds ${MAX_SHARED_SNAPSHOT_TOTAL_BYTES} retained bytes.`);
-                }
-                const stable=await readStableBytes(file.source,file.label,file.identity);
-                if(stable.bytes.length!==file.bytes){
-                    fail(`Shared payload snapshot file changed size while retained: ${file.sourceRelative}`);
-                }
-                const digest=createHash('sha256').update(stable.bytes).digest('hex');
-                const source=route.source==='.'
-                    ?file.sourceRelative
-                    :`${route.source}/${file.sourceRelative}`;
-                const record=Object.freeze({
-                    ...file,
-                    sharedPayloadId,
-                    routeIndex,
-                    sourceRelative:normalizeRelativePath(source,'shared payload snapshot source'),
-                    retainedBytes:stable.bytes,
-                    sha256:digest
-                });
-                retained.push(record);
-                retainedBySharedPayload[sharedPayloadId].push(record);
-                totalBytes+=stable.bytes.length;
-                completedFiles+=1;
-                await emitOperation(onEvent,{
-                    type:'shared-payload.snapshot.progress',
-                    current:completedFiles,
-                    completedBytes:totalBytes,
-                    sharedPayloadId,
-                    path:record.sourceRelative
-                });
-            }
-        }
-    }
-
-    const [finalWorkspaceInfo,finalConfigInfo]=await Promise.all([
-        lstat(canonicalWorkspaceRoot,{bigint:true}),
-        lstat(rootConfigDocument.configPath,{bigint:true})
-    ]);
-    const workspaceIdentity=workspaceLocationIdentity(initialWorkspaceInfo);
-    if(finalWorkspaceInfo.isSymbolicLink()||!finalWorkspaceInfo.isDirectory()
-        ||!workspaceLocationMatches(finalWorkspaceInfo,workspaceIdentity)
-        ||finalConfigInfo.isSymbolicLink()||!finalConfigInfo.isFile()
-        ||!identityMatches(finalConfigInfo,rootConfigDocument.identity)){
-        fail('Shared payload snapshot workspace or root configuration changed during preparation.');
-    }
-
-    const inventory=retained.map(record=>({
-        sharedPayloadId:record.sharedPayloadId,
-        routeIndex:record.routeIndex,
-        source:record.sourceRelative,
-        destination:record.destination,
-        bytes:record.bytes,
-        sha256:record.sha256
-    })).sort((left,right)=>compareText(JSON.stringify(left),JSON.stringify(right)));
-    const receipt=immutableJsonCopy({
-        schemaVersion:1,
-        kind:'arcane-shared-payload-snapshot',
-        canonicalWorkspaceRoot,
-        workspaceIdentity,
-        rootConfig:Object.freeze({
-            path:ROOT_CONFIG_NAME,
-            identity:rootConfigDocument.identity,
-            sha256:createHash('sha256').update(rootConfigDocument.bytes).digest('hex')
-        }),
-        sharedPayloadIds:selectedIds,
-        files:inventory,
-        fileCount:inventory.length,
-        totalBytes,
-        contentSha256:createHash('sha256').update(JSON.stringify(inventory)).digest('hex')
-    });
-    const filesBySharedPayload=Object.freeze(Object.fromEntries(
-        Object.entries(retainedBySharedPayload).map(([id,files])=>[id,Object.freeze(files)])
-    ));
-    issuedSharedPayloadSnapshots.set(receipt,Object.freeze({
-        receipt,
-        canonicalWorkspaceRoot,
-        workspaceIdentity,
-        rootConfigPath:rootConfigDocument.configPath,
-        rootConfigIdentity:rootConfigDocument.identity,
-        files:Object.freeze(retained),
-        filesBySharedPayload
-    }));
-    await emitOperation(onEvent,{
-        type:'shared-payload.snapshot.completed',
-        fileCount:receipt.fileCount,
-        totalBytes:receipt.totalBytes,
-        contentSha256:receipt.contentSha256
-    });
-    return receipt;
-}
-
-export async function authenticateSharedPayloadSnapshot(receipt,options={}){
-    await authenticateSharedPayloadSnapshotState(receipt,options);
-    return receipt;
-}
-
-async function collectPackageFiles(context,{signal,sharedPayloadState}={}){
-    const {workspaceRoot,appRoot,config,rootConfig}=context;
-    const files=await enumerateRoute({
-        workspaceRoot,
-        sourceRoot:appRoot,
-        destinationRoot:`apps/${config.id}`,
-        include:config.include,
-        exclude:config.exclude,
-        label:`apps.${config.id}`,
-        appPayload:true,
-        signal
-    });
-
-    if(sharedPayloadState){
-        assertSnapshotCoverage(sharedPayloadState,config.shared);
-        for(const sharedId of config.shared){
-            files.push(...sharedPayloadState.filesBySharedPayload[sharedId]);
-        }
-    }else{
-        for(const sharedId of config.shared){
-            const routes=rootConfig.sharedPayloads[sharedId];
-
-            for(const [index,route] of routes.entries()){
-                const sourceRoot=resolveInside(
-                    workspaceRoot,
-                    route.source,
-                    `sharedPayloads.${sharedId}[${index}].source`
-                );
-                files.push(...await enumerateRoute({
-                    workspaceRoot,
-                    sourceRoot,
-                    destinationRoot:route.destination,
-                    include:route.include,
-                    exclude:route.exclude,
-                    label:`sharedPayloads.${sharedId}[${index}]`,
-                    signal
-                }));
-            }
-        }
-    }
-
-    const destinations=new Map();
-
-    for(const file of files){
+async function copyRecords(records,stagingRoot,{signal,onEvent}={}){
+    for(const record of records){
         throwIfAborted(signal);
-        if(GENERATED_PACKAGE_ROOT_PATH_KEYS.has(pathKey(file.destination))){
-            fail(`${file.label} collides with generated package path: ${file.destination}`);
-        }
-
-        const key=pathKey(file.destination);
-
-        if(destinations.has(key)){
-            fail(`Package destination collision: ${file.destination} from ${file.source} and ${destinations.get(key).source}.`);
-        }
-
-        destinations.set(key,file);
-    }
-
-    const expectedEntry=`apps/${config.id}/${config.entry}`;
-
-    if(!destinations.has(pathKey(expectedEntry))){
-        fail(`The configured entry file was not found in the package payload: ${expectedEntry}`);
-    }
-
-    return files.sort((left,right)=>compareText(left.destination,right.destination));
-}
-
-async function copyPackageFiles(files,outputRoot,{signal,onEvent}={}){
-    let completedBytes=0;
-    const buffer=Buffer.allocUnsafe(1024*1024);
-
-    for(const [index,file] of files.entries()){
-        throwIfAborted(signal);
-        const destination=resolveInside(outputRoot,file.destination,'package destination');
+        const destination=resolveInside(stagingRoot,record.destination,'package destination');
         await mkdir(path.dirname(destination),{recursive:true});
-        if(file.retainedBytes!==undefined){
-            if(!Buffer.isBuffer(file.retainedBytes)||file.retainedBytes.length!==file.bytes){
-                fail(`Retained shared payload bytes are invalid for ${file.destination}.`);
-            }
-            const output=await open(destination,'wx');
-            let copiedBytes=0;
-            try{
-                throwIfAborted(signal);
-                await output.writeFile(file.retainedBytes);
-                copiedBytes=file.retainedBytes.length;
-                const outputAfter=await output.stat({bigint:true});
-                if(Number(outputAfter.size)!==copiedBytes){
-                    fail(`Could not finish writing retained shared payload ${file.destination}.`);
-                }
-            }finally{
-                await output.close().catch(()=>{});
-            }
-            completedBytes+=copiedBytes;
-            await emitOperation(onEvent,{
-                type:'package.copy.progress',
-                current:index+1,
-                total:files.length,
-                completedBytes,
-                path:file.destination
-            });
-            continue;
-        }
-        const source=await openStableRegularFile(file.source,file.label,file.identity);
-        let output;
-        let copiedBytes=0;
-        try{
-            output=await open(destination,'wx');
-            while(true){
-                throwIfAborted(signal);
-                const {bytesRead}=await source.handle.read(buffer,0,buffer.length,null);
-                if(bytesRead===0)break;
-                let written=0;
-                while(written<bytesRead){
-                    const result=await output.write(buffer,written,bytesRead-written,null);
-                    if(result.bytesWritten<=0)fail(`Could not finish writing ${file.destination}.`);
-                    written+=result.bytesWritten;
-                }
-                copiedBytes+=bytesRead;
-            }
-            const [sourceAfter,outputAfter]=await Promise.all([
-                source.handle.stat({bigint:true}),
-                output.stat({bigint:true})
-            ]);
-            if(!identityMatches(sourceAfter,file.identity)||copiedBytes!==file.bytes
-                ||Number(outputAfter.size)!==copiedBytes){
-                fail(`${file.label} changed while ${file.destination} was being copied.`);
-            }
-        }finally{
-            await output?.close().catch(()=>{});
-            await source.handle.close().catch(()=>{});
-        }
-        completedBytes+=copiedBytes;
-        await emitOperation(onEvent,{
-            type:'package.copy.progress',
-            current:index+1,
-            total:files.length,
-            completedBytes,
-            path:file.destination
-        });
+        await copyFile(record.source,destination);
+        await emit(onEvent,{type:'package.file.copied',path:record.destination});
     }
-}
-
-function escapeHtml(value){
-    return String(value)
-        .replaceAll('&','&amp;')
-        .replaceAll('<','&lt;')
-        .replaceAll('>','&gt;')
-        .replaceAll('"','&quot;');
-}
-
-async function materializeBasePackage(context,outputRoot,files,{signal,onEvent}={}){
-    throwIfAborted(signal);
-    await mkdir(outputRoot,{recursive:true});
-    await assertNoLinks(context.distRoot,outputRoot,'package staging root');
-    await copyPackageFiles(files,outputRoot,{signal,onEvent});
-    throwIfAborted(signal);
-    const start=`./apps/${context.config.id}/${context.config.entry}`;
-    const title=escapeHtml(context.config.displayName);
-    await writeFile(
-        path.join(outputRoot,'index.html'),
-        [
-            '<!doctype html>',
-            '<meta charset="utf-8">',
-            `<meta http-equiv="refresh" content="0; url=${escapeHtml(start)}">`,
-            `<title>${title}</title>`,
-            `<a href="${escapeHtml(start)}">Open ${title}</a>`,
-            ''
-        ].join('\n'),
-        'utf8'
-    );
-}
-
-async function sha256WithIdentity(filePath,{signal,expectedIdentity,label=filePath}={}){
-    throwIfAborted(signal);
-    const hash=createHash('sha256');
-    const opened=await openStableRegularFile(filePath,label,expectedIdentity);
-    const buffer=Buffer.allocUnsafe(1024*1024);
-
-    try{
-        while(true){
-            throwIfAborted(signal);
-            const {bytesRead}=await opened.handle.read(buffer,0,buffer.length,null);
-
-            if(bytesRead===0){
-                break;
-            }
-
-            hash.update(buffer.subarray(0,bytesRead));
-        }
-        const after=await opened.handle.stat({bigint:true});
-        if(!identityMatches(after,opened.identity))fail(`${label} changed while it was being hashed.`);
-    }finally{
-        await opened.handle.close();
-    }
-
-    return {sha256:hash.digest('hex'),identity:opened.identity};
-}
-
-async function sha256(filePath,options={}){
-    return (await sha256WithIdentity(filePath,options)).sha256;
 }
 
 async function listOutputFiles(root,{signal}={}){
     const files=[];
-
     async function visit(directory,relativeRoot=''){
         throwIfAborted(signal);
         const entries=await readdir(directory,{withFileTypes:true});
-
-        for(const entry of entries.sort((left,right)=>compareText(left.name,right.name))){
-            throwIfAborted(signal);
+        entries.sort((left,right)=>compareText(left.name,right.name));
+        for(const entry of entries){
             const relative=relativeRoot?`${relativeRoot}/${entry.name}`:entry.name;
             const absolute=path.join(directory,entry.name);
-
-            if(isAlwaysForbidden(relative)){
-                fail(`Package contains a globally forbidden path: ${relative}`);
-            }
-            if(path.posix.basename(relative)===APP_CONFIG_NAME){
-                fail(`Package contains authored configuration that must remain outside the browser payload: ${relative}`);
-            }
-
-            if(entry.isSymbolicLink()){
-                fail(`Package contains a symbolic link or junction: ${relative}`);
-            }
-
-            if(entry.isDirectory()){
-                await visit(absolute,relative);
-            }else if(entry.isFile()){
-                files.push({absolute,relative});
-            }else{
-                fail(`Package contains a non-file entry: ${relative}`);
-            }
+            const info=await lstat(absolute);
+            if(info.isSymbolicLink())fail(`Package output contains a symbolic link: ${relative}.`);
+            if(info.isDirectory())await visit(absolute,relative);
+            else if(info.isFile())files.push(relative);
+            else fail(`Package output contains a non-file entry: ${relative}.`);
         }
     }
-
     await visit(root);
-    return files.sort((left,right)=>compareText(left.relative,right.relative));
-}
-
-async function inventoryEntries(root,{signal,onEvent}={}){
-    const files=(await listOutputFiles(root,{signal})).filter(file=>
-        file.relative!==RELEASE_MANIFEST_NAME
-    );
-    const entries=[];
-    const identities=[];
-
-    let completedBytes=0;
-
-    for(const [index,file] of files.entries()){
-        throwIfAborted(signal);
-        const verified=await sha256WithIdentity(file.absolute,{
-            signal,
-            label:`package file ${file.relative}`
-        });
-        entries.push({
-            path:file.relative,
-            bytes:verified.identity.bytes,
-            sha256:verified.sha256
-        });
-        identities.push(Object.freeze({path:file.relative,...verified.identity}));
-        completedBytes+=verified.identity.bytes;
-        await emitOperation(onEvent,{
-            type:'package.hash.progress',
-            current:index+1,
-            total:files.length,
-            completedBytes,
-            path:file.relative
-        });
-    }
-
-    return {entries,identities};
-}
-
-async function assertArtifactState(root,identities,{signal}={}){
-    throwIfAborted(signal);
-    const requested=path.resolve(root);
-    const rootBefore=await lstat(requested,{bigint:true});
-    if(rootBefore.isSymbolicLink()||!rootBefore.isDirectory()){
-        fail('App release root must be a real directory.');
-    }
-    const canonical=await realpath(requested);
-    const actualPaths=(await listOutputFiles(canonical,{signal}))
-        .map(file=>file.relative)
-        .sort(compareText);
-    const expectedPaths=identities.map(identity=>identity.path).sort(compareText);
-    if(JSON.stringify(actualPaths)!==JSON.stringify(expectedPaths)){
-        fail('App release inventory changed after verification.');
-    }
-
-    for(const identity of identities){
-        throwIfAborted(signal);
-        const filePath=resolveInside(canonical,identity.path,'verified app release path');
-        const info=await lstat(filePath,{bigint:true});
-        if(info.isSymbolicLink()||!info.isFile()||!identityMatches(info,identity)){
-            fail(`App release file changed after verification: ${identity.path}`);
-        }
-    }
-    const rootAfter=await lstat(canonical,{bigint:true});
-    if(!rootAfter.isDirectory()||rootAfter.isSymbolicLink()
-        ||!identityMatches(rootAfter,fileIdentity(rootBefore))){
-        fail('App release root changed while its verification state was authenticated.');
-    }
-    return {canonical,rootIdentity:fileIdentity(rootAfter)};
-}
-
-function appReleasePackageBinding(config){
-    if(!isPlainObject(config)){
-        fail('App release package binding is missing.');
-    }
-    return immutableJsonCopy({
-        schemaVersion:1,
-        id:config.id,
-        displayName:config.displayName,
-        version:config.version,
-        entry:config.entry,
-        strategy:config.strategy,
-        security:config.security,
-        localAIModelPolicy:config.localAIModelPolicy??{verified_only:true,models:[]},
-        include:[...(config.include??[])],
-        exclude:[...(config.exclude??[])],
-        shared:[...(config.shared??[])],
-        adapter:config.adapter??null
-    });
-}
-
-async function issueAppReleaseReceipt(root,release,identities,{
-    signal,
-    packageConfig,
-    descriptorAuthority
-}={}){
-    const state=await assertArtifactState(root,identities,{signal});
-    const packageBinding=appReleasePackageBinding(packageConfig);
-    if(!descriptorAuthority?.descriptor
-        ||!/^[a-f0-9]{64}$/u.test(descriptorAuthority.descriptorSha256)){
-        fail('Canonical app descriptor authority is required to issue a release receipt.');
-    }
-    const receipt={
-        schemaVersion:1,
-        kind:'arcane-app-release-verification',
-        generation:randomBytes(16).toString('hex'),
-        canonicalLocation:state.canonical,
-        builder:release.builder,
-        app:immutableJsonCopy(release.app),
-        policySha256:release.policySha256,
-        files:immutableJsonCopy(release.files),
-        fileCount:release.fileCount,
-        totalBytes:release.totalBytes,
-        contentSha256:release.contentSha256
-    };
-    Object.defineProperty(receipt,'identities',{
-        value:Object.freeze([...identities]),
-        enumerable:false,
-        writable:false,
-        configurable:false
-    });
-    Object.freeze(receipt);
-    issuedAppReleaseReceipts.set(receipt,Object.freeze({
-        canonicalLocation:state.canonical,
-        rootIdentity:state.rootIdentity,
-        identities:receipt.identities,
-        packageBinding,
-        descriptorAuthority:Object.freeze({
-            descriptor:descriptorAuthority.descriptor,
-            descriptorSha256:descriptorAuthority.descriptorSha256,
-            source:descriptorAuthority.source
-        })
-    }));
-    return receipt;
-}
-
-async function authenticateAppReleaseReceiptState(receipt,{
-    releaseRoot,
-    expectedPackageConfig,
-    signal
-}={}){
-    const state=issuedAppReleaseReceipts.get(receipt);
-    if(!state)fail('App release receipt was not issued by this SDK process.');
-    if(typeof releaseRoot!=='string'||!releaseRoot.trim())fail('releaseRoot is required to authenticate an app release receipt.');
-    const requested=path.resolve(releaseRoot);
-    const canonical=await realpath(requested);
-    if(canonical!==state.canonicalLocation||receipt.canonicalLocation!==canonical){
-        fail('App release receipt belongs to a different release location.');
-    }
-    const rootInfo=await lstat(canonical,{bigint:true});
-    if(rootInfo.isSymbolicLink()||!rootInfo.isDirectory()
-        ||!identityMatches(rootInfo,state.rootIdentity)){
-        fail('App release root changed after its receipt was issued.');
-    }
-    if(expectedPackageConfig!==undefined
-        &&JSON.stringify(appReleasePackageBinding(expectedPackageConfig))
-            !==JSON.stringify(state.packageBinding)){
-        fail('App release receipt belongs to a different authored package policy.');
-    }
-    await assertArtifactState(canonical,state.identities,{signal});
-    return state;
-}
-
-export async function authenticateAppReleaseReceipt(receipt,options={}){
-    await authenticateAppReleaseReceiptState(receipt,options);
-    return receipt;
-}
-
-export async function authenticateAppReleaseAuthority(receipt,{
-    releaseRoot,
-    expectedPackageConfig,
-    expectedDescriptor,
-    signal
-}={}){
-    const state=await authenticateAppReleaseReceiptState(receipt,{
-        releaseRoot,
-        expectedPackageConfig,
-        signal
-    });
-    const authority=state.descriptorAuthority;
-    if(!authority?.descriptor||!/^[a-f0-9]{64}$/u.test(authority.descriptorSha256)){
-        fail('App release receipt is missing its canonical descriptor authority.');
-    }
-    if(expectedDescriptor!==undefined){
-        const contracts=await appDescriptorContracts();
-        if(contracts.appDescriptorSha256(expectedDescriptor)!==authority.descriptorSha256){
-            fail('App release receipt belongs to a different canonical app descriptor.');
-        }
-    }
-    return Object.freeze({
-        receipt,
-        descriptor:authority.descriptor,
-        descriptorSha256:authority.descriptorSha256,
-        source:authority.source
-    });
-}
-
-export async function readVerifiedAppReleaseFile(receipt,{
-    releaseRoot,
-    relativePath,
-    signal
-}={}){
-    throwIfAborted(signal);
-    const state=issuedAppReleaseReceipts.get(receipt);
-    if(!state)fail('App release receipt was not issued by this SDK process.');
-    if(typeof releaseRoot!=='string'||!releaseRoot.trim()){
-        fail('releaseRoot is required to read a verified app release file.');
-    }
-    const requested=path.resolve(releaseRoot);
-    const canonical=await realpath(requested);
-    if(canonical!==state.canonicalLocation||receipt.canonicalLocation!==canonical){
-        fail('App release receipt belongs to a different release location.');
-    }
-    const rootInfo=await lstat(canonical,{bigint:true});
-    if(rootInfo.isSymbolicLink()||!rootInfo.isDirectory()
-        ||!identityMatches(rootInfo,state.rootIdentity)){
-        fail('App release root changed after its receipt was issued.');
-    }
-
-    const normalized=normalizeRelativePath(relativePath,'verified app release path');
-    const file=receipt.files.find(candidate=>pathKey(candidate.path)===pathKey(normalized));
-    if(!file)fail(`Path is not in the verified app release inventory: ${normalized}.`);
-    if(file.bytes>MAX_VERIFIED_APP_FILE_BYTES){
-        fail(
-            `Verified browser file exceeds the ${MAX_VERIFIED_APP_FILE_BYTES}-byte development serving limit: ${file.path}.`,
-            'ARCANE_POLICY_DENIED'
-        );
-    }
-    const identity=state.identities.find(candidate=>
-        pathKey(candidate.path)===pathKey(file.path)
-    );
-    if(!identity)fail(`Verified app release identity is missing for ${file.path}.`);
-    const filePath=resolveInside(canonical,file.path,'verified app release path');
-    const opened=await openStableRegularFile(filePath,`verified app release file ${file.path}`,identity);
-    try{
-        throwIfAborted(signal);
-        const bytes=await opened.handle.readFile();
-        throwIfAborted(signal);
-        const after=await opened.handle.stat({bigint:true});
-        if(!identityMatches(after,opened.identity)||bytes.length!==file.bytes){
-            fail(`Verified app release file changed while it was being read: ${file.path}.`);
-        }
-        const digest=createHash('sha256').update(bytes).digest('hex');
-        if(digest!==file.sha256){
-            fail(`Verified app release file hash changed: ${file.path}.`);
-        }
-        const current=await lstat(filePath,{bigint:true});
-        if(current.isSymbolicLink()||!current.isFile()||!identityMatches(current,identity)){
-            fail(`Verified app release path changed while it was being read: ${file.path}.`);
-        }
-        const canonicalFile=await realpath(filePath);
-        if(!isInside(canonical,canonicalFile)){
-            fail(`Verified app release path left its release root: ${file.path}.`);
-        }
-        return bytes;
-    }finally{
-        await opened.handle.close();
-    }
-}
-
-function normalizedRoutePolicy(route){
-    return {
-        source:route.source,
-        destination:route.destination,
-        include:[...route.include].sort(compareText),
-        exclude:[...route.exclude].sort(compareText)
-    };
-}
-
-async function packagePolicySha256(context,{signal}={}){
-    throwIfAborted(signal);
-    const {config,rootConfig,appRoot}=context;
-    let adapter=null;
-
-    if(config.adapter){
-        const adapterPath=resolveInside(appRoot,config.adapter,`${config.id} adapter`);
-        await assertNoLinks(appRoot,adapterPath,`${config.id} adapter`);
-        adapter={
-            path:config.adapter,
-            sha256:await sha256(adapterPath,{signal})
-        };
-    }
-
-    const shared=[...config.shared]
-        .sort(compareText)
-        .map(id=>({
-            id,
-            routes:rootConfig.sharedPayloads[id]
-                .map(normalizedRoutePolicy)
-                .sort((left,right)=>compareText(JSON.stringify(left),JSON.stringify(right)))
-        }));
-    const policy={
-        strategy:config.strategy,
-        security:config.security,
-        localAIModelPolicy:{...config.localAIModelPolicy},
-        include:[...config.include].sort(compareText),
-        exclude:[...config.exclude].sort(compareText),
-        shared,
-        adapter
-    };
-
-    return createHash('sha256')
-        .update(JSON.stringify(policy))
-        .digest('hex');
-}
-
-async function writeReleaseManifest(root,context,version,{signal,onEvent}={}){
-    const {config}=context;
-    const inventory=await inventoryEntries(root,{signal,onEvent});
-    const files=inventory.entries;
-    const totalBytes=files.reduce((total,file)=>total+file.bytes,0);
-    const contentSha256=createHash('sha256')
-        .update(JSON.stringify(files))
-        .digest('hex');
-    const release={
-        schemaVersion:1,
-        builder:PACKAGER_VERSION,
-        app:{
-            id:config.id,
-            displayName:config.displayName,
-            version,
-            entry:config.entry,
-            start:`./apps/${config.id}/${config.entry}`,
-            security:config.security,
-            localAIModelPolicy:{...config.localAIModelPolicy}
-        },
-        policySha256:await packagePolicySha256(context,{signal}),
-        fileCount:files.length,
-        totalBytes,
-        contentSha256,
-        files
-    };
-
-    const manifestPath=path.join(root,RELEASE_MANIFEST_NAME);
-    await writeFile(
-        manifestPath,
-        `${JSON.stringify(release,null,2)}\n`,
-        {encoding:'utf8',flag:'wx'}
-    );
-    const manifest=await openStableRegularFile(manifestPath,RELEASE_MANIFEST_NAME);
-    await manifest.handle.close();
-    return {
-        release,
-        identities:Object.freeze([
-            ...inventory.identities,
-            Object.freeze({path:RELEASE_MANIFEST_NAME,...manifest.identity})
-        ])
-    };
-}
-
-async function writeRuntimeAuthorities(root,state){
-    if(state==null)return;
-    const authorityPath=path.join(root,RUNTIME_AUTHORITIES_NAME);
-    await writeFile(
-        authorityPath,
-        `${JSON.stringify(state.document,null,2)}\n`,
-        {encoding:'utf8',flag:'wx'}
-    );
-    const authority=await openStableRegularFile(authorityPath,RUNTIME_AUTHORITIES_NAME);
-    await authority.handle.close();
-}
-
-async function writeRuntimeProjection(root,state){
-    if(state==null)return;
-    const projectionPath=path.join(root,RUNTIME_PROJECTION_NAME);
-    await writeFile(
-        projectionPath,
-        `${JSON.stringify(state.projectionDocument,null,2)}\n`,
-        {encoding:'utf8',flag:'wx'}
-    );
-    const projection=await openStableRegularFile(projectionPath,RUNTIME_PROJECTION_NAME);
-    await projection.handle.close();
-}
-
-async function verifyRuntimeAuthorities(root,state){
-    const authorityPath=path.join(root,RUNTIME_AUTHORITIES_NAME);
-    if(state==null){
-        try{
-            await lstat(authorityPath);
-            fail(`${RUNTIME_AUTHORITIES_NAME} is not allowed without an external runtime authority.`);
-        }catch(error){
-            if(error?.code!=='ENOENT')throw error;
-        }
-        return;
-    }
-    const document=await readJsonDocument(authorityPath,RUNTIME_AUTHORITIES_NAME);
-    if(!isDeepStrictEqual(document.value,state.document)){
-        fail(`${RUNTIME_AUTHORITIES_NAME} does not match the admitted workspace runtime authorities.`);
-    }
-}
-
-async function verifyRuntimeProjection(root,state,release){
-    const projectionPath=path.join(root,RUNTIME_PROJECTION_NAME);
-    const releaseRecords=release.files.filter(file=>file.path===RUNTIME_PROJECTION_NAME);
-    if(state==null){
-        if(releaseRecords.length!==0){
-            fail(
-                `${RUNTIME_PROJECTION_NAME} is not allowed without an external runtime authority.`,
-                RUNTIME_PROJECTION_ERROR
-            );
-        }
-        try{
-            await lstat(projectionPath);
-            fail(
-                `${RUNTIME_PROJECTION_NAME} is not allowed without an external runtime authority.`,
-                RUNTIME_PROJECTION_ERROR
-            );
-        }catch(error){
-            if(error?.code!=='ENOENT')throw error;
-        }
-        return;
-    }
-
-    let document;
-    try{
-        document=await readJsonDocument(projectionPath,RUNTIME_PROJECTION_NAME);
-    }catch(error){
-        fail(
-            `${RUNTIME_PROJECTION_NAME} could not be authenticated: ${error.message}`,
-            RUNTIME_PROJECTION_ERROR
-        );
-    }
-    const expectedBytes=Buffer.from(`${JSON.stringify(state.projectionDocument,null,2)}\n`,'utf8');
-    if(!document.bytes.equals(expectedBytes)
-        ||!isDeepStrictEqual(document.value,state.projectionDocument)){
-        fail(
-            `${RUNTIME_PROJECTION_NAME} does not match the admitted workspace runtime inventory.`,
-            RUNTIME_PROJECTION_ERROR
-        );
-    }
-    const expectedSha256=createHash('sha256').update(expectedBytes).digest('hex');
-    const record=releaseRecords[0];
-    if(releaseRecords.length!==1
-        ||record.bytes!==expectedBytes.length
-        ||record.sha256!==expectedSha256){
-        fail(
-            `${RUNTIME_PROJECTION_NAME} is not authenticated by the packaged release inventory.`,
-            RUNTIME_PROJECTION_ERROR
-        );
-    }
-}
-
-function verifyRuntimeProjectionAuthority(release,state){
-    if(state==null)return;
-    const projection=release.files
-        .filter(file=>file.path.startsWith('arcane/'))
-        .map(file=>({
-            path:file.path.slice('arcane/'.length),
-            bytes:file.bytes,
-            sha256:file.sha256
-        }));
-    const totalBytes=projection.reduce((total,file)=>total+file.bytes,0);
-    const contentSha256=createHash('sha256')
-        .update(JSON.stringify(projection))
-        .digest('hex');
-    const expected=state.document.projection;
-    if(projection.length!==expected.fileCount
-        ||totalBytes!==expected.totalBytes
-        ||contentSha256!==expected.contentSha256){
-        fail('The packaged arcane runtime does not match its admitted runtime authorities.');
-    }
-}
-
-function expectedReleaseApp(context,version){
-    const {config}=context;
-    return {
-        id:config.id,
-        displayName:config.displayName,
-        version,
-        entry:config.entry,
-        start:`./apps/${config.id}/${config.entry}`,
-        security:config.security,
-        localAIModelPolicy:{...config.localAIModelPolicy}
-    };
-}
-
-async function verifyFreshStaticRelease(root,context,version,releaseState,{
-    runtimeAuthorityState,
-    signal
-}={}){
-    throwIfAborted(signal);
-    const {config}=context;
-    const expectedApp=expectedReleaseApp(context,version);
-    const release=releaseState.release;
-
-    if(release?.schemaVersion!==1||release?.builder!==PACKAGER_VERSION
-        ||JSON.stringify(release?.app)!==JSON.stringify(expectedApp)
-        ||!Array.isArray(release?.files)
-        ||release.fileCount!==release.files.length){
-        fail(`${config.id}/${RELEASE_MANIFEST_NAME} identity is invalid.`);
-    }
-
-    // This staging tree is owned by this operation and no adapter has run. The
-    // release inventory was produced from the final bytes immediately before
-    // this check, so reuse that receipt instead of hashing every file twice.
-    const rootIndex=path.join(root,'index.html');
-    const entry=resolveInside(root,expectedApp.start.slice(2),'package entry');
-    const [indexInfo,entryInfo,manifestInfo]=await Promise.all([
-        lstat(rootIndex),
-        lstat(entry),
-        lstat(path.join(root,RELEASE_MANIFEST_NAME))
-    ]);
-
-    if(!indexInfo.isFile()||indexInfo.isSymbolicLink()
-        ||!entryInfo.isFile()||entryInfo.isSymbolicLink()
-        ||!manifestInfo.isFile()||manifestInfo.isSymbolicLink()){
-        fail(`Package entry files for ${config.id} are invalid.`);
-    }
-
-    await verifyRuntimeAuthorities(root,runtimeAuthorityState);
-    await verifyRuntimeProjection(root,runtimeAuthorityState,release);
-    verifyRuntimeProjectionAuthority(release,runtimeAuthorityState);
-
-    return releaseState;
-}
-
-async function verifyGenericRelease(root,context,version,{
-    runtimeAuthorityState,
-    signal,
-    onEvent
-}={}){
-    const {config}=context;
-    const manifestDocument=await readJsonDocument(
-        path.join(root,RELEASE_MANIFEST_NAME),
-        `${config.id}/${RELEASE_MANIFEST_NAME}`
-    );
-    const release=manifestDocument.value;
-    const expectedApp=expectedReleaseApp(context,version);
-
-    if(release?.schemaVersion!==1||release?.builder!==PACKAGER_VERSION
-        ||JSON.stringify(release?.app)!==JSON.stringify(expectedApp)
-        ||release?.policySha256!==await packagePolicySha256(context,{signal})
-        ||!Array.isArray(release?.files)){
-        fail(`${config.id}/${RELEASE_MANIFEST_NAME} identity is invalid.`);
-    }
-
-    const inventory=await inventoryEntries(root,{signal,onEvent});
-    const actualFiles=inventory.entries;
-    const totalBytes=actualFiles.reduce((total,file)=>total+file.bytes,0);
-    const contentSha256=createHash('sha256')
-        .update(JSON.stringify(actualFiles))
-        .digest('hex');
-
-    if(release.fileCount!==actualFiles.length
-        ||release.totalBytes!==totalBytes
-        ||release.contentSha256!==contentSha256
-        ||JSON.stringify(release.files)!==JSON.stringify(actualFiles)){
-        fail(`${config.id}/${RELEASE_MANIFEST_NAME} does not match the package tree.`);
-    }
-
-    const rootIndex=path.join(root,'index.html');
-    const entry=resolveInside(root,expectedApp.start.slice(2),'package entry');
-    const [indexInfo,entryInfo]=await Promise.all([lstat(rootIndex),lstat(entry)]);
-
-    if(!indexInfo.isFile()||indexInfo.isSymbolicLink()
-        ||!entryInfo.isFile()||entryInfo.isSymbolicLink()){
-        fail(`Package entry files for ${config.id} are invalid.`);
-    }
-
-    await verifyRuntimeAuthorities(root,runtimeAuthorityState);
-    await verifyRuntimeProjection(root,runtimeAuthorityState,release);
-    verifyRuntimeProjectionAuthority(release,runtimeAuthorityState);
-
-    return {
-        release,
-        identities:Object.freeze([
-            ...inventory.identities,
-            Object.freeze({path:RELEASE_MANIFEST_NAME,...manifestDocument.identity})
-        ])
-    };
+    return files.sort(compareText);
 }
 
 async function loadAdapter(context){
-    if(context.config.strategy!=='adapter'){
-        return null;
+    if(context.config.strategy!=='adapter')return null;
+    const adapterPath=resolveInside(context.appRoot,context.config.adapter,`${context.appId} adapter`);
+    await assertContainedRealPath(context.appRoot,adapterPath,`${context.appId} adapter`);
+    const module=await import(`${pathToFileURL(adapterPath).href}?source=${Date.now()}`);
+    if(typeof module.buildArcanePackage!=='function'){
+        fail(`${context.appId} adapter must export buildArcanePackage.`);
     }
-
-    const adapterPath=resolveInside(
-        context.appRoot,
-        context.config.adapter,
-        `${context.config.id} adapter`
-    );
-    await assertNoLinks(context.appRoot,adapterPath,`${context.config.id} adapter`);
-    const details=await stat(adapterPath);
-
-    if(!details.isFile()){
-        fail(`${context.config.id} adapter is not a regular file.`);
-    }
-
-    const adapterBytes=await readFile(adapterPath);
-
-    if(adapterBytes.includes(0x0d)){
-        fail(`${context.config.id} adapter must use canonical LF line endings.`);
-    }
-
-    const module=await import(`${pathToFileURL(adapterPath).href}?mtime=${details.mtimeMs}`);
-
-    if(typeof module.buildArcanePackage!=='function'
-        ||typeof module.verifyArcanePackage!=='function'){
-        fail(`${context.config.id} adapter must export buildArcanePackage and verifyArcanePackage.`);
-    }
-
     return module;
 }
 
-async function verifyBuiltPackage(context,outputRoot,version,adapter,{
-    runtimeAuthorityState,
-    signal,
-    onEvent
-}={}){
-    throwIfAborted(signal);
-    if(adapter){
-        await adapter.verifyArcanePackage({
-            workspaceRoot:context.workspaceRoot,
-            appRoot:context.appRoot,
-            outputRoot,
-            config:context.config,
-            version,
-            signal,
-            onEvent
-        });
-    }
-
-    return verifyGenericRelease(outputRoot,context,version,{
-        runtimeAuthorityState,
-        signal,
-        onEvent
-    });
-}
-
-async function writeAppVersion(context,version){
-    parseSemver(version);
-    const raw=await readJson(context.config.configPath,context.config.configPath);
-    raw.version=version;
-    const temporary=`${context.config.configPath}.tmp-${process.pid}-${randomBytes(4).toString('hex')}`;
-    const backup=`${context.config.configPath}.bak-${process.pid}-${randomBytes(4).toString('hex')}`;
-    await writeFile(temporary,`${JSON.stringify(raw,null,2)}\n`,'utf8');
-
-    let originalMoved=false;
-    let replacementInstalled=false;
-
-    try{
-        await rename(context.config.configPath,backup);
-        originalMoved=true;
-        await rename(temporary,context.config.configPath);
-        replacementInstalled=true;
-    }catch(error){
-        await rm(temporary,{force:true});
-
-        if(originalMoved&&!replacementInstalled){
-            try{
-                await rename(backup,context.config.configPath);
-            }catch{
-                // Preserve the original error; the backup path remains recoverable.
-            }
-        }
-
-        throw error;
-    }
-
-    await rm(backup,{force:true}).catch(()=>{});
-}
-
-function resolveTargetVersion(current,{bump,exactVersion,preid}={}){
-    if(bump&&exactVersion){
-        fail('Choose either a semantic version bump or an exact version, not both.');
-    }
-
-    if(exactVersion!==undefined){
-        parseSemver(exactVersion);
-
-        if(exactVersion===current){
-            fail(`Version is already ${current}.`);
-        }
-
-        return exactVersion;
-    }
-
-    return bump?incrementSemver(current,bump,preid):current;
-}
-
-async function acquirePackageLock(distRoot,appId){
-    const lockPath=path.join(distRoot,`.arcane-packager-${appId}.lock`);
-    let handle;
-
-    try{
-        handle=await open(lockPath,'wx');
-        await handle.writeFile(`${JSON.stringify({pid:process.pid,app:appId})}\n`,'utf8');
-    }catch(error){
-        if(handle){
-            await handle.close().catch(()=>{});
-            await rm(lockPath,{force:true}).catch(()=>{});
-        }
-
-        if(error?.code==='EEXIST'){
-            fail(`Another package operation for ${appId} is already running. If no process is active, remove the stale lock at ${lockPath}.`);
-        }
-
-        throw error;
-    }
-
-    let released=false;
-
-    return async()=>{
-        if(released){
-            return;
-        }
-
-        released=true;
-        const cleanupErrors=[];
-
-        try{
-            await handle.close();
-        }catch(error){
-            cleanupErrors.push(`close failed: ${error.message}`);
-        }
-
-        try{
-            await rm(lockPath,{force:true});
-        }catch(error){
-            cleanupErrors.push(`remove failed: ${error.message}`);
-        }
-
-        if(cleanupErrors.length){
-            console.error(
-                `Arcane packager completed but could not fully clean ${lockPath} (${cleanupErrors.join('; ')}). Remove the stale lock before the next operation.`
-            );
-        }
-    };
-}
-
-async function acquireOperationLock(workspaceRoot,appId){
-    const resolvedWorkspace=normalizeWorkspaceRoot(workspaceRoot);
-
-    if(typeof appId!=='string'||!APP_ID_PATTERN.test(appId)){
-        fail(`Invalid app id: ${String(appId)}`);
-    }
-
-    const rootConfig=await loadRootConfig(resolvedWorkspace);
-    const distRoot=path.join(resolvedWorkspace,rootConfig.distRoot);
-    await assertSafeDistBoundary(resolvedWorkspace,distRoot,{create:true});
-    return acquirePackageLock(distRoot,appId);
-}
-
-async function readDistVersion(outputRoot){
-    try{
-        const release=await readJson(path.join(outputRoot,RELEASE_MANIFEST_NAME));
-        return typeof release?.app?.version==='string'?release.app.version:null;
-    }catch{
-        return null;
-    }
-}
-
-export async function discoverApps({workspaceRoot:requestedWorkspaceRoot}){
-    const workspaceRoot=normalizeWorkspaceRoot(requestedWorkspaceRoot);
-    const rootConfig=await loadRootConfig(workspaceRoot);
-    const appsRoot=path.join(workspaceRoot,rootConfig.appsRoot);
-    const entries=await readdir(appsRoot,{withFileTypes:true});
-    const apps=[];
-
-    for(const entry of entries.sort((left,right)=>compareText(left.name,right.name))){
-        if(!APP_ID_PATTERN.test(entry.name)||(entry.isFile()&&!entry.isSymbolicLink())){
-            continue;
-        }
-
-        if(entry.isSymbolicLink()){
-            apps.push({
-                id:entry.name,
-                displayName:entry.name,
-                configured:false,
-                status:'unsafe-link',
-                version:null,
-                distVersion:null
-            });
-            continue;
-        }
-
-        if(!entry.isDirectory()){
-            continue;
-        }
-
-        const configPath=path.join(appsRoot,entry.name,APP_CONFIG_NAME);
-
-        try{
-            const context=await getAppContext({workspaceRoot,appId:entry.name});
-            apps.push({
-                id:entry.name,
-                displayName:context.config.displayName,
-                configured:true,
-                status:'ready',
-                version:context.config.version,
-                distVersion:await readDistVersion(context.outputRoot),
-                strategy:context.config.strategy,
-                entry:context.config.entry,
-                output:path.relative(workspaceRoot,context.outputRoot).replaceAll('\\','/')
-            });
-        }catch(error){
-            let configured=true;
-
-            try{
-                await lstat(configPath);
-            }catch{
-                configured=false;
-            }
-
-            let displayName=entry.name;
-
-            try{
-                const manifest=await readJson(path.join(appsRoot,entry.name,'manifest.json'));
-                if(typeof manifest?.name==='string'&&manifest.name.trim()){
-                    displayName=manifest.name.trim();
-                }
-            }catch{
-                // An unconfigured app can still be listed without a PWA manifest.
-            }
-
-            apps.push({
-                id:entry.name,
-                displayName,
-                configured,
-                status:configured?'invalid':'unconfigured',
-                version:null,
-                distVersion:null,
-                error:configured?error.message:undefined
-            });
-        }
-    }
-
-    return apps;
-}
-
-export async function inspectApp({workspaceRoot,appId}){
-    const context=await getAppContext({workspaceRoot,appId});
-    const files=await collectPackageFiles(context);
-    const totalBytes=files.reduce((total,file)=>total+file.bytes,0);
-    const largestFiles=[...files]
-        .sort((left,right)=>right.bytes-left.bytes||compareText(left.destination,right.destination))
-        .slice(0,10)
-        .map(file=>({path:file.destination,bytes:file.bytes}));
-
+function releaseManifest(context,files){
     return {
-        id:context.config.id,
-        displayName:context.config.displayName,
-        version:context.config.version,
-        distVersion:await readDistVersion(context.outputRoot),
-        strategy:context.config.strategy,
-        entry:context.config.entry,
-        output:path.relative(context.workspaceRoot,context.outputRoot).replaceAll('\\','/'),
-        include:[...context.config.include],
-        exclude:[...context.config.exclude],
-        shared:[...context.config.shared],
-        adapter:context.config.adapter,
-        baseFileCount:files.length,
-        baseBytes:totalBytes,
-        largestFiles,
-        note:context.config.strategy==='adapter'
-            ?'Counts cover the static base; the adapter can add generated public files.'
-            :undefined
+        schemaVersion:1,
+        kind:'arcane-app-release',
+        packagerVersion:PACKAGER_VERSION,
+        app:{
+            id:context.appId,
+            displayName:context.config.displayName,
+            version:context.config.version,
+            entry:context.config.entry,
+            strategy:context.config.strategy,
+            shared:[...context.config.shared],
+            ...(context.config.security===undefined?{}:{security:copyJson(context.config.security)}),
+            ...(context.config.localAIModelPolicy===undefined?{}:{
+                localAIModelPolicy:copyJson(context.config.localAIModelPolicy)
+            })
+        },
+        files:[...files]
     };
 }
 
-async function packageAppUnlocked({
-    workspaceRoot,
-    appId,
-    bump,
-    preid,
-    exactVersion,
-    dryRun=false,
-    context:preparedContext,
-    sharedPayloadSnapshot,
-    authenticatedSharedPayloadState,
-    importMapReceipt,
-    runtimeVerificationState,
-    signal,
-    onEvent,
-    validateSourceState
-}){
-    throwIfAborted(signal);
-    if(validateSourceState!==undefined&&typeof validateSourceState!=='function'){
-        fail('validateSourceState must be a function when provided.');
-    }
-    const context=preparedContext??await getAppContext({
-        workspaceRoot,
-        appId,
-        bindDescriptorAuthority:true,
-        signal
-    });
-    const currentVersion=context.config.version;
-    const version=resolveTargetVersion(currentVersion,{bump,exactVersion,preid});
-    const importMapFiles=dryRun
-        ?Object.freeze([])
-        :await authenticateImportMapFiles(context,importMapReceipt,{signal});
-    const files=await collectPackageFiles(context,{
-        signal,
-        sharedPayloadState:authenticatedSharedPayloadState
-    });
-    if(!dryRun){
-        await authenticateCollectedImportMapFiles(context,files,importMapFiles,{signal});
-    }
-    const preview={
-        app:appId,
-        currentVersion,
-        version,
-        bump:bump??null,
-        dryRun:Boolean(dryRun),
-        output:path.relative(context.workspaceRoot,context.outputRoot).replaceAll('\\','/'),
-        baseFileCount:files.length,
-        baseBytes:files.reduce((total,file)=>total+file.bytes,0),
-        strategy:context.config.strategy
-    };
-
-    if(dryRun){
-        throwIfAborted(signal);
-        return preview;
-    }
-
-    const token=`${process.pid}-${Date.now()}-${randomBytes(4).toString('hex')}`;
-    const staging=resolveInside(context.distRoot,`.arcane-packager-${appId}-${token}`,'staging output');
-    const stagingTemporary=`${staging}.tmp`;
-    const backup=resolveInside(context.distRoot,`.arcane-packager-${appId}-backup-${token}`,'backup output');
-    const failedOutput=resolveInside(context.distRoot,`.arcane-packager-${appId}-failed-${token}`,'failed output');
-    let adapter=null;
-    let movedExisting=false;
-    let promoted=false;
-    let operationSucceeded=false;
-    let rollbackRestored=false;
-    let runtimeAuthorityState=null;
-
+async function replaceDirectory(stagingRoot,outputRoot){
+    const backupRoot=`${outputRoot}.backup-${process.pid}-${Date.now()}`;
+    let backedUp=false;
     try{
-        await rm(staging,{recursive:true,force:true});
-        await rm(stagingTemporary,{recursive:true,force:true});
-        await rm(backup,{recursive:true,force:true}).catch(()=>{});
-        await rm(failedOutput,{recursive:true,force:true}).catch(()=>{});
-        adapter=await loadAdapter(context);
-        throwIfAborted(signal);
+        const existing=await lstat(outputRoot);
+        if(existing.isSymbolicLink()||!existing.isDirectory()){
+            fail('Existing package output must be a real directory.');
+        }
+        await rename(outputRoot,backupRoot);
+        backedUp=true;
+    }catch(error){
+        if(error?.code!=='ENOENT')throw error;
+    }
+    try{
+        await rename(stagingRoot,outputRoot);
+        if(backedUp)await rm(backupRoot,{recursive:true});
+    }catch(error){
+        if(backedUp)await rename(backupRoot,outputRoot).catch(()=>{});
+        throw error;
+    }
+}
 
+async function packageWithContext(context,options={}){
+    const {signal,onEvent}=options;
+    const inspected=await inspectContext(context,{signal});
+    if(options.dryRun){
+        return {
+            appId:context.appId,
+            version:context.config.version,
+            output:inspected.output,
+            dryRun:true,
+            files:[...inspected.files]
+        };
+    }
+    await mkdir(context.distRoot,{recursive:true});
+    const distInfo=await lstat(context.distRoot);
+    if(distInfo.isSymbolicLink()||!distInfo.isDirectory())fail('dist must be a real directory.');
+    const stagingRoot=path.join(
+        context.distRoot,
+        `.${context.appId}-staging-${process.pid}-${Date.now()}`
+    );
+    await mkdir(stagingRoot);
+    let promoted=false;
+    try{
+        const records=await collectPackageRecords(context,{signal});
+        const copyBase=()=>copyRecords(records,stagingRoot,{signal,onEvent});
+        const adapter=await loadAdapter(context);
         if(adapter){
-            let prepared=false;
             await adapter.buildArcanePackage({
+                appId:context.appId,
                 workspaceRoot:context.workspaceRoot,
                 appRoot:context.appRoot,
-                outputRoot:staging,
-                config:context.config,
-                version,
-                signal,
-                onEvent,
-                deferFinalVerification:true,
-                prepareBase:async outputRoot=>{
-                    if(prepared){
-                        fail(`${appId} adapter requested its base payload more than once.`);
-                    }
-
-                    prepared=true;
-                    const requestedRoot=path.resolve(outputRoot);
-
-                    if(requestedRoot!==path.resolve(staging)
-                        &&requestedRoot!==path.resolve(stagingTemporary)){
-                        fail(`${appId} adapter requested its base payload outside its assigned staging roots.`);
-                    }
-
-                    await materializeBasePackage(context,outputRoot,files,{signal,onEvent});
-                }
-            });
-
-            if(!prepared){
-                fail(`${appId} adapter did not materialize the configured public base payload.`);
-            }
-        }else{
-            await materializeBasePackage(context,staging,files,{signal,onEvent});
-        }
-
-        throwIfAborted(signal);
-        let sourceValidation;
-        if(validateSourceState){
-            sourceValidation=await validateSourceState({signal});
-            await assertValidatedDescriptorAuthority(
-                sourceValidation,
-                context.descriptorAuthority
-            );
-        }
-        runtimeAuthorityState=await prepareRuntimeAuthorityState(context,{
-            validation:sourceValidation,
-            runtimeVerificationState,
-            signal,
-            onEvent
-        });
-        await writeRuntimeAuthorities(staging,runtimeAuthorityState);
-        await writeRuntimeProjection(staging,runtimeAuthorityState);
-        const releaseState=await writeReleaseManifest(staging,context,version,{signal,onEvent});
-        const verifiedRelease=adapter
-            ?await verifyBuiltPackage(context,staging,version,adapter,{
-                runtimeAuthorityState,
+                outputRoot:stagingRoot,
+                copyBase,
                 signal,
                 onEvent
-            })
-            :await verifyFreshStaticRelease(staging,context,version,releaseState,{
-                runtimeAuthorityState,
-                signal
             });
-
-        throwIfAborted(signal);
-        if(validateSourceState){
-            const validation=await validateSourceState({signal});
-            await assertValidatedDescriptorAuthority(
-                validation,
-                context.descriptorAuthority
-            );
+        }else{
+            await copyBase();
         }
-        await authenticateRuntimeAuthorityState(context,runtimeAuthorityState,{signal,onEvent});
-        await assertAppDescriptorAuthorityCurrent(context,{signal});
-        if(sharedPayloadSnapshot!==undefined){
-            await authenticateSharedPayloadSnapshotState(sharedPayloadSnapshot,{
-                workspaceRoot:context.workspaceRoot,
-                sharedPayloadIds:context.config.shared,
-                signal
-            });
+        const files=await listOutputFiles(stagingRoot,{signal});
+        if(files.some(file=>pathKey(file)===pathKey(RELEASE_MANIFEST_NAME))){
+            fail(`Package content must not author ${RELEASE_MANIFEST_NAME}.`);
         }
-        await authenticateImportMapFiles(context,importMapReceipt,{signal});
-        authenticatePackagedImportMapFiles(verifiedRelease.release,importMapFiles);
-        await assertArtifactState(staging,verifiedRelease.identities,{signal});
-        throwIfAborted(signal);
-
-        try{
-            await lstat(context.outputRoot);
-            await renamePackageDirectory(context.outputRoot,backup);
-            movedExisting=true;
-        }catch(error){
-            if(error?.code!=='ENOENT'){
-                throw error;
-            }
+        if(!files.some(file=>pathKey(file)===pathKey(context.config.entry))){
+            fail(`Package output is missing its entry file: ${context.config.entry}.`);
         }
-
-        throwIfAborted(signal);
-        await renamePackageDirectory(staging,context.outputRoot);
-        promoted=true;
-
-        throwIfAborted(signal);
-        const receipt=await issueAppReleaseReceipt(
-            context.outputRoot,
-            verifiedRelease.release,
-            verifiedRelease.identities,
-            {
-                signal,
-                packageConfig:{...context.config,version},
-                descriptorAuthority:context.descriptorAuthority
-            }
+        const manifest=releaseManifest(context,files);
+        await writeFile(
+            path.join(stagingRoot,RELEASE_MANIFEST_NAME),
+            `${JSON.stringify(manifest,null,2)}\n`,
+            'utf8'
         );
-
-        if(version!==currentVersion){
-            await writeAppVersion(context,version);
-        }
-
-        operationSucceeded=true;
+        throwIfAborted(signal);
+        await replaceDirectory(stagingRoot,context.outputRoot);
+        promoted=true;
+        await emit(onEvent,{
+            type:'package.completed',
+            appId:context.appId,
+            outputRoot:context.outputRoot,
+            files:[...files]
+        });
         return {
-            ...preview,
-            dryRun:false,
-            fileCount:verifiedRelease.release.fileCount,
-            totalBytes:verifiedRelease.release.totalBytes,
-            contentSha256:verifiedRelease.release.contentSha256,
-            receipt
+            appId:context.appId,
+            version:context.config.version,
+            output:path.relative(context.workspaceRoot,context.outputRoot).split(path.sep).join('/'),
+            outputRoot:context.outputRoot,
+            manifest,
+            files:[...files]
         };
-    }catch(error){
-        const rollbackErrors=[];
-        let targetVacated=!promoted;
-
-        if(promoted){
-            try{
-                await renamePackageDirectory(context.outputRoot,failedOutput);
-                targetVacated=true;
-            }catch(moveError){
-                targetVacated=false;
-                rollbackErrors.push(`could not move the failed package aside: ${moveError.message}`);
-            }
-        }
-
-        if(movedExisting&&targetVacated){
-            try{
-                await renamePackageDirectory(backup,context.outputRoot);
-                rollbackRestored=true;
-            }catch(restoreError){
-                rollbackErrors.push(`could not restore the previous package from ${backup}: ${restoreError.message}`);
-            }
-        }
-
-        if(rollbackErrors.length){
-            error.message+=` Rollback warning: ${rollbackErrors.join('; ')}. Preserve ${backup} until manually recovered.`;
-        }
-
-        throw error;
     }finally{
-        await rm(staging,{recursive:true,force:true}).catch(()=>{});
-        await rm(stagingTemporary,{recursive:true,force:true}).catch(()=>{});
-        await rm(failedOutput,{recursive:true,force:true}).catch(()=>{});
-
-        if(operationSucceeded||rollbackRestored||!movedExisting){
-            await rm(backup,{recursive:true,force:true}).catch(()=>{});
-        }
+        if(!promoted)await rm(stagingRoot,{recursive:true,force:true}).catch(()=>{});
     }
 }
 
-export async function packageApp(options){
-    throwIfAborted(options?.signal);
-    const context=await getAppContext({
-        workspaceRoot:options?.workspaceRoot,
-        appId:options?.appId,
-        bindDescriptorAuthority:true,
-        signal:options?.signal
-    });
-    throwIfAborted(options?.signal);
-    const authenticatedSharedPayloadState=options?.sharedPayloadSnapshot===undefined
-        ?null
-        :await authenticateSharedPayloadSnapshotState(options.sharedPayloadSnapshot,{
-            workspaceRoot:context.workspaceRoot,
-            sharedPayloadIds:context.config.shared,
-            signal:options?.signal
-        });
-    if(options?.dryRun){
-        if(options?.runtimeVerificationState!==undefined){
-            if(!await hasExternalRuntimeAdmission(context)){
-                fail('A runtime verification state cannot be supplied to an integrated workspace.');
-            }
-            const validation=await validateExternalRuntimeAdmission(context,{
-                signal:options?.signal,
-                onEvent:options?.onEvent
-            });
-            await authenticatePackageRuntimeVerificationState(
-                context,
-                options.runtimeVerificationState,
-                {signal:options?.signal,validation}
-            );
-        }
-        return packageAppUnlocked({...options,context,authenticatedSharedPayloadState});
-    }
+export async function packageApp(options={}){
+    const context=await loadContext(options.workspaceRoot,options.appId);
+    const execute=()=>packageWithContext(context,options);
+    if(options.workspaceOperationLease)return execute();
     return withWorkspaceOperationLock({
         workspaceRoot:context.workspaceRoot,
         operation:'package',
-        workspaceOperationLease:options?.workspaceOperationLease,
-        signal:options?.signal,
-        onEvent:options?.onEvent
-    },async workspaceOperationLease=>{
-        await assertSafeDistBoundary(context.workspaceRoot,context.distRoot,{create:true});
-        const releaseLock=await acquirePackageLock(context.distRoot,options?.appId);
-        try{
-            const refreshed=await refreshPackageImportMap(context,{
-                runtimeVerificationState:options?.runtimeVerificationState,
-                workspaceOperationLease,
-                signal:options?.signal,
-                onEvent:options?.onEvent
-            });
-            const importMapReceipt=authenticatedImportMapReceipt(refreshed.importMapReceipt);
-            const packaged=await packageAppUnlocked({
-                ...options,
-                context,
-                authenticatedSharedPayloadState,
-                importMapReceipt,
-                runtimeVerificationState:refreshed.runtimeVerificationState??undefined
-            });
-            return {...packaged,importMapReceipt};
-        }finally{
-            await releaseLock();
-        }
-    });
+        signal:options.signal,
+        onEvent:options.onEvent
+    },execute);
 }
 
-export async function verifyApp({
-    workspaceRoot,
-    appId,
-    runtimeVerificationState,
-    signal,
-    onEvent
-}){
+export async function verifyApp({workspaceRoot,appId,signal,onEvent}={}){
     throwIfAborted(signal);
-    const context=await getAppContext({
-        workspaceRoot,
-        appId,
-        bindDescriptorAuthority:true,
-        signal
-    });
-    const runtimeAuthorityState=await prepareRuntimeAuthorityState(context,{
-        runtimeVerificationState,
-        signal,
-        onEvent
-    });
-    const adapter=await loadAdapter(context);
-    const releaseState=await verifyBuiltPackage(
-        context,
-        context.outputRoot,
-        context.config.version,
-        adapter,
-        {runtimeAuthorityState,signal,onEvent}
-    );
-    await authenticateRuntimeAuthorityState(context,runtimeAuthorityState,{signal,onEvent});
-    const release=releaseState.release;
-    const receipt=await issueAppReleaseReceipt(
-        context.outputRoot,
-        release,
-        releaseState.identities,
-        {
-            signal,
-            packageConfig:context.config,
-            descriptorAuthority:context.descriptorAuthority
-        }
-    );
-
+    const context=await loadContext(workspaceRoot,appId);
+    const outputRoot=await realDirectory(context.outputRoot,`dist/${appId}`);
+    const manifest=await readJson(path.join(outputRoot,RELEASE_MANIFEST_NAME),RELEASE_MANIFEST_NAME);
+    if(!isPlainObject(manifest)||manifest.schemaVersion!==1||manifest.kind!=='arcane-app-release'
+        ||manifest.packagerVersion!==PACKAGER_VERSION||manifest.app?.id!==appId
+        ||manifest.app?.version!==context.config.version||!Array.isArray(manifest.files)){
+        fail(`${RELEASE_MANIFEST_NAME} is malformed.`);
+    }
+    const expected=manifest.files.map((file,index)=>normalizeRelativePath(
+        file,
+        `${RELEASE_MANIFEST_NAME}.files[${index}]`
+    )).sort(compareText);
+    if(new Set(expected.map(pathKey)).size!==expected.length){
+        fail(`${RELEASE_MANIFEST_NAME} contains duplicate files.`);
+    }
+    const actual=(await listOutputFiles(outputRoot,{signal}))
+        .filter(file=>pathKey(file)!==pathKey(RELEASE_MANIFEST_NAME));
+    if(JSON.stringify(actual)!==JSON.stringify(expected)){
+        fail('Packaged file inventory differs from its release manifest.');
+    }
+    await emit(onEvent,{type:'package.inspected',appId,outputRoot,files:[...actual]});
     return {
-        app:appId,
-        // The verified manifest is already bound to this exact configured
-        // version; do not couple the public verify result to a nested app
-        // representation used by a particular schema generation.
-        version:context.config.version,
-        output:path.relative(context.workspaceRoot,context.outputRoot).replaceAll('\\','/'),
-        fileCount:release.fileCount,
-        totalBytes:release.totalBytes,
-        contentSha256:release.contentSha256,
         verified:true,
-        receipt
+        appId,
+        version:context.config.version,
+        outputRoot,
+        manifest:copyJson(manifest),
+        files:[...actual]
     };
 }
 
-async function bumpVersionUnlocked({
-    workspaceRoot,
-    appId,
-    bump,
-    preid,
-    exactVersion,
-    dryRun=false
-}){
-    const context=await getAppContext({workspaceRoot,appId});
-    const currentVersion=context.config.version;
-    const version=resolveTargetVersion(currentVersion,{bump,exactVersion,preid});
-
-    if(version===currentVersion){
-        fail('A bump level or exact version is required.');
+export async function bumpVersion({workspaceRoot,appId,bump='patch',preid,signal,onEvent}={}){
+    throwIfAborted(signal);
+    const context=await loadContext(workspaceRoot,appId);
+    const nextVersion=incrementSemver(context.config.version,bump,preid);
+    const configDocument=await readJson(context.config.configPath,`${appId}/${APP_CONFIG_NAME}`);
+    configDocument.version=nextVersion;
+    const descriptorPath=path.join(context.appRoot,APP_DESCRIPTOR_NAME);
+    let descriptor=null;
+    try{
+        descriptor=await readJson(descriptorPath,APP_DESCRIPTOR_NAME);
+        descriptor.version=nextVersion;
+    }catch(error){
+        if(error?.code!=='ARCANE_PACKAGE_INVALID'||!String(error.message).includes('does not exist'))throw error;
     }
-
-    if(!dryRun){
-        await writeAppVersion(context,version);
-    }
-
-    return {
-        app:appId,
-        currentVersion,
-        version,
-        bump:bump??null,
-        dryRun:Boolean(dryRun)
-    };
-}
-
-export async function bumpVersion(options){
-    if(options?.dryRun){
-        return bumpVersionUnlocked(options);
-    }
-
-    const context=await getAppContext({
-        workspaceRoot:options?.workspaceRoot,
-        appId:options?.appId
-    });
-    return withWorkspaceOperationLock({
-        workspaceRoot:context.workspaceRoot,
-        operation:'version-bump',
-        workspaceOperationLease:options?.workspaceOperationLease,
-        signal:options?.signal,
-        onEvent:options?.onEvent
-    },async()=>{
-        const releaseLock=await acquireOperationLock(
-            context.workspaceRoot,
-            options?.appId
-        );
-        try{
-            return await bumpVersionUnlocked({...options,workspaceRoot:context.workspaceRoot});
-        }finally{
-            await releaseLock();
-        }
-    });
+    await writeFile(context.config.configPath,`${JSON.stringify(configDocument,null,2)}\n`,'utf8');
+    if(descriptor)await writeFile(descriptorPath,`${JSON.stringify(descriptor,null,2)}\n`,'utf8');
+    await emit(onEvent,{type:'package.version.updated',appId,version:nextVersion});
+    return {appId,previousVersion:context.config.version,version:nextVersion};
 }

@@ -7,13 +7,13 @@ import {
 } from './mail-credentials.mjs';
 import {sendResendMail,startResendMailServer} from './mail-server.mjs';
 
-export const MAIL_COMMAND_ACTIONS=Object.freeze([
+export const MAIL_COMMAND_ACTIONS=[
     'key-set',
     'key-status',
     'key-delete',
     'send',
     'serve'
-]);
+];
 
 const ACTION_SET=new Set(MAIL_COMMAND_ACTIONS);
 
@@ -112,7 +112,7 @@ async function deleteCredential(options){
 }
 
 function safeSendFailure(result){
-    return Object.freeze({
+    return {
         provider:'resend',
         status:result.status,
         classification:result.classification,
@@ -125,7 +125,7 @@ function safeSendFailure(result){
         ...(Number.isSafeInteger(result.retryAfterMs)&&result.retryAfterMs>0
             ?{retryAfterMs:result.retryAfterMs}
             :{})
-    });
+    };
 }
 
 async function sendMail(options){
@@ -155,8 +155,6 @@ async function sendMail(options){
             appId:'arcane-cli',
             fetchImpl:options.fetchImpl,
             from:options.from,
-            maxProviderResponseBytes:options.maxProviderResponseBytes,
-            maxRequestBytes:options.maxRequestBytes,
             onEvent:options.onEvent,
             providerTimeoutMs:options.requestTimeout,
             report,
@@ -225,12 +223,8 @@ async function serveMail(options){
             host:options.host,
             maxConcurrentBodyReads:options.maxConcurrentBodyReads,
             maxConcurrentSends:options.maxConcurrentSends,
-            maxMessageBytes:options.maxMessageBytes,
-            maxProviderResponseBytes:options.maxProviderResponseBytes,
             maxQueuedBodyReads:options.maxQueuedBodyReads,
             maxQueuedSends:options.maxQueuedSends,
-            maxQueuedMessageBytes:options.maxQueuedMessageBytes,
-            maxRequestBytes:options.maxRequestBytes,
             onEvent:options.onEvent,
             port:options.port,
             providerTimeoutMs:options.requestTimeout,

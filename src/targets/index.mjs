@@ -1,10 +1,7 @@
+import path from 'node:path';
 import {packageApp,verifyApp} from '../packager/core.mjs';
 import {startDevServer} from '../dev-server.mjs';
-import path from 'node:path';
-import {
-    TARGET_ADAPTER_PROTOCOL,
-    TARGET_IDS
-} from '../constants.mjs';
+import {TARGET_ADAPTER_PROTOCOL,TARGET_IDS} from '../constants.mjs';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from '../errors.mjs';
 import {
     createNativeBuildPlan,
@@ -12,68 +9,38 @@ import {
     validateNativeBuilder
 } from '../native-plan.mjs';
 
-const DEFINITIONS=Object.freeze([
-    Object.freeze({
-        id:'browser',
-        displayName:'Browser/static',
-        status:'available',
-        platforms:['any'],
-        architectures:['any'],
-        formats:['directory'],
-        signingModes:['none'],
-        reason:null
-    }),
-    Object.freeze({
-        id:'portable',
-        displayName:'Portable native application',
-        status:'pairing-required',
-        platforms:['windows','linux'],
-        architectures:['x64','arm64'],
-        formats:['portable'],
+const DEFINITIONS=[
+    {
+        id:'browser',displayName:'Browser/static',status:'available',
+        platforms:['any'],architectures:['any'],formats:['directory'],signingModes:['none'],reason:null
+    },
+    {
+        id:'portable',displayName:'Portable native application',status:'pairing-required',
+        platforms:['windows','linux'],architectures:['x64','arm64'],formats:['portable'],
         signingModes:['unsigned-local-test'],
-        reason:'Portable output is available only when explicitly paired to a compatible Arcane OS checkout with --arcane-root.'
-    }),
-    Object.freeze({
-        id:'windows-x64',
-        displayName:'Windows x64 executable',
-        status:'pairing-required',
-        platforms:['windows'],
-        architectures:['x64'],
-        formats:['exe'],
-        signingModes:['unsigned-local-test'],
-        reason:'Windows output requires explicit pairing to a compatible Arcane OS checkout with --arcane-root.'
-    }),
-    Object.freeze({
-        id:'linux-x64',
-        displayName:'Linux x64 executable',
-        status:'pairing-required',
-        platforms:['linux'],
-        architectures:['x64'],
-        formats:['deb'],
-        signingModes:['unsigned-local-test'],
-        reason:'Linux x64 output requires explicit pairing to a compatible Arcane OS checkout with --arcane-root.'
-    }),
-    Object.freeze({
-        id:'linux-arm64',
-        displayName:'Linux ARM64 executable',
-        status:'pairing-required',
-        platforms:['linux'],
-        architectures:['arm64'],
-        formats:['deb'],
-        signingModes:['unsigned-local-test'],
-        reason:'Linux ARM64 output requires explicit pairing to a compatible Arcane OS checkout with --arcane-root and a native ARM64 toolchain.'
-    }),
-    Object.freeze({
-        id:'android-arm64',
-        displayName:'Android ARM64 application',
-        status:'pairing-required',
-        platforms:['android'],
-        architectures:['arm64'],
-        formats:['apk'],
-        signingModes:['development'],
-        reason:'Android APK output requires explicit pairing to a compatible Arcane OS checkout with --arcane-root and the Android development toolchain.'
-    })
-]);
+        reason:'Portable output is available when paired to an Arcane OS native provider.'
+    },
+    {
+        id:'windows-x64',displayName:'Windows x64 executable',status:'pairing-required',
+        platforms:['windows'],architectures:['x64'],formats:['exe'],signingModes:['unsigned-local-test'],
+        reason:'Windows output requires an Arcane OS native provider.'
+    },
+    {
+        id:'linux-x64',displayName:'Linux x64 executable',status:'pairing-required',
+        platforms:['linux'],architectures:['x64'],formats:['deb'],signingModes:['unsigned-local-test'],
+        reason:'Linux x64 output requires an Arcane OS native provider.'
+    },
+    {
+        id:'linux-arm64',displayName:'Linux ARM64 executable',status:'pairing-required',
+        platforms:['linux'],architectures:['arm64'],formats:['deb'],signingModes:['unsigned-local-test'],
+        reason:'Linux ARM64 output requires an Arcane OS native provider.'
+    },
+    {
+        id:'android-arm64',displayName:'Android ARM64 application',status:'pairing-required',
+        platforms:['android'],architectures:['arm64'],formats:['apk'],signingModes:['development'],
+        reason:'Android output requires an Arcane OS native provider and Android development toolchain.'
+    }
+];
 
 function describe(definition){
     return {
@@ -88,12 +55,9 @@ function describe(definition){
 }
 
 function deferredError(definition){
-    const state=definition.status==='pairing-required'
-        ?`requires explicit pairing. ${definition.reason}`
-        :`is deferred. ${definition.reason}`;
     return new ArcaneError(
         ERROR_CODES.targetDeferred,
-        `Target ${definition.id} ${state}`,
+        `Target ${definition.id} requires pairing. ${definition.reason}`,
         {details:describe(definition)}
     );
 }
@@ -103,7 +67,7 @@ function createDeferredAdapter(definition){
         throwIfAborted(options?.signal);
         throw deferredError(definition);
     };
-    return Object.freeze({
+    return {
         protocol:TARGET_ADAPTER_PROTOCOL,
         id:definition.id,
         describe:async()=>describe(definition),
@@ -118,11 +82,11 @@ function createDeferredAdapter(definition){
         build:unavailable,
         verify:unavailable,
         run:unavailable
-    });
+    };
 }
 
 const browserDefinition=DEFINITIONS[0];
-const browserAdapter=Object.freeze({
+const browserAdapter={
     protocol:TARGET_ADAPTER_PROTOCOL,
     id:'browser',
     describe:async()=>describe(browserDefinition),
@@ -152,7 +116,7 @@ const browserAdapter=Object.freeze({
             appId,
             format,
             signing,
-            operations:['verify-sdk-runtime','validate-workspace','package-selected-app']
+            operations:['validate-workspace','package-selected-app']
         };
     },
     async build({
@@ -163,75 +127,43 @@ const browserAdapter=Object.freeze({
         dryRun=false,
         signal,
         onEvent,
-        workspaceOperationLease,
-        runtimeVerificationState,
-        validateSourceState
+        workspaceOperationLease
     }={}){
         await this.plan({workspaceRoot,appId,format,signing,signal});
-        throwIfAborted(signal);
         const release=await packageApp({
             workspaceRoot,
             appId,
             dryRun,
             signal,
             onEvent,
-            workspaceOperationLease,
-            runtimeVerificationState,
-            validateSourceState
+            workspaceOperationLease
         });
         return {target:'browser',format,signing,release};
     },
-    async verify({workspaceRoot,appId,runtimeVerificationState,signal,onEvent}={}){
+    async verify({workspaceRoot,appId,signal,onEvent}={}){
         throwIfAborted(signal);
-        return {
-            target:'browser',
-            release:await verifyApp({
-                workspaceRoot,
-                appId,
-                runtimeVerificationState,
-                signal,
-                onEvent
-            })
-        };
+        return {target:'browser',release:await verifyApp({workspaceRoot,appId,signal,onEvent})};
     },
-    async run({
-        workspaceRoot,
-        appId,
-        runtimeVerificationState,
-        host='127.0.0.1',
-        port=0,
-        signal,
-        onEvent
-    }={}){
+    async run({workspaceRoot,appId,host='127.0.0.1',port=0,signal,onEvent}={}){
         throwIfAborted(signal);
-        const verified=await verifyApp({
-            workspaceRoot,
-            appId,
-            runtimeVerificationState,
-            signal,
-            onEvent
-        });
+        const releaseRoot=path.join(workspaceRoot,'dist',appId);
         const server=await startDevServer({
             workspaceRoot,
             appId,
             mode:'packaged',
-            releaseRoot:path.join(workspaceRoot,'dist',appId),
-            releaseReceipt:verified.receipt,
+            releaseRoot,
             host,
             port,
             signal,
             onEvent
         });
-        return {...server,target:'browser',verified};
+        return {...server,target:'browser',releaseRoot};
     }
-});
+};
 
 const adapters=new Map([
     ['browser',browserAdapter],
-    ...DEFINITIONS.slice(1).map(definition=>[
-        definition.id,
-        createDeferredAdapter(definition)
-    ])
+    ...DEFINITIONS.slice(1).map(definition=>[definition.id,createDeferredAdapter(definition)])
 ]);
 
 function nativeDefinition(targetId){
@@ -249,20 +181,17 @@ function selectedNativeRequest(targetId,targetRequest){
     if(targetRequest?.target!==targetId){
         throw new ArcaneError(
             ERROR_CODES.targetUnavailable,
-            `The injected native adapter for ${targetId} requires an explicit matching targetRequest.`
+            `The injected native adapter for ${targetId} requires a matching targetRequest.`
         );
     }
     return targetRequest;
 }
 
-function selectedArtifactReceipt(artifactReceipt){
-    if(!artifactReceipt||typeof artifactReceipt!=='object'||Array.isArray(artifactReceipt)){
-        throw new ArcaneError(
-            ERROR_CODES.integrityFailed,
-            'An explicit native artifact receipt is required.'
-        );
+function selectedArtifact(artifact){
+    if(!artifact||typeof artifact!=='object'||Array.isArray(artifact)){
+        throw new ArcaneError(ERROR_CODES.usage,'A native artifact is required.');
     }
-    return artifactReceipt;
+    return artifact;
 }
 
 export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
@@ -276,7 +205,7 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
                 ||!Array.isArray(description.targets)||!description.targets.includes(targetId)){
                 throw new ArcaneError(
                     ERROR_CODES.targetUnavailable,
-                    `The selected native provider does not declare support for target ${targetId}.`
+                    `The selected native provider does not support target ${targetId}.`
                 );
             }
             return description;
@@ -286,12 +215,11 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
 
     async function plan({
         toolchainRoot,
-        toolchainReceipt,
+        toolchain,
         appReleaseRoot,
-        appReleaseReceipt,
+        release,
         appDescriptor,
         dependencyReleases,
-        providerGeneration,
         minimumCoreVersion,
         protectedRoots,
         outputRoot,
@@ -303,12 +231,11 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
         return createNativeBuildPlan({
             nativeBuilder:provider,
             toolchainRoot,
-            toolchainReceipt,
+            toolchain,
             appReleaseRoot,
-            appReleaseReceipt,
+            release,
             appDescriptor,
             dependencyReleases,
-            providerGeneration:providerGeneration??provider.providerGeneration,
             minimumCoreVersion,
             protectedRoots,
             outputRoot,
@@ -318,23 +245,19 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
         });
     }
 
-    return Object.freeze({
+    return {
         protocol:TARGET_ADAPTER_PROTOCOL,
         id:definition.id,
         describe:async()=>{
             await requireProviderTarget();
-            return {
-                ...describe(definition),
-                status:'available',
-                reason:null
-            };
+            return {...describe(definition),status:'available',reason:null};
         },
-        async doctor({toolchainRoot,toolchainReceipt,targetRequest,signal,onEvent}={}){
+        async doctor({toolchainRoot,toolchain,targetRequest,signal,onEvent}={}){
             throwIfAborted(signal);
             await requireProviderTarget();
             return provider.doctor({
                 toolchainRoot,
-                toolchainReceipt,
+                toolchain,
                 targetRequest:selectedNativeRequest(targetId,targetRequest),
                 signal,
                 onEvent
@@ -355,14 +278,14 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
             throwIfAborted(options.signal);
             await requireProviderTarget();
             const selectedPlan=nativePlan??await plan(options);
-            const result=await executeNativeBuildPlan(selectedPlan,{
+            const artifact=await executeNativeBuildPlan(selectedPlan,{
                 expectedNativeBuilder:provider,
                 expectedTarget:targetId,
                 signal:options.signal,
                 onEvent:options.onEvent
             });
             return {
-                ...result,
+                artifact,
                 target:targetId,
                 platform:selectedPlan.targetRequest.platform,
                 architecture:selectedPlan.targetRequest.architecture,
@@ -371,65 +294,35 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
                 plan:selectedPlan
             };
         },
-        async verify({
-            toolchainRoot,
-            toolchainReceipt,
-            artifactReceipt,
-            targetRequest,
-            signal,
-            onEvent
-        }={}){
+        async verify({toolchainRoot,toolchain,artifact,targetRequest,signal,onEvent}={}){
             throwIfAborted(signal);
             await requireProviderTarget();
-            const selectedReceipt=selectedArtifactReceipt(artifactReceipt);
+            const selected=selectedArtifact(artifact);
             const result=await provider.verify({
                 toolchainRoot,
-                toolchainReceipt,
-                artifactReceipt:selectedReceipt,
+                toolchain,
+                artifact:selected,
                 targetRequest:selectedNativeRequest(targetId,targetRequest),
                 signal,
                 onEvent
             });
-            if(!result||result.verified!==true){
-                throw new ArcaneError(
-                    ERROR_CODES.integrityFailed,
-                    `The native provider did not verify the ${targetId} artifact.`
-                );
-            }
-            return {
-                target:targetId,
-                targetRequest,
-                artifactReceipt:selectedReceipt,
-                verification:result
-            };
+            return {target:targetId,targetRequest,artifact:selected,result};
         },
-        async run({
-            toolchainRoot,
-            toolchainReceipt,
-            artifactReceipt,
-            targetRequest,
-            signal,
-            onEvent
-        }={}){
+        async run({toolchainRoot,toolchain,artifact,targetRequest,signal,onEvent}={}){
             throwIfAborted(signal);
             await requireProviderTarget();
-            const selectedReceipt=selectedArtifactReceipt(artifactReceipt);
+            const selected=selectedArtifact(artifact);
             const result=await provider.run({
                 toolchainRoot,
-                toolchainReceipt,
-                artifactReceipt:selectedReceipt,
+                toolchain,
+                artifact:selected,
                 targetRequest:selectedNativeRequest(targetId,targetRequest),
                 signal,
                 onEvent
             });
-            return {
-                target:targetId,
-                targetRequest,
-                artifactReceipt:selectedReceipt,
-                result
-            };
+            return {target:targetId,targetRequest,artifact:selected,result};
         }
-    });
+    };
 }
 
 export function listTargets(){
@@ -448,16 +341,13 @@ export function getTargetAdapter(targetId){
 }
 
 export async function buildTarget(options={}){
-    const adapter=getTargetAdapter(options.target);
-    return adapter.build(options);
+    return getTargetAdapter(options.target).build(options);
 }
 
 export async function verifyTarget(options={}){
-    const adapter=getTargetAdapter(options.target);
-    return adapter.verify(options);
+    return getTargetAdapter(options.target).verify(options);
 }
 
 export async function runTarget(options={}){
-    const adapter=getTargetAdapter(options.target);
-    return adapter.run(options);
+    return getTargetAdapter(options.target).run(options);
 }

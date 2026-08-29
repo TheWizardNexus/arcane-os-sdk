@@ -1,18 +1,20 @@
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 
+const completeValue=(value)=>value;
+
 export const AI_RUNTIME_PROTOCOL = 'arcane-ai-runtime-state/1';
 export const AI_RUNTIME_STATE_EVENT = 'arcane-ai-runtime-state';
 export const AI_RUNTIME_INTENT_EVENT = 'arcane-ai-runtime-intent';
 /** Emitted with the text-chat barrier report, not full speech settlement. */
 export const AI_RUNTIME_STARTUP_EVENT = 'arcane-ai-runtime-startup-settled';
 
-export const AI_RUNTIME_ROLES = Object.freeze([
+export const AI_RUNTIME_ROLES = completeValue([
     'llm',
     'stt',
     'tts'
 ]);
 
-export const AI_RUNTIME_STATES = Object.freeze([
+export const AI_RUNTIME_STATES = completeValue([
     'unavailable',
     'unloaded',
     'loading',
@@ -22,7 +24,7 @@ export const AI_RUNTIME_STATES = Object.freeze([
     'disposed'
 ]);
 
-const ROLE_KEYS = Object.freeze([
+const ROLE_KEYS = completeValue([
     'role',
     'state',
     'providerId',
@@ -34,30 +36,31 @@ const ROLE_KEYS = Object.freeze([
     'progress',
     'error'
 ]);
-const PROGRESS_KEYS = Object.freeze([
+const PROGRESS_KEYS = completeValue([
     'phase',
     'completed',
     'total',
     'unit',
     'heartbeat'
 ]);
-const ERROR_KEYS = Object.freeze([
+const ERROR_KEYS = completeValue([
     'code',
     'message'
 ]);
-const INTENT_KEYS = Object.freeze([
+const INTENT_KEYS = completeValue([
     'role',
     'action',
     'reason'
 ]);
-const SUBSCRIPTION_OPTION_KEYS = Object.freeze([
+const SUBSCRIPTION_OPTION_KEYS = completeValue([
     'signal',
     'emitCurrent'
 ]);
-const INTENT_SUBSCRIPTION_OPTION_KEYS = Object.freeze([
+const INTENT_SUBSCRIPTION_OPTION_KEYS = completeValue([
     'signal'
 ]);
-const STARTUP_OPTION_KEYS = Object.freeze([
+const STARTUP_OPTION_KEYS = completeValue([
+    'startLanguageModel',
     'startMuted',
     'startTranscription',
     'signal'
@@ -85,9 +88,6 @@ const STARTUP_TERMINAL_STATES = new Set([
     'error',
     'disposed'
 ]);
-const MAX_IDENTIFIER_LENGTH = 128;
-const MAX_PROGRESS_UNIT_LENGTH = 32;
-const MAX_ERROR_MESSAGE_LENGTH = 512;
 
 /**
  * @deprecated Subscribe through the focused runtime helpers or arcaneEvents.
@@ -109,14 +109,14 @@ const aiRuntimeEventSource = createArcaneEventSource(
     aiRuntimeEventCompatibilityView,
     {
         source: 'ai-runtime-state',
-        eventTypes: Object.freeze([
+        eventTypes: completeValue([
             AI_RUNTIME_STATE_EVENT,
             AI_RUNTIME_INTENT_EVENT,
             AI_RUNTIME_STARTUP_EVENT
         ])
     }
 );
-export const aiRuntimeEvents = Object.freeze(aiRuntimeEventCompatibilityView);
+export const aiRuntimeEvents = completeValue(aiRuntimeEventCompatibilityView);
 
 function fail(message) {
     throw new TypeError(`ARCANE_AI_RUNTIME_STATE_INVALID: ${message}`);
@@ -139,8 +139,8 @@ function assertClosedRecord(value, expectedKeys, label) {
         fail(`${label} must not contain symbol keys.`);
     }
 
-    const actualKeys = ownKeys.slice().sort();
-    const requiredKeys = expectedKeys.slice().sort();
+    const actualKeys = [...ownKeys].sort();
+    const requiredKeys = [...expectedKeys].sort();
     if (actualKeys.length !== requiredKeys.length
         || actualKeys.some(function hasUnexpectedKey(key, index) {
             return key !== requiredKeys[index];
@@ -154,6 +154,16 @@ function assertClosedRecord(value, expectedKeys, label) {
             fail(`${label}.${key} must be a data property.`);
         }
     }
+}
+
+function nextRevision(value) {
+    if (typeof value === 'bigint') {
+        return value + 1n;
+    }
+    if (value === Number.MAX_SAFE_INTEGER) {
+        return BigInt(value) + 1n;
+    }
+    return value + 1;
 }
 
 function assertClosedOptions(value, allowedKeys, label) {
@@ -184,9 +194,8 @@ function assertNullableIdentifier(value, label) {
 
     if (typeof value !== 'string'
         || value.length < 1
-        || value.length > MAX_IDENTIFIER_LENGTH
         || value.trim() !== value) {
-        fail(`${label} must be null or a trimmed 1-${MAX_IDENTIFIER_LENGTH} character string.`);
+        fail(`${label} must be null or a nonempty trimmed string.`);
     }
 }
 
@@ -204,9 +213,8 @@ function copyProgress(progress) {
     assertClosedRecord(progress, PROGRESS_KEYS, 'progress');
     if (typeof progress.phase !== 'string'
         || progress.phase.length < 1
-        || progress.phase.length > MAX_IDENTIFIER_LENGTH
         || progress.phase.trim() !== progress.phase) {
-        fail(`progress.phase must be a trimmed 1-${MAX_IDENTIFIER_LENGTH} character string.`);
+        fail('progress.phase must be a nonempty trimmed string.');
     }
     if (!Number.isSafeInteger(progress.completed) || progress.completed < 0) {
         fail('progress.completed must be a nonnegative safe integer.');
@@ -218,15 +226,14 @@ function copyProgress(progress) {
     }
     if (typeof progress.unit !== 'string'
         || progress.unit.length < 1
-        || progress.unit.length > MAX_PROGRESS_UNIT_LENGTH
         || progress.unit.trim() !== progress.unit) {
-        fail(`progress.unit must be a trimmed 1-${MAX_PROGRESS_UNIT_LENGTH} character string.`);
+        fail('progress.unit must be a nonempty trimmed string.');
     }
     if (typeof progress.heartbeat !== 'boolean') {
         fail('progress.heartbeat must be a boolean.');
     }
 
-    return Object.freeze(
+    return completeValue(
         {
             phase: progress.phase,
             completed: progress.completed,
@@ -245,18 +252,15 @@ function copyError(error) {
     assertClosedRecord(error, ERROR_KEYS, 'error');
     if (typeof error.code !== 'string'
         || error.code.length < 1
-        || error.code.length > MAX_IDENTIFIER_LENGTH
         || error.code.trim() !== error.code) {
-        fail(`error.code must be a trimmed 1-${MAX_IDENTIFIER_LENGTH} character string.`);
+        fail('error.code must be a nonempty trimmed string.');
     }
     if (typeof error.message !== 'string'
-        || error.message.length < 1
-        || error.message.length > MAX_ERROR_MESSAGE_LENGTH
-        || error.message.trim() !== error.message) {
-        fail(`error.message must be a trimmed 1-${MAX_ERROR_MESSAGE_LENGTH} character string.`);
+        || error.message.length < 1) {
+        fail('error.message must be a nonempty string.');
     }
 
-    return Object.freeze(
+    return completeValue(
         {
             code: error.code,
             message: error.message
@@ -312,7 +316,7 @@ function copyRoleRecord(role, record) {
         fail('only an error role state may include error details.');
     }
 
-    return Object.freeze(
+    return completeValue(
         {
             role,
             state: record.state,
@@ -329,7 +333,7 @@ function copyRoleRecord(role, record) {
 }
 
 function unavailableRole(role) {
-    return Object.freeze(
+    return completeValue(
         {
             role,
             state: 'unavailable',
@@ -347,7 +351,7 @@ function unavailableRole(role) {
 
 function publicAIRuntimeState(snapshot, role = null) {
     const roleState = role === null ? null : snapshot.roles[role];
-    return Object.freeze(
+    return completeValue(
         {
             revision: snapshot.revision,
             ...(roleState
@@ -370,7 +374,7 @@ function publicAIRuntimeState(snapshot, role = null) {
 }
 
 function publicAIRuntimeIntent(intent) {
-    return Object.freeze(
+    return completeValue(
         {
             role: intent.role,
             action: intent.action,
@@ -380,7 +384,7 @@ function publicAIRuntimeIntent(intent) {
 }
 
 function publicAIRuntimeStartup(report) {
-    return Object.freeze(
+    return completeValue(
         {
             revision: report.currentRevision,
             role: 'llm',
@@ -390,11 +394,11 @@ function publicAIRuntimeStartup(report) {
 }
 
 function initialSnapshot() {
-    return Object.freeze(
+    return completeValue(
         {
             protocol: AI_RUNTIME_PROTOCOL,
             revision: 0,
-            roles: Object.freeze(
+            roles: completeValue(
                 {
                     llm: unavailableRole('llm'),
                     stt: unavailableRole('stt'),
@@ -403,6 +407,26 @@ function initialSnapshot() {
             )
         }
     );
+}
+
+function copyRuntimeRoleView(record) {
+    return {
+        ...record,
+        progress: record.progress === null ? null : {...record.progress},
+        error: record.error === null ? null : {...record.error}
+    };
+}
+
+function copyRuntimeSnapshot(snapshot) {
+    return {
+        protocol: snapshot.protocol,
+        revision: snapshot.revision,
+        roles: {
+            llm: copyRuntimeRoleView(snapshot.roles.llm),
+            stt: copyRuntimeRoleView(snapshot.roles.stt),
+            tts: copyRuntimeRoleView(snapshot.roles.tts)
+        }
+    };
 }
 
 let currentSnapshot = initialSnapshot();
@@ -468,6 +492,7 @@ function intentSubscriptionOptions(options) {
 function startupOptions(options) {
     if (options === undefined) {
         return {
+            startLanguageModel: true,
             startMuted: true,
             startTranscription: false,
             signal: null
@@ -475,6 +500,9 @@ function startupOptions(options) {
     }
 
     assertClosedOptions(options, STARTUP_OPTION_KEYS, 'startup options');
+    const startLanguageModel = Object.hasOwn(options, 'startLanguageModel')
+        ? options.startLanguageModel
+        : true;
     const startMuted = Object.hasOwn(options, 'startMuted')
         ? options.startMuted
         : true;
@@ -482,6 +510,9 @@ function startupOptions(options) {
         ? options.startTranscription
         : false;
     const signal = Object.hasOwn(options, 'signal') ? options.signal : null;
+    if (typeof startLanguageModel !== 'boolean') {
+        fail('startup options.startLanguageModel must be a boolean.');
+    }
     if (typeof startMuted !== 'boolean') {
         fail('startup options.startMuted must be a boolean.');
     }
@@ -491,6 +522,7 @@ function startupOptions(options) {
     assertAbortSignal(signal);
 
     return {
+        startLanguageModel,
         startMuted,
         startTranscription,
         signal
@@ -501,10 +533,16 @@ function hasAIRuntimeSelection(roleState) {
     return roleState.providerId !== null && roleState.modelId !== null;
 }
 
-function startupRequestedRoles(snapshot, startMuted, startTranscription) {
-    return Object.freeze(
+function startupRequestedRoles(
+    snapshot,
+    startLanguageModel,
+    startMuted,
+    startTranscription
+) {
+    return completeValue(
         {
-            llm: hasAIRuntimeSelection(snapshot.roles.llm),
+            llm: startLanguageModel
+                && hasAIRuntimeSelection(snapshot.roles.llm),
             stt: startTranscription && hasAIRuntimeSelection(snapshot.roles.stt),
             tts: !startMuted && hasAIRuntimeSelection(snapshot.roles.tts)
         }
@@ -518,7 +556,7 @@ function isAIRuntimeStartupRoleSettled(roleState) {
 }
 
 function startupRoleReport(requested, roleState) {
-    return Object.freeze(
+    return completeValue(
         {
             requested,
             state: roleState
@@ -529,19 +567,21 @@ function startupRoleReport(requested, roleState) {
 function startupReport(
     snapshot,
     startRevision,
+    startLanguageModel,
     startMuted,
     startTranscription,
     requestedRoles
 ) {
-    return Object.freeze(
+    return completeValue(
         {
             protocol: AI_RUNTIME_PROTOCOL,
             startRevision,
             currentRevision: snapshot.revision,
+            startLanguageModel,
             startMuted,
             startTranscription,
             chatReady: snapshot.roles.llm.state === 'ready',
-            roles: Object.freeze(
+            roles: completeValue(
                 {
                     llm: startupRoleReport(
                         requestedRoles.llm,
@@ -605,9 +645,9 @@ function subscribe(eventName, listener, normalized, currentValue) {
     return unsubscribeAIRuntimeEvent;
 }
 
-/** Returns the current deeply immutable runtime-state snapshot. */
+/** Returns a complete defensive copy of the current runtime-state snapshot. */
 export function getAIRuntimeState() {
-    return currentSnapshot;
+    return copyRuntimeSnapshot(currentSnapshot);
 }
 
 /**
@@ -619,7 +659,7 @@ export function subscribeAIRuntimeState(listener, options) {
         AI_RUNTIME_STATE_EVENT,
         listener,
         stateSubscriptionOptions(options),
-        currentSnapshot
+        copyRuntimeSnapshot(currentSnapshot)
     );
 }
 
@@ -629,33 +669,27 @@ export function subscribeAIRuntimeState(listener, options) {
  */
 export function publishAIRuntimeRoleState(role, completeRecord) {
     const nextRole = copyRoleRecord(role, completeRecord);
-    if (currentSnapshot.revision === Number.MAX_SAFE_INTEGER) {
-        throw new RangeError(
-            'ARCANE_AI_RUNTIME_STATE_INVALID: state revision exhausted.'
-        );
-    }
-
     const nextRoles = {
         llm: currentSnapshot.roles.llm,
         stt: currentSnapshot.roles.stt,
         tts: currentSnapshot.roles.tts
     };
     nextRoles[role] = nextRole;
-    currentSnapshot = Object.freeze(
+    currentSnapshot = completeValue(
         {
             protocol: AI_RUNTIME_PROTOCOL,
-            revision: currentSnapshot.revision + 1,
-            roles: Object.freeze(nextRoles)
+            revision: nextRevision(currentSnapshot.revision),
+            roles: completeValue(nextRoles)
         }
     );
     aiRuntimeEventSource.dispatch(
         AI_RUNTIME_STATE_EVENT,
-        currentSnapshot,
+        copyRuntimeSnapshot(currentSnapshot),
         {
             publicDetail: publicAIRuntimeState(currentSnapshot, role)
         }
     );
-    return currentSnapshot;
+    return copyRuntimeSnapshot(currentSnapshot);
 }
 
 /**
@@ -665,37 +699,32 @@ export function publishAIRuntimeRoleState(role, completeRecord) {
  */
 export function publishAIRuntimeRolesState(completeRecords) {
     assertClosedRecord(completeRecords, AI_RUNTIME_ROLES, 'runtime role states');
-    const nextRoles = Object.freeze(
+    const nextRoles = completeValue(
         {
             llm: copyRoleRecord('llm', completeRecords.llm),
             stt: copyRoleRecord('stt', completeRecords.stt),
             tts: copyRoleRecord('tts', completeRecords.tts)
         }
     );
-    if (currentSnapshot.revision === Number.MAX_SAFE_INTEGER) {
-        throw new RangeError(
-            'ARCANE_AI_RUNTIME_STATE_INVALID: state revision exhausted.'
-        );
-    }
-    currentSnapshot = Object.freeze(
+    currentSnapshot = completeValue(
         {
             protocol: AI_RUNTIME_PROTOCOL,
-            revision: currentSnapshot.revision + 1,
+            revision: nextRevision(currentSnapshot.revision),
             roles: nextRoles
         }
     );
     aiRuntimeEventSource.dispatch(
         AI_RUNTIME_STATE_EVENT,
-        currentSnapshot,
+        copyRuntimeSnapshot(currentSnapshot),
         {
             publicDetail: publicAIRuntimeState(currentSnapshot)
         }
     );
-    return currentSnapshot;
+    return copyRuntimeSnapshot(currentSnapshot);
 }
 
 /**
- * Emits an immutable capability-neutral lifecycle request. This function does
+ * Emits a complete capability-neutral lifecycle request. This function does
  * not execute, authorize, fetch, load, unload, dispose, or select a fallback.
  */
 export function requestAIRuntimeIntent(intent) {
@@ -708,7 +737,7 @@ export function requestAIRuntimeIntent(intent) {
         fail('runtime intent.reason must be startup, user, or teardown.');
     }
 
-    const publishedIntent = Object.freeze(
+    const publishedIntent = completeValue(
         {
             role: intent.role,
             action: intent.action,
@@ -737,7 +766,9 @@ export function subscribeAIRuntimeIntents(listener, options) {
 
 /**
  * Starts one observational runtime barrier after preferences and provider
- * routes are hydrated. `barrier` resolves when LLM is ready or terminal;
+ * routes are hydrated. `startLanguageModel:false` keeps the selected LLM
+ * unloaded for an explicit user activation intent. `barrier` resolves when a
+ * requested LLM is ready or terminal, or immediately when LLM startup was not requested;
  * `settled` waits for every requested role. Providers own every requested load.
  */
 export function startAIRuntime(options) {
@@ -799,6 +830,7 @@ export function startAIRuntime(options) {
         const report = startupReport(
             snapshot,
             startRevision,
+            normalized.startLanguageModel,
             normalized.startMuted,
             normalized.startTranscription,
             requestedRoles
@@ -820,6 +852,7 @@ export function startAIRuntime(options) {
             startupReport(
                 snapshot,
                 startRevision,
+                normalized.startLanguageModel,
                 normalized.startMuted,
                 normalized.startTranscription,
                 requestedRoles
@@ -833,7 +866,10 @@ export function startAIRuntime(options) {
         }
 
         if (!barrierResolved
-            && isAIRuntimeStartupRoleSettled(snapshot.roles.llm)) {
+            && (
+                !requestedRoles.llm
+                || isAIRuntimeStartupRoleSettled(snapshot.roles.llm)
+            )) {
             resolveAIRuntimeStartupBarrier(snapshot);
         }
         if (cancelled) {
@@ -910,7 +946,7 @@ export function startAIRuntime(options) {
         cancelAIRuntimeStartup();
     }
 
-    const handle = Object.freeze(
+    const handle = completeValue(
         {
             barrier,
             settled,
@@ -922,6 +958,7 @@ export function startAIRuntime(options) {
     startRevision = latestSnapshot.revision;
     requestedRoles = startupRequestedRoles(
         latestSnapshot,
+        normalized.startLanguageModel,
         normalized.startMuted,
         normalized.startTranscription
     );

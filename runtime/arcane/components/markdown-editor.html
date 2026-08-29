@@ -2,16 +2,12 @@
 <style>
     :host{
         display:block;
-        height:100%;
-        min-height:0;
     }
 
     .markdown-editor{
         display:grid;
         gap:.75em;
-        grid-template-rows:auto minmax(8em,1fr) auto minmax(10em,1fr) auto;
-        height:100%;
-        min-height:0;
+        grid-template-rows:auto auto auto auto auto;
     }
 
     .entry-title,
@@ -25,7 +21,7 @@
         background:var(--background);
         border:1px solid var(--border-color);
         border-radius:.5em;
-        overflow:auto;
+        overflow:visible;
         padding:1em;
     }
 
@@ -235,7 +231,7 @@
             markdown:textarea.value,
             title:titleInput.value
         };
-        emit('markdown-editor-change',detail,{markdownLength:detail.markdown.length,titleLength:detail.title.length});
+        emit('markdown-editor-change',detail,detail);
         if(options.onChange){
             Promise.resolve(options.onChange(detail)).catch(
                 error=>console.error('Markdown change callback failed:',error)
@@ -265,7 +261,7 @@
         preview.querySelectorAll('a').forEach(
             link=>{
                 link.target='_blank';
-                link.rel='noopener noreferrer';
+                link.removeAttribute('rel');
             }
         );
     }
@@ -299,7 +295,7 @@
             return false;
         }
         const markdown=textarea.value;
-        const entryTitle=titleInput.value.trim();
+        const entryTitle=titleInput.value;
         if(!markdown.trim()){
             status.innerText=options.labels.emptyError;
             textarea.focus();
@@ -330,7 +326,8 @@
                 resetEditor(false);
             }
             status.innerText=options.labels.saved;
-            emit('markdown-editor-saved',{title:entryTitle,markdown},{markdownLength:markdown.length,titleLength:entryTitle.length},operationId);
+            const detail={title:entryTitle,markdown};
+            emit('markdown-editor-saved',detail,detail,operationId);
             return true;
         }catch(error){
             if(destroyed||generation!==saveGeneration||controller.signal.aborted){

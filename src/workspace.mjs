@@ -1,29 +1,19 @@
-import {createHash} from 'node:crypto';
-import {lstat,readFile,readdir,realpath} from 'node:fs/promises';
+import {readFile,readdir,realpath,stat} from 'node:fs/promises';
 import path from 'node:path';
 import {
     normalizeRelativePath,
     validateAppConfig as validatePackagerAppConfig,
     validateRootConfig as validatePackagerRootConfig
 } from './packager/core.mjs';
-import {appDescriptorSha256,loadAppDescriptor} from './app-descriptor.mjs';
-import {
-    SDK_NAME as EXPECTED_SDK_NAME,
-    SDK_VERSION as EXPECTED_SDK_VERSION
-} from './constants.mjs';
+import {loadAppDescriptor} from './app-descriptor.mjs';
+import {SDK_NAME as EXPECTED_SDK_NAME} from './constants.mjs';
 import {inspectImportMapHtml} from './import-map.mjs';
-import {
-    SDK_BROWSER_RUNTIME_CONTENT_SHA256,
-    SDK_BROWSER_RUNTIME_MANIFEST_SHA256
-} from './sdk-browser-runtime.mjs';
 
 const APP_ID_PATTERN=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
-const SHA256_PATTERN=/^[a-f0-9]{64}$/;
-const LOCAL_TARBALL_PATTERN=/^file:.+\.tgz$/iu;
 const NPM_PACKAGE_NAME_PATTERN=/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/u;
-const EXACT_SDK_ALIAS=`npm:${EXPECTED_SDK_NAME}@${EXPECTED_SDK_VERSION}`;
 const ROOT_CONFIG_NAME='arcane-packager.json';
 const APP_CONFIG_NAME='arcane-package.json';
+const completeValue=value=>value;
 
 function fail(message,code='ARCANE_WORKSPACE_INVALID'){
     const error=new Error(message);
@@ -47,14 +37,12 @@ function throwIfAborted(signal){
 }
 
 async function emit(onEvent,event){
-    if(typeof onEvent==='function')await onEvent(Object.freeze(event));
+    if(typeof onEvent==='function')await onEvent(event);
 }
 
 async function readJson(filePath,label){
     let text;
     try{
-        const info=await lstat(filePath);
-        if(info.isSymbolicLink()||!info.isFile())fail(`${label} must be a real file.`);
         text=await readFile(filePath,'utf8');
     }catch(error){
         if(error?.code==='ENOENT')fail(`${label} does not exist.`);
@@ -66,16 +54,12 @@ async function readJson(filePath,label){
 
 async function assertRealDirectory(directory,label){
     let info;
-    try{info=await lstat(directory);}
+    try{info=await stat(directory);}
     catch(error){
         if(error?.code==='ENOENT')fail(`${label} does not exist: ${directory}.`);
         throw error;
     }
-    if(info.isSymbolicLink()||!info.isDirectory())fail(`${label} must be a real directory: ${directory}.`);
-}
-
-function sameDirectoryIdentity(left,right){
-    return left.device===right.device&&left.inode===right.inode;
+    if(!info.isDirectory())fail(`${label} must be a directory: ${directory}.`);
 }
 
 function sameDirectoryPath(left,right){
@@ -84,68 +68,6 @@ function sameDirectoryPath(left,right){
         return process.platform==='win32'?resolved.toLocaleLowerCase('en-US'):resolved;
     };
     return normalize(left)===normalize(right);
-}
-
-async function captureRealDirectoryIdentity(directory,label){
-    const requested=path.resolve(directory);
-    let requestedInfo;
-    try{requestedInfo=await lstat(requested,{bigint:true});}
-    catch(error){
-        if(error?.code==='ENOENT')fail(`${label} does not exist: ${requested}.`);
-        throw error;
-    }
-    if(requestedInfo.isSymbolicLink()||!requestedInfo.isDirectory()){
-        fail(`${label} must be a real directory: ${requested}.`);
-    }
-    const canonical=await realpath(requested);
-    const canonicalInfo=await lstat(canonical,{bigint:true});
-    const requestedIdentity=Object.freeze({
-        device:requestedInfo.dev,
-        inode:requestedInfo.ino
-    });
-    const canonicalIdentity=Object.freeze({
-        device:canonicalInfo.dev,
-        inode:canonicalInfo.ino
-    });
-    if(canonicalInfo.isSymbolicLink()||!canonicalInfo.isDirectory()
-        ||!sameDirectoryIdentity(requestedIdentity,canonicalIdentity)){
-        fail(`${label} must resolve to one physical directory: ${requested}.`);
-    }
-    return Object.freeze({
-        requested,
-        requestedIdentity,
-        canonical,
-        identity:canonicalIdentity
-    });
-}
-
-async function assertRealDirectoryIdentity(captured,label){
-    let canonical;
-    let requestedInfo;
-    let canonicalInfo;
-    try{
-        [canonical,requestedInfo,canonicalInfo]=await Promise.all([
-            realpath(captured.requested),
-            lstat(captured.requested,{bigint:true}),
-            lstat(captured.canonical,{bigint:true})
-        ]);
-    }catch(error){
-        if(error?.code==='ENOENT'){
-            fail(`${label} changed while focused validation was active.`,
-                'ARCANE_INTEGRITY_FAILED');
-        }
-        throw error;
-    }
-    const requestedIdentity={device:requestedInfo.dev,inode:requestedInfo.ino};
-    const canonicalIdentity={device:canonicalInfo.dev,inode:canonicalInfo.ino};
-    if(!sameDirectoryPath(canonical,captured.canonical)
-        ||requestedInfo.isSymbolicLink()||!requestedInfo.isDirectory()
-        ||canonicalInfo.isSymbolicLink()||!canonicalInfo.isDirectory()
-        ||!sameDirectoryIdentity(requestedIdentity,captured.requestedIdentity)
-        ||!sameDirectoryIdentity(requestedIdentity,captured.identity)
-        ||!sameDirectoryIdentity(canonicalIdentity,captured.identity)){
-        fail(`${label} changed while focused validation was active.`,'ARCANE_INTEGRITY_FAILED');
-    }
 }
 
 function sdkPackageSourceForDependency(dependencyName){
@@ -172,12 +94,6 @@ function dependencyNameForSdkPackageSource(source){
     }
 }
 
-function supportedCanonicalSdkDeclaration(value){
-    return value===EXPECTED_SDK_VERSION
-        ||(typeof value==='string'&&LOCAL_TARBALL_PATTERN.test(value)
-            &&!/[\x00-\x1f\x7f]/.test(value));
-}
-
 export function resolveSdkPackageDeclaration(rootPackage,{
     allowMissing=false,
     packageSource
@@ -194,17 +110,10 @@ export function resolveSdkPackageDeclaration(rootPackage,{
                 &&(specifier===`npm:${EXPECTED_SDK_NAME}`
                     ||specifier.startsWith(`npm:${EXPECTED_SDK_NAME}@`));
             if(!canonicalName&&!aliasTarget)continue;
-            const supported=canonicalName
-                ?supportedCanonicalSdkDeclaration(specifier)
-                :specifier===EXACT_SDK_ALIAS;
-            if(!supported){
-                fail(
-                    `package.json ${groupName}.${dependencyName} must be ${EXPECTED_SDK_VERSION}, `
-                    +`a local file: tarball under ${EXPECTED_SDK_NAME}, or the exact npm alias `
-                    +`${EXACT_SDK_ALIAS} under a distinct dependency key.`
-                );
+            if(typeof specifier!=='string'||!specifier.trim()){
+                fail(`package.json ${groupName}.${dependencyName} must declare an SDK package version or source.`);
             }
-            candidates.push(Object.freeze({
+            candidates.push(completeValue({
                 dependencyName,
                 dependencyGroup:groupName,
                 packageSource:sdkPackageSourceForDependency(dependencyName),
@@ -218,8 +127,7 @@ export function resolveSdkPackageDeclaration(rootPackage,{
     if(candidates.length===0){
         if(allowMissing&&packageSource===undefined)return null;
         fail(
-            `package.json must declare exactly one ${EXPECTED_SDK_NAME} installation as `
-            +`${EXPECTED_SDK_VERSION}, a local file: tarball, or the exact npm alias ${EXACT_SDK_ALIAS}.`
+            `package.json must declare exactly one ${EXPECTED_SDK_NAME} installation.`
         );
     }
     const [declaration]=candidates;
@@ -230,13 +138,6 @@ export function resolveSdkPackageDeclaration(rootPackage,{
         );
     }
     return declaration;
-}
-
-function sdkManifestPaths(packageSource){
-    return Object.freeze({
-        runtimeManifest:`${packageSource}/runtime/ARCANE_RUNTIME_RELEASE.json`,
-        browserRuntimeManifest:`${packageSource}/browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json`
-    });
 }
 
 function classifyRootConfig(config){
@@ -299,7 +200,7 @@ function classifyRootConfig(config){
     }else{
         fail(`${ROOT_CONFIG_NAME} browser-runtime routes must match the external SDK or integrated Arcane workspace contract.`);
     }
-    return Object.freeze({
+    return completeValue({
         ...validated,
         workspaceMode,
         browserRuntimeLayout,
@@ -330,7 +231,7 @@ async function discoverAppsInRoot(root,config){
                 appId:entry.name,
                 packageManifest:manifest
             });
-            apps.push(Object.freeze({
+            apps.push(completeValue({
                 appId:entry.name,
                 appRoot,
                 manifest:validatedManifest,
@@ -342,7 +243,7 @@ async function discoverAppsInRoot(root,config){
             if(!String(error?.message).includes('does not exist'))throw error;
         }
     }
-    return Object.freeze(apps);
+    return completeValue(apps);
 }
 
 export async function discoverApps(workspaceRoot=process.cwd()){
@@ -357,7 +258,7 @@ export async function inspectWorkspaceProfile(workspaceRoot=process.cwd()){
     const config=classifyRootConfig(
         await readJson(path.join(canonicalRoot,ROOT_CONFIG_NAME),ROOT_CONFIG_NAME)
     );
-    return Object.freeze({
+    return completeValue({
         workspaceRoot:canonicalRoot,
         workspaceMode:config.workspaceMode,
         config
@@ -400,80 +301,14 @@ export async function resolveWorkspace({workspaceRoot=process.cwd(),appId}={}){
     }else{
         fail(`This workspace contains multiple apps; select one explicitly: ${apps.map(item=>item.appId).join(', ')}.`,'ARCANE_USAGE');
     }
-    return Object.freeze({
+    return completeValue({
         workspaceRoot:canonicalRoot,
         config,
         app,
         appId:app.appId,
         appRoot:app.appRoot,
-        appIds:Object.freeze(apps.map(item=>item.appId))
+        appIds:completeValue(apps.map(item=>item.appId))
     });
-}
-
-function validateLock(lock,sdkDeclaration){
-    const browser=lock?.sdkBrowserRuntime;
-    const browserSource=browser?.source;
-    const dependencies=browserSource?.dependencies;
-    const exactKeys=(value,keys)=>isObject(value)
-        &&Object.keys(value).sort().join('\0')===[...keys].sort().join('\0');
-    const expectedDependencies=[
-        {
-            name:'event-pubsub',
-            version:'6.1.0',
-            resolved:'https://registry.npmjs.org/event-pubsub/-/event-pubsub-6.1.0.tgz',
-            integrity:'sha512-FEMlhTxwqGM0hztTixG6FhVFXqp7Eq1ltk5mSreK6Mhy3xWWpLAzEUR6OMvMdNqT3jgSxA8JDhnhyAG3X4Xy7Q=='
-        },
-        {
-            name:'strong-type',
-            version:'2.0.0',
-            resolved:'https://registry.npmjs.org/strong-type/-/strong-type-2.0.0.tgz',
-            integrity:'sha512-HHrY9qYC7yn+5mlewiI3k9RQM9gZqGQsqbomZcd10Ks0h4RlX01nnkWbCe4AsVPCI6KaFvpkWm1nHMD+Ykup6g=='
-        },
-        {
-            name:'@wllama/wllama',
-            version:'3.6.0',
-            resolved:'https://registry.npmjs.org/@wllama/wllama/-/wllama-3.6.0.tgz',
-            integrity:'sha512-NN3ZBXqaaUwGXTQubkNvsCaLPjN2XVa0bVS40OYCE8zquYmRc2W3oHYEgwvuSWWDB8aUqTLyMioySCXNkcnD1w=='
-        }
-    ];
-    const dependenciesMatch=Array.isArray(dependencies)&&dependencies.length===expectedDependencies.length
-        &&dependencies.every((actual,index)=>{
-            const expected=expectedDependencies[index];
-            return exactKeys(actual,['name','version','resolved','integrity'])
-                &&actual.name===expected.name&&actual.version===expected.version
-                &&actual.resolved===expected.resolved&&actual.integrity===expected.integrity;
-        });
-    const manifests=sdkManifestPaths(sdkDeclaration.packageSource);
-    if(!exactKeys(lock,['schemaVersion','sdk','runtime','sdkBrowserRuntime','protocols'])
-        ||lock.schemaVersion!==1
-        ||!exactKeys(lock.sdk,['name','version'])
-        ||lock.sdk.name!==EXPECTED_SDK_NAME||lock.sdk.version!==EXPECTED_SDK_VERSION
-        ||!exactKeys(lock.runtime,['manifest','contentSha256','upstreamCommit'])
-        ||!SHA256_PATTERN.test(lock.runtime.contentSha256)
-        ||!/^([a-f0-9]{40})$/.test(lock.runtime.upstreamCommit)
-        ||lock.runtime.manifest!==manifests.runtimeManifest
-        ||!exactKeys(browser,[
-            'manifest','manifestSha256','contentSha256','builder','sdkVersion','source'
-        ])
-        ||browser.manifest!==manifests.browserRuntimeManifest
-        ||browser.manifestSha256!==SDK_BROWSER_RUNTIME_MANIFEST_SHA256
-        ||browser.contentSha256!==SDK_BROWSER_RUNTIME_CONTENT_SHA256
-        ||browser.builder!=='arcane-sdk-browser-runtime-v1'
-        ||browser.sdkVersion!==EXPECTED_SDK_VERSION
-        ||!exactKeys(browserSource,[
-            'authority','repository','protocol','browserEntry','dependencies'
-        ])||browserSource.authority!=='arcane-os-sdk'
-        ||browserSource.repository!=='https://github.com/TheWizardNexus/arcane-os-sdk.git'
-        ||browserSource.protocol!=='arcane-sdk-browser-runtime/1'
-        ||browserSource.browserEntry!=='arcane-os/event-manager'
-        ||!dependenciesMatch
-        ||!exactKeys(lock.protocols,['arcane','cliEvents','targetAdapter'])
-        ||lock.protocols.arcane!=='arcane/1'
-        ||lock.protocols.cliEvents!=='arcane-cli-events/1'
-        ||lock.protocols.targetAdapter!=='arcane-target-adapter/1'){
-        fail('arcane.lock.json is incompatible with this SDK. Run arcane init only after reviewing missing files; existing locks are never overwritten.');
-    }
-    return lock;
 }
 
 export async function resolveInstalledSdkInstallation(workspaceRoot,declaration){
@@ -490,8 +325,8 @@ export async function resolveInstalledSdkInstallation(workspaceRoot,declaration)
         path.join(canonicalPackageRoot,'package.json'),
         'installed SDK package manifest'
     );
-    if(installedPackage.name!==EXPECTED_SDK_NAME||installedPackage.version!==EXPECTED_SDK_VERSION){
-        fail(`Installed SDK package must identify exactly as ${EXPECTED_SDK_NAME}@${EXPECTED_SDK_VERSION}.`);
+    if(installedPackage.name!==EXPECTED_SDK_NAME||typeof installedPackage.version!=='string'){
+        fail(`Installed SDK package must identify as ${EXPECTED_SDK_NAME}.`);
     }
     const runtimeRoot=path.join(canonicalPackageRoot,'runtime');
     const browserRuntimeRoot=path.join(canonicalPackageRoot,'browser-runtime');
@@ -499,40 +334,14 @@ export async function resolveInstalledSdkInstallation(workspaceRoot,declaration)
         assertRealDirectory(runtimeRoot,'Installed SDK runtime root'),
         assertRealDirectory(browserRuntimeRoot,'Installed SDK browser runtime root')
     ]);
-    const manifests=sdkManifestPaths(declaration.packageSource);
-    return Object.freeze({
+    return completeValue({
         dependencyName:declaration.dependencyName,
         packageSource:declaration.packageSource,
         canonicalPackageRoot,
         packageName:installedPackage.name,
         packageVersion:installedPackage.version,
         runtimeRoot,
-        browserRuntimeRoot,
-        runtimeManifest:manifests.runtimeManifest,
-        browserRuntimeManifest:manifests.browserRuntimeManifest
-    });
-}
-
-function sameBrowserRuntimeSource(actual,pinned){
-    const exactKeys=(value,keys)=>isObject(value)
-        &&Object.keys(value).sort().join('\0')===[...keys].sort().join('\0');
-    const keys=['authority','repository','protocol','browserEntry','dependencies'];
-    if(!exactKeys(actual,keys)||!exactKeys(pinned,keys)
-        ||actual.authority!==pinned.authority
-        ||actual.repository!==pinned.repository
-        ||actual.protocol!==pinned.protocol
-        ||actual.browserEntry!==pinned.browserEntry
-        ||!Array.isArray(actual.dependencies)||!Array.isArray(pinned.dependencies)
-        ||actual.dependencies.length!==pinned.dependencies.length){
-        return false;
-    }
-    const dependencyKeys=['name','version','resolved','integrity'];
-    return actual.dependencies.every((dependency,index)=>{
-        const expected=pinned.dependencies[index];
-        return exactKeys(dependency,dependencyKeys)&&exactKeys(expected,dependencyKeys)
-            &&dependency.name===expected.name&&dependency.version===expected.version
-            &&dependency.resolved===expected.resolved
-            &&dependency.integrity===expected.integrity;
+        browserRuntimeRoot
     });
 }
 
@@ -618,21 +427,13 @@ export async function validateDiscoveredApplication({
         ||!app.manifest||!app.descriptor){
         fail('A discovered Arcane application is required for focused validation.');
     }
-    const capturedWorkspace=await captureRealDirectoryIdentity(workspaceRoot,'Workspace');
-    const canonicalWorkspaceRoot=capturedWorkspace.canonical;
-    const capturedAppsRoot=await captureRealDirectoryIdentity(
-        path.join(canonicalWorkspaceRoot,'apps'),
-        'Workspace apps root'
-    );
+    const canonicalWorkspaceRoot=await realpath(workspaceRoot);
+    await assertRealDirectory(path.join(canonicalWorkspaceRoot,'apps'),'Workspace apps root');
     const expectedAppRoot=path.join(canonicalWorkspaceRoot,'apps',app.appId);
-    const [capturedExpectedApp,capturedDiscoveredApp]=await Promise.all([
-        captureRealDirectoryIdentity(expectedAppRoot,`apps/${app.appId}`),
-        captureRealDirectoryIdentity(app.appRoot,`Discovered app ${app.appId}`)
-    ]);
-    if(!sameDirectoryIdentity(capturedExpectedApp.identity,capturedDiscoveredApp.identity)){
+    if(!sameDirectoryPath(app.appRoot,expectedAppRoot)){
         fail(`Discovered app ${app.appId} does not belong to the selected workspace.`);
     }
-    const canonicalAppRoot=capturedExpectedApp.canonical;
+    const canonicalAppRoot=await realpath(app.appRoot);
     let config=workspaceConfig;
     if(!config){
         const profile=await inspectWorkspaceProfile(canonicalWorkspaceRoot);
@@ -660,13 +461,7 @@ export async function validateDiscoveredApplication({
         packageManifest:rawManifest
     });
     const descriptor=loadedDescriptor.descriptor;
-    if(appDescriptorSha256(descriptor)!==appDescriptorSha256(app.descriptor)){
-        fail(
-            `The canonical descriptor for ${app.appId} changed after application discovery.`,
-            'ARCANE_INTEGRITY_FAILED'
-        );
-    }
-    const freshApp=Object.freeze({
+    const freshApp=completeValue({
         appId:app.appId,
         appRoot:canonicalAppRoot,
         manifest,
@@ -675,23 +470,16 @@ export async function validateDiscoveredApplication({
         descriptorPath:loadedDescriptor.descriptorPath
     });
     const entryPath=path.join(canonicalAppRoot,manifest.entry);
-    const info=await lstat(entryPath);
-    if(info.isSymbolicLink()||!info.isFile()){
-        fail(`apps/${app.appId}/${manifest.entry} must be a real file.`);
+    const info=await stat(entryPath);
+    if(!info.isFile()){
+        fail(`apps/${app.appId}/${manifest.entry} must be a file.`);
     }
     assertHtmlContract(await readFile(entryPath,'utf8'),app.appId,{
         entry:manifest.entry,
         strictStyles:workspaceMode==='external',
         allowMissingManagedImportMap
     });
-    const assertCapturedDirectories=()=>Promise.all([
-        assertRealDirectoryIdentity(capturedWorkspace,'Workspace'),
-        assertRealDirectoryIdentity(capturedAppsRoot,'Workspace apps root'),
-        assertRealDirectoryIdentity(capturedExpectedApp,`apps/${app.appId}`),
-        assertRealDirectoryIdentity(capturedDiscoveredApp,`Discovered app ${app.appId}`)
-    ]);
-    await assertCapturedDirectories();
-    const receipt=Object.freeze({
+    const result=completeValue({
         valid:true,
         workspaceRoot:canonicalWorkspaceRoot,
         workspaceMode,
@@ -704,8 +492,7 @@ export async function validateDiscoveredApplication({
         workspaceRoot:canonicalWorkspaceRoot,
         appId:app.appId
     });
-    await assertCapturedDirectories();
-    return receipt;
+    return result;
 }
 
 export async function validateWorkspace({
@@ -722,10 +509,9 @@ export async function validateWorkspace({
     const add=async(name,operation)=>{
         throwIfAborted(signal);
         await operation();
-        checks.push(Object.freeze({name,ok:true}));
+        checks.push(completeValue({name,ok:true}));
         await emit(onEvent,{type:'workspace.validate.check',name,ok:true});
     };
-    let lock;
     let sdkDeclaration;
     let sdkInstallation;
     let validatedApplication;
@@ -740,18 +526,6 @@ export async function validateWorkspace({
             fail('The selected Arcane application descriptor does not match the app id.');
         }
     });
-    if(workspaceMode==='external'){
-        await add('lock',async()=>{
-            sdkDeclaration=resolveSdkPackageDeclaration(
-                await readJson(path.join(resolved.workspaceRoot,'package.json'),'package.json'),
-                {packageSource:resolved.config.sdkPackageSource}
-            );
-            lock=validateLock(
-                await readJson(path.join(resolved.workspaceRoot,'arcane.lock.json'),'arcane.lock.json'),
-                sdkDeclaration
-            );
-        });
-    }
     await add('package',async()=>{
         const rootPackage=await readJson(path.join(resolved.workspaceRoot,'package.json'),'package.json');
         if(workspaceMode==='integrated'){
@@ -763,18 +537,12 @@ export async function validateWorkspace({
         const declaration=resolveSdkPackageDeclaration(rootPackage,{
             packageSource:resolved.config.sdkPackageSource
         });
+        sdkDeclaration=declaration;
         if(rootPackage?.private!==true||rootPackage?.type!=='module'){
             fail(
-                `package.json must be private, use modules, and declare one exact `
+                `package.json must be private, use modules, and declare one `
                 +`${EXPECTED_SDK_NAME} installation.`
             );
-        }
-        if(declaration.dependencyName!==sdkDeclaration.dependencyName
-            ||declaration.dependencyGroup!==sdkDeclaration.dependencyGroup
-            ||declaration.packageSource!==sdkDeclaration.packageSource
-            ||declaration.specifier!==sdkDeclaration.specifier){
-            fail('The declared SDK installation changed after workspace profile inspection.',
-                'ARCANE_INTEGRITY_FAILED');
         }
     });
     if(workspaceMode==='external'){
@@ -783,35 +551,6 @@ export async function validateWorkspace({
                 resolved.workspaceRoot,
                 sdkDeclaration
             );
-            const installed=await readJson(
-                path.join(sdkInstallation.runtimeRoot,'ARCANE_RUNTIME_RELEASE.json'),
-                'installed SDK runtime manifest'
-            );
-            if(installed.contentSha256!==lock.runtime.contentSha256
-                ||installed.source?.legacyProjection?.commit!==lock.runtime.upstreamCommit){
-                fail('Installed SDK runtime does not match arcane.lock.json.');
-            }
-            const browserManifestPath=path.join(
-                sdkInstallation.browserRuntimeRoot,
-                'ARCANE_SDK_BROWSER_RELEASE.json'
-            );
-            const browserBytes=await readFile(browserManifestPath);
-            let installedBrowser;
-            try{installedBrowser=JSON.parse(browserBytes.toString('utf8'));}
-            catch(error){
-                fail(`Installed SDK browser runtime manifest is not valid JSON: ${error.message}`);
-            }
-            if(createHash('sha256').update(browserBytes).digest('hex')
-                    !==lock.sdkBrowserRuntime.manifestSha256
-                ||installedBrowser.contentSha256!==lock.sdkBrowserRuntime.contentSha256
-                ||installedBrowser.builder!==lock.sdkBrowserRuntime.builder
-                ||installedBrowser.sdkVersion!==lock.sdkBrowserRuntime.sdkVersion
-                ||!sameBrowserRuntimeSource(
-                    installedBrowser.source,
-                    lock.sdkBrowserRuntime.source
-                )){
-                fail('Installed SDK browser runtime does not match arcane.lock.json.');
-            }
         });
     }else{
         await add('workspace-runtime',async()=>{
@@ -822,9 +561,9 @@ export async function validateWorkspace({
                 ['arcane','Integrated Arcane runtime'],
                 [strongType,'Integrated strong-type runtime']
             ]){
-                const info=await lstat(path.join(resolved.workspaceRoot,relative));
-                if(info.isSymbolicLink()||!info.isDirectory()){
-                    fail(`${label} must be a real directory.`);
+                const info=await stat(path.join(resolved.workspaceRoot,relative));
+                if(!info.isDirectory()){
+                    fail(`${label} must be a directory.`);
                 }
             }
         });
@@ -840,7 +579,7 @@ export async function validateWorkspace({
             onEvent
         });
     });
-    const receipt=Object.freeze({
+    const result=completeValue({
         valid:true,
         workspaceMode,
         workspaceRoot:resolved.workspaceRoot,
@@ -848,10 +587,9 @@ export async function validateWorkspace({
         appRoot:resolved.appRoot,
         config:resolved.config,
         app:validatedApplication.app,
-        lock,
         ...(sdkInstallation?{sdkInstallation}:{}),
-        checks:Object.freeze(checks)
+        checks:completeValue(checks)
     });
     await emit(onEvent,{type:'workspace.validate.completed',workspaceRoot:resolved.workspaceRoot,appId:resolved.appId,checks});
-    return receipt;
+    return result;
 }

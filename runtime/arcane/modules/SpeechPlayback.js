@@ -1,158 +1,69 @@
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 
-const MAX_SPEECH_INPUT=3900;
-const MAX_SPEECH_CHUNKS=32;
-const MAX_SPEECH_CHARACTERS=MAX_SPEECH_INPUT*MAX_SPEECH_CHUNKS;
-const PREFERRED_STREAM_SEGMENT=700;
-const SPEECH_VOICE_OPTIONS=Object.freeze([
-    Object.freeze({value:'alloy',label:'Alloy'}),
-    Object.freeze({value:'ash',label:'Ash'}),
-    Object.freeze({value:'ballad',label:'Ballad'}),
-    Object.freeze({value:'coral',label:'Coral'}),
-    Object.freeze({value:'echo',label:'Echo'}),
-    Object.freeze({value:'fable',label:'Fable'}),
-    Object.freeze({value:'nova',label:'Nova'}),
-    Object.freeze({value:'onyx',label:'Onyx'}),
-    Object.freeze({value:'sage',label:'Sage'}),
-    Object.freeze({value:'shimmer',label:'Shimmer'})
-]);
-const SUPERSEDED=Object.freeze({superseded:true});
+const SPEECH_VOICE_OPTIONS=[
+    {value:'alloy',label:'Alloy'},
+    {value:'ash',label:'Ash'},
+    {value:'ballad',label:'Ballad'},
+    {value:'coral',label:'Coral'},
+    {value:'echo',label:'Echo'},
+    {value:'fable',label:'Fable'},
+    {value:'nova',label:'Nova'},
+    {value:'onyx',label:'Onyx'},
+    {value:'sage',label:'Sage'},
+    {value:'shimmer',label:'Shimmer'}
+];
+const SUPERSEDED={superseded:true};
 const SPEECH_PLAYBACK_STATE_EVENT='speech-playback-state';
-const SPEECH_PLAYBACK_FAILURE_REASONS=Object.freeze({
+const SPEECH_PLAYBACK_FAILURE_REASONS={
     ARCANE_AI_OPERATION_SUPERSEDED:'speech-synthesis-superseded',
     ARCANE_AI_REQUEST_ABORTED:'speech-synthesis-cancelled',
     ARCANE_SPEECH_PLAYBACK_AUDIO_PLAYBACK_REJECTED:'audio-playback-rejected',
     ARCANE_SPEECH_PLAYBACK_SYNTHESIZED_AUDIO_CONTRACT_MISMATCH:'synthesized-audio-contract-mismatch',
     ARCANE_SPEECH_PLAYBACK_SYNTHESIZER_UNAVAILABLE:'speech-synthesizer-unavailable'
-});
-const WAV_AUDIO_CONTENT_TYPES=Object.freeze(new Set([
+};
+const WAV_AUDIO_CONTENT_TYPES=new Set([
     'audio/vnd.wave',
     'audio/wav',
     'audio/wave',
     'audio/x-wav'
-]));
+]);
 const queuesBySpeechClient=new WeakMap();
 
-class ReadonlyAliasSet{
-    #values;
-
-    constructor(values){
-        this.#values=new Set(values);
-        Object.freeze(this);
-    }
-
-    get size(){return this.#values.size;}
-    get [Symbol.toStringTag](){return 'Set';}
-    has(value){return this.#values.has(value);}
-    entries(){return this.#values.entries();}
-    keys(){return this.#values.keys();}
-    values(){return this.#values.values();}
-    [Symbol.iterator](){return this.values();}
-
-    forEach(callback,thisArgument){
-        for(const value of this.#values)callback.call(thisArgument,value,value,this);
-    }
-}
-
-const SPEECH_VOICE_ALIASES=new ReadonlyAliasSet(
+const SPEECH_VOICE_ALIASES=new Set(
     SPEECH_VOICE_OPTIONS.map(function voiceAlias(option){return option.value;})
 );
 
-function speechLimitError(message='Speech text is too long for bounded playback. The full visual content remains available.'){
-    return new RangeError(message);
-}
-
-function speechBoundary(value,limit,minimum){
-    const candidates=[
-        value.lastIndexOf('\n\n',limit),
-        value.lastIndexOf('. ',limit),
-        value.lastIndexOf('? ',limit),
-        value.lastIndexOf('! ',limit),
-        value.lastIndexOf('; ',limit),
-        value.lastIndexOf(', ',limit),
-        value.lastIndexOf(' ',limit)
-    ];
-    const boundary=Math.max(...candidates);
-    return boundary>=minimum
-        ?Math.min(limit,boundary+(/^[.!?;,]$/.test(value[boundary]||'')?1:0))
-        :limit;
-}
-
-function splitSpeechText(
-    value='',
-    maximum=MAX_SPEECH_INPUT,
-    maximumChunks=MAX_SPEECH_CHUNKS,
-    {
-        tooLongMessage='Speech text is too long for bounded playback. The full visual content remains available.',
-        queueLimitMessage='Speech text exceeds the bounded playback queue. The full visual content remains available.'
-    }={}
-){
-    const text=String(value??'').trim();
-    if(!text)return [];
-    if(!Number.isInteger(maximum)||maximum<100||maximum>4000){
-        throw new RangeError('Speech chunk size must be between 100 and 4,000 characters.');
-    }
-    if(!Number.isInteger(maximumChunks)||maximumChunks<1||maximumChunks>MAX_SPEECH_CHUNKS){
-        throw new RangeError(`Speech chunk count must be between 1 and ${MAX_SPEECH_CHUNKS}.`);
-    }
-    if(text.length>maximum*maximumChunks)throw speechLimitError(tooLongMessage);
-    const chunks=[];
-    let remaining=text;
-    while(remaining.length){
-        const slots=maximumChunks-chunks.length;
-        if(slots<1)throw speechLimitError(queueLimitMessage);
-        if(remaining.length<=maximum&&remaining.length<=PREFERRED_STREAM_SEGMENT){
-            chunks.push(remaining);
-            break;
-        }
-        const minimum=Math.ceil(remaining.length/slots);
-        const preferred=chunks.length===0?PREFERRED_STREAM_SEGMENT:maximum;
-        const target=Math.min(maximum,Math.max(preferred,minimum));
-        if(remaining.length<=target){
-            chunks.push(remaining);
-            break;
-        }
-        const boundary=speechBoundary(remaining,target,Math.max(minimum,Math.floor(target*0.55)));
-        chunks.push(remaining.slice(0,boundary).trim());
-        remaining=remaining.slice(boundary).trimStart();
-    }
-    return chunks;
+function splitSpeechText(value=''){
+    const text=String(value??'');
+    return text.trim()?[text]:[];
 }
 
 function normalizeParts(parts,defaultVoice=null,defaultSpeed=1){
     if(!Array.isArray(parts)||!parts.length){
         throw new TypeError('Narration text cannot be blank. The full visual content remains available.');
     }
-    if(parts.length>MAX_SPEECH_CHUNKS){
-        throw speechLimitError('Speech text exceeds the bounded playback queue. The full visual content remains available.');
-    }
     return parts.map(function normalizePart(part){
         const candidate=typeof part==='string'?{input:part}:part;
-        const input=String(candidate?.input??'').trim();
-        if(!input)throw new TypeError('Speech segments cannot be blank. The full visual content remains available.');
-        if(input.length>MAX_SPEECH_INPUT){
-            throw speechLimitError('A speech segment exceeds the local service limit. The full visual content remains available.');
-        }
+        const input=String(candidate?.input??'');
+        if(!input.trim())throw new TypeError('Speech segments cannot be blank. The full visual content remains available.');
         const pauseAfterMs=Number(candidate?.pauseAfterMs??0);
-        if(!Number.isFinite(pauseAfterMs)||pauseAfterMs<0||pauseAfterMs>60_000){
-            throw new RangeError('Speech segment pauses must be between 0 and 60,000 milliseconds.');
+        if(!Number.isFinite(pauseAfterMs)||pauseAfterMs<0){
+            throw new RangeError('Speech segment pauses must be a nonnegative number of milliseconds.');
         }
         const voiceValue=candidate?.voice??defaultVoice;
-        const voice=voiceValue===null||voiceValue===undefined
-            ?null
-            :String(voiceValue).trim();
+        const voice=voiceValue===null||voiceValue===undefined?null:String(voiceValue);
         const speed=Number(candidate?.speed??defaultSpeed);
-        if(voiceValue!==null&&voiceValue!==undefined&&!voice){
+        if(voiceValue!==null&&voiceValue!==undefined&&!voice.trim()){
             throw new TypeError('Speech segment voice cannot be blank.');
         }
         if(!Number.isFinite(speed)||speed<=0)throw new RangeError('Every speech segment requires a positive speech speed.');
-        return Object.freeze({
+        return {
             input,
             pauseAfterMs,
             role:String(candidate?.role||'narration'),
             speed,
             voice
-        });
+        };
     });
 }
 
@@ -394,7 +305,7 @@ function queueFor(speech){
     return queue;
 }
 
-const DEFAULT_MESSAGES=Object.freeze({
+const DEFAULT_MESSAGES={
     idle:'Speech is ready when visual content is available.',
     queued:'Waiting for the current local speech request. The latest narration will begin next.',
     preparing:function preparing({count}){return `Preparing ${count===1?'the narration':`${count} speech segments`}.`;},
@@ -412,7 +323,7 @@ const DEFAULT_MESSAGES=Object.freeze({
     invalidAudio:'Arcane returned invalid synthesized audio.',
     playbackError:'The synthesized narration could not be played. The visual content remains available.',
     fallbackError:'Speech is unavailable. The visual content remains available.'
-});
+};
 
 class SpeechPlayback{
     constructor({
@@ -441,7 +352,7 @@ class SpeechPlayback{
             this,
             {
                 source:'speech-playback',
-                eventTypes:Object.freeze([SPEECH_PLAYBACK_STATE_EVENT])
+                eventTypes:[SPEECH_PLAYBACK_STATE_EVENT]
             }
         );
         this.onState=onState;
@@ -463,7 +374,7 @@ class SpeechPlayback{
                 timer=globalThis.setTimeout(finish,duration);
             });
         };
-        this.messages=Object.freeze({...DEFAULT_MESSAGES,...messages});
+        this.messages={...DEFAULT_MESSAGES,...messages};
         this.urls=[];
         this.parts=[];
         this.index=0;
@@ -471,11 +382,11 @@ class SpeechPlayback{
         this.pendingGenerations=new Set();
         this.lookahead=null;
         this.lookaheadError=null;
-        this.model=model===null||model===undefined?null:String(model).trim()||null;
-        this.voice=voice===null||voice===undefined?null:String(voice).trim()||null;
+        this.model=model===null||model===undefined?null:String(model);
+        this.voice=voice===null||voice===undefined?null:String(voice);
         this.responseFormat=responseFormat===null||responseFormat===undefined
             ?null
-            :String(responseFormat).trim()||null;
+            :String(responseFormat);
         this.speed=normalizedSpeed;
         this.key='';
         this.state='idle';
@@ -512,7 +423,7 @@ class SpeechPlayback{
 
     emit(state,message,key=this.key,{code=null,reason=null}={}){
         this.state=state;
-        const detail=Object.freeze({
+        const detail={
             state,
             message,
             key,
@@ -524,24 +435,14 @@ class SpeechPlayback{
             operationId:this.operationId,
             code,
             reason
-        });
+        };
         if(!this.destroyed){
             this.events.dispatch(
                 SPEECH_PLAYBACK_STATE_EVENT,
                 detail,
                 {
                     operationId:this.operationId,
-                    publicDetail:{
-                        state,
-                        key,
-                        index:detail.index,
-                        total:detail.total,
-                        producing:detail.producing,
-                        buffered:detail.buffered,
-                        hasAudio:detail.hasAudio,
-                        code,
-                        reason
-                    }
+                    publicDetail:detail
                 }
             );
         }
@@ -622,7 +523,7 @@ class SpeechPlayback{
     async synthesizeSegment(index,generation,announce=false){
         const playback=this;
         const controller=new AbortController();
-        const token=Object.freeze({generation,index,controller});
+        const token={generation,index,controller};
         const queue=queueFor(this.speech);
         this.pendingGenerations.add(token);
         this.abortControllers.add(controller);
@@ -758,20 +659,20 @@ class SpeechPlayback{
             if(!Number.isFinite(numericSpeed)||numericSpeed<=0)throw new RangeError('Speech speed must be a positive number.');
             const selectedModel=model===null||model===undefined
                 ?null
-                :String(model).trim();
+                :String(model);
             const selectedVoice=voice===null||voice===undefined
                 ?null
-                :String(voice).trim();
+                :String(voice);
             const selectedResponseFormat=responseFormat===null||responseFormat===undefined
                 ?null
-                :String(responseFormat).trim();
-            if(model!==null&&model!==undefined&&!selectedModel){
+                :String(responseFormat);
+            if(model!==null&&model!==undefined&&!selectedModel.trim()){
                 throw new TypeError('Speech model cannot be blank.');
             }
-            if(voice!==null&&voice!==undefined&&!selectedVoice){
+            if(voice!==null&&voice!==undefined&&!selectedVoice.trim()){
                 throw new TypeError('Speech voice cannot be blank.');
             }
-            if(responseFormat!==null&&responseFormat!==undefined&&!selectedResponseFormat){
+            if(responseFormat!==null&&responseFormat!==undefined&&!selectedResponseFormat.trim()){
                 throw new TypeError('Speech response format cannot be blank.');
             }
             this.speed=numericSpeed;
@@ -965,10 +866,6 @@ class SpeechPlayback{
 }
 
 export {
-    MAX_SPEECH_CHARACTERS,
-    MAX_SPEECH_CHUNKS,
-    MAX_SPEECH_INPUT,
-    PREFERRED_STREAM_SEGMENT,
     SPEECH_VOICE_ALIASES,
     SPEECH_VOICE_OPTIONS,
     SPEECH_PLAYBACK_STATE_EVENT,

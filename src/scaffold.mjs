@@ -1,9 +1,7 @@
 import {lstat,mkdir,readFile,readdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
-import {verifyRuntime} from './runtime.mjs';
-import {verifySdkBrowserRuntime} from './sdk-browser-runtime.mjs';
-import {materializeWorkspaceRuntime} from './workspace-runtime.mjs';
+import {materializeWorkspaceRuntimeContent} from './workspace-runtime.mjs';
 import {generateImportMap} from './import-map.mjs';
 import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
 import {SDK_NAME,SDK_VERSION,workspaceTemplate} from './templates/workspace-template.mjs';
@@ -27,7 +25,7 @@ function throwIfAborted(signal){
 }
 
 async function emit(onEvent,event){
-    if(typeof onEvent==='function')await onEvent(Object.freeze(event));
+    if(typeof onEvent==='function')await onEvent(event);
 }
 
 function validateInputs(appId,displayName){
@@ -157,7 +155,7 @@ async function readExistingPackage(workspaceRoot){
     try{source=await readFile(packagePath,'utf8');}
     catch(error){
         if(error?.code==='ENOENT'){
-            return Object.freeze({exists:false,packagePath,source:null,document:null});
+            return {exists:false,packagePath,source:null,document:null};
         }
         throw error;
     }
@@ -165,7 +163,7 @@ async function readExistingPackage(workspaceRoot){
     try{existing=JSON.parse(source);}
     catch(error){fail(`Existing package.json is not valid JSON: ${error.message}.`);}
     if(!existing||typeof existing!=='object'||Array.isArray(existing))fail('Existing package.json must be a JSON object.');
-    return Object.freeze({exists:true,packagePath,source,document:existing});
+    return {exists:true,packagePath,source,document:existing};
 }
 
 function defaultSdkDeclaration(){
@@ -174,7 +172,7 @@ function defaultSdkDeclaration(){
 
 async function prepareExistingPackage(workspaceRoot,files,existingPackage,sdkDeclaration){
     const packageState=existingPackage??await readExistingPackage(workspaceRoot);
-    if(!packageState.exists)return Object.freeze({exists:false,updated:false});
+    if(!packageState.exists)return {exists:false,updated:false};
     const {packagePath,source,document:existing}=packageState;
     const generated=JSON.parse(files.get('package.json'));
     const conflicts=[];
@@ -207,15 +205,15 @@ async function prepareExistingPackage(workspaceRoot,files,existingPackage,sdkDec
         if(Object.keys(merged.dependencies).length===0)delete merged.dependencies;
     }
     if(JSON.stringify(existing)===JSON.stringify(merged)){
-        return Object.freeze({exists:true,updated:false});
+        return {exists:true,updated:false};
     }
-    return Object.freeze({
+    return {
         exists:true,
         updated:true,
         packagePath,
         source,
         content:`${JSON.stringify(merged,null,2)}\n`
-    });
+    };
 }
 
 async function applyPackageMerge(workspaceRoot,plan,{signal,onEvent}){
@@ -267,29 +265,6 @@ async function writeMissingFiles(workspaceRoot,files,{signal,onEvent}){
         await emit(onEvent,{type:'scaffold.file.created',path:relative});
     }
     return {createdFiles,skippedFiles};
-}
-
-async function assertExistingLockAdmission(workspaceRoot,files){
-    const expected=files.get('arcane.lock.json');
-    if(typeof expected!=='string')return;
-    const lockPath=path.join(workspaceRoot,'arcane.lock.json');
-    let info;
-    try{
-        info=await lstat(lockPath);
-    }catch(error){
-        if(error?.code==='ENOENT')return;
-        throw error;
-    }
-    if(info.isSymbolicLink()||!info.isFile()){
-        fail('Existing arcane.lock.json must be a real file.');
-    }
-    if(await readFile(lockPath,'utf8')!==expected){
-        fail(
-            'Existing arcane.lock.json does not match the authenticated SDK runtime '
-            +'admission. Remove or reconcile it before running arcane init; Arcane never '
-            +'overwrites a lock implicitly.'
-        );
-    }
 }
 
 async function runGitInit(workspaceRoot,signal,onEvent){
@@ -346,29 +321,21 @@ export async function createWorkspace({
     const workspaceRoot=path.resolve(targetPath);
     await emit(onEvent,{type:'scaffold.started',mode:'create',workspaceRoot,appId,target});
     await assertCreateTarget(workspaceRoot);
-    const receipt=await withWorkspaceOperationLock({
+    const operationResult=await withWorkspaceOperationLock({
         workspaceRoot,
         operation:'scaffold-create',
         signal,
         onEvent
     },async workspaceOperationLease=>{
-    const runtimeReceipt=await verifyRuntime({signal,onEvent});
-    const sdkBrowserRuntimeReceipt=await verifySdkBrowserRuntime({signal,onEvent});
     const template=workspaceTemplate({
         appId,
         displayName,
-        runtimeRelease:runtimeReceipt,
-        sdkBrowserRuntimeRelease:sdkBrowserRuntimeReceipt,
         target,
         appIcon:await scaffoldIcon(target)
     });
-    const result=await writeMissingFiles(workspaceRoot,template.files,{signal,onEvent});
-    const workspaceRuntimeReceipt=await materializeWorkspaceRuntime({
+    const writtenFiles=await writeMissingFiles(workspaceRoot,template.files,{signal,onEvent});
+    const workspaceRuntime=await materializeWorkspaceRuntimeContent({
         workspaceRoot,
-        runtimeRoot:runtimeReceipt.canonicalLocation,
-        runtimeReceipt,
-        browserRuntimeRoot:sdkBrowserRuntimeReceipt.canonicalLocation,
-        sdkBrowserRuntimeReceipt,
         signal,
         onEvent
     });
@@ -376,26 +343,25 @@ export async function createWorkspace({
         workspaceRoot,
         appId,
         appRoot:path.join(workspaceRoot,'apps',appId),
-        workspaceRuntimeReceipt,
         workspaceOperationLease,
         signal,
         onEvent
     });
     if(initializeGit)await runGitInit(workspaceRoot,signal,onEvent);
-    const receipt={
+    const result={
         workspaceRoot,
         appId,
         displayName:template.name,
         target,
-        ...result,
-        workspaceRuntime:workspaceRuntimeReceipt,
+        ...writtenFiles,
+        workspaceRuntime,
         importMap,
         gitInitialized:Boolean(initializeGit)
     };
-    return receipt;
+    return result;
     });
-    await emit(onEvent,{type:'scaffold.completed',...receipt});
-    return receipt;
+    await emit(onEvent,{type:'scaffold.completed',...operationResult});
+    return operationResult;
 }
 
 export async function initWorkspace({
@@ -412,7 +378,7 @@ export async function initWorkspace({
     const resolvedRoot=path.resolve(workspaceRoot);
     await emit(onEvent,{type:'scaffold.started',mode:'init',workspaceRoot:resolvedRoot,appId,target});
     await assertInitTarget(resolvedRoot);
-    const receipt=await withWorkspaceOperationLock({
+    const operationResult=await withWorkspaceOperationLock({
         workspaceRoot:resolvedRoot,
         operation:'scaffold-init',
         signal,
@@ -422,12 +388,6 @@ export async function initWorkspace({
     const workspaceMode=profile?.workspaceMode??'external';
     const legacyIntegrated=workspaceMode==='integrated'
         &&profile.config.browserRuntimeLayout==='integrated-legacy';
-    const runtimeReceipt=workspaceMode==='external'
-        ?await verifyRuntime({signal,onEvent})
-        :null;
-    const sdkBrowserRuntimeReceipt=workspaceMode==='external'
-        ?await verifySdkBrowserRuntime({signal,onEvent})
-        :null;
     const existingPackage=workspaceMode==='external'
         ?await readExistingPackage(resolvedRoot)
         :null;
@@ -455,8 +415,6 @@ export async function initWorkspace({
         :workspaceTemplate({
             appId,
             displayName,
-            runtimeRelease:runtimeReceipt,
-            sdkBrowserRuntimeRelease:sdkBrowserRuntimeReceipt,
             sdkDependencyName:sdkDeclaration.dependencyName,
             sdkDependencySpecifier:sdkDeclaration.specifier,
             sdkPackageSource:sdkDeclaration.packageSource,
@@ -464,41 +422,33 @@ export async function initWorkspace({
             appIcon:await scaffoldIcon(target)
         });
     const packagePlan=workspaceMode==='integrated'
-        ?Object.freeze({exists:true,updated:false})
+        ?{exists:true,updated:false}
         :await prepareExistingPackage(
             resolvedRoot,
             template.files,
             existingPackage,
             sdkDeclaration
         );
-    if(workspaceMode==='external'){
-        await assertExistingLockAdmission(resolvedRoot,template.files);
-    }
-    const result=await writeMissingFiles(resolvedRoot,template.files,{signal,onEvent});
+    const writtenFiles=await writeMissingFiles(resolvedRoot,template.files,{signal,onEvent});
     const packageUpdated=await applyPackageMerge(resolvedRoot,packagePlan,{signal,onEvent});
-    const workspaceRuntimeReceipt=workspaceMode==='external'
-        ?await materializeWorkspaceRuntime({
+    const workspaceRuntime=workspaceMode==='external'
+        ?await materializeWorkspaceRuntimeContent({
             workspaceRoot:resolvedRoot,
-            runtimeRoot:runtimeReceipt.canonicalLocation,
-            runtimeReceipt,
-            browserRuntimeRoot:sdkBrowserRuntimeReceipt.canonicalLocation,
-            sdkBrowserRuntimeReceipt,
             signal,
             onEvent
         })
         :null;
     const importMap=legacyIntegrated
-        ?Object.freeze({
+        ?{
             appId,
             skipped:true,
             compatibility:'integrated-legacy',
             reason:'The canonical integrated Arcane OS root retains its physical two-route browser runtime.'
-        })
+        }
         :await generateImportMap({
             workspaceRoot:resolvedRoot,
             appId,
             appRoot:path.join(resolvedRoot,'apps',appId),
-            workspaceRuntimeReceipt,
             workspaceOperationLease,
             signal,
             onEvent
@@ -506,20 +456,20 @@ export async function initWorkspace({
     if(legacyIntegrated){
         await emit(onEvent,{type:'import-map.compatibility.skipped',...importMap});
     }
-    const receipt={
+    const result={
         workspaceRoot:resolvedRoot,
         workspaceMode,
         appId,
         displayName:template.name,
         target,
-        ...result,
+        ...writtenFiles,
         packageUpdated,
-        workspaceRuntime:workspaceRuntimeReceipt,
+        workspaceRuntime,
         importMap,
         gitInitialized:false
     };
-    return receipt;
+    return result;
     });
-    await emit(onEvent,{type:'scaffold.completed',...receipt});
-    return receipt;
+    await emit(onEvent,{type:'scaffold.completed',...operationResult});
+    return operationResult;
 }

@@ -42,7 +42,7 @@
     </div>
     <div id="details-panel" class="panel details" role="tabpanel" aria-labelledby="details-tab" data-panel="details" hidden>
         <section class="metadata"><h3>Source details</h3><dl data-metadata></dl></section>
-        <form class="review"><h3 data-review-heading>Review</h3><label>Status<select data-review-status></select></label><label data-classification-field hidden><span data-classification-label>Classification</span><select data-review-classification></select></label><div data-review-fields></div><label><span data-notes-label>Notes</span><textarea data-review-notes maxlength="10000"></textarea></label><button class="save" type="submit">Save review</button><span class="save-state" aria-live="polite"></span></form>
+        <form class="review"><h3 data-review-heading>Review</h3><label>Status<select data-review-status></select></label><label data-classification-field hidden><span data-classification-label>Classification</span><select data-review-classification></select></label><div data-review-fields></div><label><span data-notes-label>Notes</span><textarea data-review-notes></textarea></label><button class="save" type="submit">Save review</button><span class="save-state" aria-live="polite"></span></form>
     </div>
 </section>
 
@@ -108,15 +108,13 @@
         projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});
     },{signal:lifecycleController.signal});
 
-    function sameOriginUrl(value){
+    function sourceUrl(value){
         if(!String(value||'').trim()) throw new TypeError('A document source is required.');
-        const url=new URL(String(value||''),document.baseURI);
-        if(url.origin!==location.origin) throw new TypeError('Document sources must use the current application origin.');
-        return url.href;
+        return new URL(String(value||''),document.baseURI).href;
     }
 
     function pdfSourceUrl(value,page=null){
-        const url=new URL(sameOriginUrl(value));
+        const url=new URL(sourceUrl(value));
         if(page===null||page===undefined||page==='') return url.href;
         const resolvedPage=Number(page);
         if(!Number.isSafeInteger(resolvedPage)||resolvedPage<1) throw new TypeError('PDF page must be a positive integer.');
@@ -143,12 +141,8 @@
         surface.replaceChildren(paragraph);
     }
 
-    function safeMarkdown(markdown=''){
-        const template=document.createElement('template');
-        template.innerHTML=new MD(markdown).safeRendered;
-        template.content.querySelectorAll('img,video,audio,source,picture').forEach(element=>element.remove());
-        template.content.querySelectorAll('a').forEach(link=>{link.removeAttribute('href');link.removeAttribute('target');link.removeAttribute('rel');});
-        return template.innerHTML;
+    function renderMarkdownHTML(markdown=''){
+        return new MD(markdown).safeRendered;
     }
 
     function showMarkdown(){
@@ -218,7 +212,7 @@
         if(!reviewClassification.value&&reviewClassification.options.length) reviewClassification.selectedIndex=0;
         reviewFields.replaceChildren();
         for(const definition of Array.isArray(config.reviewFields)?config.reviewFields:[]){
-            const key=String(definition.key||'').replace(/[^a-z0-9._-]/gi,'-').slice(0,80);
+            const key=String(definition.key||'').replace(/[^a-z0-9._-]/gi,'-');
             if(!key) continue;
             const label=document.createElement('label'); const caption=document.createElement('span'); caption.textContent=String(definition.label||key);
             let field;
@@ -230,7 +224,7 @@
             }else{
                 field=document.createElement('input'); field.type='text';
             }
-            field.dataset.reviewField=key; field.maxLength=Math.min(Number(definition.maxLength)||10000,10000); field.placeholder=String(definition.placeholder||'');
+            field.dataset.reviewField=key; field.placeholder=String(definition.placeholder||'');
             field.value=String(config.review?.attributes?.[key]||'');
             if(definition.type==='select'&&!field.value&&field.options.length&&![...field.options].some(option=>option.value==='')) field.selectedIndex=0;
             label.append(caption,field); reviewFields.append(label);
@@ -241,7 +235,7 @@
         if(hasPdf){
             try{
                 const resolvedPage=config.pdfPage===null||config.pdfPage===undefined||config.pdfPage===''?null:Number(config.pdfPage);
-                const frame=document.createElement('iframe'); frame.className='pdf-frame'; frame.title=`Original PDF: ${config.title||'document'}${resolvedPage?`, page ${resolvedPage}`:''}`; frame.referrerPolicy='no-referrer'; frame.src=pdfSourceUrl(config.pdfUrl,resolvedPage); pdfPanel.append(frame);
+                const frame=document.createElement('iframe'); frame.className='pdf-frame'; frame.title=`Original PDF: ${config.title||'document'}${resolvedPage?`, page ${resolvedPage}`:''}`; frame.src=pdfSourceUrl(config.pdfUrl,resolvedPage); pdfPanel.append(frame);
             }catch(error){showSurfaceMessage(pdfPanel,error.message,'error');}
         }
         rawMarkdown=''; renderedMarkdown=''; markdownMessage=null;
@@ -249,11 +243,11 @@
         if(hasText){
             showSurfaceMessage(markdownSurface,'Loading document text…');
             try{
-                const response=await fetch(sameOriginUrl(config.markdownUrl),{cache:'no-store',credentials:'same-origin',signal:controller.signal});
+                const response=await fetch(sourceUrl(config.markdownUrl),{signal:controller.signal});
                 if(!response.ok) throw new Error(`Document text unavailable (${response.status}).`);
                 const markdown=await response.text();
                 if(destroyed||sequence!==loadSequence) return false;
-                rawMarkdown=markdown; renderedMarkdown=safeMarkdown(rawMarkdown); showMarkdown();
+                rawMarkdown=markdown; renderedMarkdown=renderMarkdownHTML(rawMarkdown); showMarkdown();
             }catch(error){
                 if(destroyed||sequence!==loadSequence||controller.signal.aborted) return false;
                 markdownMessage={message:error.message,className:'error'}; showMarkdown();

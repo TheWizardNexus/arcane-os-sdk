@@ -1,4 +1,4 @@
-export const ERROR_CODES=Object.freeze({
+export const ERROR_CODES={
     usage:'ARCANE_USAGE',
     workspaceInvalid:'ARCANE_WORKSPACE_INVALID',
     prerequisiteMissing:'ARCANE_PREREQUISITE_MISSING',
@@ -7,10 +7,9 @@ export const ERROR_CODES=Object.freeze({
     nativeRunUnsupported:'ARCANE_NATIVE_RUN_UNSUPPORTED',
     updateCheckFailed:'ARCANE_UPDATE_CHECK_FAILED',
     policyDenied:'ARCANE_POLICY_DENIED',
-    integrityFailed:'ARCANE_INTEGRITY_FAILED',
     operationFailed:'ARCANE_OPERATION_FAILED',
     cancelled:'ARCANE_CANCELLED'
-});
+};
 
 export class ArcaneError extends Error{
     constructor(code,message,{details,cause,exitCode}={}){

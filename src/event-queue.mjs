@@ -90,7 +90,7 @@ export function createEventQueue(onEvent,{
             if(firstError){
                 return;
             }
-            const current=Object.freeze(event);
+            const current=event;
             mirror(manager,current,eventMetadata,occurrence);
             try{
                 await callback?.(current);
@@ -128,11 +128,11 @@ export function createEventQueue(onEvent,{
         }
     };
 
-    return Object.freeze({
+    return {
         drain,
         enqueue,
         failure,
         send,
         get error(){return firstError;}
-    });
+    };
 }

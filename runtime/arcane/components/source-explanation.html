@@ -36,7 +36,7 @@
     <label>Alleged actor<select data-actor></select></label>
     <label>Disposition<select data-disposition></select></label>
     <label>Confidence<select data-confidence></select></label>
-    <label class="notes">Notes, contrary facts, and follow-up<textarea data-notes maxlength="10000"></textarea></label>
+    <label class="notes">Notes, contrary facts, and follow-up<textarea data-notes></textarea></label>
     <div class="save-row"><button type="submit">Save decision</button><span class="save-state" data-save-state aria-live="polite"></span></div>
   </form>
 </section>
@@ -82,7 +82,7 @@
 
   function showFinding(value={},config={}){
     finding=value&&typeof value==='object'?value:null; if(!finding) throw new TypeError('A finding is required.');
-    sources=(Array.isArray(finding.sources)?finding.sources:[]).slice(0,40);
+    sources=Array.isArray(finding.sources)?finding.sources:[];
     title.textContent=String(finding.label||'Investigative lead'); assessment.textContent=String(finding.assessment||finding.conclusion||'Human review is required before reliance.');
     badges.replaceChildren();
     for(const value of [finding.allegedActorLabel?`Alleged actor: ${finding.allegedActorLabel}`:'Actor not assigned',finding.kind||'Investigative lead',finding.confidence?`${finding.confidence} confidence`:'Confidence not assigned']){const badge=document.createElement('span'); badge.className='badge'; badge.textContent=value; badges.append(badge);}

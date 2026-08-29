@@ -12,7 +12,6 @@
     "version",
     "entry",
     "strategy",
-    "security",
     "include",
     "shared"
   ],
@@ -26,7 +25,6 @@
     "displayName": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 160,
       "pattern": "^(?=.*\\S)[^<>\\u0000-\\u001f\\u007f]+$"
     },
     "version": {
@@ -48,11 +46,6 @@
     "security": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "connectOrigins",
-        "frameOrigins",
-        "mediaOrigins"
-      ],
       "properties": {
         "connectOrigins": {
           "$ref": "#/$defs/connectOriginList"
@@ -145,7 +138,6 @@
     },
     "pathList": {
       "type": "array",
-      "maxItems": 512,
       "uniqueItems": true,
       "items": {
         "$ref": "#/$defs/literalRelativePath"
@@ -153,7 +145,6 @@
     },
     "connectOriginList": {
       "type": "array",
-      "maxItems": 16,
       "uniqueItems": true,
       "items": {
         "type": "string",
@@ -162,7 +153,6 @@
     },
     "httpsOriginList": {
       "type": "array",
-      "maxItems": 16,
       "uniqueItems": true,
       "items": {
         "type": "string",
@@ -171,7 +161,6 @@
     },
     "frameOriginList": {
       "type": "array",
-      "maxItems": 16,
       "uniqueItems": true,
       "items": {
         "type": "string",
@@ -191,7 +180,6 @@
         },
         "models": {
           "type": "array",
-          "maxItems": 64,
           "uniqueItems": true,
           "items": {
             "type": "object",
@@ -204,16 +192,14 @@
               "name": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256,
-                "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,191}(?::[A-Za-z0-9][A-Za-z0-9._-]{0,63})?$",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$",
                 "not": {
                   "pattern": "^[Oo][Pp][Ee][Nn][Aa][Ii]$"
                 }
               },
               "definition": {
                 "type": "string",
-                "maxLength": 128,
-                "pattern": "^(?:Modelfile|[A-Za-z0-9][A-Za-z0-9._-]{0,118}\\.Modelfile)$"
+                "pattern": "^(?:Modelfile|[A-Za-z0-9][A-Za-z0-9._-]*\\.Modelfile)$"
               }
             }
           }

@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 import {spawn} from 'node:child_process';
-import {randomUUID} from 'node:crypto';
-import {writeSync} from 'node:fs';
 import {lstat,readdir,realpath} from 'node:fs/promises';
 import {register} from 'node:module';
 import path from 'node:path';
@@ -14,17 +12,97 @@ const TEST_FILE_PATTERN=/\.test\.(?:mjs|cjs|js)$/u;
 const CANCELLATION_FORCE_WAIT_MS=1500;
 const WATCHDOG_REPORT_GRACE_MS=500;
 const FILE_HEARTBEAT_MS=30_000;
-const OUTPUT_FLUSH_TIMEOUT_MS=5_000;
 const BETWEEN_PHASE_TIMEOUT_MS=30_000;
-const TREE_DRAIN_DIAGNOSTIC_BYTES=4_096;
 const IPC_PROTOCOL=1;
-const IPC_TOKEN_ENV='ARCANE_TEST_IPC_TOKEN';
+const MANAGED_IMPORT_MAP_ENV='ARCANE_TEST_IMPORT_MAP_CONTEXT';
+const MANAGED_IMPORT_MAP_PROTOCOL='arcane-test-import-map/1';
+const APPLICATION_MAP_BOUNDARIES=new Set(['source','dist','test']);
 const ISOLATED_MODE=process.argv[2]===SINGLE_FILE_ARGUMENT;
-const ISOLATED_TOKEN=ISOLATED_MODE?process.env[IPC_TOKEN_ENV]:null;
+const MANAGED_IMPORT_MAP_SOURCE=process.env[MANAGED_IMPORT_MAP_ENV];
+const ISOLATED_MANAGED_IMPORT_MAP=ISOLATED_MODE
+    &&MANAGED_IMPORT_MAP_SOURCE!==''
+    ?MANAGED_IMPORT_MAP_SOURCE
+    :undefined;
+const COORDINATOR_MANAGED_IMPORT_MAP=!ISOLATED_MODE
+    &&MANAGED_IMPORT_MAP_SOURCE!==''
+    ?MANAGED_IMPORT_MAP_SOURCE
+    :undefined;
 const ISOLATED_SEND=ISOLATED_MODE&&typeof process.send==='function'
     ?process.send.bind(process)
     :null;
-if(ISOLATED_MODE)delete process.env[IPC_TOKEN_ENV];
+delete process.env[MANAGED_IMPORT_MAP_ENV];
+
+function importMapFailure(message,code='ARCANE_IMPORT_MAP_INVALID'){
+    const error=new Error(message);
+    error.code=code;
+    throw error;
+}
+
+function samePath(left,right){
+    const a=path.resolve(left);
+    const b=path.resolve(right);
+    return process.platform==='win32'?a.toLowerCase()===b.toLowerCase():a===b;
+}
+
+function pathInside(root,candidate){
+    const relative=path.relative(root,candidate);
+    return relative===''||(!relative.startsWith(`..${path.sep}`)&&relative!=='..'&&!path.isAbsolute(relative));
+}
+
+async function readManagedImportMapContext(source,signal,testFile){
+    if(source===undefined)return null;
+    throwIfCancelled(signal);
+    let context;
+    try{context=JSON.parse(source);}
+    catch(error){importMapFailure(`Managed import-map context is not valid JSON: ${error.message}`);}
+    if(context===null||typeof context!=='object'||Array.isArray(context)
+        ||context.protocol!==MANAGED_IMPORT_MAP_PROTOCOL
+        ||!APPLICATION_MAP_BOUNDARIES.has(context.boundary)
+        ||typeof context.baseURL!=='string'
+        ||context.imports===null||typeof context.imports!=='object'
+        ||Array.isArray(context.imports)){
+        importMapFailure('Managed import-map context is malformed.');
+    }
+    let suppliedBase;
+    try{
+        const parsed=new URL(context.baseURL);
+        if(parsed.protocol!=='file:'||parsed.username||parsed.password||parsed.search||parsed.hash){
+            importMapFailure('Managed import-map base URL must be a physical application directory.');
+        }
+        suppliedBase=path.resolve(fileURLToPath(parsed));
+    }catch(error){
+        if(error?.code)throw error;
+        importMapFailure(`Managed import-map base URL is invalid: ${error.message}`);
+    }
+    const testCodeRoot=await physicalTestCodeRoot(testFile);
+    const applicationRoot=path.dirname(testCodeRoot);
+    const expectedBase=context.boundary==='source'
+        ?applicationRoot
+        :context.boundary==='test'
+            ?testCodeRoot
+            :path.join(applicationRoot,'dist');
+    let baseInfo;
+    let canonicalBase;
+    try{
+        baseInfo=await lstat(expectedBase);
+        canonicalBase=await realpath(expectedBase);
+    }catch(error){
+        importMapFailure(`Selected ${context.boundary} application directory is unavailable: ${error.message}`);
+    }
+    if(baseInfo.isSymbolicLink()||!baseInfo.isDirectory()
+        ||!samePath(expectedBase,canonicalBase)||!samePath(suppliedBase,canonicalBase)){
+        importMapFailure(
+            `Managed import-map base URL must select this application's physical ${context.boundary} directory.`
+        );
+    }
+    throwIfCancelled(signal);
+    return {
+        protocol:MANAGED_IMPORT_MAP_PROTOCOL,
+        boundary:context.boundary,
+        baseURL:pathToFileURL(`${canonicalBase}${path.sep}`).href,
+        imports:{...context.imports}
+    };
+}
 
 function comparePaths(left,right){
     return left.localeCompare(right,'en');
@@ -36,8 +114,37 @@ function throwIfCancelled(signal){
     }
 }
 
-async function collectDirectory(root,files,signal){
+function enclosingTestCodeRoot(candidate){
+    let current=path.resolve(candidate);
+    while(true){
+        if(path.basename(current).toLowerCase()==='test')return current;
+        const parent=path.dirname(current);
+        if(samePath(parent,current))return null;
+        current=parent;
+    }
+}
+
+async function physicalTestCodeRoot(candidate){
+    const selected=enclosingTestCodeRoot(candidate);
+    if(selected===null){
+        throw new Error(`Selected test path is not inside an application test-code directory: ${candidate}`);
+    }
+    const info=await lstat(selected);
+    const canonical=await realpath(selected);
+    if(info.isSymbolicLink()||!info.isDirectory()||!samePath(selected,canonical)){
+        throw new Error(`Application test-code directory must be one physical directory: ${selected}`);
+    }
+    return canonical;
+}
+
+async function collectDirectory(root,testCodeRoot,files,signal){
     throwIfCancelled(signal);
+    const rootInfo=await lstat(root);
+    const canonicalRoot=await realpath(root);
+    if(rootInfo.isSymbolicLink()||!rootInfo.isDirectory()||!samePath(root,canonicalRoot)
+        ||!pathInside(testCodeRoot,canonicalRoot)){
+        throw new Error(`Test discovery must stay inside its physical test-code directory: ${root}`);
+    }
     const entries=await readdir(root,{withFileTypes:true});
     throwIfCancelled(signal);
     for(const entry of entries.sort((left,right)=>comparePaths(left.name,right.name))){
@@ -47,9 +154,13 @@ async function collectDirectory(root,files,signal){
             throw new Error(`Test discovery refuses symbolic links: ${candidate}`);
         }
         if(entry.isDirectory()){
-            await collectDirectory(candidate,files,signal);
+            await collectDirectory(candidate,testCodeRoot,files,signal);
         }else if(entry.isFile()&&TEST_FILE_PATTERN.test(entry.name)){
-            files.add(await realpath(candidate));
+            const canonical=await realpath(candidate);
+            if(!samePath(candidate,canonical)||!pathInside(testCodeRoot,canonical)){
+                throw new Error(`Selected test file leaves its physical test-code directory: ${candidate}`);
+            }
+            files.add(canonical);
         }
     }
 }
@@ -72,10 +183,18 @@ async function collectTestFiles(arguments_,signal){
         if(info.isSymbolicLink()){
             throw new Error(`Test paths must not be symbolic links: ${candidate}`);
         }
+        const testCodeRoot=await physicalTestCodeRoot(candidate);
+        if(!pathInside(testCodeRoot,candidate)){
+            throw new Error(`Selected test path leaves its application test-code directory: ${candidate}`);
+        }
         if(info.isDirectory()){
-            await collectDirectory(candidate,files,signal);
+            await collectDirectory(candidate,testCodeRoot,files,signal);
         }else if(info.isFile()&&TEST_FILE_PATTERN.test(path.basename(candidate))){
-            files.add(await realpath(candidate));
+            const canonical=await realpath(candidate);
+            if(!samePath(candidate,canonical)||!pathInside(testCodeRoot,canonical)){
+                throw new Error(`Selected test file leaves its physical test-code directory: ${candidate}`);
+            }
+            files.add(canonical);
         }else{
             throw new Error(`Expected a .test.js, .test.cjs, or .test.mjs file: ${candidate}`);
         }
@@ -88,14 +207,14 @@ function formatError(error){
 }
 
 function sendIsolatedMessage(message){
-    if(typeof ISOLATED_TOKEN!=='string'||ISOLATED_TOKEN===''||ISOLATED_SEND===null){
+    if(ISOLATED_SEND===null){
         return Promise.reject(
-            new Error('Internal single-file mode requires its authenticated coordinator channel.')
+            new Error('Internal single-file mode requires its coordinator channel.')
         );
     }
     return new Promise((resolve,reject)=>{
         ISOLATED_SEND(
-            {...message,protocol:IPC_PROTOCOL,token:ISOLATED_TOKEN},
+            {...message,protocol:IPC_PROTOCOL},
             error=>error?reject(error):resolve()
         );
     });
@@ -209,12 +328,9 @@ function forceDrainWindowsTree(child){
         let stdoutDiagnostic='';
         let stderrDiagnostic='';
         const deadline=performance.now()+CANCELLATION_FORCE_WAIT_MS;
-        const capture=(stream,chunk)=>{
-            const value=`${stream}${chunk.toString()}`;
-            return value.slice(-TREE_DRAIN_DIAGNOSTIC_BYTES);
-        };
+        const capture=(stream,chunk)=>`${stream}${chunk.toString()}`;
         const diagnostic=()=>[stdoutDiagnostic,stderrDiagnostic]
-            .map(value=>value.trim()).filter(Boolean).join('\n');
+            .filter(value=>value!=='').join('\n');
         const reportFailure=reason=>{
             const detail=diagnostic();
             console.error(
@@ -321,7 +437,6 @@ function forceDrainProcessTree(child){
 function runIsolatedFile(file,signal){
     if(signal.aborted)return Promise.reject(signal.reason);
     return new Promise((resolve,reject)=>{
-        const token=randomUUID();
         let settled=false;
         let escalation=null;
         let forceSettlement=null;
@@ -353,7 +468,7 @@ function runIsolatedFile(file,signal){
             if(!child?.connected)return;
             try{
                 child.send(
-                    {protocol:IPC_PROTOCOL,token,type:'abort',reason},
+                    {protocol:IPC_PROTOCOL,type:'abort',reason},
                     ()=>{}
                 );
             }catch{}
@@ -390,7 +505,7 @@ function runIsolatedFile(file,signal){
                 return;
             }
             console.error(
-                `[arcane-test] ${displayFile(file)} closed without an authenticated harness report.`
+                `[arcane-test] ${displayFile(file)} closed without a harness report.`
             );
             finish(resolve,{
                 code:2,
@@ -465,7 +580,6 @@ function runIsolatedFile(file,signal){
         const onMessage=message=>{
             if(
                 message?.protocol!==IPC_PROTOCOL
-                ||message?.token!==token
                 ||typeof message.type!=='string'
             )return;
             if(message.type==='phase'){
@@ -473,24 +587,28 @@ function runIsolatedFile(file,signal){
                     completion!==null
                     ||watchdogFailure!==null
                     ||typeof message.id!=='string'
-                    ||message.id===''||message.id.length>200
+                    ||message.id===''
                 )return;
                 if(message.status==='started'){
                     if(
                         typeof message.kind!=='string'
                         ||typeof message.name!=='string'
-                        ||!Number.isSafeInteger(message.timeoutMs)
-                        ||message.timeoutMs<1
-                        ||message.timeoutMs>3_600_000
+                        ||(message.timeoutMs!==null&&(
+                            !Number.isSafeInteger(message.timeoutMs)
+                            ||message.timeoutMs<1
+                            ||message.timeoutMs>3_600_000
+                        ))
                         ||phaseTimers.has(message.id)
                     )return;
                     clearTimeout(idleTimer);
-                    const timer=setTimeout(()=>watchdog(message),message.timeoutMs);
+                    const timer=message.timeoutMs===null
+                        ?null
+                        :setTimeout(()=>watchdog(message),message.timeoutMs);
                     phaseTimers.set(message.id,timer);
                 }else if(message.status==='completed'){
-                    const timer=phaseTimers.get(message.id);
-                    if(timer!==undefined){
-                        clearTimeout(timer);
+                    if(phaseTimers.has(message.id)){
+                        const timer=phaseTimers.get(message.id);
+                        if(timer!==null)clearTimeout(timer);
                         phaseTimers.delete(message.id);
                         scheduleIdle();
                     }
@@ -513,7 +631,10 @@ function runIsolatedFile(file,signal){
         };
         try{
             child=spawn(process.execPath,[RUNNER_PATH,SINGLE_FILE_ARGUMENT,file],{
-                env:{...process.env,[IPC_TOKEN_ENV]:token},
+                env:{
+                    ...process.env,
+                    [MANAGED_IMPORT_MAP_ENV]:COORDINATOR_MANAGED_IMPORT_MAP??''
+                },
                 shell:false,
                 windowsHide:true,
                 detached:process.platform!=='win32',
@@ -537,7 +658,17 @@ function runIsolatedFile(file,signal){
 
 async function runSingleFile(file,signal){
     console.log(`[arcane-test] IMPORT ${displayFile(file)}`);
-    register(new URL('../src/testing-loader.mjs',import.meta.url),import.meta.url);
+    const managedImportMap=await readManagedImportMapContext(
+        ISOLATED_MANAGED_IMPORT_MAP,
+        signal,
+        file
+    );
+    throwIfCancelled(signal);
+    register(new URL('../src/testing-loader.mjs',import.meta.url),{
+        parentURL:import.meta.url,
+        data:{managedImportMap}
+    });
+    throwIfCancelled(signal);
     const importPhase={
         id:'module-import',
         kind:'import',
@@ -551,6 +682,7 @@ async function runSingleFile(file,signal){
     let importError=null;
     try{
         try{
+            throwIfCancelled(signal);
             await import(pathToFileURL(file).href);
         }catch(error){
             importError=error;
@@ -617,12 +749,10 @@ function flushStream(stream){
         const finish=flushed=>{
             if(settled)return;
             settled=true;
-            clearTimeout(timeout);
             stream.removeListener('error',failed);
             resolve(flushed);
         };
         const failed=()=>finish(false);
-        const timeout=setTimeout(failed,OUTPUT_FLUSH_TIMEOUT_MS);
         stream.once('error',failed);
         try{
             stream.write('',()=>finish(true));
@@ -635,12 +765,7 @@ function flushStream(stream){
 async function flushOutput(){
     const flushed=await Promise.all([flushStream(process.stdout),flushStream(process.stderr)]);
     if(flushed.every(Boolean))return;
-    try{
-        writeSync(
-            2,
-            '[arcane-test] Output flush exceeded its bounded drain; diagnostics may be truncated.\n'
-        );
-    }catch{}
+    throw new Error('One or more test output streams failed before reporting all diagnostics.');
 }
 
 async function main(){
@@ -656,7 +781,6 @@ async function main(){
     const parentAbort=message=>{
         if(
             message?.protocol!==IPC_PROTOCOL
-            ||message?.token!==ISOLATED_TOKEN
             ||message?.type!=='abort'
         )return;
         const error=new Error(
@@ -673,9 +797,9 @@ async function main(){
             if(process.argv.length!==4){
                 throw new Error(`${SINGLE_FILE_ARGUMENT} requires one exact test file.`);
             }
-            if(typeof ISOLATED_TOKEN!=='string'||ISOLATED_TOKEN===''||ISOLATED_SEND===null){
+            if(ISOLATED_SEND===null){
                 throw new Error(
-                    'Internal single-file mode requires its authenticated coordinator channel.'
+                    'Internal single-file mode requires its coordinator channel.'
                 );
             }
             interceptIsolatedExit();
@@ -718,7 +842,7 @@ if(ISOLATED_MODE){
             kind:'flush',
             name:'test report output flush',
             status:'started',
-            timeoutMs:OUTPUT_FLUSH_TIMEOUT_MS,
+            timeoutMs:null,
             type:'phase'
         };
         await sendIsolatedMessage(flushPhase);

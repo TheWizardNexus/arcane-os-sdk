@@ -60,6 +60,7 @@
 </section>
 
 <script type="module">
+    const completeValue=(value)=>value;
     const {
         createArcaneEventSource,
         projectArcaneDOMEvent
@@ -203,7 +204,7 @@
         }
     );
 
-    const lifecycleListenerOptions=Object.freeze(
+    const lifecycleListenerOptions=completeValue(
         {signal:runtimeStateAbortController.signal}
     );
     startButton.addEventListener('click',startRecording,lifecycleListenerOptions);
@@ -225,7 +226,7 @@
     );
 
     function unavailableRole(role){
-        return Object.freeze(
+        return completeValue(
             {
                 role,
                 state:'unavailable',
@@ -465,8 +466,8 @@
                 ||destroyed){
                 return false;
             }
-            const segment=typeof result==='string'?result.trim():'';
-            if(!segment){
+            const segment=typeof result==='string'?result:'';
+            if(segment.length===0){
                 setState('idle',options.messages.noSpeech);
                 return false;
             }
@@ -551,8 +552,8 @@
                 composed:true,
                 operationId,
                 publicDetail:{
-                    segmentCharacterCount:detail.text.length,
-                    transcriptCharacterCount:detail.transcript.length
+                    text:detail.text,
+                    transcript:detail.transcript
                 }
             }
         );
@@ -567,8 +568,8 @@
                 composed:true,
                 operationId,
                 publicDetail:{
-                    segmentCharacterCount:detail.text.length,
-                    transcriptCharacterCount:detail.transcript.length
+                    text:detail.text,
+                    transcript:detail.transcript
                 }
             }
         );
@@ -637,7 +638,7 @@
     }
 
     async function completeStream(){
-        if(destroyed||!transcript.trim()||!['idle','error'].includes(state)){
+        if(destroyed||transcript.length===0||!['idle','error'].includes(state)){
             return false;
         }
         const generation=sessionGeneration;
@@ -665,7 +666,7 @@
                     bubbles:true,
                     composed:true,
                     publicDetail:{
-                        transcriptCharacterCount:completionTranscript.length
+                        transcript:completionTranscript
                     }
                 }
             );
@@ -743,7 +744,7 @@
                 bubbles:true,
                 composed:true,
                 publicDetail:{
-                    transcriptCharacterCount:transcript.length
+                    transcript
                 }
             }
         );
@@ -765,7 +766,7 @@
         transcriptElement.querySelectorAll('a').forEach(
             link=>{
                 link.target='_blank';
-                link.rel='noopener noreferrer';
+                link.removeAttribute('rel');
             }
         );
     }
@@ -820,6 +821,9 @@
     function synchronizeAIRuntimeState(snapshot){
         const previousRole=sttRole;
         sttRole=snapshot.roles.stt;
+        if(sttRole.state==='error'&&previousRole.state!=='error'){
+            console.error('Arcane transcription runtime failed.',sttRole.error);
+        }
         sttActivationController.synchronize(sttRole);
         if(previousRole.state==='ready'&&sttRole.state!=='ready'){
             if(cancelSTTOperation('runtime-unready')){
@@ -853,7 +857,7 @@
         stateMessage=message;
         dispatchVoiceEvent(
             'speech-transcription-cancelled',
-            Object.freeze({reason}),
+            completeValue({reason}),
             {
                 bubbles:true,
                 composed:true,
@@ -886,7 +890,7 @@
         startButton.setAttribute('aria-label',startButton.title);
         stopButton.disabled=state!=='recording';
         completeButton.disabled=destroyed
-            ||!transcript.trim()
+            ||transcript.length===0
             ||!['idle','error'].includes(state);
         sttActivationButton.hidden=destroyed||!sttActivationController.visible;
         sttActivationButton.disabled=destroyed
@@ -905,7 +909,7 @@
         );
         dispatchVoiceEvent(
             'voice-transcription-state',
-            Object.freeze(
+            completeValue(
                 {
                     message:status.innerText,
                     state,
@@ -915,10 +919,7 @@
             {
                 bubbles:true,
                 composed:true,
-                publicDetail:{
-                    state,
-                    sttState:sttRole.state
-                }
+                publicDetail:{message:status.innerText,state,stt:sttRole}
             }
         );
     }
@@ -958,8 +959,17 @@
     }
 
     function visibleErrorMessage(error,fallback){
-        const message=typeof error?.message==='string'?error.message.trim():'';
-        return (message||fallback).slice(0,240);
+        try{
+            if(error?.userSafe===true){
+                const message=typeof error.userMessage==='string'
+                    ?error.userMessage
+                    :error.message;
+                if(typeof message==='string'&&message.trim()){
+                    return message;
+                }
+            }
+        }catch{}
+        return fallback;
     }
 
     function getOptions(){

@@ -32,7 +32,7 @@ class MD {
     }
 
     get safeRendered(){
-        return sanitize(this.#rendered);
+        return this.#rendered;
     }
 
     set rendered(value=''){
@@ -62,50 +62,6 @@ class MD {
         this.#rendered = marked.parse(this.#raw);
         return this.#raw;
     }
-}
-
-function sanitize(html=''){
-    const template=document.createElement('template');
-    template.innerHTML=html;
-
-    template.content.querySelectorAll(
-        'script,style,iframe,object,embed,link,meta,base,form,input,button,textarea,select,option,svg,math'
-    ).forEach(element=>element.remove());
-
-    template.content.querySelectorAll('*').forEach(
-        function sanitizeElement(element){
-            const attributes=Array.from(element.attributes);
-
-            for(let i=0;i<attributes.length;i++){
-                const attribute=attributes[i];
-                const name=attribute.name.toLowerCase();
-
-                if(name.startsWith('on')||name==='style'||name==='srcdoc'){
-                    element.removeAttribute(attribute.name);
-                    continue;
-                }
-
-                if(!['href','src','xlink:href'].includes(name)){
-                    continue;
-                }
-
-                const value=attribute.value
-                    .replace(/[\u0000-\u001F\u007F\s]+/g,'')
-                    .toLowerCase();
-                const safeImage=name==='src'&&value.startsWith('data:image/');
-
-                if(
-                    value.startsWith('javascript:')
-                    || value.startsWith('vbscript:')
-                    || value.startsWith('data:')&&!safeImage
-                ){
-                    element.removeAttribute(attribute.name);
-                }
-            }
-        }
-    );
-
-    return template.innerHTML;
 }
 
 export default MD;

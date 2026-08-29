@@ -1,16 +1,16 @@
-const DEFAULT_LEVELS=Object.freeze([
+const DEFAULT_LEVELS=[
     {minimum:70,id:'critical'},
     {minimum:40,id:'high'},
     {minimum:15,id:'caution'},
     {minimum:0,id:'low'},
-]);
+];
 
-function normalizeText(value,maxLength){
-    return String(value??'').normalize('NFKC').slice(0,maxLength);
+function normalizeText(value){
+    return String(value??'').normalize('NFKC');
 }
 
-export function analyzeRiskSignals(input,{signals=[],levels=DEFAULT_LEVELS,maxLength=20_000}={}){
-    const text=normalizeText(input,maxLength);
+export function analyzeRiskSignals(input,{signals=[],levels=DEFAULT_LEVELS}={}){
+    const text=normalizeText(input);
     const matches=[];
     let score=0;
 
@@ -18,7 +18,7 @@ export function analyzeRiskSignals(input,{signals=[],levels=DEFAULT_LEVELS,maxLe
         if(!signal||typeof signal.id!=='string'||!(signal.pattern instanceof RegExp))continue;
         signal.pattern.lastIndex=0;
         if(!signal.pattern.test(text))continue;
-        const weight=Math.max(0,Math.min(100,Number(signal.weight)||0));
+        const weight=Math.max(0,Number(signal.weight)||0);
         score+=weight;
         matches.push({
             id:signal.id,
@@ -28,10 +28,9 @@ export function analyzeRiskSignals(input,{signals=[],levels=DEFAULT_LEVELS,maxLe
         });
     }
 
-    score=Math.min(100,score);
     const ordered=[...levels].sort((a,b)=>b.minimum-a.minimum);
     const level=ordered.find(candidate=>score>=candidate.minimum)?.id||'unknown';
-    return Object.freeze({level,matches:Object.freeze(matches),score,textLength:text.length,truncated:String(input??'').length>text.length});
+    return {level,matches,score,textLength:text.length};
 }
 
 export {DEFAULT_LEVELS};

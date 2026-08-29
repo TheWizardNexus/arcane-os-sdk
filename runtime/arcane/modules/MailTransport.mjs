@@ -1,24 +1,24 @@
-export const DEFAULT_MAIL_REQUEST_TIMEOUT_MS=590_000;
-export const MAX_MAIL_RESPONSE_BYTES=65_536;
+export const DEFAULT_MAIL_REQUEST_TIMEOUT_MS=null;
 
-const REPORT_KEY_PATTERN=/^[a-zA-Z0-9._:-]{8,128}$/;
-const REQUEST_ID_PATTERN=/^[a-zA-Z0-9-]{8,128}$/;
-const PROVIDER_ID_PATTERN=/^[a-zA-Z0-9._:-]{1,256}$/;
-const ERROR_CODE_PATTERN=/^[a-zA-Z0-9._:-]{1,80}$/;
+const REPORT_KEY_PATTERN=/^[a-zA-Z0-9._:-]+$/;
+const REQUEST_ID_PATTERN=/^[a-zA-Z0-9-]+$/;
+const PROVIDER_ID_PATTERN=/^[a-zA-Z0-9._:-]+$/;
+const ERROR_CODE_PATTERN=/^[a-zA-Z0-9._:-]+$/;
 const RETRYABLE_STATUS_CODES=new Set([408,425,429,500,502,503,504]);
 const NON_RETRYABLE_RATE_CODES=new Set(['daily_quota_exceeded','monthly_quota_exceeded']);
-const RESPONSE_CONTRACT=Object.freeze({
+const RESPONSE_CONTRACT={
     accepted:202,
     delivery_uncertain:207,
     partially_accepted:207,
-});
+};
 
 export class MailTransportError extends Error {
-    constructor(message,{cause,code='MAIL_TRANSPORT_ERROR',retryable=false,
+    constructor(message,{cause,code='MAIL_TRANSPORT_ERROR',details=null,retryable=false,
         retryAfterMs=0,statusCode=0,uncertain=false}={}){
         super(message,{cause});
         this.name='MailTransportError';
         this.code=code;
+        this.details=details;
         this.retryable=Boolean(retryable);
         this.retryAfterMs=Number.isSafeInteger(retryAfterMs)&&retryAfterMs>0
             ? retryAfterMs
@@ -94,17 +94,18 @@ function parseRetryAfter(value,now=Date.now()){
     }
     const trimmed=value.trim();
     if(/^\d+(?:\.\d+)?$/u.test(trimmed)){
-        return Math.min(86_400_000,Math.max(0,Math.ceil(Number(trimmed)*1000)));
+        return Math.max(0,Math.ceil(Number(trimmed)*1000));
     }
     const timestamp=Date.parse(trimmed);
     return Number.isFinite(timestamp)
-        ? Math.min(86_400_000,Math.max(0,timestamp-now))
+        ? Math.max(0,timestamp-now)
         : 0;
 }
 
-function invalidSuccessResponse(response){
+function invalidSuccessResponse(response,responseText){
     return new MailTransportError('Mail server returned an invalid success response',{
         code:'MAIL_INVALID_RESPONSE',statusCode:response.status,uncertain:true,
+        details:parseJsonObject(responseText)??responseText
     });
 }
 
@@ -114,20 +115,21 @@ function parseDeliveryResponse(response,responseText){
         || typeof body.requestId!=='string'||!REQUEST_ID_PATTERN.test(body.requestId)
         || !Object.hasOwn(RESPONSE_CONTRACT,body.status)
         || RESPONSE_CONTRACT[body.status]!==response.status) {
-        throw invalidSuccessResponse(response);
+        throw invalidSuccessResponse(response,responseText);
     }
     for(const field of ['accepted','rejected']){
         if(body[field]!==undefined
             && (!Number.isSafeInteger(body[field])||body[field]<0)) {
-            throw invalidSuccessResponse(response);
+            throw invalidSuccessResponse(response,responseText);
         }
     }
     if(body.providerId!==undefined
         && (typeof body.providerId!=='string'||!PROVIDER_ID_PATTERN.test(body.providerId))){
-        throw invalidSuccessResponse(response);
+        throw invalidSuccessResponse(response,responseText);
     }
 
     return {
+        ...body,
         requestId:body.requestId,
         sent:body.status==='accepted',
         partial:body.status==='partially_accepted',
@@ -164,6 +166,7 @@ function parseRejection(response,responseText){
         : 0;
     return new MailTransportError(`Mail server rejected the request (${response.status})`,{
         code,
+        details:body??responseText,
         retryable,
         retryAfterMs:bodyRetryAfter||parseRetryAfter(response.headers?.get?.('retry-after')),
         statusCode:response.status,
@@ -171,37 +174,18 @@ function parseRejection(response,responseText){
     });
 }
 
-async function readBoundedResponseText(response){
-    const declaredLength=response.headers?.get?.('content-length');
-    if(declaredLength!==null&&declaredLength!==undefined&&declaredLength!==''){
-        const parsedLength=Number(declaredLength);
-        if(!Number.isSafeInteger(parsedLength)||parsedLength<0||parsedLength>MAX_MAIL_RESPONSE_BYTES){
-            throw new MailTransportError(
-                `Mail server response cannot exceed ${MAX_MAIL_RESPONSE_BYTES.toLocaleString('en-US')} bytes`,
-                {code:'MAIL_RESPONSE_TOO_LARGE',statusCode:response.status,uncertain:true}
-            );
-        }
-    }
-
+async function readResponseText(response){
     if(!response.body||typeof response.body.getReader!=='function'){
         if(typeof response.text!=='function'){
             throw new MailTransportError('Mail server returned an unreadable response',{
                 code:'MAIL_UNREADABLE_RESPONSE',statusCode:response.status,uncertain:true,
             });
         }
-        const text=await response.text();
-        if(new TextEncoder().encode(text).byteLength>MAX_MAIL_RESPONSE_BYTES){
-            throw new MailTransportError(
-                `Mail server response cannot exceed ${MAX_MAIL_RESPONSE_BYTES.toLocaleString('en-US')} bytes`,
-                {code:'MAIL_RESPONSE_TOO_LARGE',statusCode:response.status,uncertain:true}
-            );
-        }
-        return text;
+        return response.text();
     }
 
     const reader=response.body.getReader();
     const decoder=new TextDecoder();
-    let byteLength=0;
     let text='';
     try{
         while(true){
@@ -211,14 +195,6 @@ async function readBoundedResponseText(response){
                 throw new MailTransportError('Mail server returned an unreadable response',{
                     code:'MAIL_UNREADABLE_RESPONSE',statusCode:response.status,uncertain:true,
                 });
-            }
-            byteLength+=value.byteLength;
-            if(byteLength>MAX_MAIL_RESPONSE_BYTES){
-                await reader.cancel().catch(function ignoreReaderCancellation(){});
-                throw new MailTransportError(
-                    `Mail server response cannot exceed ${MAX_MAIL_RESPONSE_BYTES.toLocaleString('en-US')} bytes`,
-                    {code:'MAIL_RESPONSE_TOO_LARGE',statusCode:response.status,uncertain:true}
-                );
             }
             text+=decoder.decode(value,{stream:true});
         }
@@ -235,7 +211,7 @@ function requestBodyFrom({report,serializedReport}){
     }
     const validated=validateSerializedReport(serializedReport);
     if(report!==undefined&&serializeMailReport(report)!==validated){
-        throw new Error('Mail report does not match its immutable serialized request body');
+        throw new Error('Mail report does not match its stored serialized request body');
     }
     return validated;
 }
@@ -259,10 +235,11 @@ export async function sendMailReport({
         throw new Error('Mail application identity is invalid');
     }
     if(typeof reportKey!=='string'||!REPORT_KEY_PATTERN.test(reportKey)){
-        throw new Error('Mail report key must contain 8-128 safe characters');
+        throw new Error('Mail report key must contain safe characters');
     }
-    if(!Number.isSafeInteger(requestTimeout)||requestTimeout<1_000||requestTimeout>600_000){
-        throw new Error('Mail request timeout must be an integer between 1000 and 600000 milliseconds');
+    if(requestTimeout!==null&&requestTimeout!==undefined
+        &&(!Number.isSafeInteger(requestTimeout)||requestTimeout<1)){
+        throw new Error('Mail request timeout must be a positive integer');
     }
     if(appKey!==undefined&&appKey!==null&&typeof appKey!=='string'){
         throw new Error('Mail application key must be a string');
@@ -290,13 +267,15 @@ export async function sendMailReport({
     if(signal?.aborted){
         forwardAbort();
     }
-    const timeout=setTimeout(
-        function abortTimedOutMail(){
-            timedOut=true;
-            controller.abort(new Error('Mail request timed out'));
-        },
-        requestTimeout
-    );
+    const timeout=requestTimeout==null
+        ?null
+        :setTimeout(
+            function abortTimedOutMail(){
+                timedOut=true;
+                controller.abort(new Error('Mail request timed out'));
+            },
+            requestTimeout
+        );
 
     try{
         let response;
@@ -326,13 +305,13 @@ export async function sendMailReport({
             );
         }
 
-        const responseText=await readBoundedResponseText(response);
+        const responseText=await readResponseText(response);
         if(!response.ok){
             throw parseRejection(response,responseText);
         }
         return parseDeliveryResponse(response,responseText);
     }finally{
-        clearTimeout(timeout);
+        if(timeout!==null) clearTimeout(timeout);
         signal?.removeEventListener('abort',forwardAbort);
     }
 }

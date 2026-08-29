@@ -2,185 +2,52 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/TheWizardNexus/arcane-os-sdk/schemas/arcane-lock.schema.json",
   "title": "Arcane SDK workspace lock",
-  "description": "Pins an authored workspace to one SDK runtime and protocol state.",
+  "description": "Identifies the installed SDK roots and public protocol versions used by an authored workspace without byte identities or security admission.",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "sdk",
-    "runtime",
-    "sdkBrowserRuntime",
-    "protocols"
-  ],
+  "required": ["schemaVersion", "sdk", "runtime", "sdkBrowserRuntime", "protocols"],
   "properties": {
-    "schemaVersion": {
-      "const": 1
-    },
+    "schemaVersion": {"const": 1},
     "sdk": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "name",
-        "version"
-      ],
+      "required": ["name", "version"],
       "properties": {
-        "name": {
-          "const": "arcane-os"
-        },
-        "version": {
-          "const": "0.3.1"
-        }
+        "name": {"const": "arcane-os"},
+        "version": {"const": "0.3.1"}
       }
     },
     "runtime": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "manifest",
-        "contentSha256",
-        "upstreamCommit"
-      ],
-      "properties": {
-        "manifest": {
-          "type": "string",
-          "pattern": "^node_modules/(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*/runtime/ARCANE_RUNTIME_RELEASE\\.json$"
-        },
-        "contentSha256": {
-          "$ref": "#/$defs/sha256"
-        },
-        "upstreamCommit": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{40}$"
-        }
-      }
+      "required": ["root"],
+      "properties": {"root": {"$ref": "#/$defs/runtimeRoot"}}
     },
     "sdkBrowserRuntime": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "manifest",
-        "manifestSha256",
-        "contentSha256",
-        "builder",
-        "sdkVersion",
-        "source"
-      ],
-      "properties": {
-        "manifest": {
-          "type": "string",
-          "pattern": "^node_modules/(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*/browser-runtime/ARCANE_SDK_BROWSER_RELEASE\\.json$"
-        },
-        "manifestSha256": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
-        },
-        "contentSha256": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
-        },
-        "builder": {
-          "const": "arcane-sdk-browser-runtime-v1"
-        },
-        "sdkVersion": {
-          "const": "0.3.1"
-        },
-        "source": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "authority",
-            "repository",
-            "protocol",
-            "browserEntry",
-            "dependencies"
-          ],
-          "properties": {
-            "authority": {
-              "const": "arcane-os-sdk"
-            },
-            "repository": {
-              "const": "https://github.com/TheWizardNexus/arcane-os-sdk.git"
-            },
-            "protocol": {
-              "const": "arcane-sdk-browser-runtime/1"
-            },
-            "browserEntry": {
-              "const": "arcane-os/event-manager"
-            },
-            "dependencies": {
-              "type": "array",
-              "minItems": 3,
-              "maxItems": 3,
-              "prefixItems": [
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": ["name", "version", "resolved", "integrity"],
-                  "properties": {
-                    "name": {"const": "event-pubsub"},
-                    "version": {"const": "6.1.0"},
-                    "resolved": {"const": "https://registry.npmjs.org/event-pubsub/-/event-pubsub-6.1.0.tgz"},
-                    "integrity": {"const": "sha512-FEMlhTxwqGM0hztTixG6FhVFXqp7Eq1ltk5mSreK6Mhy3xWWpLAzEUR6OMvMdNqT3jgSxA8JDhnhyAG3X4Xy7Q=="}
-                  }
-                },
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": ["name", "version", "resolved", "integrity"],
-                  "properties": {
-                    "name": {"const": "strong-type"},
-                    "version": {"const": "2.0.0"},
-                    "resolved": {"const": "https://registry.npmjs.org/strong-type/-/strong-type-2.0.0.tgz"},
-                    "integrity": {"const": "sha512-HHrY9qYC7yn+5mlewiI3k9RQM9gZqGQsqbomZcd10Ks0h4RlX01nnkWbCe4AsVPCI6KaFvpkWm1nHMD+Ykup6g=="}
-                  }
-                },
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": ["name", "version", "resolved", "integrity"],
-                  "properties": {
-                    "name": {"const": "@wllama/wllama"},
-                    "version": {"const": "3.6.0"},
-                    "resolved": {"const": "https://registry.npmjs.org/@wllama/wllama/-/wllama-3.6.0.tgz"},
-                    "integrity": {"const": "sha512-NN3ZBXqaaUwGXTQubkNvsCaLPjN2XVa0bVS40OYCE8zquYmRc2W3oHYEgwvuSWWDB8aUqTLyMioySCXNkcnD1w=="}
-                  }
-                }
-              ],
-              "items": false
-            }
-          }
-        }
-      }
+      "required": ["root"],
+      "properties": {"root": {"$ref": "#/$defs/browserRuntimeRoot"}}
     },
     "protocols": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "arcane",
-        "cliEvents",
-        "targetAdapter"
-      ],
+      "required": ["arcane", "cliEvents", "targetAdapter"],
       "properties": {
-        "arcane": {
-          "const": "arcane/1"
-        },
-        "cliEvents": {
-          "const": "arcane-cli-events/1"
-        },
-        "targetAdapter": {
-          "const": "arcane-target-adapter/1"
-        }
+        "arcane": {"const": "arcane/1"},
+        "cliEvents": {"const": "arcane-cli-events/1"},
+        "targetAdapter": {"const": "arcane-target-adapter/1"}
       }
     }
   },
   "$defs": {
-    "semver": {
+    "runtimeRoot": {
       "type": "string",
-      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+      "pattern": "^node_modules/(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*/runtime$"
     },
-    "sha256": {
+    "browserRuntimeRoot": {
       "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
+      "pattern": "^node_modules/(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*/browser-runtime$"
     }
   }
 }
