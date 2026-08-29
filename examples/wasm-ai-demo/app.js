@@ -458,7 +458,6 @@ async function initializeApplication() {
   chat.name = "You";
   chat.aiName = selectedProfile.label;
   chat.modelName = selectedModel.label;
-  chat.setInitialSpeechMuted(false);
 
   const dbopfs = globalThis.dbopfs || new DBOPFS();
   globalThis.dbopfs = dbopfs;
@@ -506,6 +505,7 @@ async function initializeApplication() {
 
   try {
     await ai.configureBrowserSpeech(speechConfiguration(dbopfs));
+    chat.setInitialSpeechMuted(false);
   } catch (error) {
     console.error("Arcane SDK speech configuration failed.", error);
   }
