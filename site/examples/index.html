@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#040915">
   <meta name="color-scheme" content="dark">
-  <meta name="description" content="Run the minimal Arcane SDK Hello World chat directly from current SDK source.">
+  <meta name="description" content="Run the smallest Arcane SDK Hello World greeting directly from current SDK source.">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/examples/">
   <link rel="icon" type="image/png" href="../assets/arcane-sigil-512.png">
@@ -39,8 +39,8 @@
     <header class="doc-hero section-shell">
       <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../">Docs</a><span aria-hidden="true">/</span><span aria-current="page">Hello World</span></nav>
       <p class="eyebrow">Source example</p>
-      <h1>A chat page with almost no application code.</h1>
-      <p class="doc-lead">Hello World is one HTML page and one configuration module. It consumes the current SDK source directly; the shared SDK owns the chat interface and behavior.</p>
+      <h1>A themed greeting with almost no application code.</h1>
+      <p class="doc-lead">Hello World is one HTML page and one JavaScript file. It consumes the current SDK source directly, applies the shared theme, and labels its browser or Arcane host.</p>
     </header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar" aria-label="Hello World navigation">
@@ -60,16 +60,16 @@
         </section>
         <section id="run">
           <p class="step-label">Run</p>
-          <h2>Use any generic static HTTPS server</h2>
+          <h2>Use any generic static HTTP server</h2>
           <p>Serve the canonical SDK repository root, then open:</p>
-          <div class="code-block"><div class="code-bar"><span>Browser</span><button type="button" data-copy-button>Copy</button></div><pre><code>https://localhost:8444/examples/hello-world/</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div>
-          <p>The repository root remains the server root so the same origin exposes the current <code>/runtime</code>, <code>/browser-runtime</code>, and <code>/src</code> source trees. The static server needs no Arcane-specific routing.</p>
+          <div class="code-block"><div class="code-bar"><span>Browser</span><button type="button" data-copy-button>Copy</button></div><pre><code>http://127.0.0.1:8444/examples/hello-world/</code></pre><span class="copy-status" role="status" aria-live="polite" data-copy-status></span></div>
+          <p>The repository root remains the server root so the same origin exposes the current <code>/runtime</code> and <code>/src</code> source trees plus the mapped SDK dependency. The static server needs no Arcane-specific routing.</p>
         </section>
         <section id="ownership">
           <p class="step-label">Ownership</p>
-          <h2>The example selects; the SDK operates.</h2>
-          <p><code>index.html</code> includes the shared chat component. <code>App.js</code> selects the upstream language and speech authorities and binds the shared SDK session.</p>
-          <p>The SDK owns transcript rendering, composing and sending, explicit activation, progress and errors, cancellation, persistence, transcription, speech playback, and cleanup. Page load does not activate or download a model.</p>
+          <h2>The SDK themes; the example greets.</h2>
+          <p><code>index.html</code> declares the <code>hello-world</code> application identity, loads the shared theme and primitives, and maps the named SDK imports.</p>
+          <p><code>App.js</code> waits for <code>arcaneThemeReady</code>, then owns only the greeting and the browser-versus-Arcane-host label. Chat, models, transcription, and speech remain in the advanced example.</p>
           <p><a href="https://github.com/TheWizardNexus/arcane-os-sdk/tree/main/examples/hello-world">Read the complete current example source on GitHub.</a></p>
         </section>
       </article>

@@ -1577,7 +1577,7 @@ test('site interaction is bounded, copyable, and accessibility-aware',async t=>{
     });
 });
 
-test('maintained Hello World example is a flat current-source chat',async t=>{
+test('maintained Hello World example is a flat current-source greeting',async t=>{
     const requiredFiles=['AGENTS.md','App.js','README.md','index.html'];
     const entries=(await readdir(exampleRoot,{withFileTypes:true}))
         .map(entry=>entry.name)
@@ -1592,32 +1592,36 @@ test('maintained Hello World example is a flat current-source chat',async t=>{
     ]);
 
     await t.test('loads current SDK source without app or package scaffolding',()=>{
+        assert.match(html,/<meta name="arcane-app-id" content="hello-world">/u);
         assert.match(html,/href="\/runtime\/arcane\/css\/theme[.]css"/u);
-        assert.match(html,/href="\/runtime\/arcane\/components\/chat[.]html[?]v=2"/u);
-        assert.match(html,/src="[.]\/App[.]js[?]v=1"/u);
-        assert.match(html,/"arcane-os\/ai\/browser-wasm": "\/browser-runtime\/ai\/browser-wasm[.]mjs"/u);
+        assert.match(html,/href="\/runtime\/arcane\/css\/primitives[.]css"/u);
+        assert.match(html,/src="[.]\/App[.]js"/u);
         assert.match(html,/"arcane-os\/event-manager": "\/src\/event-manager[.]mjs"/u);
+        assert.match(html,/"arcane\/ThemeBootstrap": "\/runtime\/arcane\/modules\/ThemeBootstrap[.]js"/u);
+        assert.match(html,/"event-pubsub": "\/node_modules\/event-pubsub\/index[.]js"/u);
+        assert.doesNotMatch(html,/chat[.]html|browser-wasm|browser-speech/iu);
         assert.doesNotMatch(html,/apps\/hello-world|arcane-packager|arcane[.]lock[.]json/u);
     });
 
-    await t.test('keeps behavior in shared SDK contracts',()=>{
-        assert.match(script,/createBrowserWasmLlmProvider/u);
-        assert.match(script,/createDbopfsModelStore/u);
-        assert.match(script,/configureBrowserSpeech/u);
-        assert.match(script,/chat[.]bindSession/u);
-        assert.match(script,/loadExisting:true/u);
-        assert.match(script,/request:\{localOnly:true\}/u);
-        assert.doesNotMatch(script,/@wllama\/wllama|createChatCompletion|data:text\/javascript/iu);
+    await t.test('keeps the example-owned behavior to one greeting and host label',()=>{
+        assert.match(script,/import arcaneThemeReady from 'arcane\/ThemeBootstrap'/u);
+        assert.match(script,/await arcaneThemeReady/u);
+        assert.match(script,/Hello, Arcane World!/u);
+        assert.match(script,/runtime[?][.]native/u);
+        assert.match(script,/Running inside Arcane OS[.]/u);
+        assert.match(script,/Running in a web browser[.]/u);
+        assert.doesNotMatch(script,/chat|createBrowserWasmLlmProvider|configureBrowserSpeech/iu);
         assert.doesNotMatch(script,/addEventListener\(['"](?:click|submit)|innerHTML\s*=|insertAdjacentHTML/iu);
     });
 
     await t.test('documents the same flat source boundary',()=>{
-        assert.match(readme,/source example, not an application workspace or release package/u);
-        assert.match(readme,/https:\/\/localhost:8444\/examples\/hello-world\//u);
-        assert.match(readme,/does not use a copied `arcane\/` runtime/u);
+        assert.match(readme,/smallest Arcane source example/u);
+        assert.match(readme,/http:\/\/127[.]0[.]0[.]1:8444\/examples\/hello-world\//u);
+        assert.match(readme,/prints a greeting/u);
         assert.match(tutorial,/Four maintained files/u);
         assert.match(tutorial,/There is no nested app workspace/u);
-        assert.match(tutorial,/https:\/\/localhost:8444\/examples\/hello-world\//u);
+        assert.match(tutorial,/http:\/\/127[.]0[.]0[.]1:8444\/examples\/hello-world\//u);
+        assert.match(tutorial,/themed greeting/u);
         assert.doesNotMatch(tutorial,/apps\/hello-world|arcane[.]lock[.]json|byte-identical/u);
     });
 });
