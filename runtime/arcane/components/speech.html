@@ -1235,11 +1235,14 @@
         }
 
         const generation = ++recordingGeneration;
-        transcriptionOperationId = nextSpeechOperationId('transcription');
+        const operationId = nextSpeechOperationId('transcription');
+        transcriptionOperationId = operationId;
         recordingRequested = true;
         localStatus = {
             message: 'Recording. Release to transcribe.',
-            tone: ''
+            tone: '',
+            owner: 'recording',
+            generation
         };
         renderControls();
         renderStatus();
@@ -1248,6 +1251,9 @@
         try {
             stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         } catch (error) {
+            if (generation !== recordingGeneration || destroyed) {
+                return false;
+            }
             recordingRequested = false;
             resetRecordPress();
             if (
@@ -1268,7 +1274,7 @@
                     {
                         bubbles: true,
                         composed: true,
-                        operationId: transcriptionOperationId,
+                        operationId,
                         publicDetail: {
                             ...publicSpeechErrorFields(
                                 error,
@@ -1278,7 +1284,9 @@
                         }
                     }
                 );
-                transcriptionOperationId = null;
+                if (transcriptionOperationId === operationId) {
+                    transcriptionOperationId = null;
+                }
             } else {
                 reportTranscriptionError(error);
             }
@@ -1287,15 +1295,25 @@
             return false;
         }
 
+        const currentGeneration = generation === recordingGeneration;
         if (
             !recordingRequested
-            || generation !== recordingGeneration
+            || !currentGeneration
             || sttRole.state !== 'ready'
             || sttRole.busy
             || destroyed
         ) {
             stopMediaStream(stream);
-            resetRecordPress();
+            if (currentGeneration) {
+                recordingRequested = false;
+                resetRecordPress();
+                clearRecordingStatus(generation);
+                if (transcriptionOperationId === operationId) {
+                    transcriptionOperationId = null;
+                }
+                renderControls();
+                renderStatus();
+            }
             return false;
         }
 
@@ -1311,6 +1329,7 @@
             const processor = audioContext.createScriptProcessor(4096, 1, 1);
             session = {
                 generation,
+                operationId,
                 recorder,
                 stream,
                 audioContext,
@@ -1349,7 +1368,6 @@
             recorder.start();
             return true;
         } catch (error) {
-            recordingRequested = false;
             if (session) {
                 session.cancelled = true;
                 releaseCaptureSession(session);
@@ -1359,8 +1377,11 @@
             } else {
                 stopMediaStream(stream);
             }
-            resetRecordPress();
-            reportTranscriptionError(error);
+            if (generation === recordingGeneration) {
+                recordingRequested = false;
+                resetRecordPress();
+                reportTranscriptionError(error);
+            }
             return false;
         }
     }
@@ -1377,9 +1398,34 @@
         }
     }
 
+    function clearRecordingStatus(generation) {
+        if (
+            localStatus?.owner === 'recording'
+            && localStatus.generation === generation
+        ) {
+            localStatus = null;
+        }
+    }
+
     function stop() {
+        const pendingCaptureStart = recordingRequested && !captureSession;
+        const generation = recordingGeneration;
+        const operationId = transcriptionOperationId;
         recordingRequested = false;
         clearSilenceTimer();
+        if (pendingCaptureStart) {
+            // getUserMedia cannot be cancelled synchronously. Retire this
+            // generation so its eventual settlement cannot touch a retry.
+            recordingGeneration += 1;
+            resetRecordPress();
+            clearRecordingStatus(generation);
+            if (transcriptionOperationId === operationId) {
+                transcriptionOperationId = null;
+            }
+            renderControls();
+            renderStatus();
+            return true;
+        }
         if (captureSession && captureSession.recorder.state !== 'inactive') {
             captureSession.recorder.stop();
         }
@@ -1387,22 +1433,32 @@
     }
 
     async function finalizeCapture(session) {
+        const currentGeneration = session.generation === recordingGeneration;
+        const currentOperation = transcriptionOperationId === session.operationId;
         releaseCaptureSession(session);
         if (captureSession === session) {
             captureSession = null;
         }
-        recordingRequested = false;
-        resetRecordPress();
+        if (currentGeneration) {
+            recordingRequested = false;
+            resetRecordPress();
+        }
 
         if (
             session.cancelled
-            || session.generation !== recordingGeneration
+            || !currentGeneration
             || sttRole.state !== 'ready'
             || sttRole.busy
             || destroyed
         ) {
-            renderControls();
-            renderStatus();
+            if (currentGeneration) {
+                clearRecordingStatus(session.generation);
+                if (currentOperation) {
+                    transcriptionOperationId = null;
+                }
+                renderControls();
+                renderStatus();
+            }
             return false;
         }
 
@@ -1415,12 +1471,13 @@
             'audio.webm',
             { type: 'audio/webm' }
         );
-        return transcribeAudio(audioFile);
+        return transcribeAudio(audioFile, session.operationId);
     }
 
-    async function transcribeAudio(audioFile) {
+    async function transcribeAudio(audioFile, operationId = null) {
         const generation = ++transcriptionGeneration;
-        transcriptionOperationId = transcriptionOperationId
+        transcriptionOperationId = operationId
+            || transcriptionOperationId
             || nextSpeechOperationId('transcription');
         const controller = new AbortController();
         transcriptionAbortController?.abort();
