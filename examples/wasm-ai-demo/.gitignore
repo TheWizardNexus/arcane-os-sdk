@@ -1,0 +1,14 @@
+arcane/
+chrome-*/
+kokoro-compliant/
+model-source/
+models/
+node_modules/
+release-evidence/
+runtime-smoke/
+sdk-contract/
+third-party-cache/
+tls/
+tools/
+whisper-repro/
+*.gguf

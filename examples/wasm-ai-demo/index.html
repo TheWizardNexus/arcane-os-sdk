@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="arcane-app-id" content="wasm-ai-demo">
+    <title>Arcane WASM Voice Chat</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/runtime/arcane/css/theme.css">
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #090b10;
+        color: #edf0f7;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        min-width: 320px;
+        min-height: 100vh;
+        margin: 0;
+        background:
+          radial-gradient(circle at 50% -15%, rgba(117, 85, 255, 0.22), transparent 42rem),
+          #090b10;
+      }
+
+      button,
+      textarea,
+      input,
+      select { font: inherit; }
+
+      button:focus-visible,
+      textarea:focus-visible,
+      input:focus-visible,
+      select:focus-visible {
+        outline: 2px solid #9b87ff;
+        outline-offset: 2px;
+      }
+
+      .shell {
+        width: min(900px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 36px 0 28px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 20px;
+      }
+
+      .eyebrow {
+        margin: 0 0 7px;
+        color: #a893ff;
+        font-size: 0.73rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.75rem, 4vw, 2.65rem);
+        font-weight: 650;
+        letter-spacing: -0.04em;
+      }
+
+      .subtitle {
+        margin: 8px 0 0;
+        color: #9299a8;
+      }
+
+      .topbar-controls {
+        display: flex;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .model-picker {
+        display: inline-flex;
+        min-height: 36px;
+        align-items: center;
+        gap: 9px;
+        padding: 0 7px 0 12px;
+        border: 1px solid #272b35;
+        border-radius: 999px;
+        background: rgba(18, 21, 29, 0.8);
+        color: #8f97a7;
+        font-size: 0.78rem;
+      }
+
+      .model-picker select {
+        min-height: 28px;
+        padding: 0 27px 0 9px;
+        border: 1px solid #343947;
+        border-radius: 999px;
+        background: #1a1e28;
+        color: #e8eaf1;
+        cursor: pointer;
+      }
+
+      .model-picker select:disabled {
+        cursor: wait;
+        opacity: 0.55;
+      }
+
+      .status {
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-items: center;
+        gap: 9px;
+        min-height: 36px;
+        padding: 0 13px;
+        border: 1px solid #272b35;
+        border-radius: 999px;
+        background: rgba(18, 21, 29, 0.8);
+        color: #c5cad5;
+        font-size: 0.84rem;
+      }
+
+      .status-dot,
+      .runtime-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #f0b45a;
+        box-shadow: 0 0 14px rgba(240, 180, 90, 0.58);
+      }
+
+      .status[data-state="ready"] .status-dot,
+      .runtime-item[data-state="ready"] .runtime-dot {
+        background: #58d49b;
+        box-shadow: 0 0 14px rgba(88, 212, 155, 0.58);
+      }
+
+      .status[data-state="error"] .status-dot,
+      .runtime-item[data-state="error"] .runtime-dot {
+        background: #ff6f76;
+        box-shadow: 0 0 14px rgba(255, 111, 118, 0.58);
+      }
+
+      .runtime {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1px;
+        overflow: hidden;
+        margin-bottom: 14px;
+        border: 1px solid #232731;
+        border-radius: 13px;
+        background: #232731;
+      }
+
+      .runtime-item {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        min-height: 58px;
+        padding: 10px 15px;
+        background: rgba(16, 19, 26, 0.96);
+      }
+
+      .runtime-copy { min-width: 0; }
+
+      .runtime-copy strong,
+      .runtime-copy span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .runtime-copy strong {
+        color: #edf0f7;
+        font-size: 0.83rem;
+        font-weight: 620;
+      }
+
+      .runtime-copy span {
+        margin-top: 3px;
+        color: #8d95a5;
+        font-size: 0.76rem;
+      }
+
+      .knowledge-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        min-height: 54px;
+        margin-bottom: 14px;
+        padding: 9px 10px 9px 15px;
+        border: 1px solid #232731;
+        border-radius: 13px;
+        background: rgba(16, 19, 26, 0.92);
+      }
+
+      .knowledge-copy {
+        min-width: 0;
+      }
+
+      .knowledge-copy strong,
+      .knowledge-copy span {
+        display: block;
+      }
+
+      .knowledge-copy strong {
+        color: #dfe3ec;
+        font-size: 0.8rem;
+        font-weight: 620;
+      }
+
+      .knowledge-copy span {
+        margin-top: 2px;
+        color: #858d9d;
+        font-size: 0.74rem;
+        overflow-wrap: anywhere;
+      }
+
+      .knowledge-button {
+        flex: 0 0 auto;
+        min-height: 34px;
+        padding: 0 12px;
+        border: 1px solid #51458b;
+        border-radius: 9px;
+        background: #2b2544;
+        color: #ded8ff;
+        font-size: 0.78rem;
+        font-weight: 620;
+        cursor: pointer;
+      }
+
+      .knowledge-button:hover:not(:disabled) { background: #373057; }
+
+      .chat {
+        overflow: hidden;
+        min-height: 620px;
+        border: 1px solid #232731;
+        border-radius: 18px;
+        background: rgba(14, 17, 23, 0.94);
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+      }
+
+      #chat {
+        display: block;
+        width: 100%;
+        min-height: 620px;
+        height: min(70vh, 760px);
+      }
+
+      .note {
+        margin: 13px 2px 0;
+        color: #777f8f;
+        font-size: 0.78rem;
+        text-align: center;
+      }
+
+      .note a { color: #a99aff; }
+
+      [hidden] { display: none !important; }
+
+      @media (max-width: 680px) {
+        .shell {
+          width: min(100% - 20px, 900px);
+          padding-top: 22px;
+        }
+
+        .topbar { display: block; }
+        .topbar-controls {
+          justify-content: flex-start;
+          margin-top: 16px;
+        }
+        .runtime { grid-template-columns: 1fr; }
+
+        .knowledge-bar {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 9px;
+          padding: 12px;
+        }
+
+        .knowledge-button { width: 100%; }
+
+        .chat,
+        #chat { min-height: 540px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Arcane local SDK source demo</p>
+          <h1>WASM Voice Chat</h1>
+          <p class="subtitle">Selectable local chat, retrieval, Whisper, and Kokoro through the Arcane SDK.</p>
+        </div>
+        <div class="topbar-controls">
+          <label class="model-picker" for="profile-select">
+            <span>Profile</span>
+            <select id="profile-select" aria-label="AI profile">
+              <option value="general" selected>General</option>
+              <option value="focused">Focused</option>
+              <option value="tools">Tool visibility</option>
+            </select>
+          </label>
+          <label class="model-picker" for="modelSelect">
+            <span>Chat model</span>
+            <select id="modelSelect" aria-label="Chat model">
+              <option value="granite-3b">Granite 3B · faster</option>
+              <option value="granite-8b" selected>Granite 8B · 32K desktop</option>
+              <option value="gpt-oss-20b">GPT-OSS 20B · desktop · 32K</option>
+            </select>
+          </label>
+          <div id="status" class="status" data-state="loading" role="status" aria-live="polite">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="statusText">Starting runtimes…</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="runtime" aria-label="Runtime details">
+        <div id="llmRuntime" class="runtime-item" data-state="loading">
+          <span class="runtime-dot" aria-hidden="true"></span>
+          <div class="runtime-copy">
+            <strong id="llmModelName">Granite 4.1 8B · Q4_K_M</strong>
+            <span id="llmRuntimeText">Arcane SDK browser-WASM · available on demand</span>
+          </div>
+        </div>
+        <div id="speechRuntime" class="runtime-item" data-state="loading">
+          <span class="runtime-dot" aria-hidden="true"></span>
+          <div class="runtime-copy">
+            <strong>Whisper tiny.en FP32 + Kokoro 82M Q8</strong>
+            <span id="speechRuntimeText">Arcane SDK speech · available on demand</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="knowledge-bar" aria-label="Local knowledge">
+        <div class="knowledge-copy">
+          <strong>Local knowledge</strong>
+          <span id="rag-status" role="status" aria-live="polite">Preparing DBOPFS knowledge…</span>
+        </div>
+        <input
+          id="rag-file-input"
+          type="file"
+          accept=".txt,.md,.json,.csv,text/plain,text/markdown,application/json,text/csv"
+          multiple
+          hidden
+        >
+        <button id="rag-import-button" class="knowledge-button" type="button" disabled>Add local documents</button>
+      </section>
+
+      <section class="chat" aria-label="Local AI voice chat">
+        <html-import
+          id="chat"
+          href="/runtime/arcane/components/chat.html"
+          presentation="basic"
+        ></html-import>
+      </section>
+
+      <p class="note">No Ollama daemon or local AI service is used. This page consumes this checkout's live Arcane SDK source; selected models persist through SDK DBOPFS and only one runs in memory at a time.</p>
+    </main>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "arcane-os/event-manager": "/src/event-manager.mjs",
+          "arcane-os/dom-event-instrumentation": "/src/dom-event-instrumentation.mjs",
+          "event-pubsub": "/browser-runtime/dependencies/event-pubsub/index.js",
+          "arcane-os/ai/browser-wasm": "/browser-runtime/ai/browser-wasm.mjs",
+          "arcane-os/ai/browser-speech": "/browser-runtime/ai/browser-speech.mjs",
+          "arcane-os/preference-store": "/runtime/arcane/modules/PreferenceStore.js",
+          "arcane-os/speech-playback": "/runtime/arcane/modules/SpeechPlayback.js",
+          "#arcane/persistent-ai-chat-session": "/runtime/arcane/modules/PersistentAIChatSession.js",
+          "/runtime/node_modules/strong-type/index.js": "/runtime/strong-type/index.js",
+          "arcane/AI": "/runtime/arcane/modules/AI.js",
+          "arcane/AIRuntimeState": "/runtime/arcane/modules/AIRuntimeState.js",
+          "arcane/DBOPFS": "/runtime/arcane/modules/DBOPFS.js",
+          "arcane/DBOPFSDocumentLibrary": "/runtime/arcane/modules/DBOPFSDocumentLibrary.js",
+          "arcane/DocumentLexicalSearch": "/runtime/arcane/modules/DocumentLexicalSearch.js",
+          "arcane/HTMLImport": "/runtime/arcane/modules/HTMLImport.js",
+          "arcane/PreferenceStore": "/runtime/arcane/modules/PreferenceStore.js",
+          "arcane/SpeechPlayback": "/runtime/arcane/modules/SpeechPlayback.js",
+          "arcane/ThemeBootstrap": "/runtime/arcane/modules/ThemeBootstrap.js",
+          "arcane/WaitForComponent": "/runtime/arcane/modules/WaitForComponent.js"
+        }
+      }
+    </script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
