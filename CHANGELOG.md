@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.3
+
+- Corrected installed-workspace import-map refresh to preserve rich browser
+  document inspection records while passing only navigable document paths to
+  the public generator, including `.html` and `.htm` pages without modifying
+  HTML fragments.
+- Restored one semantic `arcane.lock.json` contract across scaffold, init, and
+  installed runtime materialization, replacing stale versions with the exact
+  installed package version and npm-alias roots without byte or security
+  metadata.
+- Added selected installed-package coverage for stale-lock replacement and the
+  public multi-document import-map command through the packed npm artifact.
+
 ## 0.3.2
 
 - Preserved complete application, document, model, message, event, process,
