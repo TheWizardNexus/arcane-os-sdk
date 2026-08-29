@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.2
+
+- Preserved complete application, document, model, message, event, process,
+  mail, and diagnostic content across the ordinary SDK runtime and tooling.
+- Removed ordinary byte, hash, digest, receipt, provenance, exact-inventory,
+  truncation, clipping, freeze, and unapproved hardening gates while retaining
+  unavoidable transport framing and credential protection at their owners.
+- Added the complete browser-WASM chat, speech, persistence, structural-tool,
+  source-example serving, descriptor, packaging, and application-test contracts
+  required by SDK consumers, with optional security remaining opt-in.
+- Limited the npm package to consumer runtime, source, schema, CLI/tooling, and
+  required root metadata; examples, documentation, generated site output, and
+  tests remain repository-owned follow-up surfaces outside the published package.
+
 ## 0.3.1
 
 - Restored ordinary warn-first Browser Speech operation with explicit

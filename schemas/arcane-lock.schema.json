@@ -14,7 +14,7 @@
       "required": ["name", "version"],
       "properties": {
         "name": {"const": "arcane-os"},
-        "version": {"const": "0.3.1"}
+        "version": {"const": "0.3.2"}
       }
     },
     "runtime": {

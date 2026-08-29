@@ -1,6 +1,6 @@
 {
   "name": "arcane-os",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Arcane OS JavaScript SDK, project-local CLI, browser runtime, and repository-portable application packager.",
   "type": "module",
   "main": "./src/index.mjs",
@@ -44,7 +44,6 @@
     "src/",
     "runtime/",
     "schemas/",
-    "docs/",
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
