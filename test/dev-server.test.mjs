@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from '../src/testing.mjs';
 import {createWorkspace} from '../src/scaffold.mjs';
 import {startDevServer} from '../src/dev-server.mjs';
+import {materializeInstalledSdkRuntime} from '../src/installed-sdk-runtime.mjs';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';
 import {SDK_NAME,SDK_VERSION} from '../src/constants.mjs';
 import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
@@ -148,11 +149,12 @@ async function assertPortCanBeReused(port){
     await new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));
 }
 
-test('source server exposes only the selected app and SDK browser routes',async t=>{
+test('source server exposes the selected app and installed SDK browser routes',async t=>{
     const parent=await temporaryDirectory(t,{prefix:'arcane-server-'});
     const workspaceRoot=path.join(parent,'workspace');
     await createWorkspace({targetPath:workspaceRoot,appId:'served-app'});
     await installRuntime(workspaceRoot);
+    await materializeInstalledSdkRuntime({workspaceRoot});
     const appRoot=path.join(workspaceRoot,'apps','served-app');
     const descriptorPath=path.join(appRoot,'arcane-app.json');
     const descriptor=JSON.parse(await readFile(descriptorPath,'utf8'));
@@ -210,6 +212,12 @@ test('source server exposes only the selected app and SDK browser routes',async 
     assert.match(speechWorker.headers.get('content-type'),/^text\/javascript/);
     assertPermissiveDevelopmentHeaders(speechWorker);
     await speechWorker.arrayBuffer();
+
+    const eventManager=await request(origin,'/arcane/sdk/event-manager.mjs');
+    assert.equal(eventManager.status,200);
+    assert.match(eventManager.headers.get('content-type'),/^text\/javascript/);
+    assertPermissiveDevelopmentHeaders(eventManager);
+    await eventManager.text();
 
     const networkPolicy=await request(origin,'/arcane/security/arcane-network-policy.json');
     assert.equal(networkPolicy.status,200);

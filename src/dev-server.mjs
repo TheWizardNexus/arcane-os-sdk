@@ -31,6 +31,11 @@ const SDK_RUNTIME_SOURCE_PROTOCOL='arcane-sdk-runtime-source/1';
 const SDK_RUNTIME_SOURCE_ARCANE_ROOTS=new Set([
     'components','css','entities','img','modules','security'
 ]);
+const SDK_INSTALLED_ARCANE_ROOTS=new Set([
+    ...SDK_RUNTIME_SOURCE_ARCANE_ROOTS,
+    'dependencies',
+    'sdk'
+]);
 const SDK_RUNTIME_SOURCE_PRIVATE_SEGMENTS=new Set([
     'node_modules','.git','.hg','.svn','cvs'
 ]);
@@ -126,7 +131,7 @@ async function canonicalRealDirectory(requested,label){
     return canonical;
 }
 
-function sdkRuntimeSourcePathAllowed(relative,{arcaneRoot=false}={}){
+function sdkRuntimeSourcePathAllowed(relative,{arcaneRoots=null}={}){
     if(relative.length===0)return false;
     const normalized=relative.map(function normalizeRuntimeSourceSegment(segment){
         return segment.normalize('NFC').toLowerCase();
@@ -135,11 +140,15 @@ function sdkRuntimeSourcePathAllowed(relative,{arcaneRoot=false}={}){
         return segment.startsWith('.')||SDK_RUNTIME_SOURCE_PRIVATE_SEGMENTS.has(segment)
             ||SDK_RUNTIME_SOURCE_PRIVATE_MANIFESTS.has(segment);
     }))return false;
-    return !arcaneRoot||SDK_RUNTIME_SOURCE_ARCANE_ROOTS.has(normalized[0]);
+    return arcaneRoots===null||arcaneRoots.has(normalized[0]);
 }
 
 function sdkArcaneSourcePathAllowed(relative){
-    return sdkRuntimeSourcePathAllowed(relative,{arcaneRoot:true});
+    return sdkRuntimeSourcePathAllowed(relative,{arcaneRoots:SDK_RUNTIME_SOURCE_ARCANE_ROOTS});
+}
+
+function sdkInstalledArcanePathAllowed(relative){
+    return sdkRuntimeSourcePathAllowed(relative,{arcaneRoots:SDK_INSTALLED_ARCANE_ROOTS});
 }
 
 function sdkDependencySourcePathAllowed(relative){
@@ -418,7 +427,7 @@ async function sourceRoutes(workspaceRoot,appId,{
             {
                 prefix:['arcane'],
                 root:runtimeRoot,
-                allow:sdkArcaneSourcePathAllowed
+                allow:sdkInstalledArcanePathAllowed
             }
         ]
     };
