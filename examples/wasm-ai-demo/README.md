@@ -15,9 +15,9 @@ The Arcane SDK owns the shared behavior:
 - `DBOPFSDocumentLibrary` owns the profile-specific local document corpus and lexical retrieval.
 - `PreferenceStore` owns model and profile selection persistence.
 
-The example owns only its branded outer shell, neutral model/profile catalog, example prompts, local-document controls, and example tool declarations. Structural tool calls are displayed and are not executed by this example. Arcane OS product prompts and generated product corpora remain with their owning applications and are not copied into this SDK example.
+The example owns only its branded outer shell, neutral model/profile catalog, example prompts, local-document controls, and example tool declarations. SDK Chat displays structural tool calls; the example records them through Chat's public tool-result method with the explicit `not-executed` disposition so the persisted conversation can continue without pretending an action ran. Arcane OS product prompts and generated product corpora remain with their owning applications and are not copied into this SDK example.
 
-The current bound Chat/PersistentAIChatSession contract renders each completed response as one persisted turn. A combined persisted streaming-session seam is not yet exposed by the current live source, so this example does not claim token or sentence streaming through that path.
+Chat uses `PersistentAIChatSession`'s SDK-owned streaming seam, which composes live AI deltas with cancellation and one durable persisted turn. SDK Chat also owns the structural tool-call records and their visible disposition.
 
 ## Local model assets
 

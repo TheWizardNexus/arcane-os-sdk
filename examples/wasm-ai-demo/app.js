@@ -85,7 +85,7 @@ const PROFILES = {
     id: "tools",
     label: "Tool visibility",
     minimumContextTokens: 0,
-    instruction: "Use a declared function tool when the request clearly calls for one. The browser example displays structural tool calls but does not execute them, so never claim that a requested tool ran or succeeded.",
+    instruction: "Use a declared function tool when the request clearly calls for one. The browser example displays structural tool calls but does not execute them, so never claim that a requested tool ran or succeeded. Supply a nonempty message argument that honestly explains the proposed handoff to the user.",
   },
 };
 
@@ -96,11 +96,6 @@ const DEFAULT_MODEL_ID = MOBILE_BROWSER ? "granite-3b" : "granite-8b";
 
 const statusElement = document.getElementById("status");
 const statusText = document.getElementById("statusText");
-const llmRuntime = document.getElementById("llmRuntime");
-const llmRuntimeText = document.getElementById("llmRuntimeText");
-const llmModelName = document.getElementById("llmModelName");
-const speechRuntime = document.getElementById("speechRuntime");
-const speechRuntimeText = document.getElementById("speechRuntimeText");
 const modelSelect = document.getElementById("modelSelect");
 const profileSelect = document.getElementById("profile-select");
 const ragFileInput = document.getElementById("rag-file-input");
@@ -159,21 +154,12 @@ let ragImporting = false;
 let ragStats = null;
 let systemPrompt = "";
 let stopRuntimeSubscription = null;
-let speechConfigurationError = "";
 let teardownStarted = false;
-
-function setRuntime(element, copyElement, state, text) {
-  element.dataset.state = state;
-  copyElement.textContent = text;
-}
+let toolSettlementPending = false;
 
 function setPageStatus(state, text) {
   statusElement.dataset.state = state;
   statusText.textContent = text;
-}
-
-function formatContext(tokens) {
-  return Number.isInteger(tokens / 1_024) ? `${tokens / 1_024}K` : String(tokens);
 }
 
 function generalSystemPrompt() {
@@ -295,64 +281,6 @@ function speechConfiguration(dbopfs) {
   };
 }
 
-function toolArguments(value) {
-  const text = String(value || "");
-  try {
-    return JSON.stringify(JSON.parse(text), null, 2);
-  } catch {
-    return text;
-  }
-}
-
-function visibleToolCalls(message) {
-  const calls = Array.isArray(message?.tool_calls) ? message.tool_calls : [];
-  return calls.map(function visibleToolCall(call, index) {
-    const name = call?.function?.name || "unnamed_function";
-    return [
-      `Tool call requested (not executed) ${index + 1}: ${name}`,
-      toolArguments(call?.function?.arguments),
-    ].join("\n");
-  }).join("\n\n");
-}
-
-function projectToolCalls(response) {
-  if (!response || typeof response !== "object" || Array.isArray(response)) return response;
-  if (response.message && typeof response.message === "object") {
-    const toolText = visibleToolCalls(response.message);
-    if (!toolText) return response;
-    const message = {
-      ...response.message,
-      content: [response.message.content, toolText].filter(Boolean).join("\n\n"),
-    };
-    return { ...response, message };
-  }
-  if (!Array.isArray(response.choices)) return response;
-  const choices = response.choices.map(function projectChoice(choice) {
-    const message = choice?.message;
-    const toolText = visibleToolCalls(message);
-    if (!toolText) return choice;
-    return {
-      ...choice,
-      message: {
-        ...message,
-        content: [message.content, toolText].filter(Boolean).join("\n\n"),
-      },
-    };
-  });
-  return { ...response, choices };
-}
-
-async function requestProfileCompletion(request) {
-  const tools = toolsForProfile(selectedProfile.id);
-  const response = await ai.fetchRequest({
-    ...request,
-    localOnly: true,
-    tools,
-    toolChoice: "auto",
-  });
-  return projectToolCalls(response);
-}
-
 async function buildRequestContext({ input, signal } = {}) {
   if (!ragReady) return "";
   try {
@@ -373,39 +301,13 @@ async function buildRequestContext({ input, signal } = {}) {
   }
 }
 
-function runtimeCopy(role) {
-  if (!role?.providerId || !role?.modelId) return "not configured";
-  if (role.state === "ready") return "ready";
-  if (role.state === "loading") return "loading";
-  if (role.state === "unloading") return "unloading";
-  if (role.state === "error") return role.error?.message || "error";
-  return "available on demand";
-}
-
 function synchronizeRuntime(snapshot) {
   const llm = snapshot.roles.llm;
-  const stt = snapshot.roles.stt;
-  const tts = snapshot.roles.tts;
-  const llmState = llm.state === "ready"
-    ? "ready"
-    : (llm.state === "error" ? "error" : "loading");
-  setRuntime(
-    llmRuntime,
-    llmRuntimeText,
-    llmState,
-    `Arcane SDK browser-WASM · ${runtimeCopy(llm)} · ${formatContext(contextTokens)} context`,
-  );
-  const speechFailed = stt.state === "error" && tts.state === "error";
-  const speechReady = stt.state === "ready" || tts.state === "ready";
-  setRuntime(
-    speechRuntime,
-    speechRuntimeText,
-    speechFailed ? "error" : (speechReady ? "ready" : "loading"),
-    `Arcane SDK speech · Whisper ${runtimeCopy(stt)} · Kokoro ${runtimeCopy(tts)}`,
-  );
-
   if (llm.state === "ready") {
     setPageStatus("ready", `${selectedProfile.label} ready`);
+    queueMicrotask(function settleRestoredToolAfterRuntimeUpdate() {
+      void settleDisplayedToolCall();
+    });
   } else if (llm.state === "loading") {
     setPageStatus("loading", `Starting ${selectedModel.shortLabel}…`);
   } else if (llm.state === "error") {
@@ -500,7 +402,6 @@ async function initializeApplication() {
   for (const option of modelSelect.options) {
     option.disabled = MOBILE_BROWSER && Boolean(MODELS[option.value]?.desktopOnly);
   }
-  llmModelName.textContent = `${selectedProfile.label} · ${selectedModel.label} · ${selectedModel.quantization}`;
   if (preferenceWarning) {
     ragStatus.textContent = `Using default selectors: ${preferenceWarning}`;
   }
@@ -510,7 +411,7 @@ async function initializeApplication() {
     waitForComponent(chat, {
       errorEvent: "html-import-error",
       event: "chat-ready",
-      methods: ["bindSession"],
+      methods: ["bindSession", "setInitialSpeechMuted", "submitToolResult"],
       property: "ready",
     }),
   ]);
@@ -566,23 +467,21 @@ async function initializeApplication() {
   try {
     await ai.configureBrowserSpeech(speechConfiguration(dbopfs));
   } catch (error) {
-    speechConfigurationError = error instanceof Error ? error.message : String(error);
-    setRuntime(
-      speechRuntime,
-      speechRuntimeText,
-      "error",
-      `Arcane SDK speech unavailable · ${speechConfigurationError}`,
-    );
+    console.error("Arcane SDK speech configuration failed.", error);
   }
 
   stopRuntimeSubscription = subscribeAIRuntimeState(synchronizeRuntime);
   const session = await createPersistentAIChatSession({
-    chat: requestProfileCompletion,
+    ai,
     chatFileName: `wasm-ai-demo-${selectedProfile.id}-${selectedModel.id}.jsonl`,
     contextBuilder: buildRequestContext,
     loadExisting: true,
     memory: false,
-    request: { localOnly: true },
+    request: {
+      localOnly: true,
+      tools: toolsForProfile(selectedProfile.id),
+      toolChoice: "auto",
+    },
     systemPrompt,
   });
   await chat.bindSession({ session });
@@ -605,6 +504,34 @@ chat.addEventListener("chat-file-uploaded", function importChatKnowledgeFile(eve
   if (!file || (!file.type.startsWith("text/") && !/\.(?:csv|json|md|txt)$/i.test(file.name))) return;
   void importKnowledgeFiles([file]);
 });
+async function settleDisplayedToolCall() {
+  const pendingTool = chat.pendingTool;
+  if (!pendingTool || chat.aiAvailability?.llm !== true || toolSettlementPending) return false;
+  toolSettlementPending = true;
+  try {
+    const accepted = await chat.submitToolResult({
+      disposition: "not-executed",
+      message: "This SDK example displays the requested tool call but does not execute application actions.",
+      request: { toolChoice: "none" },
+      toolCallId: pendingTool.id,
+    });
+    if (!accepted) {
+      throw new Error("Arcane SDK Chat did not accept the not-executed tool disposition.");
+    }
+    return true;
+  } catch (error) {
+    console.error("The displayed SDK tool call could not be settled as not executed.", error);
+    return false;
+  } finally {
+    toolSettlementPending = false;
+  }
+}
+chat.addEventListener("chat-session-bound", function settleRestoredToolCall() {
+  void settleDisplayedToolCall();
+});
+chat.addEventListener("chat-session-message", function settleNewToolCall() {
+  void settleDisplayedToolCall();
+});
 window.addEventListener("pagehide", function disposeDemoOnPageHide() {
   void disposeApplication();
 }, { once: true });
@@ -612,8 +539,7 @@ window.addEventListener("pagehide", function disposeDemoOnPageHide() {
 try {
   await initializeApplication();
 } catch (error) {
-  const message = error instanceof Error ? error.message : String(error);
   setPageStatus("error", "SDK initialization failed");
-  setRuntime(llmRuntime, llmRuntimeText, "error", message);
+  console.error("Arcane SDK initialization failed.", error);
   ragImportButton.disabled = true;
 }

@@ -126,8 +126,7 @@
         font-size: 0.84rem;
       }
 
-      .status-dot,
-      .runtime-dot {
+      .status-dot {
         width: 8px;
         height: 8px;
         border-radius: 50%;
@@ -135,59 +134,14 @@
         box-shadow: 0 0 14px rgba(240, 180, 90, 0.58);
       }
 
-      .status[data-state="ready"] .status-dot,
-      .runtime-item[data-state="ready"] .runtime-dot {
+      .status[data-state="ready"] .status-dot {
         background: #58d49b;
         box-shadow: 0 0 14px rgba(88, 212, 155, 0.58);
       }
 
-      .status[data-state="error"] .status-dot,
-      .runtime-item[data-state="error"] .runtime-dot {
+      .status[data-state="error"] .status-dot {
         background: #ff6f76;
         box-shadow: 0 0 14px rgba(255, 111, 118, 0.58);
-      }
-
-      .runtime {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1px;
-        overflow: hidden;
-        margin-bottom: 14px;
-        border: 1px solid #232731;
-        border-radius: 13px;
-        background: #232731;
-      }
-
-      .runtime-item {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        gap: 10px;
-        align-items: center;
-        min-height: 58px;
-        padding: 10px 15px;
-        background: rgba(16, 19, 26, 0.96);
-      }
-
-      .runtime-copy { min-width: 0; }
-
-      .runtime-copy strong,
-      .runtime-copy span {
-        display: block;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .runtime-copy strong {
-        color: #edf0f7;
-        font-size: 0.83rem;
-        font-weight: 620;
-      }
-
-      .runtime-copy span {
-        margin-top: 3px;
-        color: #8d95a5;
-        font-size: 0.76rem;
       }
 
       .knowledge-bar {
@@ -283,8 +237,6 @@
           justify-content: flex-start;
           margin-top: 16px;
         }
-        .runtime { grid-template-columns: 1fr; }
-
         .knowledge-bar {
           align-items: flex-start;
           flex-direction: column;
@@ -330,23 +282,6 @@
           </div>
         </div>
       </header>
-
-      <section class="runtime" aria-label="Runtime details">
-        <div id="llmRuntime" class="runtime-item" data-state="loading">
-          <span class="runtime-dot" aria-hidden="true"></span>
-          <div class="runtime-copy">
-            <strong id="llmModelName">Granite 4.1 8B · Q4_K_M</strong>
-            <span id="llmRuntimeText">Arcane SDK browser-WASM · available on demand</span>
-          </div>
-        </div>
-        <div id="speechRuntime" class="runtime-item" data-state="loading">
-          <span class="runtime-dot" aria-hidden="true"></span>
-          <div class="runtime-copy">
-            <strong>Whisper tiny.en FP32 + Kokoro 82M Q8</strong>
-            <span id="speechRuntimeText">Arcane SDK speech · available on demand</span>
-          </div>
-        </div>
-      </section>
 
       <section class="knowledge-bar" aria-label="Local knowledge">
         <div class="knowledge-copy">
