@@ -1,4 +1,10 @@
-import {SDK_NAME,SDK_VERSION} from '../constants.mjs';
+import {
+    ARCANE_PROTOCOL,
+    CLI_EVENT_PROTOCOL,
+    SDK_NAME,
+    SDK_VERSION,
+    TARGET_ADAPTER_PROTOCOL
+} from '../constants.mjs';
 
 const NPM_PACKAGE_NAME_PATTERN=/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/u;
 const LOCAL_TARBALL_PATTERN=/^file:.+\.tgz$/iu;
@@ -20,6 +26,32 @@ function titleCase(appId){
     return appId.split('-')
         .map(part=>`${part.slice(0,1).toUpperCase()}${part.slice(1)}`)
         .join(' ');
+}
+
+export function createWorkspaceLockDocument({
+    dependencyName=SDK_NAME,
+    packageName=SDK_NAME,
+    packageVersion=SDK_VERSION,
+    packageSource=`node_modules/${dependencyName}`
+}={}){
+    if(packageName!==SDK_NAME||typeof packageVersion!=='string'
+        ||!/^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/u.test(packageVersion)
+        ||typeof dependencyName!=='string'||dependencyName.length>214
+        ||!NPM_PACKAGE_NAME_PATTERN.test(dependencyName)
+        ||packageSource!==`node_modules/${dependencyName}`){
+        throw new Error('Invalid workspace SDK lock authority.');
+    }
+    return {
+        schemaVersion:1,
+        sdk:{name:packageName,version:packageVersion},
+        runtime:{root:`${packageSource}/runtime`},
+        sdkBrowserRuntime:{root:`${packageSource}/browser-runtime`},
+        protocols:{
+            arcane:ARCANE_PROTOCOL,
+            cliEvents:CLI_EVENT_PROTOCOL,
+            targetAdapter:TARGET_ADAPTER_PROTOCOL
+        }
+    };
 }
 
 export function workspaceTemplate({
@@ -212,6 +244,10 @@ Every browser release also carries Arcane OS licensing material under \`licenses
             ]
         }
     }));
+    files.set('arcane.lock.json',json(createWorkspaceLockDocument({
+        dependencyName:sdkDependencyName,
+        packageSource:sdkPackageSource
+    })));
     files.set(`apps/${appId}/arcane-app.json`,json({
         schemaVersion:2,
         id:appId,

@@ -430,6 +430,25 @@ export async function initWorkspace({
             sdkDeclaration
         );
     const writtenFiles=await writeMissingFiles(resolvedRoot,template.files,{signal,onEvent});
+    if(workspaceMode==='external'&&writtenFiles.skippedFiles.includes('arcane.lock.json')){
+        throwIfAborted(signal);
+        await assertNoLinkedAncestors(resolvedRoot,'arcane.lock.json');
+        const lockPath=path.join(resolvedRoot,'arcane.lock.json');
+        const lockInfo=await lstat(lockPath);
+        if(lockInfo.isSymbolicLink()||!lockInfo.isFile()){
+            fail('Existing arcane.lock.json must be a real file.');
+        }
+        await writeFile(
+            lockPath,
+            template.files.get('arcane.lock.json'),
+            'utf8'
+        );
+        writtenFiles.skippedFiles=writtenFiles.skippedFiles.filter(
+            relative=>relative!=='arcane.lock.json'
+        );
+        writtenFiles.replacedFiles=['arcane.lock.json'];
+        await emit(onEvent,{type:'scaffold.file.replaced',path:'arcane.lock.json'});
+    }
     const packageUpdated=await applyPackageMerge(resolvedRoot,packagePlan,{signal,onEvent});
     const workspaceRuntime=workspaceMode==='external'
         ?await materializeWorkspaceRuntimeContent({

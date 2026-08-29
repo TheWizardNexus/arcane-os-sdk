@@ -251,7 +251,7 @@ test('create refuses a nonempty target and init preserves existing authored file
     assert.ok(receipt.createdFiles.includes('apps/preserved-app/index.html'));
 });
 
-test('init rejects an incompatible structural SDK lock before materializing runtime content',async t=>{
+test('init replaces an obsolete SDK lock with the canonical semantic document',async t=>{
     const workspaceRoot=await temporaryDirectory(t);
     const generated=workspaceTemplate({appId:'forged-lock'});
     const forged=JSON.parse(generated.files.get('arcane.lock.json'));
@@ -260,16 +260,18 @@ test('init rejects an incompatible structural SDK lock before materializing runt
     const original=`${JSON.stringify(forged,null,2)}\n`;
     await writeFile(lockPath,original);
 
-    await assert.rejects(
-        initWorkspace({workspaceRoot,appId:'forged-lock'}),
-        error=>error?.code==='ARCANE_WORKSPACE_LOCK_INVALID'
-            &&/compatible Arcane SDK installation/u.test(error.message)
-    );
-    assert.equal(await readFile(lockPath,'utf8'),original);
-    await assert.rejects(
-        lstat(path.join(workspaceRoot,'arcane')),
-        error=>error?.code==='ENOENT'
-    );
+    const initialized=await initWorkspace({workspaceRoot,appId:'forged-lock'});
+    const reconciled=JSON.parse(await readFile(lockPath,'utf8'));
+    assert.equal(initialized.workspaceMode,'external');
+    assert.deepEqual(initialized.replacedFiles,['arcane.lock.json']);
+    assert.equal(initialized.skippedFiles.includes('arcane.lock.json'),false);
+    assert.notEqual(await readFile(lockPath,'utf8'),original);
+    assert.deepEqual(reconciled.runtime,{root:'node_modules/arcane-os/runtime'});
+    assert.deepEqual(reconciled.sdkBrowserRuntime,{
+        root:'node_modules/arcane-os/browser-runtime'
+    });
+    assert.doesNotMatch(JSON.stringify(reconciled),/sha|digest|integrity|bytes/iu);
+    assert.equal((await lstat(path.join(workspaceRoot,'arcane'))).isDirectory(),true);
 });
 
 test('workspace template lock contains only semantic SDK roots and protocols',()=>{

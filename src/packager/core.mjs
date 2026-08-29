@@ -499,16 +499,23 @@ async function collectPackageRecords(context,{signal}={}){
     return records;
 }
 
-async function browserDocuments(records){
+async function browserDocuments(records,entry){
+    let entryDocument=null;
     const documents=[];
     for(const record of records){
-        if(path.posix.extname(record.destination).toLocaleLowerCase('en-US')!=='.html')continue;
+        const extension=path.posix.extname(record.destination).toLocaleLowerCase('en-US');
+        if(extension!=='.html'&&extension!=='.htm')continue;
         const inspected=inspectImportMapHtml(await readFile(record.source,'utf8'),{
             documentPath:record.destination
         });
-        documents.push({path:record.destination,...copyJson(inspected)});
+        const document={path:record.destination,...copyJson(inspected)};
+        if(record.destination===entry){
+            entryDocument=document;
+        }else if(inspected.bases.length>0){
+            documents.push(document);
+        }
     }
-    return documents;
+    return entryDocument===null?documents:[entryDocument,...documents];
 }
 
 async function optionalDescriptor(context){
@@ -540,7 +547,7 @@ async function inspectContext(context,{signal}={}){
         }),
         ...(context.config.adapter===undefined?{}:{adapter:context.config.adapter}),
         descriptor:await optionalDescriptor(context),
-        browserDocuments:await browserDocuments(records),
+        browserDocuments:await browserDocuments(records,context.config.entry),
         files:records.map(record=>record.destination),
         output:path.relative(context.workspaceRoot,context.outputRoot).split(path.sep).join('/')
     };

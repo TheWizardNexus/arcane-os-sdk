@@ -179,7 +179,7 @@ async function configureLegacyIntegratedWorkspace(workspaceRoot){
     );
 }
 
-test('installed SDK materialization copies the complete alias runtime without identity metadata',async t=>{
+test('installed SDK materialization copies the complete alias runtime without byte identity metadata',async t=>{
     const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-installed-runtime-'});
     await writeJson(path.join(workspaceRoot,'package.json'),{
         name:'installed-runtime-fixture',
@@ -188,6 +188,11 @@ test('installed SDK materialization copies the complete alias runtime without id
         devDependencies:{'arcane-sdk':`npm:${SDK_NAME}@${SDK_VERSION}`}
     });
     const installedRoot=await installSdkAliasRuntime(workspaceRoot);
+    const legacyRuntimeLock=path.join(workspaceRoot,'arcane.lock.json');
+    await writeJson(legacyRuntimeLock,{
+        schemaVersion:1,
+        sdk:{name:SDK_NAME,version:'0.2.1'}
+    });
 
     const created=await materializeInstalledSdkRuntime({workspaceRoot});
     assert.equal(created.status,'materialized');
@@ -200,6 +205,20 @@ test('installed SDK materialization copies the complete alias runtime without id
     assert.equal(Object.hasOwn(created,'persistentReceipt'),false);
     assert.equal(Object.hasOwn(created,'receiptPath'),false);
     assert.equal(Object.hasOwn(created,'lockReconciliation'),false);
+    const refreshedLock=JSON.parse(await readFile(legacyRuntimeLock,'utf8'));
+    assert.deepEqual(refreshedLock,{
+        schemaVersion:1,
+        sdk:{name:SDK_NAME,version:SDK_VERSION},
+        runtime:{root:'node_modules/arcane-sdk/runtime'},
+        sdkBrowserRuntime:{root:'node_modules/arcane-sdk/browser-runtime'},
+        protocols:{
+            arcane:'arcane/1',
+            cliEvents:'arcane-cli-events/1',
+            targetAdapter:'arcane-target-adapter/1'
+        }
+    });
+    assert.equal(created.workspaceLock.path,legacyRuntimeLock);
+    assert.deepEqual(created.workspaceLock.document,refreshedLock);
 
     const stalePath=path.join(workspaceRoot,'arcane','stale-runtime-file.txt');
     await writeFile(stalePath,'stale\n');

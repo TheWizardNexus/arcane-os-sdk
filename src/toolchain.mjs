@@ -314,7 +314,9 @@ async function refreshPreparedImportMap(prepared,{signal,onEvent,workspaceOperat
         appId:prepared.appId,
         appRoot:prepared.appRoot,
         entry:manifest.entry,
-        documents:inspected.browserDocuments,
+        documents:inspected.browserDocuments.map(function selectBrowserDocumentPath(document){
+            return document.path;
+        }),
         workspaceOperationLease,
         signal,
         onEvent

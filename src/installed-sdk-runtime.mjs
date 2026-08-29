@@ -1,7 +1,8 @@
-import {readFile,realpath,stat} from 'node:fs/promises';
+import {lstat,readFile,realpath,stat,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {materializeWorkspaceRuntimeContent} from './workspace-runtime.mjs';
 import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
+import {createWorkspaceLockDocument} from './templates/workspace-template.mjs';
 import {
     resolveInstalledSdkInstallation,
     resolveSdkPackageDeclaration
@@ -55,6 +56,18 @@ async function installedSdkAuthority(canonicalRoot,{sdkPackageSource}={}){
     return {declaration,installation};
 }
 
+async function writeWorkspaceLock(lockPath,lock){
+    try{
+        const info=await lstat(lockPath);
+        if(info.isSymbolicLink()||!info.isFile()){
+            fail(`Workspace SDK lock must be a real file: ${lockPath}.`);
+        }
+    }catch(error){
+        if(error?.code!=='ENOENT')throw error;
+    }
+    await writeFile(lockPath,`${JSON.stringify(lock,null,2)}\n`,'utf8');
+}
+
 export async function materializeInstalledSdkRuntime({
     workspaceRoot,
     sdkPackageSource,
@@ -79,12 +92,21 @@ export async function materializeInstalledSdkRuntime({
             signal,
             onEvent
         });
+        const lockPath=path.join(canonicalRoot,'arcane.lock.json');
+        const lock=createWorkspaceLockDocument({
+            dependencyName:authority.installation.dependencyName,
+            packageName:authority.installation.packageName,
+            packageVersion:authority.installation.packageVersion,
+            packageSource:authority.installation.packageSource
+        });
+        await writeWorkspaceLock(lockPath,lock);
         return {
             schemaVersion:1,
             kind:'arcane-installed-sdk-runtime-materialization',
             status:'materialized',
             installation:authority.installation,
-            workspaceRuntime
+            workspaceRuntime,
+            workspaceLock:{path:lockPath,document:lock}
         };
     });
 }
