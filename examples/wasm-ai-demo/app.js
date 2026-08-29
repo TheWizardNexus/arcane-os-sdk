@@ -269,6 +269,7 @@ function localModelDescriptor(model) {
 
 function speechConfiguration(dbopfs) {
   const transformersDistribution = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0/dist/";
+  const kokoroWasmDistribution = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/";
   return {
     protocol: AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
     id: "wasm-ai-demo-browser-speech",
@@ -309,7 +310,7 @@ function speechConfiguration(dbopfs) {
         version: "1.2.1",
         revision: "664c76a704021239ba59c84dcbaa4d3dece01fe9",
         entry: "kokoro.web.js",
-        wasmPaths: transformersDistribution,
+        wasmPaths: kokoroWasmDistribution,
         files: [{
           path: "kokoro.web.js",
           url: "https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js",
