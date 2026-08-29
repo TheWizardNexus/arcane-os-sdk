@@ -2,20 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <meta name="arcane-app-id" content="hello-world">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Arcane Hello World</title>
     <script type="importmap">
 {
   "imports": {
-    "/runtime/node_modules/strong-type/index.js": "/node_modules/strong-type/index.js",
-    "arcane-os/ai/browser-speech": "/browser-runtime/ai/browser-speech.mjs",
-    "arcane-os/ai/browser-wasm": "/browser-runtime/ai/browser-wasm.mjs",
     "arcane-os/event-manager": "/src/event-manager.mjs",
-    "arcane/AI": "/runtime/arcane/modules/AI.js",
-    "arcane/DBOPFS": "/runtime/arcane/modules/DBOPFS.js",
-    "arcane/HTMLImport": "/runtime/arcane/modules/HTMLImport.js",
     "arcane/ThemeBootstrap": "/runtime/arcane/modules/ThemeBootstrap.js",
-    "arcane/WaitForComponent": "/runtime/arcane/modules/WaitForComponent.js",
     "event-pubsub": "/node_modules/event-pubsub/index.js"
   }
 }
@@ -24,32 +18,33 @@
     <link rel="stylesheet" href="/runtime/arcane/css/primitives.css">
     <style>
         body {
+            display: grid;
             margin: 0;
             min-height: 100vh;
+            place-items: center;
             background: var(--background, rgb(13, 18, 32));
             color: var(--text-color, rgb(235, 241, 255));
         }
 
         main {
-            box-sizing: border-box;
-            min-height: 100vh;
-            padding: 1rem;
+            padding: 2rem;
+            text-align: center;
         }
 
         h1 {
-            margin: 0 0 1rem;
+            margin: 0;
+        }
+
+        p {
+            margin: 0.75rem 0 0;
         }
     </style>
 </head>
 <body>
     <main>
-        <h1>Hello, Arcane World!</h1>
-        <html-import
-            id="hello-world-chat"
-            href="/runtime/arcane/components/chat.html?v=2"
-            presentation="basic">
-        </html-import>
+        <h1 id="message">Loading…</h1>
+        <p id="environment">Starting the Arcane theme…</p>
     </main>
-    <script type="module" src="./App.js?v=1"></script>
+    <script type="module" src="./App.js"></script>
 </body>
 </html>

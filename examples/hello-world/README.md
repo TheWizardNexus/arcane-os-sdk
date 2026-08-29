@@ -1,20 +1,16 @@
 # Arcane Hello World
 
-This is a source example, not an application workspace or release package. It
-contains one page and one configuration module. The page includes the shared
-SDK chat; the SDK owns the transcript, composer, model lifecycle, progress,
-errors, cancellation, persistence, transcription, speech playback, and cleanup.
+This is the smallest Arcane source example: one HTML page and one JavaScript
+file. It applies the shared Arcane theme, prints a greeting, and says whether it
+is running in a normal web browser or inside an Arcane host.
 
-Serve the canonical SDK repository root with any generic static HTTPS server,
-then open:
+Serve the canonical SDK repository root with a local static server, then open:
 
-`https://localhost:8444/examples/hello-world/`
+`http://127.0.0.1:8444/examples/hello-world/`
 
-The example resolves the current checkout's `/runtime`, `/browser-runtime`, and
-`/src` files directly. It does not use a copied `arcane/` runtime, an app
-descriptor, a packager configuration, or application-local functional code.
+`index.html` declares the app identity and maps the named SDK imports. `App.js`
+waits for the Arcane theme and writes the two visible lines. The same files run
+in either environment.
 
-`App.js` owns only the selected upstream model and speech authorities plus the
-minimal call to `chat.bindSession({ai, sessionOptions})`. Importing the example
-does not download or activate a model; each provider starts only after the user
-operates its SDK-owned control.
+For models, chat, transcription, and speech, continue with the advanced
+[`wasm-ai-demo`](../wasm-ai-demo/) example after this one works.
