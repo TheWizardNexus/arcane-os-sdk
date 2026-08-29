@@ -2,6 +2,15 @@ name: Publish npm package
 
 on:
   workflow_dispatch:
+    inputs:
+      check_run_id:
+        description: Successful Check workflow run containing the selected npm package
+        required: true
+        type: string
+      version:
+        description: Exact numeric package version in the selected Check artifact
+        required: true
+        type: string
 
 permissions: {}
 
@@ -14,6 +23,7 @@ jobs:
     name: Publish selected npm version
     if: github.repository == 'TheWizardNexus/arcane-os-sdk' && github.ref == 'refs/heads/main'
     permissions:
+      actions: read
       contents: read
       id-token: write
     environment:
@@ -21,7 +31,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     outputs:
-      version: ${{ steps.pack.outputs.version }}
+      version: ${{ steps.selected.outputs.version }}
       channel: ${{ steps.publication.outputs.channel }}
     steps:
       - name: Check out main
@@ -35,22 +45,32 @@ jobs:
           architecture: x64
           registry-url: https://registry.npmjs.org/
           package-manager-cache: false
-      - name: Install declared dependencies
-        run: npm ci --ignore-scripts
-      - name: Pack the selected version
-        id: pack
+      - name: Download the selected Check package
+        uses: actions/download-artifact@v8
+        with:
+          name: arcane-sdk-npm-${{ inputs.version }}
+          path: ${{ runner.temp }}/arcane-sdk-npm-release
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.check_run_id }}
+      - name: Select the checked tarball
+        id: selected
         shell: bash
         env:
-          RELEASE_OUTPUT: ${{ runner.temp }}/arcane-sdk-npm-release
-        run: node tools/build-npm-release.mjs --output "$RELEASE_OUTPUT"
+          RELEASE_INPUT: ${{ runner.temp }}/arcane-sdk-npm-release
+          SELECTED_VERSION: ${{ inputs.version }}
+        run: |
+          tarball="$RELEASE_INPUT/arcane-os-$SELECTED_VERSION.tgz"
+          test -f "$tarball"
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+          echo "version=$SELECTED_VERSION" >> "$GITHUB_OUTPUT"
       - name: Resolve version and channel
         id: publication
         shell: bash
-        run: node tools/npm-registry-publication.mjs preflight --tarball "${{ steps.pack.outputs.tarball }}"
+        run: node tools/npm-registry-publication.mjs preflight --tarball "${{ steps.selected.outputs.tarball }}"
       - name: Publish the selected tarball
         if: steps.publication.outputs['needs-publish'] == 'true'
         shell: bash
-        run: npm publish "${{ steps.pack.outputs.tarball }}" --ignore-scripts --access public --tag "${{ steps.publication.outputs.channel }}"
+        run: npm publish "${{ steps.selected.outputs.tarball }}" --ignore-scripts --access public --tag "${{ steps.publication.outputs.channel }}"
 
   verify_registry:
     name: Verify npm version and channel
