@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.4
+
+- Allowed external and integrated physical SDK workspaces to omit the optional
+  `security` runtime route while preserving the canonical functional route
+  order, `dependencies` and `sdk` projections, external license routing, and
+  compatibility with workspaces that still include `security`.
+- Preserved a newer microphone retry's press, status, and operation identity
+  when an earlier pending capture request settles, while retaining the original
+  operation correlation for successful transcription.
+
 ## 0.3.3
 
 - Corrected installed-workspace import-map refresh to preserve rich browser
