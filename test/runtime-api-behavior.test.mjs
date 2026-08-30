@@ -1513,11 +1513,11 @@ test(
         const pendingTupleRoutes = runtime.configureFromTuple(
             [
                 'missing-llm',
-                'local-stt',
-                'local-tts',
+                'saved-stt-route',
+                'saved-tts-route',
                 'missing-llm-model',
-                'local-tts-model',
-                'local-stt-model'
+                'saved-tts-model',
+                'saved-stt-model'
             ]
         );
         assert.deepEqual(
@@ -1526,38 +1526,14 @@ test(
         );
         assert.deepEqual(
             pendingTupleRoutes.stt.default,
-            selection('local-stt', 'local-stt-model', null)
+            selection('saved-stt-route', 'saved-stt-model', null)
         );
         assert.deepEqual(
             pendingTupleRoutes.tts.default,
-            selection('local-tts', 'local-tts-model', null)
+            selection('saved-tts-route', 'saved-tts-model', null)
         );
-        assert.equal(runtime.providerIdentity('stt', 'local-stt'), null);
-        assert.equal(runtime.providerIdentity('tts', 'local-tts'), null);
-        const pendingSpeechSnapshot = runtime.status();
-        assert.throws(
-            function rejectMismatchedPendingSpeechHydration() {
-                runtime.replaceSpeechProviders({
-                    providers: {stt: localSTT, tts: localTTS},
-                    routes: {
-                        stt: {
-                            default: selection('local-stt', 'wrong-model', true),
-                            localOnly: selection('local-stt', 'wrong-model', true)
-                        },
-                        tts: {
-                            default: selection('local-tts', 'local-tts-model', true),
-                            localOnly: selection('local-tts', 'local-tts-model', true)
-                        }
-                    },
-                    expectedProviders: {stt: null, tts: null}
-                });
-            },
-            function isPendingHydrationMismatch(error) {
-                return error?.code
-                    === 'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_EXPECTED_PROVIDER_REQUIRED';
-            }
-        );
-        assert.equal(runtime.status(), pendingSpeechSnapshot);
+        assert.equal(runtime.providerIdentity('stt', 'saved-stt-route'), null);
+        assert.equal(runtime.providerIdentity('tts', 'saved-tts-route'), null);
         const hydratedSpeech = runtime.replaceSpeechProviders({
             providers: {stt: localSTT, tts: localTTS},
             routes: {
@@ -1576,6 +1552,8 @@ test(
         assert.equal(hydratedSpeech.context,'caller hydration context');
         assert.equal(runtime.providerIdentity('stt', 'local-stt').id, 'local-stt');
         assert.equal(runtime.providerIdentity('tts', 'local-tts').id, 'local-tts');
+        assert.equal(runtime.providerIdentity('stt', 'saved-stt-route'), null);
+        assert.equal(runtime.providerIdentity('tts', 'saved-tts-route'), null);
         assert.deepEqual(
             runtime.selection('stt'),
             selection('local-stt', 'local-stt-model', true)
@@ -2438,8 +2416,8 @@ test(
             const runtime=ai.providerRuntime;
             const initialExternalTTSSelection=runtime.selection('tts');
             const pendingSTTSelection={
-                providerId:'browser-stt-direct',
-                modelId:'stt-model-direct',
+                providerId:'saved-stt-route',
+                modelId:'saved-stt-model',
                 localOnly:null
             };
             runtime.configureSpeech({
@@ -2477,6 +2455,10 @@ test(
             }
             assert.equal(hydrationProviderIds.includes('OPENAI'),false);
             assert.equal(
+                hydrationProviderIds.includes('browser-stt-direct'),
+                true
+            );
+            assert.equal(
                 hydrationProviderIds.every(providerId=>
                     providerId==='browser-stt-direct'
                 ),
@@ -2486,6 +2468,8 @@ test(
             assert.equal(initialSTTDescriptor.stt.providerId,'browser-stt-direct');
             assert.equal(initialSTTDescriptor.stt.modelId,'stt-model-direct');
             assert.equal(initialSTTDescriptor.tts,null);
+            assert.equal(runtime.status('stt').state,'unloaded');
+            assert.deepEqual(dbopfsReads,[]);
             assert.deepEqual(
                 runtime.providerIdentity('tts','OPENAI'),
                 externalTTSIdentity

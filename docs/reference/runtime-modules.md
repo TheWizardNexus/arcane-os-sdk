@@ -546,11 +546,13 @@ removes that role and requires its exact non-null expected provider. The method 
 provider registration, routes, selection, readiness, generation, sticky state,
 owned lifecycle work, and TTS mute state. `replaceSpeechProviders(value)` keeps
 the existing atomic two-role boundary for a coordinated STT/TTS replacement.
-Either replacement may hydrate an exact selected-but-unregistered speech route
-whose saved locality is still `null`, but only when provider id, model id, and
-every pending route agree with the replacement. Registration and route
-publication remain one commit; a mismatched, already registered, local-only,
-busy, or partially divergent selection rejects without changing either role.
+Either replacement may replace a selected-but-unregistered pending speech
+placeholder whose saved locality is still `null`. Every existing pending route
+must agree with that saved placeholder; the replacement provider and routes
+then define the actual selected provider and model. Registration and route
+publication remain one commit without loading either provider; an already
+registered, local-only, busy, or partially divergent selection rejects without
+changing either role.
 
 `start(options)` waits for prior speech-state and role unload work, applies the
 requested initial mute state, and returns the `startAIRuntime()` control handle

@@ -2031,15 +2031,12 @@ export class AIProviderRuntime {
         }
     }
 
-    #pendingSpeechProviderHydrationMatches(role, slot, provider, routes) {
-        if (!provider || !slot.selection || !routes.default) {
+    #pendingSpeechProviderHydrationMatches(role, slot) {
+        if (!slot.selection) {
             return false;
         }
         const pending = slot.selection;
-        if (this.#providers.has(providerKey(role, pending.providerId))
-            || provider.id !== pending.providerId
-            || routes.default.providerId !== pending.providerId
-            || routes.default.modelId !== pending.modelId) {
+        if (this.#providers.has(providerKey(role, pending.providerId))) {
             return false;
         }
         const currentSelections = [
@@ -2048,10 +2045,12 @@ export class AIProviderRuntime {
             slot.routes.localOnly
         ].filter(Boolean);
         return currentSelections.length > 0
-            && currentSelections.every(selection =>
-                selection.providerId === pending.providerId
-                && selection.modelId === pending.modelId
-                && selection.localOnly === null
+            && currentSelections.every(
+                function isSamePendingSpeechSelection(selection) {
+                    return selection.providerId === pending.providerId
+                        && selection.modelId === pending.modelId
+                        && selection.localOnly === null;
+                }
             );
     }
 
@@ -2104,9 +2103,7 @@ export class AIProviderRuntime {
             || slot.selection)
             && !this.#pendingSpeechProviderHydrationMatches(
                 role,
-                slot,
-                replacement.provider,
-                replacement.routes
+                slot
             )) {
             throw speechProviderReplacementError(
                 'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_EXPECTED_PROVIDER_REQUIRED',
@@ -2249,9 +2246,7 @@ export class AIProviderRuntime {
                 || slot.selection)
                 && !this.#pendingSpeechProviderHydrationMatches(
                     role,
-                    slot,
-                    replacement.providers[role],
-                    replacement.routes[role]
+                    slot
                 )) {
                 throw speechProviderReplacementError(
                     'ARCANE_AI_SPEECH_PROVIDER_REPLACEMENT_EXPECTED_PROVIDER_REQUIRED',
