@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.6
+
+- Replaced coherent selected-but-unregistered STT and TTS placeholders during
+  initial explicit browser-speech configuration while preserving rejection of
+  registered, busy, local-only, or internally divergent selections and keeping
+  the new providers unloaded until the application activates them.
+- Preserved complete finite provider progress values and units as
+  informational, non-gating state in the reusable formatter and shared Chat
+  activation interface.
+
 ## 0.3.5
 
 - Preserved complete AI and chat runtime content across multi-choice streaming,
