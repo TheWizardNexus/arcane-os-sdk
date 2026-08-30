@@ -421,6 +421,10 @@ The SDK runtime owns
 [`DBOPFSDocumentLibrary`](runtime-modules.md#dbopfsdocumentlibraryjs),
 [`DocumentLexicalSearch`](runtime-modules.md#documentlexicalsearchjs), and
 [`PersistentAIChatSession`](runtime-modules.md#persistentaichatsessionjs).
+DBOPFS JSONL parsing preserves every nonblank unreadable row as its original
+string. Persistent chat can therefore expose the complete saved transcript for
+application-owned inspection and recovery while rejecting that row from
+provider-facing history with a coded persistence error.
 Document bootstrap is explicit and schema-driven, commits a completed
 generation last, and returns complete search results with partial read failures
 disclosed. `evaluate()` can instead score a caller-owned source set without
@@ -448,12 +452,12 @@ ready. Unload always cancels active role work before releasing that role's
 execution state, and superseded late results are rejected rather than committed
 or retried through another provider.
 
-Interactive request ownership is latest-request-wins independently for each
-role. A new valid request aborts the active role request
-and waits for its provider promise settlement; stream replacement additionally
-requires confirmed handle cleanup. Only the newest waiting request may
-start after settlement, and request-specific generations prevent superseded
-callbacks from clearing or restoring newer state. The runtime revalidates
+Interactive requests enter an uncapped FIFO lane independently for each role.
+A new valid request neither aborts nor discards the active request; it starts
+after every earlier request settles. A caller signal cancels only its own queued
+or active request, while explicit role cancellation targets only the active
+request. Request-specific generations prevent canceled or superseded callbacks
+from clearing or restoring newer state. The runtime revalidates
 selected-provider readiness and never reloads, switches, or falls back
 implicitly. Generic provider-promise settlement is not a claim that underlying
 work stopped; only a provider's documented positive acknowledgement or
@@ -495,6 +499,15 @@ LLM tool calls are structural result data only. The SDK never executes a
 handler. The application owns schema validation, authorization, side-effect
 policy, dispatch, and the matching tool-result turn.
 
+Ordinary streaming publishes complete nonstructural content and reasoning from
+every provider choice in order. Complete provider chunks and terminal records
+remain independently available through the data callbacks. Structural deltas
+stay private until terminal validation; terminal-only calls are valid, while
+any observed call must keep the same choice, order, identity, exact argument
+string, and extension fields at settlement. Awaiting a terminal result before
+iterating does not stall the private provider stream; projected chunks remain
+available to the later consumer.
+
 Every first-party function-tool declaration includes
 `function.parameters.properties.message` as a required nonempty string, and
 every emitted call includes that plain-language user-facing value in the JSON
@@ -503,9 +516,11 @@ call's progress, question, or next step; it does not treat raw tool envelopes,
 arguments, internal sequencing state, or protocol failures as ordinary
 transcript content. An explicitly selected developer inspection surface may
 show the raw structure separately. This `message` does not replace domain
-fields such as a closing report's `final_message`, nor does it replace the
-matching executed, declined, cancelled, or not-executed tool-result turn that
-must settle the structural call before another user turn.
+fields such as a closing report's `final_message`. One assistant response may
+contain an ordered array of calls with unique IDs. Display does not settle any
+call: one atomic result batch must provide exactly one matching nonblank
+executed, declined, cancelled, or not-executed `role:'tool'` turn for every
+pending ID before another user or provider turn.
 
 <details>
 <summary>Portable AI protocol disclosure</summary>

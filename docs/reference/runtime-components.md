@@ -62,7 +62,7 @@ appropriate.
 | [`assistant-panel.html`](#assistant-panelhtml) | Reusable assistant drawer, message area, composer, pending/streaming/empty/error state, and actions. | `open()`<br>`close()`<br>`toggle()`<br>`send()`<br>`clear()`<br>`setState()`<br>`focusComposer()`<br>`scrollToEnd()`<br>`destroy()` | `assistant-ready`<br>`assistant-opened`<br>`assistant-closed`<br>`assistant-send`<br>`assistant-clear` | DOM-normalized; caller/provider results remain external |
 | [`calculator.html`](#calculatorhtml) | Calculator keypad and result/error event surface backed by CalculatorEngine. | `calculate()`<br>`destroy()` | `calculator-ready`<br>`calculation-complete`<br>`calculation-error` | Normalized Calculation/error events |
 | [`chart.html`](#charthtml) | Accessible uPlot line, area, or point chart with normalized options and rows. | `configure()`<br>`populate()`<br>`setData()`<br>`addData()`<br>`update()`<br>`destroy()` | `chart-ready`<br>`chart-remove` | Options/rows normalized; uPlot rendering is vendor-native |
-| [`chat.html`](#chathtml) | Shared chat, visible selected-model activation request, file upload, streaming, structural tool settlement, speech, language, availability, and conversation-timebox surface. | `streamMessage()`<br>`setMessageProgress()`<br>`setAIAvailability()`<br>`setInitialSpeechMuted()`<br>`setConversationComplete()`<br>`bindConversationTimebox()`<br>`bindSession()`<br>`submitMessage()`<br>`submitToolResult()`<br>`sendMessage()`<br>`languageChanged()`<br>`requestAIActivation()`<br>`destroy()` | `chat-ready`<br>`chat-session-bound`<br>`chat-session-message`<br>`chat-session-error`<br>`chat-send-message`<br>`chat-send-error`<br>`chat-file-uploaded`<br>`chat-file-upload-error`<br>`chat-language-changed`<br>`chat-language-change-error`<br>`chat-ai-activation-request`<br>`chat-ai-activation-error`<br>`chat-speech-synthesis-error`<br>`conversation-timebox-error` | UI/runtime state, explicit user activation intent, and honest structural-call settlement normalized; AI/storage/media behavior mixed |
+| [`chat.html`](#chathtml) | Shared chat, visible selected-model activation request, file upload, streaming, structural tool settlement, speech, language, availability, and conversation-timebox surface. | `streamMessage()`<br>`setMessageProgress()`<br>`setAIAvailability()`<br>`setInitialSpeechMuted()`<br>`setConversationComplete()`<br>`bindConversationTimebox()`<br>`bindSession()`<br>`submitMessage()`<br>`submitToolResult()`<br>`submitToolResults()`<br>`sendMessage()`<br>`languageChanged()`<br>`requestAIActivation()`<br>`destroy()` | `chat-ready`<br>`chat-session-bound`<br>`chat-session-message`<br>`chat-session-error`<br>`chat-send-message`<br>`chat-send-error`<br>`chat-file-uploaded`<br>`chat-file-upload-error`<br>`chat-language-changed`<br>`chat-language-change-error`<br>`chat-ai-activation-request`<br>`chat-ai-activation-error`<br>`chat-speech-synthesis-error`<br>`conversation-timebox-error` | UI/runtime state, explicit user activation intent, and honest structural-call settlement normalized; AI/storage/media behavior mixed |
 | [`conversation-view.html`](#conversation-viewhtml) | Provider-neutral conversation display, advisory actions, composer, busy state, and status. | `setConversation()`<br>`setBusy()`<br>`setStatus()`<br>`clearComposer()`<br>`destroy()` | `conversation-view-ready`<br>`communication-send`<br>`communication-advisory-action` | DOM-normalized |
 | [`dashboard-config.html`](#dashboard-confightml) | Selects which normalized chart definitions are visible on a dashboard. | `configure()`<br>`setDefinitions()`<br>`setVisibility()`<br>`getChartOptions()`<br>`getEffectiveVisibility()`<br>`open()`<br>`close()`<br>`destroy()` | `dashboard-config-ready`<br>`dashboard-config-opened`<br>`dashboard-config-closed`<br>`dashboard-config-change` | Fully normalized definitions and visibility |
 | [`data-maintenance.html`](#data-maintenancehtml) | Runs destructive cleanup of empty chats and memories inside the current app data scope. | `open()`<br>`destroy()` | `data-maintenance-ready`<br>`data-maintenance-complete` | Normalized counts; DBOPFS failures mixed |
@@ -219,8 +219,9 @@ speech, language, availability, and conversation-timebox surface.
 Methods/properties: `streamMessage()`, `setMessageProgress()`,
 `setAIAvailability()`, `setInitialSpeechMuted()`,
 `setConversationComplete()`, `bindConversationTimebox()`, `bindSession()`,
-`submitMessage()`, `submitToolResult()`, `sendMessage()`, `languageChanged()`,
-`requestAIActivation()`, `session`, `sessionStatus`, `pendingTool`, `modelName`,
+`submitMessage()`, `submitToolResult()`, `submitToolResults()`, `sendMessage()`,
+`languageChanged()`, `requestAIActivation()`, `session`, `sessionStatus`,
+`pendingTool`, `pendingTools`, `pendingToolCall`, `pendingToolCalls`, `modelName`,
 and `destroy()`.
 
 `sendMessage(text)` and `languageChanged(text)` are host-overridable async
@@ -253,15 +254,21 @@ Assistant structural calls render their nonempty `function.arguments.message`
 as ordinary visible progress. The exact call name and argument string are
 retained inside a collapsed `Tool call details` inspection surface. Displaying
 a call does not settle it or enable another user turn.
+`submitToolResults({results,request?},{operationId?,signal?})` atomically settles
+the current ordered pending-call set. `results` supplies exactly one
+`{toolCallId,disposition,message,persist?}` record for every pending ID, without
+duplicates or omissions. `disposition` is `executed`, `declined`, `cancelled`,
+or `not-executed`; every result in the batch uses the same persistence choice.
+The method preserves pending order, persists and renders every human-readable
+disposition plus complete message as matching `role:'tool'` requests, and then
+renders one assistant continuation. Live submission and restored history both
+require nonblank user-facing result content; accepted text is preserved exactly
+rather than trimmed or rewritten.
+
 `submitToolResult({toolCallId?,disposition,message,persist?,request?},{operationId?,signal?})`
-settles only the current exact pending call. `disposition` is `executed`,
-`declined`, `cancelled`, or `not-executed`; the exact matching ID is inferred
-when omitted, and an explicitly supplied different ID is rejected. The method
-persists and renders the human-readable disposition plus complete message as a
-matching `role:'tool'` request, then renders the assistant continuation. Live
-submission and restored history both require that tool-result content contain
-nonblank user-facing text; accepted text is preserved exactly rather than
-trimmed or rewritten.
+is the one-call compatibility method. It infers the only pending ID when omitted
+and rejects when zero or multiple calls are pending; parallel calls must use
+`submitToolResults()`.
 Optional plain-object `request` contains per-turn generation choices forwarded
 through the session; a visibility-only host can use
 `request:{toolChoice:'none'}` after a not-executed result so that continuation
@@ -289,21 +296,26 @@ string labels/status, but routes Error objects through the same user-safe copy
 boundary and otherwise displays generic progress text while logging the exact
 diagnostic value.
 
-`pendingTool` is `null` or a mutable actionable summary containing only
-`{id,name,message}`; it never exposes raw arguments. On restored history,
-`bindSession()` clears its binding guard before publishing `chat-session-bound`
-with the same `pendingTool` summary. A listener can therefore call
-`submitToolResult()` immediately after reload without parsing transcript DOM or
-duplicating the session protocol. Restoration accepts one pending call and
-settles it only when the next tool record has the exact matching
-`tool_call_id` and nonblank content; an absent, blank, different, overlapping,
-or out-of-order record leaves the chat unavailable and reports the coded
+`pendingTools` is the mutable ordered array of actionable `{id,name,message}`
+summaries and never exposes raw arguments. `pendingTool` is that compatibility
+summary only when exactly one call is pending. `pendingToolCalls` exposes
+complete copied call envelopes for an explicitly selected inspection or host
+settlement surface, while `pendingToolCall` is its one-call compatibility view.
+On restored history, `bindSession()` clears its binding guard before publishing
+`chat-session-bound` with all four views. A listener can therefore call
+`submitToolResult()` or `submitToolResults()` immediately after reload without
+parsing transcript DOM or duplicating the session protocol. Restoration keeps
+the complete ordered pending set and settles it only when the following tool
+records contain one exact matching `tool_call_id` with nonblank content for
+every call. An absent, blank, duplicate, different, partial, or overlapping
+record leaves the chat unavailable and reports the coded
 diagnostic to the developer console while the visible status says only that
 the saved chat could not be opened.
 
-For streaming sessions, a provisional structural card and the terminal result
-must describe the same exact ID, type, function name, and argument string. A
-changed or omitted terminal call fails with
+For streaming sessions, every provisional structural card and the terminal
+result must preserve the same choice, ordered call position, exact ID, type,
+function name, argument string, and extension fields. A changed or omitted
+observed call fails with
 `AI_CHAT_STREAM_TOOL_CALL_MISMATCH`; the provisional card is removed and the
 prior pending-call state is restored instead of leaving a ghost card or a false
 settlement.
@@ -332,9 +344,14 @@ bubbles/composed, noncancelable `chat-ai-activation-error` event with mutable co
 `{request,error,message}`. A recognized canceled load whose current route is
 `unloaded` or `unloading` is not reported as an activation error.
 
+On `pagehide`, a BFCache-persisted page retains the component and its session,
+speech, listeners, and provider state. A matching persisted `pageshow` refreshes
+the current availability UI without rebinding or duplicating listeners.
+Nonpersisted `pagehide` remains terminal and calls `destroy()`.
+
 `destroy()` aborts the component's AI-runtime-state subscription, destroys the
-activation controller, removes its `pagehide` listener, calls the optional
-speech controller's `destroy()`, sets `ready` to `false`, and returns
+activation controller, removes both page lifecycle listeners, calls the
+optional speech controller's `destroy()`, sets `ready` to `false`, and returns
 `true`; later calls return `false`. It does not initiate a provider load or
 unload.
 
@@ -1121,6 +1138,12 @@ Mute calls `AI.setSpeechMuted(true)`, stops playback, cancels active TTS work,
 and unloads the selected TTS role. Lifecycle failures remain visible through
 `speech-tts-lifecycle-error` and sticky role state.
 
+A BFCache-persisted `pagehide` retains the component, active provider state,
+microphone permission observation, and listeners. On persisted `pageshow`, the
+component resynchronizes the current AI mute state and rerenders its controls
+and status without duplicating activation or provider work. Nonpersisted
+`pagehide` remains terminal and destroys the component.
+
 Speech operation ids are
 `<component-instance-id>:<kind>:<sequence>`. Canonical cancellation reasons are
 `stt-role-unready`, `stt-provider-transcription-cancelled`, `stt-role-busy`,
@@ -1419,6 +1442,10 @@ advances its generation, aborts owned STT delivery, releases owned media, emits
 late settlement before publishing the assigned transcript. Assigning transcript
 text during active recording preserves that recording and changes the transcript
 to which the captured segment will be appended.
+On a BFCache-persisted `pagehide`, the component and its owned state remain
+live. A persisted `pageshow` rerenders the retained authoritative state without
+restarting capture, transcription, or activation. Nonpersisted `pagehide`
+retains terminal destruction.
 `destroy()` aborts the state subscription, cancels active work, removes the
 activation listener, sets component `ready` to `false`, and returns `true`;
 repeated destruction is

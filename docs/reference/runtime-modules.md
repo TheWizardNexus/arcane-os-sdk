@@ -72,7 +72,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`CoreLocalModelCatalog.js`](#corelocalmodelcatalogjs) | esm | Projects Core local-AI status into UI-safe model and speech availability catalogs. | Cross-host | Fully normalized descriptors and stable availability labels. |
 | [`DataMaintenance.js`](#datamaintenancejs) | esm | Deletes empty chats and associated/empty memory records inside the current app data scope. | Browser / native WebView | Normalized counts; destructive storage failures preserved. |
 | [`DBLS.js`](#dblsjs) | esm | Provides app-scoped localStorage tables, batch reads/writes, filtering, deletion, and counts. | Browser / native WebView | Scoped keys and values normalized; storage failures mixed. |
-| [`DBOPFS.js`](#dbopfsjs) | esm | Provides app-scoped OPFS tables, worker I/O, backup/restore, compression, and CRUD/batch APIs. | Browser / native WebView | App scope normalized; DOM/storage errors preserved. |
+| [`DBOPFS.js`](#dbopfsjs) | esm | Provides app-scoped OPFS tables, worker I/O, backup/restore, compression, and CRUD/batch APIs. | Browser / native WebView | App scope and recognized file parsing normalized; nonblank unreadable JSONL rows and DOM/storage errors are preserved. |
 | [`DBOPFSDocumentLibrary.js`](#dbopfsdocumentlibraryjs) | esm | Bootstraps and searches an app-defined DBOPFS corpus and builds complete chat context. | Browser or compatible DBOPFS host | Existing DBOPFS semantics; generation completion and complete search only after the app calls it or wires its context builder. |
 | [`DBOPFSWorker.js`](#dbopfsworkerjs) | worker | Serializes OPFS sync-handle read/write requests from a MessagePort. | Dedicated worker | Responses normalize to `{success,fileData?}` or `{error:{name,message}}`. |
 | [`DevelopmentWorkspace.js`](#developmentworkspacejs) | esm | Provides complete workspace inspection, context, setup task, and Node installer clients without arbitrary command execution. | Native bridge | Inputs normalized; complete provider result/error preserved. |
@@ -144,6 +144,14 @@ default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and
 `streamTTS()`, `finishTTS()`, `fetchTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`,
 `playAudio()`; consumes `user-entity-loaded` and `arcane-ollama-ready`,
 installs `window.ai`, and emits `ai-ready` and `ai-tts-failure`.
+
+Initialization uses the canonical realm user's actual readiness state. If
+`window.user?.ready` is already true, AI initializes immediately. Otherwise one
+shared registration observes `user-entity-loaded`, then rechecks readiness
+after registration so an event that occurred between the initial check and the
+subscription cannot strand initialization. Compatibility event projections do
+not need to preserve object identity with `window.user`; the event only prompts
+the readiness recheck. This boundary uses no timer or polling fallback.
 
 The provider-runtime methods keep LLM, STT, and TTS selection explicit. They do
 not reinterpret one provider's failure as permission to select another
@@ -222,12 +230,19 @@ still pending until a matching `role:'tool'` message records an executed,
 declined, cancelled, or not-executed result.
 That tool-result content must be a nonblank string and is preserved exactly.
 
-`streamRequest()` owns the complete terminal callback sequence. It awaits the
-explicit `onResponse` callback with the unprojected terminal provider response,
-then invokes `onToolCall` exactly once for each complete normalized structural
-call, then awaits `onComplete`. Ordinary `onChunk` delivery contains only text
-or reasoning text; partial structural deltas are retained internally until the
-terminal envelope validates. Request observers receive
+`streamRequest()` owns the complete terminal callback sequence. `onDataChunk`
+receives each complete provider chunk before ordinary projection, while
+`onChunk` receives every nonstructural content or reasoning value from every
+choice in provider order. After the stream settles, `onDataResult` receives the
+complete terminal completion, `onResponse` receives that same unprojected
+provider response, `onToolCall` runs exactly once for each complete normalized
+structural call, and `onComplete` receives the application-facing output. That
+output is the ordered structural-call array when the selected result contains
+tools, the complete completion object when it contains multiple choices, or
+the ordinary single-result text/completion otherwise; later choices are never
+discarded.
+Partial structural deltas remain private until the matching terminal envelope
+validates. Request observers receive
 `onRequest(request,id,metadata)` and any transport metadata supplied by the
 selected route is forwarded unchanged. Every async native, HTTP, provider, and
 legacy callback is observed before the next callback or terminal settlement.
@@ -487,9 +502,8 @@ The singleton exposes read-only `protocol`, `configured`, and `speechMuted`;
 `disposeAll(options={})`; `cancel(role)`; `request(role,options={})`;
 `chat(payload,options={})`; `stream(payload,options={})`;
 `transcribe(payload,options={})`; `synthesize(payload,options={})`; and
-`setSpeechMuted(muted)`. Provider payloads must
-be data-only; callbacks, accessors, symbols, cycles, and excessive nesting are
-rejected at the provider boundary.
+`setSpeechMuted(muted)`. Provider payloads must be data-only; callbacks,
+accessors, symbols, and cycles are rejected at the provider boundary.
 
 Selection options admit `localOnly=false`; inspection admits
 `{localOnly=false,signal=null}`; startup admits
@@ -560,15 +574,21 @@ promise completed; provider-specific cancellation acknowledgement remains the
 selected provider's boundary.
 
 Direct LLM `request()`, `chat()`, and `stream()` use the same message history,
-tool-declaration, emitted-call, all-choice, and single-call contracts as the
-high-level AI API module, including nonblank matching tool-result content. A
-complete text-only terminal string remains compatible; structured terminals
-must use exactly one message or choices envelope. An ordinary stream iterator exposes only nonstructural
-content/reasoning chunks; provider-native tool deltas remain internal until the
-complete terminal result validates. The handle's `result` retains the complete
-validated terminal provider response. Consumer `return()` starts observed
-cancellation immediately and returns promptly; provider cleanup and any failure
-remain observable through the terminal result or complete developer-console
+tool-declaration, emitted-call, all-choice, and ordered parallel-call contracts
+as the high-level AI API module, including one nonblank matching result for
+every pending tool-call ID. A complete text-only terminal string remains
+compatible; structured terminals must use exactly one message or choices
+envelope. An ordinary stream iterator exposes complete nonstructural content
+and reasoning projections from every choice in FIFO order; provider-native
+tool deltas remain private until the complete terminal result validates. The
+runtime drains private provider streams even when `result` is awaited before
+iteration, buffers projected chunks for later consumption, and retains the
+complete validated terminal provider response on `result`. A terminal-only
+tool call is valid; any tool call observed during streaming must retain the
+same choice, ID, type, function name, argument string, and extension fields at
+terminal settlement. Consumer `return()` starts observed cancellation
+immediately and returns promptly; provider cleanup and any failure remain
+observable through the terminal result or complete developer-console
 diagnostics rather than blocking iterator return.
 
 ### Availability and normalization
@@ -1243,12 +1263,13 @@ or tool-call sequence; `systemPrompt` owns the separate system message.
 Each assistant structural tool call is one complete function call with an exact
 nonempty string `id`, `type:'function'`, a nonempty `function.name`, and
 `function.arguments` as a JSON string encoding an object containing a nonempty
-user-facing `message`. At most one structural call is accepted per assistant
-message. Validation does not trim or reserialize an accepted ID, name, or
-argument string. A pending call is settled only by a request with `role:'tool'`,
-nonempty content, and a `tool_call_id` exactly matching that call's ID. A user
-turn, mismatched tool result, or overlapping structural call is rejected until
-settlement.
+user-facing `message`. One assistant message may contain an ordered array of
+calls with unique IDs; every call and every extension field is preserved.
+Validation does not trim or reserialize an accepted ID, name, or argument
+string. A pending call set is settled atomically only by one request batch that
+contains exactly one `role:'tool'` message with nonempty content for every
+pending ID. A user turn, duplicate or mismatched result, partial result batch,
+or overlapping structural call is rejected until the complete set settles.
 
 `prepare(input,{request,signal})` performs the complete request but does not
 commit history immediately. It returns mutable `{response,commit,rollback}`;
@@ -1272,10 +1293,9 @@ done,doneReason,promptEvalCount,evalCount}` and preserve the complete provider
 response in `providerResponse`. Tool calls remain structural data and are never
 executed. General malformed responses fail `AI_CHAT_INVALID_RESPONSE`;
 malformed structural envelopes or argument JSON fail
-`AI_CHAT_INVALID_TOOL_CALL`, a missing or blank argument `message` fails
-`AI_CHAT_TOOL_MESSAGE_REQUIRED`, and more than one structural call fails
-`AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED`. Caller cancellation is `AbortError` with
-code `AI_CHAT_ABORTED`. A new user
+`AI_CHAT_INVALID_TOOL_CALL`, and a missing or blank argument `message` fails
+`AI_CHAT_TOOL_MESSAGE_REQUIRED`. Caller cancellation is `AbortError` with code
+`AI_CHAT_ABORTED`. A new user
 turn cannot bypass a pending structural tool call
 (`AI_CHAT_TOOL_RESULT_REQUIRED`), a mismatched tool result fails
 `AI_CHAT_INVALID_TOOL_MESSAGE`, and a second terminal settlement of one
@@ -1489,7 +1509,12 @@ Exact exports: `DBOPFS_EVENT_TYPES`, `DBOPFS_REASONS`, `default`.
 
 ### Availability and normalization
 
-**Browser / native WebView.** App scope normalized; DOM/storage errors preserved. Transport: OPFS, DBOPFSWorker, Compression Streams. [Deep protocol details](protocols.md).
+**Browser / native WebView.** App scope and recognized JSON/JSONL file parsing
+are normalized. Each readable JSONL row becomes its parsed value; a nonblank
+unreadable row remains in its original string form so the owning application
+can display, diagnose, or recover it without silent data loss. DOM and storage
+errors remain observable. Transport: OPFS, DBOPFSWorker, Compression Streams.
+[Deep protocol details](protocols.md).
 
 ### Example
 
@@ -2299,9 +2324,12 @@ static `create()`, getters `ai`, `chatEntity`, and `fileName`, and `ready()`,
 `stream(input,handlers)`.
 `ready()` waits for initialization and resolves the same session instance.
 
-`send()` accepts `{message:{content,role:'user'|'tool',tool_call_id?,persist},
-request?,response:{persist},signal?}`. Message and response persistence must
-match. Plain-object `request` supplies per-turn generation options such as
+`send()` accepts either
+`{message:{content,role:'user'|'tool',tool_call_id?,persist},...}` or an atomic
+`{messages:[{content,role:'tool',tool_call_id,persist},...],...}` result batch,
+plus `request?`, `response:{persist}`, and `signal?`. Every message and the
+response must use the same persistence choice. Plain-object `request` supplies
+per-turn generation options such as
 `toolChoice:'none'`; it cannot replace session-owned `messages`, `signal`, or
 streaming/lifecycle callback state.
 `persist:false` still commits the coherent turn to complete live model context,
@@ -2310,18 +2338,21 @@ use the persistence choice captured by its matching assistant tool call.
 
 `history()` returns provider-safe configured model context, including the
 system prompt, complete optional assistant reasoning, and every committed live
-turn. `transcript()` returns copies of
-the current non-hidden ChatEntity records with their display timestamps. A
+turn. `transcript()` returns complete copies of every current ChatEntity record,
+including legacy UI metadata and display timestamps. A
 `persist:false` turn remains in both live history and transcript for the active
 session while remaining excluded from DBOPFS durability and memory extraction.
 
 `stream()` accepts the same input as `send()` and optional
-`{onChunk,onToolCall}` handlers. When `ai.streamRequest()` is available, it
-forwards live text deltas, buffers a normalized structural call until its exact
-ID, type, name, and argument string match the terminal response and the complete
-response passes configured-session validation, and only then publishes that
-call and uses the same atomic ChatEntity append/configured session commit as
-`send()`. Omission or divergence rejects with
+`{onChunk,onDataChunk,onDataResult,onToolCall}` handlers. When
+`ai.streamRequest()` is available, it forwards complete provider data through
+the data callbacks and ordinary live text/reasoning through `onChunk`. It
+buffers every observed structural call until the ordered call array exactly
+matches the terminal response and the complete response passes
+configured-session validation, and only then publishes each call and uses the
+same atomic ChatEntity append/configured session commit as `send()`. A
+terminal-only call is valid; omission or divergence of any observed call
+rejects with
 `AI_CHAT_STREAM_TOOL_CALL_MISMATCH` before persistence or commit. When streaming
 is unavailable, `stream()` uses the
 configured non-stream chat request and still returns, validates, persists, and
@@ -2329,9 +2360,10 @@ renders the complete terminal response and tool calls; optional streaming is
 not a session failure. The same caller signal and transaction rollback govern
 both paths.
 
-When an assistant response opens a structural call, the response persistence
-choice is retained under the exact call ID. The matching `role:'tool'`
-settlement must use that same choice. Persisted legacy calls without the
+When an assistant response opens structural calls, the response persistence
+choice is retained under every exact call ID. One ordered `role:'tool'` request
+batch must settle all pending IDs with that same persistence choice before a
+new user or provider turn. Persisted legacy calls without the
 required nonempty argument `message` are never assigned invented text; loading
 reports the coded structural-message failure while leaving the stored record
 unchanged for application-owned recovery.

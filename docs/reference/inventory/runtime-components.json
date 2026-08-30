@@ -141,6 +141,11 @@
         "bindSession()",
         "submitMessage()",
         "submitToolResult()",
+        "submitToolResults()",
+        "pendingTool",
+        "pendingTools",
+        "pendingToolCall",
+        "pendingToolCalls",
         "sendMessage()",
         "languageChanged()",
         "requestAIActivation()",
@@ -171,7 +176,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "UI/runtime state, honest model progress, complete timestamped transcript, user-facing structural arguments.message, nonblank tool-result restoration, collapsed raw inspection, exact-ID replay validation, streamed/terminal envelope correlation, text-only stream rendering, generic visible failure outcomes with complete console diagnostics, matching executed/declined/cancelled/not-executed settlement with per-turn request options, pending-call reload recovery, and reentrant terminal-event ownership are normalized; destroy aborts observation and returns true once/false thereafter; AI/storage/media behavior remains mixed"
+      "normalization": "UI/runtime state, honest model progress, complete timestamped transcript including ui_hidden legacy records, user-facing structural arguments.message, nonblank all-ID tool-result restoration, collapsed complete raw inspection, ordered parallel-call replay validation, per-choice streamed/terminal complete-envelope correlation, complete nonstructural stream rendering, generic visible failure outcomes with complete console diagnostics, atomic executed/declined/cancelled/not-executed result batches with one continuation, plural pending-call reload recovery, reentrant terminal-event ownership, and BFCache-preserving page lifecycle are normalized; destroy aborts observation and returns true once/false thereafter; AI/storage/media behavior remains mixed"
     },
     {
       "file": "runtime/arcane/components/conversation-view.html",
@@ -766,7 +771,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "UI/runtime state, explicit STT activation intent, request-owned cancellation, and capture generation/operation correlation are normalized; pending release retires only its generation and stale permission settlement cannot clear a newer retry; positive compatibility booleans cannot manufacture provider readiness; provider/model authority and media behavior remain external"
+      "normalization": "UI/runtime state, explicit STT activation intent, request-owned cancellation, capture generation/operation correlation, and BFCache-preserving page lifecycle are normalized; pending release retires only its generation and stale permission settlement cannot clear a newer retry; persisted pageshow resynchronizes mute state and rerenders retained controls/status, while nonpersisted pagehide destroys; positive compatibility booleans cannot manufacture provider readiness; provider/model authority and media behavior remain external"
     },
     {
       "file": "runtime/arcane/components/summary-strip.html",
@@ -969,7 +974,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "Sticky runtime STT readiness, explicit activation, request cancellation, and state/text are normalized; media/provider behavior remains external"
+      "normalization": "Sticky runtime STT readiness, explicit activation, request cancellation, state/text, and BFCache-preserving page lifecycle are normalized; persisted pageshow rerenders retained state without restarting work, while nonpersisted pagehide destroys; media/provider behavior remains external"
     },
     {
       "file": "runtime/arcane/components/weather-widget.html",

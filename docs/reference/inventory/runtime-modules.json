@@ -34,8 +34,8 @@
       "summary": "Owns provider-selectable chat and the one-time caller-authority browser STT/TTS configuration, lifecycle, synthesis, transcription, and playback boundary.",
       "availability": "Browser + native bridge + cloud",
       "protocol": "arcane-ai-browser-speech-configuration/1, AIProviderRuntime arcane-ai-provider/2 routes, globalThis.arcaneEvents, OpenAI HTTPS, Arcane.ollama, Arcane.speech, Android WebView bridge",
-      "normalization": "Complete mutable caller-owned browser speech authority, SDK-owned provider registration/replacement/disposal, explicit STT/TTS activation, sticky readiness, exact structural call identity with required arguments.message, nonblank matching tool-result sequencing, all-choice validation, native Ollama structural adaptation, complete-response then single-tool then completion callback ordering, observed async callbacks, Blob/File transcription, playable audio, active-generation TTS operation-failure routing, mute, and cancellation are normalized; provider/model/runtime/voice policy remains caller-owned.",
-      "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact calls, synthesis/transcription, and playback controls; installs `window.ai` and projects `ai-ready` plus active-generation `ai-tts-failure`."
+      "normalization": "Complete mutable caller-owned browser speech authority, SDK-owned provider registration/replacement/disposal, explicit STT/TTS activation, sticky readiness, canonical window.user readiness without compatibility-event object-identity admission or polling, exact ordered structural calls with required arguments.message, atomic nonblank all-ID tool-result sequencing, complete all-choice streaming/data validation, native Ollama structural adaptation, complete-response then all validated tool callbacks then completion ordering, observed async callbacks, Blob/File transcription, playable audio, active-generation TTS operation-failure routing, mute, and cancellation are normalized; provider/model/runtime/voice policy remains caller-owned.",
+      "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact ordered calls, synthesis/transcription, and playback controls; initializes from current canonical user readiness, installs `window.ai`, and projects `ai-ready` plus active-generation `ai-tts-failure`."
     },
     {
       "file": "runtime/arcane/modules/AIPreferenceRuntime.js",
@@ -81,7 +81,7 @@
       "summary": "Provider-neutral selection, lifecycle, routing, startup, request, streaming, cancellation, and independent LLM/STT/TTS state.",
       "availability": "Cross-host in-process runtime; registered providers remain browser, native, or cloud specific",
       "protocol": "arcane-ai-runtime/2, arcane-ai-provider/2, arcane-ai-model-authority/1",
-      "normalization": "Normalizes mutable complete per-role routes, lifecycle/status, cancellation, streaming cleanup, uncapped FIFO request lanes, local-only selection, direct LLM history/declaration/terminal structural contracts, content/reasoning-only ordinary iteration, and a separate complete validated terminal result without creating a fallback.",
+      "normalization": "Normalizes mutable complete per-role routes, lifecycle/status, cancellation, streaming cleanup, uncapped FIFO request lanes, local-only selection, direct LLM history/declaration/terminal structural contracts, complete all-choice content/reasoning FIFO iteration, private automatic provider draining with result-first buffering, terminal-only structural calls, exact per-choice observed/terminal correlation, and a separate complete validated terminal result without creating a fallback.",
       "surface": "Protocol constants; singleton-only `AIProviderRuntime`; `aiProviderRuntime`; `getAIProviderRuntime()`; provider registration/identity/selection, closed three-role and STT/TTS-only validation/configuration/replacement, status/catalog/inspection, startup, per-role load/unload/dispose/cancel, dispose-all, request/stream/speech aliases, and mute controls."
     },
     {
@@ -393,7 +393,8 @@
       "name": "CommunicationPreferences.js",
       "kind": "esm",
       "exports": [
-        "default"
+        "default",
+        "normalizeStructuralToolCall"
       ],
       "summary": "Stores app-scoped, non-secret communication provider preferences.",
       "availability": "Browser / native WebView hybrid",
@@ -457,8 +458,8 @@
       "summary": "Owns complete in-memory AI turns, context construction, provider response preservation, and atomic history commit.",
       "availability": "Native bridge by default; cross-host with injected chat",
       "protocol": "Arcane.ai.chat or injected provider",
-      "normalization": "Complete mutable session/result; declarations and emitted calls require nonempty user-facing arguments.message, exact IDs/names/arguments are preserved, per-turn request options cannot replace session-owned messages or signal, persisted sequencing has stable coded failures, and provider rejection remains visible.",
-      "surface": "default `ConfiguredAIChatSession`, named `normalizeStructuralToolCall`; constructor accepts complete initial messages and structural tool calls; history/clear/prepare/send; per-turn request overrides preserve session-owned messages/signal; exactly one pending call requires an exact matching role=tool result."
+      "normalization": "Complete mutable session/result; declarations and emitted calls require nonempty user-facing arguments.message; ordered parallel calls, exact IDs/names/arguments, and extension fields are preserved; one atomic result batch must settle every pending ID; per-turn request options cannot replace session-owned messages or signal; persisted sequencing has stable coded failures; and provider rejection remains visible.",
+      "surface": "default `ConfiguredAIChatSession`, named `normalizeStructuralToolCall`; constructor accepts complete initial messages and ordered structural tool-call arrays; history/clear/prepare/send; per-turn request overrides preserve session-owned messages/signal; every pending ID requires exactly one matching nonblank role=tool result in the same request batch."
     },
     {
       "file": "runtime/arcane/modules/ConversationActionItems.js",
@@ -592,7 +593,7 @@
       "summary": "Provides app-scoped OPFS tables, worker I/O, backup/restore, compression, and CRUD/batch APIs.",
       "availability": "Browser / native WebView",
       "protocol": "OPFS, DBOPFSWorker, Compression Streams, and per-realm globalThis.arcaneEvents authority",
-      "normalization": "App scope normalized; DOM/storage errors preserved.",
+      "normalization": "App scope and recognized file parsing are normalized; nonblank unreadable JSONL rows remain complete raw strings, and DOM/storage errors are preserved.",
       "surface": "default `DBOPFS`; installs `window.dbopfs`, emits `dbopfs-ready`; table/file/backup APIs."
     },
     {
@@ -1011,7 +1012,7 @@
       "summary": "Composes complete configured chat with an existing ChatEntity so each user, assistant, and structural tool turn has an explicit persistence and transport policy.",
       "availability": "Browser or native WebView with the projected ChatEntity, DBOPFS, and a configured chat function or normalized Arcane.ai surface",
       "protocol": "Existing ChatEntity/DBOPFS methods plus provider-neutral chat request/result records",
-      "normalization": "Preserves provider-safe history, complete optional assistant reasoning, and timestamped UI transcript; commits live context atomically; falls back from optional streaming to configured non-stream transport; carries per-turn generation options while owning lifecycle callbacks; correlates streamed calls against exact validated terminal envelopes before callback/persistence; and keeps exact structural tool-call/nonblank result persistence coherent without inventing legacy messages.",
+      "normalization": "Preserves provider-safe history, complete optional assistant reasoning, every timestamped UI transcript record including legacy ui_hidden metadata, and arbitrary nonempty caller-owned chat file names; commits live context atomically; falls back from optional streaming to configured non-stream transport; carries per-turn generation options while owning lifecycle callbacks; exposes complete data callbacks; accepts terminal-only structural calls; correlates every observed per-choice call against the exact validated terminal envelope before callback/persistence; atomically settles every pending ID once; and keeps malformed legacy records readable without inventing or rewriting messages.",
       "surface": "Default/named `PersistentAIChatSession`, `createPersistentAIChatSession()`; `create()`, `ai`, `chatEntity`, `fileName`, `ready()`, `history()`, `transcript()`, `settleMemory()`, `send()`, and `stream()`."
     },
     {

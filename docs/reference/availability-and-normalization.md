@@ -30,9 +30,9 @@ version; WebKitGTK availability must not be generalized to macOS.
 | Publish application events or review a complete event history | `arcane-os/event-manager` | **Node** and **Browser**; optional DOM capture needs a browser DOM or compatible host | Live listeners receive original arguments. Ordinary `secure:false` recording preserves complete URLs, public details, and captured stack text in deeply frozen `arcane-event-stack/1` snapshots while credential-named fields remain redacted. The stack format is local diagnostic data, not a host transport. |
 | Build browser UI and app-local behavior | `/arcane/modules/*.js`, shared entities, and components | **Browser**; many modules also run inside every native renderer | Pure modules own their result contracts. Modules that call `Arcane` inherit the bridge boundary described below. |
 | Select and observe independent LLM/STT/TTS roles | `/arcane/modules/AIProviderRuntime.js` and `AIRuntimeState.js` | **Cross-host** controller/state; registered providers retain their own host requirements | Required/projected provider members, route/configuration records, and status fields; per-role lifecycle, cancellation, stream cleanup, sticky state, and startup barriers are normalized. `localOnly` creates no fallback. |
-| Run a caller-selected local LLM entirely in a browser renderer | `arcane-os/ai/browser-wasm` through `createArcaneAI()` | **Browser** only; secure context, WebAssembly, OPFS/DBOPFS, WebGPU, and requested full offload are required; no CPU fallback | The public AI API module normalizes multi-model lifecycle, status, streaming, cancellation, exact structural tool-call visibility, and session persistence. Model sources are canonical ordered file descriptors; licenses and model choice remain application policy. |
+| Run a caller-selected local LLM entirely in a browser renderer | `arcane-os/ai/browser-wasm` through `createArcaneAI()` | **Browser** only; secure context, WebAssembly, OPFS/DBOPFS, WebGPU, and requested full offload are required; no CPU fallback | The public AI API module normalizes multi-model lifecycle, status, complete all-choice streaming, cancellation, exact ordered structural tool-call visibility, and session persistence. Model sources are canonical ordered file descriptors; licenses and model choice remain application policy. |
 | Run caller-selected Whisper or Kokoro in a browser renderer | `arcane-os/ai/browser-speech` registered with `AIProviderRuntime` | **Browser** only; DBOPFS, Web Locks, Workers, Fetch/object URLs, and a caller-supplied self-contained runtime/model closure are required | STT/TTS use independent provider/2 lifecycle and status. Complete model/runtime selection, offline behavior, cancellation, Worker teardown, and request/result shapes are normalized. No runtime/model content or cloud fallback is supplied. |
-| Preserve complete chat history and memory | `/arcane/modules/PersistentAIChatSession.js` | **Browser / native WebView** with ChatEntity/DBOPFS and a configured chat function | Existing DBOPFS names and memory semantics are preserved. Live-context commit is atomic; durable persistence is explicit and coherent across user/assistant/tool turns. |
+| Preserve complete chat history and memory | `/arcane/modules/PersistentAIChatSession.js` | **Browser / native WebView** with ChatEntity/DBOPFS and a configured chat function | Existing DBOPFS names and memory semantics are preserved. Live-context commit is atomic; durable persistence is explicit and coherent across user/assistant turns and atomic all-ID tool-result batches. |
 | Search an app-owned document corpus for explicit chat context | `/arcane/modules/DBOPFSDocumentLibrary.js` | **Browser** or compatible injected DBOPFS adapter | Generation/manifest completion, complete lexical search, partial read failures, and untrusted context labels are normalized. Construction does not search; an explicitly wired context builder performs retrieval for each prepared chat send. |
 | Read host identity, capabilities, storage, preferences, appearance, or platform state | `globalThis.Arcane` | **Cross-host** where the method is implemented and admitted | Promise behavior and `Arcane.Error` are normalized. Result fields are normalized unless the method explicitly documents a platform-dependent snapshot. |
 | Use local AI without coupling app code to Ollama HTTP | `Arcane.localAI`, `Arcane.ai`, or `/arcane/modules/Ollama.js` | Primarily **Native**; Android exposes a narrower admitted inference projection | Admission, errors, and managed-operation events are normalized. Direct Ollama response envelopes remain **Provider-native**. |
@@ -110,15 +110,20 @@ Wllama model loading remains mandatory. `load({offline:true})` permits only a co
 cache entry and otherwise rejects with `ARCANE_AI_MODEL_OFFLINE_MISS`. Tool
 calls are result data for application review and dispatch; every declaration
 and emitted call requires nonempty user-facing `arguments.message`, and the SDK
-never executes them. A call remains pending until the application records its
-exact matching executed, declined, cancelled, or not-executed `role:'tool'`
-result with nonblank user-facing content. The direct browser provider and its
+never executes them. An ordered assistant call array remains pending until the
+application records exactly one matching executed, declined, cancelled, or
+not-executed `role:'tool'` result with nonblank user-facing content for every
+pending ID in one atomic batch. The direct browser provider and its
 v1-to-provider/2 adapter validate the same request history, declarations, and
 terminal structural-call contract. Structured completions contain exactly one
 top-level `message` or `choices` envelope, every choice is validated, and the
-ordinary stream iterator exposes only content and reasoning until its complete
-terminal result has passed validation; raw provider envelopes remain available
-only through the explicit response or inspection surface.
+ordinary stream iterator exposes complete content and reasoning projections
+from every choice in provider order while its private pump continues even when
+the terminal result is awaited first. Structural deltas remain private until
+validation; terminal-only calls are valid, while observed calls must preserve
+their choice, order, identity, exact arguments, and extension fields at
+settlement. Complete provider chunks and terminal envelopes remain available
+through explicit data, response, or inspection surfaces.
 
 [`arcane-os/ai/browser-speech`](ai/browser-speech.md) implements the sibling
 `stt` and `tts` provider/2 roles. Each caller-selected Whisper or Kokoro

@@ -5836,11 +5836,14 @@ At least one `llm` or `provider` is required. The mutable API object contains
 `llm`, `runtime`, `createChatSession`, `status`, `load`, `unload`, `probe`,
 `fetchRequest`, `streamRequest`, and `dispose`. `status()` returns
 `{llm: status}`; lifecycle methods return the flat LLM status.
-`fetchRequest()` returns the completion. `streamRequest()` consumes streaming
-and returns complete terminal text and structural tool-call records. Use
-`ai.llm.stream()` for the async iterator; its ordinary chunks contain only
-content/reasoning data, while structural fragments remain internal until the
-complete terminal result validates.
+`fetchRequest()` returns the completion. `streamRequest()` consumes streaming,
+delivers every choice's ordinary content/reasoning values in provider order,
+and returns ordinary terminal text for one choice, a structural-call array for
+selected tool output, or complete JSON text for a multi-choice completion.
+`onDataChunk` and `onDataResult` preserve the complete provider chunk and
+terminal record independently of that application-facing projection. Use
+`ai.llm.stream()` for the async iterator; structural fragments remain private
+until the complete terminal result validates.
 
 When `llm` is an existing `ModelController`, it retains the load policy chosen
 when that controller was created. `createArcaneAI()` does not reapply its
@@ -5861,11 +5864,13 @@ The session's `stream()` uses this controller's streaming transport when
 available and otherwise completes the same atomic turn through its configured
 non-stream request; lack of optional streaming is not a protocol error.
 Per-turn `request` options merge over the session defaults while messages and
-the caller signal remain session-owned. A visibility-only consumer can submit a
-matching tool disposition with `request:{toolChoice:'none'}` so the continuation
-cannot open another tool loop, without calling Wllama directly. A streamed
-structural call is published only after its exact ID, type, name, and argument
-string match the terminal response; omission or divergence rejects with
+the caller signal remain session-owned. A visibility-only consumer can submit
+one atomic result batch for every pending tool-call ID with
+`request:{toolChoice:'none'}` so the continuation cannot open another tool loop,
+without calling Wllama directly. A terminal-only structural call is valid. Each
+call observed during streaming is published only after its choice, ordered
+position, exact ID, type, name, argument string, and extension fields match the
+terminal response; omission or divergence rejects with
 `AI_CHAT_STREAM_TOOL_CALL_MISMATCH` before persistence or commit.
 
 ### Availability and normalization
@@ -5993,10 +5998,11 @@ or partial offload.
 Chat supports OpenAI-like message/generation fields, tools, tool choice,
 parallel tool-call preference, and JSON/JSON-Schema structured output.
 `stream()` returns a mutable async iterator with `result` and `cancel(reason)`.
-Direct chat and stream ingress validate complete history, require nonblank
-matching tool results, and validate every terminal choice. Ordinary stream
-iteration omits structural deltas; the exact validated terminal calls remain
-on `result`.
+Direct chat and stream ingress validate complete history, require one nonblank
+matching tool result for every pending ID, and validate every terminal choice.
+Ordinary stream iteration preserves complete content/reasoning projections from
+every choice in provider order while withholding structural deltas; the exact
+validated terminal calls and every completion choice remain on `result`.
 Every function declaration requires
 `parameters.properties.message:{type:'string',minLength:1}` and includes
 `message` in `required`. Returned calls preserve exact IDs, names, and
@@ -6097,11 +6103,15 @@ status,load,request,unload,dispose}`. `inspect()` returns an
 `request()` accepts only the `chat` and `stream` operations, preserves
 structural tool calls, and never invokes application handlers. Both operations
 validate declaration/history ingress and terminal structural messages. The
-stream wrapper exposes only content/reasoning chunks, validates its complete
-terminal result, and starts observed provider cancellation immediately when the
-consumer returns early without making iterator return wait for provider cleanup.
-The terminal result retains provider settlement; any later cancellation or
-iterator-return failure is reported completely to the developer console.
+stream wrapper privately drains the provider whether the consumer iterates or
+awaits `result` first, buffers complete content/reasoning projections from every
+choice in FIFO order, and validates its complete terminal result. Terminal-only
+tool calls are valid; observed calls must preserve the same choice, order,
+identity, argument string, and extension fields at terminal settlement. An
+early consumer return starts observed provider cancellation immediately without
+making iterator return wait for provider cleanup. The terminal result retains
+provider settlement; any later cancellation or iterator-return failure is
+reported completely to the developer console.
 Re-adapting the same provider returns the same adapter object.
 
 ### Availability and normalization

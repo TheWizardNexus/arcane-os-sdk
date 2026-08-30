@@ -72,6 +72,22 @@ console.log(new Calculation({expression: '2 + 2', result: 4}).toJSON());
 and optional app-scoped DBOPFS persistence. It installs no independent native
 authority; AI and storage dependencies must be available to the host.
 
+`messages` returns provider-facing copies with persistence, memory, legacy UI,
+and timestamp metadata removed while preserving complete content, reasoning,
+tool-call arrays, tool-result IDs, and caller extension fields. `transcript`
+returns complete copied records for UI and recovery, including legacy
+`ui_hidden` metadata; that flag no longer removes a saved record from the
+public transcript. Replacing `messages` keeps complete copied rows so malformed
+legacy history remains readable and unchanged even when provider-facing history
+validation later reports a coded recovery error.
+
+An assistant record may open an ordered array of structural calls with unique
+IDs. Until every pending ID receives exactly one matching nonblank
+`role:'tool'` result in the same atomic turn, another user/provider turn is
+rejected. Parallel call and result order, complete argument strings, and caller
+extension fields are retained. Persistence failures roll back the complete turn
+rather than leaving provider and stored history divergent.
+
 ### Example
 
 ```javascript

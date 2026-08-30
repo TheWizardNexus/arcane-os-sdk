@@ -2926,7 +2926,7 @@
       "summary": "Adapts one compatible browser LLM provider to the provider-neutral LLM role contract.",
       "availability": "Browser; the wrapped provider retains its own WebGPU, storage, model, and lifecycle requirements",
       "protocol": "arcane-ai-provider/2 adapted from the browser LLM adapter surface",
-      "normalization": "Projects catalog, inspection, status, lifecycle, declaration/history-validated chat and stream, content/reasoning-only ordinary iterator chunks, validated terminal structural calls, prompt observed early-return cancellation, and disposal without adding a provider or fallback"
+      "normalization": "Projects catalog, inspection, status, lifecycle, declaration/history-validated chat and stream, private automatic stream draining, complete all-choice content/reasoning FIFO projections, result-first buffering, terminal-only structural-call acceptance, exact per-choice observed/terminal complete-envelope correlation, prompt observed early-return cancellation, and disposal without adding a provider or fallback"
     },
     {
       "id": "browser-wasm:completeValueText",
@@ -2958,7 +2958,7 @@
       "summary": "Creates the provider-neutral browser AI API module and LLM lifecycle controller around one compatible provider or controller.",
       "availability": "Browser; the selected provider observes its own WebAssembly, storage, and model readiness",
       "protocol": "arcane-ai-adapter/1",
-      "normalization": "Normalizes lazy or manual load, mutable complete lifecycle status, cancellation, nonstructural ordinary stream iteration, validated terminal completion, required structural arguments.message, and exact matching nonblank tool-result sequencing without executing tools; an existing ModelController retains its preconfigured load policy and rejects a new security option"
+      "normalization": "Normalizes lazy or manual load, mutable complete lifecycle status, cancellation, complete all-choice nonstructural stream projection, complete provider data callbacks, single-choice text or multi-choice terminal output, required structural arguments.message, and atomic exact matching nonblank all-ID tool-result sequencing without executing tools; an existing ModelController retains its preconfigured load policy and rejects a new security option"
     },
     {
       "id": "browser-wasm:createBrowserModelSource",
@@ -2990,7 +2990,7 @@
       "summary": "Creates the packaged Wllama browser provider with complete serialized inference, streaming, abort, unload, and probe operations.",
       "availability": "Browser context with WebAssembly, OPFS/DBOPFS, and WebGPU; no CPU fallback",
       "protocol": "arcane-ai-adapter/1 with OpenAI-like chat completion and streaming envelopes",
-      "normalization": "Mutable complete lifecycle/status records, declaration/history validation, nonblank tool-result sequencing, nonstructural ordinary iterator chunks, all-choice terminal validation, and exact structured tool-call data with required user-facing message; the SDK never invokes application tools"
+      "normalization": "Mutable complete lifecycle/status records, declaration/history validation, atomic nonblank all-ID tool-result sequencing, complete all-choice nonstructural ordinary iterator projections, all-choice terminal validation, terminal-only structural-call acceptance, and exact structured tool-call data with required user-facing message and retained extension fields; the SDK never invokes application tools"
     },
     {
       "id": "browser-wasm:createDbopfsModelStore",

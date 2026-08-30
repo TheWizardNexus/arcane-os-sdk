@@ -72,7 +72,7 @@ not count, limit, hash, or identify model content by bytes.
 | `ai.load(options)` | Flat LLM status after load. |
 | `ai.llm.chat(request)` / `ai.fetchRequest(request)` | Validated OpenAI-like completion. |
 | `ai.llm.stream(request)` | Mutable async-iterator handle with `result` and `cancel(reason)`. |
-| `ai.streamRequest(request)` | Consumes the stream and returns complete terminal text and structural tool-call records. |
+| `ai.streamRequest(request)` | Consumes the stream, publishes every choice's ordinary content/reasoning in provider order, and returns complete JSON text for a multi-choice terminal completion, one structural-call array for selected tool output, or ordinary single-choice text. |
 | `ai.createChatSession(options)` | Asynchronously resolves `Promise<PersistentAIChatSession>` bound to this exact controller; caller-supplied `chat` is rejected. |
 | `ai.unload()` | Cancels active work, releases the Wllama session, and returns flat unloaded status; the DBOPFS cache remains. |
 | `ai.dispose()` | Permanently disposes the controller; explicit `store.remove(source)` is required to delete cached model content. |
@@ -206,8 +206,8 @@ as unavailable.
 | Source and download | `ARCANE_AI_MODEL_SOURCE_INVALID`, `ARCANE_AI_MODEL_SOURCE_UNAVAILABLE`, `ARCANE_AI_MODEL_DOWNLOAD_FAILED`, `ARCANE_AI_MODEL_REDIRECT_BLOCKED` |
 | Cache and storage | `ARCANE_AI_MODEL_CACHE_REJECTED`, `ARCANE_AI_MODEL_OFFLINE_MISS`, `ARCANE_AI_STORAGE_UNAVAILABLE`, `ARCANE_AI_STORAGE_READ_FAILED`, `ARCANE_AI_STORAGE_DELETE_FAILED` |
 | Lifecycle | `ARCANE_AI_UNAVAILABLE`, `ARCANE_AI_NOT_READY`, `ARCANE_AI_MODEL_NOT_READY`, `ARCANE_AI_LOAD_FAILED`, `ARCANE_AI_UNLOAD_FAILED`, `ARCANE_AI_DISPOSE_FAILED`, `ARCANE_AI_DISPOSED`, `ARCANE_AI_OPERATION_SUPERSEDED` |
-| Requests | `ARCANE_AI_REQUEST_ABORTED`, `ARCANE_AI_REQUEST_FAILED`, `ARCANE_AI_RUNTIME_BUSY`, `ARCANE_AI_INVALID_PROVIDER_RESULT`, `ARCANE_AI_TOOL_CALL_INVALID`, `ARCANE_AI_TOOL_MESSAGE_REQUIRED`, `ARCANE_AI_INVALID_TOOL_MESSAGE`, `ARCANE_AI_TOOL_RESULT_REQUIRED`, `ARCANE_AI_PARALLEL_TOOLS_UNSUPPORTED`, `ARCANE_AI_LOCAL_ONLY_UNAVAILABLE`, `ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH` |
-| Persistent sessions | `AI_CHAT_INVALID_TOOL_CALL`, `AI_CHAT_INVALID_TOOL_MESSAGE`, `AI_CHAT_TOOL_MESSAGE_REQUIRED`, `AI_CHAT_TOOL_RESULT_REQUIRED`, `AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED`, `AI_CHAT_INCOHERENT_PERSISTENCE`, `AI_CHAT_STREAM_TOOL_CALL_MISMATCH`, `AI_CHAT_TRANSACTION_SETTLED` |
+| Requests | `ARCANE_AI_REQUEST_ABORTED`, `ARCANE_AI_REQUEST_FAILED`, `ARCANE_AI_RUNTIME_BUSY`, `ARCANE_AI_INVALID_PROVIDER_RESULT`, `ARCANE_AI_TOOL_CALL_INVALID`, `ARCANE_AI_TOOL_MESSAGE_REQUIRED`, `ARCANE_AI_INVALID_TOOL_MESSAGE`, `ARCANE_AI_TOOL_RESULT_REQUIRED`, `ARCANE_AI_LOCAL_ONLY_UNAVAILABLE`, `ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH` |
+| Persistent sessions | `AI_CHAT_INVALID_TOOL_CALL`, `AI_CHAT_INVALID_TOOL_MESSAGE`, `AI_CHAT_TOOL_MESSAGE_REQUIRED`, `AI_CHAT_TOOL_RESULT_REQUIRED`, `AI_CHAT_INCOHERENT_PERSISTENCE`, `AI_CHAT_STREAM_TOOL_CALL_MISMATCH`, `AI_CHAT_TRANSACTION_SETTLED` |
 | Provider/2 adapter | `ARCANE_AI_MODEL_AUTHORITY_REQUIRED`, `ARCANE_AI_PROVIDER_ROLE_MISMATCH`, `ARCANE_AI_PROVIDER_PROGRESS_INVALID`, `ARCANE_AI_PROVIDER_STATUS_INVALID`, `ARCANE_AI_PROVIDER_OPERATION_UNAVAILABLE` |
 | WebGPU and model availability | `ARCANE_AI_WEBGPU_REQUIRED`, `ARCANE_AI_WEBGPU_API_UNAVAILABLE`, `ARCANE_AI_WEBGPU_EVIDENCE_INVALID`, `ARCANE_AI_MODEL_FULL_OFFLOAD_UNPROVEN`, `ARCANE_AI_MODEL_WEBGPU_REQUIREMENT_FAILED`, `ARCANE_AI_MODEL_GPU_MEMORY_INSUFFICIENT`, `ARCANE_AI_MODEL_RELOAD_REQUIRED`, `ARCANE_AI_LOAD_PLAN_RELOAD_REQUIRED` |
 | Worker cleanup and recovery | `ARCANE_AI_WORKER_TERMINATION_UNCONFIRMED`, `ARCANE_AI_COMPLETION_RECOVERY_UNCONFIRMED` |
@@ -491,12 +491,18 @@ returns `arcane-ai-model-authority/1` only for an exact catalog selection.
 `request()` supports `chat` and `stream` and preserves structural tool data.
 Both operations validate request history and tool declarations before provider
 dispatch, then validate every terminal choice and required nonempty
-`arguments.message`. The stream projection withholds structural deltas from its
-ordinary iterator until its complete terminal `result` validates. Consumer
-`return()` starts observed provider cancellation immediately and completes the
-iterator return without waiting for provider cleanup. The terminal `result`
-retains provider settlement, and a later cancellation/iterator-return failure
-is reported completely to the developer console.
+`arguments.message`. The adapter drains the private provider stream regardless
+of whether the consumer iterates first or awaits `result` first. Its ordinary
+iterator receives complete nonstructural content/reasoning projections from
+every choice in FIFO order, while structural deltas remain private until the
+complete terminal `result` validates. A terminal-only structural call is valid;
+any call observed during streaming must preserve its choice, ordered position,
+ID, type, name, exact argument string, and extension fields in the terminal
+envelope. Consumer `return()` starts observed provider cancellation immediately
+and completes the iterator return without waiting for provider cleanup. The
+terminal `result` retains provider settlement, and a later
+cancellation/iterator-return failure is reported completely to the developer
+console.
 
 ### Availability and normalization
 

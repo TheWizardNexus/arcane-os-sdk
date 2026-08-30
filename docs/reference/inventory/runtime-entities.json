@@ -9,7 +9,7 @@
   "modules": [
     {"file":"runtime/arcane/entities/ApiModelRecord.js","exports":["default"],"availability":"cross-host","normalization":"normalized"},
     {"file":"runtime/arcane/entities/Calculation.js","exports":["default"],"availability":"cross-host","normalization":"normalized"},
-    {"file":"runtime/arcane/entities/Chat.js","exports":["default"],"availability":"browser/native-webview","normalization":"mixed"},
+    {"file":"runtime/arcane/entities/Chat.js","exports":["default"],"availability":"browser/native-webview","normalization":"Provider-facing messages omit only persistence, memory, legacy UI, and timestamp metadata; complete transcript records remain readable, including ui_hidden legacy rows; ordered parallel structural calls require one exact nonblank result for every pending ID in one atomic turn, with complete extension fields and rollback-safe persistence."},
     {"file":"runtime/arcane/entities/CommunicationMessage.js","exports":["communicationChannels","default"],"availability":"cross-host","normalization":"normalized"},
     {"file":"runtime/arcane/entities/CommunicationThread.js","exports":["default"],"availability":"cross-host","normalization":"normalized"},
     {"file":"runtime/arcane/entities/Document.js","exports":["default"],"availability":"browser/native-webview","normalization":"mixed"},
