@@ -15,7 +15,7 @@
   },
   "artifactCount": 84,
   "javascriptArtifactCount": 82,
-  "esmExportCount": 352,
+  "esmExportCount": 351,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -798,7 +798,6 @@
       "name": "MailOutbox.mjs",
       "kind": "esm",
       "exports": [
-        "MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES",
         "MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS",
         "MAIL_OUTBOX_PROTOCOL",
         "MAIL_OUTBOX_STATES",
@@ -811,7 +810,7 @@
       "availability": "Browser/native WebView or compatible injected host with durable storage, Web Locks, and a delivery function",
       "protocol": "arcane-mail-outbox/1 + injected durable storage + Web Locks + AbortSignal + online EventTarget",
       "normalization": "Complete records, idempotency and retry/reconciliation state, full drains/inventory, cancellation, and invalid-record maintenance are normalized; storage, lock, and delivery failures are coded.",
-      "surface": "Protocol/table/window/state/acceptance constants; `MailOutbox`, factory/default; read-only lifecycle diagnostics; record inspection and maintenance; enqueue, drain, start, and stop."
+      "surface": "Protocol/table/window/state constants; `MailOutbox`, factory/default; read-only lifecycle diagnostics; record inspection and maintenance; enqueue, drain, start, and stop."
     },
     {
       "file": "runtime/arcane/modules/MailTransport.mjs",

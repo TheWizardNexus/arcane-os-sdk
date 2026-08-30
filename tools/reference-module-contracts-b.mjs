@@ -90,21 +90,21 @@ console.log(config);`
     {
         name:'MailOutbox.mjs',
         classification:'public-first-party',
-        lifecycleSideEffects:'Construction validates caller-owned DBOPFS-compatible storage, Web Locks, delivery, clock, and online-event adapters. enqueue() persists complete content before delivery; start() owns the online listener; drain() serializes FIFO attempts; stop() and dispose() detach lifecycle work without deleting records.',
-        paramsResults:'new MailOutbox(options={}); enqueue({report,reportKey,serializedReport?}); drain({reason,signal?}={}); list(); get(reportKey); removeInvalid(reportKey); start(); stop(); dispose(). createMailOutbox(options) returns the same validated contract.',
-        events:['mail-outbox-state','mail-outbox-delivery','mail-outbox-drain'],
-        errors:['MAIL_OUTBOX_INVALID','MAIL_OUTBOX_RECORD_INVALID','MAIL_OUTBOX_CAPACITY_EXCEEDED','MAIL_OUTBOX_DELIVERY_FAILED','MAIL_OUTBOX_DISPOSED'],
-        capabilitiesCore:'None. Delivery authority belongs to the injected transport or admitted Core adapter; acceptance is not inbox-delivery proof.',
+        lifecycleSideEffects:'Construction validates caller-owned DBOPFS-compatible storage, Web Locks, delivery, clock, and online-event adapters. enqueue() persists complete content before delivery; start() owns the online listener; drain() serializes FIFO attempts; stop() detaches the listener and its owned online drain without deleting records.',
+        paramsResults:"new MailOutbox(options={}); enqueue({report,reportKey},{attempt=true,signal=null}={}); drain({reason='manual',signal=null}={}); get(key); list(); audit(); deleteInvalid(fileName); repairInvalid(fileName,replacement); quarantineInvalid(); start({signal=null}={}); stop(). Accepted delivery results require requestId; providerId and acceptanceAuthority are optional transport metadata, and records and summaries remain complete mutable values. createMailOutbox(options) returns the same validated contract.",
+        events:[],
+        errors:['MAIL_OUTBOX_INVALID','MAIL_OUTBOX_RECORD_INVALID','MAIL_OUTBOX_DELIVERY_RESULT_INVALID','MAIL_OUTBOX_STORAGE_UNAVAILABLE','MAIL_OUTBOX_LOCK_UNAVAILABLE','MAIL_OUTBOX_STORAGE_FAILED','MAIL_OUTBOX_IDEMPOTENCY_CONFLICT','MAIL_OUTBOX_ABORTED'],
+        capabilitiesCore:'None. Delivery authority belongs to the injected transport or Core adapter. An accepted result requires requestId; providerId and acceptanceAuthority are optional transport metadata, and acceptance is not inbox-delivery proof.',
         example:String.raw`import {createMailOutbox} from '/arcane/modules/MailOutbox.mjs';
 
-const outbox=createMailOutbox({storage,locks,deliver});
+const outbox=createMailOutbox({storage,lockManager,deliver});
 await outbox.start();`
     },
     {
         name:'MailTransport.mjs',
         classification:'public-first-party',
-        lifecycleSideEffects:'normalizeMailEndpoint() is pure. sendMailReport() performs one HTTP(S) POST with timeout, same-origin credentials, no-referrer, redirect rejection, idempotency/app headers, and reads the complete response.',
-        paramsResults:'normalizeMailEndpoint(endpoint,base?) returns an absolute HTTPS or loopback-HTTP URL without credentials/query/fragment. sendMailReport({appKey?,appName,endpoint,fetchImpl?,report,reportKey,requestTimeout=590000}) resolves {requestId,sent,partial,uncertain,status,statusCode} for the exact 202/207 response contract.',
+        lifecycleSideEffects:'normalizeMailEndpoint() is pure. sendMailReport() performs one HTTP(S) POST with same-origin credentials, no-referrer, redirect rejection, idempotency/app headers, an explicit caller timeout when supplied, and reads the complete response.',
+        paramsResults:'normalizeMailEndpoint(endpoint,base?) returns an absolute HTTPS or loopback-HTTP URL without credentials/query/fragment. sendMailReport({appKey?,appName,endpoint,fetchImpl?,report,reportKey,requestTimeout=null,serializedReport?,signal?}) resolves the complete provider response plus normalized requestId, sent, partial, uncertain, status, statusCode, optional providerId, and retryAfterMs for the exact 202/207 response contract.',
         events:[],
         errors:['Uncoded Error for invalid endpoint, identity, key, timeout, report, timeout/network/HTTP failure, or an unreadable/invalid success response.'],
         capabilitiesCore:'None; this is direct fetch transport. Core mail.send remains separate.',

@@ -254,7 +254,6 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `parseEventStack()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `projectArcaneDOMEvent()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Browser DOM or a DOM-compatible test host |
 | `DEFAULT_MAIL_REQUEST_TIMEOUT_MS` | constant | `arcane-os/mail` | Portable Mail | Node and browser with Fetch and AbortController for transport use |
-| `MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
 | `MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
 | `MAIL_OUTBOX_PROTOCOL` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
 | `MAIL_OUTBOX_STATES` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
@@ -6550,7 +6549,7 @@ and CLI responsibilities rather than browser-package exports.
 
 ### Overview
 
-Default upper bound for one Mail HTTP request in milliseconds.
+Default timeout selection for one Mail HTTP request.
 
 ### Value and import
 
@@ -6560,35 +6559,13 @@ const DEFAULT_MAIL_REQUEST_TIMEOUT_MS
 
 ### Availability and normalization
 
-Node and browser with Fetch and AbortController. The immutable value is 590000.
+Node and browser with Fetch and AbortController. The value is `null`, so the
+ordinary transport adds no request deadline.
 
 ### Example
 
 ```js
 import {DEFAULT_MAIL_REQUEST_TIMEOUT_MS} from 'arcane-os/mail';
-```
-
-## MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES
-
-### Overview
-
-Frozen acceptance-authority allowlist for durable outbox delivery evidence.
-
-### Value and import
-
-```text
-const MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES
-```
-
-### Availability and normalization
-
-Node and browser metadata. Acceptance means provider or Core
-acceptance, not independent inbox delivery.
-
-### Example
-
-```js
-import {MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES} from 'arcane-os/mail';
 ```
 
 ## MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS
@@ -6639,7 +6616,7 @@ import {MAIL_OUTBOX_PROTOCOL} from 'arcane-os/mail';
 
 ### Overview
 
-Frozen ordered vocabulary for durable Mail outbox lifecycle states.
+Mutable ordered vocabulary for durable Mail outbox lifecycle states.
 
 ### Value and import
 
@@ -6696,7 +6673,8 @@ new Mail(config=globalThis.arcane?.config?.mail||{}, options={})
 ### Availability and normalization
 
 Node with injected host adapters, or browser/native WebView with durable
-storage and Web Locks. Reports persist before delivery and results are frozen.
+storage and Web Locks. Reports persist before delivery and results remain
+complete mutable records.
 
 ### Example
 
@@ -6721,7 +6699,10 @@ new MailOutbox(options={})
 ### Availability and normalization
 
 Node or browser with injected DBOPFS-compatible storage and a Web
-Locks-compatible lock manager. Records and summaries are deeply frozen.
+Locks-compatible lock manager. Records and summaries remain complete mutable
+values. An accepted result requires a valid `requestId`; `providerId` and
+`acceptanceAuthority` are optional transport metadata, and an acceptance
+authority is valid only on an accepted result.
 
 ### Example
 
@@ -6840,7 +6821,8 @@ resolveMailConfig(config=globalThis.arcane?.config?.mail||{}, options={})
 ### Availability and normalization
 
 Node with explicit configuration, or browser/native WebView with optional
-document and location defaults. The returned configuration is frozen.
+document and location defaults. The returned configuration is a mutable plain
+record.
 
 ### Example
 
@@ -6858,7 +6840,7 @@ Sends one complete Mail report with an idempotency key through HTTP.
 ### Signature and result
 
 ```text
-sendMailReport({ appKey, appName, endpoint, fetchImpl=globalThis.fetch, report, reportKey, requestTimeout=590000, serializedReport, signal })
+sendMailReport({ appKey, appName, endpoint, fetchImpl=globalThis.fetch, report, reportKey, requestTimeout=null, serializedReport, signal })
 ```
 
 ### Availability and normalization
@@ -6878,7 +6860,7 @@ const result = await sendMailReport(options);
 
 ### Overview
 
-Serializes one JSON-object Mail report for immutable body comparison.
+Serializes one JSON-object Mail report for exact body comparison.
 
 ### Signature and result
 

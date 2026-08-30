@@ -92,7 +92,7 @@ Public reference entries follow the established Arcane documentation model:
 
 ## Public runtime inventory
 
-The package exposes 205 semantic JavaScript records across 16 JavaScript
+The package exposes 204 semantic JavaScript records across 16 JavaScript
 entrypoints, plus eight JSON Schemas and package metadata. Ten entrypoints are
 Node.js control-plane surfaces,
 `arcane-os/event-manager`, `arcane-os/mail`, `arcane-os/preference-store`, and

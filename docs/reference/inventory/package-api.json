@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 205,
+  "memberCount": 204,
   "members": [
     {
       "id": "root:APP_BUNDLE_DESCRIPTOR_NAME",
@@ -3129,24 +3129,10 @@
       "entrypoints": ["arcane-os/mail"],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
-      "summary": "Default upper bound for one Mail HTTP request in milliseconds.",
+      "summary": "Default timeout selection for one Mail HTTP request.",
       "availability": "Node and browser with Fetch and AbortController for transport use",
       "protocol": "Arcane Mail HTTP transport",
-      "normalization": "Exact immutable value of 590000 milliseconds"
-    },
-    {
-      "id": "mail:MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES",
-      "name": "MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES",
-      "displayName": "MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES",
-      "kind": "constant",
-      "signature": "const MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES",
-      "entrypoints": ["arcane-os/mail"],
-      "primaryImport": "arcane-os/mail",
-      "group": "Portable Mail",
-      "summary": "Frozen acceptance-authority allowlist for durable outbox delivery evidence.",
-      "availability": "Node and browser metadata",
-      "protocol": "arcane-mail-outbox/1",
-      "normalization": "Exact immutable authority names; acceptance means admitted provider or Core acceptance, not inbox delivery"
+      "normalization": "Exact value null; the ordinary transport adds no request deadline"
     },
     {
       "id": "mail:MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS",
@@ -3185,7 +3171,7 @@
       "entrypoints": ["arcane-os/mail"],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
-      "summary": "Frozen ordered vocabulary for durable Mail outbox lifecycle states.",
+      "summary": "Mutable ordered vocabulary for durable Mail outbox lifecycle states.",
       "availability": "Node and browser metadata",
       "protocol": "arcane-mail-outbox/1",
       "normalization": "Exact queued, sending, retry_wait, accepted, failed, and reconciliation_required state list"
@@ -3216,7 +3202,7 @@
       "summary": "Owns the application Mail singleton, durable lifecycle, report normalization, and explicit transport selection.",
       "availability": "Node with injected host adapters, or browser/native WebView with durable storage and Web Locks",
       "protocol": "arcane-mail-outbox/1 with native Arcane.mail or complete HTTP delivery",
-      "normalization": "Validates complete reports, persists before delivery, and returns frozen provider-neutral send results"
+      "normalization": "Validates complete reports, persists before delivery, and returns complete mutable provider-neutral send results"
     },
     {
       "id": "mail:MailOutbox",
@@ -3230,7 +3216,7 @@
       "summary": "Persists complete reports before delivery and owns FIFO draining, retry classification, and explicit invalid-record maintenance.",
       "availability": "Node or browser with injected DBOPFS-compatible storage and a Web Locks-compatible lock manager",
       "protocol": "arcane-mail-outbox/1",
-      "normalization": "Returns deeply frozen complete records and summaries; ambiguous attempts remain same-key retries or require reconciliation"
+      "normalization": "Returns complete mutable records and summaries; accepted results require requestId, optional providerId and acceptanceAuthority remain transport metadata, and ambiguous attempts remain same-key retries or require reconciliation"
     },
     {
       "id": "mail:MailTransportError",
@@ -3300,14 +3286,14 @@
       "summary": "Resolves application identity, key, endpoint, and timeout from explicit or host Mail configuration.",
       "availability": "Node with explicit configuration, or browser/native WebView with optional document and location defaults",
       "protocol": "Arcane Mail configuration",
-      "normalization": "Returns a frozen appName, appKey, endpoint, and requestTimeout record without initiating delivery"
+      "normalization": "Returns a mutable appName, appKey, endpoint, and requestTimeout record without initiating delivery"
     },
     {
       "id": "mail:sendMailReport",
       "name": "sendMailReport",
       "displayName": "sendMailReport()",
       "kind": "function",
-      "signature": "sendMailReport({ appKey, appName, endpoint, fetchImpl=globalThis.fetch, report, reportKey, requestTimeout=590000, serializedReport, signal })",
+      "signature": "sendMailReport({ appKey, appName, endpoint, fetchImpl=globalThis.fetch, report, reportKey, requestTimeout=null, serializedReport, signal })",
       "entrypoints": ["arcane-os/mail"],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
@@ -3325,7 +3311,7 @@
       "entrypoints": ["arcane-os/mail"],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
-      "summary": "Serializes one JSON-object Mail report for immutable request-body comparison and delivery.",
+      "summary": "Serializes one JSON-object Mail report for exact request-body comparison and delivery.",
       "availability": "Node and browser",
       "protocol": "Arcane Mail HTTP transport",
       "normalization": "Returns compact JSON and rejects non-object or non-serializable reports"

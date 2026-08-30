@@ -1937,8 +1937,7 @@ recipient, retention policy, retry timer, or transport fallback.
 
 ### Public surface
 
-Exact exports: `MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES`,
-`MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS`, `MAIL_OUTBOX_PROTOCOL`,
+Exact exports: `MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS`, `MAIL_OUTBOX_PROTOCOL`,
 `MAIL_OUTBOX_STATES`, `MAIL_OUTBOX_TABLE`, `MailOutbox`, `createMailOutbox`, and
 `default`.
 
@@ -1964,9 +1963,9 @@ complete parsed report, its stable idempotency key, the exact stored JSON string
 and the caller-owned signal. Omitted `lockManager` resolves first from storage
 and then from `navigator.locks`. A delivery result must identify a valid
 `requestId` and one of `accepted`, `delivery_uncertain`,
-`temporarily_rejected`, `permanently_rejected`, or `partially_accepted`;
-accepted results additionally require a provider ID or the admitted
-`arcane-core-mail-send-v1` acceptance authority.
+`retryable`, `permanently_rejected`, or `partially_accepted`;
+`providerId` and `acceptanceAuthority` are optional transport-owned metadata,
+and an acceptance authority is valid only on an `accepted` result.
 
 Read-only getters are `started`, `invalidRecords`, and `lastBackgroundError`.
 Methods are `get(key)`, `list()`, `audit()`, `deleteInvalid(fileName)`,
@@ -1982,7 +1981,8 @@ lastAttemptAt,nextAttemptAt,attempts,result,failure}`. Protocol is
 `arcane-mail-outbox/1`; the default table is `mail_outbox`; the idempotency
 window is 86,400,000 milliseconds. States are exactly `queued`, `sending`,
 `retry_wait`, `accepted`, `failed`, and `reconciliation_required`. Accepted
-means provider or admitted Core acceptance, not inbox delivery.
+means the selected transport returned `accepted` with a valid request ID, not
+that the message reached an inbox.
 
 `enqueue()` serializes same-instance persistence and binds one report key to one
 complete serialized body. It preserves the complete queued content without

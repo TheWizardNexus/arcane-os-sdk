@@ -173,7 +173,7 @@ The returned durable record has one of these states:
 | `queued` | Persisted, but no attempt was made, normally because the device is offline. |
 | `sending` | An attempt was durably recorded before calling the transport. An interrupted instance recovers this state on the next drain. |
 | `retry_wait` | A retryable or uncertain result is retained inside Resend's 24-hour idempotency window. |
-| `accepted` | Direct gateway delivery returned both its request id and a Resend provider id, or the exact native `mail-send-v1` bridge returned accepted under named `arcane-core-mail-send-v1` authority without fabricating a provider id. This is API acceptance, not an inbox-delivery claim. |
+| `accepted` | The selected transport returned `accepted` with a valid request id. A provider id or acceptance authority may be preserved as optional transport metadata, but neither is required by the outbox. This is API acceptance, not an inbox-delivery claim. |
 | `failed` | A permanent failure or expired non-ambiguous retry cannot be retried automatically. |
 | `reconciliation_required` | An ambiguous attempt reached the end of the idempotency window. Automatic retry stops to avoid a duplicate send. |
 
@@ -227,12 +227,13 @@ operation result.
 
 When both an explicit endpoint and native `Arcane.mail.send` exist, Mail uses
 the configured HTTP endpoint so the authenticated SDK gateway can return its
-provider acceptance id. The native bridge remains a fallback when no endpoint
-is configured; its exact Core result is recorded with the named acceptance
-authority above. A malformed or unreadable native response is retained as an
-uncertain same-key retry, while temporary native transport unavailability is a
-non-ambiguous retryable failure. Once a valid accepted result has returned, a
-racing lifecycle cancellation cannot erase that authoritative acceptance.
+complete provider result. The native bridge remains a fallback when no endpoint
+is configured; an accepted Core result keeps its native acceptance-authority
+metadata without an SDK allowlist. A malformed or unreadable native response
+is retained as an uncertain same-key retry, while temporary native transport
+unavailability is a non-ambiguous retryable failure. Once a valid accepted
+result has returned, a racing lifecycle cancellation cannot erase that
+committed acceptance result.
 
 ## Operate the CLI and local gateway
 
