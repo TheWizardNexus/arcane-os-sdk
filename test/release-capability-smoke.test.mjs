@@ -248,7 +248,7 @@ test('installed public SDK entrypoints and runtime materialization are functiona
     );
     assert.equal(
         await readFile(path.join(workspaceRoot,'.arcane','preserved.txt'),'utf8'),
-        'preserve this workspace entry\n'
+        'preserve this workspace entry\\n'
     );
 });
 `);
