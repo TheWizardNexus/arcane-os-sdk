@@ -45,6 +45,11 @@ settles it: an exact matching executed, declined, cancelled, or not-executed
   providers, protocol/state/lifecycle machinery, public native contracts and
   adapters, development source mounts, packaging, and licenses.
   Never keep a copied app or Arcane OS fork of that behavior.
+- Application and consumer tasks may request a reusable SDK change, but they
+  must not edit SDK source or hand-edit a generated SDK projection. The SDK
+  source owner makes shared changes here and publishes them through the public
+  package/materializer boundary. Behavior unique to one product stays in that
+  application's local source and does not become SDK policy.
 - Every portable application artifact must contain a complete copy
   of its selected SDK runtime, assets, workers, licenses, and public
   contracts. A portable app must never require an Arcane OS installation or

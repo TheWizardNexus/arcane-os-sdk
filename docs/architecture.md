@@ -54,6 +54,12 @@ Do not copy a reusable implementation between the SDK, Arcane OS and an app,
 and do not create a hidden Arcane OS source dependency. Extend one neutral SDK
 contract and keep product policy in the consumer.
 
+Application and consumer tasks do not modify this repository's SDK source and
+do not hand-edit materialized `arcane/**` projections. They request a reusable
+change from an SDK source owner, or implement behavior that is specific to their
+product in that application's local source. Consumer projections change only
+through the selected public package and materializer.
+
 Development and distribution use different authority. The explicit
 `arcane dev --sdk-runtime-source <sdk-root>` development-only live source mount
 lets a refresh read the saved SDK source without copying it into the app.

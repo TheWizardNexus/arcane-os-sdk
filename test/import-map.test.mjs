@@ -48,11 +48,6 @@ async function writeRuntimeFixture(workspaceRoot){
     );
     await writeWorkspaceFile(
         workspaceRoot,
-        'arcane/modules/CaseEvidenceIndexer.js',
-        'export default class CaseEvidenceIndexer {}\n'
-    );
-    await writeWorkspaceFile(
-        workspaceRoot,
         'arcane/entities/Preference.js',
         'export default class Preference {}\n'
     );
@@ -131,7 +126,6 @@ test('complete runtime inventory produces a mutable named import map without rea
             'modules/PreferenceStore.js',
             'modules/SpeechPlayback.js',
             'modules/PersistentAIChatSession.js',
-            'modules/CaseEvidenceIndexer.js',
             'entities/Preference.js',
             'dependencies/strong-type/index.js',
             'sdk/event-manager.mjs',
@@ -163,7 +157,7 @@ test('complete runtime inventory produces a mutable named import map without rea
         'arcane/entities/Preference':'./arcane/entities/Preference.js',
         'event-pubsub':'./arcane/sdk/dependencies/event-pubsub/index.js'
     });
-    assert.deepEqual(result.excludedModules,['modules/CaseEvidenceIndexer.js']);
+    assert.deepEqual(result.excludedModules,[]);
     result.imports['fixture/mutable']='./fixture.js';
     result.excludedModules.push('fixture.js');
     assert.equal(result.imports['fixture/mutable'],'./fixture.js');

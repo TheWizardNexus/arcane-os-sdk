@@ -6,7 +6,6 @@ export const IMPORT_MAP_RELATIVE_PATH='modules/arcane.importmap.json';
 export const MANAGED_IMPORT_MAP_ATTRIBUTE='data-arcane-import-map';
 
 const JAVASCRIPT_EXTENSION=/\.(?:js|mjs)$/u;
-const NODE_ONLY_MODULE='modules/CaseEvidenceIndexer.js';
 const PERSISTENT_CHAT_IMPORT='#arcane/persistent-ai-chat-session';
 const PERSISTENT_CHAT_MODULE='modules/PersistentAIChatSession.js';
 const SDK_BROWSER_ENTRY='sdk/event-manager.mjs';
@@ -808,13 +807,8 @@ export async function buildImportMap({files,signal}={}){
             &&JAVASCRIPT_EXTENSION.test(relative))
         .sort(compareText);
     const namedRegistry=new Map();
-    const excludedModules=[];
     for(const relative of modules){
         throwIfAborted(signal);
-        if(relative===NODE_ONLY_MODULE){
-            excludedModules.push(relative);
-            continue;
-        }
         const name=path.posix.basename(relative).replace(JAVASCRIPT_EXTENSION,'');
         registerSpecifier(namedRegistry,`arcane/${name}`,`./arcane/${relative}`);
     }
@@ -870,7 +864,7 @@ export async function buildImportMap({files,signal}={}){
     }
     return {
         imports,
-        excludedModules:excludedModules.sort(compareText)
+        excludedModules:[]
     };
 }
 
